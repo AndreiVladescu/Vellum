@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
@@ -18,12 +19,14 @@ class ShelfView extends StatelessWidget {
   const ShelfView({
     super.key,
     required this.books,
-    required this.onBookTap,
+    required this.detailBuilder,
     this.coverFileOf,
   });
 
   final List<Book> books;
-  final void Function(Book) onBookTap;
+
+  /// Builds the page a book opens into (container-transform animation).
+  final Widget Function(Book) detailBuilder;
 
   /// Resolves a book's downloaded cover image, if it has one. Spines of
   /// covered books are drawn from the cover art (like real books, where the
@@ -41,7 +44,7 @@ class ShelfView extends StatelessWidget {
         itemCount: rows.length,
         itemBuilder: (context, i) => _ShelfRow(
           row: rows[i],
-          onTap: onBookTap,
+          detailBuilder: detailBuilder,
           coverFileOf: coverFileOf,
         ),
       );
@@ -67,12 +70,12 @@ class ShelfView extends StatelessWidget {
 class _ShelfRow extends StatelessWidget {
   const _ShelfRow({
     required this.row,
-    required this.onTap,
+    required this.detailBuilder,
     required this.coverFileOf,
   });
 
   final List<Book> row;
-  final void Function(Book) onTap;
+  final Widget Function(Book) detailBuilder;
   final File? Function(Book)? coverFileOf;
 
   @override
@@ -89,10 +92,26 @@ class _ShelfRow extends StatelessWidget {
               for (final book in row)
                 Padding(
                   padding: const EdgeInsets.only(right: _spineGap),
-                  child: BookSpine(
-                    book: book,
-                    coverFile: coverFileOf?.call(book),
-                    onTap: () => onTap(book),
+                  // The spine "opens" into the detail page: a container
+                  // transform grows the spine into the full page, like
+                  // pulling the book off the shelf and opening it.
+                  child: OpenContainer(
+                    closedElevation: 0,
+                    openElevation: 0,
+                    closedColor: Colors.transparent,
+                    middleColor: Colors.transparent,
+                    openColor: Theme.of(context).colorScheme.surface,
+                    closedShape: const RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                    transitionDuration: const Duration(milliseconds: 500),
+                    openBuilder: (context, _) => detailBuilder(book),
+                    closedBuilder: (context, open) => BookSpine(
+                      book: book,
+                      coverFile: coverFileOf?.call(book),
+                      onTap: open,
+                    ),
                   ),
                 ),
             ],

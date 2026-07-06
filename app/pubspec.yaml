@@ -41,6 +41,10 @@ dependencies:
   uuid: ^4.5.3
   path: ^1.9.1
   shared_preferences: ^2.5.5
+  animations: ^2.2.0
+  file_selector: ^1.1.0
+  crypto: ^3.0.7
+  pdfrx: ^2.4.4
 
 dev_dependencies:
   flutter_test:

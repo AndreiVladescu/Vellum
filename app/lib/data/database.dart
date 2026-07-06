@@ -16,6 +16,10 @@ class Books extends Table {
   IntColumn get pageCount => integer().nullable()();
   TextColumn get coverPath => text().nullable()();
   TextColumn get spineStyle => text().nullable()(); // JSON: generated spine params
+  // Reading state (null progress = never opened).
+  RealColumn get readingProgress => real().nullable()(); // 0..1
+  IntColumn get lastReadPage => integer().nullable()();
+  DateTimeColumn get lastReadAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
@@ -71,6 +75,7 @@ class BookFiles extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@DataClassName('PhysicalCopy')
 class PhysicalCopies extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text().references(Books, #id)();
@@ -96,6 +101,7 @@ class Loans extends Table {
 }
 
 /// Manual collections/panes, independent of genres, with explicit ordering.
+@DataClassName('Shelf')
 class Shelves extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
@@ -130,7 +136,21 @@ class VellumDatabase extends _$VellumDatabase {
   VellumDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(books, books.readingProgress);
+            await m.addColumn(books, books.lastReadPage);
+            await m.addColumn(books, books.lastReadAt);
+          }
+        },
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
 
   /// All books, alphabetically — reactive: the shelf UI rebuilds on changes.
   Stream<List<Book>> watchAllBooks() =>
