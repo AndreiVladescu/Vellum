@@ -132,6 +132,32 @@ class _BookDetailBody extends StatelessWidget {
                 foregroundColor: theme.colorScheme.error,
               ),
               onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: Text('Remove “${book.title}”?'),
+                    content: const Text(
+                        'This deletes the book, its downloaded cover, and '
+                        'any attached files from your library. There is no '
+                        'undo.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              Theme.of(dialogContext).colorScheme.error,
+                        ),
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        child: const Text('Remove'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true) return;
                 await repository.deleteBook(book);
                 if (context.mounted) Navigator.of(context).pop();
               },

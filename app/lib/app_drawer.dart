@@ -2,11 +2,54 @@ import 'package:flutter/material.dart';
 
 import 'account/account_page.dart';
 import 'account/user_profile.dart';
+import 'settings/app_settings.dart';
+import 'settings/wallpaper.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key, required this.profile});
+  const AppDrawer(
+      {super.key, required this.profile, required this.settings});
 
   final UserProfileStore profile;
+  final AppSettingsStore settings;
+
+  Future<void> _pickWallpaper(BuildContext context) async {
+    Navigator.of(context).pop(); // close the drawer
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Wallpaper'),
+        children: [
+          for (final wallpaper in Wallpaper.values)
+            SimpleDialogOption(
+              onPressed: () {
+                settings.setWallpaper(wallpaper);
+                Navigator.of(dialogContext).pop();
+              },
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: SizedBox(
+                      width: 72,
+                      height: 44,
+                      child: WallpaperBackground(
+                        wallpaper: wallpaper,
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(child: Text(wallpaper.label)),
+                  if (settings.wallpaper == wallpaper)
+                    Icon(Icons.check,
+                        color: Theme.of(dialogContext).colorScheme.primary),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   void _openAccount(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
@@ -61,6 +104,11 @@ class AppDrawer extends StatelessWidget {
             enabled: false,
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.wallpaper),
+            title: const Text('Wallpaper'),
+            onTap: () => _pickWallpaper(context),
+          ),
           ListTile(
             leading: const Icon(Icons.person_outline),
             title: const Text('Account'),
