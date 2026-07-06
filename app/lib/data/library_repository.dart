@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -26,10 +27,66 @@ class LibraryRepository {
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
     await Directory(p.join(dir.path, 'covers')).create(recursive: true);
+    await Directory(p.join(dir.path, 'files')).create(recursive: true);
     return LibraryRepository._(db, OpenLibraryClient(), dir);
   }
 
   Stream<List<Book>> watchAllBooks() => db.watchAllBooks();
+
+  Stream<Book?> watchBook(String id) =>
+      (db.select(db.books)..where((b) => b.id.equals(id))).watchSingleOrNull();
+
+  Stream<List<BookFile>> watchFilesOf(String bookId) =>
+      (db.select(db.bookFiles)..where((f) => f.bookId.equals(bookId))).watch();
+
+  Stream<List<PhysicalCopy>> watchCopiesOf(String bookId) =>
+      (db.select(db.physicalCopies)
+            ..where((c) => c.bookId.equals(bookId)))
+          .watch();
+
+  /// Absolute file for an attached digital copy.
+  File fileOf(BookFile file) => File(p.join(_dataDir.path, file.path));
+
+  /// Copies a picked file into the library store and records it.
+  Future<void> attachFile(String bookId, String sourcePath) async {
+    final source = File(sourcePath);
+    final ext = p.extension(sourcePath).replaceFirst('.', '').toLowerCase();
+    final id = _uuid.v4();
+    final relPath = p.join('files', '$id.$ext');
+    await source.copy(p.join(_dataDir.path, relPath));
+    final digest = await sha256.bind(source.openRead()).first;
+    await db.into(db.bookFiles).insert(BookFilesCompanion.insert(
+          id: id,
+          bookId: bookId,
+          format: ext.isEmpty ? 'unknown' : ext,
+          path: relPath,
+          sizeBytes: await source.length(),
+          sha256: digest.toString(),
+        ));
+  }
+
+  Future<void> addPhysicalCopy(String bookId,
+      {String? location, String? notes}) async {
+    await db.into(db.physicalCopies).insert(PhysicalCopiesCompanion.insert(
+          id: _uuid.v4(),
+          bookId: bookId,
+          location: Value(location),
+          notes: Value(notes),
+        ));
+  }
+
+  /// Called by the reader as the user turns pages.
+  Future<void> saveReadingPosition(
+      String bookId, int page, int pageCount) async {
+    final now = DateTime.now();
+    await (db.update(db.books)..where((b) => b.id.equals(bookId)))
+        .write(BooksCompanion(
+      readingProgress: Value(pageCount == 0 ? 0 : page / pageCount),
+      lastReadPage: Value(page),
+      lastReadAt: Value(now),
+      updatedAt: Value(now),
+    ));
+  }
 
   /// Absolute file for a book's cover, or null if it has none.
   File? coverFileOf(Book book) => book.coverPath == null
@@ -134,6 +191,9 @@ class LibraryRepository {
   }
 
   Future<void> deleteBook(Book book) async {
+    final attachedFiles = await (db.select(db.bookFiles)
+          ..where((f) => f.bookId.equals(book.id)))
+        .get();
     await db.transaction(() async {
       // Explicit deletes rather than relying on FK cascades, so this works
       // on databases created before cascades were added to the schema.
@@ -156,5 +216,9 @@ class LibraryRepository {
     });
     final cover = coverFileOf(book);
     if (cover != null && await cover.exists()) await cover.delete();
+    for (final f in attachedFiles) {
+      final file = fileOf(f);
+      if (await file.exists()) await file.delete();
+    }
   }
 }

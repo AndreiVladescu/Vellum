@@ -112,6 +112,39 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _readingProgressMeta = const VerificationMeta(
+    'readingProgress',
+  );
+  @override
+  late final GeneratedColumn<double> readingProgress = GeneratedColumn<double>(
+    'reading_progress',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastReadPageMeta = const VerificationMeta(
+    'lastReadPage',
+  );
+  @override
+  late final GeneratedColumn<int> lastReadPage = GeneratedColumn<int>(
+    'last_read_page',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastReadAtMeta = const VerificationMeta(
+    'lastReadAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastReadAt = GeneratedColumn<DateTime>(
+    'last_read_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -148,6 +181,9 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     pageCount,
     coverPath,
     spineStyle,
+    readingProgress,
+    lastReadPage,
+    lastReadAt,
     createdAt,
     updatedAt,
   ];
@@ -230,6 +266,33 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         spineStyle.isAcceptableOrUnknown(data['spine_style']!, _spineStyleMeta),
       );
     }
+    if (data.containsKey('reading_progress')) {
+      context.handle(
+        _readingProgressMeta,
+        readingProgress.isAcceptableOrUnknown(
+          data['reading_progress']!,
+          _readingProgressMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_read_page')) {
+      context.handle(
+        _lastReadPageMeta,
+        lastReadPage.isAcceptableOrUnknown(
+          data['last_read_page']!,
+          _lastReadPageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_read_at')) {
+      context.handle(
+        _lastReadAtMeta,
+        lastReadAt.isAcceptableOrUnknown(
+          data['last_read_at']!,
+          _lastReadAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -291,6 +354,18 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.string,
         data['${effectivePrefix}spine_style'],
       ),
+      readingProgress: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}reading_progress'],
+      ),
+      lastReadPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_read_page'],
+      ),
+      lastReadAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_read_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -319,6 +394,9 @@ class Book extends DataClass implements Insertable<Book> {
   final int? pageCount;
   final String? coverPath;
   final String? spineStyle;
+  final double? readingProgress;
+  final int? lastReadPage;
+  final DateTime? lastReadAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Book({
@@ -332,6 +410,9 @@ class Book extends DataClass implements Insertable<Book> {
     this.pageCount,
     this.coverPath,
     this.spineStyle,
+    this.readingProgress,
+    this.lastReadPage,
+    this.lastReadAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -364,6 +445,15 @@ class Book extends DataClass implements Insertable<Book> {
     if (!nullToAbsent || spineStyle != null) {
       map['spine_style'] = Variable<String>(spineStyle);
     }
+    if (!nullToAbsent || readingProgress != null) {
+      map['reading_progress'] = Variable<double>(readingProgress);
+    }
+    if (!nullToAbsent || lastReadPage != null) {
+      map['last_read_page'] = Variable<int>(lastReadPage);
+    }
+    if (!nullToAbsent || lastReadAt != null) {
+      map['last_read_at'] = Variable<DateTime>(lastReadAt);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -395,6 +485,15 @@ class Book extends DataClass implements Insertable<Book> {
       spineStyle: spineStyle == null && nullToAbsent
           ? const Value.absent()
           : Value(spineStyle),
+      readingProgress: readingProgress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readingProgress),
+      lastReadPage: lastReadPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReadPage),
+      lastReadAt: lastReadAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReadAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -416,6 +515,9 @@ class Book extends DataClass implements Insertable<Book> {
       pageCount: serializer.fromJson<int?>(json['pageCount']),
       coverPath: serializer.fromJson<String?>(json['coverPath']),
       spineStyle: serializer.fromJson<String?>(json['spineStyle']),
+      readingProgress: serializer.fromJson<double?>(json['readingProgress']),
+      lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
+      lastReadAt: serializer.fromJson<DateTime?>(json['lastReadAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -434,6 +536,9 @@ class Book extends DataClass implements Insertable<Book> {
       'pageCount': serializer.toJson<int?>(pageCount),
       'coverPath': serializer.toJson<String?>(coverPath),
       'spineStyle': serializer.toJson<String?>(spineStyle),
+      'readingProgress': serializer.toJson<double?>(readingProgress),
+      'lastReadPage': serializer.toJson<int?>(lastReadPage),
+      'lastReadAt': serializer.toJson<DateTime?>(lastReadAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -450,6 +555,9 @@ class Book extends DataClass implements Insertable<Book> {
     Value<int?> pageCount = const Value.absent(),
     Value<String?> coverPath = const Value.absent(),
     Value<String?> spineStyle = const Value.absent(),
+    Value<double?> readingProgress = const Value.absent(),
+    Value<int?> lastReadPage = const Value.absent(),
+    Value<DateTime?> lastReadAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Book(
@@ -465,6 +573,11 @@ class Book extends DataClass implements Insertable<Book> {
     pageCount: pageCount.present ? pageCount.value : this.pageCount,
     coverPath: coverPath.present ? coverPath.value : this.coverPath,
     spineStyle: spineStyle.present ? spineStyle.value : this.spineStyle,
+    readingProgress: readingProgress.present
+        ? readingProgress.value
+        : this.readingProgress,
+    lastReadPage: lastReadPage.present ? lastReadPage.value : this.lastReadPage,
+    lastReadAt: lastReadAt.present ? lastReadAt.value : this.lastReadAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -486,6 +599,15 @@ class Book extends DataClass implements Insertable<Book> {
       spineStyle: data.spineStyle.present
           ? data.spineStyle.value
           : this.spineStyle,
+      readingProgress: data.readingProgress.present
+          ? data.readingProgress.value
+          : this.readingProgress,
+      lastReadPage: data.lastReadPage.present
+          ? data.lastReadPage.value
+          : this.lastReadPage,
+      lastReadAt: data.lastReadAt.present
+          ? data.lastReadAt.value
+          : this.lastReadAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -504,6 +626,9 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('pageCount: $pageCount, ')
           ..write('coverPath: $coverPath, ')
           ..write('spineStyle: $spineStyle, ')
+          ..write('readingProgress: $readingProgress, ')
+          ..write('lastReadPage: $lastReadPage, ')
+          ..write('lastReadAt: $lastReadAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -522,6 +647,9 @@ class Book extends DataClass implements Insertable<Book> {
     pageCount,
     coverPath,
     spineStyle,
+    readingProgress,
+    lastReadPage,
+    lastReadAt,
     createdAt,
     updatedAt,
   );
@@ -539,6 +667,9 @@ class Book extends DataClass implements Insertable<Book> {
           other.pageCount == this.pageCount &&
           other.coverPath == this.coverPath &&
           other.spineStyle == this.spineStyle &&
+          other.readingProgress == this.readingProgress &&
+          other.lastReadPage == this.lastReadPage &&
+          other.lastReadAt == this.lastReadAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -554,6 +685,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<int?> pageCount;
   final Value<String?> coverPath;
   final Value<String?> spineStyle;
+  final Value<double?> readingProgress;
+  final Value<int?> lastReadPage;
+  final Value<DateTime?> lastReadAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -568,6 +702,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.pageCount = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.spineStyle = const Value.absent(),
+    this.readingProgress = const Value.absent(),
+    this.lastReadPage = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -583,6 +720,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.pageCount = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.spineStyle = const Value.absent(),
+    this.readingProgress = const Value.absent(),
+    this.lastReadPage = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -599,6 +739,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<int>? pageCount,
     Expression<String>? coverPath,
     Expression<String>? spineStyle,
+    Expression<double>? readingProgress,
+    Expression<int>? lastReadPage,
+    Expression<DateTime>? lastReadAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -614,6 +757,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (pageCount != null) 'page_count': pageCount,
       if (coverPath != null) 'cover_path': coverPath,
       if (spineStyle != null) 'spine_style': spineStyle,
+      if (readingProgress != null) 'reading_progress': readingProgress,
+      if (lastReadPage != null) 'last_read_page': lastReadPage,
+      if (lastReadAt != null) 'last_read_at': lastReadAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -631,6 +777,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<int?>? pageCount,
     Value<String?>? coverPath,
     Value<String?>? spineStyle,
+    Value<double?>? readingProgress,
+    Value<int?>? lastReadPage,
+    Value<DateTime?>? lastReadAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -646,6 +795,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
       pageCount: pageCount ?? this.pageCount,
       coverPath: coverPath ?? this.coverPath,
       spineStyle: spineStyle ?? this.spineStyle,
+      readingProgress: readingProgress ?? this.readingProgress,
+      lastReadPage: lastReadPage ?? this.lastReadPage,
+      lastReadAt: lastReadAt ?? this.lastReadAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -685,6 +837,15 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (spineStyle.present) {
       map['spine_style'] = Variable<String>(spineStyle.value);
     }
+    if (readingProgress.present) {
+      map['reading_progress'] = Variable<double>(readingProgress.value);
+    }
+    if (lastReadPage.present) {
+      map['last_read_page'] = Variable<int>(lastReadPage.value);
+    }
+    if (lastReadAt.present) {
+      map['last_read_at'] = Variable<DateTime>(lastReadAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -710,6 +871,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('pageCount: $pageCount, ')
           ..write('coverPath: $coverPath, ')
           ..write('spineStyle: $spineStyle, ')
+          ..write('readingProgress: $readingProgress, ')
+          ..write('lastReadPage: $lastReadPage, ')
+          ..write('lastReadAt: $lastReadAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -2787,7 +2951,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
   }
 }
 
-class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelve> {
+class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -2831,7 +2995,7 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelve> {
   static const String $name = 'shelves';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Shelve> instance, {
+    Insertable<Shelf> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -2861,9 +3025,9 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelve> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Shelve map(Map<String, dynamic> data, {String? tablePrefix}) {
+  Shelf map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Shelve(
+    return Shelf(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -2885,11 +3049,11 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelve> {
   }
 }
 
-class Shelve extends DataClass implements Insertable<Shelve> {
+class Shelf extends DataClass implements Insertable<Shelf> {
   final String id;
   final String name;
   final int sortOrder;
-  const Shelve({required this.id, required this.name, required this.sortOrder});
+  const Shelf({required this.id, required this.name, required this.sortOrder});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2907,12 +3071,12 @@ class Shelve extends DataClass implements Insertable<Shelve> {
     );
   }
 
-  factory Shelve.fromJson(
+  factory Shelf.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Shelve(
+    return Shelf(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
@@ -2928,13 +3092,13 @@ class Shelve extends DataClass implements Insertable<Shelve> {
     };
   }
 
-  Shelve copyWith({String? id, String? name, int? sortOrder}) => Shelve(
+  Shelf copyWith({String? id, String? name, int? sortOrder}) => Shelf(
     id: id ?? this.id,
     name: name ?? this.name,
     sortOrder: sortOrder ?? this.sortOrder,
   );
-  Shelve copyWithCompanion(ShelvesCompanion data) {
-    return Shelve(
+  Shelf copyWithCompanion(ShelvesCompanion data) {
+    return Shelf(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
@@ -2943,7 +3107,7 @@ class Shelve extends DataClass implements Insertable<Shelve> {
 
   @override
   String toString() {
-    return (StringBuffer('Shelve(')
+    return (StringBuffer('Shelf(')
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder')
@@ -2956,13 +3120,13 @@ class Shelve extends DataClass implements Insertable<Shelve> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Shelve &&
+      (other is Shelf &&
           other.id == this.id &&
           other.name == this.name &&
           other.sortOrder == this.sortOrder);
 }
 
-class ShelvesCompanion extends UpdateCompanion<Shelve> {
+class ShelvesCompanion extends UpdateCompanion<Shelf> {
   final Value<String> id;
   final Value<String> name;
   final Value<int> sortOrder;
@@ -2980,7 +3144,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelve> {
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
-  static Insertable<Shelve> custom({
+  static Insertable<Shelf> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<int>? sortOrder,
@@ -3349,6 +3513,9 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<int?> pageCount,
       Value<String?> coverPath,
       Value<String?> spineStyle,
+      Value<double?> readingProgress,
+      Value<int?> lastReadPage,
+      Value<DateTime?> lastReadAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -3365,6 +3532,9 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<int?> pageCount,
       Value<String?> coverPath,
       Value<String?> spineStyle,
+      Value<double?> readingProgress,
+      Value<int?> lastReadPage,
+      Value<DateTime?> lastReadAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -3522,6 +3692,21 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<String> get spineStyle => $composableBuilder(
     column: $table.spineStyle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get readingProgress => $composableBuilder(
+    column: $table.readingProgress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastReadPage => $composableBuilder(
+    column: $table.lastReadPage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3720,6 +3905,21 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get readingProgress => $composableBuilder(
+    column: $table.readingProgress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastReadPage => $composableBuilder(
+    column: $table.lastReadPage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -3773,6 +3973,21 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<String> get spineStyle => $composableBuilder(
     column: $table.spineStyle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get readingProgress => $composableBuilder(
+    column: $table.readingProgress,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastReadPage => $composableBuilder(
+    column: $table.lastReadPage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
     builder: (column) => column,
   );
 
@@ -3952,6 +4167,9 @@ class $$BooksTableTableManager
                 Value<int?> pageCount = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
                 Value<String?> spineStyle = const Value.absent(),
+                Value<double?> readingProgress = const Value.absent(),
+                Value<int?> lastReadPage = const Value.absent(),
+                Value<DateTime?> lastReadAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -3966,6 +4184,9 @@ class $$BooksTableTableManager
                 pageCount: pageCount,
                 coverPath: coverPath,
                 spineStyle: spineStyle,
+                readingProgress: readingProgress,
+                lastReadPage: lastReadPage,
+                lastReadAt: lastReadAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -3982,6 +4203,9 @@ class $$BooksTableTableManager
                 Value<int?> pageCount = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
                 Value<String?> spineStyle = const Value.absent(),
+                Value<double?> readingProgress = const Value.absent(),
+                Value<int?> lastReadPage = const Value.absent(),
+                Value<DateTime?> lastReadAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -3996,6 +4220,9 @@ class $$BooksTableTableManager
                 pageCount: pageCount,
                 coverPath: coverPath,
                 spineStyle: spineStyle,
+                readingProgress: readingProgress,
+                lastReadPage: lastReadPage,
+                lastReadAt: lastReadAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -6421,7 +6648,7 @@ typedef $$ShelvesTableUpdateCompanionBuilder =
     });
 
 final class $$ShelvesTableReferences
-    extends BaseReferences<_$VellumDatabase, $ShelvesTable, Shelve> {
+    extends BaseReferences<_$VellumDatabase, $ShelvesTable, Shelf> {
   $$ShelvesTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static MultiTypedResultKey<$ShelfBooksTable, List<ShelfBook>>
@@ -6567,14 +6794,14 @@ class $$ShelvesTableTableManager
         RootTableManager<
           _$VellumDatabase,
           $ShelvesTable,
-          Shelve,
+          Shelf,
           $$ShelvesTableFilterComposer,
           $$ShelvesTableOrderingComposer,
           $$ShelvesTableAnnotationComposer,
           $$ShelvesTableCreateCompanionBuilder,
           $$ShelvesTableUpdateCompanionBuilder,
-          (Shelve, $$ShelvesTableReferences),
-          Shelve,
+          (Shelf, $$ShelvesTableReferences),
+          Shelf,
           PrefetchHooks Function({bool shelfBooksRefs})
         > {
   $$ShelvesTableTableManager(_$VellumDatabase db, $ShelvesTable table)
@@ -6628,7 +6855,7 @@ class $$ShelvesTableTableManager
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (shelfBooksRefs)
-                    await $_getPrefetchedData<Shelve, $ShelvesTable, ShelfBook>(
+                    await $_getPrefetchedData<Shelf, $ShelvesTable, ShelfBook>(
                       currentTable: table,
                       referencedTable: $$ShelvesTableReferences
                           ._shelfBooksRefsTable(db),
@@ -6653,14 +6880,14 @@ typedef $$ShelvesTableProcessedTableManager =
     ProcessedTableManager<
       _$VellumDatabase,
       $ShelvesTable,
-      Shelve,
+      Shelf,
       $$ShelvesTableFilterComposer,
       $$ShelvesTableOrderingComposer,
       $$ShelvesTableAnnotationComposer,
       $$ShelvesTableCreateCompanionBuilder,
       $$ShelvesTableUpdateCompanionBuilder,
-      (Shelve, $$ShelvesTableReferences),
-      Shelve,
+      (Shelf, $$ShelvesTableReferences),
+      Shelf,
       PrefetchHooks Function({bool shelfBooksRefs})
     >;
 typedef $$ShelfBooksTableCreateCompanionBuilder =
