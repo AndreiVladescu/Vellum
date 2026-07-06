@@ -1,0 +1,13 @@
+# Rust (server/)
+server/target/
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# Editor/OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
