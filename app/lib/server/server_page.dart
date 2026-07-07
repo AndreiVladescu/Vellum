@@ -80,8 +80,7 @@ class _ServerPageState extends State<ServerPage> {
   Future<void> _pull() => _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
-        final books = await client.listBooks();
-        final count = await widget.repository.importServerBooks(books);
+        final count = await widget.repository.pullFromServer(client);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(count == 0

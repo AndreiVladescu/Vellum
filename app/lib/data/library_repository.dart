@@ -175,11 +175,13 @@ class LibraryRepository {
     return id;
   }
 
-  /// Pulls books from a connected server into the local database (a one-way
-  /// sync for now). Existing rows with the same id are updated in place;
-  /// locally-attached files and downloaded covers are left untouched. Returns
-  /// the number of books written.
-  Future<int> importServerBooks(List<ServerBook> books) async {
+  /// Pulls the server library onto this device (a one-way sync for now):
+  /// upserts book metadata, then downloads any covers we don't already hold.
+  /// Locally-attached files are left untouched. Returns the number of books
+  /// written.
+  Future<int> pullFromServer(VellumServerClient client) async {
+    final books = await client.listBooks();
+
     await db.transaction(() async {
       for (final b in books) {
         final spine = b.spineStyle ??
@@ -198,6 +200,22 @@ class LibraryRepository {
             ));
       }
     });
+
+    // Fetch cover art outside the transaction; a failed cover never fails the
+    // whole pull.
+    for (final b in books.where((b) => b.hasCover)) {
+      final local = File(p.join(_dataDir.path, 'covers', '${b.id}.jpg'));
+      if (await local.exists()) continue;
+      try {
+        final bytes = await client.downloadCover(b.id);
+        if (bytes == null) continue;
+        await local.writeAsBytes(bytes);
+        await (db.update(db.books)..where((x) => x.id.equals(b.id)))
+            .write(BooksCompanion(coverPath: Value(p.join('covers', '${b.id}.jpg'))));
+      } catch (_) {
+        // Leave this book cover-less; it still shows a generated spine.
+      }
+    }
     return books.length;
   }
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -45,6 +46,7 @@ class ServerBook {
     this.publishedYear,
     this.pageCount,
     this.spineStyle,
+    this.coverPath,
   });
 
   final String id;
@@ -57,6 +59,11 @@ class ServerBook {
   final int? pageCount;
   final String? spineStyle;
 
+  /// Server-relative cover path; non-null means a cover is available to fetch.
+  final String? coverPath;
+
+  bool get hasCover => coverPath != null && coverPath!.isNotEmpty;
+
   factory ServerBook.fromJson(Map<String, dynamic> j) => ServerBook(
         id: j['id'] as String,
         title: j['title'] as String? ?? '',
@@ -67,6 +74,7 @@ class ServerBook {
         publishedYear: j['published_year'] as int?,
         pageCount: j['page_count'] as int?,
         spineStyle: j['spine_style'] as String?,
+        coverPath: j['cover_path'] as String?,
       );
 }
 
@@ -135,6 +143,16 @@ class VellumServerClient {
     return [
       for (final b in list) ServerBook.fromJson(b as Map<String, dynamic>),
     ];
+  }
+
+  /// The book's cover bytes, or null if it has none (404). Throws on other
+  /// errors.
+  Future<Uint8List?> downloadCover(String bookId) async {
+    final res =
+        await _http.get(_uri('/api/books/$bookId/cover'), headers: _headers);
+    if (res.statusCode == 404) return null;
+    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
+    throw ServerException('Cover download failed (HTTP ${res.statusCode})');
   }
 }
 

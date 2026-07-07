@@ -134,8 +134,9 @@ one-way, metadata-only pull. Remaining work, in order:
 1. ✅ **Server blob storage** — upload/download endpoints for cover images and
    book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the
    book they belong to.
-2. **App: pull covers & files** — during a pull, download each book's cover (and
-   on demand its file) so shelves show real art and downloaded books open.
+2. 🚧 **App: pull covers & files** — a pull now downloads each book's cover so
+   shelves show real art. On-demand book-*file* download (to read a synced book)
+   still to come.
 3. **App: push** — upload local-only books (and their covers) to the server,
    making the sync two-way.
 4. **App: manage groups & shares** — in-app UI over the existing group, share,
