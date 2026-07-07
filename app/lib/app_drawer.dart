@@ -2,15 +2,32 @@ import 'package:flutter/material.dart';
 
 import 'account/account_page.dart';
 import 'account/user_profile.dart';
+import 'data/library_repository.dart';
+import 'server/connection_store.dart';
+import 'server/server_page.dart';
 import 'settings/app_settings.dart';
 import 'settings/preferences_page.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer(
-      {super.key, required this.profile, required this.settings});
+  const AppDrawer({
+    super.key,
+    required this.profile,
+    required this.settings,
+    required this.connection,
+    required this.repository,
+  });
 
   final UserProfileStore profile;
   final AppSettingsStore settings;
+  final ServerConnection connection;
+  final LibraryRepository repository;
+
+  void _openServer(BuildContext context) {
+    Navigator.of(context).pop(); // close the drawer first
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ServerPage(connection: connection, repository: repository),
+    ));
+  }
 
   void _openPreferences(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
@@ -65,11 +82,18 @@ class AppDrawer extends StatelessWidget {
             subtitle: Text('Coming soon'),
             enabled: false,
           ),
-          const ListTile(
-            leading: Icon(Icons.cloud_outlined),
-            title: Text('Library server'),
-            subtitle: Text('Coming soon'),
-            enabled: false,
+          ListenableBuilder(
+            listenable: connection,
+            builder: (context, _) => ListTile(
+              leading: Icon(connection.isConnected
+                  ? Icons.cloud_done_outlined
+                  : Icons.cloud_outlined),
+              title: const Text('Library server'),
+              subtitle: Text(connection.isConnected
+                  ? 'Connected · ${connection.email}'
+                  : 'Not connected'),
+              onTap: () => _openServer(context),
+            ),
           ),
           const Divider(),
           ListTile(
