@@ -139,9 +139,9 @@ one-way, metadata-only pull. Remaining work, in order:
    still to come.
 3. ✅ **App: push** — upload local books (and their covers) to the server via an
    id-preserving `PUT /api/books/{id}` upsert, making the sync two-way.
-4. **App: manage groups & shares** — in-app UI over the existing group, share,
-   and public-link endpoints (create a group, add books, share with a user,
-   mint a public link).
+4. ✅ **App: manage groups & shares** — a Sharing screen over the group, share,
+   and public-link endpoints (create a group, add books, share the library /
+   a group / a book with a user, mint and revoke public links).
 5. **OPDS feed** — expose the library as an OPDS catalog for third-party
    e-readers.
 

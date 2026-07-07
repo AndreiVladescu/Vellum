@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/library_repository.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
+import 'sharing_page.dart';
 
 /// Connect the app to a Vellum sync server: log in (or register the first,
 /// master account), then pull the shared library onto this device.
@@ -166,6 +167,22 @@ class _ServerPageState extends State<ServerPage> {
           const SizedBox(height: 16),
           Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
         ],
+        const SizedBox(height: 24),
+        Text('Sharing', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        const Text('Create book groups, share the library or a book with other '
+            'accounts, and mint public links.'),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _busy
+              ? null
+              : () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) =>
+                        SharingPage(connection: widget.connection),
+                  )),
+          icon: const Icon(Icons.group_outlined),
+          label: const Text('Manage sharing'),
+        ),
         const SizedBox(height: 32),
         OutlinedButton.icon(
           onPressed: _busy ? null : () => widget.connection.disconnect(),
