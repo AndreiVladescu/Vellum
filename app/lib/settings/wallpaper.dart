@@ -88,11 +88,12 @@ class _FernPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Anchored to the bottom-left corner with fixed pixel offsets and lengths,
+    // so the fronds don't slide or scale as the window is resized.
     final h = size.height;
-    final w = size.width;
-    _frond(canvas, Offset(w * 0.06, h * 1.02), -1.35, h * 0.46);
-    _frond(canvas, Offset(-w * 0.01, h * 0.98), -0.95, h * 0.36);
-    _frond(canvas, Offset(w * 0.13, h * 1.02), -1.72, h * 0.32);
+    _frond(canvas, Offset(26, h + 8), -1.35, 300);
+    _frond(canvas, Offset(-4, h + 2), -0.95, 235);
+    _frond(canvas, Offset(58, h + 8), -1.72, 210);
   }
 
   void _frond(Canvas canvas, Offset base, double angle, double length) {
