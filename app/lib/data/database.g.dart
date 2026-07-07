@@ -145,6 +145,28 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _readerNotesMeta = const VerificationMeta(
+    'readerNotes',
+  );
+  @override
+  late final GeneratedColumn<String> readerNotes = GeneratedColumn<String>(
+    'reader_notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceMetadataMeta = const VerificationMeta(
+    'sourceMetadata',
+  );
+  @override
+  late final GeneratedColumn<String> sourceMetadata = GeneratedColumn<String>(
+    'source_metadata',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -184,6 +206,8 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     readingProgress,
     lastReadPage,
     lastReadAt,
+    readerNotes,
+    sourceMetadata,
     createdAt,
     updatedAt,
   ];
@@ -293,6 +317,24 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         ),
       );
     }
+    if (data.containsKey('reader_notes')) {
+      context.handle(
+        _readerNotesMeta,
+        readerNotes.isAcceptableOrUnknown(
+          data['reader_notes']!,
+          _readerNotesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_metadata')) {
+      context.handle(
+        _sourceMetadataMeta,
+        sourceMetadata.isAcceptableOrUnknown(
+          data['source_metadata']!,
+          _sourceMetadataMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -366,6 +408,14 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_read_at'],
       ),
+      readerNotes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reader_notes'],
+      ),
+      sourceMetadata: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_metadata'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -397,6 +447,8 @@ class Book extends DataClass implements Insertable<Book> {
   final double? readingProgress;
   final int? lastReadPage;
   final DateTime? lastReadAt;
+  final String? readerNotes;
+  final String? sourceMetadata;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Book({
@@ -413,6 +465,8 @@ class Book extends DataClass implements Insertable<Book> {
     this.readingProgress,
     this.lastReadPage,
     this.lastReadAt,
+    this.readerNotes,
+    this.sourceMetadata,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -454,6 +508,12 @@ class Book extends DataClass implements Insertable<Book> {
     if (!nullToAbsent || lastReadAt != null) {
       map['last_read_at'] = Variable<DateTime>(lastReadAt);
     }
+    if (!nullToAbsent || readerNotes != null) {
+      map['reader_notes'] = Variable<String>(readerNotes);
+    }
+    if (!nullToAbsent || sourceMetadata != null) {
+      map['source_metadata'] = Variable<String>(sourceMetadata);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -494,6 +554,12 @@ class Book extends DataClass implements Insertable<Book> {
       lastReadAt: lastReadAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastReadAt),
+      readerNotes: readerNotes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readerNotes),
+      sourceMetadata: sourceMetadata == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceMetadata),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -518,6 +584,8 @@ class Book extends DataClass implements Insertable<Book> {
       readingProgress: serializer.fromJson<double?>(json['readingProgress']),
       lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
       lastReadAt: serializer.fromJson<DateTime?>(json['lastReadAt']),
+      readerNotes: serializer.fromJson<String?>(json['readerNotes']),
+      sourceMetadata: serializer.fromJson<String?>(json['sourceMetadata']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -539,6 +607,8 @@ class Book extends DataClass implements Insertable<Book> {
       'readingProgress': serializer.toJson<double?>(readingProgress),
       'lastReadPage': serializer.toJson<int?>(lastReadPage),
       'lastReadAt': serializer.toJson<DateTime?>(lastReadAt),
+      'readerNotes': serializer.toJson<String?>(readerNotes),
+      'sourceMetadata': serializer.toJson<String?>(sourceMetadata),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -558,6 +628,8 @@ class Book extends DataClass implements Insertable<Book> {
     Value<double?> readingProgress = const Value.absent(),
     Value<int?> lastReadPage = const Value.absent(),
     Value<DateTime?> lastReadAt = const Value.absent(),
+    Value<String?> readerNotes = const Value.absent(),
+    Value<String?> sourceMetadata = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Book(
@@ -578,6 +650,10 @@ class Book extends DataClass implements Insertable<Book> {
         : this.readingProgress,
     lastReadPage: lastReadPage.present ? lastReadPage.value : this.lastReadPage,
     lastReadAt: lastReadAt.present ? lastReadAt.value : this.lastReadAt,
+    readerNotes: readerNotes.present ? readerNotes.value : this.readerNotes,
+    sourceMetadata: sourceMetadata.present
+        ? sourceMetadata.value
+        : this.sourceMetadata,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -608,6 +684,12 @@ class Book extends DataClass implements Insertable<Book> {
       lastReadAt: data.lastReadAt.present
           ? data.lastReadAt.value
           : this.lastReadAt,
+      readerNotes: data.readerNotes.present
+          ? data.readerNotes.value
+          : this.readerNotes,
+      sourceMetadata: data.sourceMetadata.present
+          ? data.sourceMetadata.value
+          : this.sourceMetadata,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -629,6 +711,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
+          ..write('readerNotes: $readerNotes, ')
+          ..write('sourceMetadata: $sourceMetadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -650,6 +734,8 @@ class Book extends DataClass implements Insertable<Book> {
     readingProgress,
     lastReadPage,
     lastReadAt,
+    readerNotes,
+    sourceMetadata,
     createdAt,
     updatedAt,
   );
@@ -670,6 +756,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.readingProgress == this.readingProgress &&
           other.lastReadPage == this.lastReadPage &&
           other.lastReadAt == this.lastReadAt &&
+          other.readerNotes == this.readerNotes &&
+          other.sourceMetadata == this.sourceMetadata &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -688,6 +776,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<double?> readingProgress;
   final Value<int?> lastReadPage;
   final Value<DateTime?> lastReadAt;
+  final Value<String?> readerNotes;
+  final Value<String?> sourceMetadata;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -705,6 +795,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
+    this.readerNotes = const Value.absent(),
+    this.sourceMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -723,6 +815,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
+    this.readerNotes = const Value.absent(),
+    this.sourceMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -742,6 +836,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<double>? readingProgress,
     Expression<int>? lastReadPage,
     Expression<DateTime>? lastReadAt,
+    Expression<String>? readerNotes,
+    Expression<String>? sourceMetadata,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -760,6 +856,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (readingProgress != null) 'reading_progress': readingProgress,
       if (lastReadPage != null) 'last_read_page': lastReadPage,
       if (lastReadAt != null) 'last_read_at': lastReadAt,
+      if (readerNotes != null) 'reader_notes': readerNotes,
+      if (sourceMetadata != null) 'source_metadata': sourceMetadata,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -780,6 +878,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<double?>? readingProgress,
     Value<int?>? lastReadPage,
     Value<DateTime?>? lastReadAt,
+    Value<String?>? readerNotes,
+    Value<String?>? sourceMetadata,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -798,6 +898,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       readingProgress: readingProgress ?? this.readingProgress,
       lastReadPage: lastReadPage ?? this.lastReadPage,
       lastReadAt: lastReadAt ?? this.lastReadAt,
+      readerNotes: readerNotes ?? this.readerNotes,
+      sourceMetadata: sourceMetadata ?? this.sourceMetadata,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -846,6 +948,12 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (lastReadAt.present) {
       map['last_read_at'] = Variable<DateTime>(lastReadAt.value);
     }
+    if (readerNotes.present) {
+      map['reader_notes'] = Variable<String>(readerNotes.value);
+    }
+    if (sourceMetadata.present) {
+      map['source_metadata'] = Variable<String>(sourceMetadata.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -874,6 +982,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
+          ..write('readerNotes: $readerNotes, ')
+          ..write('sourceMetadata: $sourceMetadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -3516,6 +3626,8 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<double?> readingProgress,
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
+      Value<String?> readerNotes,
+      Value<String?> sourceMetadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -3535,6 +3647,8 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<double?> readingProgress,
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
+      Value<String?> readerNotes,
+      Value<String?> sourceMetadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -3707,6 +3821,16 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<DateTime> get lastReadAt => $composableBuilder(
     column: $table.lastReadAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get readerNotes => $composableBuilder(
+    column: $table.readerNotes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceMetadata => $composableBuilder(
+    column: $table.sourceMetadata,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3920,6 +4044,16 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get readerNotes => $composableBuilder(
+    column: $table.readerNotes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceMetadata => $composableBuilder(
+    column: $table.sourceMetadata,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -3988,6 +4122,16 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastReadAt => $composableBuilder(
     column: $table.lastReadAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get readerNotes => $composableBuilder(
+    column: $table.readerNotes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceMetadata => $composableBuilder(
+    column: $table.sourceMetadata,
     builder: (column) => column,
   );
 
@@ -4170,6 +4314,8 @@ class $$BooksTableTableManager
                 Value<double?> readingProgress = const Value.absent(),
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<String?> readerNotes = const Value.absent(),
+                Value<String?> sourceMetadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4187,6 +4333,8 @@ class $$BooksTableTableManager
                 readingProgress: readingProgress,
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
+                readerNotes: readerNotes,
+                sourceMetadata: sourceMetadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -4206,6 +4354,8 @@ class $$BooksTableTableManager
                 Value<double?> readingProgress = const Value.absent(),
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<String?> readerNotes = const Value.absent(),
+                Value<String?> sourceMetadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4223,6 +4373,8 @@ class $$BooksTableTableManager
                 readingProgress: readingProgress,
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
+                readerNotes: readerNotes,
+                sourceMetadata: sourceMetadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

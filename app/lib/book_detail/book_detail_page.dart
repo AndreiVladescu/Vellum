@@ -1,6 +1,8 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../data/book_file_validation.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../reader/reader_page.dart';
@@ -8,7 +10,11 @@ import '../reader/reader_page.dart';
 /// Full-page book view: metadata, digital formats, physical copies, and the
 /// Read / Resume reading action.
 class BookDetailPage extends StatelessWidget {
-  const BookDetailPage({super.key, required this.book, required this.repository});
+  const BookDetailPage({
+    super.key,
+    required this.book,
+    required this.repository,
+  });
 
   /// Snapshot used before the first stream event arrives.
   final Book book;
@@ -32,140 +38,289 @@ class BookDetailPage extends StatelessWidget {
   }
 }
 
-class _BookDetailBody extends StatelessWidget {
+class _BookDetailBody extends StatefulWidget {
   const _BookDetailBody({required this.book, required this.repository});
 
   final Book book;
   final LibraryRepository repository;
 
   @override
+  State<_BookDetailBody> createState() => _BookDetailBodyState();
+}
+
+class _BookDetailBodyState extends State<_BookDetailBody> {
+  bool _dragging = false;
+
+  Book get book => widget.book;
+  LibraryRepository get repository => widget.repository;
+
+  /// Handles files dropped anywhere on the page: images become the cover,
+  /// PDFs/EPUBs are attached, anything else is rejected.
+  Future<void> _handleDrop(List<XFile> files) async {
+    var attached = 0;
+    String? message;
+    for (final file in files) {
+      final kind = await classifyBookFile(file.path);
+      if (kind == BookFileKind.image) {
+        await repository.setCoverFromFile(book.id, file.path);
+        message = 'Cover updated';
+      } else if (kind.isBook) {
+        await repository.attachFile(book.id, file.path);
+        attached++;
+      } else {
+        message = 'Only PDF, EPUB, or image files are accepted';
+      }
+    }
+    if (attached > 0) {
+      message = 'Attached $attached file${attached == 1 ? '' : 's'}';
+    }
+    if (mounted && message != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _pickCover() async {
+    const group = XTypeGroup(
+      label: 'Images',
+      extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    );
+    final picked = await openFile(acceptedTypeGroups: const [group]);
+    if (picked == null) return;
+    if (await classifyBookFile(picked.path) != BookFileKind.image) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("That doesn't look like an image.")),
+        );
+      }
+      return;
+    }
+    await repository.setCoverFromFile(book.id, picked.path);
+  }
+
+  void _openEditSheet() => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => _EditBookSheet(
+      book: book,
+      repository: repository,
+      onPickCover: _pickCover,
+    ),
+  );
+
+  Future<void> _revert() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Revert to library defaults?'),
+        content: const Text(
+          'This restores the title, description, year, and cover to the '
+          'values from the online library. Your reader notes and attached '
+          'files are kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Revert'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await repository.revertToDefault(book);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reverted to library defaults')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cover = repository.coverFileOf(book);
     return Scaffold(
-      appBar: AppBar(title: Text(book.title)),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: AppBar(
+        title: Text(book.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit details',
+            onPressed: _openEditSheet,
+          ),
+        ],
+      ),
+      body: DropTarget(
+        onDragEntered: (_) => setState(() => _dragging = true),
+        onDragExited: (_) => setState(() => _dragging = false),
+        onDragDone: (details) {
+          setState(() => _dragging = false);
+          _handleDrop(details.files);
+        },
+        child: Container(
+          foregroundDecoration: _dragging
+              ? BoxDecoration(
+                  border: Border.all(
+                    color: theme.colorScheme.primary,
+                    width: 3,
+                  ),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.06),
+                )
+              : null,
+          child: ListView(
+            padding: const EdgeInsets.all(24),
             children: [
-              if (cover != null && cover.existsSync())
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(cover,
-                      width: 110, height: 162, fit: BoxFit.cover),
-                ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(book.title, style: theme.textTheme.headlineSmall),
-                    if (book.subtitle != null)
-                      Text(book.subtitle!, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    FutureBuilder<BookDetails>(
-                      future: repository.detailsFor(book.id),
-                      builder: (context, snapshot) {
-                        final details = snapshot.data;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              [
-                                if (details != null &&
-                                    details.authors.isNotEmpty)
-                                  details.authors.join(', '),
-                                if (book.publishedYear != null)
-                                  '${book.publishedYear}',
-                                if (book.pageCount != null)
-                                  '${book.pageCount} pages',
-                                if (book.publisher != null) book.publisher!,
-                              ].join(' · '),
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                            if (book.isbn != null)
-                              Text('ISBN ${book.isbn}',
-                                  style: theme.textTheme.bodySmall),
-                            if (details != null &&
-                                details.genres.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [
-                                  for (final genre in details.genres)
-                                    Chip(
-                                      label: Text(genre),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        );
-                      },
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (cover != null && cover.existsSync())
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        cover,
+                        width: 110,
+                        height: 162,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ],
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(book.title, style: theme.textTheme.headlineSmall),
+                        if (book.subtitle != null)
+                          Text(
+                            book.subtitle!,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        const SizedBox(height: 8),
+                        FutureBuilder<BookDetails>(
+                          future: repository.detailsFor(book.id),
+                          builder: (context, snapshot) {
+                            final details = snapshot.data;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  [
+                                    if (details != null &&
+                                        details.authors.isNotEmpty)
+                                      details.authors.join(', '),
+                                    if (book.publishedYear != null)
+                                      '${book.publishedYear}',
+                                    if (book.pageCount != null)
+                                      '${book.pageCount} pages',
+                                    if (book.publisher != null) book.publisher!,
+                                  ].join(' · '),
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                                if (book.isbn != null)
+                                  Text(
+                                    'ISBN ${book.isbn}',
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                if (details != null &&
+                                    details.genres.isNotEmpty) ...[
+                                  const SizedBox(height: 10),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      for (final genre in details.genres)
+                                        Chip(
+                                          label: Text(genre),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _ReadButton(book: book, repository: repository),
+              if (book.description != null) ...[
+                const SizedBox(height: 20),
+                Text('About', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(book.description!, style: theme.textTheme.bodyMedium),
+              ],
+              const SizedBox(height: 24),
+              _DigitalFormatsSection(book: book, repository: repository),
+              const SizedBox(height: 24),
+              _PhysicalCopiesSection(book: book, repository: repository),
+              const SizedBox(height: 24),
+              _ReaderNotesSection(book: book, repository: repository),
+              if (repository.canRevert(book)) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _revert,
+                    icon: const Icon(Icons.settings_backup_restore),
+                    label: const Text('Revert to library defaults'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 32),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                  ),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: Text('Remove “${book.title}”?'),
+                        content: const Text(
+                          'This deletes the book, its downloaded cover, and '
+                          'any attached files from your library. There is no '
+                          'undo.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Theme.of(
+                                dialogContext,
+                              ).colorScheme.error,
+                            ),
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
+                            child: const Text('Remove'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true) return;
+                    await repository.deleteBook(book);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Remove from library'),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          _ReadButton(book: book, repository: repository),
-          if (book.description != null) ...[
-            const SizedBox(height: 20),
-            Text('About', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(book.description!, style: theme.textTheme.bodyMedium),
-          ],
-          const SizedBox(height: 24),
-          _DigitalFormatsSection(book: book, repository: repository),
-          const SizedBox(height: 24),
-          _PhysicalCopiesSection(book: book, repository: repository),
-          const SizedBox(height: 32),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.error,
-              ),
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: Text('Remove “${book.title}”?'),
-                    content: const Text(
-                        'This deletes the book, its downloaded cover, and '
-                        'any attached files from your library. There is no '
-                        'undo.'),
-                    actions: [
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.of(dialogContext).pop(false),
-                        child: const Text('Cancel'),
-                      ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(dialogContext).colorScheme.error,
-                        ),
-                        onPressed: () => Navigator.of(dialogContext).pop(true),
-                        child: const Text('Remove'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed != true) return;
-                await repository.deleteBook(book);
-                if (context.mounted) Navigator.of(context).pop();
-              },
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Remove from library'),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -188,26 +343,32 @@ class _ReadButton extends StatelessWidget {
         final label = !started
             ? 'Read'
             : 'Resume reading · '
-                '${(book.readingProgress! * 100).round()}% '
-                '(page ${book.lastReadPage})';
+                  '${(book.readingProgress! * 100).round()}% '
+                  '(page ${book.lastReadPage})';
         return FilledButton.icon(
           onPressed: files.isEmpty
               ? null
               : () {
                   if (pdf == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
                         content: Text(
-                            'Only PDF reading is supported for now — '
-                            'EPUB is coming later.')));
+                          'Only PDF reading is supported for now — '
+                          'EPUB is coming later.',
+                        ),
+                      ),
+                    );
                     return;
                   }
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => ReaderPage(
-                      book: book,
-                      file: repository.fileOf(pdf),
-                      repository: repository,
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ReaderPage(
+                        book: book,
+                        file: repository.fileOf(pdf),
+                        repository: repository,
+                      ),
                     ),
-                  ));
+                  );
                 },
           icon: Icon(started ? Icons.play_arrow : Icons.menu_book),
           label: Text(files.isEmpty ? 'Read (no digital copy yet)' : label),
@@ -224,16 +385,14 @@ class _DigitalFormatsSection extends StatelessWidget {
   final LibraryRepository repository;
 
   Future<void> _attach(BuildContext context) async {
-    const typeGroup = XTypeGroup(
-      label: 'Books',
-      extensions: ['pdf', 'epub'],
-    );
+    const typeGroup = XTypeGroup(label: 'Books', extensions: ['pdf', 'epub']);
     final picked = await openFile(acceptedTypeGroups: const [typeGroup]);
     if (picked == null) return;
     await repository.attachFile(book.id, picked.path);
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Attached ${picked.name}')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Attached ${picked.name}')));
     }
   }
 
@@ -250,8 +409,10 @@ class _DigitalFormatsSection extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text('Digital formats',
-                      style: theme.textTheme.titleMedium),
+                  child: Text(
+                    'Digital formats',
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: () => _attach(context),
@@ -261,18 +422,23 @@ class _DigitalFormatsSection extends StatelessWidget {
               ],
             ),
             if (files.isEmpty)
-              Text('No files yet — attach a PDF or EPUB.',
-                  style: theme.textTheme.bodySmall)
+              Text(
+                'No files yet — attach a PDF or EPUB.',
+                style: theme.textTheme.bodySmall,
+              )
             else
               for (final f in files)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(f.format == 'pdf'
-                      ? Icons.picture_as_pdf_outlined
-                      : Icons.book_outlined),
+                  leading: Icon(
+                    f.format == 'pdf'
+                        ? Icons.picture_as_pdf_outlined
+                        : Icons.book_outlined,
+                  ),
                   title: Text(f.format.toUpperCase()),
                   subtitle: Text(
-                      '${(f.sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB'),
+                    '${(f.sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB',
+                  ),
                 ),
           ],
         );
@@ -348,8 +514,10 @@ class _PhysicalCopiesSection extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text('Physical copies',
-                      style: theme.textTheme.titleMedium),
+                  child: Text(
+                    'Physical copies',
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: () => _addCopy(context),
@@ -359,8 +527,10 @@ class _PhysicalCopiesSection extends StatelessWidget {
               ],
             ),
             if (copies.isEmpty)
-              Text("You don't own this one on paper (yet).",
-                  style: theme.textTheme.bodySmall)
+              Text(
+                "You don't own this one on paper (yet).",
+                style: theme.textTheme.bodySmall,
+              )
             else
               for (final c in copies)
                 _PhysicalCopyTile(copy: c, repository: repository),
@@ -379,7 +549,8 @@ class _PhysicalCopyTile extends StatelessWidget {
   final PhysicalCopy copy;
   final LibraryRepository repository;
 
-  static String _date(DateTime d) => '${d.year}-'
+  static String _date(DateTime d) =>
+      '${d.year}-'
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 
@@ -435,12 +606,13 @@ class _PhysicalCopyTile extends StatelessWidget {
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(active != null
-                  ? Icons.person_outline
-                  : Icons.place_outlined),
+              leading: Icon(
+                active != null ? Icons.person_outline : Icons.place_outlined,
+              ),
               title: Text(copy.location ?? 'Somewhere…'),
               subtitle: Text(
-                  [if (copy.notes != null) copy.notes!, status].join('\n')),
+                [if (copy.notes != null) copy.notes!, status].join('\n'),
+              ),
               isThreeLine: copy.notes != null,
               trailing: active != null
                   ? TextButton(
@@ -463,6 +635,199 @@ class _PhysicalCopyTile extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Personal reader notes for a book — stored locally, never synced to a server.
+class _ReaderNotesSection extends StatefulWidget {
+  const _ReaderNotesSection({required this.book, required this.repository});
+
+  final Book book;
+  final LibraryRepository repository;
+
+  @override
+  State<_ReaderNotesSection> createState() => _ReaderNotesSectionState();
+}
+
+class _ReaderNotesSectionState extends State<_ReaderNotesSection> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.book.readerNotes ?? '',
+  );
+  bool _dirty = false;
+
+  @override
+  void didUpdateWidget(covariant _ReaderNotesSection old) {
+    super.didUpdateWidget(old);
+    // Pick up external changes (e.g. a revert) unless the user is mid-edit.
+    if (!_dirty && (widget.book.readerNotes ?? '') != _controller.text) {
+      _controller.text = widget.book.readerNotes ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text('My notes', style: theme.textTheme.titleMedium),
+            ),
+            if (_dirty)
+              TextButton(
+                onPressed: () async {
+                  await widget.repository.setReaderNotes(
+                    widget.book.id,
+                    _controller.text,
+                  );
+                  if (mounted) setState(() => _dirty = false);
+                },
+                child: const Text('Save'),
+              ),
+          ],
+        ),
+        Text(
+          'Private to this device — never shared with a server.',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _controller,
+          minLines: 3,
+          maxLines: 8,
+          onChanged: (_) {
+            if (!_dirty) setState(() => _dirty = true);
+          },
+          decoration: const InputDecoration(
+            hintText: 'Thoughts, quotes, where you left off…',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bottom sheet to edit a book's core details and change its cover.
+class _EditBookSheet extends StatefulWidget {
+  const _EditBookSheet({
+    required this.book,
+    required this.repository,
+    required this.onPickCover,
+  });
+
+  final Book book;
+  final LibraryRepository repository;
+  final Future<void> Function() onPickCover;
+
+  @override
+  State<_EditBookSheet> createState() => _EditBookSheetState();
+}
+
+class _EditBookSheetState extends State<_EditBookSheet> {
+  late final _title = TextEditingController(text: widget.book.title);
+  late final _subtitle = TextEditingController(
+    text: widget.book.subtitle ?? '',
+  );
+  late final _year = TextEditingController(
+    text: widget.book.publishedYear?.toString() ?? '',
+  );
+  late final _description = TextEditingController(
+    text: widget.book.description ?? '',
+  );
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _subtitle.dispose();
+    _year.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final title = _title.text.trim();
+    if (title.isEmpty) return;
+    await widget.repository.updateBookDetails(
+      widget.book.id,
+      title: title,
+      subtitle: _subtitle.text,
+      publishedYear: int.tryParse(_year.text.trim()),
+      description: _description.text,
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Edit details', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _title,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _subtitle,
+              decoration: const InputDecoration(labelText: 'Subtitle'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _year,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Published year'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _description,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => widget.onPickCover(),
+              icon: const Icon(Icons.image_outlined),
+              label: const Text('Change cover…'),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tip: you can also drag an image, PDF, or EPUB onto the book '
+              'page.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(onPressed: _save, child: const Text('Save')),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

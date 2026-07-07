@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
 import '../data/metadata.dart';
+import 'custom_book_page.dart';
 
 /// Search Open Library and pick the edition to add to the shelf.
 class AddBookPage extends StatefulWidget {
@@ -63,7 +64,25 @@ class _AddBookPageState extends State<AddBookPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add a book')),
+      appBar: AppBar(
+        title: const Text('Add a book'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_note),
+            tooltip: 'Create a custom book',
+            onPressed: () async {
+              final title = await Navigator.of(context).push<String>(
+                MaterialPageRoute(
+                  builder: (_) => CustomBookPage(repository: widget.repository),
+                ),
+              );
+              if (title != null && context.mounted) {
+                Navigator.of(context).pop(title);
+              }
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -136,10 +155,12 @@ class _AddBookPageState extends State<AddBookPage> {
                   ),
           ),
           title: Text(r.title),
-          subtitle: Text([
-            r.authorLine,
-            if (r.firstPublishYear != null) '${r.firstPublishYear}',
-          ].join(' · ')),
+          subtitle: Text(
+            [
+              r.authorLine,
+              if (r.firstPublishYear != null) '${r.firstPublishYear}',
+            ].join(' · '),
+          ),
           trailing: adding
               ? const SizedBox(
                   width: 20,

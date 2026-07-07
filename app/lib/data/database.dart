@@ -20,6 +20,11 @@ class Books extends Table {
   RealColumn get readingProgress => real().nullable()(); // 0..1
   IntColumn get lastReadPage => integer().nullable()();
   DateTimeColumn get lastReadAt => dateTime().nullable()();
+  // Personal reader notes. Local-only — never pushed to or pulled from a server.
+  TextColumn get readerNotes => text().nullable()();
+  // JSON snapshot of the official library metadata this book was imported with,
+  // so edits can be reverted to the source. Null for custom (manual) books.
+  TextColumn get sourceMetadata => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
@@ -136,7 +141,7 @@ class VellumDatabase extends _$VellumDatabase {
   VellumDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -145,6 +150,10 @@ class VellumDatabase extends _$VellumDatabase {
             await m.addColumn(books, books.readingProgress);
             await m.addColumn(books, books.lastReadPage);
             await m.addColumn(books, books.lastReadAt);
+          }
+          if (from < 3) {
+            await m.addColumn(books, books.readerNotes);
+            await m.addColumn(books, books.sourceMetadata);
           }
         },
         beforeOpen: (details) async {

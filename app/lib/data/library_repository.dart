@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -40,10 +42,9 @@ class LibraryRepository {
   Stream<List<BookFile>> watchFilesOf(String bookId) =>
       (db.select(db.bookFiles)..where((f) => f.bookId.equals(bookId))).watch();
 
-  Stream<List<PhysicalCopy>> watchCopiesOf(String bookId) =>
-      (db.select(db.physicalCopies)
-            ..where((c) => c.bookId.equals(bookId)))
-          .watch();
+  Stream<List<PhysicalCopy>> watchCopiesOf(String bookId) => (db.select(
+    db.physicalCopies,
+  )..where((c) => c.bookId.equals(bookId))).watch();
 
   /// Absolute file for an attached digital copy.
   File fileOf(BookFile file) => File(p.join(_dataDir.path, file.path));
@@ -56,60 +57,194 @@ class LibraryRepository {
     final relPath = p.join('files', '$id.$ext');
     await source.copy(p.join(_dataDir.path, relPath));
     final digest = await sha256.bind(source.openRead()).first;
-    await db.into(db.bookFiles).insert(BookFilesCompanion.insert(
-          id: id,
-          bookId: bookId,
-          format: ext.isEmpty ? 'unknown' : ext,
-          path: relPath,
-          sizeBytes: await source.length(),
-          sha256: digest.toString(),
-        ));
+    await db
+        .into(db.bookFiles)
+        .insert(
+          BookFilesCompanion.insert(
+            id: id,
+            bookId: bookId,
+            format: ext.isEmpty ? 'unknown' : ext,
+            path: relPath,
+            sizeBytes: await source.length(),
+            sha256: digest.toString(),
+          ),
+        );
   }
 
-  Future<void> addPhysicalCopy(String bookId,
-      {String? location, String? notes}) async {
-    await db.into(db.physicalCopies).insert(PhysicalCopiesCompanion.insert(
-          id: _uuid.v4(),
-          bookId: bookId,
-          location: Value(location),
-          notes: Value(notes),
-        ));
+  /// Creates a book by hand — for a PDF you can't find in an online library.
+  /// It has no [sourceMetadata], so it offers no "revert to default".
+  Future<String> createCustomBook({
+    required String title,
+    String? author,
+    int? publishedYear,
+    String? description,
+  }) async {
+    final id = _uuid.v4();
+    final spine = SpineStyle.generate(title: title, author: author);
+    await db.transaction(() async {
+      await db
+          .into(db.books)
+          .insert(
+            BooksCompanion.insert(
+              id: id,
+              title: title.trim(),
+              description: Value(_blankToNull(description)),
+              publishedYear: Value(publishedYear),
+              spineStyle: Value(spine.toJson()),
+            ),
+          );
+      final name = author?.trim();
+      if (name != null && name.isNotEmpty) {
+        final authorId = await _idForName(db.authors, name);
+        await db
+            .into(db.bookAuthors)
+            .insert(
+              BookAuthorsCompanion.insert(bookId: id, authorId: authorId),
+            );
+      }
+    });
+    return id;
+  }
+
+  /// Applies edited details (from the detail-page edit form). Empty subtitle /
+  /// description clear the field; a null [publishedYear] clears the year.
+  Future<void> updateBookDetails(
+    String id, {
+    required String title,
+    String? subtitle,
+    int? publishedYear,
+    String? description,
+  }) async {
+    await (db.update(db.books)..where((b) => b.id.equals(id))).write(
+      BooksCompanion(
+        title: Value(title.trim()),
+        subtitle: Value(_blankToNull(subtitle)),
+        publishedYear: Value(publishedYear),
+        description: Value(_blankToNull(description)),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Personal notes — stored locally only, never pushed to a server.
+  Future<void> setReaderNotes(String bookId, String? notes) async {
+    await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+      BooksCompanion(readerNotes: Value(_blankToNull(notes))),
+    );
+  }
+
+  /// Replaces a book's cover from raw image bytes.
+  Future<void> setCoverBytes(String bookId, Uint8List bytes) async {
+    final rel = p.join('covers', '$bookId.jpg');
+    await File(p.join(_dataDir.path, rel)).writeAsBytes(bytes);
+    await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+      BooksCompanion(coverPath: Value(rel), updatedAt: Value(DateTime.now())),
+    );
+  }
+
+  Future<void> setCoverFromFile(String bookId, String sourcePath) async =>
+      setCoverBytes(bookId, await File(sourcePath).readAsBytes());
+
+  /// True when the book was imported from a library and can be reset.
+  bool canRevert(Book book) => book.sourceMetadata != null;
+
+  /// Restores the book's details (and cover, if online) to the official
+  /// library snapshot captured at import.
+  Future<void> revertToDefault(Book book) async {
+    final raw = book.sourceMetadata;
+    if (raw == null) return;
+    final m = jsonDecode(raw) as Map<String, dynamic>;
+    await (db.update(db.books)..where((b) => b.id.equals(book.id))).write(
+      BooksCompanion(
+        title: Value((m['title'] as String?) ?? book.title),
+        subtitle: Value(m['subtitle'] as String?),
+        description: Value(m['description'] as String?),
+        isbn: Value(m['isbn'] as String?),
+        publisher: Value(m['publisher'] as String?),
+        publishedYear: Value(m['publishedYear'] as int?),
+        pageCount: Value(m['pageCount'] as int?),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+    final coverUrl = m['coverUrl'] as String?;
+    if (coverUrl != null) {
+      try {
+        final res = await http.get(Uri.parse(coverUrl));
+        if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+          await setCoverBytes(book.id, res.bodyBytes);
+        }
+      } catch (_) {
+        // Keep the reverted metadata even if the cover can't be re-fetched.
+      }
+    }
+  }
+
+  static String? _blankToNull(String? s) {
+    final t = s?.trim();
+    return (t == null || t.isEmpty) ? null : t;
+  }
+
+  Future<void> addPhysicalCopy(
+    String bookId, {
+    String? location,
+    String? notes,
+  }) async {
+    await db
+        .into(db.physicalCopies)
+        .insert(
+          PhysicalCopiesCompanion.insert(
+            id: _uuid.v4(),
+            bookId: bookId,
+            location: Value(location),
+            notes: Value(notes),
+          ),
+        );
   }
 
   /// Loan history for a physical copy, most recent first. The active loan (if
   /// any) is the row whose returnedAt is null.
-  Stream<List<Loan>> watchLoansOf(String copyId) => (db.select(db.loans)
-        ..where((l) => l.copyId.equals(copyId))
-        ..orderBy([(l) => OrderingTerm.desc(l.loanedAt)]))
-      .watch();
+  Stream<List<Loan>> watchLoansOf(String copyId) =>
+      (db.select(db.loans)
+            ..where((l) => l.copyId.equals(copyId))
+            ..orderBy([(l) => OrderingTerm.desc(l.loanedAt)]))
+          .watch();
 
   /// Lends a copy to [borrower]. Callers only offer this when the copy has no
   /// active loan, so no additional check is needed here.
   Future<void> lendCopy(String copyId, String borrower) async {
-    await db.into(db.loans).insert(LoansCompanion.insert(
-          id: _uuid.v4(),
-          copyId: copyId,
-          borrower: borrower,
-        ));
+    await db
+        .into(db.loans)
+        .insert(
+          LoansCompanion.insert(
+            id: _uuid.v4(),
+            copyId: copyId,
+            borrower: borrower,
+          ),
+        );
   }
 
   /// Marks a loan returned as of now, keeping it in the history.
   Future<void> returnLoan(String loanId) async {
-    await (db.update(db.loans)..where((l) => l.id.equals(loanId)))
-        .write(LoansCompanion(returnedAt: Value(DateTime.now())));
+    await (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
+      LoansCompanion(returnedAt: Value(DateTime.now())),
+    );
   }
 
   /// Called by the reader as the user turns pages.
   Future<void> saveReadingPosition(
-      String bookId, int page, int pageCount) async {
+    String bookId,
+    int page,
+    int pageCount,
+  ) async {
     final now = DateTime.now();
-    await (db.update(db.books)..where((b) => b.id.equals(bookId)))
-        .write(BooksCompanion(
-      readingProgress: Value(pageCount == 0 ? 0 : page / pageCount),
-      lastReadPage: Value(page),
-      lastReadAt: Value(now),
-      updatedAt: Value(now),
-    ));
+    await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+      BooksCompanion(
+        readingProgress: Value(pageCount == 0 ? 0 : page / pageCount),
+        lastReadPage: Value(page),
+        lastReadAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
   }
 
   /// Absolute file for a book's cover, or null if it has none.
@@ -137,28 +272,49 @@ class LibraryRepository {
       pageCount: result.pageCount,
     );
 
+    // Snapshot the official metadata so later edits can be reverted to it.
+    final source = jsonEncode({
+      'title': result.title,
+      'subtitle': result.subtitle,
+      'description': description,
+      'isbn': result.isbn,
+      'publisher': result.publisher,
+      'publishedYear': result.firstPublishYear,
+      'pageCount': result.pageCount,
+      'coverUrl': result.largeCoverUrl?.toString(),
+    });
+
     await db.transaction(() async {
-      await db.into(db.books).insert(BooksCompanion.insert(
-            id: id,
-            title: result.title,
-            subtitle: Value(result.subtitle),
-            description: Value(description),
-            isbn: Value(result.isbn),
-            publisher: Value(result.publisher),
-            publishedYear: Value(result.firstPublishYear),
-            pageCount: Value(result.pageCount),
-            coverPath: Value(coverPath),
-            spineStyle: Value(spine.toJson()),
-          ));
+      await db
+          .into(db.books)
+          .insert(
+            BooksCompanion.insert(
+              id: id,
+              title: result.title,
+              subtitle: Value(result.subtitle),
+              description: Value(description),
+              isbn: Value(result.isbn),
+              publisher: Value(result.publisher),
+              publishedYear: Value(result.firstPublishYear),
+              pageCount: Value(result.pageCount),
+              coverPath: Value(coverPath),
+              spineStyle: Value(spine.toJson()),
+              sourceMetadata: Value(source),
+            ),
+          );
 
       var position = 0;
       for (final name in result.authors) {
         final authorId = await _idForName(db.authors, name);
-        await db.into(db.bookAuthors).insert(BookAuthorsCompanion.insert(
-              bookId: id,
-              authorId: authorId,
-              position: Value(position++),
-            ));
+        await db
+            .into(db.bookAuthors)
+            .insert(
+              BookAuthorsCompanion.insert(
+                bookId: id,
+                authorId: authorId,
+                position: Value(position++),
+              ),
+            );
       }
 
       // Open Library "subjects" are noisy; keep the first few short ones.
@@ -184,20 +340,27 @@ class LibraryRepository {
 
     await db.transaction(() async {
       for (final b in books) {
-        final spine = b.spineStyle ??
-            SpineStyle.generate(title: b.title, pageCount: b.pageCount)
-                .toJson();
-        await db.into(db.books).insertOnConflictUpdate(BooksCompanion.insert(
-              id: b.id,
+        final spine =
+            b.spineStyle ??
+            SpineStyle.generate(
               title: b.title,
-              subtitle: Value(b.subtitle),
-              description: Value(b.description),
-              isbn: Value(b.isbn),
-              publisher: Value(b.publisher),
-              publishedYear: Value(b.publishedYear),
-              pageCount: Value(b.pageCount),
-              spineStyle: Value(spine),
-            ));
+              pageCount: b.pageCount,
+            ).toJson();
+        await db
+            .into(db.books)
+            .insertOnConflictUpdate(
+              BooksCompanion.insert(
+                id: b.id,
+                title: b.title,
+                subtitle: Value(b.subtitle),
+                description: Value(b.description),
+                isbn: Value(b.isbn),
+                publisher: Value(b.publisher),
+                publishedYear: Value(b.publishedYear),
+                pageCount: Value(b.pageCount),
+                spineStyle: Value(spine),
+              ),
+            );
       }
     });
 
@@ -210,8 +373,9 @@ class LibraryRepository {
         final bytes = await client.downloadCover(b.id);
         if (bytes == null) continue;
         await local.writeAsBytes(bytes);
-        await (db.update(db.books)..where((x) => x.id.equals(b.id)))
-            .write(BooksCompanion(coverPath: Value(p.join('covers', '${b.id}.jpg'))));
+        await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
+          BooksCompanion(coverPath: Value(p.join('covers', '${b.id}.jpg'))),
+        );
       } catch (_) {
         // Leave this book cover-less; it still shows a generated spine.
       }
@@ -277,18 +441,22 @@ class LibraryRepository {
     // Note: drift table names are plural (books, authors, ...) while the
     // server's SQL schema uses singular names; sync happens over REST, so
     // only the column/relation structure needs to match.
-    final authorRows = await db.customSelect(
-      'SELECT a.name FROM authors a '
-      'JOIN book_authors ba ON ba.author_id = a.id '
-      'WHERE ba.book_id = ? ORDER BY ba.position',
-      variables: [Variable.withString(bookId)],
-    ).get();
-    final genreRows = await db.customSelect(
-      'SELECT g.name FROM genres g '
-      'JOIN book_genres bg ON bg.genre_id = g.id '
-      'WHERE bg.book_id = ? ORDER BY g.name',
-      variables: [Variable.withString(bookId)],
-    ).get();
+    final authorRows = await db
+        .customSelect(
+          'SELECT a.name FROM authors a '
+          'JOIN book_authors ba ON ba.author_id = a.id '
+          'WHERE ba.book_id = ? ORDER BY ba.position',
+          variables: [Variable.withString(bookId)],
+        )
+        .get();
+    final genreRows = await db
+        .customSelect(
+          'SELECT g.name FROM genres g '
+          'JOIN book_genres bg ON bg.genre_id = g.id '
+          'WHERE bg.book_id = ? ORDER BY g.name',
+          variables: [Variable.withString(bookId)],
+        )
+        .get();
     return (
       authors: [for (final r in authorRows) r.read<String>('name')],
       genres: [for (final r in genreRows) r.read<String>('name')],
@@ -296,9 +464,9 @@ class LibraryRepository {
   }
 
   Future<void> deleteBook(Book book) async {
-    final attachedFiles = await (db.select(db.bookFiles)
-          ..where((f) => f.bookId.equals(book.id)))
-        .get();
+    final attachedFiles = await (db.select(
+      db.bookFiles,
+    )..where((f) => f.bookId.equals(book.id))).get();
     await db.transaction(() async {
       // Explicit deletes rather than relying on FK cascades, so this works
       // on databases created before cascades were added to the schema.
@@ -308,15 +476,19 @@ class LibraryRepository {
         'book_files',
         'shelf_books',
       ]) {
-        await db.customStatement(
-            'DELETE FROM $table WHERE book_id = ?', [book.id]);
+        await db.customStatement('DELETE FROM $table WHERE book_id = ?', [
+          book.id,
+        ]);
       }
       await db.customStatement(
-          'DELETE FROM loans WHERE copy_id IN '
-          '(SELECT id FROM physical_copies WHERE book_id = ?)',
-          [book.id]);
+        'DELETE FROM loans WHERE copy_id IN '
+        '(SELECT id FROM physical_copies WHERE book_id = ?)',
+        [book.id],
+      );
       await db.customStatement(
-          'DELETE FROM physical_copies WHERE book_id = ?', [book.id]);
+        'DELETE FROM physical_copies WHERE book_id = ?',
+        [book.id],
+      );
       await (db.delete(db.books)..where((b) => b.id.equals(book.id))).go();
     });
     final cover = coverFileOf(book);

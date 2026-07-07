@@ -44,6 +44,7 @@ dependencies:
   file_selector: ^1.1.0
   crypto: ^3.0.7
   pdfrx: ^2.4.4
+  desktop_drop: ^0.7.1
 
 dev_dependencies:
   flutter_test:
