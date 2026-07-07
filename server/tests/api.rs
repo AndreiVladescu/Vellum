@@ -442,13 +442,14 @@ async fn public_link_reads_one_book_then_revokes() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
+    // The link URL is a friendly /p/{token} page; the token drives the API.
     let url = link["url"].as_str().unwrap();
-    // The public path is what a browser without an account would hit.
-    let path = url.strip_prefix("http://test.local").unwrap();
+    let token = url.rsplit('/').next().unwrap().to_string();
     let link_id = link["id"].as_str().unwrap();
 
-    // Anonymous read works (no token header).
-    let (status, body) = call(&app, "GET", path, None, None).await;
+    // Anonymous metadata read works (no token header).
+    let (status, body) =
+        call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["title"], json!("Dune"));
 
@@ -462,6 +463,72 @@ async fn public_link_reads_one_book_then_revokes() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let (status, _) = call(&app, "GET", path, None, None).await;
+    let (status, _) =
+        call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn one_time_link_downloads_exactly_once() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // Attach a file so there is something to download.
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=dune.pdf"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "application/pdf")
+        .body(Body::from(b"%PDF-1.4 hello".to_vec()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::OK
+    );
+
+    // A one-time link.
+    let (status, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book, "one_time": true })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let token = link["url"].as_str().unwrap().rsplit('/').next().unwrap().to_string();
+
+    // Metadata advertises a one-time download and doesn't consume it.
+    let (_, meta) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    assert_eq!(meta["download_available"], json!(true));
+    assert_eq!(meta["one_time"], json!(true));
+
+    // First download succeeds...
+    let first = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/public/{token}/file"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(first.status(), StatusCode::OK);
+
+    // ...the second is gone, and the link is now used up for metadata too.
+    let second = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/public/{token}/file"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(second.status(), StatusCode::NOT_FOUND);
+    let (status, _) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }

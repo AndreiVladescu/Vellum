@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vellum console</title>
+<style>
+  :root { color-scheme: light dark; --line:#e3dccd; --bg:#faf6ee; --fg:#2a241c;
+          --muted:#8a7c68; --accent:#7a5c3e; --chip:#efe7d6; --row:#fff; --alt:#f6f1e7; }
+  @media (prefers-color-scheme: dark) {
+    :root { --line:#3a3228; --bg:#171310; --fg:#e8e0d4; --muted:#9c8f79;
+            --accent:#a07c54; --chip:#2f2820; --row:#1e1913; --alt:#191510; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+         background:var(--bg); color:var(--fg); }
+  header { display:flex; align-items:center; gap:12px; padding:12px 18px;
+           border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; }
+  header h1 { font-size:1.15rem; margin:0; flex:0 0 auto; }
+  header .spacer { flex:1; }
+  .muted { color:var(--muted); }
+  button, select, input { font:inherit; }
+  .btn { border:1px solid var(--line); background:var(--row); color:var(--fg);
+         padding:7px 12px; border-radius:7px; cursor:pointer; }
+  .btn:hover { border-color:var(--accent); }
+  .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.danger { color:#b3261e; }
+  .btn[disabled] { opacity:.45; cursor:default; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+             padding:12px 18px; border-bottom:1px solid var(--line); position:sticky;
+             top:49px; background:var(--bg); z-index:4; }
+  .toolbar .group { display:flex; gap:6px; align-items:center; }
+  input[type=text], input[type=date], select {
+    padding:7px 9px; border:1px solid var(--line); border-radius:7px;
+    background:var(--row); color:var(--fg); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  thead th { position:sticky; top:99px; background:var(--alt); z-index:3; font-size:.85rem; }
+  tbody tr:nth-child(even) { background:var(--alt); }
+  tbody tr:nth-child(odd) { background:var(--row); }
+  tbody tr.sel { outline:2px solid var(--accent); outline-offset:-2px; }
+  td.year, td.actions { white-space:nowrap; }
+  .chip { display:inline-flex; align-items:center; gap:5px; background:var(--chip);
+          border-radius:999px; padding:3px 9px; margin:2px 3px 2px 0; font-size:.85rem; }
+  .chip button { border:0; background:none; color:var(--muted); cursor:pointer; padding:0; font-size:.95rem; line-height:1; }
+  .addtag { border:1px dashed var(--line); background:none; color:var(--muted);
+            border-radius:999px; padding:3px 9px; cursor:pointer; font-size:.85rem; }
+  #login { max-width:340px; margin:12vh auto; padding:26px; border:1px solid var(--line);
+           border-radius:12px; background:var(--row); }
+  #login h1 { margin-top:0; }
+  #login input { width:100%; margin:6px 0 12px; }
+  .err { color:#b3261e; min-height:1.2em; }
+  .hidden { display:none !important; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); display:grid; place-items:center; z-index:20; }
+  .modal { background:var(--row); border-radius:12px; padding:22px; width:min(420px,92vw); }
+  .modal h2 { margin-top:0; }
+  .modal label { display:block; margin:12px 0 4px; }
+  .modal .row { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+  .linkout { word-break:break-all; background:var(--alt); padding:10px; border-radius:8px; font-family:monospace; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+           background:var(--fg); color:var(--bg); padding:10px 16px; border-radius:8px; z-index:30; }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login">
+  <h1>Vellum console</h1>
+  <p class="muted">Sign in to manage the library.</p>
+  <input id="l-email" type="text" placeholder="Email" autocomplete="username">
+  <input id="l-pass" type="password" placeholder="Password" autocomplete="current-password">
+  <button class="btn primary" style="width:100%" onclick="login()">Log in</button>
+  <p class="err" id="l-err"></p>
+</div>
+
+<!-- App -->
+<div id="app" class="hidden">
+  <header>
+    <h1>Vellum</h1>
+    <span class="muted" id="who"></span>
+    <span class="spacer"></span>
+    <button class="btn" onclick="loadAll()">Refresh</button>
+    <button class="btn" onclick="logout()">Log out</button>
+  </header>
+
+  <div class="toolbar">
+    <div class="group">
+      <input id="newtag" type="text" placeholder="New tag name" style="width:150px">
+      <button class="btn" onclick="createTag()">Create tag</button>
+    </div>
+    <span class="muted">|</span>
+    <div class="group">
+      <select id="bulktag"></select>
+      <button class="btn" onclick="bulkTag(true)">Tag selected</button>
+      <button class="btn" onclick="bulkTag(false)">Untag selected</button>
+    </div>
+    <span class="muted">|</span>
+    <button class="btn danger" onclick="deleteSelected()">Delete selected</button>
+    <span class="spacer"></span>
+    <span class="muted" id="count"></span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:34px"><input type="checkbox" id="selall" onchange="toggleAll(this.checked)"></th>
+        <th>Title</th>
+        <th style="width:70px">Year</th>
+        <th>Tags</th>
+        <th style="width:120px">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+const S = { token: localStorage.getItem('vellum_token'), email: localStorage.getItem('vellum_email'),
+            books: [], groups: [], members: new Set(), selected: new Set() };
+
+function esc(s){ return (s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+function key(g,b){ return g+'|'+b; }
+
+async function api(method, path, body){
+  const res = await fetch(path, {
+    method,
+    headers: { 'content-type':'application/json', ...(S.token?{authorization:'Bearer '+S.token}:{}) },
+    body: body!==undefined ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401) { logout(); throw new Error('Session expired'); }
+  const data = res.status===204 ? null : await res.json().catch(()=>null);
+  if (!res.ok) throw new Error((data&&data.error) || ('HTTP '+res.status));
+  return data;
+}
+
+async function login(){
+  const email = document.getElementById('l-email').value.trim();
+  const pass = document.getElementById('l-pass').value;
+  const err = document.getElementById('l-err');
+  err.textContent = '';
+  try {
+    const r = await api('POST','/api/auth/login',{ email, password: pass });
+    S.token = r.token; S.email = r.user.email;
+    localStorage.setItem('vellum_token', S.token);
+    localStorage.setItem('vellum_email', S.email);
+    showApp();
+  } catch(e){ err.textContent = e.message; }
+}
+
+function logout(){
+  S.token=null; localStorage.removeItem('vellum_token'); localStorage.removeItem('vellum_email');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+}
+
+function showApp(){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('who').textContent = S.email || '';
+  loadAll();
+}
+
+async function loadAll(){
+  try {
+    const [books, groups, members] = await Promise.all([
+      api('GET','/api/books'), api('GET','/api/groups'), api('GET','/api/memberships'),
+    ]);
+    S.books = books; S.groups = groups;
+    S.members = new Set(members.map(m=>key(m.group_id,m.book_id)));
+    S.selected = new Set([...S.selected].filter(id=>books.some(b=>b.id===id)));
+    render();
+  } catch(e){ toast(e.message); }
+}
+
+function render(){
+  // bulk tag dropdown
+  const sel = document.getElementById('bulktag');
+  sel.innerHTML = S.groups.length
+    ? S.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')
+    : '<option value="">(no tags yet)</option>';
+
+  const rows = document.getElementById('rows');
+  rows.innerHTML = S.books.map(b=>{
+    const tags = S.groups.filter(g=>S.members.has(key(g.id,b.id)));
+    const chips = tags.map(g=>
+      `<span class="chip">${esc(g.name)}<button title="Remove tag" onclick="removeTag('${g.id}','${b.id}')">×</button></span>`
+    ).join('');
+    const checked = S.selected.has(b.id) ? 'checked' : '';
+    return `<tr class="${S.selected.has(b.id)?'sel':''}">
+      <td><input type="checkbox" ${checked} onchange="toggleRow('${b.id}',this.checked)"></td>
+      <td>${esc(b.title)}</td>
+      <td class="year">${b.published_year??''}</td>
+      <td>${chips}<button class="addtag" onclick="quickAdd(this,'${b.id}')">＋ tag</button></td>
+      <td class="actions"><button class="btn" onclick="openLink('${b.id}')">Link</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('count').textContent =
+    `${S.books.length} books · ${S.selected.size} selected`;
+  document.getElementById('selall').checked =
+    S.books.length>0 && S.selected.size===S.books.length;
+}
+
+function toggleRow(id, on){ on?S.selected.add(id):S.selected.delete(id); render(); }
+function toggleAll(on){ S.selected = on ? new Set(S.books.map(b=>b.id)) : new Set(); render(); }
+
+async function createTag(){
+  const input = document.getElementById('newtag');
+  const name = input.value.trim();
+  if (!name) return;
+  try { await api('POST','/api/groups',{ name }); input.value=''; await loadAll(); toast('Tag created'); }
+  catch(e){ toast(e.message); }
+}
+
+async function addMember(groupId, bookId){
+  if (S.members.has(key(groupId,bookId))) return;
+  await api('POST', `/api/groups/${groupId}/books`, { book_id: bookId });
+}
+async function removeTag(groupId, bookId){
+  try { await api('DELETE', `/api/groups/${groupId}/books/${bookId}`); await loadAll(); }
+  catch(e){ toast(e.message); }
+}
+
+async function bulkTag(add){
+  const groupId = document.getElementById('bulktag').value;
+  if (!groupId || S.selected.size===0) { toast('Pick a tag and select some books'); return; }
+  try {
+    for (const bookId of S.selected){
+      if (add) await addMember(groupId, bookId);
+      else if (S.members.has(key(groupId,bookId)))
+        await api('DELETE', `/api/groups/${groupId}/books/${bookId}`);
+    }
+    await loadAll(); toast(add?'Tagged':'Untagged');
+  } catch(e){ toast(e.message); }
+}
+
+function quickAdd(btn, bookId){
+  const avail = S.groups.filter(g=>!S.members.has(key(g.id,bookId)));
+  if (avail.length===0){ toast('No more tags — create one first'); return; }
+  const sel = document.createElement('select');
+  sel.innerHTML = '<option value="">Add tag…</option>' +
+    avail.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  sel.onchange = async ()=>{
+    if (!sel.value) return;
+    try { await addMember(sel.value, bookId); await loadAll(); }
+    catch(e){ toast(e.message); }
+  };
+  btn.replaceWith(sel); sel.focus();
+}
+
+async function deleteSelected(){
+  if (S.selected.size===0) return;
+  if (!confirm(`Delete ${S.selected.size} book(s)? This cannot be undone.`)) return;
+  try { for (const id of S.selected) await api('DELETE', `/api/books/${id}`);
+        S.selected.clear(); await loadAll(); toast('Deleted'); }
+  catch(e){ toast(e.message); }
+}
+
+function openLink(bookId){
+  const book = S.books.find(b=>b.id===bookId);
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <h2>Public link</h2>
+      <p class="muted">${esc(book?book.title:'')}</p>
+      <label><input type="checkbox" id="m-onetime"> One-time download</label>
+      <label>Expires on (optional)</label>
+      <input type="date" id="m-exp">
+      <div id="m-out"></div>
+      <div class="row">
+        <button class="btn" onclick="closeModal()">Close</button>
+        <button class="btn primary" id="m-create" onclick="createLink('${bookId}')">Create link</button>
+      </div>
+    </div>
+   </div>`;
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+
+async function createLink(bookId){
+  const oneTime = document.getElementById('m-onetime').checked;
+  const exp = document.getElementById('m-exp').value; // YYYY-MM-DD or ''
+  try {
+    const r = await api('POST','/api/share-links', {
+      book_id: bookId, one_time: oneTime, ...(exp?{expires_at:exp}:{}),
+    });
+    const out = document.getElementById('m-out');
+    out.innerHTML = `<label>Share this link</label>
+      <div class="linkout" id="m-url">${esc(r.url)}</div>
+      <div class="row"><button class="btn" onclick="copyUrl('${esc(r.url)}')">Copy</button></div>`;
+    document.getElementById('m-create').disabled = true;
+  } catch(e){ toast(e.message); }
+}
+function copyUrl(url){ navigator.clipboard.writeText(url).then(()=>toast('Copied')); }
+
+// boot
+if (S.token) showApp();
+</script>
+</body>
+</html>
