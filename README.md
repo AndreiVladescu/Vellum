@@ -48,5 +48,8 @@ cargo run            # starts the API on http://localhost:3000
 
 ## Status
 
-Early days — scaffolding and schema. See the build order in
-[DESIGN.md](DESIGN.md#build-order).
+The standalone app is functional: add books with online metadata, a spine/cover
+shelf, a PDF reader, and physical-copy loan tracking. The optional server adds
+multi-user accounts, RBAC, book groups, sharing, and public per-book links; the
+app can log in and pull a shared library. See the build order and the
+connected-mode sync roadmap in [DESIGN.md](DESIGN.md#build-order--status).
