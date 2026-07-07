@@ -200,6 +200,149 @@ class VellumServerClient {
     );
     _body(res);
   }
+
+  // ---- groups -------------------------------------------------------------
+
+  Future<List<ServerGroup>> listGroups() async {
+    final res = await _http.get(_uri('/api/groups'), headers: _headers);
+    return [
+      for (final g in _body(res) as List)
+        ServerGroup.fromJson(g as Map<String, dynamic>),
+    ];
+  }
+
+  Future<ServerGroup> createGroup(String name) async {
+    final res = await _http.post(_uri('/api/groups'),
+        headers: _headers, body: jsonEncode({'name': name}));
+    return ServerGroup.fromJson(_body(res) as Map<String, dynamic>);
+  }
+
+  Future<void> addBookToGroup(String groupId, String bookId) async {
+    final res = await _http.post(_uri('/api/groups/$groupId/books'),
+        headers: _headers, body: jsonEncode({'book_id': bookId}));
+    _body(res);
+  }
+
+  // ---- shares -------------------------------------------------------------
+
+  Future<List<ServerShare>> listShares() async {
+    final res = await _http.get(_uri('/api/shares'), headers: _headers);
+    return [
+      for (final s in _body(res) as List)
+        ServerShare.fromJson(s as Map<String, dynamic>),
+    ];
+  }
+
+  /// Grant [granteeEmail] access at [scope] ('all' | 'group' | 'book'); pass
+  /// [scopeId] for group/book scopes.
+  Future<void> createShare({
+    required String scope,
+    String? scopeId,
+    required String granteeEmail,
+    String permission = 'viewer',
+  }) async {
+    final res = await _http.post(
+      _uri('/api/shares'),
+      headers: _headers,
+      body: jsonEncode({
+        'scope': scope,
+        if (scopeId != null) 'scope_id': scopeId,
+        'grantee_email': granteeEmail,
+        'permission': permission,
+      }),
+    );
+    _body(res);
+  }
+
+  Future<void> deleteShare(String id) async {
+    final res = await _http.delete(_uri('/api/shares/$id'), headers: _headers);
+    _body(res);
+  }
+
+  // ---- public links -------------------------------------------------------
+
+  Future<List<ServerLink>> listLinks() async {
+    final res = await _http.get(_uri('/api/share-links'), headers: _headers);
+    return [
+      for (final l in _body(res) as List)
+        ServerLink.fromJson(l as Map<String, dynamic>),
+    ];
+  }
+
+  /// Mint a public link for [bookId]; returns the shareable URL (shown once).
+  Future<String> createShareLink(String bookId, {int? expiresInDays}) async {
+    final res = await _http.post(
+      _uri('/api/share-links'),
+      headers: _headers,
+      body: jsonEncode({
+        'book_id': bookId,
+        if (expiresInDays != null) 'expires_in_days': expiresInDays,
+      }),
+    );
+    return (_body(res) as Map<String, dynamic>)['url'] as String;
+  }
+
+  Future<void> deleteLink(String id) async {
+    final res =
+        await _http.delete(_uri('/api/share-links/$id'), headers: _headers);
+    _body(res);
+  }
+}
+
+/// A shareable book group on the server.
+class ServerGroup {
+  ServerGroup({required this.id, required this.name, required this.bookCount});
+  final String id;
+  final String name;
+  final int bookCount;
+  factory ServerGroup.fromJson(Map<String, dynamic> j) => ServerGroup(
+        id: j['id'] as String,
+        name: j['name'] as String? ?? '',
+        bookCount: j['book_count'] as int? ?? 0,
+      );
+}
+
+/// A grant of access from one account to another.
+class ServerShare {
+  ServerShare({
+    required this.id,
+    required this.scope,
+    required this.permission,
+    required this.granteeEmail,
+    this.scopeLabel,
+  });
+  final String id;
+  final String scope;
+  final String permission;
+  final String granteeEmail;
+  final String? scopeLabel;
+  factory ServerShare.fromJson(Map<String, dynamic> j) => ServerShare(
+        id: j['id'] as String,
+        scope: j['scope'] as String? ?? '',
+        permission: j['permission'] as String? ?? 'viewer',
+        granteeEmail: j['grantee_email'] as String? ?? '',
+        scopeLabel: j['scope_label'] as String?,
+      );
+}
+
+/// A public per-book link.
+class ServerLink {
+  ServerLink({
+    required this.id,
+    required this.bookTitle,
+    required this.revoked,
+    this.expiresAt,
+  });
+  final String id;
+  final String bookTitle;
+  final bool revoked;
+  final String? expiresAt;
+  factory ServerLink.fromJson(Map<String, dynamic> j) => ServerLink(
+        id: j['id'] as String,
+        bookTitle: j['book_title'] as String? ?? '',
+        revoked: j['revoked'] as bool? ?? false,
+        expiresAt: j['expires_at'] as String?,
+      );
 }
 
 /// Token + user returned by register/login.
