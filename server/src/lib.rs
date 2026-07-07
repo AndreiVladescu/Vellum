@@ -14,6 +14,7 @@ mod blobs;
 mod books;
 mod error;
 mod groups;
+mod opds;
 mod shares;
 
 /// Largest blob (book file) the server accepts in one upload.
@@ -83,6 +84,8 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/share-links/{id}", delete(shares::delete_link))
         .route("/api/public/{token}", get(shares::public_book))
+        // OPDS catalog for third-party e-readers (HTTP Basic auth).
+        .route("/opds", get(opds::feed))
         .layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES))
         .with_state(state)
 }

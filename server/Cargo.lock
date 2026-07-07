@@ -1848,6 +1848,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "axum",
+ "base64",
  "chrono",
  "hex",
  "rand_core",

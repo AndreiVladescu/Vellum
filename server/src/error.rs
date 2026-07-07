@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde_json::json;
@@ -21,6 +21,15 @@ pub type AppResult<T> = Result<T, AppError>;
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        // 401s carry a Basic challenge so OPDS e-readers show a login prompt.
+        if let AppError::Unauthorized(m) = &self {
+            return (
+                StatusCode::UNAUTHORIZED,
+                [(header::WWW_AUTHENTICATE, "Basic realm=\"Vellum\"")],
+                Json(json!({ "error": m })),
+            )
+                .into_response();
+        }
         let (status, message) = match self {
             AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m),
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m),

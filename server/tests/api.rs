@@ -381,6 +381,53 @@ async fn cover_upload_and_download_round_trips() {
 }
 
 #[tokio::test]
+async fn opds_feed_needs_basic_auth_and_lists_books() {
+    use base64::Engine;
+
+    let app = test_app().await;
+    let master = register_master(&app).await; // master@lib.test / masterpass1
+    create_book(&app, &master, "Dune").await;
+
+    // No credentials -> 401 with a Basic challenge (so e-readers prompt).
+    let unauth = app
+        .clone()
+        .oneshot(Request::builder().uri("/opds").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(unauth.status(), StatusCode::UNAUTHORIZED);
+    assert!(unauth.headers().contains_key("www-authenticate"));
+
+    // HTTP Basic email:password works and the feed lists the book.
+    let basic = base64::engine::general_purpose::STANDARD
+        .encode("master@lib.test:masterpass1");
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/opds")
+                .header("authorization", format!("Basic {basic}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(response
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .contains("opds-catalog"));
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let xml = String::from_utf8(bytes.to_vec()).unwrap();
+    assert!(xml.contains("<title>Dune</title>"));
+    assert!(xml.contains("opds-spec.org"));
+}
+
+#[tokio::test]
 async fn public_link_reads_one_book_then_revokes() {
     let app = test_app().await;
     let master = register_master(&app).await;
