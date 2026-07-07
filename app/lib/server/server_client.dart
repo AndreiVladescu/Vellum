@@ -154,6 +154,52 @@ class VellumServerClient {
     if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
     throw ServerException('Cover download failed (HTTP ${res.statusCode})');
   }
+
+  /// Upsert a book at [id] (create or update). Used to push local books up.
+  Future<void> pushBook({
+    required String id,
+    required String title,
+    String? subtitle,
+    String? description,
+    String? isbn,
+    String? publisher,
+    int? publishedYear,
+    int? pageCount,
+    String? spineStyle,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/books/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        'title': title,
+        'subtitle': subtitle,
+        'description': description,
+        'isbn': isbn,
+        'publisher': publisher,
+        'published_year': publishedYear,
+        'page_count': pageCount,
+        'spine_style': spineStyle,
+      }),
+    );
+    _body(res);
+  }
+
+  /// Upload (replace) a book's cover image.
+  Future<void> uploadCover(
+    String bookId,
+    Uint8List bytes, {
+    String contentType = 'image/jpeg',
+  }) async {
+    final res = await _http.put(
+      _uri('/api/books/$bookId/cover'),
+      headers: {
+        'content-type': contentType,
+        if (token != null) 'authorization': 'Bearer $token',
+      },
+      body: bytes,
+    );
+    _body(res);
+  }
 }
 
 /// Token + user returned by register/login.

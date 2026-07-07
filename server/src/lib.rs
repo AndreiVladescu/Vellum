@@ -53,7 +53,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/books", get(books::list).post(books::create))
         .route(
             "/api/books/{id}",
-            get(books::get).patch(books::update).delete(books::delete),
+            get(books::get)
+                .put(books::upsert)
+                .patch(books::update)
+                .delete(books::delete),
         )
         // Cover images and book files (filesystem-backed blobs).
         .route(

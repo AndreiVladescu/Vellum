@@ -90,6 +90,18 @@ class _ServerPageState extends State<ServerPage> {
         }
       });
 
+  Future<void> _push() => _run(() async {
+        final client = widget.connection.client;
+        if (client == null) return;
+        final count = await widget.repository.pushToServer(client);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Pushed $count book${count == 1 ? '' : 's'} '
+                'to the server.'),
+          ));
+        }
+      });
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,18 +138,29 @@ class _ServerPageState extends State<ServerPage> {
         Text('Sync', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         const Text(
-            'Pull the books shared with you on the server into your local '
-            'shelf. This is one-way for now — it never uploads or deletes.'),
+            'Pull the books shared with you into your local shelf, or push your '
+            'local books up to the server. Neither side deletes.'),
         const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _busy ? null : _pull,
-          icon: _busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.download),
-          label: const Text('Pull library'),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            FilledButton.icon(
+              onPressed: _busy ? null : _pull,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.download),
+              label: const Text('Pull library'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _push,
+              icon: const Icon(Icons.upload),
+              label: const Text('Push my books'),
+            ),
+          ],
         ),
         if (_error != null) ...[
           const SizedBox(height: 16),
