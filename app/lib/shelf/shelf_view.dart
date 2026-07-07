@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
+import '../settings/book_face.dart';
 import 'book_open_route.dart';
 import 'spine_style.dart';
 
@@ -10,6 +11,8 @@ const _bookAreaHeight = 175.0;
 const _boardHeight = 14.0;
 const _spineGap = 5.0;
 const _shelfPadding = 18.0;
+// Face-out covers are uniform, in a roughly 2:3 book aspect ratio.
+const _coverWidth = 116.0;
 
 /// The library as rows of wooden shelves holding book spines.
 ///
@@ -20,10 +23,14 @@ class ShelfView extends StatelessWidget {
     super.key,
     required this.books,
     required this.detailBuilder,
+    this.bookFace = BookFace.spine,
     this.coverFileOf,
   });
 
   final List<Book> books;
+
+  /// Whether books stand spine-out or face-out with their front cover.
+  final BookFace bookFace;
 
   /// Builds the page a book opens into (container-transform animation).
   final Widget Function(Book) detailBuilder;
@@ -44,6 +51,7 @@ class ShelfView extends StatelessWidget {
         itemCount: rows.length,
         itemBuilder: (context, i) => _ShelfRow(
           row: rows[i],
+          bookFace: bookFace,
           detailBuilder: detailBuilder,
           coverFileOf: coverFileOf,
         ),
@@ -51,11 +59,15 @@ class ShelfView extends StatelessWidget {
     });
   }
 
+  double _widthOf(Book book) => bookFace == BookFace.cover
+      ? _coverWidth
+      : SpineStyle.fromJson(book.spineStyle, title: book.title).width;
+
   List<List<Book>> _packIntoRows(double rowWidth) {
     final rows = <List<Book>>[[]];
     var used = 0.0;
     for (final book in books) {
-      final w = SpineStyle.fromJson(book.spineStyle, title: book.title).width;
+      final w = _widthOf(book);
       if (rows.last.isNotEmpty && used + _spineGap + w > rowWidth) {
         rows.add([]);
         used = 0.0;
@@ -70,21 +82,22 @@ class ShelfView extends StatelessWidget {
 class _ShelfRow extends StatelessWidget {
   const _ShelfRow({
     required this.row,
+    required this.bookFace,
     required this.detailBuilder,
     required this.coverFileOf,
   });
 
   final List<Book> row;
+  final BookFace bookFace;
   final Widget Function(Book) detailBuilder;
   final File? Function(Book)? coverFileOf;
 
-  void _openBook(BuildContext spineContext, Book book) {
-    final box = spineContext.findRenderObject()! as RenderBox;
+  void _openBook(BuildContext bookContext, Book book, Widget face) {
+    final box = bookContext.findRenderObject()! as RenderBox;
     final rect = box.localToGlobal(Offset.zero) & box.size;
-    final coverFile = coverFileOf?.call(book);
-    Navigator.of(spineContext).push(BookOpenRoute(
-      spineRect: rect,
-      spineFace: BookSpine(book: book, coverFile: coverFile),
+    Navigator.of(bookContext).push(BookOpenRoute(
+      bookRect: rect,
+      bookFace: face,
       detailBuilder: (_) => detailBuilder(book),
     ));
   }
@@ -103,15 +116,26 @@ class _ShelfRow extends StatelessWidget {
               for (final book in row)
                 Padding(
                   padding: const EdgeInsets.only(right: _spineGap),
-                  // Builder gives each spine its own context so we can
-                  // measure where it sits — the take-out animation starts
-                  // from that exact spot on the shelf.
+                  // Builder gives each book its own context so we can measure
+                  // where it sits — the pull-out animation starts from that
+                  // exact spot on the shelf.
                   child: Builder(
-                    builder: (spineContext) => BookSpine(
-                      book: book,
-                      coverFile: coverFileOf?.call(book),
-                      onTap: () => _openBook(spineContext, book),
-                    ),
+                    builder: (bookContext) {
+                      final coverFile = coverFileOf?.call(book);
+                      Widget face({VoidCallback? onTap}) =>
+                          bookFace == BookFace.cover
+                              ? BookCover(
+                                  book: book,
+                                  coverFile: coverFile,
+                                  onTap: onTap)
+                              : BookSpine(
+                                  book: book,
+                                  coverFile: coverFile,
+                                  onTap: onTap);
+                      return face(
+                        onTap: () => _openBook(bookContext, book, face()),
+                      );
+                    },
                   ),
                 ),
             ],
@@ -292,4 +316,74 @@ class BookSpine extends StatelessWidget {
           borderRadius: BorderRadius.circular(2),
         ),
       );
+}
+
+/// A single book shown face-out with its front cover — the downloaded cover
+/// image if there is one, otherwise a cover generated in the book's spine
+/// style. Used when the shelf is in [BookFace.cover] mode.
+class BookCover extends StatelessWidget {
+  const BookCover({
+    super.key,
+    required this.book,
+    this.onTap,
+    this.coverFile,
+  });
+
+  final Book book;
+  final VoidCallback? onTap;
+  final File? coverFile;
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = coverFile;
+    final hasCover = cover != null && cover.existsSync();
+    return GestureDetector(
+      onTap: onTap,
+      child: Tooltip(
+        message: book.title,
+        waitDuration: const Duration(milliseconds: 600),
+        child: SizedBox(
+          width: _coverWidth,
+          height: _bookAreaHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: hasCover
+                ? Image.file(cover, fit: BoxFit.cover)
+                : _generatedCover(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Front cover synthesized from the spine style, for books without art.
+  Widget _generatedCover() {
+    final style = SpineStyle.fromJson(book.spineStyle, title: book.title);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(style.color, Colors.white, 0.10)!,
+            Color.lerp(style.color, Colors.black, 0.15)!,
+          ],
+        ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Center(
+        child: Text(
+          book.title,
+          textAlign: TextAlign.center,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: style.textColor,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
 }
