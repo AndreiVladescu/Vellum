@@ -19,7 +19,7 @@ class LibraryRepository {
   LibraryRepository._(this.db, this.metadata, this._dataDir);
 
   final VellumDatabase db;
-  final OpenLibraryClient metadata;
+  final MetadataService metadata;
   final Directory _dataDir;
 
   static const _uuid = Uuid();
@@ -28,7 +28,7 @@ class LibraryRepository {
     final dir = await getApplicationSupportDirectory();
     await Directory(p.join(dir.path, 'covers')).create(recursive: true);
     await Directory(p.join(dir.path, 'files')).create(recursive: true);
-    return LibraryRepository._(db, OpenLibraryClient(), dir);
+    return LibraryRepository._(db, MetadataService(), dir);
   }
 
   Stream<List<Book>> watchAllBooks() => db.watchAllBooks();
@@ -122,9 +122,9 @@ class LibraryRepository {
     final id = _uuid.v4();
 
     // Network work first, outside the transaction.
-    final description = await metadata.fetchDescription(result.workKey);
+    final description = await metadata.descriptionOf(result);
     String? coverPath;
-    final coverBytes = await metadata.downloadCover(result.coverId);
+    final coverBytes = await metadata.downloadCover(result);
     if (coverBytes != null) {
       coverPath = p.join('covers', '$id.jpg');
       await File(p.join(_dataDir.path, coverPath)).writeAsBytes(coverBytes);
