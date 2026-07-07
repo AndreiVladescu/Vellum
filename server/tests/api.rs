@@ -307,6 +307,40 @@ async fn all_scope_share_exposes_whole_library() {
 }
 
 #[tokio::test]
+async fn put_upserts_a_book_at_a_chosen_id() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    // Create at a client-chosen id.
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/books/my-local-id",
+        Some(&master),
+        Some(json!({ "title": "Pushed", "page_count": 100 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["id"], json!("my-local-id"));
+    assert_eq!(body["title"], json!("Pushed"));
+
+    // PUT again updates the same row rather than creating a new one.
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/books/my-local-id",
+        Some(&master),
+        Some(json!({ "title": "Pushed v2" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["title"], json!("Pushed v2"));
+
+    let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    assert_eq!(list.as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn cover_upload_and_download_round_trips() {
     let app = test_app().await;
     let master = register_master(&app).await;

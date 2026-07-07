@@ -219,6 +219,43 @@ class LibraryRepository {
     return books.length;
   }
 
+  /// Pushes local books (and their covers) up to the server, upserting by id so
+  /// pull and push stay consistent. Books the caller can't write on the server
+  /// (e.g. shared read-only) are skipped. Returns the number pushed.
+  Future<int> pushToServer(VellumServerClient client) async {
+    final books = await db.select(db.books).get();
+    var pushed = 0;
+    for (final b in books) {
+      try {
+        await client.pushBook(
+          id: b.id,
+          title: b.title,
+          subtitle: b.subtitle,
+          description: b.description,
+          isbn: b.isbn,
+          publisher: b.publisher,
+          publishedYear: b.publishedYear,
+          pageCount: b.pageCount,
+          spineStyle: b.spineStyle,
+        );
+        final cover = coverFileOf(b);
+        if (cover != null && await cover.exists()) {
+          await client.uploadCover(
+            b.id,
+            await cover.readAsBytes(),
+            contentType: p.extension(cover.path).toLowerCase() == '.png'
+                ? 'image/png'
+                : 'image/jpeg',
+          );
+        }
+        pushed++;
+      } on ServerException {
+        // Read-only or rejected — leave it and keep going.
+      }
+    }
+    return pushed;
+  }
+
   /// Get-or-create for the name-keyed lookup tables (authors, genres).
   Future<String> _idForName(TableInfo table, String name) async {
     final existing = await db

@@ -112,6 +112,76 @@ pub async fn create(
     fetch_book(&state, &id).await
 }
 
+/// Upsert a book at a caller-chosen id — the app pushes local books this way so
+/// ids stay consistent across push and pull. Creates it (owned by the caller)
+/// if absent, otherwise updates it (requires editor access). `cover_path` and
+/// `spine_style` are preserved when omitted, since covers sync separately.
+pub async fn upsert(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+    Json(input): Json<BookInput>,
+) -> AppResult<Json<BookDto>> {
+    if input.title.trim().is_empty() {
+        return Err(AppError::BadRequest("title is required".into()));
+    }
+    let owner: Option<Option<String>> = sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?;
+
+    match owner {
+        Some(_) => {
+            if !book_access(&state, &user, &id).await?.can_edit() {
+                return Err(AppError::Forbidden(
+                    "you have read-only access to this book".into(),
+                ));
+            }
+            sqlx::query(
+                "UPDATE book SET title = ?, subtitle = ?, description = ?, isbn = ?, \
+                    publisher = ?, published_year = ?, page_count = ?, \
+                    cover_path = COALESCE(?, cover_path), \
+                    spine_style = COALESCE(?, spine_style), \
+                    updated_at = datetime('now') \
+                 WHERE id = ?",
+            )
+            .bind(input.title.trim())
+            .bind(&input.subtitle)
+            .bind(&input.description)
+            .bind(&input.isbn)
+            .bind(&input.publisher)
+            .bind(input.published_year)
+            .bind(input.page_count)
+            .bind(&input.cover_path)
+            .bind(&input.spine_style)
+            .bind(&id)
+            .execute(&state.db)
+            .await?;
+        }
+        None => {
+            sqlx::query(
+                "INSERT INTO book (id, title, subtitle, description, isbn, publisher, \
+                    published_year, page_count, cover_path, spine_style, owner_id) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&id)
+            .bind(input.title.trim())
+            .bind(&input.subtitle)
+            .bind(&input.description)
+            .bind(&input.isbn)
+            .bind(&input.publisher)
+            .bind(input.published_year)
+            .bind(input.page_count)
+            .bind(&input.cover_path)
+            .bind(&input.spine_style)
+            .bind(&user.id)
+            .execute(&state.db)
+            .await?;
+        }
+    }
+    fetch_book(&state, &id).await
+}
+
 pub async fn get(
     State(state): State<AppState>,
     user: AuthUser,

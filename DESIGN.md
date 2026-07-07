@@ -137,8 +137,8 @@ one-way, metadata-only pull. Remaining work, in order:
 2. 🚧 **App: pull covers & files** — a pull now downloads each book's cover so
    shelves show real art. On-demand book-*file* download (to read a synced book)
    still to come.
-3. **App: push** — upload local-only books (and their covers) to the server,
-   making the sync two-way.
+3. ✅ **App: push** — upload local books (and their covers) to the server via an
+   id-preserving `PUT /api/books/{id}` upsert, making the sync two-way.
 4. **App: manage groups & shares** — in-app UI over the existing group, share,
    and public-link endpoints (create a group, add books, share with a user,
    mint a public link).
