@@ -39,6 +39,7 @@
   tbody tr:nth-child(even) { background:var(--alt); }
   tbody tr:nth-child(odd) { background:var(--row); }
   tbody tr.sel { outline:2px solid var(--accent); outline-offset:-2px; }
+  tbody tr.drop { outline:2px dashed var(--accent); outline-offset:-2px; background:var(--chip); }
   td.year, td.actions { white-space:nowrap; }
   .chip { display:inline-flex; align-items:center; gap:5px; background:var(--chip);
           border-radius:999px; padding:3px 9px; margin:2px 3px 2px 0; font-size:.85rem; }
@@ -84,6 +85,8 @@
   </header>
 
   <div class="toolbar">
+    <button class="btn primary" onclick="newBook()">＋ New book</button>
+    <span class="muted">|</span>
     <div class="group">
       <input id="newtag" type="text" placeholder="New tag name" style="width:150px">
       <button class="btn" onclick="createTag()">Create tag</button>
@@ -190,12 +193,17 @@ function render(){
       `<span class="chip">${esc(g.name)}<button title="Remove tag" onclick="removeTag('${g.id}','${b.id}')">×</button></span>`
     ).join('');
     const checked = S.selected.has(b.id) ? 'checked' : '';
-    return `<tr class="${S.selected.has(b.id)?'sel':''}">
+    return `<tr class="${S.selected.has(b.id)?'sel':''}"
+        ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropOn(event,'${b.id}',this)"
+        title="Drop a PDF/EPUB or cover image here">
       <td><input type="checkbox" ${checked} onchange="toggleRow('${b.id}',this.checked)"></td>
       <td>${esc(b.title)}</td>
       <td class="year">${b.published_year??''}</td>
       <td>${chips}<button class="addtag" onclick="quickAdd(this,'${b.id}')">＋ tag</button></td>
-      <td class="actions"><button class="btn" onclick="openLink('${b.id}')">Link</button></td>
+      <td class="actions">
+        <button class="btn" onclick="pickUpload('${b.id}')">Upload</button>
+        <button class="btn" onclick="openLink('${b.id}')">Link</button>
+      </td>
     </tr>`;
   }).join('');
   document.getElementById('count').textContent =
@@ -206,6 +214,59 @@ function render(){
 
 function toggleRow(id, on){ on?S.selected.add(id):S.selected.delete(id); render(); }
 function toggleAll(on){ S.selected = on ? new Set(S.books.map(b=>b.id)) : new Set(); render(); }
+
+function newBook(){
+  const title = prompt('New book title');
+  if (!title || !title.trim()) return;
+  api('POST','/api/books',{ title: title.trim() })
+    .then(()=>loadAll()).then(()=>toast('Book created')).catch(e=>toast(e.message));
+}
+
+// Classify a dropped/picked file by its magic bytes (not just its name).
+async function classify(file){
+  const buf = new Uint8Array(await file.slice(0,16).arrayBuffer());
+  const m = sig => sig.every((byte,i)=>buf[i]===byte);
+  if (m([0x25,0x50,0x44,0x46])) return 'pdf';                       // %PDF
+  if (m([0xFF,0xD8,0xFF]) || m([0x89,0x50,0x4E,0x47]) || m([0x47,0x49,0x46,0x38])) return 'image';
+  if (m([0x50,0x4B,0x03,0x04]) && file.name.toLowerCase().endsWith('.epub')) return 'epub';
+  return 'unsupported';
+}
+
+async function uploadTo(id, file){
+  const kind = await classify(file);
+  const auth = { authorization: 'Bearer ' + S.token };
+  try {
+    if (kind === 'image'){
+      const res = await fetch('/api/books/'+id+'/cover',
+        { method:'PUT', headers:{...auth,'content-type':file.type||'image/jpeg'}, body:file });
+      if (!res.ok) throw new Error('Cover upload failed');
+      toast('Cover updated'); await loadAll();
+    } else if (kind === 'pdf' || kind === 'epub'){
+      const mime = kind==='epub' ? 'application/epub+zip' : 'application/pdf';
+      const res = await fetch('/api/books/'+id+'/files?filename='+encodeURIComponent(file.name),
+        { method:'POST', headers:{...auth,'content-type':mime}, body:file });
+      if (!res.ok) throw new Error('File upload failed');
+      toast('Uploaded ' + file.name);
+    } else {
+      toast('Only PDF, EPUB, or image files are accepted');
+    }
+  } catch(e){ toast(e.message); }
+}
+
+function pickUpload(id){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.pdf,.epub,image/*';
+  input.onchange = ()=>{ if (input.files[0]) uploadTo(id, input.files[0]); };
+  input.click();
+}
+
+function dragOver(e, tr){ e.preventDefault(); tr.classList.add('drop'); }
+function dragLeave(tr){ tr.classList.remove('drop'); }
+function dropOn(e, id, tr){
+  e.preventDefault(); tr.classList.remove('drop');
+  const f = e.dataTransfer.files[0];
+  if (f) uploadTo(id, f);
+}
 
 async function createTag(){
   const input = document.getElementById('newtag');
