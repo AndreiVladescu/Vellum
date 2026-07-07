@@ -22,6 +22,11 @@ depend on the server being reachable.
 - App: drift tables in `app/lib/data/database.dart` (codegen → `database.g.dart`)
 - Server: SQL migrations in `server/migrations/`
 
+Exception: a few `book` columns are **app-local-only by design** and must NOT be
+added to the server schema or sync payloads — reading state, `readerNotes`
+(personal), and `sourceMetadata` (the import snapshot behind "revert to
+defaults").
+
 IDs are UUID strings. Book files and cover images live on the filesystem; the
 DB stores paths and hashes only. Loans are a separate table from physical
 copies so lending history is preserved (active loan = `returned_at IS NULL`).
