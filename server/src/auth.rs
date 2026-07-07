@@ -28,25 +28,61 @@ impl FromRequestParts<AppState> for AuthUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let token = parts
+        let header = parts
             .headers
             .get(AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
+            .ok_or_else(|| AppError::Unauthorized("missing credentials".into()))?;
 
-        let user = sqlx::query_as::<_, AuthUser>(
-            "SELECT u.id, u.email, u.display_name, u.is_master \
-             FROM session s JOIN app_user u ON u.id = s.user_id \
-             WHERE s.token_hash = ? AND s.expires_at > datetime('now')",
-        )
-        .bind(sha256_hex(token))
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::Unauthorized("invalid or expired token".into()))?;
-
-        Ok(user)
+        // Bearer for the app; Basic so OPDS e-readers (and file downloads) work.
+        if let Some(token) = header.strip_prefix("Bearer ") {
+            user_from_token(state, token).await
+        } else if let Some(encoded) = header.strip_prefix("Basic ") {
+            user_from_basic(state, encoded).await
+        } else {
+            Err(AppError::Unauthorized("unsupported authorization scheme".into()))
+        }
     }
+}
+
+async fn user_from_token(state: &AppState, token: &str) -> AppResult<AuthUser> {
+    sqlx::query_as::<_, AuthUser>(
+        "SELECT u.id, u.email, u.display_name, u.is_master \
+         FROM session s JOIN app_user u ON u.id = s.user_id \
+         WHERE s.token_hash = ? AND s.expires_at > datetime('now')",
+    )
+    .bind(sha256_hex(token))
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::Unauthorized("invalid or expired token".into()))
+}
+
+async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser> {
+    use base64::Engine;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .ok()
+        .and_then(|b| String::from_utf8(b).ok())
+        .ok_or_else(|| AppError::Unauthorized("malformed basic credentials".into()))?;
+    let (email, password) = decoded
+        .split_once(':')
+        .ok_or_else(|| AppError::Unauthorized("malformed basic credentials".into()))?;
+
+    let row = sqlx::query_as::<_, (String, String, String, bool, String)>(
+        "SELECT id, email, display_name, is_master, password_hash \
+         FROM app_user WHERE email = ?",
+    )
+    .bind(email.trim().to_lowercase())
+    .fetch_optional(&state.db)
+    .await?;
+
+    let Some((id, email, display_name, is_master, password_hash)) = row else {
+        return Err(AppError::Unauthorized("invalid email or password".into()));
+    };
+    if !verify_password(password, &password_hash) {
+        return Err(AppError::Unauthorized("invalid email or password".into()));
+    }
+    Ok(AuthUser { id, email, display_name, is_master })
 }
 
 /// Rejects non-master callers — used to guard administrative endpoints.

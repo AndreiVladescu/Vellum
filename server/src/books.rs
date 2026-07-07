@@ -56,11 +56,8 @@ pub struct BookUpdate {
 
 /// Every book the caller can see: the ones they own, plus everything reachable
 /// through a share (whole-library, group, or single-book), plus everything if
-/// they are the master.
-pub async fn list(
-    State(state): State<AppState>,
-    user: AuthUser,
-) -> AppResult<Json<Vec<BookDto>>> {
+/// they are the master. Shared by the JSON list and the OPDS feed.
+pub async fn visible_books(state: &AppState, user: &AuthUser) -> AppResult<Vec<BookDto>> {
     let books = sqlx::query_as::<_, BookDto>(&format!(
         "SELECT {BOOK_COLUMNS} FROM book b \
          WHERE b.owner_id = ? \
@@ -79,7 +76,14 @@ pub async fn list(
     .bind(&user.id)
     .fetch_all(&state.db)
     .await?;
-    Ok(Json(books))
+    Ok(books)
+}
+
+pub async fn list(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Vec<BookDto>>> {
+    Ok(Json(visible_books(&state, &user).await?))
 }
 
 pub async fn create(

@@ -82,8 +82,10 @@ own it, or reach it through any share (all / group / book). Editing needs
 `/api/books`, `/api/groups`, `/api/shares`, `/api/share-links`, and the
 unauthenticated `/api/public/{token}`. Cover images and book files are stored
 as filesystem blobs under `VELLUM_DATA_DIR` and served, access-checked, from
-`/api/books/{id}/cover` and `/api/files/{id}`. Port is `VELLUM_PORT` (default
-3000), public link base is `VELLUM_PUBLIC_URL`.
+`/api/books/{id}/cover` and `/api/files/{id}`. Auth is a bearer token or HTTP
+Basic (email:password), the latter so e-readers can use the OPDS catalog at
+`/opds`. Port is `VELLUM_PORT` (default 3000), public link base is
+`VELLUM_PUBLIC_URL`.
 
 ## Data model
 
@@ -142,8 +144,8 @@ one-way, metadata-only pull. Remaining work, in order:
 4. ✅ **App: manage groups & shares** — a Sharing screen over the group, share,
    and public-link endpoints (create a group, add books, share the library /
    a group / a book with a user, mint and revoke public links).
-5. **OPDS feed** — expose the library as an OPDS catalog for third-party
-   e-readers.
+5. ✅ **OPDS feed** — `/opds` serves an OPDS acquisition catalog (HTTP Basic
+   auth) so third-party e-readers can browse and download books.
 
 ## Repo layout
 
