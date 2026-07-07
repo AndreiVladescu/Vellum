@@ -85,7 +85,6 @@ class _ShelfRow extends StatelessWidget {
     Navigator.of(spineContext).push(BookOpenRoute(
       spineRect: rect,
       spineFace: BookSpine(book: book, coverFile: coverFile),
-      coverFace: BookFrontCover(book: book, coverFile: coverFile),
       detailBuilder: (_) => detailBuilder(book),
     ));
   }
@@ -293,51 +292,4 @@ class BookSpine extends StatelessWidget {
           borderRadius: BorderRadius.circular(2),
         ),
       );
-}
-
-/// The book's front face, shown mid-flight when the take-out animation flips
-/// the book around: the cover image if we have one, otherwise a front
-/// generated in the spine's style.
-class BookFrontCover extends StatelessWidget {
-  const BookFrontCover({super.key, required this.book, this.coverFile});
-
-  final Book book;
-  final File? coverFile;
-
-  @override
-  Widget build(BuildContext context) {
-    final cover = coverFile;
-    if (cover != null && cover.existsSync()) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Image.file(cover, fit: BoxFit.cover),
-      );
-    }
-    final style = SpineStyle.fromJson(book.spineStyle, title: book.title);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(style.color, Colors.white, 0.10)!,
-            Color.lerp(style.color, Colors.black, 0.15)!,
-          ],
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: Text(
-          book.title,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: style.textColor,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
 }
