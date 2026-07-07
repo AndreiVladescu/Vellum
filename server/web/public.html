@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vellum — shared book</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #f4efe6; color: #2a241c;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #171310; color: #e8e0d4; }
+    .card { background: #221c16 !important; box-shadow: none !important; }
+    .btn { background: #7a5c3e !important; }
+  }
+  .card {
+    max-width: 480px; margin: 24px; padding: 28px; border-radius: 14px;
+    background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.12);
+  }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .authors { color: #8a7c68; margin: 0 0 16px; }
+  .desc { line-height: 1.5; white-space: pre-wrap; }
+  .btn {
+    display: inline-block; margin-top: 20px; padding: 12px 20px; border: 0;
+    border-radius: 8px; background: #7a5c3e; color: #fff; font-size: 1rem;
+    text-decoration: none; cursor: pointer;
+  }
+  .btn[disabled] { opacity: .5; pointer-events: none; }
+  .note { margin-top: 14px; font-size: .85rem; color: #8a7c68; }
+  .err { color: #b3261e; }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <p id="status">Loading…</p>
+  </div>
+<script>
+  const token = location.pathname.split('/').filter(Boolean).pop();
+  const card = document.getElementById('card');
+
+  function esc(s) {
+    return (s ?? '').replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  async function load() {
+    try {
+      const res = await fetch('/api/public/' + encodeURIComponent(token));
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        card.innerHTML = '<p class="err">' +
+          esc(body.error || 'This link is invalid or has expired.') + '</p>';
+        return;
+      }
+      const b = await res.json();
+      const authors = (b.authors || []).join(', ');
+      const bits = [];
+      if (b.published_year) bits.push(b.published_year);
+      if (b.publisher) bits.push(esc(b.publisher));
+      let html = '<h1>' + esc(b.title) + '</h1>';
+      if (authors) html += '<p class="authors">' + esc(authors) + '</p>';
+      if (b.description) html += '<p class="desc">' + esc(b.description) + '</p>';
+      if (b.download_available) {
+        html += '<a class="btn" href="/api/public/' + encodeURIComponent(token) +
+          '/file">Download</a>';
+        if (b.one_time) html += '<p class="note">This is a one-time download — ' +
+          'the link stops working afterwards.</p>';
+      } else {
+        html += '<p class="note">No downloadable file is attached to this book.</p>';
+      }
+      if (bits.length) html += '<p class="note">' + bits.join(' · ') + '</p>';
+      card.innerHTML = html;
+    } catch (e) {
+      card.innerHTML = '<p class="err">Could not load this book.</p>';
+    }
+  }
+  load();
+</script>
+</body>
+</html>

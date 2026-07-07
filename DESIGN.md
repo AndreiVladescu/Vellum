@@ -73,8 +73,10 @@ single-user and offline. These tables are **server-only** (migration
   (the owner's whole library), `group`, or `book`; `permission` is `viewer`
   (read) or `editor` (read + modify).
 - **share_link** — a public link (SHA-256 stored) giving anonymous **read**
-  access to a **single** book, for people without an account. Optional expiry;
-  revocable.
+  access to a **single** book, for people without an account. Optional expiry
+  (a date or `+N days`) and an optional use cap (`max_uses = 1` → a one-time
+  download); revocable. `/p/{token}` is a friendly landing page and
+  `/api/public/{token}/file` is the (use-consuming) download.
 
 Access is resolved per request: a caller may see a book if they are the master,
 own it, or reach it through any share (all / group / book). Editing needs
@@ -86,6 +88,13 @@ as filesystem blobs under `VELLUM_DATA_DIR` and served, access-checked, from
 Basic (email:password), the latter so e-readers can use the OPDS catalog at
 `/opds`. Port is `VELLUM_PORT` (default 3000), public link base is
 `VELLUM_PUBLIC_URL`.
+
+The server also hosts its own **web admin console** at `/` (embedded HTML/JS,
+no external assets): a spreadsheet-like table of books where you select rows,
+add/remove tags (groups) in bulk or per book, delete several at once, and mint
+public links with an expiry date and one-time-download option. It is the
+primary way to manage the library; the app's Sharing screen covers the same
+endpoints for on-device use.
 
 ## Data model
 
@@ -146,6 +155,9 @@ one-way, metadata-only pull. Remaining work, in order:
    a group / a book with a user, mint and revoke public links).
 5. ✅ **OPDS feed** — `/opds` serves an OPDS acquisition catalog (HTTP Basic
    auth) so third-party e-readers can browse and download books.
+6. ✅ **Web admin console** — server-hosted spreadsheet-like UI at `/` to manage
+   books, tags/groups (bulk), deletions, and public links with expiry +
+   one-time download; friendly public landing page at `/p/{token}`.
 
 ## Repo layout
 

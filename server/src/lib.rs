@@ -16,6 +16,7 @@ mod error;
 mod groups;
 mod opds;
 mod shares;
+mod web;
 
 /// Largest blob (book file) the server accepts in one upload.
 const MAX_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
@@ -45,6 +46,10 @@ pub async fn connect_db(path: &str) -> anyhow::Result<SqlitePool> {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        // Web admin console + public landing page.
+        .route("/", get(web::console))
+        .route("/p/{token}", get(web::public_page))
+        .route("/api/memberships", get(web::memberships))
         // Accounts & sessions.
         .route("/api/auth/register", post(auth::register))
         .route("/api/auth/login", post(auth::login))
@@ -84,6 +89,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/share-links/{id}", delete(shares::delete_link))
         .route("/api/public/{token}", get(shares::public_book))
+        .route("/api/public/{token}/file", get(shares::public_file))
         // OPDS catalog for third-party e-readers (HTTP Basic auth).
         .route("/opds", get(opds::feed))
         .layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES))

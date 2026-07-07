@@ -157,6 +157,8 @@ pub struct LinkDto {
     pub permission: String,
     pub created_at: String,
     pub expires_at: Option<String>,
+    pub max_uses: Option<i64>,
+    pub use_count: i64,
     pub revoked: bool,
 }
 
@@ -166,6 +168,13 @@ pub struct LinkInput {
     pub permission: Option<String>,
     /// Days until the link expires; omit for a link that never expires.
     pub expires_in_days: Option<i64>,
+    /// Explicit expiry: a date (`YYYY-MM-DD`, inclusive) or full timestamp.
+    /// Takes precedence over `expires_in_days`.
+    pub expires_at: Option<String>,
+    /// Cap on the number of downloads; omit for unlimited.
+    pub max_uses: Option<i64>,
+    /// Convenience for `max_uses = 1` (a one-time download).
+    pub one_time: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -183,7 +192,7 @@ pub async fn list_links(
 ) -> AppResult<Json<Vec<LinkDto>>> {
     let links = sqlx::query_as::<_, LinkDto>(
         "SELECT l.id, l.book_id, b.title AS book_title, l.permission, l.created_at, \
-            l.expires_at, l.revoked \
+            l.expires_at, l.max_uses, l.use_count, l.revoked \
          FROM share_link l JOIN book b ON b.id = l.book_id \
          WHERE ? = 1 OR l.owner_id = ? \
          ORDER BY l.created_at DESC",
@@ -210,32 +219,52 @@ pub async fn create_link(
         hex::encode(bytes)
     };
     let id = uuid::Uuid::new_v4().to_string();
-    let modifier = input.expires_in_days.map(|d| format!("+{d} days"));
+
+    // Prefer an explicit date; a bare YYYY-MM-DD is treated as end-of-day so the
+    // link stays valid through that whole day. Otherwise fall back to +N days.
+    let expires_at: Option<String> = if let Some(raw) = input.expires_at.as_deref() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            None
+        } else if trimmed.len() == 10 {
+            Some(format!("{trimmed} 23:59:59"))
+        } else {
+            Some(trimmed.to_string())
+        }
+    } else {
+        input.expires_in_days.map(|d| {
+            (chrono::Utc::now() + chrono::Duration::days(d))
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+        })
+    };
+
+    let max_uses = if input.one_time.unwrap_or(false) {
+        Some(1)
+    } else {
+        input.max_uses
+    };
 
     sqlx::query(
-        "INSERT INTO share_link (id, owner_id, book_id, token_hash, permission, expires_at) \
-         VALUES (?, ?, ?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE datetime('now', ?) END)",
+        "INSERT INTO share_link \
+            (id, owner_id, book_id, token_hash, permission, expires_at, max_uses) \
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&user.id)
     .bind(&input.book_id)
     .bind(sha256_hex(&token))
     .bind(&permission)
-    .bind(&modifier)
-    .bind(&modifier)
+    .bind(&expires_at)
+    .bind(max_uses)
     .execute(&state.db)
     .await?;
-
-    let expires_at: Option<String> =
-        sqlx::query_scalar("SELECT expires_at FROM share_link WHERE id = ?")
-            .bind(&id)
-            .fetch_one(&state.db)
-            .await?;
 
     Ok(Json(LinkCreated {
         id,
         book_id: input.book_id,
-        url: format!("{}/api/public/{}", state.public_base_url, token),
+        // A friendly landing page rather than the raw API endpoint.
+        url: format!("{}/p/{}", state.public_base_url, token),
         expires_at,
     }))
 }
@@ -266,22 +295,31 @@ pub struct PublicBook {
     #[serde(flatten)]
     pub book: BookDto,
     pub authors: Vec<String>,
+    /// Whether the link still has a download available (a file + uses left).
+    pub download_available: bool,
+    /// True when the link permits a single download.
+    pub one_time: bool,
 }
 
-/// Anonymous access to a single book via its share-link token. No auth header.
+/// A link is usable when it is not revoked, not past expiry, and has uses left.
+const LINK_VALID: &str = "revoked = 0 \
+    AND (expires_at IS NULL OR expires_at > datetime('now')) \
+    AND (max_uses IS NULL OR use_count < max_uses)";
+
+/// Anonymous metadata for a shared book. Does NOT consume a use (viewing the
+/// landing page shouldn't burn a one-time link — only downloading does).
 pub async fn public_book(
     State(state): State<AppState>,
     Path(token): Path<String>,
 ) -> AppResult<Json<PublicBook>> {
-    let book_id: Option<String> = sqlx::query_scalar(
-        "SELECT book_id FROM share_link \
-         WHERE token_hash = ? AND revoked = 0 \
-           AND (expires_at IS NULL OR expires_at > datetime('now'))",
-    )
+    let row: Option<(String, Option<i64>)> = sqlx::query_as(&format!(
+        "SELECT book_id, max_uses FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
+    ))
     .bind(sha256_hex(&token))
     .fetch_optional(&state.db)
     .await?;
-    let book_id = book_id.ok_or_else(|| AppError::NotFound("link is invalid or expired".into()))?;
+    let (book_id, max_uses) =
+        row.ok_or_else(|| AppError::NotFound("link is invalid or expired".into()))?;
 
     let book = sqlx::query_as::<_, BookDto>(
         "SELECT id, title, subtitle, description, isbn, publisher, published_year, \
@@ -301,7 +339,101 @@ pub async fn public_book(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(Json(PublicBook { book, authors }))
+    let has_file: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM book_file WHERE book_id = ?)")
+            .bind(&book_id)
+            .fetch_one(&state.db)
+            .await?;
+
+    Ok(Json(PublicBook {
+        book,
+        authors,
+        download_available: has_file,
+        one_time: max_uses == Some(1),
+    }))
+}
+
+/// Anonymous one-shot download of the shared book's file. Atomically consumes a
+/// use, so a one-time link can only be downloaded once even under concurrency.
+pub async fn public_file(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> AppResult<axum::response::Response> {
+    use axum::http::header;
+    use axum::response::IntoResponse;
+
+    let hash = sha256_hex(&token);
+
+    // Which book, and does it have a file? (No consume yet.)
+    let book_id: Option<String> = sqlx::query_scalar(&format!(
+        "SELECT book_id FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
+    ))
+    .bind(&hash)
+    .fetch_optional(&state.db)
+    .await?;
+    let book_id =
+        book_id.ok_or_else(|| AppError::NotFound("link is invalid, expired, or used up".into()))?;
+
+    let file: Option<(String, String)> = sqlx::query_as(
+        "SELECT path, format FROM book_file WHERE book_id = ? ORDER BY added_at LIMIT 1",
+    )
+    .bind(&book_id)
+    .fetch_optional(&state.db)
+    .await?;
+    let (rel, format) =
+        file.ok_or_else(|| AppError::NotFound("this book has no file to download".into()))?;
+
+    // Consume a use atomically; the WHERE re-checks validity, so concurrent
+    // downloads of a one-time link can't both succeed.
+    let consumed = sqlx::query(&format!(
+        "UPDATE share_link SET use_count = use_count + 1 WHERE token_hash = ? AND {LINK_VALID}"
+    ))
+    .bind(&hash)
+    .execute(&state.db)
+    .await?
+    .rows_affected();
+    if consumed == 0 {
+        return Err(AppError::NotFound("link is no longer available".into()));
+    }
+
+    let title: String = sqlx::query_scalar("SELECT title FROM book WHERE id = ?")
+        .bind(&book_id)
+        .fetch_one(&state.db)
+        .await?;
+    let bytes = tokio::fs::read(state.data_dir.join(&rel))
+        .await
+        .map_err(|_| AppError::NotFound("file missing on disk".into()))?;
+
+    let filename = format!("{}.{}", sanitize_filename(&title), format);
+    let mime = match format.as_str() {
+        "epub" => "application/epub+zip",
+        "pdf" => "application/pdf",
+        _ => "application/octet-stream",
+    };
+    Ok((
+        [
+            (header::CONTENT_TYPE, mime.to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+fn sanitize_filename(title: &str) -> String {
+    let cleaned: String = title
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' })
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        "book".to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 // ---- shared helpers -------------------------------------------------------
