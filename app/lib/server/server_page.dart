@@ -1,0 +1,242 @@
+import 'package:flutter/material.dart';
+
+import '../data/library_repository.dart';
+import 'connection_store.dart';
+import 'server_client.dart';
+
+/// Connect the app to a Vellum sync server: log in (or register the first,
+/// master account), then pull the shared library onto this device.
+class ServerPage extends StatefulWidget {
+  const ServerPage({
+    super.key,
+    required this.connection,
+    required this.repository,
+  });
+
+  final ServerConnection connection;
+  final LibraryRepository repository;
+
+  @override
+  State<ServerPage> createState() => _ServerPageState();
+}
+
+class _ServerPageState extends State<ServerPage> {
+  late final TextEditingController _url = TextEditingController(
+    text: widget.connection.baseUrl.isEmpty
+        ? 'http://localhost:3000'
+        : widget.connection.baseUrl,
+  );
+  final _email = TextEditingController();
+  final _displayName = TextEditingController();
+  final _password = TextEditingController();
+
+  bool _busy = false;
+  bool _registerMode = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _email.dispose();
+    _displayName.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+    } on ServerException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not reach the server.\n$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _authenticate() => _run(() async {
+        final url = _url.text;
+        final client = widget.connection.anonymousClient(url);
+        final auth = _registerMode
+            ? await client.register(
+                email: _email.text.trim(),
+                displayName: _displayName.text.trim().isEmpty
+                    ? _email.text.trim()
+                    : _displayName.text.trim(),
+                password: _password.text,
+              )
+            : await client.login(
+                email: _email.text.trim(),
+                password: _password.text,
+              );
+        await widget.connection.saveSession(url: url, auth: auth);
+      });
+
+  Future<void> _pull() => _run(() async {
+        final client = widget.connection.client;
+        if (client == null) return;
+        final books = await client.listBooks();
+        final count = await widget.repository.importServerBooks(books);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(count == 0
+                ? 'No books on the server yet.'
+                : 'Pulled $count book${count == 1 ? '' : 's'} onto this device.'),
+          ));
+        }
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Library server')),
+      body: ListenableBuilder(
+        listenable: widget.connection,
+        builder: (context, _) => widget.connection.isConnected
+            ? _buildConnected(context)
+            : _buildSignIn(context),
+      ),
+    );
+  }
+
+  Widget _buildConnected(BuildContext context) {
+    final theme = Theme.of(context);
+    final conn = widget.connection;
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.cloud_done_outlined),
+            title: Text(conn.email),
+            subtitle: Text(conn.baseUrl),
+            trailing: conn.isMaster
+                ? Chip(
+                    label: const Text('Master'),
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                  )
+                : null,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text('Sync', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        const Text(
+            'Pull the books shared with you on the server into your local '
+            'shelf. This is one-way for now — it never uploads or deletes.'),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: _busy ? null : _pull,
+          icon: _busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.download),
+          label: const Text('Pull library'),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+        ],
+        const SizedBox(height: 32),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => widget.connection.disconnect(),
+          icon: const Icon(Icons.logout),
+          label: const Text('Disconnect'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSignIn(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text(
+          _registerMode ? 'Create the master account' : 'Sign in to a server',
+          style: theme.textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _registerMode
+              ? 'The first account on a fresh server becomes its master (owner).'
+              : 'Connect to a self-hosted Vellum server to access a shared '
+                  'library.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _url,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            labelText: 'Server address',
+            hintText: 'http://localhost:3000',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        if (_registerMode) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _displayName,
+            decoration: const InputDecoration(
+              labelText: 'Display name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: _password,
+          obscureText: true,
+          onSubmitted: (_) => _busy ? null : _authenticate(),
+          decoration: const InputDecoration(
+            labelText: 'Password',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+        ],
+        const SizedBox(height: 20),
+        FilledButton(
+          onPressed: _busy ? null : _authenticate,
+          child: _busy
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(_registerMode ? 'Create account' : 'Log in'),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _busy
+              ? null
+              : () => setState(() {
+                    _registerMode = !_registerMode;
+                    _error = null;
+                  }),
+          child: Text(_registerMode
+              ? 'Have an account? Log in'
+              : 'Setting up a new server? Create the master account'),
+        ),
+      ],
+    );
+  }
+}

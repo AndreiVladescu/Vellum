@@ -6,6 +6,7 @@ import 'app_drawer.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
 import 'data/library_repository.dart';
+import 'server/connection_store.dart';
 import 'settings/app_settings.dart';
 import 'settings/wallpaper.dart';
 import 'shelf/shelf_view.dart';
@@ -15,8 +16,13 @@ Future<void> main() async {
   final repository = await LibraryRepository.open(VellumDatabase());
   final profile = await UserProfileStore.load();
   final settings = await AppSettingsStore.load();
+  final connection = await ServerConnection.load();
   runApp(VellumApp(
-      repository: repository, profile: profile, settings: settings));
+    repository: repository,
+    profile: profile,
+    settings: settings,
+    connection: connection,
+  ));
 }
 
 class VellumApp extends StatelessWidget {
@@ -25,11 +31,13 @@ class VellumApp extends StatelessWidget {
     required this.repository,
     required this.profile,
     required this.settings,
+    required this.connection,
   });
 
   final LibraryRepository repository;
   final UserProfileStore profile;
   final AppSettingsStore settings;
+  final ServerConnection connection;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +52,11 @@ class VellumApp extends StatelessWidget {
         brightness: Brightness.dark,
       ),
       home: LibraryPage(
-          repository: repository, profile: profile, settings: settings),
+        repository: repository,
+        profile: profile,
+        settings: settings,
+        connection: connection,
+      ),
     );
   }
 }
@@ -55,11 +67,13 @@ class LibraryPage extends StatefulWidget {
     required this.repository,
     required this.profile,
     required this.settings,
+    required this.connection,
   });
 
   final LibraryRepository repository;
   final UserProfileStore profile;
   final AppSettingsStore settings;
+  final ServerConnection connection;
 
   @override
   State<LibraryPage> createState() => _LibraryPageState();
@@ -95,7 +109,12 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: AppDrawer(profile: widget.profile, settings: widget.settings),
+      drawer: AppDrawer(
+        profile: widget.profile,
+        settings: widget.settings,
+        connection: widget.connection,
+        repository: widget.repository,
+      ),
       appBar: AppBar(
         title: TextField(
           onChanged: (value) => setState(() => _query = value),

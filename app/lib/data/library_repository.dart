@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../server/server_client.dart';
 import '../shelf/spine_style.dart';
 import 'database.dart';
 import 'metadata.dart';
@@ -172,6 +173,32 @@ class LibraryRepository {
       }
     });
     return id;
+  }
+
+  /// Pulls books from a connected server into the local database (a one-way
+  /// sync for now). Existing rows with the same id are updated in place;
+  /// locally-attached files and downloaded covers are left untouched. Returns
+  /// the number of books written.
+  Future<int> importServerBooks(List<ServerBook> books) async {
+    await db.transaction(() async {
+      for (final b in books) {
+        final spine = b.spineStyle ??
+            SpineStyle.generate(title: b.title, pageCount: b.pageCount)
+                .toJson();
+        await db.into(db.books).insertOnConflictUpdate(BooksCompanion.insert(
+              id: b.id,
+              title: b.title,
+              subtitle: Value(b.subtitle),
+              description: Value(b.description),
+              isbn: Value(b.isbn),
+              publisher: Value(b.publisher),
+              publishedYear: Value(b.publishedYear),
+              pageCount: Value(b.pageCount),
+              spineStyle: Value(spine),
+            ));
+      }
+    });
+    return books.length;
   }
 
   /// Get-or-create for the name-keyed lookup tables (authors, genres).
