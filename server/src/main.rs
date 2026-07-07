@@ -11,7 +11,12 @@ async fn main() -> anyhow::Result<()> {
 
     let public_base_url =
         std::env::var("VELLUM_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:3000".into());
-    let state = AppState { db, public_base_url };
+    let data_dir = std::env::var("VELLUM_DATA_DIR").unwrap_or_else(|_| "data".into());
+    let state = AppState {
+        db,
+        public_base_url,
+        data_dir: data_dir.into(),
+    };
 
     let port: u16 = std::env::var("VELLUM_PORT")
         .ok()

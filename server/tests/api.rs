@@ -8,13 +8,17 @@ use serde_json::{json, Value};
 use tower::ServiceExt; // for `oneshot`
 use vellum_server::{connect_db, router, AppState};
 
-/// A fresh app backed by its own temp-file database (migrated).
+/// A fresh app backed by its own temp-file database (migrated) and its own
+/// temp data directory for blobs.
 async fn test_app() -> axum::Router {
-    let path = std::env::temp_dir().join(format!("vellum_test_{}.db", uuid::Uuid::new_v4()));
+    let id = uuid::Uuid::new_v4();
+    let path = std::env::temp_dir().join(format!("vellum_test_{id}.db"));
+    let data_dir = std::env::temp_dir().join(format!("vellum_test_data_{id}"));
     let db = connect_db(path.to_str().unwrap()).await.unwrap();
     router(AppState {
         db,
         public_base_url: "http://test.local".into(),
+        data_dir,
     })
 }
 
@@ -300,6 +304,46 @@ async fn all_scope_share_exposes_whole_library() {
     let mut seen = titles(&list);
     seen.sort();
     assert_eq!(seen, vec!["Dune".to_string(), "Neuromancer".to_string()]);
+}
+
+#[tokio::test]
+async fn cover_upload_and_download_round_trips() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let png = b"\x89PNG\r\n\x1a\n fake image bytes";
+    let put = Request::builder()
+        .method("PUT")
+        .uri(format!("/api/books/{book}/cover"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "image/png")
+        .body(Body::from(png.to_vec()))
+        .unwrap();
+    let response = app.clone().oneshot(put).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Downloading returns the same bytes with an image content type.
+    let get = Request::builder()
+        .method("GET")
+        .uri(format!("/api/books/{book}/cover"))
+        .header("authorization", format!("Bearer {master}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(get).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get("content-type").unwrap(),
+        "image/png"
+    );
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(bytes.as_ref(), png);
+
+    // Anonymous callers can't read a private cover.
+    let (status, _) = call(&app, "GET", &format!("/api/books/{book}/cover"), None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
