@@ -80,8 +80,10 @@ Access is resolved per request: a caller may see a book if they are the master,
 own it, or reach it through any share (all / group / book). Editing needs
 `editor`; deleting needs ownership. Endpoints: `/api/auth/*`, `/api/users`,
 `/api/books`, `/api/groups`, `/api/shares`, `/api/share-links`, and the
-unauthenticated `/api/public/{token}`. Port is `VELLUM_PORT` (default 3000),
-public link base is `VELLUM_PUBLIC_URL`.
+unauthenticated `/api/public/{token}`. Cover images and book files are stored
+as filesystem blobs under `VELLUM_DATA_DIR` and served, access-checked, from
+`/api/books/{id}/cover` and `/api/files/{id}`. Port is `VELLUM_PORT` (default
+3000), public link base is `VELLUM_PUBLIC_URL`.
 
 ## Data model
 
@@ -129,7 +131,7 @@ title/author search with a user-facing "pick the right edition" step.
 The server already exposes the full multi-user API; the app currently does a
 one-way, metadata-only pull. Remaining work, in order:
 
-1. **Server blob storage** — upload/download endpoints for cover images and
+1. ✅ **Server blob storage** — upload/download endpoints for cover images and
    book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the
    book they belong to.
 2. **App: pull covers & files** — during a pull, download each book's cover (and
