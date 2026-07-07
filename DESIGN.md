@@ -55,6 +55,34 @@ e-reader apps can browse the server too.
 └────────────────────────┘        └─────────────────────────┘
 ```
 
+## Server: accounts, RBAC & sharing
+
+The server turns one library into a shared one. It is multi-user; the app stays
+single-user and offline. These tables are **server-only** (migration
+`0003_users_and_sharing.sql`) and are not mirrored in the app's drift schema.
+
+- **app_user** — email, display name, Argon2 password hash, `is_master` flag.
+  The **first** account created becomes the master (library owner/admin);
+  afterwards registration is closed and the master provisions member accounts.
+- **session** — opaque bearer tokens (only their SHA-256 is stored), 30-day
+  expiry. Sent as `Authorization: Bearer <token>`.
+- **book.owner_id** — every book belongs to the account that added it.
+- **book_group** / **book_group_item** — shareable collections, distinct from
+  the app's local `shelf` panes.
+- **share** — a grant from an owner to another account. `scope` is `all`
+  (the owner's whole library), `group`, or `book`; `permission` is `viewer`
+  (read) or `editor` (read + modify).
+- **share_link** — a public link (SHA-256 stored) giving anonymous **read**
+  access to a **single** book, for people without an account. Optional expiry;
+  revocable.
+
+Access is resolved per request: a caller may see a book if they are the master,
+own it, or reach it through any share (all / group / book). Editing needs
+`editor`; deleting needs ownership. Endpoints: `/api/auth/*`, `/api/users`,
+`/api/books`, `/api/groups`, `/api/shares`, `/api/share-links`, and the
+unauthenticated `/api/public/{token}`. Port is `VELLUM_PORT` (default 3000),
+public link base is `VELLUM_PUBLIC_URL`.
+
 ## Data model
 
 - **book** — title, subtitle, description, ISBN, publisher, year, page count,
