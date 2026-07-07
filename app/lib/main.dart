@@ -127,6 +127,7 @@ class _LibraryPageState extends State<LibraryPage> {
               }
               return ShelfView(
                 books: books,
+                bookFace: widget.settings.bookFace,
                 coverFileOf: repository.coverFileOf,
                 detailBuilder: (book) =>
                     BookDetailPage(book: book, repository: repository),
