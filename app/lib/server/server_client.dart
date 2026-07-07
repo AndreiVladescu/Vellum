@@ -90,9 +90,12 @@ class VellumServerClient {
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
 
+  /// The bearer header value, or null when unauthenticated.
+  String? get _bearer => token == null ? null : 'Bearer $token';
+
   Map<String, String> get _headers => {
         'content-type': 'application/json',
-        if (token != null) 'authorization': 'Bearer $token',
+        'authorization': ?_bearer,
       };
 
   /// Decodes a JSON object response, throwing [ServerException] on error status.
@@ -194,7 +197,7 @@ class VellumServerClient {
       _uri('/api/books/$bookId/cover'),
       headers: {
         'content-type': contentType,
-        if (token != null) 'authorization': 'Bearer $token',
+        'authorization': ?_bearer,
       },
       body: bytes,
     );
@@ -246,7 +249,7 @@ class VellumServerClient {
       headers: _headers,
       body: jsonEncode({
         'scope': scope,
-        if (scopeId != null) 'scope_id': scopeId,
+        'scope_id': ?scopeId,
         'grantee_email': granteeEmail,
         'permission': permission,
       }),
@@ -276,7 +279,7 @@ class VellumServerClient {
       headers: _headers,
       body: jsonEncode({
         'book_id': bookId,
-        if (expiresInDays != null) 'expires_in_days': expiresInDays,
+        'expires_in_days': ?expiresInDays,
       }),
     );
     return (_body(res) as Map<String, dynamic>)['url'] as String;
