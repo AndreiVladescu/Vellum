@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'book_face.dart';
 import 'wallpaper.dart';
 
 /// App-wide preferences stored on device.
@@ -8,6 +9,7 @@ class AppSettingsStore extends ChangeNotifier {
   AppSettingsStore._(this._prefs);
 
   static const _wallpaperKey = 'settings.wallpaper';
+  static const _bookFaceKey = 'settings.bookFace';
 
   final SharedPreferences _prefs;
 
@@ -24,6 +26,18 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setWallpaper(Wallpaper value) async {
     await _prefs.setString(_wallpaperKey, value.name);
+    notifyListeners();
+  }
+
+  /// Whether the shelf shows spines or front covers.
+  BookFace get bookFace {
+    final stored = _prefs.getString(_bookFaceKey);
+    return BookFace.values.where((f) => f.name == stored).firstOrNull ??
+        BookFace.spine;
+  }
+
+  Future<void> setBookFace(BookFace value) async {
+    await _prefs.setString(_bookFaceKey, value.name);
     notifyListeners();
   }
 }
