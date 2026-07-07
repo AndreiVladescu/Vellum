@@ -91,10 +91,11 @@ Basic (email:password), the latter so e-readers can use the OPDS catalog at
 
 The server also hosts its own **web admin console** at `/` (embedded HTML/JS,
 no external assets): a spreadsheet-like table of books where you select rows,
-add/remove tags (groups) in bulk or per book, delete several at once, and mint
-public links with an expiry date and one-time-download option. It is the
-primary way to manage the library; the app's Sharing screen covers the same
-endpoints for on-device use.
+add/remove tags (groups) in bulk or per book, delete several at once, create
+new books, drag-and-drop (or click to upload) a PDF/EPUB or cover image onto a
+row — validated by magic bytes — and mint public links with an expiry date and
+one-time-download option. It is the primary way to manage the library; the
+app's Sharing screen covers the same endpoints for on-device use.
 
 ## Data model
 
@@ -108,6 +109,16 @@ endpoints for on-device use.
   their own table so lending *history* comes for free.
 - **shelf** — manual collections/panes, with explicit book ordering,
   independent of genres.
+
+**App-local-only columns on `book`** (deliberately *not* in the server schema
+and never synced): reading state (progress/page/last-read), **reader notes**
+(personal), and **`source_metadata`** — a JSON snapshot of the online-library
+data a book was imported with. That snapshot powers **"revert to library
+defaults"**: after editing a book's title, year, description, or cover, you can
+restore the official values (custom, hand-made books have no snapshot, so no
+revert). Book files and cover images can be attached by **drag-and-drop** on
+desktop; the file is accepted only if its magic bytes are a real PDF/EPUB (or an
+image, for covers).
 
 ## Spine rendering
 
@@ -125,7 +136,9 @@ title/author search with a user-facing "pick the right edition" step.
 
 ## Build order & status
 
-1. ✅ Flutter desktop app: schema, add a book, shelf view.
+1. ✅ Flutter desktop app: add a book (online search **or** a hand-made custom
+   book for PDFs not in any library), edit details/cover, drag-and-drop file
+   uploads with format validation, personal reader notes, shelf view.
 2. ✅ Shelf UI — generated spines, packing into rows, pull-out open animation,
    spine/cover display toggle, wallpapers.
 3. ✅ Metadata fetch on add — Open Library, falling back to Google Books.
