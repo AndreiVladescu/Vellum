@@ -110,15 +110,37 @@ On add: query Open Library first (free, no key), fall back to Google Books.
 Match by ISBN when available (Android gets barcode scanning), otherwise
 title/author search with a user-facing "pick the right edition" step.
 
-## Build order
+## Build order & status
 
-1. Flutter desktop app: schema, add a book manually, flat grid view.
-2. Shelf UI — generated spines, swiping, panes. The differentiator; invest early.
-3. Metadata fetch on add.
-4. PDF reader (`pdfrx`), then EPUB.
-5. Physical copies: locations + loan tracking.
-6. Android build, barcode scanning.
-7. Rust server + sync (connected mode), OPDS feed.
+1. ✅ Flutter desktop app: schema, add a book, shelf view.
+2. ✅ Shelf UI — generated spines, packing into rows, pull-out open animation,
+   spine/cover display toggle, wallpapers.
+3. ✅ Metadata fetch on add — Open Library, falling back to Google Books.
+4. ✅ PDF reader (`pdfrx`) with saved reading position. EPUB still later.
+5. ✅ Physical copies: locations + loan tracking (lend / return / history).
+6. ⏳ Android build, barcode scanning. **Not started.**
+7. 🚧 Rust server + sync (connected mode), OPDS feed. Server is in place
+   (accounts, RBAC, groups, sharing, public links — see above) with API
+   integration tests; the app can log in and **pull** the shared library.
+   Blob sync, push, and in-app sharing management are the next steps below.
+
+## Sync roadmap (connected mode)
+
+The server already exposes the full multi-user API; the app currently does a
+one-way, metadata-only pull. Remaining work, in order:
+
+1. **Server blob storage** — upload/download endpoints for cover images and
+   book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the
+   book they belong to.
+2. **App: pull covers & files** — during a pull, download each book's cover (and
+   on demand its file) so shelves show real art and downloaded books open.
+3. **App: push** — upload local-only books (and their covers) to the server,
+   making the sync two-way.
+4. **App: manage groups & shares** — in-app UI over the existing group, share,
+   and public-link endpoints (create a group, add books, share with a user,
+   mint a public link).
+5. **OPDS feed** — expose the library as an OPDS catalog for third-party
+   e-readers.
 
 ## Repo layout
 
