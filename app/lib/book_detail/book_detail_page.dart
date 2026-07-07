@@ -363,12 +363,103 @@ class _PhysicalCopiesSection extends StatelessWidget {
                   style: theme.textTheme.bodySmall)
             else
               for (final c in copies)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.place_outlined),
-                  title: Text(c.location ?? 'Somewhere…'),
-                  subtitle: c.notes == null ? null : Text(c.notes!),
+                _PhysicalCopyTile(copy: c, repository: repository),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// One physical copy with its lending state: shows who has it (if anyone),
+/// lets you lend it out or mark it returned, and lists past borrowers.
+class _PhysicalCopyTile extends StatelessWidget {
+  const _PhysicalCopyTile({required this.copy, required this.repository});
+
+  final PhysicalCopy copy;
+  final LibraryRepository repository;
+
+  static String _date(DateTime d) => '${d.year}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _lend(BuildContext context) async {
+    final borrower = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Lend this copy'),
+        content: TextField(
+          controller: borrower,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
+          decoration: const InputDecoration(
+            labelText: 'Borrower',
+            hintText: "Who's taking it?",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(borrower.text.trim()),
+            child: const Text('Lend'),
+          ),
+        ],
+      ),
+    );
+    borrower.dispose();
+    if (name != null && name.isNotEmpty) {
+      await repository.lendCopy(copy.id, name);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return StreamBuilder<List<Loan>>(
+      stream: repository.watchLoansOf(copy.id),
+      builder: (context, snapshot) {
+        final loans = snapshot.data ?? const <Loan>[];
+        final active = loans.where((l) => l.returnedAt == null).firstOrNull;
+        final past = loans.where((l) => l.returnedAt != null).toList();
+        final status = active != null
+            ? 'On loan to ${active.borrower} since ${_date(active.loanedAt)}'
+            : 'On the shelf';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(active != null
+                  ? Icons.person_outline
+                  : Icons.place_outlined),
+              title: Text(copy.location ?? 'Somewhere…'),
+              subtitle: Text(
+                  [if (copy.notes != null) copy.notes!, status].join('\n')),
+              isThreeLine: copy.notes != null,
+              trailing: active != null
+                  ? TextButton(
+                      onPressed: () => repository.returnLoan(active.id),
+                      child: const Text('Return'),
+                    )
+                  : TextButton(
+                      onPressed: () => _lend(context),
+                      child: const Text('Lend'),
+                    ),
+            ),
+            if (past.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 8),
+                child: Text(
+                  'Previously lent to ${past.map((l) => l.borrower).join(', ')}',
+                  style: theme.textTheme.bodySmall,
                 ),
+              ),
           ],
         );
       },

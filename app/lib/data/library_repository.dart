@@ -75,6 +75,29 @@ class LibraryRepository {
         ));
   }
 
+  /// Loan history for a physical copy, most recent first. The active loan (if
+  /// any) is the row whose returnedAt is null.
+  Stream<List<Loan>> watchLoansOf(String copyId) => (db.select(db.loans)
+        ..where((l) => l.copyId.equals(copyId))
+        ..orderBy([(l) => OrderingTerm.desc(l.loanedAt)]))
+      .watch();
+
+  /// Lends a copy to [borrower]. Callers only offer this when the copy has no
+  /// active loan, so no additional check is needed here.
+  Future<void> lendCopy(String copyId, String borrower) async {
+    await db.into(db.loans).insert(LoansCompanion.insert(
+          id: _uuid.v4(),
+          copyId: copyId,
+          borrower: borrower,
+        ));
+  }
+
+  /// Marks a loan returned as of now, keeping it in the history.
+  Future<void> returnLoan(String loanId) async {
+    await (db.update(db.loans)..where((l) => l.id.equals(loanId)))
+        .write(LoansCompanion(returnedAt: Value(DateTime.now())));
+  }
+
   /// Called by the reader as the user turns pages.
   Future<void> saveReadingPosition(
       String bookId, int page, int pageCount) async {
