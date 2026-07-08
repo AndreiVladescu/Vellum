@@ -87,7 +87,10 @@ as filesystem blobs under `VELLUM_DATA_DIR` and served, access-checked, from
 `/api/books/{id}/cover` and `/api/files/{id}`. Auth is a bearer token or HTTP
 Basic (email:password), the latter so e-readers can use the OPDS catalog at
 `/opds`. Port is `VELLUM_PORT` (default 3000), public link base is
-`VELLUM_PUBLIC_URL`.
+`VELLUM_PUBLIC_URL`, and the max upload size is `VELLUM_MAX_UPLOAD_MB` (default
+2048). The cover and file endpoints also accept the token as a `?token=` query
+param, so a browser `<img>` (cover) or `<a download>` (file) works without an
+Authorization header.
 
 For book discovery the server runs the **same metadata search** as the app
 (`GET /api/metadata/search`, Open Library → Google Books); `POST
@@ -100,8 +103,10 @@ add/remove tags (groups) in bulk or per book, delete several at once, add books
 (search online or create custom, optionally attaching a file), drag-and-drop
 (or click to upload) a PDF/EPUB or cover image onto a row — validated by magic
 bytes — and mint public links with an expiry date and one-time-download option.
-It is the primary way to manage the library; the app's Sharing screen covers the
-same endpoints for on-device use.
+Clicking a book opens a **detail view** — cover, metadata, tags, and files —
+where you edit fields in place and **download the book file** directly. It is
+the primary way to manage the library; the app's Sharing screen covers the same
+endpoints for on-device use.
 
 ## Data model
 
@@ -155,11 +160,13 @@ zip, or an image for covers — not just the file extension.
 
 Once a book exists you can edit its **title, subtitle, year, and description**,
 and change its **cover**. The cover can come from an image (drop or pick) or, in
-the app, from the **first page of an attached PDF**, rendered with `pdfrx` —
-done automatically when a book is created with a PDF, and available any time
-from the book's edit sheet. (Server-side rendering of a first-page cover is not
-offered: it would need a native PDF rasterizer, at odds with the single-binary
-server — on the console you set covers from an image.)
+the app, from the **first (full) page of an attached PDF**, rendered with
+`pdfrx` — done automatically whenever a PDF lands on a cover-less book, including
+books **pulled from the server** (so server-uploaded PDFs get a cover after a
+pull), and available any time from the book's edit sheet. (The server itself
+doesn't rasterize PDFs — that would need a native renderer, at odds with the
+single-binary server — so covers for server-only books come from the app on
+pull, or from an image you set on the console.)
 
 Two things stay **on the device only** and are never synced to a server:
 
