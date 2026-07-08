@@ -89,24 +89,19 @@ Basic (email:password), the latter so e-readers can use the OPDS catalog at
 `/opds`. Port is `VELLUM_PORT` (default 3000), public link base is
 `VELLUM_PUBLIC_URL`.
 
-The server does the **same online metadata search** as the app (Open Library →
-Google Books, at `GET /api/metadata/search`); `POST /api/books/from-search` adds
-a chosen result, fetching its description and cover. On both the console and the
-app the Add-book flow has a **Search** button and a **Create book** button, so
-you can create a book by hand without searching (for one no library has), plus
-an optional **file to attach** (drag-and-drop or browse, validated by magic
-bytes). When a PDF is attached, the app can set the cover from its **first
-page** (rendered via `pdfrx`) — automatically on create, and on demand from the
-book's edit sheet.
+For book discovery the server runs the **same metadata search** as the app
+(`GET /api/metadata/search`, Open Library → Google Books); `POST
+/api/books/from-search` adds a chosen result, fetching its description and cover.
+See **Adding & editing books** below.
 
 The server also hosts its own **web admin console** at `/` (embedded HTML/JS,
 no external assets): a spreadsheet-like table of books where you select rows,
 add/remove tags (groups) in bulk or per book, delete several at once, add books
-(search online or create custom), drag-and-drop (or click to upload) a PDF/EPUB
-or cover image onto a row — validated by magic bytes — and mint public links
-with an expiry date and one-time-download option. It is the primary way to
-manage the library; the
-app's Sharing screen covers the same endpoints for on-device use.
+(search online or create custom, optionally attaching a file), drag-and-drop
+(or click to upload) a PDF/EPUB or cover image onto a row — validated by magic
+bytes — and mint public links with an expiry date and one-time-download option.
+It is the primary way to manage the library; the app's Sharing screen covers the
+same endpoints for on-device use.
 
 ## Data model
 
@@ -122,14 +117,10 @@ app's Sharing screen covers the same endpoints for on-device use.
   independent of genres.
 
 **App-local-only columns on `book`** (deliberately *not* in the server schema
-and never synced): reading state (progress/page/last-read), **reader notes**
-(personal), and **`source_metadata`** — a JSON snapshot of the online-library
-data a book was imported with. That snapshot powers **"revert to library
-defaults"**: after editing a book's title, year, description, or cover, you can
-restore the official values (custom, hand-made books have no snapshot, so no
-revert). Book files and cover images can be attached by **drag-and-drop** on
-desktop; the file is accepted only if its magic bytes are a real PDF/EPUB (or an
-image, for covers).
+and never synced): reading state (progress/page/last-read), **reader notes**,
+and **`source_metadata`** (a JSON snapshot of the online-library data a book was
+imported with, behind *revert to library defaults*). See **Adding & editing
+books**.
 
 ## Spine rendering
 
@@ -143,7 +134,40 @@ can tweak it later.
 
 On add: query Open Library first (free, no key), fall back to Google Books.
 Match by ISBN when available (Android gets barcode scanning), otherwise
-title/author search with a user-facing "pick the right edition" step.
+title/author search with a user-facing "pick the right edition" step. Both the
+app and the server run this search (the server exposes it at
+`GET /api/metadata/search` for its console); a search that finds nothing lets
+you create a custom book instead.
+
+## Adding & editing books
+
+The app's Add-book screen and the console's Add-book dialog work the same way,
+with two explicit actions:
+
+- **Search** an online library and pick an edition — its description and cover
+  are fetched automatically.
+- **Create book** without searching — the title is enough — for a PDF no
+  library has. Other details can be edited afterwards.
+
+Either way you may **attach a file** in the same flow (drag-and-drop or a file
+picker). Uploads are validated by their **magic bytes** — a real `%PDF`, an EPUB
+zip, or an image for covers — not just the file extension.
+
+Once a book exists you can edit its **title, subtitle, year, and description**,
+and change its **cover**. The cover can come from an image (drop or pick) or, in
+the app, from the **first page of an attached PDF**, rendered with `pdfrx` —
+done automatically when a book is created with a PDF, and available any time
+from the book's edit sheet. (Server-side rendering of a first-page cover is not
+offered: it would need a native PDF rasterizer, at odds with the single-binary
+server — on the console you set covers from an image.)
+
+Two things stay **on the device only** and are never synced to a server:
+
+- **Reader notes** — a personal per-book notes field.
+- **Revert to library defaults** — books added from an online library keep a
+  `source_metadata` snapshot of their original title/year/description/cover, so
+  edits can be rolled back to the source. Hand-made custom books have no
+  snapshot, so they offer no revert.
 
 ## Build order & status
 
