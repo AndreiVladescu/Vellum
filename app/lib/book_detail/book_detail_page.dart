@@ -298,6 +298,10 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     foregroundColor: theme.colorScheme.error,
                   ),
                   onPressed: () async {
+                    // Capture the navigator now: deleting the book makes the
+                    // parent StreamBuilder emit null and unmount this widget,
+                    // so `context` would no longer be mounted to pop with.
+                    final navigator = Navigator.of(context);
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (dialogContext) => AlertDialog(
@@ -328,7 +332,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     );
                     if (confirmed != true) return;
                     await repository.deleteBook(book);
-                    if (context.mounted) Navigator.of(context).pop();
+                    navigator.pop();
                   },
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Remove from library'),
