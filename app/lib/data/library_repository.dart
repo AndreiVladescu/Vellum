@@ -438,16 +438,32 @@ class LibraryRepository {
       }
     }
 
-    // Give any cover-less PDF book a first-page cover (e.g. books uploaded on
-    // the server, which can't render covers there).
+    // For books the server has no cover for (e.g. PDFs uploaded on the server,
+    // which can't render covers there): make sure we have a local cover
+    // (rendering the first PDF page if needed) and push it back, so the
+    // server/console shows the same cover the app does.
     for (final b in books) {
+      if (b.hasCover) continue; // the server already has a cover
       final row = await (db.select(
         db.books,
       )..where((x) => x.id.equals(b.id))).getSingleOrNull();
-      if (row != null && row.coverPath == null) {
+      if (row == null) continue;
+      var localCover = row.coverPath;
+      if (localCover == null) {
         try {
-          await setCoverFromFirstPage(b.id);
+          if (await setCoverFromFirstPage(b.id)) {
+            localCover = p.join('covers', '${b.id}.jpg');
+          }
         } catch (_) {}
+      }
+      if (localCover == null) continue;
+      final coverFile = File(p.join(_dataDir.path, localCover));
+      if (await coverFile.exists()) {
+        try {
+          await client.uploadCover(b.id, await coverFile.readAsBytes());
+        } catch (_) {
+          // View-only or offline — the cover stays local to this device.
+        }
       }
     }
     return books.length;
