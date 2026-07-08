@@ -70,6 +70,15 @@ class LibraryRepository {
             sha256: digest.toString(),
           ),
         );
+    // A cover-less book that just got a PDF: use its first page as the cover.
+    if (ext == 'pdf') {
+      final book = await (db.select(
+        db.books,
+      )..where((b) => b.id.equals(bookId))).getSingleOrNull();
+      if (book != null && book.coverPath == null) {
+        await setCoverFromFirstPage(bookId);
+      }
+    }
   }
 
   /// Creates a book by hand — for a PDF you can't find in an online library.
@@ -396,6 +405,38 @@ class LibraryRepository {
         // Leave this book cover-less; it still shows a generated spine.
       }
     }
+
+    // Download digital files the device doesn't already have. Dedup by content
+    // hash, so a file pushed under a different id isn't downloaded twice.
+    for (final b in books) {
+      try {
+        for (final f in await client.listFiles(b.id)) {
+          final have =
+              await (db.select(db.bookFiles)..where(
+                    (x) => x.bookId.equals(b.id) & x.sha256.equals(f.sha256),
+                  ))
+                  .getSingleOrNull();
+          if (have != null) continue;
+          final bytes = await client.downloadFile(f.id);
+          final rel = p.join('files', '${f.id}.${f.format}');
+          await File(p.join(_dataDir.path, rel)).writeAsBytes(bytes);
+          await db
+              .into(db.bookFiles)
+              .insertOnConflictUpdate(
+                BookFilesCompanion.insert(
+                  id: f.id,
+                  bookId: b.id,
+                  format: f.format,
+                  path: rel,
+                  sizeBytes: f.sizeBytes,
+                  sha256: f.sha256,
+                ),
+              );
+        }
+      } catch (_) {
+        // Metadata and cover are already pulled; skip files on error.
+      }
+    }
     return books.length;
   }
 
@@ -427,6 +468,27 @@ class LibraryRepository {
                 ? 'image/png'
                 : 'image/jpeg',
           );
+        }
+
+        // Upload local files the server doesn't already have (dedup by hash).
+        final localFiles = await (db.select(
+          db.bookFiles,
+        )..where((f) => f.bookId.equals(b.id))).get();
+        if (localFiles.isNotEmpty) {
+          final remoteHashes = (await client.listFiles(
+            b.id,
+          )).map((f) => f.sha256).toSet();
+          for (final lf in localFiles) {
+            if (remoteHashes.contains(lf.sha256)) continue;
+            final file = fileOf(lf);
+            if (await file.exists()) {
+              await client.uploadFile(
+                b.id,
+                await file.readAsBytes(),
+                format: lf.format,
+              );
+            }
+          }
         }
         pushed++;
       } on ServerException {

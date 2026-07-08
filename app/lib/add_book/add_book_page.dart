@@ -122,8 +122,8 @@ class _AddBookPageState extends State<AddBookPage> {
     try {
       final id = await widget.repository.createCustomBook(title: title);
       if (_filePath != null) {
+        // attachFile auto-generates a first-page cover for a PDF.
         await widget.repository.attachFile(id, _filePath!);
-        await widget.repository.setCoverFromFirstPage(id); // no-op for EPUB
       }
       if (!mounted) return;
       Navigator.of(context).pop(title);

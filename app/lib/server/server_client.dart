@@ -27,11 +27,11 @@ class ServerUser {
   final bool isMaster;
 
   factory ServerUser.fromJson(Map<String, dynamic> j) => ServerUser(
-        id: j['id'] as String? ?? '',
-        email: j['email'] as String? ?? '',
-        displayName: j['display_name'] as String? ?? '',
-        isMaster: j['is_master'] as bool? ?? false,
-      );
+    id: j['id'] as String? ?? '',
+    email: j['email'] as String? ?? '',
+    displayName: j['display_name'] as String? ?? '',
+    isMaster: j['is_master'] as bool? ?? false,
+  );
 }
 
 /// A book row from the server library (subset the app cares about).
@@ -65,24 +65,27 @@ class ServerBook {
   bool get hasCover => coverPath != null && coverPath!.isNotEmpty;
 
   factory ServerBook.fromJson(Map<String, dynamic> j) => ServerBook(
-        id: j['id'] as String,
-        title: j['title'] as String? ?? '',
-        subtitle: j['subtitle'] as String?,
-        description: j['description'] as String?,
-        isbn: j['isbn'] as String?,
-        publisher: j['publisher'] as String?,
-        publishedYear: j['published_year'] as int?,
-        pageCount: j['page_count'] as int?,
-        spineStyle: j['spine_style'] as String?,
-        coverPath: j['cover_path'] as String?,
-      );
+    id: j['id'] as String,
+    title: j['title'] as String? ?? '',
+    subtitle: j['subtitle'] as String?,
+    description: j['description'] as String?,
+    isbn: j['isbn'] as String?,
+    publisher: j['publisher'] as String?,
+    publishedYear: j['published_year'] as int?,
+    pageCount: j['page_count'] as int?,
+    spineStyle: j['spine_style'] as String?,
+    coverPath: j['cover_path'] as String?,
+  );
 }
 
 /// Thin REST client for a Vellum sync server. Stateless apart from [baseUrl] and
 /// an optional bearer [token]; create a new one when either changes.
 class VellumServerClient {
-  VellumServerClient({required this.baseUrl, this.token, http.Client? httpClient})
-      : _http = httpClient ?? http.Client();
+  VellumServerClient({
+    required this.baseUrl,
+    this.token,
+    http.Client? httpClient,
+  }) : _http = httpClient ?? http.Client();
 
   final String baseUrl;
   final String? token;
@@ -94,9 +97,9 @@ class VellumServerClient {
   String? get _bearer => token == null ? null : 'Bearer $token';
 
   Map<String, String> get _headers => {
-        'content-type': 'application/json',
-        'authorization': ?_bearer,
-      };
+    'content-type': 'application/json',
+    'authorization': ?_bearer,
+  };
 
   /// Decodes a JSON object response, throwing [ServerException] on error status.
   dynamic _body(http.Response res) {
@@ -116,8 +119,11 @@ class VellumServerClient {
     final res = await _http.post(
       _uri('/api/auth/register'),
       headers: _headers,
-      body: jsonEncode(
-          {'email': email, 'display_name': displayName, 'password': password}),
+      body: jsonEncode({
+        'email': email,
+        'display_name': displayName,
+        'password': password,
+      }),
     );
     return AuthResult._(_body(res) as Map<String, dynamic>);
   }
@@ -151,8 +157,10 @@ class VellumServerClient {
   /// The book's cover bytes, or null if it has none (404). Throws on other
   /// errors.
   Future<Uint8List?> downloadCover(String bookId) async {
-    final res =
-        await _http.get(_uri('/api/books/$bookId/cover'), headers: _headers);
+    final res = await _http.get(
+      _uri('/api/books/$bookId/cover'),
+      headers: _headers,
+    );
     if (res.statusCode == 404) return null;
     if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
     throw ServerException('Cover download failed (HTTP ${res.statusCode})');
@@ -195,10 +203,47 @@ class VellumServerClient {
   }) async {
     final res = await _http.put(
       _uri('/api/books/$bookId/cover'),
-      headers: {
-        'content-type': contentType,
-        'authorization': ?_bearer,
-      },
+      headers: {'content-type': contentType, 'authorization': ?_bearer},
+      body: bytes,
+    );
+    _body(res);
+  }
+
+  // ---- book files ---------------------------------------------------------
+
+  Future<List<ServerFile>> listFiles(String bookId) async {
+    final res = await _http.get(
+      _uri('/api/books/$bookId/files'),
+      headers: _headers,
+    );
+    return [
+      for (final f in _body(res) as List)
+        ServerFile.fromJson(f as Map<String, dynamic>),
+    ];
+  }
+
+  /// Downloads a book file's bytes by its server id.
+  Future<Uint8List> downloadFile(String fileId) async {
+    final res = await _http.get(_uri('/api/files/$fileId'), headers: _headers);
+    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
+    throw ServerException('File download failed (HTTP ${res.statusCode})');
+  }
+
+  /// Uploads a book file. [format] (e.g. 'pdf') sets the stored extension.
+  Future<void> uploadFile(
+    String bookId,
+    Uint8List bytes, {
+    required String format,
+  }) async {
+    final mime = switch (format) {
+      'pdf' => 'application/pdf',
+      'epub' => 'application/epub+zip',
+      _ => 'application/octet-stream',
+    };
+    final filename = Uri.encodeQueryComponent('book.$format');
+    final res = await _http.post(
+      _uri('/api/books/$bookId/files?filename=$filename'),
+      headers: {'content-type': mime, 'authorization': ?_bearer},
       body: bytes,
     );
     _body(res);
@@ -215,14 +260,20 @@ class VellumServerClient {
   }
 
   Future<ServerGroup> createGroup(String name) async {
-    final res = await _http.post(_uri('/api/groups'),
-        headers: _headers, body: jsonEncode({'name': name}));
+    final res = await _http.post(
+      _uri('/api/groups'),
+      headers: _headers,
+      body: jsonEncode({'name': name}),
+    );
     return ServerGroup.fromJson(_body(res) as Map<String, dynamic>);
   }
 
   Future<void> addBookToGroup(String groupId, String bookId) async {
-    final res = await _http.post(_uri('/api/groups/$groupId/books'),
-        headers: _headers, body: jsonEncode({'book_id': bookId}));
+    final res = await _http.post(
+      _uri('/api/groups/$groupId/books'),
+      headers: _headers,
+      body: jsonEncode({'book_id': bookId}),
+    );
     _body(res);
   }
 
@@ -277,17 +328,16 @@ class VellumServerClient {
     final res = await _http.post(
       _uri('/api/share-links'),
       headers: _headers,
-      body: jsonEncode({
-        'book_id': bookId,
-        'expires_in_days': ?expiresInDays,
-      }),
+      body: jsonEncode({'book_id': bookId, 'expires_in_days': ?expiresInDays}),
     );
     return (_body(res) as Map<String, dynamic>)['url'] as String;
   }
 
   Future<void> deleteLink(String id) async {
-    final res =
-        await _http.delete(_uri('/api/share-links/$id'), headers: _headers);
+    final res = await _http.delete(
+      _uri('/api/share-links/$id'),
+      headers: _headers,
+    );
     _body(res);
   }
 }
@@ -299,10 +349,10 @@ class ServerGroup {
   final String name;
   final int bookCount;
   factory ServerGroup.fromJson(Map<String, dynamic> j) => ServerGroup(
-        id: j['id'] as String,
-        name: j['name'] as String? ?? '',
-        bookCount: j['book_count'] as int? ?? 0,
-      );
+    id: j['id'] as String,
+    name: j['name'] as String? ?? '',
+    bookCount: j['book_count'] as int? ?? 0,
+  );
 }
 
 /// A grant of access from one account to another.
@@ -320,12 +370,37 @@ class ServerShare {
   final String granteeEmail;
   final String? scopeLabel;
   factory ServerShare.fromJson(Map<String, dynamic> j) => ServerShare(
-        id: j['id'] as String,
-        scope: j['scope'] as String? ?? '',
-        permission: j['permission'] as String? ?? 'viewer',
-        granteeEmail: j['grantee_email'] as String? ?? '',
-        scopeLabel: j['scope_label'] as String?,
-      );
+    id: j['id'] as String,
+    scope: j['scope'] as String? ?? '',
+    permission: j['permission'] as String? ?? 'viewer',
+    granteeEmail: j['grantee_email'] as String? ?? '',
+    scopeLabel: j['scope_label'] as String?,
+  );
+}
+
+/// A digital file attached to a book on the server.
+class ServerFile {
+  ServerFile({
+    required this.id,
+    required this.bookId,
+    required this.format,
+    required this.sizeBytes,
+    required this.sha256,
+  });
+
+  final String id;
+  final String bookId;
+  final String format;
+  final int sizeBytes;
+  final String sha256;
+
+  factory ServerFile.fromJson(Map<String, dynamic> j) => ServerFile(
+    id: j['id'] as String,
+    bookId: j['book_id'] as String,
+    format: j['format'] as String? ?? 'bin',
+    sizeBytes: j['size_bytes'] as int? ?? 0,
+    sha256: j['sha256'] as String? ?? '',
+  );
 }
 
 /// A public per-book link.
@@ -341,18 +416,18 @@ class ServerLink {
   final bool revoked;
   final String? expiresAt;
   factory ServerLink.fromJson(Map<String, dynamic> j) => ServerLink(
-        id: j['id'] as String,
-        bookTitle: j['book_title'] as String? ?? '',
-        revoked: j['revoked'] as bool? ?? false,
-        expiresAt: j['expires_at'] as String?,
-      );
+    id: j['id'] as String,
+    bookTitle: j['book_title'] as String? ?? '',
+    revoked: j['revoked'] as bool? ?? false,
+    expiresAt: j['expires_at'] as String?,
+  );
 }
 
 /// Token + user returned by register/login.
 class AuthResult {
   AuthResult._(Map<String, dynamic> json)
-      : token = json['token'] as String,
-        user = ServerUser.fromJson(json['user'] as Map<String, dynamic>);
+    : token = json['token'] as String,
+      user = ServerUser.fromJson(json['user'] as Map<String, dynamic>);
 
   final String token;
   final ServerUser user;
