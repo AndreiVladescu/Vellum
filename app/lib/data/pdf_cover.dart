@@ -12,12 +12,20 @@ Future<Uint8List?> renderPdfFirstPagePng(String path) async {
     if (doc.pages.isEmpty) return null;
     final page = doc.pages.first;
 
-    // Aim for ~1000px-tall covers, preserving aspect ratio.
-    const targetHeight = 1000.0;
+    // Aim for ~1200px-tall covers, preserving aspect ratio.
+    const targetHeight = 1200.0;
     final scale = targetHeight / page.height;
+    final w = (page.width * scale).round();
+    final h = (page.height * scale).round();
+    // Render the WHOLE page: the output rectangle (0,0,w,h) must span the full
+    // page (fullWidth/fullHeight), otherwise pdfrx returns just a top-left crop.
     final image = await page.render(
-      width: (page.width * scale).round(),
-      height: (page.height * scale).round(),
+      x: 0,
+      y: 0,
+      width: w,
+      height: h,
+      fullWidth: w.toDouble(),
+      fullHeight: h.toDouble(),
       backgroundColor: 0xFFFFFFFF, // white, so a transparent page isn't black
     );
     if (image == null) return null;

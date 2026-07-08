@@ -437,6 +437,19 @@ class LibraryRepository {
         // Metadata and cover are already pulled; skip files on error.
       }
     }
+
+    // Give any cover-less PDF book a first-page cover (e.g. books uploaded on
+    // the server, which can't render covers there).
+    for (final b in books) {
+      final row = await (db.select(
+        db.books,
+      )..where((x) => x.id.equals(b.id))).getSingleOrNull();
+      if (row != null && row.coverPath == null) {
+        try {
+          await setCoverFromFirstPage(b.id);
+        } catch (_) {}
+      }
+    }
     return books.length;
   }
 
