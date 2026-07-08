@@ -5,32 +5,49 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vellum — shared book</title>
 <style>
-  :root { color-scheme: light dark; }
-  body {
-    margin: 0; min-height: 100vh; display: grid; place-items: center;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    background: #f4efe6; color: #2a241c;
+  :root {
+    color-scheme: light dark;
+    --bg:#f4efe6; --fg:#2a241c; --muted:#8a7c68; --accent:#7a5c3e;
+    --card:#fff; --line:#e3dccd;
+    --shadow:0 14px 40px rgba(60,44,26,.16);
+    --serif:'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   }
   @media (prefers-color-scheme: dark) {
-    body { background: #171310; color: #e8e0d4; }
-    .card { background: #221c16 !important; box-shadow: none !important; }
-    .btn { background: #7a5c3e !important; }
+    :root { --bg:#171310; --fg:#e8e0d4; --muted:#9c8f79; --accent:#a07c54;
+            --card:#221c16; --line:#3a3228; --shadow:0 14px 40px rgba(0,0,0,.55); }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; min-height:100vh; display:grid; place-items:center;
+    font-family:var(--sans); background:var(--bg); color:var(--fg);
   }
   .card {
-    max-width: 480px; margin: 24px; padding: 28px; border-radius: 14px;
-    background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.12);
+    position:relative; max-width:480px; margin:24px; padding:30px 30px 28px;
+    border:1px solid var(--line); border-radius:16px;
+    background:var(--card); box-shadow:var(--shadow); overflow:hidden;
   }
-  h1 { font-size: 1.5rem; margin: 0 0 4px; }
-  .authors { color: #8a7c68; margin: 0 0 16px; }
-  .desc { line-height: 1.5; white-space: pre-wrap; }
+  .card::before {
+    content:""; position:absolute; inset:0 0 auto; height:4px; background:var(--accent);
+  }
+  .eyebrow {
+    font-size:.62rem; text-transform:uppercase; letter-spacing:.22em;
+    color:var(--muted); margin:6px 0 12px;
+  }
+  h1 { font-family:var(--serif); font-size:1.7rem; font-weight:600; line-height:1.15; margin:0 0 4px; }
+  .subtitle { font-style:italic; color:var(--muted); margin:0 0 6px; }
+  .authors { color:var(--muted); margin:0 0 18px; }
+  .desc { line-height:1.6; white-space:pre-wrap; }
   .btn {
-    display: inline-block; margin-top: 20px; padding: 12px 20px; border: 0;
-    border-radius: 8px; background: #7a5c3e; color: #fff; font-size: 1rem;
-    text-decoration: none; cursor: pointer;
+    display:inline-block; margin-top:22px; padding:12px 22px; border:0;
+    border-radius:9px; background:var(--accent); color:#fff; font-size:1rem;
+    text-decoration:none; cursor:pointer; transition:filter .12s;
   }
-  .btn[disabled] { opacity: .5; pointer-events: none; }
-  .note { margin-top: 14px; font-size: .85rem; color: #8a7c68; }
-  .err { color: #b3261e; }
+  .btn:hover { filter:brightness(1.08); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn[disabled] { opacity:.5; pointer-events:none; }
+  .note { margin-top:14px; font-size:.85rem; color:var(--muted); }
+  .err { color:#b3261e; }
 </style>
 </head>
 <body>
@@ -60,7 +77,9 @@
       const bits = [];
       if (b.published_year) bits.push(b.published_year);
       if (b.publisher) bits.push(esc(b.publisher));
-      let html = '<h1>' + esc(b.title) + '</h1>';
+      let html = '<p class="eyebrow">Shared from a Vellum library</p>';
+      html += '<h1>' + esc(b.title) + '</h1>';
+      if (b.subtitle) html += '<p class="subtitle">' + esc(b.subtitle) + '</p>';
       if (authors) html += '<p class="authors">' + esc(authors) + '</p>';
       if (b.description) html += '<p class="desc">' + esc(b.description) + '</p>';
       if (b.download_available) {

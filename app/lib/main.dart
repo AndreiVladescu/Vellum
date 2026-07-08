@@ -133,16 +133,40 @@ class _LibraryPageState extends State<LibraryPage> {
             stream: repository.watchAllBooks(),
             builder: (context, snapshot) {
               final all = snapshot.data ?? const [];
+              final theme = Theme.of(context);
               if (all.isEmpty) {
-                return const Center(
-                  child: Text('Your shelf is empty.\nAdd your first book!',
-                      textAlign: TextAlign.center),
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_stories_outlined,
+                        size: 56,
+                        color: theme.colorScheme.primary
+                            .withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Your shelf is empty',
+                          style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Add your first book to see it here.',
+                        style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
                 );
               }
               final books = _filter(all);
               if (books.isEmpty) {
                 return Center(
-                    child: Text('No books match “${_query.trim()}”.'));
+                  child: Text(
+                    'No books match “${_query.trim()}”.',
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                );
               }
               return ShelfView(
                 books: books,
