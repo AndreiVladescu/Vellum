@@ -20,9 +20,6 @@ mod opds;
 mod shares;
 mod web;
 
-/// Largest blob (book file) the server accepts in one upload.
-const MAX_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
-
 /// Shared handler state: the database pool, the base URL used to build public
 /// share links (`VELLUM_PUBLIC_URL`), and the directory holding cover/file
 /// blobs (`VELLUM_DATA_DIR`).
@@ -33,6 +30,8 @@ pub struct AppState {
     pub data_dir: PathBuf,
     /// Shared client for outbound metadata lookups (Open Library, Google Books).
     pub http: reqwest::Client,
+    /// Largest upload (book file) accepted, in bytes (`VELLUM_MAX_UPLOAD_MB`).
+    pub max_upload_bytes: usize,
 }
 
 /// Open (creating if missing) the SQLite database at `path` and run migrations.
@@ -48,6 +47,7 @@ pub async fn connect_db(path: &str) -> anyhow::Result<SqlitePool> {
 
 /// Build the full application router.
 pub fn router(state: AppState) -> Router {
+    let max_upload = state.max_upload_bytes;
     Router::new()
         .route("/health", get(health))
         // Web admin console + public landing page.
@@ -99,7 +99,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/public/{token}/file", get(shares::public_file))
         // OPDS catalog for third-party e-readers (HTTP Basic auth).
         .route("/opds", get(opds::feed))
-        .layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES))
+        // Book detail (metadata + authors + genres + files) for the console.
+        .route("/api/books/{id}/detail", get(books::detail))
+        .layer(DefaultBodyLimit::max(max_upload))
         .with_state(state)
 }
 

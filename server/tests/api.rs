@@ -20,6 +20,7 @@ async fn test_app() -> axum::Router {
         public_base_url: "http://test.local".into(),
         data_dir,
         http: reqwest::Client::new(),
+        max_upload_bytes: 512 * 1024 * 1024,
     })
 }
 
@@ -339,6 +340,66 @@ async fn put_upserts_a_book_at_a_chosen_id() {
 
     let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
     assert_eq!(list.as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn book_detail_and_query_token_download() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // Attach a file.
+    let pdf = b"%PDF-1.4 hello".to_vec();
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=dune.pdf"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "application/pdf")
+        .body(Body::from(pdf.clone()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::OK
+    );
+
+    // Detail carries metadata + files.
+    let (status, detail) =
+        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(detail["title"], json!("Dune"));
+    let files = detail["files"].as_array().unwrap();
+    assert_eq!(files.len(), 1);
+    let file_id = files[0]["id"].as_str().unwrap().to_string();
+
+    // A `?token=` query authenticates a plain download (no Authorization header).
+    let download = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(download.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(download.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(bytes.as_ref(), pdf.as_slice());
+
+    // A bad token is rejected.
+    let bad = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token=nope"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(bad.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]

@@ -28,21 +28,30 @@ impl FromRequestParts<AppState> for AuthUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let header = parts
-            .headers
-            .get(AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .ok_or_else(|| AppError::Unauthorized("missing credentials".into()))?;
-
         // Bearer for the app; Basic so OPDS e-readers (and file downloads) work.
-        if let Some(token) = header.strip_prefix("Bearer ") {
-            user_from_token(state, token).await
-        } else if let Some(encoded) = header.strip_prefix("Basic ") {
-            user_from_basic(state, encoded).await
-        } else {
-            Err(AppError::Unauthorized("unsupported authorization scheme".into()))
+        if let Some(header) = parts.headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
+            return if let Some(token) = header.strip_prefix("Bearer ") {
+                user_from_token(state, token).await
+            } else if let Some(encoded) = header.strip_prefix("Basic ") {
+                user_from_basic(state, encoded).await
+            } else {
+                Err(AppError::Unauthorized("unsupported authorization scheme".into()))
+            };
         }
+
+        // Fallback: a `?token=` query param, so browser <img> and <a download>
+        // links to authenticated blobs (covers, file downloads) work.
+        if let Some(token) = query_token(parts.uri.query()) {
+            return user_from_token(state, token).await;
+        }
+        Err(AppError::Unauthorized("missing credentials".into()))
     }
+}
+
+/// Extracts a `token` value from a URL query string (tokens are hex, so no
+/// percent-decoding is needed).
+fn query_token(query: Option<&str>) -> Option<&str> {
+    query?.split('&').find_map(|pair| pair.strip_prefix("token="))
 }
 
 async fn user_from_token(state: &AppState, token: &str) -> AppResult<AuthUser> {
