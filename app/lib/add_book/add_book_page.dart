@@ -21,6 +21,12 @@ class _AddBookPageState extends State<AddBookPage> {
   String? _addingWorkKey;
   String? _error;
 
+  /// The query behind the current [_results]; used to offer create-on-empty.
+  String _lastQuery = '';
+
+  /// Sentinel for the busy indicator while creating a custom book.
+  static const _customKey = '__custom__';
+
   @override
   void dispose() {
     _queryController.dispose();
@@ -37,7 +43,10 @@ class _AddBookPageState extends State<AddBookPage> {
     try {
       final results = await widget.repository.metadata.search(query);
       if (!mounted) return;
-      setState(() => _results = results);
+      setState(() {
+        _results = results;
+        _lastQuery = query;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = 'Search failed — are you online?\n$e');
@@ -57,6 +66,37 @@ class _AddBookPageState extends State<AddBookPage> {
       setState(() {
         _addingWorkKey = null;
         _error = 'Could not add “${result.title}”: $e';
+      });
+    }
+  }
+
+  /// Enter either searches, or — when the last search found nothing — creates a
+  /// custom book from the typed title.
+  Future<void> _submit() async {
+    final q = _queryController.text.trim();
+    if (q.isEmpty) return;
+    if (_results != null && _results!.isEmpty && q == _lastQuery) {
+      await _createFromQuery(q);
+    } else {
+      await _search();
+    }
+  }
+
+  /// Creates a bare custom book titled [q] — for a book no library has.
+  Future<void> _createFromQuery(String q) async {
+    setState(() {
+      _addingWorkKey = _customKey;
+      _error = null;
+    });
+    try {
+      await widget.repository.createCustomBook(title: q);
+      if (!mounted) return;
+      Navigator.of(context).pop(q);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _addingWorkKey = null;
+        _error = 'Could not create “$q”: $e';
       });
     }
   }
@@ -91,7 +131,7 @@ class _AddBookPageState extends State<AddBookPage> {
               controller: _queryController,
               autofocus: true,
               textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _search(),
+              onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
                 hintText: 'Title, author, or ISBN',
                 prefixIcon: const Icon(Icons.search),
@@ -134,7 +174,28 @@ class _AddBookPageState extends State<AddBookPage> {
       );
     }
     if (results.isEmpty) {
-      return const Center(child: Text('No results — try different words.'));
+      final q = _lastQuery;
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('No results for “$q”.', textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed:
+                    _addingWorkKey != null ? null : () => _createFromQuery(q),
+                icon: const Icon(Icons.add),
+                label: Text('Create “$q” as a custom book'),
+              ),
+              const SizedBox(height: 8),
+              Text('or press Enter again',
+                  style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      );
     }
     return ListView.builder(
       itemCount: results.length,
