@@ -37,8 +37,8 @@ A repository layer inside the app abstracts where data comes from:
 
 - **Standalone mode** — repository reads/writes local storage only.
 - **Connected mode** — same local storage, plus a sync engine that pulls
-  metadata from the server, lazily downloads book files on first open, and
-  pushes local changes back.
+  metadata, covers, and book files from the server and pushes local books
+  (with their covers and files) back.
 
 The server is deliberately boring: a REST API over (nearly) the same schema,
 plus blob storage for book files and images. Later: an OPDS feed so existing
@@ -104,8 +104,11 @@ add/remove tags (groups) in bulk or per book, delete several at once, add books
 (or click to upload) a PDF/EPUB or cover image onto a row — validated by magic
 bytes — and mint public links with an expiry date and one-time-download option.
 Clicking a book opens a **detail view** — cover, metadata, tags, and files —
-where you edit fields in place and **download the book file** directly. It is
-the primary way to manage the library; the app's Sharing screen covers the same
+where you edit fields in place, **download the book file** directly, **change
+the cover** (the cover shows and reveals a *Change cover* affordance on hover),
+and **upload** a file (with a live upload-progress bar, since big books take a
+while). It is the primary way to manage the library; the app's Sharing screen
+covers the same
 endpoints for on-device use.
 
 ## Data model
@@ -159,14 +162,18 @@ picker). Uploads are validated by their **magic bytes** — a real `%PDF`, an EP
 zip, or an image for covers — not just the file extension.
 
 Once a book exists you can edit its **title, subtitle, year, and description**,
-and change its **cover**. The cover can come from an image (drop or pick) or, in
-the app, from the **first (full) page of an attached PDF**, rendered with
-`pdfrx` — done automatically whenever a PDF lands on a cover-less book, including
-books **pulled from the server** (so server-uploaded PDFs get a cover after a
-pull), and available any time from the book's edit sheet. (The server itself
-doesn't rasterize PDFs — that would need a native renderer, at odds with the
-single-binary server — so covers for server-only books come from the app on
-pull, or from an image you set on the console.)
+and change its **cover**. On both the app and the console the cover shows and is
+**clickable** — hover reveals a *Change cover* affordance (a cover-less book is
+a clickable placeholder); clicking picks a new image. The cover can also come
+from the **first (full) page of an attached PDF**, rendered with `pdfrx` — done
+automatically whenever a PDF lands on a cover-less book (including books
+**pulled from the server**), and available any time from the app's edit sheet.
+
+The server itself doesn't rasterize PDFs (that would need a native renderer, at
+odds with the single-binary server), so covers for books uploaded on the server
+are rendered by the **app on pull and pushed back**, so the console then shows
+the same cover the app does. (Note this is one place a pull writes to the
+server.)
 
 Two things stay **on the device only** and are never synced to a server:
 
@@ -187,22 +194,25 @@ Two things stay **on the device only** and are never synced to a server:
 4. ✅ PDF reader (`pdfrx`) with saved reading position. EPUB still later.
 5. ✅ Physical copies: locations + loan tracking (lend / return / history).
 6. ⏳ Android build, barcode scanning. **Not started.**
-7. 🚧 Rust server + sync (connected mode), OPDS feed. Server is in place
-   (accounts, RBAC, groups, sharing, public links — see above) with API
-   integration tests; the app can log in and **pull** the shared library.
-   Blob sync, push, and in-app sharing management are the next steps below.
+7. 🚧 Rust server + sync (connected mode), OPDS feed. In place: accounts, RBAC,
+   groups, sharing, public links, blob storage, OPDS, and a web admin console,
+   with API integration tests. The app logs in and syncs **both ways** —
+   metadata, covers, and files — and manages sharing on-device. Remaining:
+   conflict handling / real-time updates and the Android side.
 
 ## Sync roadmap (connected mode)
 
-The server already exposes the full multi-user API; the app currently does a
-one-way, metadata-only pull. Remaining work, in order:
+The connected-mode roadmap below is essentially complete; the app does a
+two-way sync of metadata, covers, and files. Remaining polish is conflict
+resolution and live updates.
 
 1. ✅ **Server blob storage** — upload/download endpoints for cover images and
    book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the
    book they belong to.
-2. 🚧 **App: pull covers & files** — a pull now downloads each book's cover so
-   shelves show real art. On-demand book-*file* download (to read a synced book)
-   still to come.
+2. ✅ **App: pull covers & files** — a pull downloads each book's cover *and* its
+   digital files (deduped by content hash), so synced books show real art and
+   open in the reader. Covers the app derives from a PDF's first page are pushed
+   back so the server shows them too.
 3. ✅ **App: push** — upload local books (and their covers) to the server via an
    id-preserving `PUT /api/books/{id}` upsert, making the sync two-way.
 4. ✅ **App: manage groups & shares** — a Sharing screen over the group, share,
