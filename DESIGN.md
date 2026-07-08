@@ -89,12 +89,19 @@ Basic (email:password), the latter so e-readers can use the OPDS catalog at
 `/opds`. Port is `VELLUM_PORT` (default 3000), public link base is
 `VELLUM_PUBLIC_URL`.
 
+The server does the **same online metadata search** as the app (Open Library →
+Google Books, at `GET /api/metadata/search`); `POST /api/books/from-search` adds
+a chosen result, fetching its description and cover. On both the console and the
+app, a search that finds nothing lets you **create a custom book** from the
+typed title by pressing Enter — the path for books no library has.
+
 The server also hosts its own **web admin console** at `/` (embedded HTML/JS,
 no external assets): a spreadsheet-like table of books where you select rows,
-add/remove tags (groups) in bulk or per book, delete several at once, create
-new books, drag-and-drop (or click to upload) a PDF/EPUB or cover image onto a
-row — validated by magic bytes — and mint public links with an expiry date and
-one-time-download option. It is the primary way to manage the library; the
+add/remove tags (groups) in bulk or per book, delete several at once, add books
+(search online or create custom), drag-and-drop (or click to upload) a PDF/EPUB
+or cover image onto a row — validated by magic bytes — and mint public links
+with an expiry date and one-time-download option. It is the primary way to
+manage the library; the
 app's Sharing screen covers the same endpoints for on-device use.
 
 ## Data model
