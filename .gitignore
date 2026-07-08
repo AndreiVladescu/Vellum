@@ -6,6 +6,9 @@ server/target/
 *.db-shm
 *.db-wal
 
+# Server blob store (created at runtime)
+server/data/
+
 # Editor/OS noise
 .vscode/
 .idea/
