@@ -92,8 +92,12 @@ Basic (email:password), the latter so e-readers can use the OPDS catalog at
 The server does the **same online metadata search** as the app (Open Library →
 Google Books, at `GET /api/metadata/search`); `POST /api/books/from-search` adds
 a chosen result, fetching its description and cover. On both the console and the
-app, a search that finds nothing lets you **create a custom book** from the
-typed title by pressing Enter — the path for books no library has.
+app the Add-book flow has a **Search** button and a **Create book** button, so
+you can create a book by hand without searching (for one no library has), plus
+an optional **file to attach** (drag-and-drop or browse, validated by magic
+bytes). When a PDF is attached, the app can set the cover from its **first
+page** (rendered via `pdfrx`) — automatically on create, and on demand from the
+book's edit sheet.
 
 The server also hosts its own **web admin console** at `/` (embedded HTML/JS,
 no external assets): a spreadsheet-like table of books where you select rows,
