@@ -63,7 +63,17 @@
   .modal textarea { background:var(--row); color:var(--fg); border:1px solid var(--line); border-radius:7px; padding:8px; font:inherit; resize:vertical; min-height:80px; }
   .cover-box { width:120px; height:180px; border-radius:6px; background:var(--chip); flex:0 0 auto; cursor:pointer; overflow:hidden; position:relative; }
   .cover-box img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-  .cover-box .hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.78rem; color:var(--muted); text-align:center; padding:6px; }
+  .cover-box .hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.78rem; color:var(--muted); }
+  /* The change affordance only appears on hover, over the shown cover. */
+  .cover-box .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:6px; font-size:.8rem; color:#fff; background:rgba(0,0,0,.5); opacity:0; transition:opacity .15s; }
+  .cover-box:hover .overlay { opacity:1; }
+  .uprog { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:40; display:none; align-items:center; gap:10px; background:var(--row); border:1px solid var(--line); border-radius:10px; padding:10px 14px; box-shadow:0 6px 24px rgba(0,0,0,.3); min-width:300px; }
+  .uprog-label { font-size:.85rem; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .uprog-track { flex:1; height:6px; background:var(--chip); border-radius:3px; overflow:hidden; }
+  .uprog-bar { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+  .uprog-pct { font-size:.8rem; color:var(--muted); min-width:36px; text-align:right; }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:7px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
   .link { color:var(--accent); cursor:pointer; }
   .link:hover { text-decoration:underline; }
   .ab-item { display:flex; gap:10px; align-items:center; padding:8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; cursor:pointer; }
@@ -239,8 +249,8 @@ function openAddBook(){
       <h2>Add a book</h2>
       <input id="ab-q" type="text" autocomplete="off" placeholder="Title, author, or ISBN">
       <div class="row" style="justify-content:flex-start; margin-top:10px">
-        <button class="btn" onclick="runSearch(document.getElementById('ab-q').value.trim())">Search</button>
-        <button class="btn primary" onclick="createBook()">Create book</button>
+        <button class="btn" id="ab-search" onclick="runSearch(document.getElementById('ab-q').value.trim())">Search</button>
+        <button class="btn primary" id="ab-create" onclick="createBook()">Create book</button>
       </div>
       <div id="ab-drop" class="ab-drop" onclick="pickAbFile()"
         ondragover="abDragOver(event)" ondragleave="abDragLeave()" ondrop="abDrop(event)">
@@ -314,11 +324,23 @@ async function createBook(){
   const title = document.getElementById('ab-q').value.trim();
   const status = document.getElementById('ab-status');
   if (!title){ status.textContent = 'Enter a title first.'; return; }
+  const createBtn = document.getElementById('ab-create');
+  const searchBtn = document.getElementById('ab-search');
+  createBtn.disabled = true; searchBtn.disabled = true;
+  createBtn.innerHTML = '<span class="spin"></span>Creating…';
+  status.textContent = '';
   try {
     const book = await api('POST','/api/books',{ title });
-    if (AB.file) await uploadTo(book.id, AB.file);
+    if (AB.file){
+      createBtn.innerHTML = '<span class="spin"></span>Uploading…';
+      await uploadTo(book.id, AB.file); // shows the progress bar
+    }
     closeModal(); await loadAll(); toast('Created “'+title+'”');
-  } catch(e){ status.textContent = e.message; }
+  } catch(e){
+    status.textContent = e.message;
+    createBtn.disabled = false; searchBtn.disabled = false;
+    createBtn.innerHTML = 'Create book';
+  }
 }
 
 // Classify a dropped/picked file by its magic bytes (not just its name).
@@ -331,25 +353,66 @@ async function classify(file){
   return 'unsupported';
 }
 
+// A global upload progress bar (fetch can't report upload progress, so uploads
+// use XMLHttpRequest).
+function showProgress(label){
+  let el = document.getElementById('uprog');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'uprog'; el.className = 'uprog';
+    el.innerHTML = '<div class="uprog-label"></div><div class="uprog-track"><div class="uprog-bar"></div></div><div class="uprog-pct"></div>';
+    document.body.appendChild(el);
+  }
+  el.querySelector('.uprog-label').textContent = label;
+  el.querySelector('.uprog-bar').style.width = '0%';
+  el.querySelector('.uprog-pct').textContent = '0%';
+  el.style.display = 'flex';
+}
+function setProgress(fraction){
+  const el = document.getElementById('uprog'); if (!el) return;
+  const pct = Math.round(fraction * 100);
+  el.querySelector('.uprog-bar').style.width = pct + '%';
+  el.querySelector('.uprog-pct').textContent = (pct >= 100 ? 'finishing…' : pct + '%');
+}
+function hideProgress(){ const el = document.getElementById('uprog'); if (el) el.style.display = 'none'; }
+
+function xhrUpload(method, url, file, mime){
+  return new Promise((resolve, reject)=>{
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.setRequestHeader('authorization', 'Bearer ' + S.token);
+    xhr.setRequestHeader('content-type', mime);
+    xhr.upload.onprogress = e => { if (e.lengthComputable) setProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      let msg = 'Upload failed (HTTP ' + xhr.status + ')';
+      try { const j = JSON.parse(xhr.responseText); if (j.error) msg = j.error; } catch(_) {}
+      reject(new Error(msg));
+    };
+    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.send(file);
+  });
+}
+
 async function uploadTo(id, file){
   const kind = await classify(file);
-  const auth = { authorization: 'Bearer ' + S.token };
+  if (kind !== 'image' && kind !== 'pdf' && kind !== 'epub'){
+    toast('Only PDF, EPUB, or image files are accepted');
+    return false;
+  }
+  showProgress('Uploading ' + file.name);
   try {
     if (kind === 'image'){
-      const res = await fetch('/api/books/'+id+'/cover',
-        { method:'PUT', headers:{...auth,'content-type':file.type||'image/jpeg'}, body:file });
-      if (!res.ok) throw new Error('Cover upload failed');
+      await xhrUpload('PUT', '/api/books/'+id+'/cover', file, file.type || 'image/jpeg');
       toast('Cover updated'); await loadAll();
-    } else if (kind === 'pdf' || kind === 'epub'){
-      const mime = kind==='epub' ? 'application/epub+zip' : 'application/pdf';
-      const res = await fetch('/api/books/'+id+'/files?filename='+encodeURIComponent(file.name),
-        { method:'POST', headers:{...auth,'content-type':mime}, body:file });
-      if (!res.ok) throw new Error('File upload failed');
-      toast('Uploaded ' + file.name);
     } else {
-      toast('Only PDF, EPUB, or image files are accepted');
+      const mime = kind === 'epub' ? 'application/epub+zip' : 'application/pdf';
+      await xhrUpload('POST', '/api/books/'+id+'/files?filename='+encodeURIComponent(file.name), file, mime);
+      toast('Uploaded ' + file.name);
     }
-  } catch(e){ toast(e.message); }
+    return true;
+  } catch(e){ toast(e.message); return false; }
+  finally { hideProgress(); }
 }
 
 function pickUpload(id){
@@ -441,9 +504,10 @@ async function openDetail(id){
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal" style="width:min(720px,95vw); max-height:90vh; overflow:auto">
       <div style="display:flex; gap:16px">
-        <div class="cover-box" title="Click to change the cover" onclick="detailPick('${id}','image/*')">
-          <span class="hint">Click to set a cover</span>
+        <div class="cover-box" onclick="detailPick('${id}','image/*')">
+          <span class="hint">No cover</span>
           <img src="/api/books/${id}/cover?token=${tok}&t=${Date.now()}" alt="" onerror="this.remove()">
+          <div class="overlay">Change cover</div>
         </div>
         <div style="flex:1; min-width:0">
           <label>Title</label><input id="d-title" type="text" value="${esc(d.title)}">
