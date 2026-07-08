@@ -12,8 +12,10 @@ mod access;
 mod auth;
 mod blobs;
 mod books;
+mod discover;
 mod error;
 mod groups;
+mod metadata;
 mod opds;
 mod shares;
 mod web;
@@ -29,6 +31,8 @@ pub struct AppState {
     pub db: SqlitePool,
     pub public_base_url: String,
     pub data_dir: PathBuf,
+    /// Shared client for outbound metadata lookups (Open Library, Google Books).
+    pub http: reqwest::Client,
 }
 
 /// Open (creating if missing) the SQLite database at `path` and run migrations.
@@ -55,6 +59,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/me", get(auth::me))
         .route("/api/users", get(auth::list_users).post(auth::create_user))
+        // Online metadata search + add a chosen result.
+        .route("/api/metadata/search", get(discover::search))
+        .route("/api/books/from-search", post(discover::add_from_search))
         // Books (visibility-filtered by RBAC).
         .route("/api/books", get(books::list).post(books::create))
         .route(

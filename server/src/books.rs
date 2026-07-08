@@ -264,7 +264,7 @@ pub async fn delete(
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 
-async fn fetch_book(state: &AppState, id: &str) -> AppResult<Json<BookDto>> {
+pub(crate) async fn fetch_book(state: &AppState, id: &str) -> AppResult<Json<BookDto>> {
     let book = sqlx::query_as::<_, BookDto>(&format!("SELECT {BOOK_COLUMNS} FROM book WHERE id = ?"))
         .bind(id)
         .fetch_optional(&state.db)
