@@ -12,11 +12,16 @@ async fn main() -> anyhow::Result<()> {
     let public_base_url =
         std::env::var("VELLUM_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:3000".into());
     let data_dir = std::env::var("VELLUM_DATA_DIR").unwrap_or_else(|_| "data".into());
+    let max_upload_mb: usize = std::env::var("VELLUM_MAX_UPLOAD_MB")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2048); // 2 GB default
     let state = AppState {
         db,
         public_base_url,
         data_dir: data_dir.into(),
         http: reqwest::Client::new(),
+        max_upload_bytes: max_upload_mb * 1024 * 1024,
     };
 
     let port: u16 = std::env::var("VELLUM_PORT")

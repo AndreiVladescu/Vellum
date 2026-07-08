@@ -186,6 +186,49 @@ pub async fn upsert(
     fetch_book(&state, &id).await
 }
 
+/// Full detail for the console's book view: metadata + authors + genres + files.
+#[derive(Serialize)]
+pub struct BookDetail {
+    #[serde(flatten)]
+    pub book: BookDto,
+    pub authors: Vec<String>,
+    pub genres: Vec<String>,
+    pub files: Vec<crate::blobs::FileDto>,
+}
+
+pub async fn detail(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<BookDetail>> {
+    if !book_access(&state, &user, &id).await?.can_view() {
+        return Err(AppError::NotFound("book not found".into()));
+    }
+    let book = fetch_book(&state, &id).await?.0;
+    let authors: Vec<String> = sqlx::query_scalar(
+        "SELECT a.name FROM author a JOIN book_author ba ON ba.author_id = a.id \
+         WHERE ba.book_id = ? ORDER BY ba.position",
+    )
+    .bind(&id)
+    .fetch_all(&state.db)
+    .await?;
+    let genres: Vec<String> = sqlx::query_scalar(
+        "SELECT g.name FROM genre g JOIN book_genre bg ON bg.genre_id = g.id \
+         WHERE bg.book_id = ? ORDER BY g.name",
+    )
+    .bind(&id)
+    .fetch_all(&state.db)
+    .await?;
+    let files = sqlx::query_as::<_, crate::blobs::FileDto>(
+        "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
+         FROM book_file WHERE book_id = ? ORDER BY added_at",
+    )
+    .bind(&id)
+    .fetch_all(&state.db)
+    .await?;
+    Ok(Json(BookDetail { book, authors, genres, files }))
+}
+
 pub async fn get(
     State(state): State<AppState>,
     user: AuthUser,
