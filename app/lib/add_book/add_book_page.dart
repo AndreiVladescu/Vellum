@@ -50,7 +50,17 @@ class _AddBookPageState extends State<AddBookPage> {
       _filePath = path;
       _fileName = name;
       _error = null;
+      // Seed the title from the filename when the user hasn't typed one.
+      if (_queryController.text.trim().isEmpty) {
+        _queryController.text = _titleFromFilename(name);
+      }
     });
+  }
+
+  /// The filename without its extension, as a starting title.
+  static String _titleFromFilename(String name) {
+    final dot = name.lastIndexOf('.');
+    return (dot > 0 ? name.substring(0, dot) : name).trim();
   }
 
   Future<void> _pickFile() async {

@@ -261,6 +261,9 @@ async function setAbFile(file){
   AB.file = file;
   const d = document.getElementById('ab-drop');
   if (d) d.textContent = 'Attached: ' + file.name;
+  // Seed the title from the filename when the user hasn't typed one.
+  const q = document.getElementById('ab-q');
+  if (q && !q.value.trim()) q.value = file.name.replace(/\.[^.]+$/, '');
 }
 function abDragOver(e){ e.preventDefault(); document.getElementById('ab-drop').classList.add('over'); }
 function abDragLeave(){ const d = document.getElementById('ab-drop'); if (d) d.classList.remove('over'); }
