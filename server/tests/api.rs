@@ -19,6 +19,7 @@ async fn test_app() -> axum::Router {
         db,
         public_base_url: "http://test.local".into(),
         data_dir,
+        http: reqwest::Client::new(),
     })
 }
 

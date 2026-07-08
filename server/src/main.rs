@@ -16,6 +16,7 @@ async fn main() -> anyhow::Result<()> {
         db,
         public_base_url,
         data_dir: data_dir.into(),
+        http: reqwest::Client::new(),
     };
 
     let port: u16 = std::env::var("VELLUM_PORT")
