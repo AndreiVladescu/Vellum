@@ -99,6 +99,21 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     await repository.setCoverFromFile(book.id, picked.path);
   }
 
+  Future<void> _coverFromFirstPage() async {
+    final ok = await repository.setCoverFromFirstPage(book.id);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Cover set from the first page'
+                : 'Attach a PDF first to use its first page',
+          ),
+        ),
+      );
+    }
+  }
+
   void _openEditSheet() => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -106,6 +121,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       book: book,
       repository: repository,
       onPickCover: _pickCover,
+      onCoverFromFirstPage: _coverFromFirstPage,
     ),
   );
 
@@ -723,11 +739,13 @@ class _EditBookSheet extends StatefulWidget {
     required this.book,
     required this.repository,
     required this.onPickCover,
+    required this.onCoverFromFirstPage,
   });
 
   final Book book;
   final LibraryRepository repository;
   final Future<void> Function() onPickCover;
+  final Future<void> Function() onCoverFromFirstPage;
 
   @override
   State<_EditBookSheet> createState() => _EditBookSheetState();
@@ -806,6 +824,15 @@ class _EditBookSheetState extends State<_EditBookSheet> {
               onPressed: () => widget.onPickCover(),
               icon: const Icon(Icons.image_outlined),
               label: const Text('Change cover…'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onCoverFromFirstPage();
+              },
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text('Use first page of the PDF as cover'),
             ),
             const SizedBox(height: 6),
             Text(

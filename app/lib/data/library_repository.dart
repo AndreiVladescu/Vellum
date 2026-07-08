@@ -12,6 +12,7 @@ import '../server/server_client.dart';
 import '../shelf/spine_style.dart';
 import 'database.dart';
 import 'metadata.dart';
+import 'pdf_cover.dart';
 
 /// Author names and genre names for a book, for the detail view.
 typedef BookDetails = ({List<String> authors, List<String> genres});
@@ -144,6 +145,21 @@ class LibraryRepository {
 
   Future<void> setCoverFromFile(String bookId, String sourcePath) async =>
       setCoverBytes(bookId, await File(sourcePath).readAsBytes());
+
+  /// Renders the first page of one of the book's attached PDFs and uses it as
+  /// the cover. Returns false if the book has no PDF or rendering fails.
+  Future<bool> setCoverFromFirstPage(String bookId) async {
+    final files = await (db.select(
+      db.bookFiles,
+    )..where((f) => f.bookId.equals(bookId) & f.format.equals('pdf'))).get();
+    if (files.isEmpty) return false;
+    final png = await renderPdfFirstPagePng(
+      p.join(_dataDir.path, files.first.path),
+    );
+    if (png == null) return false;
+    await setCoverBytes(bookId, png);
+    return true;
+  }
 
   /// True when the book was imported from a library and can be reset.
   bool canRevert(Book book) => book.sourceMetadata != null;
