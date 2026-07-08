@@ -58,7 +58,11 @@
   .modal label { display:block; margin:12px 0 4px; }
   .modal .row { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
   .linkout { word-break:break-all; background:var(--alt); padding:10px; border-radius:8px; font-family:monospace; }
-  .modal input[type=text] { width:100%; }
+  .modal input[type=text], .modal textarea { width:100%; }
+  .modal label { display:block; margin:10px 0 3px; font-size:.82rem; color:var(--muted); }
+  .modal textarea { background:var(--row); color:var(--fg); border:1px solid var(--line); border-radius:7px; padding:8px; font:inherit; }
+  .link { color:var(--accent); cursor:pointer; }
+  .link:hover { text-decoration:underline; }
   .ab-item { display:flex; gap:10px; align-items:center; padding:8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; cursor:pointer; }
   .ab-item:hover { border-color:var(--accent); }
   .ab-item img { width:34px; height:48px; object-fit:cover; border-radius:3px; flex:0 0 auto; }
@@ -205,7 +209,7 @@ function render(){
         ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropOn(event,'${b.id}',this)"
         title="Drop a PDF/EPUB or cover image here">
       <td><input type="checkbox" ${checked} onchange="toggleRow('${b.id}',this.checked)"></td>
-      <td>${esc(b.title)}</td>
+      <td><span class="link" onclick="openDetail('${b.id}')">${esc(b.title)}</span></td>
       <td class="year">${b.published_year??''}</td>
       <td>${chips}<button class="addtag" onclick="quickAdd(this,'${b.id}')">＋ tag</button></td>
       <td class="actions">
@@ -409,6 +413,70 @@ async function deleteSelected(){
   if (!confirm(`Delete ${S.selected.size} book(s)? This cannot be undone.`)) return;
   try { for (const id of S.selected) await api('DELETE', `/api/books/${id}`);
         S.selected.clear(); await loadAll(); toast('Deleted'); }
+  catch(e){ toast(e.message); }
+}
+
+function fmtSize(b){ return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
+
+async function openDetail(id){
+  let d;
+  try { d = await api('GET','/api/books/'+id+'/detail'); }
+  catch(e){ toast(e.message); return; }
+  const tok = encodeURIComponent(S.token);
+  const authors = (d.authors||[]).join(', ');
+  const genres = (d.genres||[]);
+  const files = (d.files||[]).map(f =>
+    '<div class="ab-item"><div style="flex:1">'+esc(f.format.toUpperCase())+' · '+fmtSize(f.size_bytes)+'</div>'+
+    '<a class="btn" href="/api/files/'+f.id+'?token='+tok+'" download="'+esc(d.title)+'.'+esc(f.format)+'">Download</a></div>'
+  ).join('') || '<div class="muted">No files uploaded.</div>';
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(720px,95vw); max-height:90vh; overflow:auto">
+      <div style="display:flex; gap:16px">
+        <img src="/api/books/${id}/cover?token=${tok}" alt="" onerror="this.style.visibility='hidden'"
+          style="width:120px; height:180px; object-fit:cover; border-radius:6px; background:var(--chip); flex:0 0 auto">
+        <div style="flex:1; min-width:0">
+          <label>Title</label><input id="d-title" type="text" value="${esc(d.title)}">
+          <label>Subtitle</label><input id="d-subtitle" type="text" value="${esc(d.subtitle||'')}">
+          <label>Year</label><input id="d-year" type="text" value="${d.published_year??''}">
+          <div class="muted" style="margin-top:8px">${
+            [authors?('by '+esc(authors)):'', d.publisher?esc(d.publisher):'', d.isbn?('ISBN '+esc(d.isbn)):''].filter(Boolean).join(' · ')
+          }</div>
+          ${genres.length?('<div style="margin-top:6px">'+genres.map(g=>'<span class="chip">'+esc(g)+'</span>').join('')+'</div>'):''}
+        </div>
+      </div>
+      <label>Description</label>
+      <textarea id="d-desc" rows="5">${esc(d.description||'')}</textarea>
+      <label>Files</label>
+      ${files}
+      <div class="row" style="justify-content:space-between; margin-top:16px">
+        <button class="btn danger" onclick="deleteBook('${id}')">Delete</button>
+        <div>
+          <button class="btn" onclick="closeModal()">Close</button>
+          <button class="btn primary" onclick="saveDetail('${id}')">Save</button>
+        </div>
+      </div>
+    </div>
+   </div>`;
+}
+
+async function saveDetail(id){
+  const body = {
+    title: document.getElementById('d-title').value.trim(),
+    subtitle: document.getElementById('d-subtitle').value,
+    description: document.getElementById('d-desc').value,
+  };
+  const y = document.getElementById('d-year').value.trim();
+  if (y && !isNaN(parseInt(y,10))) body.published_year = parseInt(y,10);
+  if (!body.title){ toast('Title cannot be empty'); return; }
+  try { await api('PATCH','/api/books/'+id, body); closeModal(); await loadAll(); toast('Saved'); }
+  catch(e){ toast(e.message); }
+}
+
+async function deleteBook(id){
+  if (!confirm('Delete this book? This cannot be undone.')) return;
+  try { await api('DELETE','/api/books/'+id); closeModal(); await loadAll(); toast('Deleted'); }
   catch(e){ toast(e.message); }
 }
 
