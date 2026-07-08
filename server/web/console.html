@@ -63,6 +63,8 @@
   .ab-item:hover { border-color:var(--accent); }
   .ab-item img { width:34px; height:48px; object-fit:cover; border-radius:3px; flex:0 0 auto; }
   .ab-noimg { width:34px; height:48px; background:var(--chip); border-radius:3px; flex:0 0 auto; }
+  .ab-drop { margin-top:10px; padding:16px; border:1px dashed var(--line); border-radius:8px; text-align:center; color:var(--muted); cursor:pointer; }
+  .ab-drop.over { border-color:var(--accent); background:var(--chip); }
   .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
            background:var(--fg); color:var(--bg); padding:10px 16px; border-radius:8px; z-index:30; }
 </style>
@@ -127,7 +129,7 @@
 <script>
 const S = { token: localStorage.getItem('vellum_token'), email: localStorage.getItem('vellum_email'),
             books: [], groups: [], members: new Set(), selected: new Set() };
-const AB = { emptyFor: null, results: [] };
+const AB = { results: [], file: null };
 
 function esc(s){ return (s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
@@ -222,41 +224,58 @@ function toggleRow(id, on){ on?S.selected.add(id):S.selected.delete(id); render(
 function toggleAll(on){ S.selected = on ? new Set(S.books.map(b=>b.id)) : new Set(); render(); }
 
 function openAddBook(){
-  AB.emptyFor = null; AB.results = [];
+  AB.results = []; AB.file = null;
   const root = document.getElementById('modal-root');
   root.innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal" style="width:min(600px,94vw)">
       <h2>Add a book</h2>
-      <input id="ab-q" type="text" autocomplete="off"
-        placeholder="Search title, author or ISBN — or type a title and press Enter to create">
+      <input id="ab-q" type="text" autocomplete="off" placeholder="Title, author, or ISBN">
+      <div class="row" style="justify-content:flex-start; margin-top:10px">
+        <button class="btn" onclick="runSearch(document.getElementById('ab-q').value.trim())">Search</button>
+        <button class="btn primary" onclick="createBook()">Create book</button>
+      </div>
+      <div id="ab-drop" class="ab-drop" onclick="pickAbFile()"
+        ondragover="abDragOver(event)" ondragleave="abDragLeave()" ondrop="abDrop(event)">
+        Drop a PDF/EPUB here, or click to choose (optional)
+      </div>
       <div id="ab-status" class="muted" style="margin:10px 0"></div>
-      <div id="ab-results" style="max-height:52vh; overflow:auto"></div>
+      <div id="ab-results" style="max-height:40vh; overflow:auto"></div>
       <div class="row"><button class="btn" onclick="closeModal()">Close</button></div>
     </div>
    </div>`;
   const q = document.getElementById('ab-q');
   q.focus();
-  q.addEventListener('keydown', ev=>{
-    if (ev.key !== 'Enter') return;
-    ev.preventDefault();
-    const query = q.value.trim();
-    if (!query) return;
-    if (AB.emptyFor === query) createCustom(query); else runSearch(query);
-  });
+  q.addEventListener('keydown', ev=>{ if (ev.key==='Enter'){ ev.preventDefault(); runSearch(q.value.trim()); } });
 }
+
+function pickAbFile(){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.pdf,.epub';
+  input.onchange = ()=>{ if (input.files[0]) setAbFile(input.files[0]); };
+  input.click();
+}
+async function setAbFile(file){
+  const kind = await classify(file);
+  if (kind !== 'pdf' && kind !== 'epub'){ toast('Only PDF or EPUB can be attached'); return; }
+  AB.file = file;
+  const d = document.getElementById('ab-drop');
+  if (d) d.textContent = 'Attached: ' + file.name;
+}
+function abDragOver(e){ e.preventDefault(); document.getElementById('ab-drop').classList.add('over'); }
+function abDragLeave(){ const d = document.getElementById('ab-drop'); if (d) d.classList.remove('over'); }
+function abDrop(e){ e.preventDefault(); abDragLeave(); const f = e.dataTransfer.files[0]; if (f) setAbFile(f); }
 
 async function runSearch(query){
   const status = document.getElementById('ab-status');
   const box = document.getElementById('ab-results');
-  status.textContent = 'Searching…'; box.innerHTML=''; AB.emptyFor = null;
+  if (!query){ status.textContent = 'Type a title, author, or ISBN to search.'; return; }
+  status.textContent = 'Searching…'; box.innerHTML = '';
   try {
     const list = await api('GET','/api/metadata/search?q='+encodeURIComponent(query));
     AB.results = list;
     if (!list.length){
-      AB.emptyFor = query;
-      status.innerHTML = 'No matches. Press Enter again to create <b>'+esc(query)+'</b> as a custom book.';
-      box.innerHTML = '<button class="btn primary" onclick="createCustom('+JSON.stringify(query)+')">Create “'+esc(query)+'”</button>';
+      status.innerHTML = 'No matches — use <b>Create book</b> above to add “'+esc(query)+'” yourself.';
       return;
     }
     status.textContent = list.length+' result'+(list.length>1?'s':'')+' — click one to add';
@@ -274,13 +293,22 @@ async function addResult(i){
   const r = AB.results[i];
   const status = document.getElementById('ab-status');
   status.textContent = 'Adding “'+r.title+'”…';
-  try { await api('POST','/api/books/from-search', r); closeModal(); await loadAll(); toast('Added “'+r.title+'”'); }
-  catch(e){ status.textContent = e.message; }
+  try {
+    const book = await api('POST','/api/books/from-search', r);
+    if (AB.file) await uploadTo(book.id, AB.file);
+    closeModal(); await loadAll(); toast('Added “'+r.title+'”');
+  } catch(e){ status.textContent = e.message; }
 }
 
-async function createCustom(title){
-  try { await api('POST','/api/books',{ title }); closeModal(); await loadAll(); toast('Created “'+title+'”'); }
-  catch(e){ toast(e.message); }
+async function createBook(){
+  const title = document.getElementById('ab-q').value.trim();
+  const status = document.getElementById('ab-status');
+  if (!title){ status.textContent = 'Enter a title first.'; return; }
+  try {
+    const book = await api('POST','/api/books',{ title });
+    if (AB.file) await uploadTo(book.id, AB.file);
+    closeModal(); await loadAll(); toast('Created “'+title+'”');
+  } catch(e){ status.textContent = e.message; }
 }
 
 // Classify a dropped/picked file by its magic bytes (not just its name).
