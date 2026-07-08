@@ -60,7 +60,10 @@
   .linkout { word-break:break-all; background:var(--alt); padding:10px; border-radius:8px; font-family:monospace; }
   .modal input[type=text], .modal textarea { width:100%; }
   .modal label { display:block; margin:10px 0 3px; font-size:.82rem; color:var(--muted); }
-  .modal textarea { background:var(--row); color:var(--fg); border:1px solid var(--line); border-radius:7px; padding:8px; font:inherit; }
+  .modal textarea { background:var(--row); color:var(--fg); border:1px solid var(--line); border-radius:7px; padding:8px; font:inherit; resize:vertical; min-height:80px; }
+  .cover-box { width:120px; height:180px; border-radius:6px; background:var(--chip); flex:0 0 auto; cursor:pointer; overflow:hidden; position:relative; }
+  .cover-box img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .cover-box .hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.78rem; color:var(--muted); text-align:center; padding:6px; }
   .link { color:var(--accent); cursor:pointer; }
   .link:hover { text-decoration:underline; }
   .ab-item { display:flex; gap:10px; align-items:center; padding:8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; cursor:pointer; }
@@ -425,17 +428,23 @@ async function openDetail(id){
   const tok = encodeURIComponent(S.token);
   const authors = (d.authors||[]).join(', ');
   const genres = (d.genres||[]);
-  const files = (d.files||[]).map(f =>
+  const list = (d.files||[]).map(f =>
     '<div class="ab-item"><div style="flex:1">'+esc(f.format.toUpperCase())+' · '+fmtSize(f.size_bytes)+'</div>'+
     '<a class="btn" href="/api/files/'+f.id+'?token='+tok+'" download="'+esc(d.title)+'.'+esc(f.format)+'">Download</a></div>'
-  ).join('') || '<div class="muted">No files uploaded.</div>';
+  ).join('');
+  const upBtn = '<button class="btn" onclick="detailPick(\''+id+'\',\'.pdf,.epub\')">Upload</button>';
+  const files = list
+    ? list + '<div style="text-align:right; margin-top:6px">'+upBtn+'</div>'
+    : '<div style="display:flex; align-items:center; gap:10px"><span class="muted">No files uploaded.</span>'+upBtn+'</div>';
   const root = document.getElementById('modal-root');
   root.innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal" style="width:min(720px,95vw); max-height:90vh; overflow:auto">
       <div style="display:flex; gap:16px">
-        <img src="/api/books/${id}/cover?token=${tok}" alt="" onerror="this.style.visibility='hidden'"
-          style="width:120px; height:180px; object-fit:cover; border-radius:6px; background:var(--chip); flex:0 0 auto">
+        <div class="cover-box" title="Click to change the cover" onclick="detailPick('${id}','image/*')">
+          <span class="hint">Click to set a cover</span>
+          <img src="/api/books/${id}/cover?token=${tok}&t=${Date.now()}" alt="" onerror="this.remove()">
+        </div>
         <div style="flex:1; min-width:0">
           <label>Title</label><input id="d-title" type="text" value="${esc(d.title)}">
           <label>Subtitle</label><input id="d-subtitle" type="text" value="${esc(d.subtitle||'')}">
@@ -459,6 +468,19 @@ async function openDetail(id){
       </div>
     </div>
    </div>`;
+}
+
+// Pick a file (image for a cover, or PDF/EPUB for a book file) and upload it,
+// routed by magic bytes, then refresh the detail view.
+function detailPick(id, accept){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = accept;
+  input.onchange = async ()=>{
+    if (!input.files[0]) return;
+    await uploadTo(id, input.files[0]);
+    openDetail(id);
+  };
+  input.click();
 }
 
 async function saveDetail(id){
