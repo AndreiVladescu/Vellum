@@ -10,12 +10,17 @@ shelf, instead of scrolling a grid of covers.
   physical books: where they live, and who you lent them to.
 - **A shelf, not a spreadsheet** — swipe through shelves of generated book
   spines, organize into panes, collections, and genres.
-- **Automatic metadata** — add a book (or scan its barcode) and Vellum looks up
-  the author, genre, description, and cover online.
+- **Add books your way** — search Open Library / Google Books for the metadata
+  and cover, or create a custom book and drop in your own PDF/EPUB. Edit any
+  detail later (or use a PDF's first page as its cover), keep private reader
+  notes, and revert an imported book to its library defaults.
 - **Integrated reader** — read your PDFs (EPUB coming later) right in the app.
+- **Share it (optional)** — a self-hosted server adds accounts and roles, book
+  groups, sharing (whole library, a group, or one book), public per-book links
+  with expiry / one-time download, an OPDS feed for e-readers, and a web admin
+  console for managing it all.
 - **Yours** — works fully offline as a standalone app with a local database,
-  or connects to a lightweight self-hosted server that holds the shared
-  library.
+  or connects to that self-hosted server for a shared library.
 
 ## Structure
 
