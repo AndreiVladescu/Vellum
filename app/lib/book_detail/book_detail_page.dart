@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -58,11 +60,13 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
   /// PDFs/EPUBs are attached, anything else is rejected.
   Future<void> _handleDrop(List<XFile> files) async {
     var attached = 0;
+    var coverChanged = false;
     String? message;
     for (final file in files) {
       final kind = await classifyBookFile(file.path);
       if (kind == BookFileKind.image) {
         await repository.setCoverFromFile(book.id, file.path);
+        coverChanged = true;
         message = 'Cover updated';
       } else if (kind.isBook) {
         await repository.attachFile(book.id, file.path);
@@ -71,6 +75,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
         message = 'Only PDF, EPUB, or image files are accepted';
       }
     }
+    if (coverChanged) await _evictCover();
     if (attached > 0) {
       message = 'Attached $attached file${attached == 1 ? '' : 's'}';
     }
@@ -97,10 +102,20 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       return;
     }
     await repository.setCoverFromFile(book.id, picked.path);
+    await _evictCover();
+  }
+
+  /// The cover always writes to the same path, so drop it from the image cache
+  /// to force a reload after a change.
+  Future<void> _evictCover() async {
+    final cover = repository.coverFileOf(book);
+    if (cover != null) await FileImage(cover).evict();
+    if (mounted) setState(() {});
   }
 
   Future<void> _coverFromFirstPage() async {
     final ok = await repository.setCoverFromFirstPage(book.id);
+    if (ok) await _evictCover();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -194,16 +209,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (cover != null && cover.existsSync())
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        cover,
-                        width: 110,
-                        height: 162,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                  _CoverThumb(cover: cover, onTap: _pickCover),
                   const SizedBox(width: 20),
                   Expanded(
                     child: Column(
@@ -655,6 +661,71 @@ class _PhysicalCopyTile extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// The book's cover: shows the image and, on hover (desktop), reveals a
+/// "Change cover" overlay. Tapping picks a new image — the same mechanic as the
+/// server console. A cover-less book shows a clickable "No cover" placeholder.
+class _CoverThumb extends StatefulWidget {
+  const _CoverThumb({required this.cover, required this.onTap});
+
+  final File? cover;
+  final VoidCallback onTap;
+
+  @override
+  State<_CoverThumb> createState() => _CoverThumbState();
+}
+
+class _CoverThumbState extends State<_CoverThumb> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cover = widget.cover;
+    final hasCover = cover != null && cover.existsSync();
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 110,
+            height: 162,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (hasCover)
+                  Image.file(cover, fit: BoxFit.cover)
+                else
+                  Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    alignment: Alignment.center,
+                    child: Text('No cover', style: theme.textTheme.bodySmall),
+                  ),
+                AnimatedOpacity(
+                  opacity: _hover ? 1 : 0,
+                  duration: const Duration(milliseconds: 120),
+                  child: Container(
+                    color: Colors.black54,
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Change\ncover',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
