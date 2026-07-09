@@ -54,6 +54,25 @@ class SettleResult {
 ///
 /// This is pure (no Flutter/database types) so the packing rules can be unit
 /// tested in isolation; the environment editor adapts its models to it.
+/// True when any book in [others] is resting on shelf [s] — its bottom at the
+/// shelf's top (within [tol]) and its footprint overlapping the shelf
+/// horizontally. Used to pin a shelf that still holds books.
+bool shelfHasBooks(
+  SettleSegment s,
+  List<SettleBox> others, {
+  double tol = 0.02,
+}) {
+  final left = math.min(s.x1, s.x2);
+  final right = math.max(s.x1, s.x2);
+  final top = math.max(s.y1, s.y2);
+  for (final o in others) {
+    if (o.x + o.w > left && o.x < right && (o.y - top).abs() <= tol) {
+      return true;
+    }
+  }
+  return false;
+}
+
 SettleResult settle({
   required double x,
   required double y,
