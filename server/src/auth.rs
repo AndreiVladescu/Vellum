@@ -183,9 +183,12 @@ pub async fn register(
 ) -> AppResult<Json<AuthResponse>> {
     validate_credentials(&input.email, &input.password)?;
 
+    // Check "is there a master yet?" and insert the first user in one
+    // transaction, so two simultaneous first-registrations can't both win.
+    let mut tx = state.db.begin().await?;
     let master_exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM app_user WHERE is_master = 1)")
-            .fetch_one(&state.db)
+            .fetch_one(&mut *tx)
             .await?;
     if master_exists {
         return Err(AppError::Forbidden(
@@ -193,7 +196,10 @@ pub async fn register(
         ));
     }
 
-    let user = insert_user(&state, &input.email, &input.display_name, &input.password, true).await?;
+    let user =
+        insert_user(&mut *tx, &input.email, &input.display_name, &input.password, true).await?;
+    tx.commit().await?;
+
     let token = issue_token(&state, &user.id).await?;
     Ok(Json(AuthResponse { token, user }))
 }
@@ -265,7 +271,7 @@ pub async fn create_user(
     require_master(&caller)?;
     validate_credentials(&input.email, &input.password)?;
     let user =
-        insert_user(&state, &input.email, &input.display_name, &input.password, false).await?;
+        insert_user(&state.db, &input.email, &input.display_name, &input.password, false).await?;
     Ok(Json(user))
 }
 
@@ -296,13 +302,16 @@ fn validate_credentials(email: &str, password: &str) -> AppResult<()> {
     Ok(())
 }
 
-async fn insert_user(
-    state: &AppState,
+async fn insert_user<'e, E>(
+    executor: E,
     email: &str,
     display_name: &str,
     password: &str,
     is_master: bool,
-) -> AppResult<AuthUser> {
+) -> AppResult<AuthUser>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
     let id = uuid::Uuid::new_v4().to_string();
     let email = email.trim().to_lowercase();
     let display_name = display_name.trim();
@@ -317,7 +326,7 @@ async fn insert_user(
     .bind(display_name)
     .bind(&hash)
     .bind(is_master)
-    .execute(&state.db)
+    .execute(executor)
     .await;
 
     if let Err(sqlx::Error::Database(e)) = &result
