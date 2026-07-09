@@ -62,6 +62,7 @@ pub fn router(state: AppState) -> Router {
         // Online metadata search + add a chosen result.
         .route("/api/metadata/search", get(discover::search))
         .route("/api/books/from-search", post(discover::add_from_search))
+        .route("/api/books/{id}/enrich", post(discover::enrich))
         // Books (visibility-filtered by RBAC).
         .route("/api/books", get(books::list).post(books::create))
         .route(
