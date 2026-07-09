@@ -8,7 +8,7 @@ use std::path::Path;
 use axum::body::Bytes;
 use tokio::process::Command;
 use axum::extract::{Path as AxPath, Query, State};
-use axum::http::header;
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -132,6 +132,7 @@ pub async fn get_cover(
     State(state): State<AppState>,
     user: AuthUser,
     AxPath(id): AxPath<String>,
+    headers: HeaderMap,
 ) -> AppResult<Response> {
     require_view(&state, &user, &id).await?;
     let rel: Option<Option<String>> =
@@ -142,7 +143,21 @@ pub async fn get_cover(
     let rel = rel
         .flatten()
         .ok_or_else(|| AppError::NotFound("no cover".into()))?;
-    serve_blob(&state, &rel).await
+    // Covers have no stored hash, so use a weak size+mtime validator.
+    let etag = tokio::fs::metadata(state.data_dir.join(&rel))
+        .await
+        .ok()
+        .map(|m| {
+            let mtime = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            format!("W/\"{}-{mtime}\"", m.len())
+        });
+    let inm = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok());
+    serve_blob(&state, &rel, etag, inm).await
 }
 
 // ---- book files -----------------------------------------------------------
@@ -403,15 +418,18 @@ pub async fn download_file(
     State(state): State<AppState>,
     user: AuthUser,
     AxPath(file_id): AxPath<String>,
+    headers: HeaderMap,
 ) -> AppResult<Response> {
-    let row: Option<(String, String)> =
-        sqlx::query_as("SELECT book_id, path FROM book_file WHERE id = ?")
+    let row: Option<(String, String, String)> =
+        sqlx::query_as("SELECT book_id, path, sha256 FROM book_file WHERE id = ?")
             .bind(&file_id)
             .fetch_optional(&state.db)
             .await?;
-    let (book_id, rel) = row.ok_or_else(|| AppError::NotFound("file not found".into()))?;
+    let (book_id, rel, sha) = row.ok_or_else(|| AppError::NotFound("file not found".into()))?;
     require_view(&state, &user, &book_id).await?;
-    serve_blob(&state, &rel).await
+    // A file's content hash is a strong, stable ETag.
+    let inm = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok());
+    serve_blob(&state, &rel, Some(format!("\"{sha}\"")), inm).await
 }
 
 // ---- helpers --------------------------------------------------------------
@@ -447,8 +465,27 @@ async fn write_blob(state: &AppState, rel: &str, body: &[u8]) -> AppResult<()> {
         .map_err(|e| AppError::Internal(e.to_string()))
 }
 
-/// Streams a stored blob to the client without reading it all into memory.
-async fn serve_blob(state: &AppState, rel: &str) -> AppResult<Response> {
+/// Streams a stored blob to the client without reading it all into memory. When
+/// an [etag] is supplied it is sent on the response and honored: a matching
+/// `If-None-Match` short-circuits to `304 Not Modified` so the client reuses its
+/// cached copy instead of re-downloading the whole file.
+async fn serve_blob(
+    state: &AppState,
+    rel: &str,
+    etag: Option<String>,
+    if_none_match: Option<&str>,
+) -> AppResult<Response> {
+    if let (Some(etag), Some(inm)) = (etag.as_deref(), if_none_match)
+        && inm == etag
+    {
+        let mut not_modified = Response::new(axum::body::Body::empty());
+        *not_modified.status_mut() = StatusCode::NOT_MODIFIED;
+        not_modified
+            .headers_mut()
+            .insert(header::ETAG, etag.parse().unwrap());
+        return Ok(not_modified);
+    }
+
     let full = state.data_dir.join(rel);
     let file = tokio::fs::File::open(&full)
         .await
@@ -460,12 +497,20 @@ async fn serve_blob(state: &AppState, rel: &str) -> AppResult<Response> {
         .unwrap_or("");
     let body = axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(file));
     let mut response = Response::new(body);
-    response.headers_mut().insert(
+    let headers = response.headers_mut();
+    headers.insert(
         header::CONTENT_TYPE,
         content_type_for_ext(ext).parse().unwrap(),
     );
     if let Some(len) = len {
-        response.headers_mut().insert(header::CONTENT_LENGTH, len.into());
+        headers.insert(header::CONTENT_LENGTH, len.into());
+    }
+    if let Some(etag) = etag {
+        headers.insert(header::ETAG, etag.parse().unwrap());
+        headers.insert(
+            header::CACHE_CONTROL,
+            "private, max-age=0, must-revalidate".parse().unwrap(),
+        );
     }
     Ok(response)
 }

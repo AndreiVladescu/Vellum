@@ -618,6 +618,54 @@ async fn cover_upload_rejects_non_image_bytes() {
 }
 
 #[tokio::test]
+async fn file_download_supports_etag_304() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=dune.pdf"))
+        .header("authorization", format!("Bearer {master}"))
+        .body(Body::from(b"%PDF-1.4 hello".to_vec()))
+        .unwrap();
+    assert_eq!(app.clone().oneshot(upload).await.unwrap().status(), StatusCode::OK);
+    let (_, detail) =
+        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    let file_id = detail["files"][0]["id"].as_str().unwrap().to_string();
+
+    // First download returns an ETag.
+    let first = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(first.status(), StatusCode::OK);
+    let etag = first.headers().get("etag").unwrap().to_str().unwrap().to_string();
+
+    // Re-requesting with If-None-Match yields 304 and no body.
+    let second = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .header("if-none-match", &etag)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(second.status(), StatusCode::NOT_MODIFIED);
+    let body = axum::body::to_bytes(second.into_body(), usize::MAX).await.unwrap();
+    assert!(body.is_empty());
+}
+
+#[tokio::test]
 async fn cover_upload_and_download_round_trips() {
     let app = test_app().await;
     let master = register_master(&app).await;
