@@ -212,6 +212,13 @@ pub async fn create_link(
     require_owns_book(&state, &user, &input.book_id).await?;
     let permission = normalize_permission(input.permission.as_deref())?;
 
+    if input.expires_in_days.is_some_and(|d| d <= 0) {
+        return Err(AppError::BadRequest("expires_in_days must be positive".into()));
+    }
+    if input.max_uses.is_some_and(|n| n <= 0) {
+        return Err(AppError::BadRequest("max_uses must be positive".into()));
+    }
+
     let token = {
         use rand_core::{OsRng, RngCore};
         let mut bytes = [0u8; 24];
@@ -222,21 +229,25 @@ pub async fn create_link(
 
     // Prefer an explicit date; a bare YYYY-MM-DD is treated as end-of-day so the
     // link stays valid through that whole day. Otherwise fall back to +N days.
-    let expires_at: Option<String> = if let Some(raw) = input.expires_at.as_deref() {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            None
-        } else if trimmed.len() == 10 {
-            Some(format!("{trimmed} 23:59:59"))
-        } else {
-            Some(trimmed.to_string())
-        }
-    } else {
-        input.expires_in_days.map(|d| {
+    // Parse rather than trust the string, so garbage can't become a link that
+    // compares as "never expired" against SQLite's datetime().
+    let expires_at: Option<String> = match input.expires_at.as_deref().map(str::trim) {
+        Some("") | None => input.expires_in_days.map(|d| {
             (chrono::Utc::now() + chrono::Duration::days(d))
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string()
-        })
+        }),
+        Some(raw) => {
+            let parsed = chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+                .map(|d| d.and_hms_opt(23, 59, 59).unwrap())
+                .or_else(|_| chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S"))
+                .map_err(|_| {
+                    AppError::BadRequest(
+                        "expires_at must be YYYY-MM-DD or YYYY-MM-DD HH:MM:SS".into(),
+                    )
+                })?;
+            Some(parsed.format("%Y-%m-%d %H:%M:%S").to_string())
+        }
     };
 
     let max_uses = if input.one_time.unwrap_or(false) {
