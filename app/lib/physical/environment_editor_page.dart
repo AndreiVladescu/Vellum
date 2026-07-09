@@ -638,24 +638,23 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
-        // Persistent tip on how to edit (hidden while a book is selected).
-        if (selected == null && (_placed.isNotEmpty || _shelves.isNotEmpty))
+        // Persistent tip on how to edit — a small box top-right, under the
+        // zoom icons.
+        if (_placed.isNotEmpty || _shelves.isNotEmpty)
           Positioned(
             top: 8,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                ),
-                child: Text(
-                  'Right-click or long-press a book or shelf to edit',
-                  style: theme.textTheme.bodySmall,
-                ),
+            right: 8,
+            child: Container(
+              width: 150,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.88),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Text(
+                'Right-click or long-press a book or shelf to edit',
+                style: theme.textTheme.bodySmall,
               ),
             ),
           ),

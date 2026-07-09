@@ -835,6 +835,9 @@ class _EditBookSheetState extends State<_EditBookSheet> {
   late final _year = TextEditingController(
     text: widget.book.publishedYear?.toString() ?? '',
   );
+  late final _pages = TextEditingController(
+    text: widget.book.pageCount?.toString() ?? '',
+  );
   late final _description = TextEditingController(
     text: widget.book.description ?? '',
   );
@@ -854,6 +857,7 @@ class _EditBookSheetState extends State<_EditBookSheet> {
     _author.dispose();
     _subtitle.dispose();
     _year.dispose();
+    _pages.dispose();
     _description.dispose();
     super.dispose();
   }
@@ -866,6 +870,7 @@ class _EditBookSheetState extends State<_EditBookSheet> {
       title: title,
       subtitle: _subtitle.text,
       publishedYear: int.tryParse(_year.text.trim()),
+      pageCount: int.tryParse(_pages.text.trim()),
       description: _description.text,
     );
     await widget.repository.setAuthors(
@@ -905,10 +910,28 @@ class _EditBookSheetState extends State<_EditBookSheet> {
               decoration: const InputDecoration(labelText: 'Subtitle'),
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: _year,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Published year'),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _year,
+                    keyboardType: TextInputType.number,
+                    decoration:
+                        const InputDecoration(labelText: 'Published year'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _pages,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Pages',
+                      helperText: 'Sets the physical width',
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             TextField(
