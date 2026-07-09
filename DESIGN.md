@@ -189,8 +189,10 @@ that stays intentionally simple and data-driven so it's easy to extend.
   to pan. Drag a book and on release it **settles**: its bottom drops to the
   highest shelf or book-top beneath it (within its horizontal span), then it's
   nudged sideways out of any overlap — a simple packing heuristic, not a
-  rigid-body sim. Releasing a book in empty space with **no shelf beneath it
-  takes it off the shelf** (removes the placement). Tap to select (toolbar:
+  rigid-body sim. Removing or moving a book runs a **gravity pass** so any book
+  left unsupported **falls** onto the next surface below (stacks collapse).
+  Releasing a book in empty space with **no shelf beneath it takes it off the
+  shelf** (removes the placement). Tap to select (toolbar:
   **open** the book to read it, rotate 90°, resize, remove); `Esc` deselects.
   **Long-press (touch) or right-click (desktop)** opens a context menu with the
   same actions plus *reset size*. **Shelves** can be dragged to move, and
