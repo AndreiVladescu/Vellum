@@ -47,8 +47,15 @@ class ServerConnection extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Forget the session (keeps the last URL as a convenience default).
+  /// Forget the session (keeps the last URL as a convenience default). Tells the
+  /// server to invalidate the token too, best-effort — offline is fine, the
+  /// local credentials are cleared regardless.
   Future<void> disconnect() async {
+    try {
+      await client?.logout();
+    } catch (_) {
+      // Offline or already-invalid token — clearing locally is enough.
+    }
     await _prefs.remove(_tokenKey);
     await _prefs.remove(_emailKey);
     await _prefs.remove(_masterKey);
