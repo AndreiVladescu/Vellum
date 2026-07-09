@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -254,17 +255,29 @@ class VellumServerClient {
     ];
   }
 
-  /// Downloads a book file's bytes by its server id.
-  Future<Uint8List> downloadFile(String fileId) async {
-    final res = await _http.get(_uri('/api/files/$fileId'), headers: _headers);
-    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
-    throw ServerException('File download failed (HTTP ${res.statusCode})');
+  /// Streams a book file to [dest] by its server id, without holding the whole
+  /// file in memory.
+  Future<void> downloadFileTo(String fileId, File dest) async {
+    final req = http.Request('GET', _uri('/api/files/$fileId'));
+    final auth = _bearer;
+    if (auth != null) req.headers['authorization'] = auth;
+    final res = await _http.send(req);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw ServerException('File download failed (HTTP ${res.statusCode})');
+    }
+    final sink = dest.openWrite();
+    try {
+      await sink.addStream(res.stream);
+    } finally {
+      await sink.close();
+    }
   }
 
-  /// Uploads a book file. [format] (e.g. 'pdf') sets the stored extension.
-  Future<void> uploadFile(
+  /// Streams [source] up as a book file. [format] (e.g. 'pdf') sets the stored
+  /// extension.
+  Future<void> uploadFileFrom(
     String bookId,
-    Uint8List bytes, {
+    File source, {
     required String format,
   }) async {
     final mime = switch (format) {
@@ -273,11 +286,19 @@ class VellumServerClient {
       _ => 'application/octet-stream',
     };
     final filename = Uri.encodeQueryComponent('book.$format');
-    final res = await _http.post(
-      _uri('/api/books/$bookId/files?filename=$filename'),
-      headers: {'content-type': mime, 'authorization': ?_bearer},
-      body: bytes,
+    final req =
+        http.StreamedRequest('POST', _uri('/api/books/$bookId/files?filename=$filename'))
+          ..contentLength = await source.length()
+          ..headers['content-type'] = mime;
+    final auth = _bearer;
+    if (auth != null) req.headers['authorization'] = auth;
+    source.openRead().listen(
+      req.sink.add,
+      onError: req.sink.addError,
+      onDone: req.sink.close,
+      cancelOnError: true,
     );
+    final res = await http.Response.fromStream(await _http.send(req));
     _body(res);
   }
 
