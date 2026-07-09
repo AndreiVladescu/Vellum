@@ -224,25 +224,61 @@ class VellumDatabase extends _$VellumDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
+          // Idempotent by design. `createTable` builds a table from the *latest*
+          // schema, so a later `addColumn` for a column that table already has
+          // (e.g. bookPlacements.format) would throw "duplicate column" — and a
+          // partial migration that then aborts leaves objects created while
+          // user_version lags, so the next open re-runs `createTable` and throws
+          // "already exists". Guarding every step on what's actually present
+          // makes upgrades safe to retry and self-heal such a stuck database.
+          Future<Set<String>> tableNames() async => {
+                for (final row in await customSelect(
+                        "SELECT name FROM sqlite_master WHERE type='table'")
+                    .get())
+                  row.read<String>('name'),
+              };
+          Future<Set<String>> columnsOf(String table) async => {
+                for (final row
+                    in await customSelect('PRAGMA table_info($table)').get())
+                  row.read<String>('name'),
+              };
+
+          final tables = await tableNames();
+          final bookCols = await columnsOf('books');
+
+          Future<void> addBookColumn(String name, GeneratedColumn column) async {
+            if (!bookCols.contains(name)) await m.addColumn(books, column);
+          }
+
           if (from < 2) {
-            await m.addColumn(books, books.readingProgress);
-            await m.addColumn(books, books.lastReadPage);
-            await m.addColumn(books, books.lastReadAt);
+            await addBookColumn('reading_progress', books.readingProgress);
+            await addBookColumn('last_read_page', books.lastReadPage);
+            await addBookColumn('last_read_at', books.lastReadAt);
           }
           if (from < 3) {
-            await m.addColumn(books, books.readerNotes);
-            await m.addColumn(books, books.sourceMetadata);
+            await addBookColumn('reader_notes', books.readerNotes);
+            await addBookColumn('source_metadata', books.sourceMetadata);
           }
           if (from < 4) {
-            await m.createTable(physicalEnvironments);
-            await m.createTable(physicalShelves);
-            await m.createTable(bookPlacements);
+            if (!tables.contains('physical_environments')) {
+              await m.createTable(physicalEnvironments);
+            }
+            if (!tables.contains('physical_shelves')) {
+              await m.createTable(physicalShelves);
+            }
+            if (!tables.contains('book_placements')) {
+              await m.createTable(bookPlacements);
+            }
           }
           if (from < 5) {
-            await m.addColumn(bookPlacements, bookPlacements.format);
+            if (!(await columnsOf('book_placements')).contains('format')) {
+              await m.addColumn(bookPlacements, bookPlacements.format);
+            }
           }
           if (from < 6) {
-            await m.createTable(localDeletions);
+            if (!tables.contains('local_deletions')) {
+              await m.createTable(localDeletions);
+            }
           }
         },
         beforeOpen: (details) async {
