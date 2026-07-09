@@ -162,6 +162,11 @@ pub async fn upload_file(
         }
     }
 
+    // Pull author / title / publisher / year out of the file name convention,
+    // filling only what the book is still missing (so a later online lookup can
+    // search a clean title).
+    crate::discover::apply_filename_metadata(&state, &id, &q.filename).await?;
+
     let file = sqlx::query_as::<_, FileDto>(
         "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
          FROM book_file WHERE id = ?",

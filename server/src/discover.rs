@@ -261,6 +261,70 @@ pub async fn enrich(
     Ok(Json(fetch_book(&state, &id).await?.0))
 }
 
+/// Fill a book's empty fields from its uploaded file's *name*, following the
+/// `Author(s) - Title-Publisher (Year)` download convention (see
+/// [`metadata::parse_filename`]). Authors are added only when the book has none;
+/// year/publisher fill only when empty; and the title is rewritten only while it
+/// is still the raw file name (i.e. the user hasn't set one), which then lets the
+/// online lookup search a clean title. Called from the file-upload handler.
+pub async fn apply_filename_metadata(
+    state: &AppState,
+    book_id: &str,
+    filename: &str,
+) -> AppResult<()> {
+    let stem = std::path::Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename)
+        .to_string();
+    let parsed = metadata::parse_filename(&stem);
+
+    let book = fetch_book(state, book_id).await?.0;
+    // Only tidy the title if it's still verbatim the uploaded file name.
+    let new_title = match &parsed.title {
+        Some(t) if book.title == stem && *t != stem => Some(t.clone()),
+        _ => None,
+    };
+
+    sqlx::query(
+        "UPDATE book SET \
+            title = COALESCE(?, title), \
+            publisher = COALESCE(publisher, ?), \
+            published_year = COALESCE(published_year, ?), \
+            updated_at = datetime('now') \
+         WHERE id = ?",
+    )
+    .bind(&new_title)
+    .bind(&parsed.publisher)
+    .bind(parsed.year)
+    .bind(book_id)
+    .execute(&state.db)
+    .await?;
+
+    if !parsed.authors.is_empty() {
+        let author_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM book_author WHERE book_id = ?")
+                .bind(book_id)
+                .fetch_one(&state.db)
+                .await?;
+        if author_count == 0 {
+            for (position, name) in parsed.authors.iter().enumerate() {
+                let author_id = id_for_name(state, "author", name).await?;
+                sqlx::query(
+                    "INSERT OR IGNORE INTO book_author (book_id, author_id, position) \
+                     VALUES (?, ?, ?)",
+                )
+                .bind(book_id)
+                .bind(&author_id)
+                .bind(position as i64)
+                .execute(&state.db)
+                .await?;
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Get-or-create by name for the `author` / `genre` lookup tables. `table` is a
 /// fixed literal from this module, never user input.
 async fn id_for_name(state: &AppState, table: &str, name: &str) -> AppResult<String> {

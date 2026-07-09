@@ -160,7 +160,12 @@ you create a custom book instead.
 Metadata is also filled in **automatically**, without picking an edition:
 
 - **From the file** — uploading a PDF reads its page tree (via `lopdf`, off the
-  async runtime) and sets `page_count` when the book has none.
+  async runtime) and sets `page_count` when the book has none. The file *name*
+  is parsed for the common `Author(s) - Title-Publisher (Year)` download
+  convention: authors (when the book has none), publisher, and year fill the
+  empty fields, and the title is tidied while it's still the raw file name — so
+  the online lookup below then searches a clean title instead of the whole file
+  name (which is why year/author/cover previously came back empty).
 - **From the title** — `POST /api/books/{id}/enrich` searches by the book's title
   (plus its first author, if any) and fills only the *empty* fields —
   author, year, publisher, ISBN, pages, description, cover, genres — never
