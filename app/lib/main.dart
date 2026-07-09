@@ -6,6 +6,7 @@ import 'app_drawer.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
 import 'data/library_repository.dart';
+import 'physical/physical_libraries_page.dart';
 import 'server/connection_store.dart';
 import 'settings/app_settings.dart';
 import 'settings/wallpaper.dart';
@@ -81,6 +82,7 @@ class LibraryPage extends StatefulWidget {
 
 class _LibraryPageState extends State<LibraryPage> {
   String _query = '';
+  int _tab = 0; // 0 = digital shelf, 1 = physical libraries
 
   LibraryRepository get repository => widget.repository;
 
@@ -115,74 +117,107 @@ class _LibraryPageState extends State<LibraryPage> {
         connection: widget.connection,
         repository: widget.repository,
       ),
-      appBar: AppBar(
-        title: TextField(
-          onChanged: (value) => setState(() => _query = value),
-          decoration: const InputDecoration(
-            hintText: 'Search your shelf…',
-            icon: Icon(Icons.search),
-            border: InputBorder.none,
-          ),
-        ),
+      appBar: _tab == 0
+          ? AppBar(
+              title: TextField(
+                onChanged: (value) => setState(() => _query = value),
+                decoration: const InputDecoration(
+                  hintText: 'Search your shelf…',
+                  icon: Icon(Icons.search),
+                  border: InputBorder.none,
+                ),
+              ),
+            )
+          : AppBar(title: const Text('Physical libraries')),
+      body: IndexedStack(
+        index: _tab,
+        children: [
+          _shelfTab(context),
+          PhysicalLibrariesTab(repository: repository),
+        ],
       ),
-      body: ListenableBuilder(
-        listenable: widget.settings,
-        builder: (context, _) => WallpaperBackground(
-          wallpaper: widget.settings.wallpaper,
-          child: StreamBuilder<List<Book>>(
-            stream: repository.watchAllBooks(),
-            builder: (context, snapshot) {
-              final all = snapshot.data ?? const [];
-              final theme = Theme.of(context);
-              if (all.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.auto_stories_outlined,
-                        size: 56,
-                        color: theme.colorScheme.primary
-                            .withValues(alpha: 0.7),
-                      ),
-                      const SizedBox(height: 16),
-                      Text('Your shelf is empty',
-                          style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Add your first book to see it here.',
-                        style: TextStyle(
-                            color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              final books = _filter(all);
-              if (books.isEmpty) {
-                return Center(
-                  child: Text(
-                    'No books match “${_query.trim()}”.',
-                    style: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                );
-              }
-              return ShelfView(
-                books: books,
-                bookFace: widget.settings.bookFace,
-                coverFileOf: repository.coverFileOf,
-                detailBuilder: (book) =>
-                    BookDetailPage(book: book, repository: repository),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() => _tab = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
+            label: 'Shelf',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'Physical',
+          ),
+        ],
+      ),
+      floatingActionButton: _tab == 0
+          ? FloatingActionButton.extended(
+              onPressed: () => _openAddBook(context),
+              icon: const Icon(Icons.add),
+              label: const Text('Add book'),
+            )
+          : FloatingActionButton.extended(
+              onPressed: () => promptCreateLibrary(context, repository),
+              icon: const Icon(Icons.add),
+              label: const Text('New library'),
+            ),
+    );
+  }
+
+  Widget _shelfTab(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.settings,
+      builder: (context, _) => WallpaperBackground(
+        wallpaper: widget.settings.wallpaper,
+        child: StreamBuilder<List<Book>>(
+          stream: repository.watchAllBooks(),
+          builder: (context, snapshot) {
+            final all = snapshot.data ?? const [];
+            final theme = Theme.of(context);
+            if (all.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.auto_stories_outlined,
+                      size: 56,
+                      color: theme.colorScheme.primary.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Your shelf is empty',
+                        style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Add your first book to see it here.',
+                      style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
               );
-            },
-          ),
+            }
+            final books = _filter(all);
+            if (books.isEmpty) {
+              return Center(
+                child: Text(
+                  'No books match “${_query.trim()}”.',
+                  style:
+                      TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              );
+            }
+            return ShelfView(
+              books: books,
+              bookFace: widget.settings.bookFace,
+              coverFileOf: repository.coverFileOf,
+              detailBuilder: (book) =>
+                  BookDetailPage(book: book, repository: repository),
+            );
+          },
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openAddBook(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Add book'),
       ),
     );
   }
