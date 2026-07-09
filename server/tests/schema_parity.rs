@@ -45,14 +45,9 @@ async fn synced_tables_have_the_expected_columns() {
                 "spine_style",
                 "created_at",
                 "updated_at",
-                // NOTE: migration 0002 added these three reading-state columns to
-                // the server schema, but they were later declared app-local-only
-                // (CLAUDE.md / DESIGN.md) and are NOT synced. They linger here as
-                // dormant columns; the server never reads or writes them. Left in
-                // place because an applied migration must not be edited.
-                "reading_progress",
-                "last_read_page",
-                "last_read_at",
+                // Reading state (reading_progress/last_read_page/last_read_at) was
+                // added to the server by migration 0002, then dropped again by
+                // 0006 — it's app-local-only by design and never synced.
                 "owner_id", // server-only (migration 0003); not in the app schema
             ],
         ),

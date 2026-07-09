@@ -157,10 +157,9 @@ new server URLs to `https://` and warns when a URL is unencrypted.
 (progress/page/last-read), **reader notes**, and **`source_metadata`** (a JSON
 snapshot of the online-library data a book was imported with, behind *revert to
 library defaults*). See **Adding & editing books**. (Historical note: an early
-migration, `0002`, did add the three reading-state columns to the *server*
-table; they linger there as dormant, never-synced columns, since an applied
-migration can't be edited. The reader-notes and `source_metadata` columns were
-correctly kept out of the server schema.)
+migration, `0002`, added the three reading-state columns to the *server* table
+by mistake; migration `0006` drops them again, since reading state must stay on
+the device. Reader notes and `source_metadata` were never on the server.)
 
 The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
 pins the column list of every synced table (`book`, `author`, `book_author`,
