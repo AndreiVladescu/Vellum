@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../shelf/shelf_view.dart' show SpineFace;
 import 'physical_metrics.dart';
 
 /// A book's footprint (width × height) in metres, after rotation.
@@ -62,15 +63,17 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   Offset _screenToWorld(Offset s) =>
       Offset((s.dx - _origin!.dx) / _scale, (_origin!.dy - s.dy) / _scale);
 
-  _Foot _foot(Book b, int rot, double? wo, double? ho) {
-    final t = PhysicalMetrics.thickness(b, override: wo);
-    final h = PhysicalMetrics.height(b, override: ho);
+  _Foot _foot(Book b, int rot, String? fmt, double? wo, double? ho) {
+    final format = BookFormat.byKey(fmt);
+    final t = PhysicalMetrics.thickness(b, format: format, override: wo);
+    final h = PhysicalMetrics.height(b, format: format, override: ho);
     return rot == 0 ? (w: t, h: h) : (w: h, h: t);
   }
 
   _Foot _footOf(PlacedBook pb) => _foot(
         pb.book,
         pb.placement.rotation,
+        pb.placement.format,
         pb.placement.widthOverride,
         pb.placement.heightOverride,
       );
@@ -250,7 +253,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     // Drop at the centre of the view, then let it settle onto a surface.
     final size = context.size ?? const Size(400, 600);
     final centre = _screenToWorld(Offset(size.width / 2, size.height / 2));
-    final f = _foot(book, 0, null, null);
+    final f = _foot(book, 0, null, null, null);
     final settled = _settle(
       draggedId: '',
       x: centre.dx - f.w / 2,
@@ -271,6 +274,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final f = _foot(
       pb.book,
       newRot,
+      pb.placement.format,
       pb.placement.widthOverride,
       pb.placement.heightOverride,
     );
@@ -290,28 +294,102 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   }
 
   Future<void> _resizeSelected(PlacedBook pb) async {
+    final format = BookFormat.byKey(pb.placement.format);
     final result = await showDialog<_SizeSpec>(
       context: context,
       builder: (_) => _SizeDialog(
-        thicknessCm:
-            PhysicalMetrics.thickness(pb.book, override: pb.placement.widthOverride) *
-                100,
-        heightCm:
-            PhysicalMetrics.height(pb.book, override: pb.placement.heightOverride) *
-                100,
+        book: pb.book,
+        formatKey: pb.placement.format,
+        thicknessCm: PhysicalMetrics.thickness(
+              pb.book,
+              format: format,
+              override: pb.placement.widthOverride,
+            ) *
+            100,
+        heightCm: PhysicalMetrics.height(
+              pb.book,
+              format: format,
+              override: pb.placement.heightOverride,
+            ) *
+            100,
       ),
     );
     if (result == null) return;
+    if (result.reset) {
+      await _resetSize(pb);
+      return;
+    }
+    // Store the preset, and keep a dimension override only when it differs from
+    // what the preset would compute (so a plain preset recomputes from pages).
+    final fmt = BookFormat.byKey(result.formatKey);
+    final defT = PhysicalMetrics.thickness(pb.book, format: fmt);
+    final defH = PhysicalMetrics.height(pb.book, format: fmt);
+    final t = result.thicknessCm / 100;
+    final h = result.heightCm / 100;
     await repo.updatePlacement(
       pb.placement.id,
-      widthOverride: Value(result.reset ? null : result.thicknessCm / 100),
-      heightOverride: Value(result.reset ? null : result.heightCm / 100),
+      format: Value(result.formatKey),
+      widthOverride: (t - defT).abs() < 0.0005 ? const Value(null) : Value(t),
+      heightOverride: (h - defH).abs() < 0.0005 ? const Value(null) : Value(h),
+    );
+  }
+
+  Future<void> _resetSize(PlacedBook pb) async {
+    await repo.updatePlacement(
+      pb.placement.id,
+      format: const Value(null),
+      widthOverride: const Value(null),
+      heightOverride: const Value(null),
     );
   }
 
   Future<void> _removeSelected(PlacedBook pb) async {
     await repo.removePlacement(pb.placement);
     setState(() => _selectedId = null);
+  }
+
+  /// Long-press (touch) or right-click (desktop) a book for a quick menu.
+  Future<void> _contextMenuAt(Offset local, Offset global) async {
+    PlacedBook? hit;
+    for (final pb in _placed.reversed) {
+      if (_screenRectOf(pb).contains(local)) {
+        hit = pb;
+        break;
+      }
+    }
+    if (hit == null) return;
+    setState(() => _selectedId = hit!.placement.id);
+    final pb = hit;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(global.dx, global.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'rotate',
+          child: Text(pb.placement.rotation == 0 ? 'Lay flat' : 'Stand up'),
+        ),
+        const PopupMenuItem(value: 'resize', child: Text('Resize…')),
+        const PopupMenuItem(
+            value: 'reset', child: Text('Reset size to default')),
+        const PopupMenuItem(value: 'remove', child: Text('Remove from room')),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case 'rotate':
+        await _rotateSelected(pb);
+      case 'resize':
+        await _resizeSelected(pb);
+      case 'reset':
+        await _resetSize(pb);
+      case 'remove':
+        await _removeSelected(pb);
+    }
   }
 
   // ---- build --------------------------------------------------------------
@@ -357,11 +435,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addBook,
-        icon: const Icon(Icons.add),
-        label: const Text('Add book'),
-      ),
+      // Hidden while a book is selected, so it doesn't overlap the toolbar.
+      floatingActionButton: _selectedId != null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _addBook,
+              icon: const Icon(Icons.add),
+              label: const Text('Add book'),
+            ),
     );
   }
 
@@ -392,6 +473,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
               onScaleStart: _onScaleStart,
               onScaleUpdate: _onScaleUpdate,
               onScaleEnd: _onScaleEnd,
+              onLongPressStart: (d) =>
+                  _contextMenuAt(d.localPosition, d.globalPosition),
+              onSecondaryTapDown: (d) =>
+                  _contextMenuAt(d.localPosition, d.globalPosition),
               child: CustomPaint(
                 painter: _RoomPainter(
                   shelves: _shelves,
@@ -450,9 +535,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final topLeft = _worldToScreen(Offset(bx, by + f.h));
     final w = f.w * _scale;
     final h = f.h * _scale;
-    final color = PhysicalMetrics.color(pb.book);
     final selected = _selectedId == pb.placement.id;
     final flat = pb.placement.rotation == 90;
+
+    // The same spine artwork as the digital shelf (cover slice or generated).
+    // For a flat book, the standing spine is rotated a quarter-turn into place.
+    Widget spine = SpineFace(book: pb.book, coverFile: repo.coverFileOf(pb.book));
+    if (flat) spine = RotatedBox(quarterTurns: 1, child: spine);
 
     return Positioned(
       left: topLeft.dx,
@@ -463,47 +552,23 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         // Gestures are handled by the canvas; this is purely visual.
         child: Opacity(
           opacity: isDragging ? 0.85 : 1,
-          child: Container(
-            decoration: BoxDecoration(
-              color: color,
-              border: Border.all(
-                color: selected
-                    ? Theme.of(context).colorScheme.secondary
-                    : Colors.black.withValues(alpha: 0.35),
-                width: selected ? 2.5 : 0.6,
-              ),
-              borderRadius: BorderRadius.circular(2),
-            ),
-            clipBehavior: Clip.antiAlias,
-            alignment: Alignment.center,
-            child: _spineLabel(pb.book, w, h, flat),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              spine,
+              if (selected)
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.secondary,
+                      width: 2.5,
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _spineLabel(Book book, double w, double h, bool flat) {
-    // Only draw the title when the spine is big enough to read.
-    final smallest = math.min(w, h);
-    if (smallest < 16) return const SizedBox.shrink();
-    final text = Text(
-      book.title,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        color: PhysicalMetrics.textColor(book),
-        fontSize: (smallest * 0.42).clamp(7, 13),
-        fontWeight: FontWeight.w600,
-      ),
-    );
-    if (flat) return Padding(padding: const EdgeInsets.all(2), child: text);
-    // Standing spine: read bottom-to-top.
-    return RotatedBox(
-      quarterTurns: 3,
-      child: SizedBox(
-        width: h - 6,
-        child: Padding(padding: const EdgeInsets.all(2), child: text),
       ),
     );
   }
@@ -667,11 +732,13 @@ class _SelectionBar extends StatelessWidget {
                 style: theme.textTheme.titleSmall,
               ),
             ),
-            IconButton(
+            IconButton.filledTonal(
               tooltip: 'Rotate 90°',
               onPressed: onRotate,
+              iconSize: 28,
               icon: const Icon(Icons.rotate_90_degrees_cw),
             ),
+            const SizedBox(width: 4),
             IconButton(
               tooltip: 'Resize',
               onPressed: onResize,
@@ -878,14 +945,27 @@ class _ShelfDialogState extends State<_ShelfDialog> {
 // ---- size dialog ----------------------------------------------------------
 
 class _SizeSpec {
-  _SizeSpec({required this.thicknessCm, required this.heightCm, required this.reset});
+  _SizeSpec({
+    required this.formatKey,
+    required this.thicknessCm,
+    required this.heightCm,
+    required this.reset,
+  });
+  final String? formatKey;
   final double thicknessCm;
   final double heightCm;
   final bool reset;
 }
 
 class _SizeDialog extends StatefulWidget {
-  const _SizeDialog({required this.thicknessCm, required this.heightCm});
+  const _SizeDialog({
+    required this.book,
+    required this.formatKey,
+    required this.thicknessCm,
+    required this.heightCm,
+  });
+  final Book book;
+  final String? formatKey;
   final double thicknessCm;
   final double heightCm;
 
@@ -894,6 +974,7 @@ class _SizeDialog extends StatefulWidget {
 }
 
 class _SizeDialogState extends State<_SizeDialog> {
+  late String? _formatKey = widget.formatKey;
   late final _thickness =
       TextEditingController(text: widget.thicknessCm.toStringAsFixed(1));
   late final _height =
@@ -904,6 +985,20 @@ class _SizeDialogState extends State<_SizeDialog> {
     _thickness.dispose();
     _height.dispose();
     super.dispose();
+  }
+
+  // Picking a preset fills the fields with its size for this book's page count.
+  void _applyFormat(String? key) {
+    final format = BookFormat.byKey(key);
+    setState(() {
+      _formatKey = key;
+      _thickness.text =
+          (PhysicalMetrics.thickness(widget.book, format: format) * 100)
+              .toStringAsFixed(1);
+      _height.text =
+          (PhysicalMetrics.height(widget.book, format: format) * 100)
+              .toStringAsFixed(1);
+    });
   }
 
   @override
@@ -922,18 +1017,49 @@ class _SizeDialogState extends State<_SizeDialog> {
         );
     return AlertDialog(
       title: const Text('Book size'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          field('Thickness (cm)', _thickness),
-          field('Height (cm)', _height),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<String?>(
+              initialValue: _formatKey,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Format preset',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Default')),
+                for (final f in BookFormat.presets)
+                  DropdownMenuItem(value: f.key, child: Text(f.label)),
+              ],
+              onChanged: _applyFormat,
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'A preset sizes the book from its page count; tweak the '
+                'numbers below for a manual override.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+            field('Thickness (cm)', _thickness),
+            field('Height (cm)', _height),
+          ],
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(
             context,
-            _SizeSpec(thicknessCm: 0, heightCm: 0, reset: true),
+            _SizeSpec(
+              formatKey: null,
+              thicknessCm: 0,
+              heightCm: 0,
+              reset: true,
+            ),
           ),
           child: const Text('Reset'),
         ),
@@ -948,7 +1074,12 @@ class _SizeDialogState extends State<_SizeDialog> {
             if (t == null || h == null || t <= 0 || h <= 0) return;
             Navigator.pop(
               context,
-              _SizeSpec(thicknessCm: t, heightCm: h, reset: false),
+              _SizeSpec(
+                formatKey: _formatKey,
+                thicknessCm: t,
+                heightCm: h,
+                reset: false,
+              ),
             );
           },
           child: const Text('Save'),

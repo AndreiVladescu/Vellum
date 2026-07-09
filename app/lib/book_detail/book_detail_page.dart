@@ -828,6 +828,7 @@ class _EditBookSheet extends StatefulWidget {
 
 class _EditBookSheetState extends State<_EditBookSheet> {
   late final _title = TextEditingController(text: widget.book.title);
+  final _author = TextEditingController();
   late final _subtitle = TextEditingController(
     text: widget.book.subtitle ?? '',
   );
@@ -839,8 +840,18 @@ class _EditBookSheetState extends State<_EditBookSheet> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    // Authors live in their own table; load the current ones into the field.
+    widget.repository.detailsFor(widget.book.id).then((details) {
+      if (mounted) _author.text = details.authors.join(', ');
+    });
+  }
+
+  @override
   void dispose() {
     _title.dispose();
+    _author.dispose();
     _subtitle.dispose();
     _year.dispose();
     _description.dispose();
@@ -856,6 +867,10 @@ class _EditBookSheetState extends State<_EditBookSheet> {
       subtitle: _subtitle.text,
       publishedYear: int.tryParse(_year.text.trim()),
       description: _description.text,
+    );
+    await widget.repository.setAuthors(
+      widget.book.id,
+      _author.text.split(','),
     );
     if (mounted) Navigator.of(context).pop();
   }
@@ -875,6 +890,14 @@ class _EditBookSheetState extends State<_EditBookSheet> {
             TextField(
               controller: _title,
               decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _author,
+              decoration: const InputDecoration(
+                labelText: 'Author(s)',
+                helperText: 'Separate multiple authors with commas',
+              ),
             ),
             const SizedBox(height: 10),
             TextField(

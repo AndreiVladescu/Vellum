@@ -171,15 +171,27 @@ that stays intentionally simple and data-driven so it's easy to extend.
 - **Model.** An *environment* (room) holds *shelves* and *placements*; see
   **Data model**. Everything is metric; the view is a **front elevation** (X
   right, Y up).
-- **Sizing.** A book's spine thickness comes from its page count (~0.06 mm/leaf
-  + covers, clamped), height defaults to ~20 cm; both are overridable per
-  placement. Colour reuses the generated spine palette (`physical_metrics.dart`).
+- **Sizing.** A book's spine thickness comes from its page count via a **size
+  preset** (mm-per-page + cover allowance), calibrated against a real book
+  (a 367-page B5 softcover ≈ 2.2 cm → ~0.06 mm/page). Presets (mass-market,
+  trade, A5, B5, hardcover, A4) also set the trim **height**; both dimensions
+  fall back to a sensible default and are **overridable** per placement (the
+  `format` key + width/height overrides live on `book_placement`). See
+  `physical_metrics.dart`.
+- **Look.** Books render with the **same `SpineFace`** the digital shelf uses —
+  a slice of the cover image if there is one, else the generated spine — so a
+  book looks the same in both views. A flat (rotated) book is that spine turned
+  a quarter-turn.
 - **Interaction (no physics engine).** Pinch / scroll to zoom, drag empty space
   to pan. Drag a book and on release it **settles**: its bottom drops to the
   highest shelf or book-top beneath it (within its horizontal span), then it's
   nudged sideways out of any overlap — a simple packing heuristic, not a
-  rigid-body sim. Tap a book to rotate 90° (stand ↔ lie flat, for stacking),
-  resize, or remove it.
+  rigid-body sim. Tap to select (toolbar: rotate 90°, resize, remove);
+  **long-press (touch) or right-click (desktop)** opens a context menu with the
+  same actions plus *reset size*.
+- **Reference, not inventory.** A placement is just “this copy sits here” for
+  visualisation; it isn't concrete copy-tracking. Dropping a title in mints a
+  fresh `physical_copy`, and the same title can be placed several times.
 - **Local-only.** None of this touches the server or sync — it's a per-device
   view of a real room. The canvas and its gesture/settle logic live in
   `lib/physical/`.

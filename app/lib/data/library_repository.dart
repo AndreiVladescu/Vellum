@@ -139,6 +139,32 @@ class LibraryRepository {
     );
   }
 
+  /// Replaces a book's authors with [names] (comma-splitting is the caller's
+  /// job). Blank names are ignored; order is preserved.
+  Future<void> setAuthors(String bookId, List<String> names) async {
+    await db.transaction(() async {
+      await db.customStatement(
+        'DELETE FROM book_authors WHERE book_id = ?',
+        [bookId],
+      );
+      var position = 0;
+      for (final raw in names) {
+        final name = raw.trim();
+        if (name.isEmpty) continue;
+        final authorId = await _idForName(db.authors, name);
+        await db
+            .into(db.bookAuthors)
+            .insert(
+              BookAuthorsCompanion.insert(
+                bookId: bookId,
+                authorId: authorId,
+                position: Value(position++),
+              ),
+            );
+      }
+    });
+  }
+
   /// Personal notes — stored locally only, never pushed to a server.
   Future<void> setReaderNotes(String bookId, String? notes) async {
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
@@ -404,6 +430,7 @@ class LibraryRepository {
     int? rotation,
     Value<double?>? widthOverride,
     Value<double?>? heightOverride,
+    Value<String?>? format,
   }) async {
     await (db.update(db.bookPlacements)..where((p) => p.id.equals(id))).write(
       BookPlacementsCompanion(
@@ -412,6 +439,7 @@ class LibraryRepository {
         rotation: rotation == null ? const Value.absent() : Value(rotation),
         widthOverride: widthOverride ?? const Value.absent(),
         heightOverride: heightOverride ?? const Value.absent(),
+        format: format ?? const Value.absent(),
       ),
     );
   }
