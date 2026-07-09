@@ -50,7 +50,9 @@ visualisation, not concrete inventory tracking. Current behaviour (a fresh
   “extracted from the cover”, but the code uses a **title-hash palette**. Item 4
   reused that as-is; genuinely extracting dominant cover colours (for both
   digital and physical) is still open.
-- **Rotated-spine orientation.** The flat-book quarter-turn direction is a guess
-  (`quarterTurns: 1`); may want flipping once seen on a real display.
+- **Cover-image slice as spine.** Follow-up to item 4: painting an actual slice
+  of the cover as the spine texture (vs. the cover-or-generated `SpineFace`).
+- **Books riding shelves.** Moving a shelf still leaves its books behind; they
+  keep their positions rather than travelling with the shelf.
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.
