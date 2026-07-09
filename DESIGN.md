@@ -92,7 +92,12 @@ Basic (email:password), the latter so e-readers can use the OPDS catalog at
 `VELLUM_PUBLIC_URL`, and the max upload size is `VELLUM_MAX_UPLOAD_MB` (default
 2048). The cover and file endpoints also accept the token as a `?token=` query
 param, so a browser `<img>` (cover) or `<a download>` (file) works without an
-Authorization header.
+Authorization header. (Caveat: query-string tokens can leak into proxy/access
+logs and browser history; a future refinement is short-lived per-resource
+tokens. The server speaks plain HTTP and should sit behind a TLS reverse proxy —
+see **Deployment**.) The app keeps its own session token in the platform secure
+store (Keychain / libsecret / Keystore), not plaintext prefs, and defaults new
+server URLs to `https://`.
 
 For book discovery the server runs the **same metadata search** as the app
 (`GET /api/metadata/search`, Open Library → Google Books); `POST
