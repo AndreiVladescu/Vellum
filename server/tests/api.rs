@@ -623,6 +623,38 @@ async fn public_link_reads_one_book_then_revokes() {
 }
 
 #[tokio::test]
+async fn share_link_rejects_bad_expiry_and_honors_past_dates() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // A garbage expiry string is refused rather than silently never-expiring.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book, "expires_at": "whenever" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // A date already in the past yields a link that is immediately invalid.
+    let (status, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book, "expires_at": "2000-01-01" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let token = link["url"].as_str().unwrap().rsplit('/').next().unwrap().to_string();
+    let (status, _) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn one_time_link_downloads_exactly_once() {
     let app = test_app().await;
     let master = register_master(&app).await;
