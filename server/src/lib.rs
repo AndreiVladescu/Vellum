@@ -3,9 +3,9 @@
 
 use std::path::PathBuf;
 
+use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, post, put};
-use axum::Router;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
 mod access;
@@ -96,7 +96,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/groups", get(groups::list).post(groups::create))
         .route("/api/groups/{id}", get(groups::get).delete(groups::delete))
         .route("/api/groups/{id}/books", post(groups::add_book))
-        .route("/api/groups/{id}/books/{book_id}", delete(groups::remove_book))
+        .route(
+            "/api/groups/{id}/books/{book_id}",
+            delete(groups::remove_book),
+        )
         // User-to-user shares.
         .route("/api/shares", get(shares::list).post(shares::create))
         .route("/api/shares/{id}", delete(shares::delete))

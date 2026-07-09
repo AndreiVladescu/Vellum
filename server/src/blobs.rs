@@ -5,19 +5,19 @@
 
 use std::path::Path;
 
-use axum::body::Bytes;
-use tokio::process::Command;
-use axum::extract::{Path as AxPath, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
-use axum::response::Response;
 use axum::Json;
+use axum::body::Bytes;
+use axum::extract::{Path as AxPath, Query, State};
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::Response;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tokio::process::Command;
 
+use crate::AppState;
 use crate::access::book_access;
 use crate::auth::AuthUser;
 use crate::error::{AppError, AppResult};
-use crate::AppState;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct FileDto {
@@ -156,7 +156,9 @@ pub async fn get_cover(
                 .unwrap_or(0);
             format!("W/\"{}-{mtime}\"", m.len())
         });
-    let inm = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok());
+    let inm = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok());
     serve_blob(&state, &rel, etag, inm).await
 }
 
@@ -187,12 +189,16 @@ pub async fn upload_file(
         .unwrap_or_default();
     // Reject unsupported extensions up front, before reading a single byte.
     if ext != "pdf" && ext != "epub" {
-        return Err(AppError::BadRequest("only pdf and epub files are supported".into()));
+        return Err(AppError::BadRequest(
+            "only pdf and epub files are supported".into(),
+        ));
     }
 
     let file_id = uuid::Uuid::new_v4().to_string();
     let files_dir = state.data_dir.join("files");
-    tokio::fs::create_dir_all(&files_dir).await.map_err(internal)?;
+    tokio::fs::create_dir_all(&files_dir)
+        .await
+        .map_err(internal)?;
     let tmp = files_dir.join(format!(".tmp-{file_id}"));
 
     // Stream the body to the temp file, hashing and capturing the leading bytes
@@ -282,11 +288,13 @@ pub async fn upload_file(
         // The PDF's own first page is the preferred cover: render it now and
         // set it, overriding any online cover a prior lookup may have stored.
         if let Some(rel) = render_pdf_cover(&state, &id).await {
-            sqlx::query("UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?")
-                .bind(&rel)
-                .bind(&id)
-                .execute(&state.db)
-                .await?;
+            sqlx::query(
+                "UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?",
+            )
+            .bind(&rel)
+            .bind(&id)
+            .execute(&state.db)
+            .await?;
         }
     }
 
@@ -343,7 +351,9 @@ pub(crate) async fn render_pdf_cover(state: &AppState, book_id: &str) -> Option<
     if let Some(parent) = out_full.parent() {
         let _ = tokio::fs::create_dir_all(parent).await;
     }
-    render_first_page(&input, &out_full).await.then_some(out_rel)
+    render_first_page(&input, &out_full)
+        .await
+        .then_some(out_rel)
 }
 
 /// Try each known PDF CLI in turn until one writes a non-empty JPEG.
@@ -353,7 +363,16 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
     for tool in ["pdftoppm", "pdftocairo"] {
         let _ = tokio::fs::remove_file(out_jpg).await;
         let ran = Command::new(tool)
-            .args(["-jpeg", "-f", "1", "-l", "1", "-singlefile", "-scale-to", "1400"])
+            .args([
+                "-jpeg",
+                "-f",
+                "1",
+                "-l",
+                "1",
+                "-singlefile",
+                "-scale-to",
+                "1400",
+            ])
             .arg(input)
             .arg(&prefix)
             .status()
@@ -382,8 +401,14 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
     let _ = tokio::fs::remove_file(out_jpg).await;
     let ran = Command::new("gs")
         .args([
-            "-q", "-dSAFER", "-dBATCH", "-dNOPAUSE", "-sDEVICE=jpeg",
-            "-dFirstPage=1", "-dLastPage=1", "-r150",
+            "-q",
+            "-dSAFER",
+            "-dBATCH",
+            "-dNOPAUSE",
+            "-sDEVICE=jpeg",
+            "-dFirstPage=1",
+            "-dLastPage=1",
+            "-r150",
         ])
         .arg(format!("-sOutputFile={}", out_jpg.display()))
         .arg(input)
@@ -395,7 +420,10 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
 }
 
 async fn nonempty(p: &Path) -> bool {
-    tokio::fs::metadata(p).await.map(|m| m.len() > 0).unwrap_or(false)
+    tokio::fs::metadata(p)
+        .await
+        .map(|m| m.len() > 0)
+        .unwrap_or(false)
 }
 
 pub async fn list_files(
@@ -428,7 +456,9 @@ pub async fn download_file(
     let (book_id, rel, sha) = row.ok_or_else(|| AppError::NotFound("file not found".into()))?;
     require_view(&state, &user, &book_id).await?;
     // A file's content hash is a strong, stable ETag.
-    let inm = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok());
+    let inm = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok());
     serve_blob(&state, &rel, Some(format!("\"{sha}\"")), inm).await
 }
 
@@ -448,7 +478,9 @@ async fn require_edit(state: &AppState, user: &AuthUser, book_id: &str) -> AppRe
         return Err(AppError::NotFound("book not found".into()));
     }
     if !access.can_edit() {
-        return Err(AppError::Forbidden("you have read-only access to this book".into()));
+        return Err(AppError::Forbidden(
+            "you have read-only access to this book".into(),
+        ));
     }
     Ok(())
 }
@@ -530,7 +562,7 @@ fn content_type_for_ext(ext: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lopdf::{dictionary, Document, Object};
+    use lopdf::{Document, Object, dictionary};
 
     #[test]
     fn counts_pages_of_a_pdf() {

@@ -1,12 +1,12 @@
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 
+use crate::AppState;
 use crate::access::group_access;
 use crate::auth::AuthUser;
 use crate::books::BookDto;
 use crate::error::{AppError, AppResult};
-use crate::AppState;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct GroupDto {
@@ -35,10 +35,7 @@ pub struct AddBookInput {
 }
 
 /// Groups the caller owns or has been granted (plus everything for the master).
-pub async fn list(
-    State(state): State<AppState>,
-    user: AuthUser,
-) -> AppResult<Json<Vec<GroupDto>>> {
+pub async fn list(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<Vec<GroupDto>>> {
     let groups = sqlx::query_as::<_, GroupDto>(
         "SELECT g.id, g.owner_id, g.name, g.created_at, \
             (SELECT COUNT(*) FROM book_group_item gi WHERE gi.group_id = g.id) AS book_count \
