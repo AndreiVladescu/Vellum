@@ -7,21 +7,22 @@
 <style>
   :root { color-scheme: light dark; --line:#e3dccd; --bg:#faf6ee; --fg:#2a241c;
           --muted:#8a7c68; --accent:#7a5c3e; --accent-strong:#654a30; --chip:#efe7d6;
-          --row:#fff; --alt:#f7f2ea; --hover:#f1e8d6;
-          --radius:9px; --shadow:0 12px 36px rgba(60,44,26,.16);
+          --row:#fff; --alt:#f7f2ea; --hover:#f1e8d6; --ok:#3f9142;
+          --radius:9px; --shadow:0 12px 36px rgba(60,44,26,.16); --thead-top:150px;
           --serif:'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif;
           --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
   @media (prefers-color-scheme: dark) {
     :root { --line:#3a3228; --bg:#171310; --fg:#e8e0d4; --muted:#9c8f79;
             --accent:#a07c54; --accent-strong:#b8926a; --chip:#2f2820;
-            --row:#1e1913; --alt:#191510; --hover:#241d16;
+            --row:#1e1913; --alt:#191510; --hover:#241d16; --ok:#6fbf6f;
             --shadow:0 12px 36px rgba(0,0,0,.5); }
   }
   * { box-sizing: border-box; }
   body { margin:0; font-family:var(--sans);
          background:var(--bg); color:var(--fg); }
+  #topbar { position:sticky; top:0; z-index:6; background:var(--bg); }
   header { display:flex; align-items:baseline; gap:10px; padding:12px 18px;
-           border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; }
+           border-bottom:1px solid var(--line); }
   header h1 { font-family:var(--serif); font-size:1.4rem; font-weight:600;
               letter-spacing:.01em; margin:0; flex:0 0 auto; }
   header .eyebrow { font-size:.6rem; text-transform:uppercase; letter-spacing:.22em;
@@ -29,6 +30,7 @@
                     border:1px solid var(--line); border-radius:999px; }
   header .spacer { flex:1; }
   .muted { color:var(--muted); }
+  .dim { color:var(--muted); }
   button, select, input, textarea { font:inherit; }
   .btn { border:1px solid var(--line); background:var(--row); color:var(--fg);
          padding:7px 13px; border-radius:8px; cursor:pointer;
@@ -40,10 +42,10 @@
   .btn.primary:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
   .btn.danger { color:#b3261e; }
   .btn.danger:hover { border-color:#b3261e; }
+  .btn.sm { padding:5px 9px; font-size:.85rem; }
   .btn[disabled] { opacity:.45; cursor:default; }
   .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center;
-             padding:12px 18px; border-bottom:1px solid var(--line); position:sticky;
-             top:49px; background:var(--bg); z-index:4; }
+             padding:10px 18px; border-bottom:1px solid var(--line); background:var(--bg); }
   .toolbar .group { display:flex; gap:6px; align-items:center; }
   input[type=text], input[type=date], select {
     padding:7px 10px; border:1px solid var(--line); border-radius:8px;
@@ -54,21 +56,37 @@
   table { border-collapse:collapse; width:100%; }
   th, td { padding:11px 14px; text-align:left; vertical-align:top;
            border-bottom:1px solid var(--line); }
-  thead th { position:sticky; top:99px; background:var(--bg); z-index:3;
+  table.compact th, table.compact td { padding:5px 12px; }
+  thead th { position:sticky; top:var(--thead-top); background:var(--bg); z-index:3;
              font-size:.7rem; font-weight:600; text-transform:uppercase;
              letter-spacing:.08em; color:var(--muted); }
+  th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+  th.sortable:hover { color:var(--fg); }
   tbody tr { transition:background .12s; }
   tbody tr:hover { background:var(--hover); }
   tbody tr.sel { background:var(--chip); box-shadow:inset 3px 0 0 var(--accent); }
+  tbody tr.cursor { outline:2px solid var(--accent); outline-offset:-2px; }
   tbody tr.drop { outline:2px dashed var(--accent); outline-offset:-2px; background:var(--chip); }
   tbody tr.empty:hover { background:none; }
   td.year, td.actions { white-space:nowrap; }
+  td.editable { cursor:text; }
+  td .celledit { width:100%; }
+  .thumb { width:30px; height:44px; object-fit:cover; border-radius:3px; display:block; }
+  .nothumb { display:inline-block; width:30px; height:44px; border-radius:3px;
+             background:var(--chip); }
+  .dot { color:var(--muted); }
+  .dot.on { color:var(--ok); }
   .chip { display:inline-flex; align-items:center; gap:5px; background:var(--chip);
           border-radius:999px; padding:3px 10px; margin:2px 3px 2px 0; font-size:.85rem; }
   .chip button { border:0; background:none; color:var(--muted); cursor:pointer; padding:0; font-size:.95rem; line-height:1; }
   .addtag { border:1px dashed var(--line); background:none; color:var(--muted);
             border-radius:999px; padding:3px 10px; cursor:pointer; font-size:.85rem; transition:border-color .12s, color .12s; }
   .addtag:hover { border-color:var(--accent); color:var(--accent); }
+  .fchip { border:1px solid var(--line); background:var(--row); color:var(--muted);
+           border-radius:999px; padding:3px 10px; cursor:pointer; font-size:.82rem;
+           margin:2px 3px 2px 0; transition:all .12s; }
+  .fchip:hover { border-color:var(--accent); color:var(--fg); }
+  .fchip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
   #login { max-width:360px; margin:14vh auto; padding:34px 32px; border:1px solid var(--line);
            border-radius:16px; background:var(--row); box-shadow:var(--shadow); }
   #login h1 { font-family:var(--serif); font-size:1.9rem; font-weight:600; margin:0 0 2px; }
@@ -80,16 +98,18 @@
   .modal { background:var(--row); border:1px solid var(--line); border-radius:14px;
            padding:24px; width:min(420px,92vw); box-shadow:var(--shadow); }
   .modal h2 { font-family:var(--serif); font-weight:600; margin-top:0; }
-  .modal label { display:block; margin:12px 0 4px; }
+  .modal label { display:block; margin:10px 0 3px; font-size:.82rem; color:var(--muted); }
   .modal .row { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+  .modal .checkline { display:flex; align-items:center; gap:8px; margin:8px 0; }
+  .modal .checkline label { margin:0; font-size:.9rem; color:var(--fg); }
   .linkout { word-break:break-all; background:var(--alt); padding:10px; border-radius:8px; font-family:monospace; }
   .modal input[type=text], .modal textarea { width:100%; }
-  .modal label { display:block; margin:10px 0 3px; font-size:.82rem; color:var(--muted); }
   .modal textarea { background:var(--row); color:var(--fg); border:1px solid var(--line); border-radius:7px; padding:8px; font:inherit; resize:vertical; min-height:80px; }
+  .modal .colgrid { display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; margin-top:6px; }
+  .modal .colgrid label { display:flex; align-items:center; gap:8px; color:var(--fg); font-size:.9rem; margin:6px 0; }
   .cover-box { width:120px; height:180px; border-radius:6px; background:var(--chip); flex:0 0 auto; cursor:pointer; overflow:hidden; position:relative; }
   .cover-box img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .cover-box .hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.78rem; color:var(--muted); }
-  /* The change affordance only appears on hover, over the shown cover. */
   .cover-box .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:6px; font-size:.8rem; color:#fff; background:rgba(0,0,0,.5); opacity:0; transition:opacity .15s; }
   .cover-box:hover .overlay { opacity:1; }
   .uprog { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:40; display:none; align-items:center; gap:10px; background:var(--row); border:1px solid var(--line); border-radius:10px; padding:10px 14px; box-shadow:0 6px 24px rgba(0,0,0,.3); min-width:300px; }
@@ -109,6 +129,7 @@
   .ab-drop.over { border-color:var(--accent); background:var(--chip); }
   .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
            background:var(--fg); color:var(--bg); padding:10px 16px; border-radius:8px; z-index:30; }
+  .kbd { font-family:monospace; background:var(--alt); border:1px solid var(--line); border-radius:4px; padding:0 5px; font-size:.8rem; }
 </style>
 </head>
 <body>
@@ -125,44 +146,54 @@
 
 <!-- App -->
 <div id="app" class="hidden">
-  <header>
-    <h1>Vellum</h1>
-    <span class="eyebrow">Console</span>
-    <span class="muted" id="who"></span>
-    <span class="spacer"></span>
-    <button class="btn" onclick="loadAll()">Refresh</button>
-    <button class="btn" onclick="logout()">Log out</button>
-  </header>
+  <div id="topbar">
+    <header>
+      <h1>Vellum</h1>
+      <span class="eyebrow">Console</span>
+      <span class="muted" id="who"></span>
+      <span class="spacer"></span>
+      <span class="muted" id="count"></span>
+      <button class="btn" onclick="loadAll()">Refresh</button>
+      <button class="btn" onclick="logout()">Log out</button>
+    </header>
 
-  <div class="toolbar">
-    <button class="btn primary" onclick="openAddBook()">＋ Add book</button>
-    <span class="muted">|</span>
-    <div class="group">
-      <input id="newtag" type="text" placeholder="New tag name" style="width:150px">
-      <button class="btn" onclick="createTag()">Create tag</button>
+    <div class="toolbar">
+      <button class="btn primary" onclick="openAddBook()">＋ Add book</button>
+      <button class="btn" onclick="openImport()">Import CSV</button>
+      <span class="muted">|</span>
+      <div class="group">
+        <input id="newtag" type="text" placeholder="New tag name" style="width:140px">
+        <button class="btn" onclick="createTag()">Create tag</button>
+      </div>
+      <span class="muted">|</span>
+      <div class="group">
+        <select id="bulktag"></select>
+        <button class="btn" onclick="bulkTag(true)">Tag</button>
+        <button class="btn" onclick="bulkTag(false)">Untag</button>
+      </div>
+      <button class="btn" onclick="openBulkEdit()">Edit selected</button>
+      <button class="btn" onclick="uploadToSelected()">Upload to selected</button>
+      <button class="btn danger" onclick="deleteSelected()">Delete selected</button>
+      <span class="spacer"></span>
+      <button class="btn sm" onclick="exportCSV()">Export CSV</button>
+      <button class="btn sm" onclick="exportJSON()">Export JSON</button>
+      <button class="btn sm" onclick="openColumns()">Columns ▾</button>
+      <button class="btn sm" onclick="toggleDensity()">Density</button>
     </div>
-    <span class="muted">|</span>
-    <div class="group">
-      <select id="bulktag"></select>
-      <button class="btn" onclick="bulkTag(true)">Tag selected</button>
-      <button class="btn" onclick="bulkTag(false)">Untag selected</button>
+
+    <div class="toolbar">
+      <input id="q" type="text" placeholder="Search title, author, ISBN…"
+             oninput="setQ(this.value)" style="width:240px" autocomplete="off">
+      <span class="muted">Tags:</span>
+      <span id="tagfilters"></span>
+      <span class="muted">|</span>
+      <span id="missingfilters"></span>
+      <button class="btn sm" onclick="clearFilters()">Clear filters</button>
     </div>
-    <span class="muted">|</span>
-    <button class="btn danger" onclick="deleteSelected()">Delete selected</button>
-    <span class="spacer"></span>
-    <span class="muted" id="count"></span>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th style="width:34px"><input type="checkbox" id="selall" onchange="toggleAll(this.checked)"></th>
-        <th>Title</th>
-        <th style="width:70px">Year</th>
-        <th>Tags</th>
-        <th style="width:120px">Actions</th>
-      </tr>
-    </thead>
+  <table id="tbl">
+    <thead id="thead"></thead>
     <tbody id="rows"></tbody>
   </table>
 </div>
@@ -171,13 +202,26 @@
 
 <script>
 const S = { token: localStorage.getItem('vellum_token'), email: localStorage.getItem('vellum_email'),
-            books: [], groups: [], members: new Set(), selected: new Set() };
+            books: [], groups: [], members: new Set(), selected: new Set(),
+            view: [], cursor: -1,
+            q: '', sort: { col: 'title', dir: 'asc' },
+            fTags: new Set(), fUntagged: false, fMissing: new Set(),
+            cols: new Set(JSON.parse(localStorage.getItem('vellum_cols') || 'null') || ['author','year','status']),
+            compact: localStorage.getItem('vellum_density') === '1' };
 const AB = { results: [], file: null };
+const IMP = { items: [] };
+
+// Columns the user can show or hide (the checkbox, title, tags and actions
+// columns are always present).
+const OPT_COLS = [['cover','Cover thumbnail'],['author','Author'],['year','Year'],
+                  ['pages','Pages'],['status','Files'],['added','Date added']];
 
 function esc(s){ return (s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
   document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
 function key(g,b){ return g+'|'+b; }
+function authorStr(b){ return (b.authors||[]).join(', '); }
+function bookTags(b){ return S.groups.filter(g=>S.members.has(key(g.id,b.id))); }
 
 async function api(method, path, body){
   const res = await fetch(path, {
@@ -215,6 +259,7 @@ function showApp(){
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('who').textContent = S.email || '';
+  document.getElementById('tbl').classList.toggle('compact', S.compact);
   loadAll();
 }
 
@@ -226,58 +271,240 @@ async function loadAll(){
     S.books = books; S.groups = groups;
     S.members = new Set(members.map(m=>key(m.group_id,m.book_id)));
     S.selected = new Set([...S.selected].filter(id=>books.some(b=>b.id===id)));
-    render();
+    S.fTags = new Set([...S.fTags].filter(id=>groups.some(g=>g.id===id)));
+    renderFilters(); render();
   } catch(e){ toast(e.message); }
 }
 
+// ---- filtering + sorting ------------------------------------------------
+
+function matches(b){
+  const q = S.q.trim().toLowerCase();
+  if (q){
+    const hay = [b.title, b.subtitle, authorStr(b), b.isbn, b.publisher]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  const tags = bookTags(b);
+  if (S.fUntagged){ if (tags.length) return false; }
+  else if (S.fTags.size){ if (!tags.some(g=>S.fTags.has(g.id))) return false; }
+  for (const m of S.fMissing){
+    if (m==='file'   && b.file_count>0)          return false;
+    if (m==='cover'  && b.cover_path)             return false;
+    if (m==='year'   && b.published_year!=null)   return false;
+    if (m==='author' && authorStr(b))             return false;
+  }
+  return true;
+}
+
+function sortVal(b, col){
+  switch(col){
+    case 'author': return authorStr(b).toLowerCase();
+    case 'year':   return b.published_year ?? -Infinity;
+    case 'pages':  return b.page_count ?? -Infinity;
+    case 'status': return b.file_count || 0;
+    case 'added':  return b.created_at || '';
+    default:       return (b.title||'').toLowerCase();
+  }
+}
+
+function computeRows(){
+  const rows = S.books.filter(matches);
+  const { col, dir } = S.sort, mul = dir==='asc' ? 1 : -1;
+  rows.sort((a,b)=>{
+    const x = sortVal(a,col), y = sortVal(b,col);
+    if (x < y) return -mul;
+    if (x > y) return mul;
+    return (a.title||'').localeCompare(b.title||'');
+  });
+  return rows;
+}
+
+function sortBy(col){
+  if (S.sort.col === col) S.sort.dir = S.sort.dir==='asc' ? 'desc' : 'asc';
+  else S.sort = { col, dir: 'asc' };
+  render();
+}
+
+function setQ(v){ S.q = v; S.cursor = -1; render(); }
+
+function toggleTagFilter(id){
+  S.fUntagged = false;
+  S.fTags.has(id) ? S.fTags.delete(id) : S.fTags.add(id);
+  S.cursor = -1; renderFilters(); render();
+}
+function toggleUntagged(){
+  S.fUntagged = !S.fUntagged;
+  if (S.fUntagged) S.fTags.clear();
+  S.cursor = -1; renderFilters(); render();
+}
+function toggleMissing(k){
+  S.fMissing.has(k) ? S.fMissing.delete(k) : S.fMissing.add(k);
+  S.cursor = -1; renderFilters(); render();
+}
+function clearFilters(){
+  S.q=''; document.getElementById('q').value='';
+  S.fTags.clear(); S.fUntagged=false; S.fMissing.clear(); S.cursor=-1;
+  renderFilters(); render();
+}
+
+function renderFilters(){
+  document.getElementById('tagfilters').innerHTML =
+    S.groups.map(g=>`<button class="fchip ${S.fTags.has(g.id)?'on':''}" onclick="toggleTagFilter('${g.id}')">${esc(g.name)}</button>`).join('')
+    + `<button class="fchip ${S.fUntagged?'on':''}" onclick="toggleUntagged()">Untagged</button>`;
+  document.getElementById('missingfilters').innerHTML =
+    [['file','No file'],['cover','No cover'],['year','No year'],['author','No author']]
+      .map(([k,l])=>`<button class="fchip ${S.fMissing.has(k)?'on':''}" onclick="toggleMissing('${k}')">${l}</button>`).join('');
+}
+
+// ---- table --------------------------------------------------------------
+
+function arrow(col){ return S.sort.col===col ? (S.sort.dir==='asc'?' ▲':' ▼') : ''; }
+
+function headHtml(){
+  const th = (col,label,w)=>
+    `<th class="sortable" ${w?`style="width:${w}"`:''} onclick="sortBy('${col}')">${label}${arrow(col)}</th>`;
+  let h = '<tr><th style="width:34px"><input type="checkbox" id="selall" onchange="toggleAll(this.checked)"></th>';
+  if (S.cols.has('cover'))  h += '<th style="width:44px">Cover</th>';
+  h += th('title','Title');
+  if (S.cols.has('author')) h += th('author','Author');
+  if (S.cols.has('year'))   h += th('year','Year','70px');
+  if (S.cols.has('pages'))  h += th('pages','Pages','70px');
+  if (S.cols.has('status')) h += th('status','Files','90px');
+  h += '<th>Tags</th>';
+  if (S.cols.has('added'))  h += th('added','Added','110px');
+  h += '<th style="width:120px">Actions</th></tr>';
+  return h;
+}
+
+function statusCell(b){
+  const f = b.file_count>0, c = !!b.cover_path;
+  return `<span class="dot ${f?'on':''}" title="${f?b.file_count+' file(s)':'No file'}">●</span>${f?' '+b.file_count:''}`
+       + `<span class="dot ${c?'on':''}" title="${c?'Has cover':'No cover'}" style="margin-left:8px">▣</span>`;
+}
+
+function colCount(){ return 4 + OPT_COLS.filter(([k])=>S.cols.has(k)).length; }
+
 function render(){
-  // bulk tag dropdown
+  // bulk-tag dropdown
   const sel = document.getElementById('bulktag');
   sel.innerHTML = S.groups.length
     ? S.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')
     : '<option value="">(no tags yet)</option>';
 
+  document.getElementById('thead').innerHTML = headHtml();
+
+  S.view = computeRows();
+  if (S.cursor >= S.view.length) S.cursor = -1;
+
+  const tok = encodeURIComponent(S.token);
   const rows = document.getElementById('rows');
   if (!S.books.length){
-    rows.innerHTML = '<tr class="empty"><td colspan="5" class="muted" '+
-      'style="text-align:center; padding:44px 14px">'+
-      'Your library is empty. Add your first book to get started.</td></tr>';
-    document.getElementById('count').textContent = '0 books';
-    document.getElementById('selall').checked = false;
-    return;
+    rows.innerHTML = `<tr class="empty"><td colspan="${colCount()}" class="muted"
+      style="text-align:center; padding:44px 14px">Your library is empty. Add your first book to get started.</td></tr>`;
+  } else if (!S.view.length){
+    rows.innerHTML = `<tr class="empty"><td colspan="${colCount()}" class="muted"
+      style="text-align:center; padding:44px 14px">No books match the current filters.</td></tr>`;
+  } else {
+    rows.innerHTML = S.view.map((b,i)=>{
+      const chips = bookTags(b).map(g=>
+        `<span class="chip">${esc(g.name)}<button title="Remove tag" onclick="removeTag('${g.id}','${b.id}')">×</button></span>`
+      ).join('');
+      const rowCls = [S.selected.has(b.id)?'sel':'', i===S.cursor?'cursor':''].filter(Boolean).join(' ');
+      let r = `<tr class="${rowCls}"
+          ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropOn(event,'${b.id}',this)"
+          title="Drop a PDF/EPUB or cover image here">
+        <td><input type="checkbox" ${S.selected.has(b.id)?'checked':''} onchange="toggleRow('${b.id}',this.checked)"></td>`;
+      if (S.cols.has('cover'))
+        r += `<td>${b.cover_path
+          ? `<img class="thumb" src="/api/books/${b.id}/cover?token=${tok}&t=${encodeURIComponent(b.updated_at||'')}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nothumb'}))">`
+          : '<span class="nothumb"></span>'}</td>`;
+      r += `<td><span class="link" onclick="titleClick('${b.id}')" ondblclick="titleDbl(event,'${b.id}')">${esc(b.title)}</span></td>`;
+      if (S.cols.has('author')) r += `<td class="muted">${authorStr(b)?esc(authorStr(b)):'<span class="dim">—</span>'}</td>`;
+      if (S.cols.has('year'))   r += `<td class="year editable" ondblclick="startEdit(event,'${b.id}','year')">${b.published_year??''}</td>`;
+      if (S.cols.has('pages'))  r += `<td class="year">${b.page_count??''}</td>`;
+      if (S.cols.has('status')) r += `<td>${statusCell(b)}</td>`;
+      r += `<td>${chips}<button class="addtag" onclick="quickAdd(this,'${b.id}')">＋ tag</button></td>`;
+      if (S.cols.has('added'))  r += `<td class="muted">${esc((b.created_at||'').slice(0,10))}</td>`;
+      r += `<td class="actions">
+        <button class="btn sm" onclick="pickUpload('${b.id}')">Upload</button>
+        <button class="btn sm" onclick="openLink('${b.id}')">Link</button>
+      </td></tr>`;
+      return r;
+    }).join('');
   }
-  rows.innerHTML = S.books.map(b=>{
-    const tags = S.groups.filter(g=>S.members.has(key(g.id,b.id)));
-    const chips = tags.map(g=>
-      `<span class="chip">${esc(g.name)}<button title="Remove tag" onclick="removeTag('${g.id}','${b.id}')">×</button></span>`
-    ).join('');
-    const checked = S.selected.has(b.id) ? 'checked' : '';
-    return `<tr class="${S.selected.has(b.id)?'sel':''}"
-        ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropOn(event,'${b.id}',this)"
-        title="Drop a PDF/EPUB or cover image here">
-      <td><input type="checkbox" ${checked} onchange="toggleRow('${b.id}',this.checked)"></td>
-      <td><span class="link" onclick="openDetail('${b.id}')">${esc(b.title)}</span></td>
-      <td class="year">${b.published_year??''}</td>
-      <td>${chips}<button class="addtag" onclick="quickAdd(this,'${b.id}')">＋ tag</button></td>
-      <td class="actions">
-        <button class="btn" onclick="pickUpload('${b.id}')">Upload</button>
-        <button class="btn" onclick="openLink('${b.id}')">Link</button>
-      </td>
-    </tr>`;
-  }).join('');
+
+  const selShown = S.view.filter(b=>S.selected.has(b.id)).length;
   document.getElementById('count').textContent =
-    `${S.books.length} books · ${S.selected.size} selected`;
-  document.getElementById('selall').checked =
-    S.books.length>0 && S.selected.size===S.books.length;
+    `${S.view.length} shown · ${S.books.length} total · ${S.selected.size} selected`;
+  document.getElementById('selall').checked = S.view.length>0 && selShown===S.view.length;
+
+  // keep the sticky table header parked just below the (variable-height) toolbar
+  const tb = document.getElementById('topbar');
+  if (tb) document.documentElement.style.setProperty('--thead-top', tb.offsetHeight+'px');
 }
 
 function toggleRow(id, on){ on?S.selected.add(id):S.selected.delete(id); render(); }
-function toggleAll(on){ S.selected = on ? new Set(S.books.map(b=>b.id)) : new Set(); render(); }
+function toggleAll(on){ for(const b of S.view){ on?S.selected.add(b.id):S.selected.delete(b.id); } render(); }
+
+// ---- inline editing -----------------------------------------------------
+
+// Single click on a title opens the detail modal; a double click edits it in
+// place. We defer the open briefly so a double click can cancel it.
+let clickTimer = null;
+function titleClick(id){
+  if (clickTimer) return;                       // second click of a dblclick
+  clickTimer = setTimeout(()=>{ clickTimer=null; openDetail(id); }, 220);
+}
+function titleDbl(ev, id){
+  if (clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
+  startEdit(ev, id, 'title');
+}
+
+function startEdit(ev, id, field){
+  const td = ev.currentTarget.closest('td');
+  const b = S.books.find(x=>x.id===id);
+  if (!td || !b) return;
+  const cur = field==='title' ? (b.title||'') : (b.published_year??'');
+  const inp = document.createElement('input');
+  inp.type='text'; inp.className='celledit'; inp.value=cur;
+  td.textContent=''; td.appendChild(inp); inp.focus(); inp.select();
+  let closed = false;
+  const finish = async (save)=>{
+    if (closed) return; closed = true;
+    if (save) await commitEdit(id, field, inp.value);
+    render();
+  };
+  inp.addEventListener('keydown', e=>{
+    if (e.key==='Enter'){ e.preventDefault(); finish(true); }
+    else if (e.key==='Escape'){ e.preventDefault(); finish(false); }
+  });
+  inp.addEventListener('blur', ()=>finish(true));
+}
+
+async function commitEdit(id, field, raw){
+  const b = S.books.find(x=>x.id===id); if (!b) return;
+  const v = raw.trim(), body = {};
+  if (field==='title'){
+    if (!v){ toast('Title cannot be empty'); return; }
+    if (v===b.title) return;
+    body.title = v; b.title = v;
+  } else {
+    if (!v){ toast('Year left unchanged (clearing isn’t supported here)'); return; }
+    const y = parseInt(v,10);
+    if (isNaN(y)){ toast('Year must be a number'); return; }
+    if (y===b.published_year) return;
+    body.published_year = y; b.published_year = y;
+  }
+  try { await api('PATCH','/api/books/'+id, body); toast('Saved'); }
+  catch(e){ toast(e.message); loadAll(); }
+}
+
+// ---- add / search / create (unchanged behaviour) ------------------------
 
 function openAddBook(){
   AB.results = []; AB.file = null;
-  const root = document.getElementById('modal-root');
-  root.innerHTML = `
+  document.getElementById('modal-root').innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal" style="width:min(600px,94vw)">
       <h2>Add a book</h2>
@@ -312,7 +539,6 @@ async function setAbFile(file){
   AB.file = file;
   const d = document.getElementById('ab-drop');
   if (d) d.textContent = 'Attached: ' + file.name;
-  // Seed the title from the filename when the user hasn't typed one.
   const q = document.getElementById('ab-q');
   if (q && !q.value.trim()) q.value = file.name.replace(/\.[^.]+$/, '');
 }
@@ -367,7 +593,7 @@ async function createBook(){
     const book = await api('POST','/api/books',{ title });
     if (AB.file){
       createBtn.innerHTML = '<span class="spin"></span>Uploading…';
-      await uploadTo(book.id, AB.file); // shows the progress bar
+      await uploadTo(book.id, AB.file);
     }
     closeModal(); await loadAll(); toast('Created “'+title+'”');
   } catch(e){
@@ -377,18 +603,174 @@ async function createBook(){
   }
 }
 
-// Classify a dropped/picked file by its magic bytes (not just its name).
+// ---- CSV import ---------------------------------------------------------
+
+function openImport(){
+  IMP.items = [];
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(640px,95vw)">
+      <h2>Import books from CSV</h2>
+      <p class="muted">First row is the header. A <b>title</b> column is required;
+        <b>subtitle, year, publisher, isbn, pages</b> are optional. (Authors can’t be
+        set through the API and are ignored.)</p>
+      <textarea id="imp-text" rows="7" placeholder="title,year,publisher
+The Odyssey,1996,Penguin" oninput="importPreview()"></textarea>
+      <div class="row" style="justify-content:flex-start; margin-top:8px">
+        <button class="btn" onclick="importPickFile()">Choose CSV file…</button>
+      </div>
+      <div class="checkline">
+        <input type="checkbox" id="imp-dupes" onchange="importPreview()">
+        <label for="imp-dupes">Allow duplicate titles</label>
+      </div>
+      <div id="imp-status" class="muted" style="margin:8px 0; min-height:1.2em"></div>
+      <div class="row">
+        <button class="btn" onclick="closeModal()">Close</button>
+        <button class="btn primary" id="imp-do" disabled onclick="importDo()">Import</button>
+      </div>
+    </div>
+   </div>`;
+}
+
+function importPickFile(){
+  const i = document.createElement('input');
+  i.type='file'; i.accept='.csv,text/csv,text/plain';
+  i.onchange = async ()=>{ const f=i.files[0]; if(!f) return;
+    document.getElementById('imp-text').value = await f.text(); importPreview(); };
+  i.click();
+}
+
+// A small CSV parser: handles quoted cells, escaped "" quotes, and \r\n.
+function parseCSV(text){
+  const rows=[]; let row=[], cell='', q=false;
+  for (let i=0;i<text.length;i++){
+    const c=text[i];
+    if (q){
+      if (c==='"'){ if (text[i+1]==='"'){ cell+='"'; i++; } else q=false; }
+      else cell+=c;
+    } else {
+      if (c==='"') q=true;
+      else if (c===','){ row.push(cell); cell=''; }
+      else if (c==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+      else if (c!=='\r') cell+=c;
+    }
+  }
+  if (cell.length || row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x.trim()!==''));
+}
+
+function parseImport(text){
+  const rows = parseCSV(text);
+  if (!rows.length) return { error:'Nothing to parse.' };
+  const header = rows[0].map(h=>h.trim().toLowerCase());
+  const idx = names=>{ for(const n of names){ const i=header.indexOf(n); if(i>=0) return i; } return -1; };
+  const iTitle=idx(['title','name']);
+  if (iTitle<0) return { error:'CSV needs a "title" column in the first row.' };
+  const iSub=idx(['subtitle']), iAuth=idx(['author','authors']),
+        iYear=idx(['year','published_year','published']), iPub=idx(['publisher']),
+        iIsbn=idx(['isbn','isbn13','isbn_13']), iPages=idx(['pages','page_count']);
+  const allow = document.getElementById('imp-dupes').checked;
+  const existing = new Set(S.books.map(b=>(b.title||'').trim().toLowerCase()));
+  const items=[]; let dupes=0;
+  for (let r=1;r<rows.length;r++){
+    const row=rows[r], title=(row[iTitle]||'').trim();
+    if (!title) continue;
+    if (!allow && existing.has(title.toLowerCase())){ dupes++; continue; }
+    const it={ title };
+    if (iSub>=0 && row[iSub]) it.subtitle=row[iSub].trim();
+    if (iPub>=0 && row[iPub]) it.publisher=row[iPub].trim();
+    if (iIsbn>=0 && row[iIsbn]) it.isbn=row[iIsbn].trim();
+    if (iYear>=0 && row[iYear]){ const y=parseInt(row[iYear],10); if(!isNaN(y)) it.published_year=y; }
+    if (iPages>=0 && row[iPages]){ const p=parseInt(row[iPages],10); if(!isNaN(p)) it.page_count=p; }
+    items.push(it); existing.add(title.toLowerCase());
+  }
+  return { items, dupes, authorsIgnored: iAuth>=0 };
+}
+
+function importPreview(){
+  const st = document.getElementById('imp-status');
+  const p = parseImport(document.getElementById('imp-text').value);
+  if (p.error){ IMP.items=[]; st.textContent=p.error; document.getElementById('imp-do').disabled=true; return; }
+  IMP.items = p.items;
+  st.textContent = `${p.items.length} new book(s) ready`
+    + (p.dupes?`, ${p.dupes} duplicate title(s) skipped`:'')
+    + (p.authorsIgnored?` · author column ignored`:'') + '.';
+  document.getElementById('imp-do').disabled = p.items.length===0;
+}
+
+async function importDo(){
+  if (!IMP.items.length) return;
+  const btn = document.getElementById('imp-do');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span>Importing…';
+  let ok=0;
+  for (const it of IMP.items){ try { await api('POST','/api/books', it); ok++; } catch(_){} }
+  closeModal(); await loadAll(); toast('Imported '+ok+' book(s)');
+}
+
+// ---- export -------------------------------------------------------------
+
+function download(name, text, mime){
+  const url = URL.createObjectURL(new Blob([text],{type:mime}));
+  const a = document.createElement('a'); a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function csvCell(v){
+  if (v==null) v='';
+  v = String(v);
+  return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
+function exportJSON(){
+  download('vellum-books.json', JSON.stringify(S.view, null, 2), 'application/json');
+  toast('Exported '+S.view.length+' book(s)');
+}
+function exportCSV(){
+  const cols = ['title','subtitle','authors','published_year','publisher','isbn','page_count','file_count','has_cover','tags','created_at'];
+  const lines = [cols.join(',')];
+  for (const b of S.view){
+    const rec = { ...b, authors:authorStr(b), has_cover: b.cover_path?'yes':'no',
+                  tags: bookTags(b).map(g=>g.name).join('; ') };
+    lines.push(cols.map(c=>csvCell(rec[c])).join(','));
+  }
+  download('vellum-books.csv', lines.join('\n'), 'text/csv');
+  toast('Exported '+S.view.length+' book(s)');
+}
+
+// ---- columns + density --------------------------------------------------
+
+function openColumns(){
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <h2>Columns</h2>
+      <div class="colgrid">
+        ${OPT_COLS.map(([k,l])=>`<label><input type="checkbox" ${S.cols.has(k)?'checked':''} onchange="toggleCol('${k}',this.checked)">${l}</label>`).join('')}
+      </div>
+      <div class="row"><button class="btn primary" onclick="closeModal()">Done</button></div>
+    </div>
+   </div>`;
+}
+function toggleCol(k, on){
+  on ? S.cols.add(k) : S.cols.delete(k);
+  localStorage.setItem('vellum_cols', JSON.stringify([...S.cols]));
+  render();
+}
+function toggleDensity(){
+  S.compact = !S.compact;
+  localStorage.setItem('vellum_density', S.compact?'1':'0');
+  document.getElementById('tbl').classList.toggle('compact', S.compact);
+}
+
+// ---- uploads (unchanged) ------------------------------------------------
+
 async function classify(file){
   const buf = new Uint8Array(await file.slice(0,16).arrayBuffer());
   const m = sig => sig.every((byte,i)=>buf[i]===byte);
-  if (m([0x25,0x50,0x44,0x46])) return 'pdf';                       // %PDF
+  if (m([0x25,0x50,0x44,0x46])) return 'pdf';
   if (m([0xFF,0xD8,0xFF]) || m([0x89,0x50,0x4E,0x47]) || m([0x47,0x49,0x46,0x38])) return 'image';
   if (m([0x50,0x4B,0x03,0x04]) && file.name.toLowerCase().endsWith('.epub')) return 'epub';
   return 'unsupported';
 }
 
-// A global upload progress bar (fetch can't report upload progress, so uploads
-// use XMLHttpRequest).
 function showProgress(label){
   let el = document.getElementById('uprog');
   if (!el){
@@ -442,7 +824,7 @@ async function uploadTo(id, file){
     } else {
       const mime = kind === 'epub' ? 'application/epub+zip' : 'application/pdf';
       await xhrUpload('POST', '/api/books/'+id+'/files?filename='+encodeURIComponent(file.name), file, mime);
-      toast('Uploaded ' + file.name);
+      toast('Uploaded ' + file.name); await loadAll();
     }
     return true;
   } catch(e){ toast(e.message); return false; }
@@ -456,6 +838,33 @@ function pickUpload(id){
   input.click();
 }
 
+// Apply one picked file to every selected book (a shared cover, say).
+function uploadToSelected(){
+  if (!S.selected.size){ toast('Select some books first'); return; }
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.pdf,.epub,image/*';
+  input.onchange = async ()=>{
+    const f = input.files[0]; if (!f) return;
+    const kind = await classify(f);
+    if (kind!=='image' && kind!=='pdf' && kind!=='epub'){ toast('Only PDF, EPUB, or image files'); return; }
+    const ids = [...S.selected];
+    const what = kind==='image' ? 'cover' : 'file';
+    if (!confirm(`Apply this ${what} (${f.name}) to ${ids.length} selected book(s)?`)) return;
+    let ok=0;
+    for (const id of ids){
+      showProgress('Uploading to '+ok+'/'+ids.length);
+      try {
+        if (kind==='image') await xhrUpload('PUT','/api/books/'+id+'/cover', f, f.type||'image/jpeg');
+        else { const mime=kind==='epub'?'application/epub+zip':'application/pdf';
+               await xhrUpload('POST','/api/books/'+id+'/files?filename='+encodeURIComponent(f.name), f, mime); }
+        ok++;
+      } catch(e){ toast(e.message); }
+    }
+    hideProgress(); await loadAll(); toast('Applied to '+ok+' book(s)');
+  };
+  input.click();
+}
+
 function dragOver(e, tr){ e.preventDefault(); tr.classList.add('drop'); }
 function dragLeave(tr){ tr.classList.remove('drop'); }
 function dropOn(e, id, tr){
@@ -463,6 +872,8 @@ function dropOn(e, id, tr){
   const f = e.dataTransfer.files[0];
   if (f) uploadTo(id, f);
 }
+
+// ---- tags ---------------------------------------------------------------
 
 async function createTag(){
   const input = document.getElementById('newtag');
@@ -508,6 +919,37 @@ function quickAdd(btn, bookId){
   btn.replaceWith(sel); sel.focus();
 }
 
+// ---- bulk edit + delete -------------------------------------------------
+
+function openBulkEdit(){
+  if (!S.selected.size){ toast('Select some books first'); return; }
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <h2>Edit ${S.selected.size} selected</h2>
+      <label>Publisher</label><input id="be-pub" type="text">
+      <label>Year</label><input id="be-year" type="text">
+      <p class="muted" style="margin-top:10px">Blank fields are left unchanged.</p>
+      <div class="row">
+        <button class="btn" onclick="closeModal()">Close</button>
+        <button class="btn primary" onclick="bulkEditApply()">Apply</button>
+      </div>
+    </div>
+   </div>`;
+}
+async function bulkEditApply(){
+  const pub = document.getElementById('be-pub').value.trim();
+  const yr  = document.getElementById('be-year').value.trim();
+  const body = {};
+  if (pub) body.publisher = pub;
+  if (yr){ const y=parseInt(yr,10); if(isNaN(y)){ toast('Year must be a number'); return; } body.published_year=y; }
+  if (!Object.keys(body).length){ toast('Nothing to change'); return; }
+  const ids=[...S.selected];
+  try { for(const id of ids) await api('PATCH','/api/books/'+id, body);
+        closeModal(); await loadAll(); toast('Updated '+ids.length+' book(s)'); }
+  catch(e){ toast(e.message); }
+}
+
 async function deleteSelected(){
   if (S.selected.size===0) return;
   if (!confirm(`Delete ${S.selected.size} book(s)? This cannot be undone.`)) return;
@@ -515,6 +957,8 @@ async function deleteSelected(){
         S.selected.clear(); await loadAll(); toast('Deleted'); }
   catch(e){ toast(e.message); }
 }
+
+// ---- detail (unchanged) -------------------------------------------------
 
 function fmtSize(b){ return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
 
@@ -533,8 +977,7 @@ async function openDetail(id){
   const files = list
     ? list + '<div style="text-align:right; margin-top:6px">'+upBtn+'</div>'
     : '<div style="display:flex; align-items:center; gap:10px"><span class="muted">No files uploaded.</span>'+upBtn+'</div>';
-  const root = document.getElementById('modal-root');
-  root.innerHTML = `
+  document.getElementById('modal-root').innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal" style="width:min(720px,95vw); max-height:90vh; overflow:auto">
       <div style="display:flex; gap:16px">
@@ -568,8 +1011,6 @@ async function openDetail(id){
    </div>`;
 }
 
-// Pick a file (image for a cover, or PDF/EPUB for a book file) and upload it,
-// routed by magic bytes, then refresh the detail view.
 function detailPick(id, accept){
   const input = document.createElement('input');
   input.type = 'file'; input.accept = accept;
@@ -600,15 +1041,16 @@ async function deleteBook(id){
   catch(e){ toast(e.message); }
 }
 
+// ---- public links (unchanged) -------------------------------------------
+
 function openLink(bookId){
   const book = S.books.find(b=>b.id===bookId);
-  const root = document.getElementById('modal-root');
-  root.innerHTML = `
+  document.getElementById('modal-root').innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal">
       <h2>Public link</h2>
       <p class="muted">${esc(book?book.title:'')}</p>
-      <label><input type="checkbox" id="m-onetime"> One-time download</label>
+      <div class="checkline"><input type="checkbox" id="m-onetime"><label for="m-onetime">One-time download</label></div>
       <label>Expires on (optional)</label>
       <input type="date" id="m-exp">
       <div id="m-out"></div>
@@ -623,7 +1065,7 @@ function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
 
 async function createLink(bookId){
   const oneTime = document.getElementById('m-onetime').checked;
-  const exp = document.getElementById('m-exp').value; // YYYY-MM-DD or ''
+  const exp = document.getElementById('m-exp').value;
   try {
     const r = await api('POST','/api/share-links', {
       book_id: bookId, one_time: oneTime, ...(exp?{expires_at:exp}:{}),
@@ -636,6 +1078,34 @@ async function createLink(bookId){
   } catch(e){ toast(e.message); }
 }
 function copyUrl(url){ navigator.clipboard.writeText(url).then(()=>toast('Copied')); }
+
+// ---- keyboard navigation ------------------------------------------------
+
+document.addEventListener('keydown', e=>{
+  if (!document.getElementById('login').classList.contains('hidden')) return;   // logged out
+  const modalOpen = document.getElementById('modal-root').innerHTML !== '';
+  if (e.key === 'Escape'){ if (modalOpen) closeModal(); return; }
+  if (modalOpen) return;
+  const t = e.target, tag = (t.tagName||'').toLowerCase();
+  if (tag==='input' || tag==='textarea' || tag==='select' || t.isContentEditable) return;
+
+  if (e.key === '/'){ e.preventDefault(); document.getElementById('q').focus(); return; }
+  if (!S.view.length) return;
+  if (e.key === 'ArrowDown'){ e.preventDefault(); S.cursor = Math.min(S.view.length-1, S.cursor+1); afterCursorMove(); }
+  else if (e.key === 'ArrowUp'){ e.preventDefault(); S.cursor = Math.max(0, S.cursor<0?0:S.cursor-1); afterCursorMove(); }
+  else if (e.key === ' ' && S.cursor>=0){ e.preventDefault(); const id=S.view[S.cursor].id; toggleRow(id, !S.selected.has(id)); }
+  else if (e.key === 'Enter' && S.cursor>=0){ openDetail(S.view[S.cursor].id); }
+});
+function afterCursorMove(){
+  render();
+  const el = document.querySelector('tr.cursor');
+  if (el) el.scrollIntoView({ block:'nearest' });
+}
+
+window.addEventListener('resize', ()=>{
+  const tb = document.getElementById('topbar');
+  if (tb) document.documentElement.style.setProperty('--thead-top', tb.offsetHeight+'px');
+});
 
 // boot
 if (S.token) showApp();
