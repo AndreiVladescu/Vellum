@@ -140,6 +140,18 @@ and **`source_metadata`** (a JSON snapshot of the online-library data a book was
 imported with, behind *revert to library defaults*). See **Adding & editing
 books**.
 
+**App-local-only tables** for the physical bookshelf layouts (also never
+synced — a per-device arrangement of a real room, all lengths in **metres**):
+
+- **physical_environment** — a room/"library" (name, sort order).
+- **physical_shelf** — a flat resting surface as two points `(x1,y1)-(x2,y2)`
+  in an environment; horizontal in practice, but two points allow angling later.
+- **book_placement** — one physical copy placed at `(x, y)` (bottom-left) with a
+  `rotation` (0 = spine up, 90 = lying flat) and optional per-placement
+  `width`/`height` overrides. It references a **physical_copy**, so dropping a
+  title in creates a copy and the same title can be placed several times. See
+  **Physical bookshelf layouts**.
+
 ## Spine rendering
 
 No API on the internet serves spine images, so Vellum **generates** spines:
@@ -147,6 +159,28 @@ extract dominant colors from the cover, render the title in a vertical
 typeface, vary spine height/thickness by page count. Uniform, good-looking
 shelves for every book. The generated style is stored per-book (JSON) so users
 can tweak it later.
+
+## Physical bookshelf layouts
+
+The **Physical** tab (a bottom-nav destination on the home page) manages
+to-scale arrangements of physical books, as a lightweight "Tetris" — an idea
+that stays intentionally simple and data-driven so it's easy to extend.
+
+- **Model.** An *environment* (room) holds *shelves* and *placements*; see
+  **Data model**. Everything is metric; the view is a **front elevation** (X
+  right, Y up).
+- **Sizing.** A book's spine thickness comes from its page count (~0.06 mm/leaf
+  + covers, clamped), height defaults to ~20 cm; both are overridable per
+  placement. Colour reuses the generated spine palette (`physical_metrics.dart`).
+- **Interaction (no physics engine).** Pinch / scroll to zoom, drag empty space
+  to pan. Drag a book and on release it **settles**: its bottom drops to the
+  highest shelf or book-top beneath it (within its horizontal span), then it's
+  nudged sideways out of any overlap — a simple packing heuristic, not a
+  rigid-body sim. Tap a book to rotate 90° (stand ↔ lie flat, for stacking),
+  resize, or remove it.
+- **Local-only.** None of this touches the server or sync — it's a per-device
+  view of a real room. The canvas and its gesture/settle logic live in
+  `lib/physical/`.
 
 ## Metadata fetching
 

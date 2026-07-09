@@ -3580,6 +3580,1372 @@ class ShelfBooksCompanion extends UpdateCompanion<ShelfBook> {
   }
 }
 
+class $PhysicalEnvironmentsTable extends PhysicalEnvironments
+    with TableInfo<$PhysicalEnvironmentsTable, PhysicalEnvironment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PhysicalEnvironmentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, sortOrder, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'physical_environments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PhysicalEnvironment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PhysicalEnvironment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PhysicalEnvironment(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PhysicalEnvironmentsTable createAlias(String alias) {
+    return $PhysicalEnvironmentsTable(attachedDatabase, alias);
+  }
+}
+
+class PhysicalEnvironment extends DataClass
+    implements Insertable<PhysicalEnvironment> {
+  final String id;
+  final String name;
+  final int sortOrder;
+  final DateTime createdAt;
+  const PhysicalEnvironment({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PhysicalEnvironmentsCompanion toCompanion(bool nullToAbsent) {
+    return PhysicalEnvironmentsCompanion(
+      id: Value(id),
+      name: Value(name),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PhysicalEnvironment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PhysicalEnvironment(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PhysicalEnvironment copyWith({
+    String? id,
+    String? name,
+    int? sortOrder,
+    DateTime? createdAt,
+  }) => PhysicalEnvironment(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PhysicalEnvironment copyWithCompanion(PhysicalEnvironmentsCompanion data) {
+    return PhysicalEnvironment(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalEnvironment(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PhysicalEnvironment &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class PhysicalEnvironmentsCompanion
+    extends UpdateCompanion<PhysicalEnvironment> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const PhysicalEnvironmentsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PhysicalEnvironmentsCompanion.insert({
+    required String id,
+    required String name,
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<PhysicalEnvironment> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PhysicalEnvironmentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? sortOrder,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return PhysicalEnvironmentsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalEnvironmentsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PhysicalShelvesTable extends PhysicalShelves
+    with TableInfo<$PhysicalShelvesTable, PhysicalShelf> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PhysicalShelvesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _environmentIdMeta = const VerificationMeta(
+    'environmentId',
+  );
+  @override
+  late final GeneratedColumn<String> environmentId = GeneratedColumn<String>(
+    'environment_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES physical_environments (id)',
+    ),
+  );
+  static const VerificationMeta _x1Meta = const VerificationMeta('x1');
+  @override
+  late final GeneratedColumn<double> x1 = GeneratedColumn<double>(
+    'x1',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _y1Meta = const VerificationMeta('y1');
+  @override
+  late final GeneratedColumn<double> y1 = GeneratedColumn<double>(
+    'y1',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _x2Meta = const VerificationMeta('x2');
+  @override
+  late final GeneratedColumn<double> x2 = GeneratedColumn<double>(
+    'x2',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _y2Meta = const VerificationMeta('y2');
+  @override
+  late final GeneratedColumn<double> y2 = GeneratedColumn<double>(
+    'y2',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    environmentId,
+    x1,
+    y1,
+    x2,
+    y2,
+    label,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'physical_shelves';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PhysicalShelf> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('environment_id')) {
+      context.handle(
+        _environmentIdMeta,
+        environmentId.isAcceptableOrUnknown(
+          data['environment_id']!,
+          _environmentIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_environmentIdMeta);
+    }
+    if (data.containsKey('x1')) {
+      context.handle(_x1Meta, x1.isAcceptableOrUnknown(data['x1']!, _x1Meta));
+    } else if (isInserting) {
+      context.missing(_x1Meta);
+    }
+    if (data.containsKey('y1')) {
+      context.handle(_y1Meta, y1.isAcceptableOrUnknown(data['y1']!, _y1Meta));
+    } else if (isInserting) {
+      context.missing(_y1Meta);
+    }
+    if (data.containsKey('x2')) {
+      context.handle(_x2Meta, x2.isAcceptableOrUnknown(data['x2']!, _x2Meta));
+    } else if (isInserting) {
+      context.missing(_x2Meta);
+    }
+    if (data.containsKey('y2')) {
+      context.handle(_y2Meta, y2.isAcceptableOrUnknown(data['y2']!, _y2Meta));
+    } else if (isInserting) {
+      context.missing(_y2Meta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PhysicalShelf map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PhysicalShelf(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      environmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}environment_id'],
+      )!,
+      x1: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}x1'],
+      )!,
+      y1: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}y1'],
+      )!,
+      x2: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}x2'],
+      )!,
+      y2: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}y2'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PhysicalShelvesTable createAlias(String alias) {
+    return $PhysicalShelvesTable(attachedDatabase, alias);
+  }
+}
+
+class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
+  final String id;
+  final String environmentId;
+  final double x1;
+  final double y1;
+  final double x2;
+  final double y2;
+  final String? label;
+  final DateTime createdAt;
+  const PhysicalShelf({
+    required this.id,
+    required this.environmentId,
+    required this.x1,
+    required this.y1,
+    required this.x2,
+    required this.y2,
+    this.label,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['environment_id'] = Variable<String>(environmentId);
+    map['x1'] = Variable<double>(x1);
+    map['y1'] = Variable<double>(y1);
+    map['x2'] = Variable<double>(x2);
+    map['y2'] = Variable<double>(y2);
+    if (!nullToAbsent || label != null) {
+      map['label'] = Variable<String>(label);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PhysicalShelvesCompanion toCompanion(bool nullToAbsent) {
+    return PhysicalShelvesCompanion(
+      id: Value(id),
+      environmentId: Value(environmentId),
+      x1: Value(x1),
+      y1: Value(y1),
+      x2: Value(x2),
+      y2: Value(y2),
+      label: label == null && nullToAbsent
+          ? const Value.absent()
+          : Value(label),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PhysicalShelf.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PhysicalShelf(
+      id: serializer.fromJson<String>(json['id']),
+      environmentId: serializer.fromJson<String>(json['environmentId']),
+      x1: serializer.fromJson<double>(json['x1']),
+      y1: serializer.fromJson<double>(json['y1']),
+      x2: serializer.fromJson<double>(json['x2']),
+      y2: serializer.fromJson<double>(json['y2']),
+      label: serializer.fromJson<String?>(json['label']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'environmentId': serializer.toJson<String>(environmentId),
+      'x1': serializer.toJson<double>(x1),
+      'y1': serializer.toJson<double>(y1),
+      'x2': serializer.toJson<double>(x2),
+      'y2': serializer.toJson<double>(y2),
+      'label': serializer.toJson<String?>(label),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PhysicalShelf copyWith({
+    String? id,
+    String? environmentId,
+    double? x1,
+    double? y1,
+    double? x2,
+    double? y2,
+    Value<String?> label = const Value.absent(),
+    DateTime? createdAt,
+  }) => PhysicalShelf(
+    id: id ?? this.id,
+    environmentId: environmentId ?? this.environmentId,
+    x1: x1 ?? this.x1,
+    y1: y1 ?? this.y1,
+    x2: x2 ?? this.x2,
+    y2: y2 ?? this.y2,
+    label: label.present ? label.value : this.label,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PhysicalShelf copyWithCompanion(PhysicalShelvesCompanion data) {
+    return PhysicalShelf(
+      id: data.id.present ? data.id.value : this.id,
+      environmentId: data.environmentId.present
+          ? data.environmentId.value
+          : this.environmentId,
+      x1: data.x1.present ? data.x1.value : this.x1,
+      y1: data.y1.present ? data.y1.value : this.y1,
+      x2: data.x2.present ? data.x2.value : this.x2,
+      y2: data.y2.present ? data.y2.value : this.y2,
+      label: data.label.present ? data.label.value : this.label,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalShelf(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('x1: $x1, ')
+          ..write('y1: $y1, ')
+          ..write('x2: $x2, ')
+          ..write('y2: $y2, ')
+          ..write('label: $label, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, environmentId, x1, y1, x2, y2, label, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PhysicalShelf &&
+          other.id == this.id &&
+          other.environmentId == this.environmentId &&
+          other.x1 == this.x1 &&
+          other.y1 == this.y1 &&
+          other.x2 == this.x2 &&
+          other.y2 == this.y2 &&
+          other.label == this.label &&
+          other.createdAt == this.createdAt);
+}
+
+class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
+  final Value<String> id;
+  final Value<String> environmentId;
+  final Value<double> x1;
+  final Value<double> y1;
+  final Value<double> x2;
+  final Value<double> y2;
+  final Value<String?> label;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const PhysicalShelvesCompanion({
+    this.id = const Value.absent(),
+    this.environmentId = const Value.absent(),
+    this.x1 = const Value.absent(),
+    this.y1 = const Value.absent(),
+    this.x2 = const Value.absent(),
+    this.y2 = const Value.absent(),
+    this.label = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PhysicalShelvesCompanion.insert({
+    required String id,
+    required String environmentId,
+    required double x1,
+    required double y1,
+    required double x2,
+    required double y2,
+    this.label = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       environmentId = Value(environmentId),
+       x1 = Value(x1),
+       y1 = Value(y1),
+       x2 = Value(x2),
+       y2 = Value(y2);
+  static Insertable<PhysicalShelf> custom({
+    Expression<String>? id,
+    Expression<String>? environmentId,
+    Expression<double>? x1,
+    Expression<double>? y1,
+    Expression<double>? x2,
+    Expression<double>? y2,
+    Expression<String>? label,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (environmentId != null) 'environment_id': environmentId,
+      if (x1 != null) 'x1': x1,
+      if (y1 != null) 'y1': y1,
+      if (x2 != null) 'x2': x2,
+      if (y2 != null) 'y2': y2,
+      if (label != null) 'label': label,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PhysicalShelvesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? environmentId,
+    Value<double>? x1,
+    Value<double>? y1,
+    Value<double>? x2,
+    Value<double>? y2,
+    Value<String?>? label,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return PhysicalShelvesCompanion(
+      id: id ?? this.id,
+      environmentId: environmentId ?? this.environmentId,
+      x1: x1 ?? this.x1,
+      y1: y1 ?? this.y1,
+      x2: x2 ?? this.x2,
+      y2: y2 ?? this.y2,
+      label: label ?? this.label,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (environmentId.present) {
+      map['environment_id'] = Variable<String>(environmentId.value);
+    }
+    if (x1.present) {
+      map['x1'] = Variable<double>(x1.value);
+    }
+    if (y1.present) {
+      map['y1'] = Variable<double>(y1.value);
+    }
+    if (x2.present) {
+      map['x2'] = Variable<double>(x2.value);
+    }
+    if (y2.present) {
+      map['y2'] = Variable<double>(y2.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalShelvesCompanion(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('x1: $x1, ')
+          ..write('y1: $y1, ')
+          ..write('x2: $x2, ')
+          ..write('y2: $y2, ')
+          ..write('label: $label, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BookPlacementsTable extends BookPlacements
+    with TableInfo<$BookPlacementsTable, BookPlacement> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BookPlacementsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _environmentIdMeta = const VerificationMeta(
+    'environmentId',
+  );
+  @override
+  late final GeneratedColumn<String> environmentId = GeneratedColumn<String>(
+    'environment_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES physical_environments (id)',
+    ),
+  );
+  static const VerificationMeta _copyIdMeta = const VerificationMeta('copyId');
+  @override
+  late final GeneratedColumn<String> copyId = GeneratedColumn<String>(
+    'copy_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES physical_copies (id)',
+    ),
+  );
+  static const VerificationMeta _xMeta = const VerificationMeta('x');
+  @override
+  late final GeneratedColumn<double> x = GeneratedColumn<double>(
+    'x',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _yMeta = const VerificationMeta('y');
+  @override
+  late final GeneratedColumn<double> y = GeneratedColumn<double>(
+    'y',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rotationMeta = const VerificationMeta(
+    'rotation',
+  );
+  @override
+  late final GeneratedColumn<int> rotation = GeneratedColumn<int>(
+    'rotation',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _widthOverrideMeta = const VerificationMeta(
+    'widthOverride',
+  );
+  @override
+  late final GeneratedColumn<double> widthOverride = GeneratedColumn<double>(
+    'width_override',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _heightOverrideMeta = const VerificationMeta(
+    'heightOverride',
+  );
+  @override
+  late final GeneratedColumn<double> heightOverride = GeneratedColumn<double>(
+    'height_override',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    environmentId,
+    copyId,
+    x,
+    y,
+    rotation,
+    widthOverride,
+    heightOverride,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'book_placements';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BookPlacement> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('environment_id')) {
+      context.handle(
+        _environmentIdMeta,
+        environmentId.isAcceptableOrUnknown(
+          data['environment_id']!,
+          _environmentIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_environmentIdMeta);
+    }
+    if (data.containsKey('copy_id')) {
+      context.handle(
+        _copyIdMeta,
+        copyId.isAcceptableOrUnknown(data['copy_id']!, _copyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_copyIdMeta);
+    }
+    if (data.containsKey('x')) {
+      context.handle(_xMeta, x.isAcceptableOrUnknown(data['x']!, _xMeta));
+    } else if (isInserting) {
+      context.missing(_xMeta);
+    }
+    if (data.containsKey('y')) {
+      context.handle(_yMeta, y.isAcceptableOrUnknown(data['y']!, _yMeta));
+    } else if (isInserting) {
+      context.missing(_yMeta);
+    }
+    if (data.containsKey('rotation')) {
+      context.handle(
+        _rotationMeta,
+        rotation.isAcceptableOrUnknown(data['rotation']!, _rotationMeta),
+      );
+    }
+    if (data.containsKey('width_override')) {
+      context.handle(
+        _widthOverrideMeta,
+        widthOverride.isAcceptableOrUnknown(
+          data['width_override']!,
+          _widthOverrideMeta,
+        ),
+      );
+    }
+    if (data.containsKey('height_override')) {
+      context.handle(
+        _heightOverrideMeta,
+        heightOverride.isAcceptableOrUnknown(
+          data['height_override']!,
+          _heightOverrideMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BookPlacement map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BookPlacement(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      environmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}environment_id'],
+      )!,
+      copyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}copy_id'],
+      )!,
+      x: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}x'],
+      )!,
+      y: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}y'],
+      )!,
+      rotation: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rotation'],
+      )!,
+      widthOverride: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}width_override'],
+      ),
+      heightOverride: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}height_override'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BookPlacementsTable createAlias(String alias) {
+    return $BookPlacementsTable(attachedDatabase, alias);
+  }
+}
+
+class BookPlacement extends DataClass implements Insertable<BookPlacement> {
+  final String id;
+  final String environmentId;
+  final String copyId;
+  final double x;
+  final double y;
+  final int rotation;
+  final double? widthOverride;
+  final double? heightOverride;
+  final DateTime createdAt;
+  const BookPlacement({
+    required this.id,
+    required this.environmentId,
+    required this.copyId,
+    required this.x,
+    required this.y,
+    required this.rotation,
+    this.widthOverride,
+    this.heightOverride,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['environment_id'] = Variable<String>(environmentId);
+    map['copy_id'] = Variable<String>(copyId);
+    map['x'] = Variable<double>(x);
+    map['y'] = Variable<double>(y);
+    map['rotation'] = Variable<int>(rotation);
+    if (!nullToAbsent || widthOverride != null) {
+      map['width_override'] = Variable<double>(widthOverride);
+    }
+    if (!nullToAbsent || heightOverride != null) {
+      map['height_override'] = Variable<double>(heightOverride);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  BookPlacementsCompanion toCompanion(bool nullToAbsent) {
+    return BookPlacementsCompanion(
+      id: Value(id),
+      environmentId: Value(environmentId),
+      copyId: Value(copyId),
+      x: Value(x),
+      y: Value(y),
+      rotation: Value(rotation),
+      widthOverride: widthOverride == null && nullToAbsent
+          ? const Value.absent()
+          : Value(widthOverride),
+      heightOverride: heightOverride == null && nullToAbsent
+          ? const Value.absent()
+          : Value(heightOverride),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory BookPlacement.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BookPlacement(
+      id: serializer.fromJson<String>(json['id']),
+      environmentId: serializer.fromJson<String>(json['environmentId']),
+      copyId: serializer.fromJson<String>(json['copyId']),
+      x: serializer.fromJson<double>(json['x']),
+      y: serializer.fromJson<double>(json['y']),
+      rotation: serializer.fromJson<int>(json['rotation']),
+      widthOverride: serializer.fromJson<double?>(json['widthOverride']),
+      heightOverride: serializer.fromJson<double?>(json['heightOverride']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'environmentId': serializer.toJson<String>(environmentId),
+      'copyId': serializer.toJson<String>(copyId),
+      'x': serializer.toJson<double>(x),
+      'y': serializer.toJson<double>(y),
+      'rotation': serializer.toJson<int>(rotation),
+      'widthOverride': serializer.toJson<double?>(widthOverride),
+      'heightOverride': serializer.toJson<double?>(heightOverride),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  BookPlacement copyWith({
+    String? id,
+    String? environmentId,
+    String? copyId,
+    double? x,
+    double? y,
+    int? rotation,
+    Value<double?> widthOverride = const Value.absent(),
+    Value<double?> heightOverride = const Value.absent(),
+    DateTime? createdAt,
+  }) => BookPlacement(
+    id: id ?? this.id,
+    environmentId: environmentId ?? this.environmentId,
+    copyId: copyId ?? this.copyId,
+    x: x ?? this.x,
+    y: y ?? this.y,
+    rotation: rotation ?? this.rotation,
+    widthOverride: widthOverride.present
+        ? widthOverride.value
+        : this.widthOverride,
+    heightOverride: heightOverride.present
+        ? heightOverride.value
+        : this.heightOverride,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  BookPlacement copyWithCompanion(BookPlacementsCompanion data) {
+    return BookPlacement(
+      id: data.id.present ? data.id.value : this.id,
+      environmentId: data.environmentId.present
+          ? data.environmentId.value
+          : this.environmentId,
+      copyId: data.copyId.present ? data.copyId.value : this.copyId,
+      x: data.x.present ? data.x.value : this.x,
+      y: data.y.present ? data.y.value : this.y,
+      rotation: data.rotation.present ? data.rotation.value : this.rotation,
+      widthOverride: data.widthOverride.present
+          ? data.widthOverride.value
+          : this.widthOverride,
+      heightOverride: data.heightOverride.present
+          ? data.heightOverride.value
+          : this.heightOverride,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookPlacement(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('copyId: $copyId, ')
+          ..write('x: $x, ')
+          ..write('y: $y, ')
+          ..write('rotation: $rotation, ')
+          ..write('widthOverride: $widthOverride, ')
+          ..write('heightOverride: $heightOverride, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    environmentId,
+    copyId,
+    x,
+    y,
+    rotation,
+    widthOverride,
+    heightOverride,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BookPlacement &&
+          other.id == this.id &&
+          other.environmentId == this.environmentId &&
+          other.copyId == this.copyId &&
+          other.x == this.x &&
+          other.y == this.y &&
+          other.rotation == this.rotation &&
+          other.widthOverride == this.widthOverride &&
+          other.heightOverride == this.heightOverride &&
+          other.createdAt == this.createdAt);
+}
+
+class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
+  final Value<String> id;
+  final Value<String> environmentId;
+  final Value<String> copyId;
+  final Value<double> x;
+  final Value<double> y;
+  final Value<int> rotation;
+  final Value<double?> widthOverride;
+  final Value<double?> heightOverride;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const BookPlacementsCompanion({
+    this.id = const Value.absent(),
+    this.environmentId = const Value.absent(),
+    this.copyId = const Value.absent(),
+    this.x = const Value.absent(),
+    this.y = const Value.absent(),
+    this.rotation = const Value.absent(),
+    this.widthOverride = const Value.absent(),
+    this.heightOverride = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BookPlacementsCompanion.insert({
+    required String id,
+    required String environmentId,
+    required String copyId,
+    required double x,
+    required double y,
+    this.rotation = const Value.absent(),
+    this.widthOverride = const Value.absent(),
+    this.heightOverride = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       environmentId = Value(environmentId),
+       copyId = Value(copyId),
+       x = Value(x),
+       y = Value(y);
+  static Insertable<BookPlacement> custom({
+    Expression<String>? id,
+    Expression<String>? environmentId,
+    Expression<String>? copyId,
+    Expression<double>? x,
+    Expression<double>? y,
+    Expression<int>? rotation,
+    Expression<double>? widthOverride,
+    Expression<double>? heightOverride,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (environmentId != null) 'environment_id': environmentId,
+      if (copyId != null) 'copy_id': copyId,
+      if (x != null) 'x': x,
+      if (y != null) 'y': y,
+      if (rotation != null) 'rotation': rotation,
+      if (widthOverride != null) 'width_override': widthOverride,
+      if (heightOverride != null) 'height_override': heightOverride,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BookPlacementsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? environmentId,
+    Value<String>? copyId,
+    Value<double>? x,
+    Value<double>? y,
+    Value<int>? rotation,
+    Value<double?>? widthOverride,
+    Value<double?>? heightOverride,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return BookPlacementsCompanion(
+      id: id ?? this.id,
+      environmentId: environmentId ?? this.environmentId,
+      copyId: copyId ?? this.copyId,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      rotation: rotation ?? this.rotation,
+      widthOverride: widthOverride ?? this.widthOverride,
+      heightOverride: heightOverride ?? this.heightOverride,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (environmentId.present) {
+      map['environment_id'] = Variable<String>(environmentId.value);
+    }
+    if (copyId.present) {
+      map['copy_id'] = Variable<String>(copyId.value);
+    }
+    if (x.present) {
+      map['x'] = Variable<double>(x.value);
+    }
+    if (y.present) {
+      map['y'] = Variable<double>(y.value);
+    }
+    if (rotation.present) {
+      map['rotation'] = Variable<int>(rotation.value);
+    }
+    if (widthOverride.present) {
+      map['width_override'] = Variable<double>(widthOverride.value);
+    }
+    if (heightOverride.present) {
+      map['height_override'] = Variable<double>(heightOverride.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookPlacementsCompanion(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('copyId: $copyId, ')
+          ..write('x: $x, ')
+          ..write('y: $y, ')
+          ..write('rotation: $rotation, ')
+          ..write('widthOverride: $widthOverride, ')
+          ..write('heightOverride: $heightOverride, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$VellumDatabase extends GeneratedDatabase {
   _$VellumDatabase(QueryExecutor e) : super(e);
   $VellumDatabaseManager get managers => $VellumDatabaseManager(this);
@@ -3593,6 +4959,12 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
   late final $LoansTable loans = $LoansTable(this);
   late final $ShelvesTable shelves = $ShelvesTable(this);
   late final $ShelfBooksTable shelfBooks = $ShelfBooksTable(this);
+  late final $PhysicalEnvironmentsTable physicalEnvironments =
+      $PhysicalEnvironmentsTable(this);
+  late final $PhysicalShelvesTable physicalShelves = $PhysicalShelvesTable(
+    this,
+  );
+  late final $BookPlacementsTable bookPlacements = $BookPlacementsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3608,6 +4980,9 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     loans,
     shelves,
     shelfBooks,
+    physicalEnvironments,
+    physicalShelves,
+    bookPlacements,
   ];
 }
 
@@ -6116,6 +7491,25 @@ final class $$PhysicalCopiesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$BookPlacementsTable, List<BookPlacement>>
+  _bookPlacementsRefsTable(_$VellumDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.bookPlacements,
+        aliasName: 'physical_copies__id__book_placements__copy_id',
+      );
+
+  $$BookPlacementsTableProcessedTableManager get bookPlacementsRefs {
+    final manager = $$BookPlacementsTableTableManager(
+      $_db,
+      $_db.bookPlacements,
+    ).filter((f) => f.copyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_bookPlacementsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PhysicalCopiesTableFilterComposer
@@ -6186,6 +7580,31 @@ class $$PhysicalCopiesTableFilterComposer
           }) => $$LoansTableFilterComposer(
             $db: $db,
             $table: $db.loans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> bookPlacementsRefs(
+    Expression<bool> Function($$BookPlacementsTableFilterComposer f) f,
+  ) {
+    final $$BookPlacementsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bookPlacements,
+      getReferencedColumn: (t) => t.copyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookPlacementsTableFilterComposer(
+            $db: $db,
+            $table: $db.bookPlacements,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -6317,6 +7736,31 @@ class $$PhysicalCopiesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> bookPlacementsRefs<T extends Object>(
+    Expression<T> Function($$BookPlacementsTableAnnotationComposer a) f,
+  ) {
+    final $$BookPlacementsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bookPlacements,
+      getReferencedColumn: (t) => t.copyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookPlacementsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bookPlacements,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PhysicalCopiesTableTableManager
@@ -6332,7 +7776,11 @@ class $$PhysicalCopiesTableTableManager
           $$PhysicalCopiesTableUpdateCompanionBuilder,
           (PhysicalCopy, $$PhysicalCopiesTableReferences),
           PhysicalCopy,
-          PrefetchHooks Function({bool bookId, bool loansRefs})
+          PrefetchHooks Function({
+            bool bookId,
+            bool loansRefs,
+            bool bookPlacementsRefs,
+          })
         > {
   $$PhysicalCopiesTableTableManager(
     _$VellumDatabase db,
@@ -6387,68 +7835,100 @@ class $$PhysicalCopiesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({bookId = false, loansRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (loansRefs) db.loans],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$PhysicalCopiesTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn:
-                                    $$PhysicalCopiesTableReferences
-                                        ._bookIdTable(db)
-                                        .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                bookId = false,
+                loansRefs = false,
+                bookPlacementsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (loansRefs) db.loans,
+                    if (bookPlacementsRefs) db.bookPlacements,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (bookId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.bookId,
+                                    referencedTable:
+                                        $$PhysicalCopiesTableReferences
+                                            ._bookIdTable(db),
+                                    referencedColumn:
+                                        $$PhysicalCopiesTableReferences
+                                            ._bookIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (loansRefs)
+                        await $_getPrefetchedData<
+                          PhysicalCopy,
+                          $PhysicalCopiesTable,
+                          Loan
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PhysicalCopiesTableReferences
+                              ._loansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PhysicalCopiesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).loansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.copyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (bookPlacementsRefs)
+                        await $_getPrefetchedData<
+                          PhysicalCopy,
+                          $PhysicalCopiesTable,
+                          BookPlacement
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PhysicalCopiesTableReferences
+                              ._bookPlacementsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PhysicalCopiesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bookPlacementsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.copyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (loansRefs)
-                    await $_getPrefetchedData<
-                      PhysicalCopy,
-                      $PhysicalCopiesTable,
-                      Loan
-                    >(
-                      currentTable: table,
-                      referencedTable: $$PhysicalCopiesTableReferences
-                          ._loansRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$PhysicalCopiesTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).loansRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.copyId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -6465,7 +7945,11 @@ typedef $$PhysicalCopiesTableProcessedTableManager =
       $$PhysicalCopiesTableUpdateCompanionBuilder,
       (PhysicalCopy, $$PhysicalCopiesTableReferences),
       PhysicalCopy,
-      PrefetchHooks Function({bool bookId, bool loansRefs})
+      PrefetchHooks Function({
+        bool bookId,
+        bool loansRefs,
+        bool bookPlacementsRefs,
+      })
     >;
 typedef $$LoansTableCreateCompanionBuilder =
     LoansCompanion Function({
@@ -7407,6 +8891,1295 @@ typedef $$ShelfBooksTableProcessedTableManager =
       ShelfBook,
       PrefetchHooks Function({bool shelfId, bool bookId})
     >;
+typedef $$PhysicalEnvironmentsTableCreateCompanionBuilder =
+    PhysicalEnvironmentsCompanion Function({
+      required String id,
+      required String name,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$PhysicalEnvironmentsTableUpdateCompanionBuilder =
+    PhysicalEnvironmentsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$PhysicalEnvironmentsTableReferences
+    extends
+        BaseReferences<
+          _$VellumDatabase,
+          $PhysicalEnvironmentsTable,
+          PhysicalEnvironment
+        > {
+  $$PhysicalEnvironmentsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$PhysicalShelvesTable, List<PhysicalShelf>>
+  _physicalShelvesRefsTable(_$VellumDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.physicalShelves,
+        aliasName:
+            'physical_environments__id__physical_shelves__environment_id',
+      );
+
+  $$PhysicalShelvesTableProcessedTableManager get physicalShelvesRefs {
+    final manager = $$PhysicalShelvesTableTableManager(
+      $_db,
+      $_db.physicalShelves,
+    ).filter((f) => f.environmentId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _physicalShelvesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$BookPlacementsTable, List<BookPlacement>>
+  _bookPlacementsRefsTable(_$VellumDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.bookPlacements,
+        aliasName: 'physical_environments__id__book_placements__environment_id',
+      );
+
+  $$BookPlacementsTableProcessedTableManager get bookPlacementsRefs {
+    final manager = $$BookPlacementsTableTableManager(
+      $_db,
+      $_db.bookPlacements,
+    ).filter((f) => f.environmentId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_bookPlacementsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$PhysicalEnvironmentsTableFilterComposer
+    extends Composer<_$VellumDatabase, $PhysicalEnvironmentsTable> {
+  $$PhysicalEnvironmentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> physicalShelvesRefs(
+    Expression<bool> Function($$PhysicalShelvesTableFilterComposer f) f,
+  ) {
+    final $$PhysicalShelvesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.physicalShelves,
+      getReferencedColumn: (t) => t.environmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalShelvesTableFilterComposer(
+            $db: $db,
+            $table: $db.physicalShelves,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> bookPlacementsRefs(
+    Expression<bool> Function($$BookPlacementsTableFilterComposer f) f,
+  ) {
+    final $$BookPlacementsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bookPlacements,
+      getReferencedColumn: (t) => t.environmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookPlacementsTableFilterComposer(
+            $db: $db,
+            $table: $db.bookPlacements,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$PhysicalEnvironmentsTableOrderingComposer
+    extends Composer<_$VellumDatabase, $PhysicalEnvironmentsTable> {
+  $$PhysicalEnvironmentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PhysicalEnvironmentsTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $PhysicalEnvironmentsTable> {
+  $$PhysicalEnvironmentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  Expression<T> physicalShelvesRefs<T extends Object>(
+    Expression<T> Function($$PhysicalShelvesTableAnnotationComposer a) f,
+  ) {
+    final $$PhysicalShelvesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.physicalShelves,
+      getReferencedColumn: (t) => t.environmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalShelvesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.physicalShelves,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> bookPlacementsRefs<T extends Object>(
+    Expression<T> Function($$BookPlacementsTableAnnotationComposer a) f,
+  ) {
+    final $$BookPlacementsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bookPlacements,
+      getReferencedColumn: (t) => t.environmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookPlacementsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bookPlacements,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$PhysicalEnvironmentsTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $PhysicalEnvironmentsTable,
+          PhysicalEnvironment,
+          $$PhysicalEnvironmentsTableFilterComposer,
+          $$PhysicalEnvironmentsTableOrderingComposer,
+          $$PhysicalEnvironmentsTableAnnotationComposer,
+          $$PhysicalEnvironmentsTableCreateCompanionBuilder,
+          $$PhysicalEnvironmentsTableUpdateCompanionBuilder,
+          (PhysicalEnvironment, $$PhysicalEnvironmentsTableReferences),
+          PhysicalEnvironment,
+          PrefetchHooks Function({
+            bool physicalShelvesRefs,
+            bool bookPlacementsRefs,
+          })
+        > {
+  $$PhysicalEnvironmentsTableTableManager(
+    _$VellumDatabase db,
+    $PhysicalEnvironmentsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PhysicalEnvironmentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PhysicalEnvironmentsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PhysicalEnvironmentsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhysicalEnvironmentsCompanion(
+                id: id,
+                name: name,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhysicalEnvironmentsCompanion.insert(
+                id: id,
+                name: name,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$PhysicalEnvironmentsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({physicalShelvesRefs = false, bookPlacementsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (physicalShelvesRefs) db.physicalShelves,
+                    if (bookPlacementsRefs) db.bookPlacements,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (physicalShelvesRefs)
+                        await $_getPrefetchedData<
+                          PhysicalEnvironment,
+                          $PhysicalEnvironmentsTable,
+                          PhysicalShelf
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PhysicalEnvironmentsTableReferences
+                              ._physicalShelvesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PhysicalEnvironmentsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).physicalShelvesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.environmentId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (bookPlacementsRefs)
+                        await $_getPrefetchedData<
+                          PhysicalEnvironment,
+                          $PhysicalEnvironmentsTable,
+                          BookPlacement
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PhysicalEnvironmentsTableReferences
+                              ._bookPlacementsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PhysicalEnvironmentsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bookPlacementsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.environmentId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$PhysicalEnvironmentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $PhysicalEnvironmentsTable,
+      PhysicalEnvironment,
+      $$PhysicalEnvironmentsTableFilterComposer,
+      $$PhysicalEnvironmentsTableOrderingComposer,
+      $$PhysicalEnvironmentsTableAnnotationComposer,
+      $$PhysicalEnvironmentsTableCreateCompanionBuilder,
+      $$PhysicalEnvironmentsTableUpdateCompanionBuilder,
+      (PhysicalEnvironment, $$PhysicalEnvironmentsTableReferences),
+      PhysicalEnvironment,
+      PrefetchHooks Function({
+        bool physicalShelvesRefs,
+        bool bookPlacementsRefs,
+      })
+    >;
+typedef $$PhysicalShelvesTableCreateCompanionBuilder =
+    PhysicalShelvesCompanion Function({
+      required String id,
+      required String environmentId,
+      required double x1,
+      required double y1,
+      required double x2,
+      required double y2,
+      Value<String?> label,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$PhysicalShelvesTableUpdateCompanionBuilder =
+    PhysicalShelvesCompanion Function({
+      Value<String> id,
+      Value<String> environmentId,
+      Value<double> x1,
+      Value<double> y1,
+      Value<double> x2,
+      Value<double> y2,
+      Value<String?> label,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$PhysicalShelvesTableReferences
+    extends
+        BaseReferences<_$VellumDatabase, $PhysicalShelvesTable, PhysicalShelf> {
+  $$PhysicalShelvesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $PhysicalEnvironmentsTable _environmentIdTable(_$VellumDatabase db) =>
+      db.physicalEnvironments.createAlias(
+        'physical_shelves__environment_id__physical_environments__id',
+      );
+
+  $$PhysicalEnvironmentsTableProcessedTableManager get environmentId {
+    final $_column = $_itemColumn<String>('environment_id')!;
+
+    final manager = $$PhysicalEnvironmentsTableTableManager(
+      $_db,
+      $_db.physicalEnvironments,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_environmentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$PhysicalShelvesTableFilterComposer
+    extends Composer<_$VellumDatabase, $PhysicalShelvesTable> {
+  $$PhysicalShelvesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get x1 => $composableBuilder(
+    column: $table.x1,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get y1 => $composableBuilder(
+    column: $table.y1,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get x2 => $composableBuilder(
+    column: $table.x2,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get y2 => $composableBuilder(
+    column: $table.y2,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PhysicalEnvironmentsTableFilterComposer get environmentId {
+    final $$PhysicalEnvironmentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.environmentId,
+      referencedTable: $db.physicalEnvironments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalEnvironmentsTableFilterComposer(
+            $db: $db,
+            $table: $db.physicalEnvironments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PhysicalShelvesTableOrderingComposer
+    extends Composer<_$VellumDatabase, $PhysicalShelvesTable> {
+  $$PhysicalShelvesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get x1 => $composableBuilder(
+    column: $table.x1,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get y1 => $composableBuilder(
+    column: $table.y1,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get x2 => $composableBuilder(
+    column: $table.x2,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get y2 => $composableBuilder(
+    column: $table.y2,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PhysicalEnvironmentsTableOrderingComposer get environmentId {
+    final $$PhysicalEnvironmentsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.environmentId,
+          referencedTable: $db.physicalEnvironments,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PhysicalEnvironmentsTableOrderingComposer(
+                $db: $db,
+                $table: $db.physicalEnvironments,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$PhysicalShelvesTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $PhysicalShelvesTable> {
+  $$PhysicalShelvesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get x1 =>
+      $composableBuilder(column: $table.x1, builder: (column) => column);
+
+  GeneratedColumn<double> get y1 =>
+      $composableBuilder(column: $table.y1, builder: (column) => column);
+
+  GeneratedColumn<double> get x2 =>
+      $composableBuilder(column: $table.x2, builder: (column) => column);
+
+  GeneratedColumn<double> get y2 =>
+      $composableBuilder(column: $table.y2, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$PhysicalEnvironmentsTableAnnotationComposer get environmentId {
+    final $$PhysicalEnvironmentsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.environmentId,
+          referencedTable: $db.physicalEnvironments,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PhysicalEnvironmentsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.physicalEnvironments,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$PhysicalShelvesTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $PhysicalShelvesTable,
+          PhysicalShelf,
+          $$PhysicalShelvesTableFilterComposer,
+          $$PhysicalShelvesTableOrderingComposer,
+          $$PhysicalShelvesTableAnnotationComposer,
+          $$PhysicalShelvesTableCreateCompanionBuilder,
+          $$PhysicalShelvesTableUpdateCompanionBuilder,
+          (PhysicalShelf, $$PhysicalShelvesTableReferences),
+          PhysicalShelf,
+          PrefetchHooks Function({bool environmentId})
+        > {
+  $$PhysicalShelvesTableTableManager(
+    _$VellumDatabase db,
+    $PhysicalShelvesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PhysicalShelvesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PhysicalShelvesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PhysicalShelvesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> environmentId = const Value.absent(),
+                Value<double> x1 = const Value.absent(),
+                Value<double> y1 = const Value.absent(),
+                Value<double> x2 = const Value.absent(),
+                Value<double> y2 = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhysicalShelvesCompanion(
+                id: id,
+                environmentId: environmentId,
+                x1: x1,
+                y1: y1,
+                x2: x2,
+                y2: y2,
+                label: label,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String environmentId,
+                required double x1,
+                required double y1,
+                required double x2,
+                required double y2,
+                Value<String?> label = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhysicalShelvesCompanion.insert(
+                id: id,
+                environmentId: environmentId,
+                x1: x1,
+                y1: y1,
+                x2: x2,
+                y2: y2,
+                label: label,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$PhysicalShelvesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({environmentId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (environmentId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.environmentId,
+                                referencedTable:
+                                    $$PhysicalShelvesTableReferences
+                                        ._environmentIdTable(db),
+                                referencedColumn:
+                                    $$PhysicalShelvesTableReferences
+                                        ._environmentIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$PhysicalShelvesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $PhysicalShelvesTable,
+      PhysicalShelf,
+      $$PhysicalShelvesTableFilterComposer,
+      $$PhysicalShelvesTableOrderingComposer,
+      $$PhysicalShelvesTableAnnotationComposer,
+      $$PhysicalShelvesTableCreateCompanionBuilder,
+      $$PhysicalShelvesTableUpdateCompanionBuilder,
+      (PhysicalShelf, $$PhysicalShelvesTableReferences),
+      PhysicalShelf,
+      PrefetchHooks Function({bool environmentId})
+    >;
+typedef $$BookPlacementsTableCreateCompanionBuilder =
+    BookPlacementsCompanion Function({
+      required String id,
+      required String environmentId,
+      required String copyId,
+      required double x,
+      required double y,
+      Value<int> rotation,
+      Value<double?> widthOverride,
+      Value<double?> heightOverride,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$BookPlacementsTableUpdateCompanionBuilder =
+    BookPlacementsCompanion Function({
+      Value<String> id,
+      Value<String> environmentId,
+      Value<String> copyId,
+      Value<double> x,
+      Value<double> y,
+      Value<int> rotation,
+      Value<double?> widthOverride,
+      Value<double?> heightOverride,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$BookPlacementsTableReferences
+    extends
+        BaseReferences<_$VellumDatabase, $BookPlacementsTable, BookPlacement> {
+  $$BookPlacementsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $PhysicalEnvironmentsTable _environmentIdTable(_$VellumDatabase db) =>
+      db.physicalEnvironments.createAlias(
+        'book_placements__environment_id__physical_environments__id',
+      );
+
+  $$PhysicalEnvironmentsTableProcessedTableManager get environmentId {
+    final $_column = $_itemColumn<String>('environment_id')!;
+
+    final manager = $$PhysicalEnvironmentsTableTableManager(
+      $_db,
+      $_db.physicalEnvironments,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_environmentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $PhysicalCopiesTable _copyIdTable(_$VellumDatabase db) => db
+      .physicalCopies
+      .createAlias('book_placements__copy_id__physical_copies__id');
+
+  $$PhysicalCopiesTableProcessedTableManager get copyId {
+    final $_column = $_itemColumn<String>('copy_id')!;
+
+    final manager = $$PhysicalCopiesTableTableManager(
+      $_db,
+      $_db.physicalCopies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_copyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BookPlacementsTableFilterComposer
+    extends Composer<_$VellumDatabase, $BookPlacementsTable> {
+  $$BookPlacementsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get x => $composableBuilder(
+    column: $table.x,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get y => $composableBuilder(
+    column: $table.y,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rotation => $composableBuilder(
+    column: $table.rotation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get widthOverride => $composableBuilder(
+    column: $table.widthOverride,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get heightOverride => $composableBuilder(
+    column: $table.heightOverride,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PhysicalEnvironmentsTableFilterComposer get environmentId {
+    final $$PhysicalEnvironmentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.environmentId,
+      referencedTable: $db.physicalEnvironments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalEnvironmentsTableFilterComposer(
+            $db: $db,
+            $table: $db.physicalEnvironments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$PhysicalCopiesTableFilterComposer get copyId {
+    final $$PhysicalCopiesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.copyId,
+      referencedTable: $db.physicalCopies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalCopiesTableFilterComposer(
+            $db: $db,
+            $table: $db.physicalCopies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BookPlacementsTableOrderingComposer
+    extends Composer<_$VellumDatabase, $BookPlacementsTable> {
+  $$BookPlacementsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get x => $composableBuilder(
+    column: $table.x,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get y => $composableBuilder(
+    column: $table.y,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rotation => $composableBuilder(
+    column: $table.rotation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get widthOverride => $composableBuilder(
+    column: $table.widthOverride,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get heightOverride => $composableBuilder(
+    column: $table.heightOverride,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PhysicalEnvironmentsTableOrderingComposer get environmentId {
+    final $$PhysicalEnvironmentsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.environmentId,
+          referencedTable: $db.physicalEnvironments,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PhysicalEnvironmentsTableOrderingComposer(
+                $db: $db,
+                $table: $db.physicalEnvironments,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$PhysicalCopiesTableOrderingComposer get copyId {
+    final $$PhysicalCopiesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.copyId,
+      referencedTable: $db.physicalCopies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalCopiesTableOrderingComposer(
+            $db: $db,
+            $table: $db.physicalCopies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BookPlacementsTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $BookPlacementsTable> {
+  $$BookPlacementsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get x =>
+      $composableBuilder(column: $table.x, builder: (column) => column);
+
+  GeneratedColumn<double> get y =>
+      $composableBuilder(column: $table.y, builder: (column) => column);
+
+  GeneratedColumn<int> get rotation =>
+      $composableBuilder(column: $table.rotation, builder: (column) => column);
+
+  GeneratedColumn<double> get widthOverride => $composableBuilder(
+    column: $table.widthOverride,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get heightOverride => $composableBuilder(
+    column: $table.heightOverride,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$PhysicalEnvironmentsTableAnnotationComposer get environmentId {
+    final $$PhysicalEnvironmentsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.environmentId,
+          referencedTable: $db.physicalEnvironments,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PhysicalEnvironmentsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.physicalEnvironments,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$PhysicalCopiesTableAnnotationComposer get copyId {
+    final $$PhysicalCopiesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.copyId,
+      referencedTable: $db.physicalCopies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalCopiesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.physicalCopies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BookPlacementsTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $BookPlacementsTable,
+          BookPlacement,
+          $$BookPlacementsTableFilterComposer,
+          $$BookPlacementsTableOrderingComposer,
+          $$BookPlacementsTableAnnotationComposer,
+          $$BookPlacementsTableCreateCompanionBuilder,
+          $$BookPlacementsTableUpdateCompanionBuilder,
+          (BookPlacement, $$BookPlacementsTableReferences),
+          BookPlacement,
+          PrefetchHooks Function({bool environmentId, bool copyId})
+        > {
+  $$BookPlacementsTableTableManager(
+    _$VellumDatabase db,
+    $BookPlacementsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BookPlacementsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BookPlacementsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BookPlacementsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> environmentId = const Value.absent(),
+                Value<String> copyId = const Value.absent(),
+                Value<double> x = const Value.absent(),
+                Value<double> y = const Value.absent(),
+                Value<int> rotation = const Value.absent(),
+                Value<double?> widthOverride = const Value.absent(),
+                Value<double?> heightOverride = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BookPlacementsCompanion(
+                id: id,
+                environmentId: environmentId,
+                copyId: copyId,
+                x: x,
+                y: y,
+                rotation: rotation,
+                widthOverride: widthOverride,
+                heightOverride: heightOverride,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String environmentId,
+                required String copyId,
+                required double x,
+                required double y,
+                Value<int> rotation = const Value.absent(),
+                Value<double?> widthOverride = const Value.absent(),
+                Value<double?> heightOverride = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BookPlacementsCompanion.insert(
+                id: id,
+                environmentId: environmentId,
+                copyId: copyId,
+                x: x,
+                y: y,
+                rotation: rotation,
+                widthOverride: widthOverride,
+                heightOverride: heightOverride,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$BookPlacementsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({environmentId = false, copyId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (environmentId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.environmentId,
+                                referencedTable: $$BookPlacementsTableReferences
+                                    ._environmentIdTable(db),
+                                referencedColumn:
+                                    $$BookPlacementsTableReferences
+                                        ._environmentIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (copyId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.copyId,
+                                referencedTable: $$BookPlacementsTableReferences
+                                    ._copyIdTable(db),
+                                referencedColumn:
+                                    $$BookPlacementsTableReferences
+                                        ._copyIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$BookPlacementsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $BookPlacementsTable,
+      BookPlacement,
+      $$BookPlacementsTableFilterComposer,
+      $$BookPlacementsTableOrderingComposer,
+      $$BookPlacementsTableAnnotationComposer,
+      $$BookPlacementsTableCreateCompanionBuilder,
+      $$BookPlacementsTableUpdateCompanionBuilder,
+      (BookPlacement, $$BookPlacementsTableReferences),
+      BookPlacement,
+      PrefetchHooks Function({bool environmentId, bool copyId})
+    >;
 
 class $VellumDatabaseManager {
   final _$VellumDatabase _db;
@@ -7431,4 +10204,10 @@ class $VellumDatabaseManager {
       $$ShelvesTableTableManager(_db, _db.shelves);
   $$ShelfBooksTableTableManager get shelfBooks =>
       $$ShelfBooksTableTableManager(_db, _db.shelfBooks);
+  $$PhysicalEnvironmentsTableTableManager get physicalEnvironments =>
+      $$PhysicalEnvironmentsTableTableManager(_db, _db.physicalEnvironments);
+  $$PhysicalShelvesTableTableManager get physicalShelves =>
+      $$PhysicalShelvesTableTableManager(_db, _db.physicalShelves);
+  $$BookPlacementsTableTableManager get bookPlacements =>
+      $$BookPlacementsTableTableManager(_db, _db.bookPlacements);
 }

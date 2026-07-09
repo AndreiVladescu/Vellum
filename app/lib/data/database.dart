@@ -125,6 +125,63 @@ class ShelfBooks extends Table {
   Set<Column> get primaryKey => {shelfId, bookId};
 }
 
+// ---------------------------------------------------------------------------
+// Physical bookshelf layouts. These three tables are **app-local only** — a
+// personal, per-device arrangement of physical copies in a to-scale room — and
+// are deliberately NOT part of the server schema or sync payloads. All lengths
+// are stored in metres; a front-elevation view (X right, Y up) renders them.
+// ---------------------------------------------------------------------------
+
+/// One physical space ("library") holding shelves and placed books.
+@DataClassName('PhysicalEnvironment')
+class PhysicalEnvironments extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// A flat resting surface, defined by two points in metres (a book sits on the
+/// segment). Horizontal in practice, but both endpoints are stored so a shelf
+/// can later be angled.
+@DataClassName('PhysicalShelf')
+class PhysicalShelves extends Table {
+  TextColumn get id => text()();
+  TextColumn get environmentId => text().references(PhysicalEnvironments, #id)();
+  RealColumn get x1 => real()();
+  RealColumn get y1 => real()();
+  RealColumn get x2 => real()();
+  RealColumn get y2 => real()();
+  TextColumn get label => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// A single physical copy placed in an environment. `(x, y)` is the bottom-left
+/// of its footprint in metres; `rotation` is 0 (spine up) or 90 (lying flat).
+/// The width (thickness) and height default from the book's page count but can
+/// be overridden per placement.
+@DataClassName('BookPlacement')
+class BookPlacements extends Table {
+  TextColumn get id => text()();
+  TextColumn get environmentId => text().references(PhysicalEnvironments, #id)();
+  TextColumn get copyId => text().references(PhysicalCopies, #id)();
+  RealColumn get x => real()();
+  RealColumn get y => real()();
+  IntColumn get rotation => integer().withDefault(const Constant(0))();
+  RealColumn get widthOverride => real().nullable()();
+  RealColumn get heightOverride => real().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
   Books,
   Authors,
@@ -136,12 +193,15 @@ class ShelfBooks extends Table {
   Loans,
   Shelves,
   ShelfBooks,
+  PhysicalEnvironments,
+  PhysicalShelves,
+  BookPlacements,
 ])
 class VellumDatabase extends _$VellumDatabase {
   VellumDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -154,6 +214,11 @@ class VellumDatabase extends _$VellumDatabase {
           if (from < 3) {
             await m.addColumn(books, books.readerNotes);
             await m.addColumn(books, books.sourceMetadata);
+          }
+          if (from < 4) {
+            await m.createTable(physicalEnvironments);
+            await m.createTable(physicalShelves);
+            await m.createTable(bookPlacements);
           }
         },
         beforeOpen: (details) async {
