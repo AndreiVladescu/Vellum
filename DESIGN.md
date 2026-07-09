@@ -172,12 +172,12 @@ that stays intentionally simple and data-driven so it's easy to extend.
   **Data model**. Everything is metric; the view is a **front elevation** (X
   right, Y up).
 - **Sizing.** A book's spine thickness comes from its page count via a **size
-  preset** (mm-per-page + cover allowance), calibrated against a real book
-  (a 367-page B5 softcover ≈ 2.2 cm → ~0.06 mm/page). Presets (mass-market,
-  trade, A5, B5, hardcover, A4) also set the trim **height**; both dimensions
-  fall back to a sensible default and are **overridable** per placement (the
-  `format` key + width/height overrides live on `book_placement`). See
-  `physical_metrics.dart`.
+  preset** (mm-per-page + optional binding allowance), calibrated against a real
+  book: a 367-page B5 softcover is 21 mm → **17.48 pages/mm** (~0.057 mm/page,
+  no cover base). Presets (mass-market, trade, A5, B5, hardcover, A4) also set
+  the trim **height**; both dimensions fall back to that default curve and are
+  **overridable** per placement (the `format` key + width/height overrides live
+  on `book_placement`). See `physical_metrics.dart`.
 - **Look.** Books render with the **same `SpineFace`** the digital shelf uses —
   a slice of the cover image if there is one, else the generated spine — so a
   book looks the same in both views. A flat (rotated) book is that spine turned
@@ -188,7 +188,9 @@ that stays intentionally simple and data-driven so it's easy to extend.
   nudged sideways out of any overlap — a simple packing heuristic, not a
   rigid-body sim. Tap to select (toolbar: rotate 90°, resize, remove);
   **long-press (touch) or right-click (desktop)** opens a context menu with the
-  same actions plus *reset size*.
+  same actions plus *reset size*. **Shelves** can be dragged to move, and
+  right-click/long-press to edit (endpoints/label) or delete. A help button and
+  a persistent tip surface these gestures.
 - **Reference, not inventory.** A placement is just “this copy sits here” for
   visualisation; it isn't concrete copy-tracking. Dropping a title in mints a
   fresh `physical_copy`, and the same title can be placed several times.
