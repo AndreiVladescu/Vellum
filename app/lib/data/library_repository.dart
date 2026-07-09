@@ -709,9 +709,13 @@ class LibraryRepository {
                   ))
                   .getSingleOrNull();
           if (have != null) continue;
-          final bytes = await client.downloadFile(f.id);
           final rel = p.join('files', '${f.id}.${f.format}');
-          await File(p.join(_dataDir.path, rel)).writeAsBytes(bytes);
+          // Stream to a .part file first so an interrupted download isn't
+          // mistaken for a complete one, then move it into place.
+          final dest = File(p.join(_dataDir.path, rel));
+          final part = File('${dest.path}.part');
+          await client.downloadFileTo(f.id, part);
+          await part.rename(dest.path);
           await db
               .into(db.bookFiles)
               .insertOnConflictUpdate(
@@ -818,11 +822,7 @@ class LibraryRepository {
             if (remoteHashes.contains(lf.sha256)) continue;
             final file = fileOf(lf);
             if (await file.exists()) {
-              await client.uploadFile(
-                b.id,
-                await file.readAsBytes(),
-                format: lf.format,
-              );
+              await client.uploadFileFrom(b.id, file, format: lf.format);
             }
           }
         }
