@@ -120,12 +120,14 @@ class LibraryRepository {
   }
 
   /// Applies edited details (from the detail-page edit form). Empty subtitle /
-  /// description clear the field; a null [publishedYear] clears the year.
+  /// description clear the field; a null [publishedYear] / [pageCount] clears
+  /// that field. The page count drives the physical spine width.
   Future<void> updateBookDetails(
     String id, {
     required String title,
     String? subtitle,
     int? publishedYear,
+    int? pageCount,
     String? description,
   }) async {
     await (db.update(db.books)..where((b) => b.id.equals(id))).write(
@@ -133,6 +135,7 @@ class LibraryRepository {
         title: Value(title.trim()),
         subtitle: Value(_blankToNull(subtitle)),
         publishedYear: Value(publishedYear),
+        pageCount: Value(pageCount),
         description: Value(_blankToNull(description)),
         updatedAt: Value(DateTime.now()),
       ),

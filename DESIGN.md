@@ -177,7 +177,10 @@ that stays intentionally simple and data-driven so it's easy to extend.
   no cover base). Presets (mass-market, trade, A5, B5, hardcover, A4) also set
   the trim **height**; both dimensions fall back to that default curve and are
   **overridable** per placement (the `format` key + width/height overrides live
-  on `book_placement`). See `physical_metrics.dart`.
+  on `book_placement`). Width is computed **live** from `book.pageCount`, so
+  editing the page count (in the detail sheet) updates every un-overridden
+  placement immediately; a book with no page count uses a fixed default until
+  one is set. See `physical_metrics.dart`.
 - **Look.** Books render with the **same `SpineFace`** the digital shelf uses —
   a slice of the cover image if there is one, else the generated spine — so a
   book looks the same in both views. A flat (rotated) book is that spine turned
