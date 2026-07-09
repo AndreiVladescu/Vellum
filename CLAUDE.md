@@ -68,3 +68,12 @@ never edit an already-applied migration file; add a new one.
   briefly explain non-obvious idioms when introducing them.
 - Database reads that feed UI should be drift `.watch()` streams so the UI
   updates reactively (see `watchAllBooks()`).
+
+## Git & commits
+
+- Never add a `Co-Authored-By` line or otherwise credit Claude/Claude Code.
+  Commits are authored and pushed in the user's name only.
+- Keep commit titles short. Message bodies are optional; when present, use
+  very succinct bullets.
+- Commit and push per feature — one cohesive feature per commit, pushed on
+  its own, not batched with unrelated work.
