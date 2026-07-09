@@ -157,19 +157,33 @@ app and the server run this search (the server exposes it at
 `GET /api/metadata/search` for its console); a search that finds nothing lets
 you create a custom book instead.
 
+Metadata is also filled in **automatically**, without picking an edition:
+
+- **From the file** — uploading a PDF reads its page tree (via `lopdf`, off the
+  async runtime) and sets `page_count` when the book has none.
+- **From the title** — `POST /api/books/{id}/enrich` searches by the book's title
+  (plus its first author, if any) and fills only the *empty* fields —
+  author, year, publisher, ISBN, pages, description, cover, genres — never
+  overwriting what the user set, and short-circuiting the network call when
+  nothing is missing. The console calls it after a title-only *Create book* and
+  after a file upload, and offers it in bulk (*Fetch metadata*) and from the
+  detail view. A miss leaves the book untouched.
+
 ## Adding & editing books
 
 The app's Add-book screen and the console's Add-book dialog work the same way,
 with two explicit actions:
 
-- **Search** an online library and pick an edition — its description and cover
-  are fetched automatically.
+- **Search** an online library and pick an edition — its author, year, pages,
+  description, and cover are fetched automatically.
 - **Create book** without searching — the title is enough — for a PDF no
-  library has. Other details can be edited afterwards.
+  library has. The server then looks the title up and fills the empty fields
+  (see **Metadata fetching**); anything it can't find can be edited afterwards.
 
 Either way you may **attach a file** in the same flow (drag-and-drop or a file
 picker). Uploads are validated by their **magic bytes** — a real `%PDF`, an EPUB
-zip, or an image for covers — not just the file extension.
+zip, or an image for covers — not just the file extension. A PDF's page count is
+read from the file, and uploading one also triggers the title lookup above.
 
 Once a book exists you can edit its **title, subtitle, year, and description**,
 and change its **cover**. On both the app and the console the cover shows and is
