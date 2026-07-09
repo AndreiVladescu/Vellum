@@ -8,7 +8,7 @@ use std::path::Path;
 use axum::body::Bytes;
 use tokio::process::Command;
 use axum::extract::{Path as AxPath, Query, State};
-use axum::http::{header, HeaderMap};
+use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,55 @@ pub struct UploadQuery {
     pub filename: String,
 }
 
+// ---- content sniffing -----------------------------------------------------
+
+/// What a blob's leading bytes say it actually is — judged by magic bytes, not
+/// by the client's declared filename or Content-Type. Mirrors the app's
+/// `book_file_validation.dart` so both ends agree on what a real book/image is.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub(crate) enum Sniffed {
+    Pdf,
+    Zip,
+    Jpeg,
+    Png,
+    Gif,
+    WebP,
+    Unknown,
+}
+
+pub(crate) fn sniff(head: &[u8]) -> Sniffed {
+    if head.starts_with(b"%PDF") {
+        return Sniffed::Pdf;
+    }
+    if head.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
+        return Sniffed::Zip; // ZIP container — EPUB is a zip
+    }
+    if head.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Sniffed::Jpeg;
+    }
+    if head.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        return Sniffed::Png;
+    }
+    if head.starts_with(b"GIF8") {
+        return Sniffed::Gif;
+    }
+    if head.len() >= 12 && &head[0..4] == b"RIFF" && &head[8..12] == b"WEBP" {
+        return Sniffed::WebP;
+    }
+    Sniffed::Unknown
+}
+
+/// The stored file extension for a sniffed image, or None if it isn't an image.
+fn image_ext(sniffed: Sniffed) -> Option<&'static str> {
+    match sniffed {
+        Sniffed::Jpeg => Some("jpg"),
+        Sniffed::Png => Some("png"),
+        Sniffed::Gif => Some("gif"),
+        Sniffed::WebP => Some("webp"),
+        _ => None,
+    }
+}
+
 // ---- covers ---------------------------------------------------------------
 
 /// Upload (or replace) a book's cover. Raw image bytes in the body; the
@@ -44,16 +93,15 @@ pub async fn put_cover(
     State(state): State<AppState>,
     user: AuthUser,
     AxPath(id): AxPath<String>,
-    headers: HeaderMap,
     body: Bytes,
 ) -> AppResult<Json<serde_json::Value>> {
     require_edit(&state, &user, &id).await?;
     if body.is_empty() {
         return Err(AppError::BadRequest("empty upload".into()));
     }
-    let ext = ext_for_content_type(
-        headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()),
-    );
+    // The stored extension comes from the actual bytes, not the Content-Type.
+    let ext = image_ext(sniff(&body))
+        .ok_or_else(|| AppError::BadRequest("not a supported image (jpeg/png/gif/webp)".into()))?;
 
     let previous: Option<Option<String>> =
         sqlx::query_scalar("SELECT cover_path FROM book WHERE id = ?")
@@ -117,7 +165,18 @@ pub async fn upload_file(
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase())
         .filter(|e| !e.is_empty())
-        .unwrap_or_else(|| "bin".to_string());
+        .unwrap_or_default();
+
+    // Only genuine PDFs and EPUBs are accepted, judged by magic bytes so a
+    // renamed file can't smuggle arbitrary content past the extension.
+    let sniffed = sniff(&body);
+    match ext.as_str() {
+        "pdf" if sniffed == Sniffed::Pdf => {}
+        "pdf" => return Err(AppError::BadRequest("file is not a valid PDF".into())),
+        "epub" if sniffed == Sniffed::Zip => {}
+        "epub" => return Err(AppError::BadRequest("file is not a valid EPUB".into())),
+        _ => return Err(AppError::BadRequest("only pdf and epub files are supported".into())),
+    }
 
     let file_id = uuid::Uuid::new_v4().to_string();
     let rel = format!("files/{file_id}.{ext}");
@@ -347,15 +406,6 @@ async fn serve_blob(state: &AppState, rel: &str) -> AppResult<Response> {
     Ok(([(header::CONTENT_TYPE, content_type_for_ext(ext))], bytes).into_response())
 }
 
-fn ext_for_content_type(content_type: Option<&str>) -> &'static str {
-    match content_type.unwrap_or("") {
-        c if c.starts_with("image/png") => "png",
-        c if c.starts_with("image/webp") => "webp",
-        c if c.starts_with("image/gif") => "gif",
-        _ => "jpg",
-    }
-}
-
 fn content_type_for_ext(ext: &str) -> &'static str {
     match ext {
         "png" => "image/png",
@@ -397,5 +447,26 @@ mod tests {
     #[test]
     fn non_pdf_bytes_have_no_page_count() {
         assert_eq!(pdf_page_count(b"this is not a pdf"), None);
+    }
+
+    #[test]
+    fn sniff_recognizes_book_and_image_signatures() {
+        assert_eq!(sniff(b"%PDF-1.7 ..."), Sniffed::Pdf);
+        assert_eq!(sniff(&[0x50, 0x4B, 0x03, 0x04, 0x00]), Sniffed::Zip);
+        assert_eq!(sniff(&[0xFF, 0xD8, 0xFF, 0xE0]), Sniffed::Jpeg);
+        assert_eq!(sniff(b"\x89PNG\r\n\x1a\n"), Sniffed::Png);
+        assert_eq!(sniff(b"GIF89a"), Sniffed::Gif);
+        assert_eq!(sniff(b"RIFF\0\0\0\0WEBPVP8 "), Sniffed::WebP);
+        assert_eq!(sniff(b"not a known format"), Sniffed::Unknown);
+        assert_eq!(sniff(b""), Sniffed::Unknown);
+    }
+
+    #[test]
+    fn image_ext_maps_only_images() {
+        assert_eq!(image_ext(Sniffed::Png), Some("png"));
+        assert_eq!(image_ext(Sniffed::Jpeg), Some("jpg"));
+        assert_eq!(image_ext(Sniffed::WebP), Some("webp"));
+        assert_eq!(image_ext(Sniffed::Pdf), None);
+        assert_eq!(image_ext(Sniffed::Unknown), None);
     }
 }
