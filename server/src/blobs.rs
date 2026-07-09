@@ -141,6 +141,27 @@ pub async fn upload_file(
     .execute(&state.db)
     .await?;
 
+    // A PDF carries its own page count; fill it in when the book lacks one, so
+    // uploading a file gives the metadata for free. Parsing runs off the async
+    // runtime (it's CPU-bound) and never fails the upload.
+    if ext == "pdf" {
+        let bytes = body.clone();
+        let pages = tokio::task::spawn_blocking(move || pdf_page_count(&bytes))
+            .await
+            .ok()
+            .flatten();
+        if let Some(pages) = pages {
+            sqlx::query(
+                "UPDATE book SET page_count = COALESCE(page_count, ?), \
+                    updated_at = datetime('now') WHERE id = ?",
+            )
+            .bind(pages)
+            .bind(&id)
+            .execute(&state.db)
+            .await?;
+        }
+    }
+
     let file = sqlx::query_as::<_, FileDto>(
         "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
          FROM book_file WHERE id = ?",
@@ -149,6 +170,13 @@ pub async fn upload_file(
     .fetch_one(&state.db)
     .await?;
     Ok(Json(file))
+}
+
+/// Best-effort page count from a PDF's page tree; None if the bytes don't parse.
+fn pdf_page_count(bytes: &[u8]) -> Option<i64> {
+    let doc = lopdf::Document::load_mem(bytes).ok()?;
+    let n = doc.get_pages().len();
+    (n > 0).then_some(n as i64)
 }
 
 pub async fn list_files(
@@ -245,5 +273,37 @@ fn content_type_for_ext(ext: &str) -> &'static str {
         "pdf" => "application/pdf",
         "epub" => "application/epub+zip",
         _ => "application/octet-stream",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lopdf::{dictionary, Document, Object};
+
+    #[test]
+    fn counts_pages_of_a_pdf() {
+        // Build a valid two-page PDF with lopdf, then read the count back.
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let p1 = doc.add_object(dictionary! { "Type" => "Page", "Parent" => pages_id });
+        let p2 = doc.add_object(dictionary! { "Type" => "Page", "Parent" => pages_id });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![Object::Reference(p1), Object::Reference(p2)],
+            "Count" => 2,
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+        let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        doc.trailer.set("Root", catalog);
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).unwrap();
+
+        assert_eq!(pdf_page_count(&buf), Some(2));
+    }
+
+    #[test]
+    fn non_pdf_bytes_have_no_page_count() {
+        assert_eq!(pdf_page_count(b"this is not a pdf"), None);
     }
 }
