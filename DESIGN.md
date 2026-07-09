@@ -141,11 +141,19 @@ endpoints for on-device use.
 - **shelf** — manual collections/panes, with explicit book ordering,
   independent of genres.
 
-**App-local-only columns on `book`** (deliberately *not* in the server schema
-and never synced): reading state (progress/page/last-read), **reader notes**,
-and **`source_metadata`** (a JSON snapshot of the online-library data a book was
-imported with, behind *revert to library defaults*). See **Adding & editing
-books**.
+**App-local-only columns on `book`** (deliberately *not* synced): reading state
+(progress/page/last-read), **reader notes**, and **`source_metadata`** (a JSON
+snapshot of the online-library data a book was imported with, behind *revert to
+library defaults*). See **Adding & editing books**. (Historical note: an early
+migration, `0002`, did add the three reading-state columns to the *server*
+table; they linger there as dormant, never-synced columns, since an applied
+migration can't be edited. The reader-notes and `source_metadata` columns were
+correctly kept out of the server schema.)
+
+The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
+pins the column list of every synced table (`book`, `author`, `book_author`,
+`genre`, `book_genre`, `book_file`) and fails if the server migrations drift
+from it — a prompt to update `app/lib/data/database.dart` too.
 
 **App-local-only tables** for the physical bookshelf layouts (also never
 synced — a per-device arrangement of a real room, all lengths in **metres**):
