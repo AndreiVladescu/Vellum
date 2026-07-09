@@ -45,6 +45,35 @@ void main() {
     expect(r.onSurface, isFalse);
   });
 
+  group('shelfHasBooks', () {
+    final shelf = shelfAt(1.0, 0, 2);
+
+    test('is false for an empty shelf', () {
+      expect(shelfHasBooks(shelf, const []), isFalse);
+    });
+
+    test('is true when a book rests on the shelf top', () {
+      expect(
+        shelfHasBooks(shelf, const [SettleBox(x: 0.5, y: 1.0, w: 0.1, h: 0.2)]),
+        isTrue,
+      );
+    });
+
+    test('ignores a book on a different shelf (different height)', () {
+      expect(
+        shelfHasBooks(shelf, const [SettleBox(x: 0.5, y: 1.6, w: 0.1, h: 0.2)]),
+        isFalse,
+      );
+    });
+
+    test('ignores a book that does not overlap horizontally', () {
+      expect(
+        shelfHasBooks(shelf, const [SettleBox(x: 3.0, y: 1.0, w: 0.1, h: 0.2)]),
+        isFalse,
+      );
+    });
+  });
+
   // --- Known bugs, pinned as tests (see docs/BACKLOG.md "Settle bounds"). ---
   // When fixed, flip these expectations deliberately.
 

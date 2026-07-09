@@ -62,6 +62,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   PhysicalShelf? _shelfStart;
   Offset _shelfGrabWorld = Offset.zero;
   Offset _shelfDelta = Offset.zero; // world offset applied while dragging
+  // A shelf holding books was grabbed: it's pinned, so the gesture is swallowed
+  // and the user is told to clear the books first.
+  bool _lockedShelfGrab = false;
 
   LibraryRepository get repo => widget.repository;
 
@@ -104,6 +107,19 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     return Rect.fromLTRB(left - 6, top - 10, right + 6, top + 12);
   }
 
+  /// True when a placed book is resting on [s] (see [shelfHasBooks]). Such a
+  /// shelf is pinned: moving it would strand its books.
+  bool _shelfHasBooks(PhysicalShelf s) {
+    final others = _placed.map((pb) {
+      final f = _footOf(pb);
+      return SettleBox(x: pb.placement.x, y: pb.placement.y, w: f.w, h: f.h);
+    }).toList();
+    return shelfHasBooks(
+      SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2),
+      others,
+    );
+  }
+
   // ---- camera -------------------------------------------------------------
 
   void _zoomAt(Offset focal, double factor) {
@@ -124,6 +140,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     // Topmost book under the finger, if any.
     _dragId = null;
     _dragShelfId = null;
+    _lockedShelfGrab = false;
     for (final pb in _placed.reversed) {
       if (_screenRectOf(pb).contains(focal)) {
         _dragId = pb.placement.id;
@@ -133,14 +150,19 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         break;
       }
     }
-    // Otherwise a shelf, so shelves can be dragged too.
+    // Otherwise a shelf, so empty shelves can be dragged too. A shelf holding
+    // books is pinned — grabbing it locks the gesture instead of moving it.
     if (_dragId == null) {
       for (final s in _shelves.reversed) {
         if (_shelfHitRect(s).contains(focal)) {
-          _dragShelfId = s.id;
-          _shelfStart = s;
-          _shelfGrabWorld = _screenToWorld(focal);
-          _shelfDelta = Offset.zero;
+          if (_shelfHasBooks(s)) {
+            _lockedShelfGrab = true;
+          } else {
+            _dragShelfId = s.id;
+            _shelfStart = s;
+            _shelfGrabWorld = _screenToWorld(focal);
+            _shelfDelta = Offset.zero;
+          }
           break;
         }
       }
@@ -151,8 +173,19 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
     final focal = d.localFocalPoint;
+    // A pinned (occupied) shelf was grabbed with one finger: swallow the pan so
+    // the shelf stays put and the view doesn't slide. A pinch still zooms.
+    if (_lockedShelfGrab && d.scale == 1.0 && d.pointerCount < 2) {
+      if ((_screenToWorld(focal) - _camWorldFocal).distance > 0.002) {
+        _moved = true;
+      }
+      return;
+    }
     final draggingItem = _dragId != null || _dragShelfId != null;
     if (d.scale != 1.0 || d.pointerCount >= 2 || !draggingItem) {
+      // A pinch that began on a pinned shelf is a zoom, not a move attempt —
+      // release the lock so no "shelf is pinned" hint fires on release.
+      _lockedShelfGrab = false;
       // Pan + zoom the camera, anchoring the world point grabbed at start.
       final newScale = (_camStartScale * d.scale).clamp(_minScale, _maxScale);
       setState(() {
@@ -181,8 +214,25 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   void _onScaleEnd(ScaleEndDetails d) {
     final dragId = _dragId;
     final dragShelfId = _dragShelfId;
+    final lockedShelfGrab = _lockedShelfGrab;
     _dragId = null;
     _dragShelfId = null;
+    _lockedShelfGrab = false;
+
+    // Tried to drag a shelf that holds books: it stayed put — explain why.
+    if (lockedShelfGrab) {
+      if (_moved) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This shelf holds books — move them off to reposition it.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        setState(() => _selectedId = null);
+      }
+      return;
+    }
 
     // Finished dragging a shelf: persist the shifted endpoints.
     if (dragShelfId != null) {
@@ -575,7 +625,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
           'on top of another book.\n'
           '• Tap a book to select it (rotate / resize / remove).\n'
           '• Right-click or long-press a book or shelf to edit it.\n'
-          '• Drag a shelf to move it.',
+          '• Drag an empty shelf to move it — a shelf with books on it is '
+          'pinned until you clear them.',
         ),
         actions: [
           FilledButton(
