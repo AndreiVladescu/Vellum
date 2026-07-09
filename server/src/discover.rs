@@ -30,6 +30,90 @@ pub async fn search(
     Ok(Json(metadata::search(&state.http, q).await?))
 }
 
+#[derive(Deserialize)]
+pub struct AnalyzeInput {
+    #[serde(default)]
+    pub filename: Option<String>,
+    #[serde(default)]
+    pub query: Option<String>,
+}
+
+/// Propose metadata for a not-yet-created book without saving anything: parse
+/// the file name (if given) for the `Author(s) - Title-Publisher (Year)`
+/// convention, run one online search, and merge them — file-name
+/// author/year/publisher win (they describe this exact edition), the rest comes
+/// from the match. The console pre-fills its Add-book form with the result, then
+/// posts it back to `from-search` to actually create the book.
+pub async fn analyze(
+    State(state): State<AppState>,
+    _user: AuthUser,
+    Json(input): Json<AnalyzeInput>,
+) -> AppResult<Json<BookSearchResult>> {
+    let parsed = input.filename.as_deref().map(|f| {
+        let stem = std::path::Path::new(f)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(f);
+        metadata::parse_filename(stem)
+    });
+
+    // Pick the online query: an explicit one, else the parsed title + author.
+    let query = match input.query.as_deref().map(str::trim) {
+        Some(q) if !q.is_empty() => q.to_string(),
+        _ => parsed
+            .as_ref()
+            .map(|p| {
+                let mut q = p.title.clone().unwrap_or_default();
+                if let Some(a) = p.authors.first() {
+                    q.push(' ');
+                    q.push_str(a);
+                }
+                q
+            })
+            .unwrap_or_default(),
+    };
+
+    let online = if query.trim().is_empty() {
+        None
+    } else {
+        metadata::search(&state.http, query.trim())
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .next()
+    };
+
+    let mut result = online.unwrap_or_default();
+    if let Some(p) = parsed {
+        if !p.authors.is_empty() {
+            result.authors = p.authors;
+        }
+        if p.year.is_some() {
+            result.first_publish_year = p.year;
+        }
+        if p.publisher.is_some() {
+            result.publisher = p.publisher;
+        }
+        if result.title.is_empty()
+            && let Some(t) = p.title
+        {
+            result.title = t;
+        }
+    }
+    if result.title.is_empty() {
+        result.title = query.trim().to_string();
+    }
+
+    // A description makes the form preview nicer; fetch it if the match lacked one.
+    if result.description.is_none() && !result.work_key.is_empty() {
+        result.description = metadata::fetch_description(&state.http, &result.work_key)
+            .await
+            .unwrap_or(None);
+    }
+
+    Ok(Json(result))
+}
+
 /// Create a book from a chosen search result: fetch its description and cover,
 /// then store it (owned by the caller) with its authors and a few genres.
 pub async fn add_from_search(
@@ -171,13 +255,28 @@ pub async fn enrich(
         query.push_str(author);
     }
 
-    let Some(top) = metadata::search(&state.http, &query)
+    let top = match metadata::search(&state.http, &query)
         .await
         .unwrap_or_default()
         .into_iter()
         .next()
-    else {
-        return Ok(Json(book));
+    {
+        Some(top) => top,
+        None => {
+            // No online match — still salvage a cover from the PDF if we can.
+            if need_cover
+                && let Some(rel) = crate::blobs::render_pdf_cover(&state, &id).await
+            {
+                sqlx::query(
+                    "UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?",
+                )
+                .bind(&rel)
+                .bind(&id)
+                .execute(&state.db)
+                .await?;
+            }
+            return fetch_book(&state, &id).await;
+        }
     };
 
     // Fetch the description separately (Open Library) only when we still need it.
@@ -256,6 +355,18 @@ pub async fn enrich(
                 .execute(&state.db)
                 .await?;
         }
+    }
+
+    // The source had no cover image — fall back to the PDF's first page.
+    if need_cover
+        && cover_path.is_none()
+        && let Some(rel) = crate::blobs::render_pdf_cover(&state, &id).await
+    {
+        sqlx::query("UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?")
+            .bind(&rel)
+            .bind(&id)
+            .execute(&state.db)
+            .await?;
     }
 
     Ok(Json(fetch_book(&state, &id).await?.0))

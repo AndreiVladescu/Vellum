@@ -6,6 +6,7 @@
 use std::path::Path;
 
 use axum::body::Bytes;
+use tokio::process::Command;
 use axum::extract::{Path as AxPath, Query, State};
 use axum::http::{header, HeaderMap};
 use axum::response::{IntoResponse, Response};
@@ -141,9 +142,9 @@ pub async fn upload_file(
     .execute(&state.db)
     .await?;
 
-    // A PDF carries its own page count; fill it in when the book lacks one, so
-    // uploading a file gives the metadata for free. Parsing runs off the async
-    // runtime (it's CPU-bound) and never fails the upload.
+    // A PDF carries its own page count, which is ground truth for a digital
+    // copy, so it overrides whatever an online guess supplied. Parsing runs off
+    // the async runtime (it's CPU-bound) and never fails the upload.
     if ext == "pdf" {
         let bytes = body.clone();
         let pages = tokio::task::spawn_blocking(move || pdf_page_count(&bytes))
@@ -152,8 +153,7 @@ pub async fn upload_file(
             .flatten();
         if let Some(pages) = pages {
             sqlx::query(
-                "UPDATE book SET page_count = COALESCE(page_count, ?), \
-                    updated_at = datetime('now') WHERE id = ?",
+                "UPDATE book SET page_count = ?, updated_at = datetime('now') WHERE id = ?",
             )
             .bind(pages)
             .bind(&id)
@@ -182,6 +182,83 @@ fn pdf_page_count(bytes: &[u8]) -> Option<i64> {
     let doc = lopdf::Document::load_mem(bytes).ok()?;
     let n = doc.get_pages().len();
     (n > 0).then_some(n as i64)
+}
+
+/// Render the first page of the book's newest PDF into its JPEG cover, using
+/// whatever PDF CLI the host provides. Returns the stored cover path, or None if
+/// the book has no PDF or no renderer is installed. The server links no PDF
+/// library of its own — see DESIGN.md — so this is a best-effort convenience
+/// that simply no-ops when the tooling is absent.
+pub(crate) async fn render_pdf_cover(state: &AppState, book_id: &str) -> Option<String> {
+    let rel: Option<String> = sqlx::query_scalar(
+        "SELECT path FROM book_file WHERE book_id = ? AND format = 'pdf' \
+         ORDER BY added_at DESC LIMIT 1",
+    )
+    .bind(book_id)
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
+    let input = state.data_dir.join(rel?);
+
+    let out_rel = format!("covers/{book_id}.jpg");
+    let out_full = state.data_dir.join(&out_rel);
+    if let Some(parent) = out_full.parent() {
+        let _ = tokio::fs::create_dir_all(parent).await;
+    }
+    render_first_page(&input, &out_full).await.then_some(out_rel)
+}
+
+/// Try each known PDF CLI in turn until one writes a non-empty JPEG.
+async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
+    // poppler: pdftoppm / pdftocairo write "<prefix>.jpg" with -singlefile.
+    let prefix = out_jpg.with_extension("");
+    for tool in ["pdftoppm", "pdftocairo"] {
+        let _ = tokio::fs::remove_file(out_jpg).await;
+        let ran = Command::new(tool)
+            .args(["-jpeg", "-f", "1", "-l", "1", "-singlefile", "-scale-to", "1400"])
+            .arg(input)
+            .arg(&prefix)
+            .status()
+            .await
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if ran && nonempty(out_jpg).await {
+            return true;
+        }
+    }
+    // MuPDF: writes exactly to -o.
+    let _ = tokio::fs::remove_file(out_jpg).await;
+    let ran = Command::new("mutool")
+        .args(["draw", "-F", "jpeg", "-w", "1400", "-o"])
+        .arg(out_jpg)
+        .arg(input)
+        .arg("1")
+        .status()
+        .await
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if ran && nonempty(out_jpg).await {
+        return true;
+    }
+    // Ghostscript.
+    let _ = tokio::fs::remove_file(out_jpg).await;
+    let ran = Command::new("gs")
+        .args([
+            "-q", "-dSAFER", "-dBATCH", "-dNOPAUSE", "-sDEVICE=jpeg",
+            "-dFirstPage=1", "-dLastPage=1", "-r150",
+        ])
+        .arg(format!("-sOutputFile={}", out_jpg.display()))
+        .arg(input)
+        .status()
+        .await
+        .map(|s| s.success())
+        .unwrap_or(false);
+    ran && nonempty(out_jpg).await
+}
+
+async fn nonempty(p: &Path) -> bool {
+    tokio::fs::metadata(p).await.map(|m| m.len() > 0).unwrap_or(false)
 }
 
 pub async fn list_files(

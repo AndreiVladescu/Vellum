@@ -8,7 +8,7 @@ use crate::error::{AppError, AppResult};
 
 /// One edition/work found by a metadata search. Doubles as the body the console
 /// posts back to add the chosen book.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BookSearchResult {
     #[serde(default)]
     pub work_key: String,
