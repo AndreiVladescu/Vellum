@@ -128,6 +128,18 @@ while). It is the primary way to manage the library; the app's Sharing screen
 covers the same
 endpoints for on-device use.
 
+## Deployment
+
+The server speaks **plain HTTP** and terminates no TLS of its own. Run it behind
+a TLS reverse proxy (Caddy, nginx, Traefik) so credentials, book files, and
+`?token=` URLs travel encrypted. Set **`VELLUM_PUBLIC_URL`** to the public
+`https://` origin so minted public share links point at the proxy, not at
+`localhost`. Other knobs: `VELLUM_PORT` (bind port, default 3000, on `0.0.0.0`),
+`VELLUM_DB` (SQLite file), `VELLUM_DATA_DIR` (blob store), `VELLUM_MAX_UPLOAD_MB`
+(default 2048). Back up the `.db` file and the data dir together — the database
+stores blob *paths*, so the two are only meaningful as a pair. The app defaults
+new server URLs to `https://` and warns when a URL is unencrypted.
+
 ## Data model
 
 - **book** — title, subtitle, description, ISBN, publisher, year, page count,
@@ -170,10 +182,13 @@ synced — a per-device arrangement of a real room, all lengths in **metres**):
 ## Spine rendering
 
 No API on the internet serves spine images, so Vellum **generates** spines:
-extract dominant colors from the cover, render the title in a vertical
-typeface, vary spine height/thickness by page count. Uniform, good-looking
-shelves for every book. The generated style is stored per-book (JSON) so users
-can tweak it later.
+pick spine colours, render the title in a vertical typeface, and vary spine
+height/thickness by page count. Uniform, good-looking shelves for every book.
+The generated style is stored per-book (JSON) so users can tweak it later.
+
+> **Implementation note.** Colours today come from a **title-hash palette**
+> (`spine_style.dart`), not from the cover art. Extracting dominant colours from
+> the cover is a planned refinement — see [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ## Physical bookshelf layouts
 
