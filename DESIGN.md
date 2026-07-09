@@ -103,6 +103,16 @@ add/remove tags (groups) in bulk or per book, delete several at once, add books
 (search online or create custom, optionally attaching a file), drag-and-drop
 (or click to upload) a PDF/EPUB or cover image onto a row — validated by magic
 bytes — and mint public links with an expiry date and one-time-download option.
+The table is built for **managing at scale**: live search, click-to-sort
+columns, filters by tag / untagged / missing metadata (no file, cover, year, or
+author), show/hide columns and a density toggle (both remembered), a cover
+thumbnail and file/cover status dots, **inline** title/year editing
+(double-click), **bulk** publisher/year edits and a shared file/cover applied to
+the selection, **CSV/JSON export** of the filtered rows, **CSV import** (title
+required; deduped by title), and keyboard nav (`/` search, arrows, space to
+select, enter to open). To render the Author and file columns without a per-row
+round-trip, `GET /api/books` is enriched with `authors[]` and `file_count`
+(response-only; the app's pull ignores the extra fields).
 Clicking a book opens a **detail view** — cover, metadata, tags, and files —
 where you edit fields in place, **download the book file** directly, **change
 the cover** (the cover shows and reveals a *Change cover* affordance on hover),
@@ -222,7 +232,9 @@ resolution and live updates.
    auth) so third-party e-readers can browse and download books.
 6. ✅ **Web admin console** — server-hosted spreadsheet-like UI at `/` to manage
    books, tags/groups (bulk), deletions, and public links with expiry +
-   one-time download; friendly public landing page at `/p/{token}`.
+   one-time download; friendly public landing page at `/p/{token}`. Scales with
+   search, sort, tag/missing filters, column + density options, inline and bulk
+   edits, CSV/JSON export, CSV import, and keyboard nav.
 
 ## Repo layout
 
