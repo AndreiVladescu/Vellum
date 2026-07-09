@@ -125,6 +125,7 @@
   .ab-item:hover { border-color:var(--accent); }
   .ab-item img { width:34px; height:48px; object-fit:cover; border-radius:3px; flex:0 0 auto; }
   .ab-noimg { width:34px; height:48px; background:var(--chip); border-radius:3px; flex:0 0 auto; }
+  .ab-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 10px; }
   .ab-drop { margin-top:10px; padding:16px; border:1px dashed var(--line); border-radius:8px; text-align:center; color:var(--muted); cursor:pointer; }
   .ab-drop.over { border-color:var(--accent); background:var(--chip); }
   .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
@@ -209,7 +210,7 @@ const S = { token: localStorage.getItem('vellum_token'), email: localStorage.get
             fTags: new Set(), fUntagged: false, fMissing: new Set(),
             cols: new Set(JSON.parse(localStorage.getItem('vellum_cols') || 'null') || ['author','year','status']),
             compact: localStorage.getItem('vellum_density') === '1' };
-const AB = { results: [], file: null };
+const AB = { results: [], file: null, proposal: null };
 const IMP = { items: [] };
 
 // Columns the user can show or hide (the checkbox, title, tags and actions
@@ -503,29 +504,49 @@ async function commitEdit(id, field, raw){
 
 // ---- add / search / create (unchanged behaviour) ------------------------
 
+// The Add-book dialog is a small editable metadata form. Attaching a file (or
+// clicking "Look up online") calls /api/metadata/analyze, which parses the file
+// name and runs one online search, and pre-fills the fields. Create posts the
+// (possibly edited) result to from-search so authors, genres and a cover are
+// stored too; a hidden AB.proposal keeps the parts with no visible field
+// (cover, subjects, work key).
 function openAddBook(){
-  AB.results = []; AB.file = null;
+  AB.results = []; AB.file = null; AB.proposal = null;
   document.getElementById('modal-root').innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:min(600px,94vw)">
+    <div class="modal" style="width:min(640px,95vw); max-height:92vh; overflow:auto">
       <h2>Add a book</h2>
-      <input id="ab-q" type="text" autocomplete="off" placeholder="Title, author, or ISBN">
-      <div class="row" style="justify-content:flex-start; margin-top:10px">
-        <button class="btn" id="ab-search" onclick="runSearch(document.getElementById('ab-q').value.trim())">Search</button>
-        <button class="btn primary" id="ab-create" onclick="createBook()">Create book</button>
+      <label>Title</label>
+      <input id="ab-title" type="text" autocomplete="off" placeholder="Book title">
+      <label>Author(s)</label>
+      <input id="ab-authors" type="text" autocomplete="off" placeholder="Comma-separated">
+      <div class="ab-grid">
+        <div><label>Year</label><input id="ab-year" type="text"></div>
+        <div><label>Pages</label><input id="ab-pages" type="text"></div>
+        <div><label>Publisher</label><input id="ab-publisher" type="text"></div>
       </div>
+      <label>ISBN</label>
+      <input id="ab-isbn" type="text">
+      <label>Description</label>
+      <textarea id="ab-desc" rows="3"></textarea>
       <div id="ab-drop" class="ab-drop" onclick="pickAbFile()"
         ondragover="abDragOver(event)" ondragleave="abDragLeave()" ondrop="abDrop(event)">
-        Drop a PDF/EPUB here, or click to choose (optional)
+        Drop a PDF/EPUB here, or click to choose (optional) — details fill in automatically
+      </div>
+      <div class="row" style="justify-content:space-between; margin-top:12px">
+        <button class="btn" id="ab-lookup" onclick="runLookup()">Look up online</button>
+        <div>
+          <button class="btn" onclick="closeModal()">Close</button>
+          <button class="btn primary" id="ab-create" onclick="createBook()">Create book</button>
+        </div>
       </div>
       <div id="ab-status" class="muted" style="margin:10px 0"></div>
-      <div id="ab-results" style="max-height:40vh; overflow:auto"></div>
-      <div class="row"><button class="btn" onclick="closeModal()">Close</button></div>
+      <div id="ab-results" style="max-height:32vh; overflow:auto"></div>
     </div>
    </div>`;
-  const q = document.getElementById('ab-q');
-  q.focus();
-  q.addEventListener('keydown', ev=>{ if (ev.key==='Enter'){ ev.preventDefault(); runSearch(q.value.trim()); } });
+  const t = document.getElementById('ab-title');
+  t.focus();
+  t.addEventListener('keydown', ev=>{ if (ev.key==='Enter'){ ev.preventDefault(); runLookup(); } });
 }
 
 function pickAbFile(){
@@ -540,69 +561,106 @@ async function setAbFile(file){
   AB.file = file;
   const d = document.getElementById('ab-drop');
   if (d) d.textContent = 'Attached: ' + file.name;
-  const q = document.getElementById('ab-q');
-  if (q && !q.value.trim()) q.value = file.name.replace(/\.[^.]+$/, '');
+  await analyzeFile(file.name);
 }
 function abDragOver(e){ e.preventDefault(); document.getElementById('ab-drop').classList.add('over'); }
 function abDragLeave(){ const d = document.getElementById('ab-drop'); if (d) d.classList.remove('over'); }
 function abDrop(e){ e.preventDefault(); abDragLeave(); const f = e.dataTransfer.files[0]; if (f) setAbFile(f); }
 
-async function runSearch(query){
+function fillForm(r){
+  AB.proposal = r || {};
+  const set = (id,v)=>{ const el=document.getElementById(id); if (el) el.value = (v==null?'':v); };
+  set('ab-title', r.title);
+  set('ab-authors', (r.authors||[]).join(', '));
+  set('ab-year', r.first_publish_year);
+  set('ab-pages', r.page_count);
+  set('ab-publisher', r.publisher);
+  set('ab-isbn', r.isbn);
+  set('ab-desc', r.description);
+}
+
+// Analyze the file name (+ one online lookup) and fill the form.
+async function analyzeFile(filename){
+  const status = document.getElementById('ab-status');
+  status.textContent = 'Analyzing “'+filename+'”…';
+  try {
+    const r = await api('POST','/api/metadata/analyze', { filename });
+    fillForm(r);
+    status.textContent = 'Filled from the file name and an online lookup — review, then Create.';
+  } catch(e){
+    const t = document.getElementById('ab-title');
+    if (t && !t.value.trim()) t.value = filename.replace(/\.[^.]+$/, '');
+    status.textContent = e.message;
+  }
+}
+
+// Search online using whatever's typed; list matches to pick from.
+async function runLookup(){
   const status = document.getElementById('ab-status');
   const box = document.getElementById('ab-results');
-  if (!query){ status.textContent = 'Type a title, author, or ISBN to search.'; return; }
+  const q = document.getElementById('ab-title').value.trim()
+    || document.getElementById('ab-authors').value.trim();
+  if (!q){ status.textContent = 'Type a title (or attach a file) to look up.'; return; }
   status.textContent = 'Searching…'; box.innerHTML = '';
   try {
-    const list = await api('GET','/api/metadata/search?q='+encodeURIComponent(query));
+    const list = await api('GET','/api/metadata/search?q='+encodeURIComponent(q));
     AB.results = list;
-    if (!list.length){
-      status.innerHTML = 'No matches — use <b>Create book</b> above to add “'+esc(query)+'” yourself.';
-      return;
-    }
-    status.textContent = list.length+' result'+(list.length>1?'s':'')+' — click one to add';
+    if (!list.length){ status.textContent = 'No online matches — you can still create the book from what you’ve entered.'; return; }
+    status.textContent = list.length+' match'+(list.length>1?'es':'')+' — click one to fill the form.';
     box.innerHTML = list.map((r,i)=>{
       const cover = r.cover_id ? 'https://covers.openlibrary.org/b/id/'+r.cover_id+'-S.jpg' : (r.cover_url||'');
       const meta = [ (r.authors||[]).join(', '), r.first_publish_year||'' ].filter(Boolean).join(' · ');
-      return '<div class="ab-item" onclick="addResult('+i+')">'+
+      return '<div class="ab-item" onclick="pickCandidate('+i+')">'+
         (cover ? '<img src="'+esc(cover)+'" alt="" onerror="this.remove()">' : '<div class="ab-noimg"></div>')+
         '<div><div>'+esc(r.title)+'</div><div class="muted">'+esc(meta)+'</div></div></div>';
     }).join('');
   } catch(e){ status.textContent = e.message; }
 }
 
-async function addResult(i){
-  const r = AB.results[i];
-  const status = document.getElementById('ab-status');
-  status.textContent = 'Adding “'+r.title+'”…';
-  try {
-    const book = await api('POST','/api/books/from-search', r);
-    if (AB.file) await uploadTo(book.id, AB.file);
-    closeModal(); await loadAll(); toast('Added “'+r.title+'”');
-  } catch(e){ status.textContent = e.message; }
+function pickCandidate(i){
+  fillForm(AB.results[i]);
+  document.getElementById('ab-status').textContent = 'Filled from the selected match — review, then Create.';
 }
 
 async function createBook(){
-  const title = document.getElementById('ab-q').value.trim();
+  const title = document.getElementById('ab-title').value.trim();
   const status = document.getElementById('ab-status');
   if (!title){ status.textContent = 'Enter a title first.'; return; }
   const createBtn = document.getElementById('ab-create');
-  const searchBtn = document.getElementById('ab-search');
-  createBtn.disabled = true; searchBtn.disabled = true;
+  const lookupBtn = document.getElementById('ab-lookup');
+  createBtn.disabled = true; lookupBtn.disabled = true;
   createBtn.innerHTML = '<span class="spin"></span>Creating…';
   status.textContent = '';
+
+  const yearRaw = document.getElementById('ab-year').value.trim();
+  const pagesRaw = document.getElementById('ab-pages').value.trim();
+  const authors = document.getElementById('ab-authors').value.split(',').map(s=>s.trim()).filter(Boolean);
+  // A search-result-shaped body, so the server stores authors, genres and a
+  // cover along with the plain fields; spread AB.proposal to keep the hidden
+  // cover/subjects/work-key from the analyzed or selected match.
+  const body = {
+    ...(AB.proposal || {}),
+    title,
+    authors,
+    publisher: document.getElementById('ab-publisher').value.trim() || null,
+    isbn: document.getElementById('ab-isbn').value.trim() || null,
+    description: document.getElementById('ab-desc').value.trim() || null,
+    first_publish_year: yearRaw && !isNaN(parseInt(yearRaw,10)) ? parseInt(yearRaw,10) : null,
+    page_count: pagesRaw && !isNaN(parseInt(pagesRaw,10)) ? parseInt(pagesRaw,10) : null,
+  };
   try {
-    const book = await api('POST','/api/books',{ title });
+    const book = await api('POST','/api/books/from-search', body);
     if (AB.file){
       createBtn.innerHTML = '<span class="spin"></span>Uploading…';
-      await uploadTo(book.id, AB.file);   // uploads the file, then looks up metadata
+      await uploadTo(book.id, AB.file);   // real page count + first-page cover fallback
     } else {
       createBtn.innerHTML = '<span class="spin"></span>Looking up metadata…';
-      await enrichBook(book.id);          // no file: fill author/year from the title
+      await enrichBook(book.id);          // no file: fill any gaps from the title
     }
     closeModal(); await loadAll(); toast('Created “'+title+'”');
   } catch(e){
     status.textContent = e.message;
-    createBtn.disabled = false; searchBtn.disabled = false;
+    createBtn.disabled = false; lookupBtn.disabled = false;
     createBtn.innerHTML = 'Create book';
   }
 }
