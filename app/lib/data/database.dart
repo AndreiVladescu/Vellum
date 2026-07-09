@@ -176,6 +176,9 @@ class BookPlacements extends Table {
   IntColumn get rotation => integer().withDefault(const Constant(0))();
   RealColumn get widthOverride => real().nullable()();
   RealColumn get heightOverride => real().nullable()();
+  // Optional size preset key (see physical_metrics.dart) that drives the
+  // default thickness/height from the page count; overrides above still win.
+  TextColumn get format => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -201,7 +204,7 @@ class VellumDatabase extends _$VellumDatabase {
   VellumDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -219,6 +222,9 @@ class VellumDatabase extends _$VellumDatabase {
             await m.createTable(physicalEnvironments);
             await m.createTable(physicalShelves);
             await m.createTable(bookPlacements);
+          }
+          if (from < 5) {
+            await m.addColumn(bookPlacements, bookPlacements.format);
           }
         },
         beforeOpen: (details) async {

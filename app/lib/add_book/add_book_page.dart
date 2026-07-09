@@ -19,6 +19,10 @@ class AddBookPage extends StatefulWidget {
 
 class _AddBookPageState extends State<AddBookPage> {
   final _queryController = TextEditingController();
+  // Optional details used only when creating a book by hand (online lookup
+  // sometimes finds nothing). Author is its own field — not the subtitle.
+  final _authorController = TextEditingController();
+  final _yearController = TextEditingController();
   List<BookSearchResult>? _results;
   bool _searching = false;
   String? _addingWorkKey;
@@ -37,6 +41,8 @@ class _AddBookPageState extends State<AddBookPage> {
   @override
   void dispose() {
     _queryController.dispose();
+    _authorController.dispose();
+    _yearController.dispose();
     super.dispose();
   }
 
@@ -120,7 +126,17 @@ class _AddBookPageState extends State<AddBookPage> {
       _error = null;
     });
     try {
-      final id = await widget.repository.createCustomBook(title: title);
+      final authors = _authorController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final id = await widget.repository.createCustomBook(
+        title: title,
+        author: authors.isEmpty ? null : authors.first,
+        publishedYear: int.tryParse(_yearController.text.trim()),
+      );
+      if (authors.length > 1) await widget.repository.setAuthors(id, authors);
       if (_filePath != null) {
         // attachFile auto-generates a first-page cover for a PDF.
         await widget.repository.attachFile(id, _filePath!);
@@ -165,6 +181,37 @@ class _AddBookPageState extends State<AddBookPage> {
                       )
                     : null,
               ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _authorController,
+                    decoration: const InputDecoration(
+                      hintText: 'Author(s) — for a book you create',
+                      prefixIcon: Icon(Icons.person_outline),
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _yearController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: 'Year',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           Padding(

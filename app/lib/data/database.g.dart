@@ -4468,6 +4468,15 @@ class $BookPlacementsTable extends BookPlacements
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _formatMeta = const VerificationMeta('format');
+  @override
+  late final GeneratedColumn<String> format = GeneratedColumn<String>(
+    'format',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4490,6 +4499,7 @@ class $BookPlacementsTable extends BookPlacements
     rotation,
     widthOverride,
     heightOverride,
+    format,
     createdAt,
   ];
   @override
@@ -4562,6 +4572,12 @@ class $BookPlacementsTable extends BookPlacements
         ),
       );
     }
+    if (data.containsKey('format')) {
+      context.handle(
+        _formatMeta,
+        format.isAcceptableOrUnknown(data['format']!, _formatMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4609,6 +4625,10 @@ class $BookPlacementsTable extends BookPlacements
         DriftSqlType.double,
         data['${effectivePrefix}height_override'],
       ),
+      format: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}format'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -4631,6 +4651,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
   final int rotation;
   final double? widthOverride;
   final double? heightOverride;
+  final String? format;
   final DateTime createdAt;
   const BookPlacement({
     required this.id,
@@ -4641,6 +4662,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
     required this.rotation,
     this.widthOverride,
     this.heightOverride,
+    this.format,
     required this.createdAt,
   });
   @override
@@ -4657,6 +4679,9 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
     }
     if (!nullToAbsent || heightOverride != null) {
       map['height_override'] = Variable<double>(heightOverride);
+    }
+    if (!nullToAbsent || format != null) {
+      map['format'] = Variable<String>(format);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -4676,6 +4701,9 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
       heightOverride: heightOverride == null && nullToAbsent
           ? const Value.absent()
           : Value(heightOverride),
+      format: format == null && nullToAbsent
+          ? const Value.absent()
+          : Value(format),
       createdAt: Value(createdAt),
     );
   }
@@ -4694,6 +4722,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
       rotation: serializer.fromJson<int>(json['rotation']),
       widthOverride: serializer.fromJson<double?>(json['widthOverride']),
       heightOverride: serializer.fromJson<double?>(json['heightOverride']),
+      format: serializer.fromJson<String?>(json['format']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -4709,6 +4738,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
       'rotation': serializer.toJson<int>(rotation),
       'widthOverride': serializer.toJson<double?>(widthOverride),
       'heightOverride': serializer.toJson<double?>(heightOverride),
+      'format': serializer.toJson<String?>(format),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -4722,6 +4752,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
     int? rotation,
     Value<double?> widthOverride = const Value.absent(),
     Value<double?> heightOverride = const Value.absent(),
+    Value<String?> format = const Value.absent(),
     DateTime? createdAt,
   }) => BookPlacement(
     id: id ?? this.id,
@@ -4736,6 +4767,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
     heightOverride: heightOverride.present
         ? heightOverride.value
         : this.heightOverride,
+    format: format.present ? format.value : this.format,
     createdAt: createdAt ?? this.createdAt,
   );
   BookPlacement copyWithCompanion(BookPlacementsCompanion data) {
@@ -4754,6 +4786,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
       heightOverride: data.heightOverride.present
           ? data.heightOverride.value
           : this.heightOverride,
+      format: data.format.present ? data.format.value : this.format,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -4769,6 +4802,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
           ..write('rotation: $rotation, ')
           ..write('widthOverride: $widthOverride, ')
           ..write('heightOverride: $heightOverride, ')
+          ..write('format: $format, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4784,6 +4818,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
     rotation,
     widthOverride,
     heightOverride,
+    format,
     createdAt,
   );
   @override
@@ -4798,6 +4833,7 @@ class BookPlacement extends DataClass implements Insertable<BookPlacement> {
           other.rotation == this.rotation &&
           other.widthOverride == this.widthOverride &&
           other.heightOverride == this.heightOverride &&
+          other.format == this.format &&
           other.createdAt == this.createdAt);
 }
 
@@ -4810,6 +4846,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
   final Value<int> rotation;
   final Value<double?> widthOverride;
   final Value<double?> heightOverride;
+  final Value<String?> format;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const BookPlacementsCompanion({
@@ -4821,6 +4858,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
     this.rotation = const Value.absent(),
     this.widthOverride = const Value.absent(),
     this.heightOverride = const Value.absent(),
+    this.format = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4833,6 +4871,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
     this.rotation = const Value.absent(),
     this.widthOverride = const Value.absent(),
     this.heightOverride = const Value.absent(),
+    this.format = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4849,6 +4888,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
     Expression<int>? rotation,
     Expression<double>? widthOverride,
     Expression<double>? heightOverride,
+    Expression<String>? format,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -4861,6 +4901,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
       if (rotation != null) 'rotation': rotation,
       if (widthOverride != null) 'width_override': widthOverride,
       if (heightOverride != null) 'height_override': heightOverride,
+      if (format != null) 'format': format,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4875,6 +4916,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
     Value<int>? rotation,
     Value<double?>? widthOverride,
     Value<double?>? heightOverride,
+    Value<String?>? format,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -4887,6 +4929,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
       rotation: rotation ?? this.rotation,
       widthOverride: widthOverride ?? this.widthOverride,
       heightOverride: heightOverride ?? this.heightOverride,
+      format: format ?? this.format,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4919,6 +4962,9 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
     if (heightOverride.present) {
       map['height_override'] = Variable<double>(heightOverride.value);
     }
+    if (format.present) {
+      map['format'] = Variable<String>(format.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4939,6 +4985,7 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
           ..write('rotation: $rotation, ')
           ..write('widthOverride: $widthOverride, ')
           ..write('heightOverride: $heightOverride, ')
+          ..write('format: $format, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -9693,6 +9740,7 @@ typedef $$BookPlacementsTableCreateCompanionBuilder =
       Value<int> rotation,
       Value<double?> widthOverride,
       Value<double?> heightOverride,
+      Value<String?> format,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -9706,6 +9754,7 @@ typedef $$BookPlacementsTableUpdateCompanionBuilder =
       Value<int> rotation,
       Value<double?> widthOverride,
       Value<double?> heightOverride,
+      Value<String?> format,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -9793,6 +9842,11 @@ class $$BookPlacementsTableFilterComposer
 
   ColumnFilters<double> get heightOverride => $composableBuilder(
     column: $table.heightOverride,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get format => $composableBuilder(
+    column: $table.format,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9887,6 +9941,11 @@ class $$BookPlacementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9970,6 +10029,9 @@ class $$BookPlacementsTableAnnotationComposer
     column: $table.heightOverride,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get format =>
+      $composableBuilder(column: $table.format, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -10060,6 +10122,7 @@ class $$BookPlacementsTableTableManager
                 Value<int> rotation = const Value.absent(),
                 Value<double?> widthOverride = const Value.absent(),
                 Value<double?> heightOverride = const Value.absent(),
+                Value<String?> format = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookPlacementsCompanion(
@@ -10071,6 +10134,7 @@ class $$BookPlacementsTableTableManager
                 rotation: rotation,
                 widthOverride: widthOverride,
                 heightOverride: heightOverride,
+                format: format,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -10084,6 +10148,7 @@ class $$BookPlacementsTableTableManager
                 Value<int> rotation = const Value.absent(),
                 Value<double?> widthOverride = const Value.absent(),
                 Value<double?> heightOverride = const Value.absent(),
+                Value<String?> format = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookPlacementsCompanion.insert(
@@ -10095,6 +10160,7 @@ class $$BookPlacementsTableTableManager
                 rotation: rotation,
                 widthOverride: widthOverride,
                 heightOverride: heightOverride,
+                format: format,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

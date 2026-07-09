@@ -182,8 +182,6 @@ class BookSpine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = SpineStyle.fromJson(book.spineStyle, title: book.title);
-    final cover = coverFile;
-    final hasCover = cover != null && cover.existsSync();
     return GestureDetector(
       onTap: onTap,
       child: Tooltip(
@@ -192,10 +190,34 @@ class BookSpine extends StatelessWidget {
         child: SizedBox(
           width: style.width,
           height: _bookAreaHeight * style.heightFactor,
-          child: hasCover ? _coverSpine(cover) : _generatedSpine(style),
+          child: SpineFace(book: book, coverFile: coverFile, style: style),
         ),
       ),
     );
+  }
+}
+
+/// The spine artwork alone, filling its parent (the caller sizes it): a slice of
+/// the cover image if there is one, otherwise the generated spine. Shared by the
+/// digital shelf and the physical-layout view, so a book looks the same in both.
+class SpineFace extends StatelessWidget {
+  const SpineFace({
+    super.key,
+    required this.book,
+    this.coverFile,
+    this.style,
+  });
+
+  final Book book;
+  final File? coverFile;
+  final SpineStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = style ?? SpineStyle.fromJson(book.spineStyle, title: book.title);
+    final cover = coverFile;
+    final hasCover = cover != null && cover.existsSync();
+    return hasCover ? _coverSpine(cover) : _generatedSpine(s);
   }
 
   /// Spine drawn from the left edge of the cover image.
