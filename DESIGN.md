@@ -4,6 +4,8 @@ Vellum is a personal library manager for both digital books (PDF, EPUB, …) and
 physical books (shelf location, loan tracking), presented as a visual bookshelf
 where you browse **spines**, not cover grids.
 
+> Near-term to-do and known issues live in [`docs/BACKLOG.md`](docs/BACKLOG.md).
+
 ## Goals
 
 - One app codebase for desktop (Linux/Windows/macOS) and Android.
