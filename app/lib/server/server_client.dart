@@ -47,6 +47,7 @@ class ServerBook {
     this.pageCount,
     this.spineStyle,
     this.coverPath,
+    this.updatedAt,
   });
 
   final String id;
@@ -62,7 +63,16 @@ class ServerBook {
   /// Server-relative cover path; non-null means a cover is available to fetch.
   final String? coverPath;
 
+  /// When the server last modified this book, used to decide whether a pull
+  /// should overwrite a local row. Null if the server sent no/blank timestamp.
+  final DateTime? updatedAt;
+
   bool get hasCover => coverPath != null && coverPath!.isNotEmpty;
+
+  /// Server timestamps are `datetime('now')` UTC strings ("YYYY-MM-DD HH:MM:SS").
+  static DateTime? _parseServerTime(String? s) => (s == null || s.isEmpty)
+      ? null
+      : DateTime.tryParse('${s.replaceFirst(' ', 'T')}Z');
 
   factory ServerBook.fromJson(Map<String, dynamic> j) => ServerBook(
     id: j['id'] as String,
@@ -75,6 +85,7 @@ class ServerBook {
     pageCount: j['page_count'] as int?,
     spineStyle: j['spine_style'] as String?,
     coverPath: j['cover_path'] as String?,
+    updatedAt: _parseServerTime(j['updated_at'] as String?),
   );
 }
 
@@ -199,6 +210,20 @@ class VellumServerClient {
         'spine_style': spineStyle,
       }),
     );
+    _body(res);
+  }
+
+  /// Book ids the server has tombstoned, so a pull can delete them locally.
+  Future<List<String>> listDeletions() async {
+    final res = await _http.get(_uri('/api/deletions'), headers: _headers);
+    return [
+      for (final d in _body(res) as List) (d as Map<String, dynamic>)['book_id'] as String,
+    ];
+  }
+
+  /// Delete a book on the server (used to propagate a local delete up).
+  Future<void> deleteBook(String id) async {
+    final res = await _http.delete(_uri('/api/books/$id'), headers: _headers);
     _body(res);
   }
 
