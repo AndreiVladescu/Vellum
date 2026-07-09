@@ -79,11 +79,63 @@ pub async fn visible_books(state: &AppState, user: &AuthUser) -> AppResult<Vec<B
     Ok(books)
 }
 
+/// A book plus the two aggregates the console's table needs to render its
+/// Author and file columns without a per-row `/detail` round-trip.
+#[derive(Serialize)]
+pub struct BookListItem {
+    #[serde(flatten)]
+    pub book: BookDto,
+    pub authors: Vec<String>,
+    pub file_count: i64,
+}
+
 pub async fn list(
     State(state): State<AppState>,
     user: AuthUser,
-) -> AppResult<Json<Vec<BookDto>>> {
-    Ok(Json(visible_books(&state, &user).await?))
+) -> AppResult<Json<Vec<BookListItem>>> {
+    let books = visible_books(&state, &user).await?;
+
+    // Two grouped scans, folded into lookup maps, so the response is assembled
+    // in Rust rather than with a per-book query. Fine for a personal library.
+    #[derive(sqlx::FromRow)]
+    struct AuthorRow {
+        book_id: String,
+        name: String,
+    }
+    let author_rows = sqlx::query_as::<_, AuthorRow>(
+        "SELECT ba.book_id, a.name FROM author a \
+         JOIN book_author ba ON ba.author_id = a.id ORDER BY ba.book_id, ba.position",
+    )
+    .fetch_all(&state.db)
+    .await?;
+    let mut authors_by_book: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for row in author_rows {
+        authors_by_book.entry(row.book_id).or_default().push(row.name);
+    }
+
+    #[derive(sqlx::FromRow)]
+    struct CountRow {
+        book_id: String,
+        n: i64,
+    }
+    let count_rows = sqlx::query_as::<_, CountRow>(
+        "SELECT book_id, COUNT(*) AS n FROM book_file GROUP BY book_id",
+    )
+    .fetch_all(&state.db)
+    .await?;
+    let counts_by_book: std::collections::HashMap<String, i64> =
+        count_rows.into_iter().map(|r| (r.book_id, r.n)).collect();
+
+    let items = books
+        .into_iter()
+        .map(|book| {
+            let authors = authors_by_book.get(&book.id).cloned().unwrap_or_default();
+            let file_count = counts_by_book.get(&book.id).copied().unwrap_or(0);
+            BookListItem { book, authors, file_count }
+        })
+        .collect();
+    Ok(Json(items))
 }
 
 pub async fn create(
