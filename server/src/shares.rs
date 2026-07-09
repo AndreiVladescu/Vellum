@@ -1,11 +1,11 @@
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 
-use crate::auth::{sha256_hex, AuthUser};
+use crate::AppState;
+use crate::auth::{AuthUser, sha256_hex};
 use crate::books::BookDto;
 use crate::error::{AppError, AppResult};
-use crate::AppState;
 
 // ===========================================================================
 // User-to-user shares
@@ -35,10 +35,7 @@ pub struct ShareInput {
 }
 
 /// Shares the caller created or received.
-pub async fn list(
-    State(state): State<AppState>,
-    user: AuthUser,
-) -> AppResult<Json<Vec<ShareDto>>> {
+pub async fn list(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<Vec<ShareDto>>> {
     let shares = sqlx::query_as::<_, ShareDto>(&format!(
         "{SHARE_SELECT} WHERE s.owner_id = ? OR s.grantee_id = ? ORDER BY s.created_at DESC"
     ))
@@ -88,11 +85,17 @@ pub async fn create(
 
     let grantee_id = lookup_user_by_email(&state, &input.grantee_email).await?;
     if grantee_id == user.id {
-        return Err(AppError::BadRequest("you cannot share with yourself".into()));
+        return Err(AppError::BadRequest(
+            "you cannot share with yourself".into(),
+        ));
     }
 
     let id = uuid::Uuid::new_v4().to_string();
-    let scope_id = if input.scope == "all" { None } else { input.scope_id.clone() };
+    let scope_id = if input.scope == "all" {
+        None
+    } else {
+        input.scope_id.clone()
+    };
     sqlx::query(
         "INSERT INTO share (id, owner_id, grantee_id, scope, scope_id, permission) \
          VALUES (?, ?, ?, ?, ?, ?)",
@@ -125,7 +128,9 @@ pub async fn delete(
         .await?;
     let owner = owner.ok_or_else(|| AppError::NotFound("share not found".into()))?;
     if !user.is_master && owner != user.id {
-        return Err(AppError::Forbidden("only the share's creator may revoke it".into()));
+        return Err(AppError::Forbidden(
+            "only the share's creator may revoke it".into(),
+        ));
     }
     sqlx::query("DELETE FROM share WHERE id = ?")
         .bind(&id)
@@ -213,7 +218,9 @@ pub async fn create_link(
     let permission = normalize_permission(input.permission.as_deref())?;
 
     if input.expires_in_days.is_some_and(|d| d <= 0) {
-        return Err(AppError::BadRequest("expires_in_days must be positive".into()));
+        return Err(AppError::BadRequest(
+            "expires_in_days must be positive".into(),
+        ));
     }
     if input.max_uses.is_some_and(|n| n <= 0) {
         return Err(AppError::BadRequest("max_uses must be positive".into()));
@@ -292,7 +299,9 @@ pub async fn delete_link(
         .await?;
     let owner = owner.ok_or_else(|| AppError::NotFound("link not found".into()))?;
     if !user.is_master && owner != user.id {
-        return Err(AppError::Forbidden("only the link's creator may revoke it".into()));
+        return Err(AppError::Forbidden(
+            "only the link's creator may revoke it".into(),
+        ));
     }
     sqlx::query("UPDATE share_link SET revoked = 1 WHERE id = ?")
         .bind(&id)
@@ -431,7 +440,9 @@ pub async fn public_file(
     headers.insert(header::CONTENT_TYPE, mime.parse().unwrap());
     headers.insert(
         header::CONTENT_DISPOSITION,
-        format!("attachment; filename=\"{filename}\"").parse().unwrap(),
+        format!("attachment; filename=\"{filename}\"")
+            .parse()
+            .unwrap(),
     );
     if let Some(len) = len {
         headers.insert(header::CONTENT_LENGTH, len.into());
@@ -442,7 +453,13 @@ pub async fn public_file(
 fn sanitize_filename(title: &str) -> String {
     let cleaned: String = title
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let trimmed = cleaned.trim();
     if trimmed.is_empty() {
@@ -458,7 +475,9 @@ fn normalize_permission(value: Option<&str>) -> AppResult<String> {
     match value.unwrap_or("viewer") {
         "viewer" => Ok("viewer".to_string()),
         "editor" => Ok("editor".to_string()),
-        other => Err(AppError::BadRequest(format!("unknown permission '{other}'"))),
+        other => Err(AppError::BadRequest(format!(
+            "unknown permission '{other}'"
+        ))),
     }
 }
 
@@ -481,6 +500,8 @@ async fn require_owns_book(state: &AppState, user: &AuthUser, book_id: &str) -> 
     if user.is_master || owner.as_deref() == Some(user.id.as_str()) {
         Ok(())
     } else {
-        Err(AppError::Forbidden("only the book's owner may share it".into()))
+        Err(AppError::Forbidden(
+            "only the book's owner may share it".into(),
+        ))
     }
 }

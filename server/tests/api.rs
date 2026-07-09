@@ -4,9 +4,9 @@
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt; // for `oneshot`
-use vellum_server::{connect_db, router, AppState};
+use vellum_server::{AppState, connect_db, router};
 
 /// A fresh app backed by its own temp-file database (migrated) and its own
 /// temp data directory for blobs, plus the path to that data directory.
@@ -130,7 +130,12 @@ fn titles(list: &Value) -> Vec<String> {
 async fn health_ok() {
     let app = test_app().await;
     let response = app
-        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -335,7 +340,14 @@ async fn editor_book_share_allows_edit_but_not_delete() {
     assert_eq!(body["description"], json!("Alice edited"));
 
     // But only the owner may delete.
-    let (status, _) = call(&app, "DELETE", &format!("/api/books/{book}"), Some(&alice), None).await;
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/books/{book}"),
+        Some(&alice),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -417,8 +429,14 @@ async fn book_detail_and_query_token_download() {
     );
 
     // Detail carries metadata + files.
-    let (status, detail) =
-        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    let (status, detail) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}/detail"),
+        Some(&master),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(detail["title"], json!("Dune"));
     let files = detail["files"].as_array().unwrap();
@@ -469,28 +487,53 @@ async fn deleting_a_book_removes_its_blobs_from_disk() {
         .header("authorization", format!("Bearer {master}"))
         .body(Body::from(b"%PDF-1.4 hello".to_vec()))
         .unwrap();
-    assert_eq!(app.clone().oneshot(upload).await.unwrap().status(), StatusCode::OK);
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::OK
+    );
     let put = Request::builder()
         .method("PUT")
         .uri(format!("/api/books/{book}/cover"))
         .header("authorization", format!("Bearer {master}"))
         .body(Body::from(b"\x89PNG\r\n\x1a\n fake".to_vec()))
         .unwrap();
-    assert_eq!(app.clone().oneshot(put).await.unwrap().status(), StatusCode::OK);
+    assert_eq!(
+        app.clone().oneshot(put).await.unwrap().status(),
+        StatusCode::OK
+    );
 
     // Learn the on-disk paths, and confirm they exist.
-    let (_, detail) =
-        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    let (_, detail) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}/detail"),
+        Some(&master),
+        None,
+    )
+    .await;
     let file_rel = detail["files"][0]["path"].as_str().unwrap().to_string();
     let cover_rel = detail["cover_path"].as_str().unwrap().to_string();
     assert!(data_dir.join(&file_rel).exists());
     assert!(data_dir.join(&cover_rel).exists());
 
     // Deleting the book removes both blobs.
-    let (status, _) = call(&app, "DELETE", &format!("/api/books/{book}"), Some(&master), None).await;
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/books/{book}"),
+        Some(&master),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
-    assert!(!data_dir.join(&file_rel).exists(), "file blob should be gone");
-    assert!(!data_dir.join(&cover_rel).exists(), "cover blob should be gone");
+    assert!(
+        !data_dir.join(&file_rel).exists(),
+        "file blob should be gone"
+    );
+    assert!(
+        !data_dir.join(&cover_rel).exists(),
+        "cover blob should be gone"
+    );
 }
 
 #[tokio::test]
@@ -554,8 +597,14 @@ async fn upload_rejects_a_file_that_is_not_a_real_pdf() {
     );
 
     // And no book_file row was recorded.
-    let (_, detail) =
-        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    let (_, detail) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}/detail"),
+        Some(&master),
+        None,
+    )
+    .await;
     assert!(detail["files"].as_array().unwrap().is_empty());
 }
 
@@ -575,12 +624,24 @@ async fn large_file_streams_through_upload_and_download_intact() {
         .header("authorization", format!("Bearer {master}"))
         .body(Body::from(pdf.clone()))
         .unwrap();
-    assert_eq!(app.clone().oneshot(upload).await.unwrap().status(), StatusCode::OK);
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::OK
+    );
 
-    let (_, detail) =
-        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    let (_, detail) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}/detail"),
+        Some(&master),
+        None,
+    )
+    .await;
     let file_id = detail["files"][0]["id"].as_str().unwrap().to_string();
-    assert_eq!(detail["files"][0]["size_bytes"].as_i64().unwrap(), pdf.len() as i64);
+    assert_eq!(
+        detail["files"][0]["size_bytes"].as_i64().unwrap(),
+        pdf.len() as i64
+    );
 
     let download = app
         .clone()
@@ -593,7 +654,9 @@ async fn large_file_streams_through_upload_and_download_intact() {
         .await
         .unwrap();
     assert_eq!(download.status(), StatusCode::OK);
-    let bytes = axum::body::to_bytes(download.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(download.into_body(), usize::MAX)
+        .await
+        .unwrap();
     assert_eq!(bytes.len(), pdf.len());
     assert_eq!(&bytes[..9], b"%PDF-1.7\n");
 }
@@ -629,9 +692,18 @@ async fn file_download_supports_etag_304() {
         .header("authorization", format!("Bearer {master}"))
         .body(Body::from(b"%PDF-1.4 hello".to_vec()))
         .unwrap();
-    assert_eq!(app.clone().oneshot(upload).await.unwrap().status(), StatusCode::OK);
-    let (_, detail) =
-        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let (_, detail) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}/detail"),
+        Some(&master),
+        None,
+    )
+    .await;
     let file_id = detail["files"][0]["id"].as_str().unwrap().to_string();
 
     // First download returns an ETag.
@@ -646,7 +718,13 @@ async fn file_download_supports_etag_304() {
         .await
         .unwrap();
     assert_eq!(first.status(), StatusCode::OK);
-    let etag = first.headers().get("etag").unwrap().to_str().unwrap().to_string();
+    let etag = first
+        .headers()
+        .get("etag")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     // Re-requesting with If-None-Match yields 304 and no body.
     let second = app
@@ -661,7 +739,9 @@ async fn file_download_supports_etag_304() {
         .await
         .unwrap();
     assert_eq!(second.status(), StatusCode::NOT_MODIFIED);
-    let body = axum::body::to_bytes(second.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(second.into_body(), usize::MAX)
+        .await
+        .unwrap();
     assert!(body.is_empty());
 }
 
@@ -691,10 +771,7 @@ async fn cover_upload_and_download_round_trips() {
         .unwrap();
     let response = app.clone().oneshot(get).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response.headers().get("content-type").unwrap(),
-        "image/png"
-    );
+    assert_eq!(response.headers().get("content-type").unwrap(), "image/png");
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
@@ -723,8 +800,7 @@ async fn opds_feed_needs_basic_auth_and_lists_books() {
     assert!(unauth.headers().contains_key("www-authenticate"));
 
     // HTTP Basic email:password works and the feed lists the book.
-    let basic = base64::engine::general_purpose::STANDARD
-        .encode("master@lib.test:masterpass1");
+    let basic = base64::engine::general_purpose::STANDARD.encode("master@lib.test:masterpass1");
     let response = app
         .clone()
         .oneshot(
@@ -737,13 +813,15 @@ async fn opds_feed_needs_basic_auth_and_lists_books() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    assert!(response
-        .headers()
-        .get("content-type")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .contains("opds-catalog"));
+    assert!(
+        response
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("opds-catalog")
+    );
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
@@ -773,8 +851,7 @@ async fn public_link_reads_one_book_then_revokes() {
     let link_id = link["id"].as_str().unwrap();
 
     // Anonymous metadata read works (no token header).
-    let (status, body) =
-        call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    let (status, body) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["title"], json!("Dune"));
 
@@ -788,8 +865,7 @@ async fn public_link_reads_one_book_then_revokes() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let (status, _) =
-        call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    let (status, _) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -820,7 +896,13 @@ async fn share_link_rejects_bad_expiry_and_honors_past_dates() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let token = link["url"].as_str().unwrap().rsplit('/').next().unwrap().to_string();
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
     let (status, _) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
@@ -854,7 +936,13 @@ async fn one_time_link_downloads_exactly_once() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let token = link["url"].as_str().unwrap().rsplit('/').next().unwrap().to_string();
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
 
     // Metadata advertises a one-time download and doesn't consume it.
     let (_, meta) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;

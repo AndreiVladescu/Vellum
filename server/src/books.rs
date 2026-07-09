@@ -1,11 +1,11 @@
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 
+use crate::AppState;
 use crate::access::book_access;
 use crate::auth::AuthUser;
 use crate::error::{AppError, AppResult};
-use crate::AppState;
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct BookDto {
@@ -111,7 +111,10 @@ pub async fn list(
     let mut authors_by_book: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     for row in author_rows {
-        authors_by_book.entry(row.book_id).or_default().push(row.name);
+        authors_by_book
+            .entry(row.book_id)
+            .or_default()
+            .push(row.name);
     }
 
     #[derive(sqlx::FromRow)]
@@ -132,7 +135,11 @@ pub async fn list(
         .map(|book| {
             let authors = authors_by_book.get(&book.id).cloned().unwrap_or_default();
             let file_count = counts_by_book.get(&book.id).copied().unwrap_or(0);
-            BookListItem { book, authors, file_count }
+            BookListItem {
+                book,
+                authors,
+                file_count,
+            }
         })
         .collect();
     Ok(Json(items))
@@ -181,10 +188,11 @@ pub async fn upsert(
     if input.title.trim().is_empty() {
         return Err(AppError::BadRequest("title is required".into()));
     }
-    let owner: Option<Option<String>> = sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
-        .bind(&id)
-        .fetch_optional(&state.db)
-        .await?;
+    let owner: Option<Option<String>> =
+        sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&state.db)
+            .await?;
 
     match owner {
         Some(_) => {
@@ -284,7 +292,12 @@ pub async fn detail(
     .bind(&id)
     .fetch_all(&state.db)
     .await?;
-    Ok(Json(BookDetail { book, authors, genres, files }))
+    Ok(Json(BookDetail {
+        book,
+        authors,
+        genres,
+        files,
+    }))
 }
 
 pub async fn get(
@@ -311,7 +324,9 @@ pub async fn update(
         return Err(AppError::NotFound("book not found".into()));
     }
     if !access.can_edit() {
-        return Err(AppError::Forbidden("you have read-only access to this book".into()));
+        return Err(AppError::Forbidden(
+            "you have read-only access to this book".into(),
+        ));
     }
     sqlx::query(
         "UPDATE book SET \
@@ -348,15 +363,18 @@ pub async fn delete(
     user: AuthUser,
     Path(id): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let owner: Option<Option<String>> = sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
-        .bind(&id)
-        .fetch_optional(&state.db)
-        .await?;
+    let owner: Option<Option<String>> =
+        sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&state.db)
+            .await?;
     let Some(owner_id) = owner else {
         return Err(AppError::NotFound("book not found".into()));
     };
     if !user.is_master && owner_id.as_deref() != Some(user.id.as_str()) {
-        return Err(AppError::Forbidden("only the owner may delete this book".into()));
+        return Err(AppError::Forbidden(
+            "only the owner may delete this book".into(),
+        ));
     }
 
     // Collect blob paths before the row (and its cascaded book_file rows) vanish,
@@ -411,11 +429,12 @@ pub async fn deletions(
 }
 
 pub(crate) async fn fetch_book(state: &AppState, id: &str) -> AppResult<Json<BookDto>> {
-    let book = sqlx::query_as::<_, BookDto>(&format!("SELECT {BOOK_COLUMNS} FROM book WHERE id = ?"))
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("book not found".into()))?;
+    let book =
+        sqlx::query_as::<_, BookDto>(&format!("SELECT {BOOK_COLUMNS} FROM book WHERE id = ?"))
+            .bind(id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::NotFound("book not found".into()))?;
     Ok(Json(book))
 }
 

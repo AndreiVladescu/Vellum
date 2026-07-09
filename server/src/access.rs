@@ -1,9 +1,9 @@
 //! Permission resolution. Given a caller and a resource, decide whether they may
 //! view or modify it, taking ownership, master status, and shares into account.
 
+use crate::AppState;
 use crate::auth::AuthUser;
 use crate::error::AppResult;
-use crate::AppState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
@@ -25,10 +25,11 @@ impl Access {
 /// callers can treat "no access" and "not found" identically (avoids leaking
 /// which book ids exist).
 pub async fn book_access(state: &AppState, user: &AuthUser, book_id: &str) -> AppResult<Access> {
-    let owner: Option<Option<String>> = sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
-        .bind(book_id)
-        .fetch_optional(&state.db)
-        .await?;
+    let owner: Option<Option<String>> =
+        sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
+            .bind(book_id)
+            .fetch_optional(&state.db)
+            .await?;
     let Some(owner_id) = owner else {
         return Ok(Access::None); // no such book
     };

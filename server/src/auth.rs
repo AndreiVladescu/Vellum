@@ -1,16 +1,16 @@
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
-use rand_core::{OsRng, RngCore};
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use axum::Json;
 use axum::extract::{FromRequestParts, State};
+use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
-use axum::http::HeaderMap;
-use axum::Json;
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::{AppError, AppResult};
 use crate::AppState;
+use crate::error::{AppError, AppResult};
 
 /// A precomputed Argon2 hash used only to spend the same verification time when
 /// an email doesn't exist, so login/basic-auth timing can't confirm which
@@ -36,13 +36,19 @@ impl FromRequestParts<AppState> for AuthUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         // Bearer for the app; Basic so OPDS e-readers (and file downloads) work.
-        if let Some(header) = parts.headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
+        if let Some(header) = parts
+            .headers
+            .get(AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+        {
             return if let Some(token) = header.strip_prefix("Bearer ") {
                 user_from_token(state, token).await
             } else if let Some(encoded) = header.strip_prefix("Basic ") {
                 user_from_basic(state, encoded).await
             } else {
-                Err(AppError::Unauthorized("unsupported authorization scheme".into()))
+                Err(AppError::Unauthorized(
+                    "unsupported authorization scheme".into(),
+                ))
             };
         }
 
@@ -58,7 +64,9 @@ impl FromRequestParts<AppState> for AuthUser {
 /// Extracts a `token` value from a URL query string (tokens are hex, so no
 /// percent-decoding is needed).
 fn query_token(query: Option<&str>) -> Option<&str> {
-    query?.split('&').find_map(|pair| pair.strip_prefix("token="))
+    query?
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("token="))
 }
 
 async fn user_from_token(state: &AppState, token: &str) -> AppResult<AuthUser> {
@@ -109,7 +117,12 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
         return Err(AppError::Unauthorized("invalid email or password".into()));
     }
     state.throttle.clear(&key);
-    Ok(AuthUser { id, email, display_name, is_master })
+    Ok(AuthUser {
+        id,
+        email,
+        display_name,
+        is_master,
+    })
 }
 
 /// Rejects non-master callers — used to guard administrative endpoints.
@@ -196,8 +209,14 @@ pub async fn register(
         ));
     }
 
-    let user =
-        insert_user(&mut *tx, &input.email, &input.display_name, &input.password, true).await?;
+    let user = insert_user(
+        &mut *tx,
+        &input.email,
+        &input.display_name,
+        &input.password,
+        true,
+    )
+    .await?;
     tx.commit().await?;
 
     let token = issue_token(&state, &user.id).await?;
@@ -234,7 +253,12 @@ pub async fn login(
     }
     state.throttle.clear(&key);
 
-    let user = AuthUser { id, email, display_name, is_master };
+    let user = AuthUser {
+        id,
+        email,
+        display_name,
+        is_master,
+    };
     let token = issue_token(&state, &user.id).await?;
     Ok(Json(AuthResponse { token, user }))
 }
@@ -270,8 +294,14 @@ pub async fn create_user(
 ) -> AppResult<Json<AuthUser>> {
     require_master(&caller)?;
     validate_credentials(&input.email, &input.password)?;
-    let user =
-        insert_user(&state.db, &input.email, &input.display_name, &input.password, false).await?;
+    let user = insert_user(
+        &state.db,
+        &input.email,
+        &input.display_name,
+        &input.password,
+        false,
+    )
+    .await?;
     Ok(Json(user))
 }
 
@@ -332,7 +362,9 @@ where
     if let Err(sqlx::Error::Database(e)) = &result
         && e.is_unique_violation()
     {
-        return Err(AppError::Conflict("that email is already registered".into()));
+        return Err(AppError::Conflict(
+            "that email is already registered".into(),
+        ));
     }
     result?;
 

@@ -124,7 +124,7 @@ pub fn parse_filename(stem: &str) -> FilenameMeta {
     // Authors up to the first " - ".
     let rest = if let Some(i) = s.find(" - ") {
         meta.authors = s[..i]
-            .split(|c| c == ',' || c == '&')
+            .split([',', '&'])
             .map(str::trim)
             .filter(|a| !a.is_empty())
             .map(String::from)
@@ -249,7 +249,11 @@ fn parse_google_volume(item: &Value) -> Option<BookSearchResult> {
 
     let thumbnail = info
         .get("imageLinks")
-        .and_then(|links| links.get("thumbnail").or_else(|| links.get("smallThumbnail")))
+        .and_then(|links| {
+            links
+                .get("thumbnail")
+                .or_else(|| links.get("smallThumbnail"))
+        })
         .and_then(Value::as_str)
         .map(|s| s.replace("http://", "https://"));
 
@@ -281,7 +285,12 @@ fn str_array(value: &Value, key: &str) -> Vec<String> {
     value
         .get(key)
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(String::from)
+                .collect()
+        })
         .unwrap_or_default()
 }
 

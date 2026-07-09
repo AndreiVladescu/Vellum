@@ -53,7 +53,10 @@ mod tests {
             assert!(t.allowed("a@b.c"));
             t.record_failure("a@b.c");
         }
-        assert!(!t.allowed("a@b.c"), "should be blocked after {MAX_FAILURES}");
+        assert!(
+            !t.allowed("a@b.c"),
+            "should be blocked after {MAX_FAILURES}"
+        );
         // A different key is unaffected.
         assert!(t.allowed("other@b.c"));
         // Clearing (success) unblocks.

@@ -6,13 +6,12 @@ use axum::extract::State;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 
+use crate::AppState;
 use crate::auth::AuthUser;
 use crate::books::visible_books;
 use crate::error::AppResult;
-use crate::AppState;
 
-const OPDS_CONTENT_TYPE: &str =
-    "application/atom+xml;profile=opds-catalog;kind=acquisition";
+const OPDS_CONTENT_TYPE: &str = "application/atom+xml;profile=opds-catalog;kind=acquisition";
 
 pub async fn feed(State(state): State<AppState>, user: AuthUser) -> AppResult<Response> {
     let base = state.public_base_url.trim_end_matches('/');

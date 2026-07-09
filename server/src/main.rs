@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use vellum_server::{connect_db, router, AppState};
+use vellum_server::{AppState, connect_db, router};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
