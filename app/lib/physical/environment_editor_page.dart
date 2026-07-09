@@ -54,6 +54,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   bool _moved = false;
   double _camStartScale = 1;
   Offset _camWorldFocal = Offset.zero;
+  // Shelf dragging.
+  String? _dragShelfId;
+  PhysicalShelf? _shelfStart;
+  Offset _shelfGrabWorld = Offset.zero;
+  Offset _shelfDelta = Offset.zero; // world offset applied while dragging
 
   LibraryRepository get repo => widget.repository;
 
@@ -86,6 +91,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     return topLeft & Size(f.w * _scale, f.h * _scale);
   }
 
+  // A grab band around a shelf's plank, so the thin line is easy to hit.
+  Rect _shelfHitRect(PhysicalShelf s) {
+    final p1 = _worldToScreen(Offset(s.x1, s.y1));
+    final p2 = _worldToScreen(Offset(s.x2, s.y2));
+    final left = math.min(p1.dx, p2.dx);
+    final right = math.max(p1.dx, p2.dx);
+    final top = math.min(p1.dy, p2.dy);
+    return Rect.fromLTRB(left - 6, top - 10, right + 6, top + 12);
+  }
+
   // ---- camera -------------------------------------------------------------
 
   void _zoomAt(Offset focal, double factor) {
@@ -105,6 +120,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final focal = d.localFocalPoint;
     // Topmost book under the finger, if any.
     _dragId = null;
+    _dragShelfId = null;
     for (final pb in _placed.reversed) {
       if (_screenRectOf(pb).contains(focal)) {
         _dragId = pb.placement.id;
@@ -114,13 +130,26 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         break;
       }
     }
+    // Otherwise a shelf, so shelves can be dragged too.
+    if (_dragId == null) {
+      for (final s in _shelves.reversed) {
+        if (_shelfHitRect(s).contains(focal)) {
+          _dragShelfId = s.id;
+          _shelfStart = s;
+          _shelfGrabWorld = _screenToWorld(focal);
+          _shelfDelta = Offset.zero;
+          break;
+        }
+      }
+    }
     _camStartScale = _scale;
     _camWorldFocal = _screenToWorld(focal);
   }
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
     final focal = d.localFocalPoint;
-    if (d.scale != 1.0 || d.pointerCount >= 2 || _dragId == null) {
+    final draggingItem = _dragId != null || _dragShelfId != null;
+    if (d.scale != 1.0 || d.pointerCount >= 2 || !draggingItem) {
       // Pan + zoom the camera, anchoring the world point grabbed at start.
       final newScale = (_camStartScale * d.scale).clamp(_minScale, _maxScale);
       setState(() {
@@ -133,15 +162,41 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       _moved = true;
       return;
     }
-    // Drag the grabbed book (camera fixed).
-    final delta = _screenToWorld(focal) - _grabWorld;
+    if (_dragId != null) {
+      // Drag the grabbed book (camera fixed).
+      final delta = _screenToWorld(focal) - _grabWorld;
+      if (delta.distance > 0.002) _moved = true;
+      setState(() => _dragPos = _bookStart + delta);
+      return;
+    }
+    // Drag the grabbed shelf.
+    final delta = _screenToWorld(focal) - _shelfGrabWorld;
     if (delta.distance > 0.002) _moved = true;
-    setState(() => _dragPos = _bookStart + delta);
+    setState(() => _shelfDelta = delta);
   }
 
   void _onScaleEnd(ScaleEndDetails d) {
     final dragId = _dragId;
+    final dragShelfId = _dragShelfId;
     _dragId = null;
+    _dragShelfId = null;
+
+    // Finished dragging a shelf: persist the shifted endpoints.
+    if (dragShelfId != null) {
+      final s = _shelfStart;
+      if (_moved && s != null) {
+        repo.updateShelf(
+          s.id,
+          x1: s.x1 + _shelfDelta.dx,
+          y1: s.y1 + _shelfDelta.dy,
+          x2: s.x2 + _shelfDelta.dx,
+          y2: s.y2 + _shelfDelta.dy,
+        );
+      }
+      setState(() => _shelfDelta = Offset.zero);
+      return;
+    }
+
     if (dragId == null) {
       if (!_moved) setState(() => _selectedId = null);
       return;
@@ -348,26 +403,37 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     setState(() => _selectedId = null);
   }
 
-  /// Long-press (touch) or right-click (desktop) a book for a quick menu.
-  Future<void> _contextMenuAt(Offset local, Offset global) async {
-    PlacedBook? hit;
-    for (final pb in _placed.reversed) {
-      if (_screenRectOf(pb).contains(local)) {
-        hit = pb;
-        break;
-      }
-    }
-    if (hit == null) return;
-    setState(() => _selectedId = hit!.placement.id);
-    final pb = hit;
+  RelativeRect _menuPosition(Offset global) {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
+    return RelativeRect.fromRect(
+      Rect.fromLTWH(global.dx, global.dy, 0, 0),
+      Offset.zero & overlay.size,
+    );
+  }
+
+  /// Long-press (touch) or right-click (desktop) a book — or, failing that, a
+  /// shelf — for a quick menu.
+  Future<void> _contextMenuAt(Offset local, Offset global) async {
+    for (final pb in _placed.reversed) {
+      if (_screenRectOf(pb).contains(local)) {
+        await _bookMenu(pb, global);
+        return;
+      }
+    }
+    for (final s in _shelves.reversed) {
+      if (_shelfHitRect(s).contains(local)) {
+        await _shelfMenu(s, global);
+        return;
+      }
+    }
+  }
+
+  Future<void> _bookMenu(PlacedBook pb, Offset global) async {
+    setState(() => _selectedId = pb.placement.id);
     final choice = await showMenu<String>(
       context: context,
-      position: RelativeRect.fromRect(
-        Rect.fromLTWH(global.dx, global.dy, 0, 0),
-        Offset.zero & overlay.size,
-      ),
+      position: _menuPosition(global),
       items: [
         PopupMenuItem(
           value: 'rotate',
@@ -392,6 +458,45 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     }
   }
 
+  Future<void> _shelfMenu(PhysicalShelf s, Offset global) async {
+    final choice = await showMenu<String>(
+      context: context,
+      position: _menuPosition(global),
+      items: const [
+        PopupMenuItem(value: 'edit', child: Text('Edit shelf…')),
+        PopupMenuItem(value: 'delete', child: Text('Delete shelf')),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'delete') {
+      await repo.deleteShelf(s.id);
+    } else {
+      await _editShelf(s);
+    }
+  }
+
+  Future<void> _editShelf(PhysicalShelf s) async {
+    final result = await showDialog<_ShelfSpec>(
+      context: context,
+      builder: (_) => _ShelfDialog(
+        title: 'Edit shelf',
+        defaultY: s.y1,
+        initialLeft: math.min(s.x1, s.x2),
+        initialRight: math.max(s.x1, s.x2),
+        initialLabel: s.label,
+      ),
+    );
+    if (result == null) return;
+    await repo.updateShelf(
+      s.id,
+      x1: result.left,
+      y1: result.y,
+      x2: result.right,
+      y2: result.y,
+      label: Value(result.label),
+    );
+  }
+
   // ---- build --------------------------------------------------------------
 
   @override
@@ -414,6 +519,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
             tooltip: 'Zoom out',
             onPressed: () => _zoomAt(_viewCentre(), 0.8),
             icon: const Icon(Icons.zoom_out),
+          ),
+          IconButton(
+            tooltip: 'Help',
+            onPressed: _showHelp,
+            icon: const Icon(Icons.help_outline),
           ),
         ],
       ),
@@ -451,6 +561,29 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     return Offset(size.width / 2, size.height / 2);
   }
 
+  void _showHelp() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Arranging the room'),
+        content: const Text(
+          '• Pinch or scroll to zoom; drag empty space to pan.\n'
+          '• “Add book” drops a book in; drag it so it rests on a shelf or '
+          'on top of another book.\n'
+          '• Tap a book to select it (rotate / resize / remove).\n'
+          '• Right-click or long-press a book or shelf to edit it.\n'
+          '• Drag a shelf to move it.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCanvas(BoxConstraints constraints) {
     final theme = Theme.of(context);
     final selected = _selectedId == null
@@ -485,6 +618,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
                   line: theme.colorScheme.outlineVariant,
                   plank: theme.colorScheme.primary,
                   label: theme.colorScheme.onSurfaceVariant,
+                  draggingShelfId: _dragShelfId,
+                  shelfDelta: _shelfDelta,
                 ),
                 size: Size.infinite,
               ),
@@ -497,9 +632,31 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         if (_placed.isEmpty && _shelves.isEmpty)
           Center(
             child: Text(
-              'Add a shelf, then drop in books.\nPinch or scroll to zoom, drag to pan.',
+              'Add a shelf, then drop in books.\n'
+              'Pinch or scroll to zoom, drag to pan.',
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        // Persistent tip on how to edit (hidden while a book is selected).
+        if (selected == null && (_placed.isNotEmpty || _shelves.isNotEmpty))
+          Positioned(
+            top: 8,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Text(
+                  'Right-click or long-press a book or shelf to edit',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
             ),
           ),
         // Scale readout.
@@ -584,6 +741,8 @@ class _RoomPainter extends CustomPainter {
     required this.line,
     required this.plank,
     required this.label,
+    this.draggingShelfId,
+    this.shelfDelta = Offset.zero,
   });
 
   final List<PhysicalShelf> shelves;
@@ -592,6 +751,8 @@ class _RoomPainter extends CustomPainter {
   final Color line;
   final Color plank;
   final Color label;
+  final String? draggingShelfId;
+  final Offset shelfDelta;
 
   Offset _w2s(Offset w) =>
       Offset(origin.dx + w.dx * scale, origin.dy - w.dy * scale);
@@ -621,11 +782,12 @@ class _RoomPainter extends CustomPainter {
       ..strokeWidth = 2;
     canvas.drawLine(Offset(0, origin.dy), Offset(size.width, origin.dy), floor);
 
-    // Shelves as planks.
+    // Shelves as planks (the one being dragged is shifted live).
     final plankPaint = Paint()..color = plank.withValues(alpha: 0.85);
     for (final s in shelves) {
-      final p1 = _w2s(Offset(s.x1, s.y1));
-      final p2 = _w2s(Offset(s.x2, s.y2));
+      final d = s.id == draggingShelfId ? shelfDelta : Offset.zero;
+      final p1 = _w2s(Offset(s.x1 + d.dx, s.y1 + d.dy));
+      final p2 = _w2s(Offset(s.x2 + d.dx, s.y2 + d.dy));
       final left = math.min(p1.dx, p2.dx);
       final right = math.max(p1.dx, p2.dx);
       final top = math.min(p1.dy, p2.dy);
@@ -648,7 +810,9 @@ class _RoomPainter extends CustomPainter {
   bool shouldRepaint(covariant _RoomPainter old) =>
       old.shelves != shelves ||
       old.origin != origin ||
-      old.scale != scale;
+      old.scale != scale ||
+      old.draggingShelfId != draggingShelfId ||
+      old.shelfDelta != shelfDelta;
 }
 
 // ---- scale bar ------------------------------------------------------------
@@ -846,18 +1010,30 @@ class _ShelfSpec {
 }
 
 class _ShelfDialog extends StatefulWidget {
-  const _ShelfDialog({required this.defaultY});
+  const _ShelfDialog({
+    required this.defaultY,
+    this.title = 'Add shelf',
+    this.initialLeft,
+    this.initialRight,
+    this.initialLabel,
+  });
   final double defaultY;
+  final String title;
+  final double? initialLeft;
+  final double? initialRight;
+  final String? initialLabel;
 
   @override
   State<_ShelfDialog> createState() => _ShelfDialogState();
 }
 
 class _ShelfDialogState extends State<_ShelfDialog> {
-  late final _left = TextEditingController(text: '0.0');
-  late final _right = TextEditingController(text: '1.0');
+  late final _left =
+      TextEditingController(text: (widget.initialLeft ?? 0.0).toString());
+  late final _right =
+      TextEditingController(text: (widget.initialRight ?? 1.0).toString());
   late final _height = TextEditingController(text: widget.defaultY.toString());
-  final _label = TextEditingController();
+  late final _label = TextEditingController(text: widget.initialLabel ?? '');
 
   @override
   void dispose() {
@@ -883,7 +1059,7 @@ class _ShelfDialogState extends State<_ShelfDialog> {
           ),
         );
     return AlertDialog(
-      title: const Text('Add shelf'),
+      title: Text(widget.title),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import '../data/database.dart';
 import '../shelf/spine_style.dart';
 
+/// Measured calibration: a 367-page B5 softcover is 21 mm thick, i.e. 17.476
+/// pages per millimetre → ~0.0572 mm per page, with no separate cover base.
+/// The default and softcover presets use exactly this.
+const double _mmPerPage = 21.0 / 367.0;
+
 /// A size preset for a physical book: a trim height plus the spine growth per
 /// page and a fixed cover/binding allowance. Picking one sets a book's default
 /// thickness and height from its page count; explicit overrides still win.
-///
-/// Calibrated against a real data point — a 367-page B5 softcover measured
-/// 2.2 cm: 367 × 0.06 mm + ~1 mm covers ≈ 23 mm. (A "page" is one printed side,
-/// so ~0.12 mm of paper per leaf.)
 class BookFormat {
   const BookFormat(
     this.key,
@@ -23,15 +24,15 @@ class BookFormat {
   final String label;
   final double heightM; // trim height
   final double mmPerPage; // spine growth per page
-  final double coverMm; // fixed covers / binding
+  final double coverMm; // fixed covers / binding (boards)
 
   static const presets = <BookFormat>[
-    BookFormat('mass', 'Mass-market paperback', 0.175, 0.055, 0.8),
-    BookFormat('trade', 'Trade paperback', 0.203, 0.060, 1.0),
-    BookFormat('a5', 'A5', 0.210, 0.060, 1.0),
-    BookFormat('b5soft', 'B5 softcover', 0.250, 0.060, 1.0),
-    BookFormat('hardcover', 'Hardcover', 0.235, 0.065, 5.0),
-    BookFormat('a4', 'A4', 0.297, 0.070, 2.0),
+    BookFormat('mass', 'Mass-market paperback', 0.175, _mmPerPage, 0.0),
+    BookFormat('trade', 'Trade paperback', 0.203, _mmPerPage, 0.0),
+    BookFormat('a5', 'A5', 0.210, _mmPerPage, 0.0),
+    BookFormat('b5soft', 'B5 softcover', 0.250, _mmPerPage, 0.0),
+    BookFormat('hardcover', 'Hardcover', 0.235, _mmPerPage, 5.0),
+    BookFormat('a4', 'A4', 0.297, _mmPerPage, 0.0),
   ];
 
   static BookFormat? byKey(String? key) {
@@ -52,11 +53,11 @@ class PhysicalMetrics {
   /// Default spine height when nothing sets it — a typical book (~20 cm).
   static const double defaultHeight = 0.20;
 
-  // Defaults when no preset is chosen (roughly standard book paper).
-  static const double _defaultMmPerPage = 0.06;
-  static const double _defaultCoverMm = 1.0;
-  static const double _minThickness = 0.005;
-  static const double _maxThickness = 0.12;
+  // Defaults when no preset is chosen — the measured B5/default curve.
+  static const double _defaultMmPerPage = _mmPerPage;
+  static const double _defaultCoverMm = 0.0;
+  static const double _minThickness = 0.003;
+  static const double _maxThickness = 0.15;
 
   /// Spine thickness in metres. Priority: explicit [override] → [format] curve
   /// from the page count → the default curve.

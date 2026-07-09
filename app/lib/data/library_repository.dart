@@ -363,6 +363,25 @@ class LibraryRepository {
         );
   }
 
+  Future<void> updateShelf(
+    String id, {
+    double? x1,
+    double? y1,
+    double? x2,
+    double? y2,
+    Value<String?>? label,
+  }) async {
+    await (db.update(db.physicalShelves)..where((s) => s.id.equals(id))).write(
+      PhysicalShelvesCompanion(
+        x1: x1 == null ? const Value.absent() : Value(x1),
+        y1: y1 == null ? const Value.absent() : Value(y1),
+        x2: x2 == null ? const Value.absent() : Value(x2),
+        y2: y2 == null ? const Value.absent() : Value(y2),
+        label: label ?? const Value.absent(),
+      ),
+    );
+  }
+
   Future<void> deleteShelf(String id) async {
     await (db.delete(db.physicalShelves)..where((s) => s.id.equals(id))).go();
   }

@@ -20,12 +20,17 @@ separate from the subtitle, in both the **custom-create** flow
 
 ### ✅ 3. Physical book width: presets + override
 `physical_metrics.dart` now has **format presets** (mass-market, trade, A5, B5,
-hardcover, A4) giving mm-per-page + cover allowance + trim height, calibrated to
-a real data point (367-page B5 softcover ≈ 2.2 cm). The default curve was
-corrected (the old fixed cover base over-estimated). A `format` key is stored on
+hardcover, A4) giving mm-per-page + optional binding allowance + trim height.
+Calibrated exactly to a measured book: a 367-page B5 softcover is 21 mm →
+**17.48 pages/mm** (~0.057 mm/page, no cover base) for the default and softcover
+presets; hardcover adds board thickness. A `format` key is stored on
 `book_placement` (schema v5); the resize dialog has a **preset dropdown** plus
-manual thickness/height, reachable from the context menu (below). Right-click /
-long-press → **Resize / Rotate / Reset size / Remove**.
+manual thickness/height, reachable from the context menu (below).
+
+### ✅ 5b. Shelf move + edit
+Shelves can be **dragged to move**; right-click / long-press a shelf →
+**Edit shelf… / Delete shelf** (the shelf dialog now doubles as an editor). A
+**help button** and a persistent on-canvas **tip** explain the edit gestures.
 
 ### ✅ 4. Physical spine matches the digital shelf
 Extracted `SpineFace` from `BookSpine` and reused it for placed books, so a
@@ -45,7 +50,6 @@ visualisation, not concrete inventory tracking. Current behaviour (a fresh
   “extracted from the cover”, but the code uses a **title-hash palette**. Item 4
   reused that as-is; genuinely extracting dominant cover colours (for both
   digital and physical) is still open.
-- **Shelf editing.** Shelves are add/delete only — no drag-to-move or edit yet.
 - **Rotated-spine orientation.** The flat-book quarter-turn direction is a guess
   (`quarterTurns: 1`); may want flipping once seen on a real display.
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
