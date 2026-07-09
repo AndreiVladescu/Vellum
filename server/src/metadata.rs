@@ -91,6 +91,63 @@ pub async fn download_cover(http: &reqwest::Client, result: &BookSearchResult) -
     (!bytes.is_empty()).then(|| bytes.to_vec())
 }
 
+/// Metadata parsed out of a download's file name.
+#[derive(Debug, Default, PartialEq)]
+pub struct FilenameMeta {
+    pub authors: Vec<String>,
+    pub title: Option<String>,
+    pub publisher: Option<String>,
+    pub year: Option<i64>,
+}
+
+/// Parse the common `Author(s) - Title-Publisher (Year)` naming convention out
+/// of a file-name stem (extension already removed). Every part is optional: the
+/// authors run up to the first " - " (comma/`&`-separated), a trailing `(YYYY)`
+/// is the year, and within what's left the last `-` splits title from
+/// publisher. A name that fits no part of the pattern yields just the whole
+/// string as the title.
+pub fn parse_filename(stem: &str) -> FilenameMeta {
+    let mut s = stem.trim().to_string();
+    let mut meta = FilenameMeta::default();
+
+    // Trailing "(YYYY)".
+    if s.ends_with(')')
+        && let Some(open) = s.rfind('(')
+    {
+        let inner = &s[open + 1..s.len() - 1];
+        if inner.len() == 4 && inner.chars().all(|c| c.is_ascii_digit()) {
+            meta.year = inner.parse::<i64>().ok();
+            s = s[..open].trim_end().to_string();
+        }
+    }
+
+    // Authors up to the first " - ".
+    let rest = if let Some(i) = s.find(" - ") {
+        meta.authors = s[..i]
+            .split(|c| c == ',' || c == '&')
+            .map(str::trim)
+            .filter(|a| !a.is_empty())
+            .map(String::from)
+            .collect();
+        s[i + 3..].trim().to_string()
+    } else {
+        s
+    };
+
+    // The last "-" splits title from publisher.
+    match rest.rfind('-') {
+        Some(i) if !rest[..i].trim().is_empty() && !rest[i + 1..].trim().is_empty() => {
+            meta.title = Some(rest[..i].trim().to_string());
+            meta.publisher = Some(rest[i + 1..].trim().to_string());
+        }
+        _ => {
+            let t = rest.trim();
+            meta.title = (!t.is_empty()).then(|| t.to_string());
+        }
+    }
+    meta
+}
+
 async fn open_library_search(
     http: &reqwest::Client,
     query: &str,
@@ -252,6 +309,35 @@ mod tests {
             parsed.large_cover_url().as_deref(),
             Some("https://covers.openlibrary.org/b/id/12345-L.jpg")
         );
+    }
+
+    #[test]
+    fn parses_the_download_naming_convention() {
+        let m = parse_filename("Istvan Nagy - Complex Digital Hardware Design-CRC Press (2024)");
+        assert_eq!(m.authors, vec!["Istvan Nagy".to_string()]);
+        assert_eq!(m.title.as_deref(), Some("Complex Digital Hardware Design"));
+        assert_eq!(m.publisher.as_deref(), Some("CRC Press"));
+        assert_eq!(m.year, Some(2024));
+
+        let m = parse_filename(
+            "Andrew S. Tanenbaum, Herbert Bos - Modern Operating Systems-Pearson (2023)",
+        );
+        assert_eq!(
+            m.authors,
+            vec!["Andrew S. Tanenbaum".to_string(), "Herbert Bos".to_string()]
+        );
+        assert_eq!(m.title.as_deref(), Some("Modern Operating Systems"));
+        assert_eq!(m.publisher.as_deref(), Some("Pearson"));
+        assert_eq!(m.year, Some(2023));
+    }
+
+    #[test]
+    fn parse_filename_falls_back_to_a_plain_title() {
+        let m = parse_filename("just_a_book_name");
+        assert!(m.authors.is_empty());
+        assert_eq!(m.title.as_deref(), Some("just_a_book_name"));
+        assert_eq!(m.publisher, None);
+        assert_eq!(m.year, None);
     }
 
     #[test]
