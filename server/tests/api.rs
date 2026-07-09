@@ -9,20 +9,26 @@ use tower::ServiceExt; // for `oneshot`
 use vellum_server::{connect_db, router, AppState};
 
 /// A fresh app backed by its own temp-file database (migrated) and its own
-/// temp data directory for blobs.
-async fn test_app() -> axum::Router {
+/// temp data directory for blobs, plus the path to that data directory.
+async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
     let id = uuid::Uuid::new_v4();
     let path = std::env::temp_dir().join(format!("vellum_test_{id}.db"));
     let data_dir = std::env::temp_dir().join(format!("vellum_test_data_{id}"));
     let db = connect_db(path.to_str().unwrap()).await.unwrap();
-    router(AppState {
+    let app = router(AppState {
         db,
         public_base_url: "http://test.local".into(),
-        data_dir,
+        data_dir: data_dir.clone(),
         http: reqwest::Client::new(),
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
-    })
+    });
+    (app, data_dir)
+}
+
+/// A fresh app when the test doesn't need the data directory path.
+async fn test_app() -> axum::Router {
+    test_app_with_dir().await.0
 }
 
 /// Send one request and return the status plus the parsed JSON body (or Null).
@@ -448,6 +454,43 @@ async fn book_detail_and_query_token_download() {
         .await
         .unwrap();
     assert_eq!(bad.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn deleting_a_book_removes_its_blobs_from_disk() {
+    let (app, data_dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // Attach a real PDF and a real PNG cover.
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=dune.pdf"))
+        .header("authorization", format!("Bearer {master}"))
+        .body(Body::from(b"%PDF-1.4 hello".to_vec()))
+        .unwrap();
+    assert_eq!(app.clone().oneshot(upload).await.unwrap().status(), StatusCode::OK);
+    let put = Request::builder()
+        .method("PUT")
+        .uri(format!("/api/books/{book}/cover"))
+        .header("authorization", format!("Bearer {master}"))
+        .body(Body::from(b"\x89PNG\r\n\x1a\n fake".to_vec()))
+        .unwrap();
+    assert_eq!(app.clone().oneshot(put).await.unwrap().status(), StatusCode::OK);
+
+    // Learn the on-disk paths, and confirm they exist.
+    let (_, detail) =
+        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    let file_rel = detail["files"][0]["path"].as_str().unwrap().to_string();
+    let cover_rel = detail["cover_path"].as_str().unwrap().to_string();
+    assert!(data_dir.join(&file_rel).exists());
+    assert!(data_dir.join(&cover_rel).exists());
+
+    // Deleting the book removes both blobs.
+    let (status, _) = call(&app, "DELETE", &format!("/api/books/{book}"), Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!data_dir.join(&file_rel).exists(), "file blob should be gone");
+    assert!(!data_dir.join(&cover_rel).exists(), "cover blob should be gone");
 }
 
 #[tokio::test]

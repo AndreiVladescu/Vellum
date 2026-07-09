@@ -352,10 +352,27 @@ pub async fn delete(
     if !user.is_master && owner_id.as_deref() != Some(user.id.as_str()) {
         return Err(AppError::Forbidden("only the owner may delete this book".into()));
     }
+
+    // Collect blob paths before the row (and its cascaded book_file rows) vanish,
+    // so we can remove them from disk afterwards and not leak storage.
+    let cover: Option<Option<String>> =
+        sqlx::query_scalar("SELECT cover_path FROM book WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&state.db)
+            .await?;
+    let files: Vec<String> = sqlx::query_scalar("SELECT path FROM book_file WHERE book_id = ?")
+        .bind(&id)
+        .fetch_all(&state.db)
+        .await?;
+
     sqlx::query("DELETE FROM book WHERE id = ?")
         .bind(&id)
         .execute(&state.db)
         .await?;
+
+    for rel in files.into_iter().chain(cover.flatten()) {
+        let _ = tokio::fs::remove_file(state.data_dir.join(rel)).await;
+    }
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 
