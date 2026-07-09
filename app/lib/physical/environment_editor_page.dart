@@ -10,6 +10,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
 import 'physical_metrics.dart';
+import 'settle.dart';
 
 /// A book's footprint (width × height) in metres, after rotation.
 typedef _Foot = ({double w, double h});
@@ -238,57 +239,31 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     required double w,
     required double h,
   }) {
-    var bx = x;
-    var by = y;
-    const tol = 0.02; // 2 cm snap tolerance
-    final others =
-        _placed.where((p) => p.placement.id != draggedId).toList();
-
-    // Vertical: highest shelf/book surface at or just below the bottom,
-    // overlapping in X. Null means nothing is under the book.
-    double? surface;
-    for (final s in _shelves) {
-      final left = math.min(s.x1, s.x2);
-      final right = math.max(s.x1, s.x2);
-      final top = math.max(s.y1, s.y2);
-      if (bx + w > left &&
-          bx < right &&
-          top <= by + tol &&
-          (surface == null || top > surface)) {
-        surface = top;
-      }
-    }
-    for (final o in others) {
-      final of = _footOf(o);
-      final top = o.placement.y + of.h;
-      if (bx + w > o.placement.x &&
-          bx < o.placement.x + of.w &&
-          top <= by + tol &&
-          (surface == null || top > surface)) {
-        surface = top;
-      }
-    }
-    final onSurface = surface != null;
-    by = surface ?? 0;
-
-    // Horizontal: shove out of overlaps with books at the same height.
-    for (var pass = 0; pass < 16; pass++) {
-      var moved = false;
-      for (final o in others) {
-        final of = _footOf(o);
-        final ox = o.placement.x, oy = o.placement.y;
-        final vOverlap = by < oy + of.h - 1e-6 && by + h > oy + 1e-6;
-        final hOverlap = bx < ox + of.w - 1e-6 && bx + w > ox + 1e-6;
-        if (vOverlap && hOverlap) {
-          final pushRight = (ox + of.w) - bx;
-          final pushLeft = (bx + w) - ox;
-          bx = pushRight <= pushLeft ? ox + of.w : ox - w;
-          moved = true;
-        }
-      }
-      if (!moved) break;
-    }
-    return (pos: Offset(bx, by), onSurface: onSurface);
+    final shelves = [
+      for (final s in _shelves)
+        SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2),
+    ];
+    final others = _placed
+        .where((p) => p.placement.id != draggedId)
+        .map((p) {
+          final of = _footOf(p);
+          return SettleBox(
+            x: p.placement.x,
+            y: p.placement.y,
+            w: of.w,
+            h: of.h,
+          );
+        })
+        .toList();
+    final r = settle(
+      x: x,
+      y: y,
+      w: w,
+      h: h,
+      shelves: shelves,
+      others: others,
+    );
+    return (pos: Offset(r.x, r.y), onSurface: r.onSurface);
   }
 
   // ---- actions ------------------------------------------------------------
