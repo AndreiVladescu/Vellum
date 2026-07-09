@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../book_detail/book_detail_page.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
@@ -214,14 +216,22 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       w: f.w,
       h: f.h,
     );
-    repo.updatePlacement(dragId, x: settled.dx, y: settled.dy);
+    if (!settled.onSurface) {
+      // Dropped into empty space with no shelf beneath — take it off the shelf.
+      repo.removePlacement(pb.placement);
+      setState(() => _selectedId = null);
+      return;
+    }
+    repo.updatePlacement(dragId, x: settled.pos.dx, y: settled.pos.dy);
     setState(() => _selectedId = dragId);
   }
 
   /// Resolve where a dragged book comes to rest: drop onto the highest shelf or
   /// book-top beneath it (within its horizontal span), then nudge sideways out
-  /// of any overlaps. A plain packing heuristic — no physics.
-  Offset _settle({
+  /// of any overlaps. A plain packing heuristic — no physics. `onSurface` is
+  /// false when nothing (no shelf or book) was under it — the caller treats that
+  /// as "dropped into empty space".
+  ({Offset pos, bool onSurface}) _settle({
     required String draggedId,
     required double x,
     required double y,
@@ -234,14 +244,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final others =
         _placed.where((p) => p.placement.id != draggedId).toList();
 
-    // Vertical: highest surface at or just below the bottom, overlapping in X.
-    double best = 0; // floor
+    // Vertical: highest shelf/book surface at or just below the bottom,
+    // overlapping in X. Null means nothing is under the book.
+    double? surface;
     for (final s in _shelves) {
       final left = math.min(s.x1, s.x2);
       final right = math.max(s.x1, s.x2);
-      final surface = math.max(s.y1, s.y2);
-      if (bx + w > left && bx < right && surface <= by + tol && surface > best) {
-        best = surface;
+      final top = math.max(s.y1, s.y2);
+      if (bx + w > left &&
+          bx < right &&
+          top <= by + tol &&
+          (surface == null || top > surface)) {
+        surface = top;
       }
     }
     for (final o in others) {
@@ -250,11 +264,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       if (bx + w > o.placement.x &&
           bx < o.placement.x + of.w &&
           top <= by + tol &&
-          top > best) {
-        best = top;
+          (surface == null || top > surface)) {
+        surface = top;
       }
     }
-    by = best;
+    final onSurface = surface != null;
+    by = surface ?? 0;
 
     // Horizontal: shove out of overlaps with books at the same height.
     for (var pass = 0; pass < 16; pass++) {
@@ -273,7 +288,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       }
       if (!moved) break;
     }
-    return Offset(bx, by);
+    return (pos: Offset(bx, by), onSurface: onSurface);
   }
 
   // ---- actions ------------------------------------------------------------
@@ -319,8 +334,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     await repo.placeBook(
       widget.environmentId,
       book.id,
-      x: settled.dx,
-      y: settled.dy,
+      x: settled.pos.dx,
+      y: settled.pos.dy,
     );
   }
 
@@ -343,8 +358,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     await repo.updatePlacement(
       pb.placement.id,
       rotation: newRot,
-      x: settled.dx,
-      y: settled.dy,
+      x: settled.pos.dx,
+      y: settled.pos.dy,
     );
   }
 
@@ -403,6 +418,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     setState(() => _selectedId = null);
   }
 
+  /// Open the book's detail page (from which it can be read), so the physical
+  /// view isn't only for organising.
+  void _openBook(PlacedBook pb) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BookDetailPage(book: pb.book, repository: repo),
+      ),
+    );
+  }
+
   RelativeRect _menuPosition(Offset global) {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -435,6 +460,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       context: context,
       position: _menuPosition(global),
       items: [
+        const PopupMenuItem(value: 'open', child: Text('Open book')),
         PopupMenuItem(
           value: 'rotate',
           child: Text(pb.placement.rotation == 0 ? 'Lay flat' : 'Stand up'),
@@ -447,6 +473,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     );
     if (choice == null || !mounted) return;
     switch (choice) {
+      case 'open':
+        _openBook(pb);
       case 'rotate':
         await _rotateSelected(pb);
       case 'resize':
@@ -593,8 +621,20 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
             .cast<PlacedBook?>()
             .firstWhere((p) => true, orElse: () => null);
 
-    return Stack(
-      children: [
+    return Focus(
+      autofocus: true,
+      onKeyEvent: (node, event) {
+        // Esc clears the current selection.
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape &&
+            _selectedId != null) {
+          setState(() => _selectedId = null);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Stack(
+        children: [
         Positioned.fill(
           child: Listener(
             onPointerSignal: (event) {
@@ -672,13 +712,15 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
             bottom: 12,
             child: _SelectionBar(
               title: selected.book.title,
+              onOpen: () => _openBook(selected),
               onRotate: () => _rotateSelected(selected),
               onResize: () => _resizeSelected(selected),
               onRemove: () => _removeSelected(selected),
               onClose: () => setState(() => _selectedId = null),
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -695,9 +737,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final flat = pb.placement.rotation == 90;
 
     // The same spine artwork as the digital shelf (cover slice or generated).
-    // For a flat book, the standing spine is rotated a quarter-turn into place.
+    // For a flat book, the standing spine is turned a quarter-turn anticlockwise
+    // so the title still reads left-to-right.
     Widget spine = SpineFace(book: pb.book, coverFile: repo.coverFileOf(pb.book));
-    if (flat) spine = RotatedBox(quarterTurns: 1, child: spine);
+    if (flat) spine = RotatedBox(quarterTurns: 3, child: spine);
 
     return Positioned(
       left: topLeft.dx,
@@ -864,6 +907,7 @@ class _ScaleBar extends StatelessWidget {
 class _SelectionBar extends StatelessWidget {
   const _SelectionBar({
     required this.title,
+    required this.onOpen,
     required this.onRotate,
     required this.onResize,
     required this.onRemove,
@@ -871,6 +915,7 @@ class _SelectionBar extends StatelessWidget {
   });
 
   final String title;
+  final VoidCallback onOpen;
   final VoidCallback onRotate;
   final VoidCallback onResize;
   final VoidCallback onRemove;
@@ -894,6 +939,11 @@ class _SelectionBar extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleSmall,
               ),
+            ),
+            IconButton(
+              tooltip: 'Open book',
+              onPressed: onOpen,
+              icon: const Icon(Icons.menu_book_outlined),
             ),
             IconButton.filledTonal(
               tooltip: 'Rotate 90°',
