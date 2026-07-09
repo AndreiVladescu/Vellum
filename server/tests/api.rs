@@ -560,6 +560,45 @@ async fn upload_rejects_a_file_that_is_not_a_real_pdf() {
 }
 
 #[tokio::test]
+async fn large_file_streams_through_upload_and_download_intact() {
+    let (app, _dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Big").await;
+
+    // A ~2 MB body with a valid PDF header, to exercise the streaming path.
+    let mut pdf = b"%PDF-1.7\n".to_vec();
+    pdf.resize(2 * 1024 * 1024, b'x');
+
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=big.pdf"))
+        .header("authorization", format!("Bearer {master}"))
+        .body(Body::from(pdf.clone()))
+        .unwrap();
+    assert_eq!(app.clone().oneshot(upload).await.unwrap().status(), StatusCode::OK);
+
+    let (_, detail) =
+        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    let file_id = detail["files"][0]["id"].as_str().unwrap().to_string();
+    assert_eq!(detail["files"][0]["size_bytes"].as_i64().unwrap(), pdf.len() as i64);
+
+    let download = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(download.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(download.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(bytes.len(), pdf.len());
+    assert_eq!(&bytes[..9], b"%PDF-1.7\n");
+}
+
+#[tokio::test]
 async fn cover_upload_rejects_non_image_bytes() {
     let app = test_app().await;
     let master = register_master(&app).await;

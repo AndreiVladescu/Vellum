@@ -394,6 +394,13 @@ pub async fn public_file(
     let (rel, format) =
         file.ok_or_else(|| AppError::NotFound("this book has no file to download".into()))?;
 
+    // Open the file BEFORE consuming a use, so a blob missing on disk can't burn
+    // a one-time link on a download that then fails.
+    let handle = tokio::fs::File::open(state.data_dir.join(&rel))
+        .await
+        .map_err(|_| AppError::NotFound("file missing on disk".into()))?;
+    let len = handle.metadata().await.ok().map(|m| m.len());
+
     // Consume a use atomically; the WHERE re-checks validity, so concurrent
     // downloads of a one-time link can't both succeed.
     let consumed = sqlx::query(&format!(
@@ -411,9 +418,6 @@ pub async fn public_file(
         .bind(&book_id)
         .fetch_one(&state.db)
         .await?;
-    let bytes = tokio::fs::read(state.data_dir.join(&rel))
-        .await
-        .map_err(|_| AppError::NotFound("file missing on disk".into()))?;
 
     let filename = format!("{}.{}", sanitize_filename(&title), format);
     let mime = match format.as_str() {
@@ -421,17 +425,18 @@ pub async fn public_file(
         "pdf" => "application/pdf",
         _ => "application/octet-stream",
     };
-    Ok((
-        [
-            (header::CONTENT_TYPE, mime.to_string()),
-            (
-                header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"{filename}\""),
-            ),
-        ],
-        bytes,
-    )
-        .into_response())
+    let mut response =
+        axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(handle)).into_response();
+    let headers = response.headers_mut();
+    headers.insert(header::CONTENT_TYPE, mime.parse().unwrap());
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{filename}\"").parse().unwrap(),
+    );
+    if let Some(len) = len {
+        headers.insert(header::CONTENT_LENGTH, len.into());
+    }
+    Ok(response)
 }
 
 fn sanitize_filename(title: &str) -> String {

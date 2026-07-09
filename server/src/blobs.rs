@@ -9,7 +9,7 @@ use axum::body::Bytes;
 use tokio::process::Command;
 use axum::extract::{Path as AxPath, Query, State};
 use axum::http::header;
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -147,47 +147,91 @@ pub async fn get_cover(
 
 // ---- book files -----------------------------------------------------------
 
-/// Attach a digital file to a book (PDF/EPUB/...). Raw bytes in the body;
-/// `?filename=` supplies the name we derive the format from. Requires editor.
+/// Attach a digital file to a book (PDF/EPUB/...). The raw file streams in the
+/// body; `?filename=` supplies the name we derive the format from. Requires
+/// editor. Streams to a temp file (never buffering the whole upload in memory),
+/// hashing as it goes and validating by magic bytes before committing it.
 pub async fn upload_file(
     State(state): State<AppState>,
     user: AuthUser,
     AxPath(id): AxPath<String>,
     Query(q): Query<UploadQuery>,
-    body: Bytes,
+    body: axum::body::Body,
 ) -> AppResult<Json<FileDto>> {
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
     require_edit(&state, &user, &id).await?;
-    if body.is_empty() {
-        return Err(AppError::BadRequest("empty upload".into()));
-    }
+    let internal = |e: std::io::Error| AppError::Internal(e.to_string());
+
     let ext = Path::new(&q.filename)
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase())
         .filter(|e| !e.is_empty())
         .unwrap_or_default();
-
-    // Only genuine PDFs and EPUBs are accepted, judged by magic bytes so a
-    // renamed file can't smuggle arbitrary content past the extension.
-    let sniffed = sniff(&body);
-    match ext.as_str() {
-        "pdf" if sniffed == Sniffed::Pdf => {}
-        "pdf" => return Err(AppError::BadRequest("file is not a valid PDF".into())),
-        "epub" if sniffed == Sniffed::Zip => {}
-        "epub" => return Err(AppError::BadRequest("file is not a valid EPUB".into())),
-        _ => return Err(AppError::BadRequest("only pdf and epub files are supported".into())),
+    // Reject unsupported extensions up front, before reading a single byte.
+    if ext != "pdf" && ext != "epub" {
+        return Err(AppError::BadRequest("only pdf and epub files are supported".into()));
     }
 
     let file_id = uuid::Uuid::new_v4().to_string();
-    let rel = format!("files/{file_id}.{ext}");
-    write_blob(&state, &rel, &body).await?;
+    let files_dir = state.data_dir.join("files");
+    tokio::fs::create_dir_all(&files_dir).await.map_err(internal)?;
+    let tmp = files_dir.join(format!(".tmp-{file_id}"));
 
-    let sha = {
-        let mut hasher = Sha256::new();
-        hasher.update(&body);
-        hex::encode(hasher.finalize())
-    };
-    let size = body.len() as i64;
+    // Stream the body to the temp file, hashing and capturing the leading bytes
+    // (for the magic-byte check) as chunks arrive.
+    let mut out = tokio::fs::File::create(&tmp).await.map_err(internal)?;
+    let mut hasher = Sha256::new();
+    let mut head: Vec<u8> = Vec::with_capacity(16);
+    let mut size: i64 = 0;
+    let mut stream = body.into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = match chunk {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = tokio::fs::remove_file(&tmp).await;
+                return Err(AppError::BadRequest(format!("upload aborted: {e}")));
+            }
+        };
+        if head.len() < 16 {
+            let take = (16 - head.len()).min(chunk.len());
+            head.extend_from_slice(&chunk[..take]);
+        }
+        hasher.update(&chunk);
+        out.write_all(&chunk).await.map_err(internal)?;
+        size += chunk.len() as i64;
+    }
+    out.flush().await.map_err(internal)?;
+    drop(out);
+
+    // Validate the finished upload; clean up the temp file on any rejection.
+    if size == 0 {
+        let _ = tokio::fs::remove_file(&tmp).await;
+        return Err(AppError::BadRequest("empty upload".into()));
+    }
+    let sniffed = sniff(&head);
+    let content_ok = matches!(
+        (ext.as_str(), sniffed),
+        ("pdf", Sniffed::Pdf) | ("epub", Sniffed::Zip)
+    );
+    if !content_ok {
+        let _ = tokio::fs::remove_file(&tmp).await;
+        let msg = if ext == "pdf" {
+            "file is not a valid PDF"
+        } else {
+            "file is not a valid EPUB"
+        };
+        return Err(AppError::BadRequest(msg.into()));
+    }
+
+    // Promote the temp file to its final name and record it.
+    let rel = format!("files/{file_id}.{ext}");
+    let full = state.data_dir.join(&rel);
+    tokio::fs::rename(&tmp, &full).await.map_err(internal)?;
+
+    let sha = hex::encode(hasher.finalize());
     sqlx::query(
         "INSERT INTO book_file (id, book_id, format, path, size_bytes, sha256) \
          VALUES (?, ?, ?, ?, ?, ?)",
@@ -203,10 +247,10 @@ pub async fn upload_file(
 
     // A PDF carries its own page count, which is ground truth for a digital
     // copy, so it overrides whatever an online guess supplied. Parsing runs off
-    // the async runtime (it's CPU-bound) and never fails the upload.
+    // the async runtime (it's CPU-bound), reading the file back from disk.
     if ext == "pdf" {
-        let bytes = body.clone();
-        let pages = tokio::task::spawn_blocking(move || pdf_page_count(&bytes))
+        let path = full.clone();
+        let pages = tokio::task::spawn_blocking(move || pdf_page_count_at(&path))
             .await
             .ok()
             .flatten();
@@ -247,8 +291,17 @@ pub async fn upload_file(
 }
 
 /// Best-effort page count from a PDF's page tree; None if the bytes don't parse.
+#[cfg(test)]
 fn pdf_page_count(bytes: &[u8]) -> Option<i64> {
     let doc = lopdf::Document::load_mem(bytes).ok()?;
+    let n = doc.get_pages().len();
+    (n > 0).then_some(n as i64)
+}
+
+/// Same, reading the PDF from disk (the upload path streams to a file, so it
+/// never holds the whole document in memory).
+fn pdf_page_count_at(path: &Path) -> Option<i64> {
+    let doc = lopdf::Document::load(path).ok()?;
     let n = doc.get_pages().len();
     (n > 0).then_some(n as i64)
 }
@@ -394,16 +447,27 @@ async fn write_blob(state: &AppState, rel: &str, body: &[u8]) -> AppResult<()> {
         .map_err(|e| AppError::Internal(e.to_string()))
 }
 
+/// Streams a stored blob to the client without reading it all into memory.
 async fn serve_blob(state: &AppState, rel: &str) -> AppResult<Response> {
     let full = state.data_dir.join(rel);
-    let bytes = tokio::fs::read(&full)
+    let file = tokio::fs::File::open(&full)
         .await
         .map_err(|_| AppError::NotFound("blob missing on disk".into()))?;
+    let len = file.metadata().await.ok().map(|m| m.len());
     let ext = Path::new(rel)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
-    Ok(([(header::CONTENT_TYPE, content_type_for_ext(ext))], bytes).into_response())
+    let body = axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(file));
+    let mut response = Response::new(body);
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        content_type_for_ext(ext).parse().unwrap(),
+    );
+    if let Some(len) = len {
+        response.headers_mut().insert(header::CONTENT_LENGTH, len.into());
+    }
+    Ok(response)
 }
 
 fn content_type_for_ext(ext: &str) -> &'static str {
