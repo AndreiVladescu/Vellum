@@ -172,6 +172,7 @@
         <button class="btn" onclick="bulkTag(false)">Untag</button>
       </div>
       <button class="btn" onclick="openBulkEdit()">Edit selected</button>
+      <button class="btn" onclick="enrichSelected()">Fetch metadata</button>
       <button class="btn" onclick="uploadToSelected()">Upload to selected</button>
       <button class="btn danger" onclick="deleteSelected()">Delete selected</button>
       <span class="spacer"></span>
@@ -593,7 +594,10 @@ async function createBook(){
     const book = await api('POST','/api/books',{ title });
     if (AB.file){
       createBtn.innerHTML = '<span class="spin"></span>Uploading…';
-      await uploadTo(book.id, AB.file);
+      await uploadTo(book.id, AB.file);   // uploads the file, then looks up metadata
+    } else {
+      createBtn.innerHTML = '<span class="spin"></span>Looking up metadata…';
+      await enrichBook(book.id);          // no file: fill author/year from the title
     }
     closeModal(); await loadAll(); toast('Created “'+title+'”');
   } catch(e){
@@ -824,11 +828,29 @@ async function uploadTo(id, file){
     } else {
       const mime = kind === 'epub' ? 'application/epub+zip' : 'application/pdf';
       await xhrUpload('POST', '/api/books/'+id+'/files?filename='+encodeURIComponent(file.name), file, mime);
-      toast('Uploaded ' + file.name); await loadAll();
+      toast('Uploaded ' + file.name);
+      await enrichBook(id);          // fill missing author/year/etc. from the title
+      await loadAll();
     }
     return true;
   } catch(e){ toast(e.message); return false; }
   finally { hideProgress(); }
+}
+
+// Ask the server to fill a book's empty fields from an online metadata lookup.
+// Best-effort: a miss or a network error leaves the book untouched.
+async function enrichBook(id){
+  try { await api('POST','/api/books/'+id+'/enrich'); }
+  catch(_){ /* non-fatal — the upload/create still succeeded */ }
+}
+
+async function enrichSelected(){
+  if (!S.selected.size){ toast('Select some books first'); return; }
+  const ids = [...S.selected];
+  showProgress('Fetching metadata…');
+  let done = 0;
+  for (const id of ids){ await enrichBook(id); setProgress(++done/ids.length); }
+  hideProgress(); await loadAll(); toast('Fetched metadata for '+ids.length+' book(s)');
 }
 
 function pickUpload(id){
@@ -1001,7 +1023,10 @@ async function openDetail(id){
       <label>Files</label>
       ${files}
       <div class="row" style="justify-content:space-between; margin-top:16px">
-        <button class="btn danger" onclick="deleteBook('${id}')">Delete</button>
+        <div>
+          <button class="btn danger" onclick="deleteBook('${id}')">Delete</button>
+          <button class="btn" onclick="enrichFromDetail('${id}')">Fetch metadata</button>
+        </div>
         <div>
           <button class="btn" onclick="closeModal()">Close</button>
           <button class="btn primary" onclick="saveDetail('${id}')">Save</button>
@@ -1033,6 +1058,12 @@ async function saveDetail(id){
   if (!body.title){ toast('Title cannot be empty'); return; }
   try { await api('PATCH','/api/books/'+id, body); closeModal(); await loadAll(); toast('Saved'); }
   catch(e){ toast(e.message); }
+}
+
+async function enrichFromDetail(id){
+  showProgress('Fetching metadata…');
+  await enrichBook(id);
+  hideProgress(); await loadAll(); toast('Fetched metadata'); openDetail(id);
 }
 
 async function deleteBook(id){
