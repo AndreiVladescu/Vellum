@@ -4,6 +4,7 @@ import '../data/library_repository.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
 import 'sharing_page.dart';
+import 'sync_service.dart';
 
 /// Connect the app to a Vellum sync server: log in (or register the first,
 /// master account), then pull the shared library onto this device.
@@ -81,7 +82,7 @@ class _ServerPageState extends State<ServerPage> {
   Future<void> _pull() => _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
-        final count = await widget.repository.pullFromServer(client);
+        final count = await SyncService(widget.repository).pull(client);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(count == 0
@@ -94,7 +95,7 @@ class _ServerPageState extends State<ServerPage> {
   Future<void> _push() => _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
-        final count = await widget.repository.pushToServer(client);
+        final count = await SyncService(widget.repository).push(client);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Pushed $count book${count == 1 ? '' : 's'} '

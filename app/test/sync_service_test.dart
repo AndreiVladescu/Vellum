@@ -9,6 +9,7 @@ import 'package:http/testing.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/server/server_client.dart';
+import 'package:vellum/server/sync_service.dart';
 
 /// Builds a repository over an in-memory database and a throwaway data dir.
 Future<LibraryRepository> _repo(Directory dir) async =>
@@ -61,7 +62,7 @@ void main() {
     final repo = await _repo(dir);
     final client = _client(_server(books: [_serverBook('b1', 'Dune', '2024-01-01 00:00:00')]));
 
-    final n = await repo.pullFromServer(client);
+    final n = await SyncService(repo).pull(client);
     expect(n, 1);
     final book = await repo.watchBook('b1').first;
     expect(book?.title, 'Dune');
@@ -80,7 +81,7 @@ void main() {
     );
 
     final client = _client(_server(books: [_serverBook('b1', 'Server title', '2024-01-01 00:00:00')]));
-    await repo.pullFromServer(client);
+    await SyncService(repo).pull(client);
 
     final book = await repo.watchBook('b1').first;
     expect(book?.title, 'Local edit', reason: 'local edit is newer, must win');
@@ -98,7 +99,7 @@ void main() {
     );
 
     final client = _client(_server(books: [_serverBook('b1', 'Newer server', '2025-06-01 00:00:00')]));
-    await repo.pullFromServer(client);
+    await SyncService(repo).pull(client);
 
     final book = await repo.watchBook('b1').first;
     expect(book?.title, 'Newer server');
@@ -110,7 +111,7 @@ void main() {
     await db.into(db.books).insert(BooksCompanion.insert(id: 'gone', title: 'Doomed'));
 
     final client = _client(_server(books: const [], deletions: ['gone']));
-    await repo.pullFromServer(client);
+    await SyncService(repo).pull(client);
 
     expect(await repo.watchBook('gone').first, isNull);
     // And it did NOT leave a local tombstone (the server already knows).
@@ -126,7 +127,7 @@ void main() {
 
     final deleted = <String>[];
     final client = _client(_server(books: const [], deletedCollector: deleted));
-    await repo.pushToServer(client);
+    await SyncService(repo).push(client);
 
     expect(deleted, ['x'], reason: 'server delete should be called');
     expect(await db.select(db.localDeletions).get(), isEmpty, reason: 'tombstone cleared');
