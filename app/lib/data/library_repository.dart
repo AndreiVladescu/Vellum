@@ -202,6 +202,20 @@ class LibraryRepository {
     return true;
   }
 
+  /// The page count read from one of the book's attached PDFs, or null if it
+  /// has no PDF or the file can't be read.
+  Future<int?> pageCountFromFile(String bookId) async {
+    final files = await (db.select(db.bookFiles)
+          ..where((f) => f.bookId.equals(bookId) & f.format.equals('pdf')))
+        .get();
+    if (files.isEmpty) return null;
+    try {
+      return await pdfPageCount(p.join(_dataDir.path, files.first.path));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// True when the book was imported from a library and can be reset.
   bool canRevert(Book book) => book.sourceMetadata != null;
 
