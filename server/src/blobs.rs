@@ -160,6 +160,16 @@ pub async fn upload_file(
             .execute(&state.db)
             .await?;
         }
+
+        // The PDF's own first page is the preferred cover: render it now and
+        // set it, overriding any online cover a prior lookup may have stored.
+        if let Some(rel) = render_pdf_cover(&state, &id).await {
+            sqlx::query("UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?")
+                .bind(&rel)
+                .bind(&id)
+                .execute(&state.db)
+                .await?;
+        }
     }
 
     // Pull author / title / publisher / year out of the file name convention,

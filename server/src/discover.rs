@@ -291,17 +291,21 @@ pub async fn enrich(
         None
     };
 
+    // Cover, preferring the PDF's own first page and only reaching for an online
+    // cover when the book has no PDF to render (or no renderer is installed).
     let mut cover_path: Option<String> = None;
-    if need_cover
-        && let Some(bytes) = metadata::download_cover(&state.http, &top).await
-    {
-        let rel = format!("covers/{id}.jpg");
-        let full = state.data_dir.join(&rel);
-        if let Some(parent) = full.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
-        if tokio::fs::write(&full, &bytes).await.is_ok() {
+    if need_cover {
+        if let Some(rel) = crate::blobs::render_pdf_cover(&state, &id).await {
             cover_path = Some(rel);
+        } else if let Some(bytes) = metadata::download_cover(&state.http, &top).await {
+            let rel = format!("covers/{id}.jpg");
+            let full = state.data_dir.join(&rel);
+            if let Some(parent) = full.parent() {
+                let _ = tokio::fs::create_dir_all(parent).await;
+            }
+            if tokio::fs::write(&full, &bytes).await.is_ok() {
+                cover_path = Some(rel);
+            }
         }
     }
 
@@ -355,18 +359,6 @@ pub async fn enrich(
                 .execute(&state.db)
                 .await?;
         }
-    }
-
-    // The source had no cover image — fall back to the PDF's first page.
-    if need_cover
-        && cover_path.is_none()
-        && let Some(rel) = crate::blobs::render_pdf_cover(&state, &id).await
-    {
-        sqlx::query("UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(&rel)
-            .bind(&id)
-            .execute(&state.db)
-            .await?;
     }
 
     Ok(Json(fetch_book(&state, &id).await?.0))

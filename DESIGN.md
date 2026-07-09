@@ -161,18 +161,20 @@ Metadata is also filled in **automatically**, without picking an edition:
 
 - **From the file** — uploading a PDF reads its page tree (via `lopdf`, off the
   async runtime) and sets `page_count` — the digital copy is ground truth, so it
-  overrides any online guess. The file *name* is parsed for the common
+  overrides any online guess. Its **first page is rendered as the cover** (see
+  below) and takes precedence over an online cover — the book's own art beats a
+  generic thumbnail. The file *name* is parsed for the common
   `Author(s) - Title-Publisher (Year)` download convention: authors (when the
   book has none), publisher, and year fill the empty fields, and the title is
   tidied while it's still the raw file name — so the online lookup below then
   searches a clean title instead of the whole file name (which is why
-  year/author/cover previously came back empty).
+  year/author previously came back empty).
 - **From the title** — `POST /api/books/{id}/enrich` searches by the book's title
   (plus its first author, if any) and fills only the *empty* fields —
   author, year, publisher, ISBN, pages, description, cover, genres — never
   overwriting what the user set, and short-circuiting the network call when
-  nothing is missing. When no cover is found and the book has a PDF, it falls
-  back to **rendering the PDF's first page** (see below). The console calls it
+  nothing is missing. For the cover it **prefers the PDF's first page** and only
+  fetches an online cover when the book has no PDF to render. The console calls it
   after *Create book* and after a file upload, and offers it in bulk (*Fetch
   metadata*) and from the detail view. A miss leaves the book untouched.
 - **Proposing before saving** — `POST /api/metadata/analyze` runs the file-name
@@ -191,8 +193,9 @@ authors, year, pages, publisher, ISBN, description):
   from, filling the form from the chosen one.
 - **Create book** posts the (possibly edited) form to `from-search`, so authors,
   genres and a cover are stored alongside the plain fields; the attached file is
-  uploaded straight after, which sets the real page count and, if still needed,
-  renders the cover. Typing just a title still works — everything else fills in.
+  uploaded straight after, which sets the real page count and renders the cover
+  from the PDF's first page (overriding the online one). Typing just a title
+  still works — everything else fills in.
 
 Uploads are validated by their **magic bytes** — a real `%PDF`, an EPUB zip, or
 an image for covers — not just the file extension.
@@ -206,12 +209,13 @@ automatically whenever a PDF lands on a cover-less book (including books
 **pulled from the server**), and available any time from the app's edit sheet.
 
 The server binary links **no** PDF library of its own (that would be at odds with
-the single-binary server). Its first-page cover rendering is instead a
-best-effort **shell-out** to whatever PDF CLI the host happens to have —
-`pdftoppm`, `pdftocairo`, `mutool`, or `gs` — tried in turn, and simply skipped
-if none is installed. For the richest covers the **app still renders on pull and
-pushes back** (higher-fidelity `pdfrx`, and it reaches books the server couldn't
-render); the server-side fallback just means a console-only workflow isn't
+the single-binary server). Its first-page cover rendering — now the **preferred**
+cover source for any book that has a PDF — is instead a best-effort **shell-out**
+to whatever PDF CLI the host happens to have — `pdftoppm`, `pdftocairo`,
+`mutool`, or `gs` — tried in turn, and simply skipped if none is installed (in
+which case the online cover stands). The **app also renders on pull and pushes
+back** (higher-fidelity `pdfrx`, and it reaches books the server couldn't
+render); the server-side render just means a console-only workflow isn't
 cover-less while waiting for an app to sync. (The app pull writing covers back is
 one place a pull writes to the server.)
 
