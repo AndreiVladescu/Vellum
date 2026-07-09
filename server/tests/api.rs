@@ -21,6 +21,7 @@ async fn test_app() -> axum::Router {
         data_dir,
         http: reqwest::Client::new(),
         max_upload_bytes: 512 * 1024 * 1024,
+        throttle: std::sync::Arc::default(),
     })
 }
 
@@ -154,6 +155,53 @@ async fn first_user_is_master_and_registration_then_closes() {
     )
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn logout_invalidates_the_session_token() {
+    let app = test_app().await;
+    let token = register_master(&app).await;
+
+    // The token authenticates before logout.
+    let (status, _) = call(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call(&app, "POST", "/api/auth/logout", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // ...and is rejected afterwards (the server dropped the session).
+    let (status, _) = call(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn repeated_failed_logins_are_throttled() {
+    let app = test_app().await;
+    register_master(&app).await; // master@lib.test / masterpass1
+
+    // Ten wrong-password attempts are each merely unauthorized...
+    for _ in 0..10 {
+        let (status, _) = call(
+            &app,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "email": "master@lib.test", "password": "wrongpass1" })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    // ...but the next attempt is throttled even with the correct password.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "email": "master@lib.test", "password": "masterpass1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
 }
 
 #[tokio::test]

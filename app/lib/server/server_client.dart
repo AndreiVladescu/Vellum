@@ -145,6 +145,13 @@ class VellumServerClient {
     return ServerUser.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Invalidates the current session server-side. Best-effort: the caller still
+  /// clears local credentials even if this fails (e.g. offline).
+  Future<void> logout() async {
+    final res = await _http.post(_uri('/api/auth/logout'), headers: _headers);
+    _body(res);
+  }
+
   /// Every book visible to the authenticated user (owned + shared).
   Future<List<ServerBook>> listBooks() async {
     final res = await _http.get(_uri('/api/books'), headers: _headers);

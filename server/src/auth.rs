@@ -4,12 +4,19 @@ use rand_core::{OsRng, RngCore};
 use axum::extract::{FromRequestParts, State};
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
+use axum::http::HeaderMap;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::{AppError, AppResult};
 use crate::AppState;
+
+/// A precomputed Argon2 hash used only to spend the same verification time when
+/// an email doesn't exist, so login/basic-auth timing can't confirm which
+/// emails have accounts.
+static DUMMY_HASH: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| hash_password("timing-equalizer-dummy").unwrap());
 
 /// The authenticated caller, extracted from the `Authorization: Bearer <token>`
 /// header. Any handler that takes an `AuthUser` argument requires a valid login.
@@ -77,20 +84,31 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
         .split_once(':')
         .ok_or_else(|| AppError::Unauthorized("malformed basic credentials".into()))?;
 
+    let key = email.trim().to_lowercase();
+    if !state.throttle.allowed(&key) {
+        return Err(AppError::TooManyRequests(
+            "too many failed attempts — try again later".into(),
+        ));
+    }
+
     let row = sqlx::query_as::<_, (String, String, String, bool, String)>(
         "SELECT id, email, display_name, is_master, password_hash \
          FROM app_user WHERE email = ?",
     )
-    .bind(email.trim().to_lowercase())
+    .bind(&key)
     .fetch_optional(&state.db)
     .await?;
 
     let Some((id, email, display_name, is_master, password_hash)) = row else {
+        let _ = verify_password(password, &DUMMY_HASH); // equalize timing
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     };
     if !verify_password(password, &password_hash) {
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     }
+    state.throttle.clear(&key);
     Ok(AuthUser { id, email, display_name, is_master })
 }
 
@@ -184,20 +202,31 @@ pub async fn login(
     State(state): State<AppState>,
     Json(input): Json<LoginInput>,
 ) -> AppResult<Json<AuthResponse>> {
+    let key = input.email.trim().to_lowercase();
+    if !state.throttle.allowed(&key) {
+        return Err(AppError::TooManyRequests(
+            "too many failed attempts — try again later".into(),
+        ));
+    }
+
     let row = sqlx::query_as::<_, (String, String, String, bool, String)>(
         "SELECT id, email, display_name, is_master, password_hash \
          FROM app_user WHERE email = ?",
     )
-    .bind(input.email.trim().to_lowercase())
+    .bind(&key)
     .fetch_optional(&state.db)
     .await?;
 
     let Some((id, email, display_name, is_master, password_hash)) = row else {
+        let _ = verify_password(&input.password, &DUMMY_HASH); // equalize timing
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     };
     if !verify_password(&input.password, &password_hash) {
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     }
+    state.throttle.clear(&key);
 
     let user = AuthUser { id, email, display_name, is_master };
     let token = issue_token(&state, &user.id).await?;
@@ -206,6 +235,24 @@ pub async fn login(
 
 pub async fn me(user: AuthUser) -> Json<AuthUser> {
     Json(user)
+}
+
+/// Invalidate the presented bearer session server-side (real logout). Succeeds
+/// even if the token was already gone, so the client can always clear locally.
+pub async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> AppResult<Json<serde_json::Value>> {
+    let token = headers
+        .get(AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
+    sqlx::query("DELETE FROM session WHERE token_hash = ?")
+        .bind(sha256_hex(token))
+        .execute(&state.db)
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
 }
 
 /// Master-only: create a member account. Returns the new user (no token — they
