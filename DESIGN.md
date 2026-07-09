@@ -160,35 +160,42 @@ you create a custom book instead.
 Metadata is also filled in **automatically**, without picking an edition:
 
 - **From the file** — uploading a PDF reads its page tree (via `lopdf`, off the
-  async runtime) and sets `page_count` when the book has none. The file *name*
-  is parsed for the common `Author(s) - Title-Publisher (Year)` download
-  convention: authors (when the book has none), publisher, and year fill the
-  empty fields, and the title is tidied while it's still the raw file name — so
-  the online lookup below then searches a clean title instead of the whole file
-  name (which is why year/author/cover previously came back empty).
+  async runtime) and sets `page_count` — the digital copy is ground truth, so it
+  overrides any online guess. The file *name* is parsed for the common
+  `Author(s) - Title-Publisher (Year)` download convention: authors (when the
+  book has none), publisher, and year fill the empty fields, and the title is
+  tidied while it's still the raw file name — so the online lookup below then
+  searches a clean title instead of the whole file name (which is why
+  year/author/cover previously came back empty).
 - **From the title** — `POST /api/books/{id}/enrich` searches by the book's title
   (plus its first author, if any) and fills only the *empty* fields —
   author, year, publisher, ISBN, pages, description, cover, genres — never
   overwriting what the user set, and short-circuiting the network call when
-  nothing is missing. The console calls it after a title-only *Create book* and
-  after a file upload, and offers it in bulk (*Fetch metadata*) and from the
-  detail view. A miss leaves the book untouched.
+  nothing is missing. When no cover is found and the book has a PDF, it falls
+  back to **rendering the PDF's first page** (see below). The console calls it
+  after *Create book* and after a file upload, and offers it in bulk (*Fetch
+  metadata*) and from the detail view. A miss leaves the book untouched.
+- **Proposing before saving** — `POST /api/metadata/analyze` runs the file-name
+  parse and one online search and returns the *merged* proposal without saving,
+  so the console's Add-book form can show it for review/editing. It's the only
+  metadata call that creates nothing.
 
 ## Adding & editing books
 
-The app's Add-book screen and the console's Add-book dialog work the same way,
-with two explicit actions:
+The console's Add-book dialog is a small **editable metadata form** (title,
+authors, year, pages, publisher, ISBN, description):
 
-- **Search** an online library and pick an edition — its author, year, pages,
-  description, and cover are fetched automatically.
-- **Create book** without searching — the title is enough — for a PDF no
-  library has. The server then looks the title up and fills the empty fields
-  (see **Metadata fetching**); anything it can't find can be edited afterwards.
+- **Attach a file** (drag-and-drop or picker) and the form **auto-fills** from
+  `analyze` — the file name parsed and merged with one online lookup.
+- **Look up online** searches by whatever's typed and lists editions to pick
+  from, filling the form from the chosen one.
+- **Create book** posts the (possibly edited) form to `from-search`, so authors,
+  genres and a cover are stored alongside the plain fields; the attached file is
+  uploaded straight after, which sets the real page count and, if still needed,
+  renders the cover. Typing just a title still works — everything else fills in.
 
-Either way you may **attach a file** in the same flow (drag-and-drop or a file
-picker). Uploads are validated by their **magic bytes** — a real `%PDF`, an EPUB
-zip, or an image for covers — not just the file extension. A PDF's page count is
-read from the file, and uploading one also triggers the title lookup above.
+Uploads are validated by their **magic bytes** — a real `%PDF`, an EPUB zip, or
+an image for covers — not just the file extension.
 
 Once a book exists you can edit its **title, subtitle, year, and description**,
 and change its **cover**. On both the app and the console the cover shows and is
@@ -198,11 +205,15 @@ from the **first (full) page of an attached PDF**, rendered with `pdfrx` — don
 automatically whenever a PDF lands on a cover-less book (including books
 **pulled from the server**), and available any time from the app's edit sheet.
 
-The server itself doesn't rasterize PDFs (that would need a native renderer, at
-odds with the single-binary server), so covers for books uploaded on the server
-are rendered by the **app on pull and pushed back**, so the console then shows
-the same cover the app does. (Note this is one place a pull writes to the
-server.)
+The server binary links **no** PDF library of its own (that would be at odds with
+the single-binary server). Its first-page cover rendering is instead a
+best-effort **shell-out** to whatever PDF CLI the host happens to have —
+`pdftoppm`, `pdftocairo`, `mutool`, or `gs` — tried in turn, and simply skipped
+if none is installed. For the richest covers the **app still renders on pull and
+pushes back** (higher-fidelity `pdfrx`, and it reaches books the server couldn't
+render); the server-side fallback just means a console-only workflow isn't
+cover-less while waiting for an app to sync. (The app pull writing covers back is
+one place a pull writes to the server.)
 
 Two things stay **on the device only** and are never synced to a server:
 
