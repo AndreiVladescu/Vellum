@@ -403,6 +403,50 @@ async fn book_detail_and_query_token_download() {
 }
 
 #[tokio::test]
+async fn upload_rejects_a_file_that_is_not_a_real_pdf() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // Junk bytes named .pdf must be refused by the magic-byte check.
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=dune.pdf"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "application/pdf")
+        .body(Body::from(b"this is not really a pdf".to_vec()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+
+    // And no book_file row was recorded.
+    let (_, detail) =
+        call(&app, "GET", &format!("/api/books/{book}/detail"), Some(&master), None).await;
+    assert!(detail["files"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn cover_upload_rejects_non_image_bytes() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let put = Request::builder()
+        .method("PUT")
+        .uri(format!("/api/books/{book}/cover"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "image/png")
+        .body(Body::from(b"definitely not an image".to_vec()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(put).await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
 async fn cover_upload_and_download_round_trips() {
     let app = test_app().await;
     let master = register_master(&app).await;

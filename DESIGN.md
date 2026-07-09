@@ -253,7 +253,11 @@ authors, year, pages, publisher, ISBN, description):
   still works — everything else fills in.
 
 Uploads are validated by their **magic bytes** — a real `%PDF`, an EPUB zip, or
-an image for covers — not just the file extension.
+an image for covers — not just the file extension. This is enforced on the
+**server** (`blobs.rs` sniffs the leading bytes and rejects a mismatch: book
+files must be PDF/EPUB, covers must be JPEG/PNG/GIF/WebP, and a cover's stored
+extension comes from the sniffed type), not only in the console/app clients, so
+the API can't be tricked by a renamed file.
 
 Once a book exists you can edit its **title, subtitle, year, and description**,
 and change its **cover**. On both the app and the console the cover shows and is
