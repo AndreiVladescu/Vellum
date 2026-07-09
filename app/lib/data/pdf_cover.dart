@@ -3,6 +3,18 @@ import 'dart:ui' as ui;
 
 import 'package:pdfrx/pdfrx.dart';
 
+/// Number of pages in the PDF at [path], or null if it can't be opened.
+Future<int?> pdfPageCount(String path) async {
+  await pdfrxFlutterInitialize();
+  final doc = await PdfDocument.openFile(path);
+  try {
+    final count = doc.pages.length;
+    return count > 0 ? count : null;
+  } finally {
+    await doc.dispose();
+  }
+}
+
 /// Renders the first page of the PDF at [path] to PNG bytes, sized for a cover.
 /// Returns null if the document has no pages or rendering fails.
 Future<Uint8List?> renderPdfFirstPagePng(String path) async {

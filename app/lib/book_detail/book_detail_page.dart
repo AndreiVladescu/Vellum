@@ -841,6 +841,23 @@ class _EditBookSheetState extends State<_EditBookSheet> {
   late final _description = TextEditingController(
     text: widget.book.description ?? '',
   );
+  bool _gettingPages = false;
+
+  Future<void> _getPagesFromFile() async {
+    setState(() => _gettingPages = true);
+    final count = await widget.repository.pageCountFromFile(widget.book.id);
+    if (!mounted) return;
+    setState(() => _gettingPages = false);
+    if (count == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No PDF attached, or its pages couldn’t be read.'),
+        ),
+      );
+      return;
+    }
+    _pages.text = count.toString();
+  }
 
   @override
   void initState() {
@@ -925,15 +942,26 @@ class _EditBookSheetState extends State<_EditBookSheet> {
                   child: TextField(
                     controller: _pages,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Pages',
-                      helperText: 'Sets the physical width',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Pages'),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _gettingPages ? null : _getPagesFromFile,
+                icon: _gettingPages
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: const Text('Get page count from file'),
+              ),
+            ),
+            const SizedBox(height: 4),
             TextField(
               controller: _description,
               minLines: 3,
