@@ -233,6 +233,12 @@ pub async fn upsert(
             .bind(&user.id)
             .execute(&state.db)
             .await?;
+            // Re-creating a book at a tombstoned id revives it — drop the
+            // tombstone so it isn't deleted again on the next pull.
+            sqlx::query("DELETE FROM deletion WHERE book_id = ?")
+                .bind(&id)
+                .execute(&state.db)
+                .await?;
         }
     }
     fetch_book(&state, &id).await
@@ -365,6 +371,13 @@ pub async fn delete(
         .fetch_all(&state.db)
         .await?;
 
+    // Record a tombstone so a client that pulls after this delete removes the
+    // book locally instead of treating its absence as "nothing to do".
+    sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id) VALUES (?, ?)")
+        .bind(&id)
+        .bind(&owner_id)
+        .execute(&state.db)
+        .await?;
     sqlx::query("DELETE FROM book WHERE id = ?")
         .bind(&id)
         .execute(&state.db)
@@ -374,6 +387,27 @@ pub async fn delete(
         let _ = tokio::fs::remove_file(state.data_dir.join(rel)).await;
     }
     Ok(Json(serde_json::json!({ "deleted": id })))
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct DeletionDto {
+    pub book_id: String,
+    pub deleted_at: String,
+}
+
+/// Every delete tombstone, so a client can propagate deletes on its next pull.
+/// Returns all tombstones to any authenticated caller — this leaks only the
+/// UUIDs of deleted books, which is acceptable on a personal server.
+pub async fn deletions(
+    State(state): State<AppState>,
+    _user: AuthUser,
+) -> AppResult<Json<Vec<DeletionDto>>> {
+    let rows = sqlx::query_as::<_, DeletionDto>(
+        "SELECT book_id, deleted_at FROM deletion ORDER BY deleted_at",
+    )
+    .fetch_all(&state.db)
+    .await?;
+    Ok(Json(rows))
 }
 
 pub(crate) async fn fetch_book(state: &AppState, id: &str) -> AppResult<Json<BookDto>> {

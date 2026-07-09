@@ -185,6 +185,19 @@ class BookPlacements extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Books deleted on this device, remembered until the deletion has been pushed
+/// to the server (rows are tiny; in standalone mode they simply linger). This
+/// is app-local bookkeeping and is intentionally NOT mirrored in the server
+/// schema — the server has its own `deletion` table with its own semantics.
+@DataClassName('LocalDeletion')
+class LocalDeletions extends Table {
+  TextColumn get bookId => text()();
+  DateTimeColumn get deletedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {bookId};
+}
+
 @DriftDatabase(tables: [
   Books,
   Authors,
@@ -199,12 +212,14 @@ class BookPlacements extends Table {
   PhysicalEnvironments,
   PhysicalShelves,
   BookPlacements,
+  LocalDeletions,
 ])
 class VellumDatabase extends _$VellumDatabase {
-  VellumDatabase() : super(_openConnection());
+  VellumDatabase([QueryExecutor? executor])
+      : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -225,6 +240,9 @@ class VellumDatabase extends _$VellumDatabase {
           }
           if (from < 5) {
             await m.addColumn(bookPlacements, bookPlacements.format);
+          }
+          if (from < 6) {
+            await m.createTable(localDeletions);
           }
         },
         beforeOpen: (details) async {

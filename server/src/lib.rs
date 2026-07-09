@@ -73,6 +73,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/books/from-search", post(discover::add_from_search))
         .route("/api/books/{id}/enrich", post(discover::enrich))
         // Books (visibility-filtered by RBAC).
+        .route("/api/deletions", get(books::deletions))
         .route("/api/books", get(books::list).post(books::create))
         .route(
             "/api/books/{id}",

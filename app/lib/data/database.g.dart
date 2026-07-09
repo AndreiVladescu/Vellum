@@ -4993,6 +4993,220 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
   }
 }
 
+class $LocalDeletionsTable extends LocalDeletions
+    with TableInfo<$LocalDeletionsTable, LocalDeletion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalDeletionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _bookIdMeta = const VerificationMeta('bookId');
+  @override
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [bookId, deletedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_deletions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalDeletion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('book_id')) {
+      context.handle(
+        _bookIdMeta,
+        bookId.isAcceptableOrUnknown(data['book_id']!, _bookIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookIdMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {bookId};
+  @override
+  LocalDeletion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalDeletion(
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalDeletionsTable createAlias(String alias) {
+    return $LocalDeletionsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalDeletion extends DataClass implements Insertable<LocalDeletion> {
+  final String bookId;
+  final DateTime deletedAt;
+  const LocalDeletion({required this.bookId, required this.deletedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_id'] = Variable<String>(bookId);
+    map['deleted_at'] = Variable<DateTime>(deletedAt);
+    return map;
+  }
+
+  LocalDeletionsCompanion toCompanion(bool nullToAbsent) {
+    return LocalDeletionsCompanion(
+      bookId: Value(bookId),
+      deletedAt: Value(deletedAt),
+    );
+  }
+
+  factory LocalDeletion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalDeletion(
+      bookId: serializer.fromJson<String>(json['bookId']),
+      deletedAt: serializer.fromJson<DateTime>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bookId': serializer.toJson<String>(bookId),
+      'deletedAt': serializer.toJson<DateTime>(deletedAt),
+    };
+  }
+
+  LocalDeletion copyWith({String? bookId, DateTime? deletedAt}) =>
+      LocalDeletion(
+        bookId: bookId ?? this.bookId,
+        deletedAt: deletedAt ?? this.deletedAt,
+      );
+  LocalDeletion copyWithCompanion(LocalDeletionsCompanion data) {
+    return LocalDeletion(
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalDeletion(')
+          ..write('bookId: $bookId, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(bookId, deletedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalDeletion &&
+          other.bookId == this.bookId &&
+          other.deletedAt == this.deletedAt);
+}
+
+class LocalDeletionsCompanion extends UpdateCompanion<LocalDeletion> {
+  final Value<String> bookId;
+  final Value<DateTime> deletedAt;
+  final Value<int> rowid;
+  const LocalDeletionsCompanion({
+    this.bookId = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalDeletionsCompanion.insert({
+    required String bookId,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : bookId = Value(bookId);
+  static Insertable<LocalDeletion> custom({
+    Expression<String>? bookId,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookId != null) 'book_id': bookId,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalDeletionsCompanion copyWith({
+    Value<String>? bookId,
+    Value<DateTime>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalDeletionsCompanion(
+      bookId: bookId ?? this.bookId,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalDeletionsCompanion(')
+          ..write('bookId: $bookId, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$VellumDatabase extends GeneratedDatabase {
   _$VellumDatabase(QueryExecutor e) : super(e);
   $VellumDatabaseManager get managers => $VellumDatabaseManager(this);
@@ -5012,6 +5226,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     this,
   );
   late final $BookPlacementsTable bookPlacements = $BookPlacementsTable(this);
+  late final $LocalDeletionsTable localDeletions = $LocalDeletionsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5030,6 +5245,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     physicalEnvironments,
     physicalShelves,
     bookPlacements,
+    localDeletions,
   ];
 }
 
@@ -10246,6 +10462,155 @@ typedef $$BookPlacementsTableProcessedTableManager =
       BookPlacement,
       PrefetchHooks Function({bool environmentId, bool copyId})
     >;
+typedef $$LocalDeletionsTableCreateCompanionBuilder =
+    LocalDeletionsCompanion Function({
+      required String bookId,
+      Value<DateTime> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalDeletionsTableUpdateCompanionBuilder =
+    LocalDeletionsCompanion Function({
+      Value<String> bookId,
+      Value<DateTime> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalDeletionsTableFilterComposer
+    extends Composer<_$VellumDatabase, $LocalDeletionsTable> {
+  $$LocalDeletionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalDeletionsTableOrderingComposer
+    extends Composer<_$VellumDatabase, $LocalDeletionsTable> {
+  $$LocalDeletionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalDeletionsTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $LocalDeletionsTable> {
+  $$LocalDeletionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get bookId =>
+      $composableBuilder(column: $table.bookId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$LocalDeletionsTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $LocalDeletionsTable,
+          LocalDeletion,
+          $$LocalDeletionsTableFilterComposer,
+          $$LocalDeletionsTableOrderingComposer,
+          $$LocalDeletionsTableAnnotationComposer,
+          $$LocalDeletionsTableCreateCompanionBuilder,
+          $$LocalDeletionsTableUpdateCompanionBuilder,
+          (
+            LocalDeletion,
+            BaseReferences<
+              _$VellumDatabase,
+              $LocalDeletionsTable,
+              LocalDeletion
+            >,
+          ),
+          LocalDeletion,
+          PrefetchHooks Function()
+        > {
+  $$LocalDeletionsTableTableManager(
+    _$VellumDatabase db,
+    $LocalDeletionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalDeletionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalDeletionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalDeletionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> bookId = const Value.absent(),
+                Value<DateTime> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalDeletionsCompanion(
+                bookId: bookId,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String bookId,
+                Value<DateTime> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalDeletionsCompanion.insert(
+                bookId: bookId,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalDeletionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $LocalDeletionsTable,
+      LocalDeletion,
+      $$LocalDeletionsTableFilterComposer,
+      $$LocalDeletionsTableOrderingComposer,
+      $$LocalDeletionsTableAnnotationComposer,
+      $$LocalDeletionsTableCreateCompanionBuilder,
+      $$LocalDeletionsTableUpdateCompanionBuilder,
+      (
+        LocalDeletion,
+        BaseReferences<_$VellumDatabase, $LocalDeletionsTable, LocalDeletion>,
+      ),
+      LocalDeletion,
+      PrefetchHooks Function()
+    >;
 
 class $VellumDatabaseManager {
   final _$VellumDatabase _db;
@@ -10276,4 +10641,6 @@ class $VellumDatabaseManager {
       $$PhysicalShelvesTableTableManager(_db, _db.physicalShelves);
   $$BookPlacementsTableTableManager get bookPlacements =>
       $$BookPlacementsTableTableManager(_db, _db.bookPlacements);
+  $$LocalDeletionsTableTableManager get localDeletions =>
+      $$LocalDeletionsTableTableManager(_db, _db.localDeletions);
 }

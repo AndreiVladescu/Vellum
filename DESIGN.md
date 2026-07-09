@@ -83,8 +83,8 @@ single-user and offline. These tables are **server-only** (migration
 Access is resolved per request: a caller may see a book if they are the master,
 own it, or reach it through any share (all / group / book). Editing needs
 `editor`; deleting needs ownership. Endpoints: `/api/auth/*`, `/api/users`,
-`/api/books`, `/api/groups`, `/api/shares`, `/api/share-links`, and the
-unauthenticated `/api/public/{token}`. Cover images and book files are stored
+`/api/books`, `/api/deletions` (delete tombstones for sync), `/api/groups`,
+`/api/shares`, `/api/share-links`, and the unauthenticated `/api/public/{token}`. Cover images and book files are stored
 as filesystem blobs under `VELLUM_DATA_DIR` and served, access-checked, from
 `/api/books/{id}/cover` and `/api/files/{id}`. Auth is a bearer token or HTTP
 Basic (email:password), the latter so e-readers can use the OPDS catalog at
@@ -300,14 +300,24 @@ Two things stay **on the device only** and are never synced to a server:
 7. 🚧 Rust server + sync (connected mode), OPDS feed. In place: accounts, RBAC,
    groups, sharing, public links, blob storage, OPDS, and a web admin console,
    with API integration tests. The app logs in and syncs **both ways** —
-   metadata, covers, and files — and manages sharing on-device. Remaining:
-   conflict handling / real-time updates and the Android side.
+   metadata, covers, and files — and manages sharing on-device. Sync is
+   **last-write-wins by `updated_at`** with **delete tombstones** (below).
+   Remaining: field-level merge / real-time updates and the Android side.
 
 ## Sync roadmap (connected mode)
 
 The connected-mode roadmap below is essentially complete; the app does a
-two-way sync of metadata, covers, and files. Remaining polish is conflict
-resolution and live updates.
+two-way sync of metadata, covers, and files.
+
+**Conflict handling & deletes.** A pull compares each book's server `updated_at`
+against the local row and only overwrites when the server copy is strictly
+newer (a missing server timestamp falls back to overwriting), so a local edit
+isn't clobbered before it's pushed. Deletes propagate through tombstones: the
+server keeps a `deletion` table (exposed at `GET /api/deletions`, cleared when a
+book is re-created at the same id) and the app keeps a local `local_deletions`
+table; a pull applies the server's tombstones, a push sends the app's. The
+app-local `local_deletions` table is **not** part of the server schema. Remaining
+polish is field-level merge and live updates.
 
 1. ✅ **Server blob storage** — upload/download endpoints for cover images and
    book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the

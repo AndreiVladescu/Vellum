@@ -494,6 +494,47 @@ async fn deleting_a_book_removes_its_blobs_from_disk() {
 }
 
 #[tokio::test]
+async fn deleting_a_book_records_a_tombstone_that_upsert_clears() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    // Create via id-preserving upsert, then delete it.
+    call(
+        &app,
+        "PUT",
+        "/api/books/book-1",
+        Some(&master),
+        Some(json!({ "title": "Dune" })),
+    )
+    .await;
+    let (status, _) = call(&app, "DELETE", "/api/books/book-1", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // The tombstone is listed.
+    let (status, list) = call(&app, "GET", "/api/deletions", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let ids: Vec<&str> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["book_id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, vec!["book-1"]);
+
+    // Re-creating the book at the same id clears the tombstone.
+    call(
+        &app,
+        "PUT",
+        "/api/books/book-1",
+        Some(&master),
+        Some(json!({ "title": "Dune (revived)" })),
+    )
+    .await;
+    let (_, list) = call(&app, "GET", "/api/deletions", Some(&master), None).await;
+    assert!(list.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn upload_rejects_a_file_that_is_not_a_real_pdf() {
     let app = test_app().await;
     let master = register_master(&app).await;

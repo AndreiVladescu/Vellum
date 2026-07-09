@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -33,6 +34,21 @@ class LibraryRepository {
 
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
+    return _withDataDir(db, dir);
+  }
+
+  /// Builds a repository over an explicit data directory instead of the
+  /// platform app-support dir — for tests that can't reach `path_provider`.
+  @visibleForTesting
+  static Future<LibraryRepository> forTesting(
+    VellumDatabase db,
+    Directory dataDir,
+  ) => _withDataDir(db, dataDir);
+
+  static Future<LibraryRepository> _withDataDir(
+    VellumDatabase db,
+    Directory dir,
+  ) async {
     await Directory(p.join(dir.path, 'covers')).create(recursive: true);
     await Directory(p.join(dir.path, 'files')).create(recursive: true);
     return LibraryRepository._(db, MetadataService(), dir);
@@ -603,8 +619,40 @@ class LibraryRepository {
   Future<int> pullFromServer(VellumServerClient client) async {
     final books = await client.listBooks();
 
+    // Apply the server's deletions locally. The server already knows, so pass
+    // recordTombstone: false — otherwise we'd re-push this delete forever.
+    for (final id in await client.listDeletions()) {
+      final row = await (db.select(
+        db.books,
+      )..where((b) => b.id.equals(id))).getSingleOrNull();
+      if (row != null) await deleteBook(row, recordTombstone: false);
+    }
+
+    // Books deleted locally but not yet pushed: skip them below so a pull can't
+    // revive a book the next push is about to delete on the server.
+    final localTombstoned = {
+      for (final d in await db.select(db.localDeletions).get()) d.bookId,
+    };
+
+    // Local timestamps, to avoid clobbering edits made on this device.
+    final localUpdatedAt = {
+      for (final row in await db.select(db.books).get()) row.id: row.updatedAt,
+    };
+
     await db.transaction(() async {
       for (final b in books) {
+        if (localTombstoned.contains(b.id)) continue;
+
+        // Skip when we already hold a copy at least as new as the server's
+        // (local edits win until pushed). Overwrite when the server is strictly
+        // newer, when the row is new here, or when the server sent no timestamp
+        // to compare (fall back to the old always-overwrite behavior).
+        final local = localUpdatedAt[b.id];
+        final server = b.updatedAt;
+        if (local != null && server != null && !local.isBefore(server)) {
+          continue;
+        }
+
         final spine =
             b.spineStyle ??
             SpineStyle.generate(
@@ -624,6 +672,10 @@ class LibraryRepository {
                 publishedYear: Value(b.publishedYear),
                 pageCount: Value(b.pageCount),
                 spineStyle: Value(spine),
+                // Adopt the server's timestamp so this row isn't re-pulled every
+                // time, but a later server edit (newer) still wins. Absent when
+                // the server sent none, so the local default (now) applies.
+                updatedAt: server == null ? const Value.absent() : Value(server),
               ),
             );
       }
@@ -713,6 +765,21 @@ class LibraryRepository {
   /// pull and push stay consistent. Books the caller can't write on the server
   /// (e.g. shared read-only) are skipped. Returns the number pushed.
   Future<int> pushToServer(VellumServerClient client) async {
+    // Propagate local deletes first, then stop tracking them regardless of the
+    // outcome: 404 = already gone; 403 = we don't own the server copy (deleting
+    // a shared book locally is a local-only act — it will legitimately return
+    // on the next pull).
+    for (final d in await db.select(db.localDeletions).get()) {
+      try {
+        await client.deleteBook(d.bookId);
+      } on ServerException {
+        // Already gone or not permitted — either way, drop the tombstone.
+      }
+      await (db.delete(
+        db.localDeletions,
+      )..where((t) => t.bookId.equals(d.bookId))).go();
+    }
+
     final books = await db.select(db.books).get();
     var pushed = 0;
     for (final b in books) {
@@ -810,11 +877,22 @@ class LibraryRepository {
     );
   }
 
-  Future<void> deleteBook(Book book) async {
+  /// Deletes a book and its local data. [recordTombstone] leaves a
+  /// [LocalDeletions] row so the next push tells the server to delete it too;
+  /// pull-driven deletes (the server already knows) pass false to avoid
+  /// re-pushing the deletion forever.
+  Future<void> deleteBook(Book book, {bool recordTombstone = true}) async {
     final attachedFiles = await (db.select(
       db.bookFiles,
     )..where((f) => f.bookId.equals(book.id))).get();
     await db.transaction(() async {
+      if (recordTombstone) {
+        await db
+            .into(db.localDeletions)
+            .insertOnConflictUpdate(
+              LocalDeletionsCompanion.insert(bookId: book.id),
+            );
+      }
       // Explicit deletes rather than relying on FK cascades, so this works
       // on databases created before cascades were added to the schema.
       for (final table in [
