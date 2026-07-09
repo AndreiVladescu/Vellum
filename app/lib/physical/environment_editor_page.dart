@@ -183,17 +183,20 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     _dragId = null;
     _dragShelfId = null;
 
-    // Finished dragging a shelf: persist the shifted endpoints.
+    // Finished dragging a shelf: persist the shifted endpoints, then settle.
     if (dragShelfId != null) {
       final s = _shelfStart;
       if (_moved && s != null) {
-        repo.updateShelf(
-          s.id,
-          x1: s.x1 + _shelfDelta.dx,
-          y1: s.y1 + _shelfDelta.dy,
-          x2: s.x2 + _shelfDelta.dx,
-          y2: s.y2 + _shelfDelta.dy,
-        );
+        () async {
+          await repo.updateShelf(
+            s.id,
+            x1: s.x1 + _shelfDelta.dx,
+            y1: s.y1 + _shelfDelta.dy,
+            x2: s.x2 + _shelfDelta.dx,
+            y2: s.y2 + _shelfDelta.dy,
+          );
+          await _applyGravity();
+        }();
       }
       setState(() => _shelfDelta = Offset.zero);
       return;
@@ -217,12 +220,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       h: f.h,
     );
     if (!settled.onSurface) {
-      // Dropped into empty space with no shelf beneath — take it off the shelf.
-      repo.removePlacement(pb.placement);
+      // Dropped into empty space with no shelf beneath — take it off the shelf,
+      // then let anything that was on top of it fall.
+      _removeAndSettle(pb.placement);
       setState(() => _selectedId = null);
       return;
     }
-    repo.updatePlacement(dragId, x: settled.pos.dx, y: settled.pos.dy);
+    // Move it, then settle anything left unsupported at its old spot.
+    _moveAndSettle(dragId, settled.pos);
     setState(() => _selectedId = dragId);
   }
 
@@ -289,6 +294,56 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       if (!moved) break;
     }
     return (pos: Offset(bx, by), onSurface: onSurface);
+  }
+
+  /// Gravity pass: after a book is removed or moved, drop any book now left
+  /// unsupported onto the highest surface (shelf or book) beneath it, so stacks
+  /// collapse. Vertical only — books keep their x. Reads fresh state so it's
+  /// correct right after a mutation. Falls to the floor (y = 0) if nothing is
+  /// below (non-destructive).
+  Future<void> _applyGravity() async {
+    final books = await repo.watchPlacedBooks(widget.environmentId).first;
+    final shelves = await repo.watchShelves(widget.environmentId).first;
+    if (!mounted) return;
+    books.sort((a, b) => a.placement.y.compareTo(b.placement.y));
+    const tol = 0.02;
+    final tops = <({double x, double w, double topY})>[];
+    for (final pb in books) {
+      final f = _footOf(pb);
+      final x = pb.placement.x;
+      final bottom = pb.placement.y;
+      double surface = 0; // floor
+      for (final s in shelves) {
+        final left = math.min(s.x1, s.x2);
+        final right = math.max(s.x1, s.x2);
+        final top = math.max(s.y1, s.y2);
+        if (x + f.w > left && x < right && top <= bottom + tol && top > surface) {
+          surface = top;
+        }
+      }
+      for (final t in tops) {
+        if (x + f.w > t.x &&
+            x < t.x + t.w &&
+            t.topY <= bottom + tol &&
+            t.topY > surface) {
+          surface = t.topY;
+        }
+      }
+      tops.add((x: x, w: f.w, topY: surface + f.h));
+      if ((surface - bottom).abs() > 0.001) {
+        await repo.updatePlacement(pb.placement.id, y: surface);
+      }
+    }
+  }
+
+  Future<void> _removeAndSettle(BookPlacement p) async {
+    await repo.removePlacement(p);
+    await _applyGravity();
+  }
+
+  Future<void> _moveAndSettle(String id, Offset pos) async {
+    await repo.updatePlacement(id, x: pos.dx, y: pos.dy);
+    await _applyGravity();
   }
 
   // ---- actions ------------------------------------------------------------
@@ -361,6 +416,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       x: settled.pos.dx,
       y: settled.pos.dy,
     );
+    await _applyGravity();
   }
 
   Future<void> _resizeSelected(PlacedBook pb) async {
@@ -402,6 +458,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       widthOverride: (t - defT).abs() < 0.0005 ? const Value(null) : Value(t),
       heightOverride: (h - defH).abs() < 0.0005 ? const Value(null) : Value(h),
     );
+    await _applyGravity();
   }
 
   Future<void> _resetSize(PlacedBook pb) async {
@@ -411,11 +468,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       widthOverride: const Value(null),
       heightOverride: const Value(null),
     );
+    await _applyGravity();
   }
 
   Future<void> _removeSelected(PlacedBook pb) async {
     await repo.removePlacement(pb.placement);
     setState(() => _selectedId = null);
+    await _applyGravity();
   }
 
   /// Open the book's detail page (from which it can be read), so the physical
@@ -498,6 +557,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     if (choice == null || !mounted) return;
     if (choice == 'delete') {
       await repo.deleteShelf(s.id);
+      await _applyGravity();
     } else {
       await _editShelf(s);
     }
@@ -523,6 +583,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       y2: result.y,
       label: Value(result.label),
     );
+    await _applyGravity();
   }
 
   // ---- build --------------------------------------------------------------
