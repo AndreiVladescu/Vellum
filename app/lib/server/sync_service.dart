@@ -48,6 +48,10 @@ class SyncService {
       for (final row in await db.select(db.books).get()) row.id: row.updatedAt,
     };
 
+    // Books whose metadata we actually applied this pull; their authors/genres
+    // are replaced afterwards (outside the metadata transaction).
+    final applied = <ServerBook>[];
+
     await db.transaction(() async {
       for (final b in books) {
         if (localTombstoned.contains(b.id)) continue;
@@ -61,6 +65,7 @@ class SyncService {
         if (local != null && server != null && !local.isBefore(server)) {
           continue;
         }
+        applied.add(b);
 
         final spine =
             b.spineStyle ??
@@ -86,6 +91,13 @@ class SyncService {
             );
       }
     });
+
+    // Replace authors/genres for the rows we adopted. Null means the server
+    // didn't send them (old server) — leave the local joins untouched.
+    for (final b in applied) {
+      if (b.authors != null) await repository.setAuthors(b.id, b.authors!);
+      if (b.genres != null) await repository.setGenres(b.id, b.genres!);
+    }
 
     // Fetch cover art outside the transaction; a failed cover never fails the
     // whole pull.
@@ -197,6 +209,7 @@ class SyncService {
     var pushed = 0;
     for (final b in books) {
       try {
+        final details = await repository.detailsFor(b.id);
         await client.pushBook(
           id: b.id,
           title: b.title,
@@ -208,6 +221,8 @@ class SyncService {
           pageCount: b.pageCount,
           spineStyle: b.spineStyle,
           updatedAt: b.updatedAt,
+          authors: details.authors,
+          genres: details.genres,
         );
         final cover = repository.coverFileOf(b);
         if (cover != null && await cover.exists()) {

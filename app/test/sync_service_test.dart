@@ -135,6 +135,29 @@ void main() {
     expect(book?.title, 'Console edit');
   });
 
+  test('pull maps server authors and genres into the local db', () async {
+    final repo = await _repo(dir);
+    final client = _client(
+      _server(
+        books: [
+          {
+            'id': 'b1',
+            'title': 'Dune',
+            'updated_at': '2024-01-01 00:00:00',
+            'authors': ['Frank Herbert'],
+            'genres': ['Sci-Fi'],
+          },
+        ],
+      ),
+    );
+
+    await SyncService(repo).pull(client);
+
+    final details = await repo.detailsFor('b1');
+    expect(details.authors, ['Frank Herbert']);
+    expect(details.genres, ['Sci-Fi']);
+  });
+
   test('a server deletion removes the local book', () async {
     final repo = await _repo(dir);
     final db = repo.db;

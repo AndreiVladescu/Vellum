@@ -49,6 +49,8 @@ class ServerBook {
     this.spineStyle,
     this.coverPath,
     this.updatedAt,
+    this.authors,
+    this.genres,
   });
 
   final String id;
@@ -60,6 +62,13 @@ class ServerBook {
   final int? publishedYear;
   final int? pageCount;
   final String? spineStyle;
+
+  /// Authors / genres from the `GET /api/books` list enrichment. Null (not just
+  /// empty) when the server predates carrying them, so a pull can tell "the
+  /// server has none" (apply, possibly clearing) from "the server didn't say"
+  /// (leave local alone).
+  final List<String>? authors;
+  final List<String>? genres;
 
   /// Server-relative cover path; non-null means a cover is available to fetch.
   final String? coverPath;
@@ -87,7 +96,12 @@ class ServerBook {
     spineStyle: j['spine_style'] as String?,
     coverPath: j['cover_path'] as String?,
     updatedAt: _parseServerTime(j['updated_at'] as String?),
+    authors: _stringList(j['authors']),
+    genres: _stringList(j['genres']),
   );
+
+  static List<String>? _stringList(dynamic v) =>
+      v is List ? [for (final e in v) e.toString()] : null;
 }
 
 /// Formats a local [DateTime] as the server's UTC `"YYYY-MM-DD HH:MM:SS"` wire
@@ -212,6 +226,8 @@ class VellumServerClient {
     int? pageCount,
     String? spineStyle,
     DateTime? updatedAt,
+    List<String>? authors,
+    List<String>? genres,
   }) async {
     final res = await _http.put(
       _uri('/api/books/$id'),
@@ -226,6 +242,10 @@ class VellumServerClient {
         'page_count': pageCount,
         'spine_style': spineStyle,
         'updated_at': ?formatServerTime(updatedAt),
+        // Sent as arrays so the server replaces the joins; omitted (not null)
+        // when the caller has nothing to say, to leave server joins untouched.
+        'authors': ?authors,
+        'genres': ?genres,
       }),
     );
     _body(res);
