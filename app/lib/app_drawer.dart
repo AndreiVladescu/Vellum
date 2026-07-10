@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'account/account_page.dart';
 import 'account/user_profile.dart';
 import 'data/library_repository.dart';
+import 'loans/loans_page.dart';
 import 'server/connection_store.dart';
 import 'server/server_page.dart';
 import 'server/sync_service.dart';
@@ -51,6 +52,13 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
+  void _openLoans(BuildContext context) {
+    Navigator.of(context).pop(); // close the drawer first
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => LoansPage(repository: repository),
+    ));
+  }
+
   void _openAccount(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(
@@ -85,17 +93,10 @@ class AppDrawer extends StatelessWidget {
             selected: true,
             onTap: () => Navigator.of(context).pop(),
           ),
-          const ListTile(
-            leading: Icon(Icons.auto_stories_outlined),
-            title: Text('Physical books'),
-            subtitle: Text('Coming soon'),
-            enabled: false,
-          ),
-          const ListTile(
-            leading: Icon(Icons.swap_horiz),
-            title: Text('Loans'),
-            subtitle: Text('Coming soon'),
-            enabled: false,
+          ListTile(
+            leading: const Icon(Icons.swap_horiz),
+            title: const Text('Loans'),
+            onTap: () => _openLoans(context),
           ),
           ListenableBuilder(
             listenable: connection,

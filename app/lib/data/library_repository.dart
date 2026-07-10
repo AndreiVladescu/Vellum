@@ -25,6 +25,9 @@ export '../physical/layout_repository.dart' show LayoutRepository, PlacedBook;
 /// Author names and genre names for a book, for the detail view.
 typedef BookDetails = ({List<String> authors, List<String> genres});
 
+/// A loan joined with the book it's for, for the cross-library Loans overview.
+typedef LoanEntry = ({Loan loan, Book book});
+
 /// All library operations the UI needs. Wraps the local database, the
 /// filesystem store (covers, later book files), and the metadata client.
 class LibraryRepository {
@@ -551,6 +554,26 @@ class LibraryRepository {
             ..where((l) => l.copyId.equals(copyId))
             ..orderBy([(l) => OrderingTerm.desc(l.loanedAt)]))
           .watch();
+
+  /// Every loan across the library joined with the book it's for, most recent
+  /// first — for the cross-library Loans overview. The UI splits active
+  /// (`returnedAt == null`) from returned history.
+  Stream<List<LoanEntry>> watchAllLoans() {
+    final query = db.select(db.loans).join([
+      innerJoin(
+        db.physicalCopies,
+        db.physicalCopies.id.equalsExp(db.loans.copyId),
+      ),
+      innerJoin(db.books, db.books.id.equalsExp(db.physicalCopies.bookId)),
+    ])
+      ..orderBy([OrderingTerm.desc(db.loans.loanedAt)]);
+    return query.watch().map(
+          (rows) => [
+            for (final r in rows)
+              (loan: r.readTable(db.loans), book: r.readTable(db.books)),
+          ],
+        );
+  }
 
   /// Lends a copy to [borrower]. Callers only offer this when the copy has no
   /// active loan, so no additional check is needed here.

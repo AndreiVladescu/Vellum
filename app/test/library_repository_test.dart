@@ -68,6 +68,26 @@ void main() {
         reason: 'books survive shelf deletion');
   });
 
+  test('watchAllLoans joins the book and reflects active then returned', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'Lent'));
+    await db
+        .into(db.physicalCopies)
+        .insert(PhysicalCopiesCompanion.insert(id: 'c1', bookId: 'b1'));
+
+    await repo.lendCopy('c1', 'Alice');
+    var loans = await repo.watchAllLoans().first;
+    expect(loans, hasLength(1));
+    expect(loans.first.book.title, 'Lent');
+    expect(loans.first.loan.borrower, 'Alice');
+    expect(loans.first.loan.returnedAt, isNull, reason: 'active loan');
+
+    await repo.returnLoan(loans.first.loan.id);
+    loans = await repo.watchAllLoans().first;
+    expect(loans.first.loan.returnedAt, isNotNull, reason: 'now in history');
+  });
+
   test('re-tagging and deleting sweep orphaned author rows', () async {
     final repo = await _repo(dir);
     final db = repo.db;
