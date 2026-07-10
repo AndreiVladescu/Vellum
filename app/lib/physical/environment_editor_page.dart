@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart' show Value;
-import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,8 +9,12 @@ import '../book_detail/book_detail_page.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
+import 'book_picker.dart';
 import 'physical_metrics.dart';
+import 'placement_toolbar.dart';
+import 'room_painter.dart';
 import 'settle.dart';
+import 'shelf_dialogs.dart';
 
 /// A book's footprint (width × height) in metres, after rotation.
 typedef _Foot = ({double w, double h});
@@ -407,9 +410,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final topY = _shelves.isEmpty
         ? 0.3
         : _shelves.map((s) => math.max(s.y1, s.y2)).reduce(math.max) + 0.35;
-    final result = await showDialog<_ShelfSpec>(
+    final result = await showDialog<ShelfSpec>(
       context: context,
-      builder: (_) => _ShelfDialog(defaultY: double.parse(topY.toStringAsFixed(2))),
+      builder: (_) => ShelfDialog(defaultY: double.parse(topY.toStringAsFixed(2))),
     );
     if (result == null) return;
     await repo.layout.addShelf(
@@ -426,7 +429,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final book = await showModalBottomSheet<Book>(
       context: context,
       showDragHandle: true,
-      builder: (_) => _BookPicker(repository: repo),
+      builder: (_) => BookPicker(repository: repo),
     );
     if (book == null || _origin == null || !mounted) return;
     // Drop at the centre of the view, then let it settle onto a surface.
@@ -475,9 +478,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
 
   Future<void> _resizeSelected(PlacedBook pb) async {
     final format = BookFormat.byKey(pb.placement.format);
-    final result = await showDialog<_SizeSpec>(
+    final result = await showDialog<SizeSpec>(
       context: context,
-      builder: (_) => _SizeDialog(
+      builder: (_) => SizeDialog(
         book: pb.book,
         formatKey: pb.placement.format,
         thicknessCm: PhysicalMetrics.thickness(
@@ -618,9 +621,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   }
 
   Future<void> _editShelf(PhysicalShelf s) async {
-    final result = await showDialog<_ShelfSpec>(
+    final result = await showDialog<ShelfSpec>(
       context: context,
-      builder: (_) => _ShelfDialog(
+      builder: (_) => ShelfDialog(
         title: 'Edit shelf',
         defaultY: s.y1,
         initialLeft: math.min(s.x1, s.x2),
@@ -767,7 +770,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
               onSecondaryTapDown: (d) =>
                   _contextMenuAt(d.localPosition, d.globalPosition),
               child: CustomPaint(
-                painter: _RoomPainter(
+                painter: RoomPainter(
                   shelves: _shelves,
                   origin: _origin!,
                   scale: _scale,
@@ -821,7 +824,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         Positioned(
           left: 12,
           bottom: 12,
-          child: _ScaleBar(scale: _scale),
+          child: ScaleBar(scale: _scale),
         ),
         // Selected-book toolbar.
         if (selected != null)
@@ -829,7 +832,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
             left: 12,
             right: 12,
             bottom: 12,
-            child: _SelectionBar(
+            child: SelectionBar(
               title: selected.book.title,
               onOpen: () => _openBook(selected),
               onRotate: () => _rotateSelected(selected),
@@ -925,550 +928,6 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ---- painter --------------------------------------------------------------
-
-class _RoomPainter extends CustomPainter {
-  _RoomPainter({
-    required this.shelves,
-    required this.origin,
-    required this.scale,
-    required this.line,
-    required this.plank,
-    required this.label,
-    this.draggingShelfId,
-    required this.shelfDelta,
-  }) : super(repaint: shelfDelta);
-
-  final List<PhysicalShelf> shelves;
-  final Offset origin;
-  final double scale;
-  final Color line;
-  final Color plank;
-  final Color label;
-  final String? draggingShelfId;
-  // A live drag offset for [draggingShelfId]; drives repaints without rebuilding
-  // the widget while a shelf is dragged.
-  final ValueListenable<Offset> shelfDelta;
-
-  Offset _w2s(Offset w) =>
-      Offset(origin.dx + w.dx * scale, origin.dy - w.dy * scale);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Faint metre grid.
-    final grid = Paint()
-      ..color = line.withValues(alpha: 0.25)
-      ..strokeWidth = 1;
-    final leftWorld = (0 - origin.dx) / scale;
-    final rightWorld = (size.width - origin.dx) / scale;
-    for (var x = leftWorld.floorToDouble(); x <= rightWorld; x += 1) {
-      final sx = origin.dx + x * scale;
-      canvas.drawLine(Offset(sx, 0), Offset(sx, size.height), grid);
-    }
-    final bottomWorld = (origin.dy - size.height) / scale;
-    final topWorld = origin.dy / scale;
-    for (var y = bottomWorld.floorToDouble(); y <= topWorld; y += 1) {
-      final sy = origin.dy - y * scale;
-      canvas.drawLine(Offset(0, sy), Offset(size.width, sy), grid);
-    }
-
-    // Floor (world y = 0).
-    final floor = Paint()
-      ..color = line
-      ..strokeWidth = 2;
-    canvas.drawLine(Offset(0, origin.dy), Offset(size.width, origin.dy), floor);
-
-    // Shelves as planks (the one being dragged is shifted live).
-    final plankPaint = Paint()..color = plank.withValues(alpha: 0.85);
-    for (final s in shelves) {
-      final d = s.id == draggingShelfId ? shelfDelta.value : Offset.zero;
-      final p1 = _w2s(Offset(s.x1 + d.dx, s.y1 + d.dy));
-      final p2 = _w2s(Offset(s.x2 + d.dx, s.y2 + d.dy));
-      final left = math.min(p1.dx, p2.dx);
-      final right = math.max(p1.dx, p2.dx);
-      final top = math.min(p1.dy, p2.dy);
-      canvas.drawRect(Rect.fromLTWH(left, top, right - left, 5), plankPaint);
-      final name = s.label;
-      if (name != null && name.isNotEmpty) {
-        final tp = TextPainter(
-          text: TextSpan(
-            text: name,
-            style: TextStyle(color: label, fontSize: 11),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        tp.paint(canvas, Offset(left + 2, top + 7));
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RoomPainter old) =>
-      old.shelves != shelves ||
-      old.origin != origin ||
-      old.scale != scale ||
-      old.draggingShelfId != draggingShelfId;
-  // shelfDelta drives repaints via `repaint:` (a Listenable), so it's not
-  // compared here.
-}
-
-// ---- scale bar ------------------------------------------------------------
-
-class _ScaleBar extends StatelessWidget {
-  const _ScaleBar({required this.scale});
-  final double scale;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // Pick a round number of centimetres that fits ~a finger-width.
-    final metres = (80 / scale);
-    final cm = metres * 100;
-    final nice = cm >= 100
-        ? 100.0
-        : cm >= 50
-            ? 50.0
-            : cm >= 20
-                ? 20.0
-                : 10.0;
-    final width = (nice / 100) * scale;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: width,
-          height: 4,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          nice >= 100 ? '1 m' : '${nice.toStringAsFixed(0)} cm',
-          style: TextStyle(
-            fontSize: 11,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ---- selection toolbar ----------------------------------------------------
-
-class _SelectionBar extends StatelessWidget {
-  const _SelectionBar({
-    required this.title,
-    required this.onOpen,
-    required this.onRotate,
-    required this.onResize,
-    required this.onRemove,
-    required this.onClose,
-  });
-
-  final String title;
-  final VoidCallback onOpen;
-  final VoidCallback onRotate;
-  final VoidCallback onResize;
-  final VoidCallback onRemove;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      elevation: 3,
-      borderRadius: BorderRadius.circular(12),
-      color: theme.colorScheme.surfaceContainerHighest,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Open book',
-              onPressed: onOpen,
-              icon: const Icon(Icons.menu_book_outlined),
-            ),
-            IconButton.filledTonal(
-              tooltip: 'Rotate 90°',
-              onPressed: onRotate,
-              iconSize: 28,
-              icon: const Icon(Icons.rotate_90_degrees_cw),
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              tooltip: 'Resize',
-              onPressed: onResize,
-              icon: const Icon(Icons.straighten),
-            ),
-            IconButton(
-              tooltip: 'Remove',
-              onPressed: onRemove,
-              icon: const Icon(Icons.delete_outline),
-            ),
-            IconButton(
-              tooltip: 'Done',
-              onPressed: onClose,
-              icon: const Icon(Icons.close),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---- book picker ----------------------------------------------------------
-
-class _BookPicker extends StatefulWidget {
-  const _BookPicker({required this.repository});
-  final LibraryRepository repository;
-
-  @override
-  State<_BookPicker> createState() => _BookPickerState();
-}
-
-class _BookPickerState extends State<_BookPicker> {
-  String _query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<Book>>(
-      stream: widget.repository.watchAllBooks(),
-      builder: (context, snap) {
-        final q = _query.trim().toLowerCase();
-        final books = [
-          for (final b in snap.data ?? const <Book>[])
-            if (q.isEmpty || b.title.toLowerCase().contains(q)) b,
-        ];
-        return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: TextField(
-                  autofocus: false,
-                  onChanged: (v) => setState(() => _query = v),
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Find a book to place…',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: books.isEmpty
-                    ? const Center(child: Text('No books.'))
-                    : ListView.builder(
-                        itemCount: books.length,
-                        itemBuilder: (context, i) {
-                          final b = books[i];
-                          return ListTile(
-                            leading: Container(
-                              width: 12,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: PhysicalMetrics.color(b),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            title: Text(b.title,
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: b.pageCount == null
-                                ? null
-                                : Text('${b.pageCount} pages'),
-                            onTap: () => Navigator.pop(context, b),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ---- shelf dialog ---------------------------------------------------------
-
-class _ShelfSpec {
-  _ShelfSpec(this.left, this.right, this.y, this.label);
-  final double left;
-  final double right;
-  final double y;
-  final String? label;
-}
-
-class _ShelfDialog extends StatefulWidget {
-  const _ShelfDialog({
-    required this.defaultY,
-    this.title = 'Add shelf',
-    this.initialLeft,
-    this.initialRight,
-    this.initialLabel,
-  });
-  final double defaultY;
-  final String title;
-  final double? initialLeft;
-  final double? initialRight;
-  final String? initialLabel;
-
-  @override
-  State<_ShelfDialog> createState() => _ShelfDialogState();
-}
-
-class _ShelfDialogState extends State<_ShelfDialog> {
-  late final _left =
-      TextEditingController(text: (widget.initialLeft ?? 0.0).toString());
-  late final _right =
-      TextEditingController(text: (widget.initialRight ?? 1.0).toString());
-  late final _height = TextEditingController(text: widget.defaultY.toString());
-  late final _label = TextEditingController(text: widget.initialLabel ?? '');
-
-  @override
-  void dispose() {
-    _left.dispose();
-    _right.dispose();
-    _height.dispose();
-    _label.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget field(String label, TextEditingController c) => Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: TextField(
-            controller: c,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: label,
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-          ),
-        );
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'A shelf is a flat line between two points (metres).',
-              style: TextStyle(fontSize: 12),
-            ),
-            Row(
-              children: [
-                Expanded(child: field('Left X (m)', _left)),
-                const SizedBox(width: 8),
-                Expanded(child: field('Right X (m)', _right)),
-              ],
-            ),
-            field('Height Y (m)', _height),
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: TextField(
-                controller: _label,
-                decoration: const InputDecoration(
-                  labelText: 'Label (optional)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final left = double.tryParse(_left.text) ?? 0;
-            final right = double.tryParse(_right.text) ?? 1;
-            final y = double.tryParse(_height.text) ?? widget.defaultY;
-            if (right <= left) return;
-            Navigator.pop(
-              context,
-              _ShelfSpec(
-                left,
-                right,
-                y,
-                _label.text.trim().isEmpty ? null : _label.text.trim(),
-              ),
-            );
-          },
-          child: const Text('Add'),
-        ),
-      ],
-    );
-  }
-}
-
-// ---- size dialog ----------------------------------------------------------
-
-class _SizeSpec {
-  _SizeSpec({
-    required this.formatKey,
-    required this.thicknessCm,
-    required this.heightCm,
-    required this.reset,
-  });
-  final String? formatKey;
-  final double thicknessCm;
-  final double heightCm;
-  final bool reset;
-}
-
-class _SizeDialog extends StatefulWidget {
-  const _SizeDialog({
-    required this.book,
-    required this.formatKey,
-    required this.thicknessCm,
-    required this.heightCm,
-  });
-  final Book book;
-  final String? formatKey;
-  final double thicknessCm;
-  final double heightCm;
-
-  @override
-  State<_SizeDialog> createState() => _SizeDialogState();
-}
-
-class _SizeDialogState extends State<_SizeDialog> {
-  late String? _formatKey = widget.formatKey;
-  late final _thickness =
-      TextEditingController(text: widget.thicknessCm.toStringAsFixed(1));
-  late final _height =
-      TextEditingController(text: widget.heightCm.toStringAsFixed(1));
-
-  @override
-  void dispose() {
-    _thickness.dispose();
-    _height.dispose();
-    super.dispose();
-  }
-
-  // Picking a preset fills the fields with its size for this book's page count.
-  void _applyFormat(String? key) {
-    final format = BookFormat.byKey(key);
-    setState(() {
-      _formatKey = key;
-      _thickness.text =
-          (PhysicalMetrics.thickness(widget.book, format: format) * 100)
-              .toStringAsFixed(1);
-      _height.text =
-          (PhysicalMetrics.height(widget.book, format: format) * 100)
-              .toStringAsFixed(1);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget field(String label, TextEditingController c) => Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: TextField(
-            controller: c,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: label,
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-          ),
-        );
-    return AlertDialog(
-      title: const Text('Book size'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownButtonFormField<String?>(
-              initialValue: _formatKey,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Format preset',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Default')),
-                for (final f in BookFormat.presets)
-                  DropdownMenuItem(value: f.key, child: Text(f.label)),
-              ],
-              onChanged: _applyFormat,
-            ),
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'A preset sizes the book from its page count; tweak the '
-                'numbers below for a manual override.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-            field('Thickness (cm)', _thickness),
-            field('Height (cm)', _height),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(
-            context,
-            _SizeSpec(
-              formatKey: null,
-              thicknessCm: 0,
-              heightCm: 0,
-              reset: true,
-            ),
-          ),
-          child: const Text('Reset'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final t = double.tryParse(_thickness.text);
-            final h = double.tryParse(_height.text);
-            if (t == null || h == null || t <= 0 || h <= 0) return;
-            Navigator.pop(
-              context,
-              _SizeSpec(
-                formatKey: _formatKey,
-                thicknessCm: t,
-                heightCm: h,
-                reset: false,
-              ),
-            );
-          },
-          child: const Text('Save'),
-        ),
-      ],
     );
   }
 }
