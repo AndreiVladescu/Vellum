@@ -55,6 +55,9 @@ cargo run            # starts the API on http://localhost:3000
 
 The standalone app is functional: add books with online metadata, a spine/cover
 shelf, a PDF reader, and physical-copy loan tracking. The optional server adds
-multi-user accounts, RBAC, book groups, sharing, and public per-book links; the
-app can log in and pull a shared library. See the build order and the
-connected-mode sync roadmap in [DESIGN.md](DESIGN.md#build-order--status).
+multi-user accounts, RBAC, book groups, sharing, and public per-book links. The
+app logs in and syncs **both ways** — metadata, covers, and files stream to and
+from the server, with **last-write-wins by timestamp** and **delete tombstones**
+so edits and deletions propagate instead of resurrecting. See the build order
+and the connected-mode sync roadmap in
+[DESIGN.md](DESIGN.md#build-order--status).

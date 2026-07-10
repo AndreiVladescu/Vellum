@@ -1,11 +1,11 @@
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 
-use crate::auth::{sha256_hex, AuthUser};
+use crate::AppState;
+use crate::auth::{AuthUser, sha256_hex};
 use crate::books::BookDto;
 use crate::error::{AppError, AppResult};
-use crate::AppState;
 
 // ===========================================================================
 // User-to-user shares
@@ -35,10 +35,7 @@ pub struct ShareInput {
 }
 
 /// Shares the caller created or received.
-pub async fn list(
-    State(state): State<AppState>,
-    user: AuthUser,
-) -> AppResult<Json<Vec<ShareDto>>> {
+pub async fn list(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<Vec<ShareDto>>> {
     let shares = sqlx::query_as::<_, ShareDto>(&format!(
         "{SHARE_SELECT} WHERE s.owner_id = ? OR s.grantee_id = ? ORDER BY s.created_at DESC"
     ))
@@ -88,11 +85,17 @@ pub async fn create(
 
     let grantee_id = lookup_user_by_email(&state, &input.grantee_email).await?;
     if grantee_id == user.id {
-        return Err(AppError::BadRequest("you cannot share with yourself".into()));
+        return Err(AppError::BadRequest(
+            "you cannot share with yourself".into(),
+        ));
     }
 
     let id = uuid::Uuid::new_v4().to_string();
-    let scope_id = if input.scope == "all" { None } else { input.scope_id.clone() };
+    let scope_id = if input.scope == "all" {
+        None
+    } else {
+        input.scope_id.clone()
+    };
     sqlx::query(
         "INSERT INTO share (id, owner_id, grantee_id, scope, scope_id, permission) \
          VALUES (?, ?, ?, ?, ?, ?)",
@@ -125,7 +128,9 @@ pub async fn delete(
         .await?;
     let owner = owner.ok_or_else(|| AppError::NotFound("share not found".into()))?;
     if !user.is_master && owner != user.id {
-        return Err(AppError::Forbidden("only the share's creator may revoke it".into()));
+        return Err(AppError::Forbidden(
+            "only the share's creator may revoke it".into(),
+        ));
     }
     sqlx::query("DELETE FROM share WHERE id = ?")
         .bind(&id)
@@ -212,6 +217,15 @@ pub async fn create_link(
     require_owns_book(&state, &user, &input.book_id).await?;
     let permission = normalize_permission(input.permission.as_deref())?;
 
+    if input.expires_in_days.is_some_and(|d| d <= 0) {
+        return Err(AppError::BadRequest(
+            "expires_in_days must be positive".into(),
+        ));
+    }
+    if input.max_uses.is_some_and(|n| n <= 0) {
+        return Err(AppError::BadRequest("max_uses must be positive".into()));
+    }
+
     let token = {
         use rand_core::{OsRng, RngCore};
         let mut bytes = [0u8; 24];
@@ -222,21 +236,25 @@ pub async fn create_link(
 
     // Prefer an explicit date; a bare YYYY-MM-DD is treated as end-of-day so the
     // link stays valid through that whole day. Otherwise fall back to +N days.
-    let expires_at: Option<String> = if let Some(raw) = input.expires_at.as_deref() {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            None
-        } else if trimmed.len() == 10 {
-            Some(format!("{trimmed} 23:59:59"))
-        } else {
-            Some(trimmed.to_string())
-        }
-    } else {
-        input.expires_in_days.map(|d| {
+    // Parse rather than trust the string, so garbage can't become a link that
+    // compares as "never expired" against SQLite's datetime().
+    let expires_at: Option<String> = match input.expires_at.as_deref().map(str::trim) {
+        Some("") | None => input.expires_in_days.map(|d| {
             (chrono::Utc::now() + chrono::Duration::days(d))
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string()
-        })
+        }),
+        Some(raw) => {
+            let parsed = chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+                .map(|d| d.and_hms_opt(23, 59, 59).unwrap())
+                .or_else(|_| chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S"))
+                .map_err(|_| {
+                    AppError::BadRequest(
+                        "expires_at must be YYYY-MM-DD or YYYY-MM-DD HH:MM:SS".into(),
+                    )
+                })?;
+            Some(parsed.format("%Y-%m-%d %H:%M:%S").to_string())
+        }
     };
 
     let max_uses = if input.one_time.unwrap_or(false) {
@@ -281,7 +299,9 @@ pub async fn delete_link(
         .await?;
     let owner = owner.ok_or_else(|| AppError::NotFound("link not found".into()))?;
     if !user.is_master && owner != user.id {
-        return Err(AppError::Forbidden("only the link's creator may revoke it".into()));
+        return Err(AppError::Forbidden(
+            "only the link's creator may revoke it".into(),
+        ));
     }
     sqlx::query("UPDATE share_link SET revoked = 1 WHERE id = ?")
         .bind(&id)
@@ -383,6 +403,13 @@ pub async fn public_file(
     let (rel, format) =
         file.ok_or_else(|| AppError::NotFound("this book has no file to download".into()))?;
 
+    // Open the file BEFORE consuming a use, so a blob missing on disk can't burn
+    // a one-time link on a download that then fails.
+    let handle = tokio::fs::File::open(state.data_dir.join(&rel))
+        .await
+        .map_err(|_| AppError::NotFound("file missing on disk".into()))?;
+    let len = handle.metadata().await.ok().map(|m| m.len());
+
     // Consume a use atomically; the WHERE re-checks validity, so concurrent
     // downloads of a one-time link can't both succeed.
     let consumed = sqlx::query(&format!(
@@ -400,9 +427,6 @@ pub async fn public_file(
         .bind(&book_id)
         .fetch_one(&state.db)
         .await?;
-    let bytes = tokio::fs::read(state.data_dir.join(&rel))
-        .await
-        .map_err(|_| AppError::NotFound("file missing on disk".into()))?;
 
     let filename = format!("{}.{}", sanitize_filename(&title), format);
     let mime = match format.as_str() {
@@ -410,23 +434,32 @@ pub async fn public_file(
         "pdf" => "application/pdf",
         _ => "application/octet-stream",
     };
-    Ok((
-        [
-            (header::CONTENT_TYPE, mime.to_string()),
-            (
-                header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"{filename}\""),
-            ),
-        ],
-        bytes,
-    )
-        .into_response())
+    let mut response =
+        axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(handle)).into_response();
+    let headers = response.headers_mut();
+    headers.insert(header::CONTENT_TYPE, mime.parse().unwrap());
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{filename}\"")
+            .parse()
+            .unwrap(),
+    );
+    if let Some(len) = len {
+        headers.insert(header::CONTENT_LENGTH, len.into());
+    }
+    Ok(response)
 }
 
 fn sanitize_filename(title: &str) -> String {
     let cleaned: String = title
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let trimmed = cleaned.trim();
     if trimmed.is_empty() {
@@ -442,7 +475,9 @@ fn normalize_permission(value: Option<&str>) -> AppResult<String> {
     match value.unwrap_or("viewer") {
         "viewer" => Ok("viewer".to_string()),
         "editor" => Ok("editor".to_string()),
-        other => Err(AppError::BadRequest(format!("unknown permission '{other}'"))),
+        other => Err(AppError::BadRequest(format!(
+            "unknown permission '{other}'"
+        ))),
     }
 }
 
@@ -465,6 +500,8 @@ async fn require_owns_book(state: &AppState, user: &AuthUser, book_id: &str) -> 
     if user.is_master || owner.as_deref() == Some(user.id.as_str()) {
         Ok(())
     } else {
-        Err(AppError::Forbidden("only the book's owner may share it".into()))
+        Err(AppError::Forbidden(
+            "only the book's owner may share it".into(),
+        ))
     }
 }

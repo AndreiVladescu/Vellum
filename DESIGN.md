@@ -83,8 +83,8 @@ single-user and offline. These tables are **server-only** (migration
 Access is resolved per request: a caller may see a book if they are the master,
 own it, or reach it through any share (all / group / book). Editing needs
 `editor`; deleting needs ownership. Endpoints: `/api/auth/*`, `/api/users`,
-`/api/books`, `/api/groups`, `/api/shares`, `/api/share-links`, and the
-unauthenticated `/api/public/{token}`. Cover images and book files are stored
+`/api/books`, `/api/deletions` (delete tombstones for sync), `/api/groups`,
+`/api/shares`, `/api/share-links`, and the unauthenticated `/api/public/{token}`. Cover images and book files are stored
 as filesystem blobs under `VELLUM_DATA_DIR` and served, access-checked, from
 `/api/books/{id}/cover` and `/api/files/{id}`. Auth is a bearer token or HTTP
 Basic (email:password), the latter so e-readers can use the OPDS catalog at
@@ -92,7 +92,12 @@ Basic (email:password), the latter so e-readers can use the OPDS catalog at
 `VELLUM_PUBLIC_URL`, and the max upload size is `VELLUM_MAX_UPLOAD_MB` (default
 2048). The cover and file endpoints also accept the token as a `?token=` query
 param, so a browser `<img>` (cover) or `<a download>` (file) works without an
-Authorization header.
+Authorization header. (Caveat: query-string tokens can leak into proxy/access
+logs and browser history; a future refinement is short-lived per-resource
+tokens. The server speaks plain HTTP and should sit behind a TLS reverse proxy —
+see **Deployment**.) The app keeps its own session token in the platform secure
+store (Keychain / libsecret / Keystore), not plaintext prefs, and defaults new
+server URLs to `https://`.
 
 For book discovery the server runs the **same metadata search** as the app
 (`GET /api/metadata/search`, Open Library → Google Books); `POST
@@ -123,6 +128,18 @@ while). It is the primary way to manage the library; the app's Sharing screen
 covers the same
 endpoints for on-device use.
 
+## Deployment
+
+The server speaks **plain HTTP** and terminates no TLS of its own. Run it behind
+a TLS reverse proxy (Caddy, nginx, Traefik) so credentials, book files, and
+`?token=` URLs travel encrypted. Set **`VELLUM_PUBLIC_URL`** to the public
+`https://` origin so minted public share links point at the proxy, not at
+`localhost`. Other knobs: `VELLUM_PORT` (bind port, default 3000, on `0.0.0.0`),
+`VELLUM_DB` (SQLite file), `VELLUM_DATA_DIR` (blob store), `VELLUM_MAX_UPLOAD_MB`
+(default 2048). Back up the `.db` file and the data dir together — the database
+stores blob *paths*, so the two are only meaningful as a pair. The app defaults
+new server URLs to `https://` and warns when a URL is unencrypted.
+
 ## Data model
 
 - **book** — title, subtitle, description, ISBN, publisher, year, page count,
@@ -136,11 +153,18 @@ endpoints for on-device use.
 - **shelf** — manual collections/panes, with explicit book ordering,
   independent of genres.
 
-**App-local-only columns on `book`** (deliberately *not* in the server schema
-and never synced): reading state (progress/page/last-read), **reader notes**,
-and **`source_metadata`** (a JSON snapshot of the online-library data a book was
-imported with, behind *revert to library defaults*). See **Adding & editing
-books**.
+**App-local-only columns on `book`** (deliberately *not* synced): reading state
+(progress/page/last-read), **reader notes**, and **`source_metadata`** (a JSON
+snapshot of the online-library data a book was imported with, behind *revert to
+library defaults*). See **Adding & editing books**. (Historical note: an early
+migration, `0002`, added the three reading-state columns to the *server* table
+by mistake; migration `0006` drops them again, since reading state must stay on
+the device. Reader notes and `source_metadata` were never on the server.)
+
+The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
+pins the column list of every synced table (`book`, `author`, `book_author`,
+`genre`, `book_genre`, `book_file`) and fails if the server migrations drift
+from it — a prompt to update `app/lib/data/database.dart` too.
 
 **App-local-only tables** for the physical bookshelf layouts (also never
 synced — a per-device arrangement of a real room, all lengths in **metres**):
@@ -157,10 +181,13 @@ synced — a per-device arrangement of a real room, all lengths in **metres**):
 ## Spine rendering
 
 No API on the internet serves spine images, so Vellum **generates** spines:
-extract dominant colors from the cover, render the title in a vertical
-typeface, vary spine height/thickness by page count. Uniform, good-looking
-shelves for every book. The generated style is stored per-book (JSON) so users
-can tweak it later.
+pick spine colours, render the title in a vertical typeface, and vary spine
+height/thickness by page count. Uniform, good-looking shelves for every book.
+The generated style is stored per-book (JSON) so users can tweak it later.
+
+> **Implementation note.** Colours today come from a **title-hash palette**
+> (`spine_style.dart`), not from the cover art. Extracting dominant colours from
+> the cover is a planned refinement — see [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ## Physical bookshelf layouts
 
@@ -255,7 +282,11 @@ authors, year, pages, publisher, ISBN, description):
   still works — everything else fills in.
 
 Uploads are validated by their **magic bytes** — a real `%PDF`, an EPUB zip, or
-an image for covers — not just the file extension.
+an image for covers — not just the file extension. This is enforced on the
+**server** (`blobs.rs` sniffs the leading bytes and rejects a mismatch: book
+files must be PDF/EPUB, covers must be JPEG/PNG/GIF/WebP, and a cover's stored
+extension comes from the sniffed type), not only in the console/app clients, so
+the API can't be tricked by a renamed file.
 
 Once a book exists you can edit its **title, subtitle, year, and description**,
 and change its **cover**. On both the app and the console the cover shows and is
@@ -298,14 +329,24 @@ Two things stay **on the device only** and are never synced to a server:
 7. 🚧 Rust server + sync (connected mode), OPDS feed. In place: accounts, RBAC,
    groups, sharing, public links, blob storage, OPDS, and a web admin console,
    with API integration tests. The app logs in and syncs **both ways** —
-   metadata, covers, and files — and manages sharing on-device. Remaining:
-   conflict handling / real-time updates and the Android side.
+   metadata, covers, and files — and manages sharing on-device. Sync is
+   **last-write-wins by `updated_at`** with **delete tombstones** (below).
+   Remaining: field-level merge / real-time updates and the Android side.
 
 ## Sync roadmap (connected mode)
 
 The connected-mode roadmap below is essentially complete; the app does a
-two-way sync of metadata, covers, and files. Remaining polish is conflict
-resolution and live updates.
+two-way sync of metadata, covers, and files.
+
+**Conflict handling & deletes.** A pull compares each book's server `updated_at`
+against the local row and only overwrites when the server copy is strictly
+newer (a missing server timestamp falls back to overwriting), so a local edit
+isn't clobbered before it's pushed. Deletes propagate through tombstones: the
+server keeps a `deletion` table (exposed at `GET /api/deletions`, cleared when a
+book is re-created at the same id) and the app keeps a local `local_deletions`
+table; a pull applies the server's tombstones, a push sends the app's. The
+app-local `local_deletions` table is **not** part of the server schema. Remaining
+polish is field-level merge and live updates.
 
 1. ✅ **Server blob storage** — upload/download endpoints for cover images and
    book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the

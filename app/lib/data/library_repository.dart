@@ -3,12 +3,12 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
-import '../server/server_client.dart';
 import '../shelf/spine_style.dart';
 import 'database.dart';
 import 'metadata.dart';
@@ -33,6 +33,21 @@ class LibraryRepository {
 
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
+    return _withDataDir(db, dir);
+  }
+
+  /// Builds a repository over an explicit data directory instead of the
+  /// platform app-support dir — for tests that can't reach `path_provider`.
+  @visibleForTesting
+  static Future<LibraryRepository> forTesting(
+    VellumDatabase db,
+    Directory dataDir,
+  ) => _withDataDir(db, dataDir);
+
+  static Future<LibraryRepository> _withDataDir(
+    VellumDatabase db,
+    Directory dir,
+  ) async {
     await Directory(p.join(dir.path, 'covers')).create(recursive: true);
     await Directory(p.join(dir.path, 'files')).create(recursive: true);
     return LibraryRepository._(db, MetadataService(), dir);
@@ -596,176 +611,12 @@ class LibraryRepository {
     return id;
   }
 
-  /// Pulls the server library onto this device (a one-way sync for now):
-  /// upserts book metadata, then downloads any covers we don't already hold.
-  /// Locally-attached files are left untouched. Returns the number of books
-  /// written.
-  Future<int> pullFromServer(VellumServerClient client) async {
-    final books = await client.listBooks();
+  /// The library's data directory (covers/ and files/ live under it). Exposed
+  /// for the sync service and tests; app code uses [coverFileOf] / [fileOf].
+  Directory get dataDir => _dataDir;
 
-    await db.transaction(() async {
-      for (final b in books) {
-        final spine =
-            b.spineStyle ??
-            SpineStyle.generate(
-              title: b.title,
-              pageCount: b.pageCount,
-            ).toJson();
-        await db
-            .into(db.books)
-            .insertOnConflictUpdate(
-              BooksCompanion.insert(
-                id: b.id,
-                title: b.title,
-                subtitle: Value(b.subtitle),
-                description: Value(b.description),
-                isbn: Value(b.isbn),
-                publisher: Value(b.publisher),
-                publishedYear: Value(b.publishedYear),
-                pageCount: Value(b.pageCount),
-                spineStyle: Value(spine),
-              ),
-            );
-      }
-    });
-
-    // Fetch cover art outside the transaction; a failed cover never fails the
-    // whole pull.
-    for (final b in books.where((b) => b.hasCover)) {
-      final local = File(p.join(_dataDir.path, 'covers', '${b.id}.jpg'));
-      if (await local.exists()) continue;
-      try {
-        final bytes = await client.downloadCover(b.id);
-        if (bytes == null) continue;
-        await local.writeAsBytes(bytes);
-        await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
-          BooksCompanion(coverPath: Value(p.join('covers', '${b.id}.jpg'))),
-        );
-      } catch (_) {
-        // Leave this book cover-less; it still shows a generated spine.
-      }
-    }
-
-    // Download digital files the device doesn't already have. Dedup by content
-    // hash, so a file pushed under a different id isn't downloaded twice.
-    for (final b in books) {
-      try {
-        for (final f in await client.listFiles(b.id)) {
-          final have =
-              await (db.select(db.bookFiles)..where(
-                    (x) => x.bookId.equals(b.id) & x.sha256.equals(f.sha256),
-                  ))
-                  .getSingleOrNull();
-          if (have != null) continue;
-          final bytes = await client.downloadFile(f.id);
-          final rel = p.join('files', '${f.id}.${f.format}');
-          await File(p.join(_dataDir.path, rel)).writeAsBytes(bytes);
-          await db
-              .into(db.bookFiles)
-              .insertOnConflictUpdate(
-                BookFilesCompanion.insert(
-                  id: f.id,
-                  bookId: b.id,
-                  format: f.format,
-                  path: rel,
-                  sizeBytes: f.sizeBytes,
-                  sha256: f.sha256,
-                ),
-              );
-        }
-      } catch (_) {
-        // Metadata and cover are already pulled; skip files on error.
-      }
-    }
-
-    // For books the server has no cover for (e.g. PDFs uploaded on the server,
-    // which can't render covers there): make sure we have a local cover
-    // (rendering the first PDF page if needed) and push it back, so the
-    // server/console shows the same cover the app does.
-    for (final b in books) {
-      if (b.hasCover) continue; // the server already has a cover
-      final row = await (db.select(
-        db.books,
-      )..where((x) => x.id.equals(b.id))).getSingleOrNull();
-      if (row == null) continue;
-      var localCover = row.coverPath;
-      if (localCover == null) {
-        try {
-          if (await setCoverFromFirstPage(b.id)) {
-            localCover = p.join('covers', '${b.id}.jpg');
-          }
-        } catch (_) {}
-      }
-      if (localCover == null) continue;
-      final coverFile = File(p.join(_dataDir.path, localCover));
-      if (await coverFile.exists()) {
-        try {
-          await client.uploadCover(b.id, await coverFile.readAsBytes());
-        } catch (_) {
-          // View-only or offline — the cover stays local to this device.
-        }
-      }
-    }
-    return books.length;
-  }
-
-  /// Pushes local books (and their covers) up to the server, upserting by id so
-  /// pull and push stay consistent. Books the caller can't write on the server
-  /// (e.g. shared read-only) are skipped. Returns the number pushed.
-  Future<int> pushToServer(VellumServerClient client) async {
-    final books = await db.select(db.books).get();
-    var pushed = 0;
-    for (final b in books) {
-      try {
-        await client.pushBook(
-          id: b.id,
-          title: b.title,
-          subtitle: b.subtitle,
-          description: b.description,
-          isbn: b.isbn,
-          publisher: b.publisher,
-          publishedYear: b.publishedYear,
-          pageCount: b.pageCount,
-          spineStyle: b.spineStyle,
-        );
-        final cover = coverFileOf(b);
-        if (cover != null && await cover.exists()) {
-          await client.uploadCover(
-            b.id,
-            await cover.readAsBytes(),
-            contentType: p.extension(cover.path).toLowerCase() == '.png'
-                ? 'image/png'
-                : 'image/jpeg',
-          );
-        }
-
-        // Upload local files the server doesn't already have (dedup by hash).
-        final localFiles = await (db.select(
-          db.bookFiles,
-        )..where((f) => f.bookId.equals(b.id))).get();
-        if (localFiles.isNotEmpty) {
-          final remoteHashes = (await client.listFiles(
-            b.id,
-          )).map((f) => f.sha256).toSet();
-          for (final lf in localFiles) {
-            if (remoteHashes.contains(lf.sha256)) continue;
-            final file = fileOf(lf);
-            if (await file.exists()) {
-              await client.uploadFile(
-                b.id,
-                await file.readAsBytes(),
-                format: lf.format,
-              );
-            }
-          }
-        }
-        pushed++;
-      } on ServerException {
-        // Read-only or rejected — leave it and keep going.
-      }
-    }
-    return pushed;
-  }
+  // Sync (pull/push) lives in `server/sync_service.dart`, which drives this
+  // repository's database and file store.
 
   /// Get-or-create for the name-keyed lookup tables (authors, genres).
   Future<String> _idForName(TableInfo table, String name) async {
@@ -810,11 +661,22 @@ class LibraryRepository {
     );
   }
 
-  Future<void> deleteBook(Book book) async {
+  /// Deletes a book and its local data. [recordTombstone] leaves a
+  /// [LocalDeletions] row so the next push tells the server to delete it too;
+  /// pull-driven deletes (the server already knows) pass false to avoid
+  /// re-pushing the deletion forever.
+  Future<void> deleteBook(Book book, {bool recordTombstone = true}) async {
     final attachedFiles = await (db.select(
       db.bookFiles,
     )..where((f) => f.bookId.equals(book.id))).get();
     await db.transaction(() async {
+      if (recordTombstone) {
+        await db
+            .into(db.localDeletions)
+            .insertOnConflictUpdate(
+              LocalDeletionsCompanion.insert(bookId: book.id),
+            );
+      }
       // Explicit deletes rather than relying on FK cascades, so this works
       // on databases created before cascades were added to the schema.
       for (final table in [
