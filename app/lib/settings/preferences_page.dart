@@ -7,6 +7,7 @@ import '../data/backup_service.dart';
 import '../data/library_repository.dart';
 import 'app_settings.dart';
 import 'book_face.dart';
+import 'spine_art.dart';
 import 'wallpaper.dart';
 
 /// Appearance preferences (how books are shown on the shelf, the shelf
@@ -50,6 +51,32 @@ class PreferencesPage extends StatelessWidget {
                     settings.setBookFace(selection.first),
               ),
             ),
+            // Spine artwork only matters spine-out; face-out always shows the
+            // cover itself.
+            if (settings.bookFace == BookFace.spine) ...[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text('Spine artwork for books with a cover'),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: SegmentedButton<SpineArt>(
+                  segments: [
+                    for (final art in SpineArt.values)
+                      ButtonSegment(
+                        value: art,
+                        label: Text(art.label),
+                        icon: Icon(art == SpineArt.coverSlice
+                            ? Icons.image_outlined
+                            : Icons.palette_outlined),
+                      ),
+                  ],
+                  selected: {settings.spineArt},
+                  onSelectionChanged: (selection) =>
+                      settings.setSpineArt(selection.first),
+                ),
+              ),
+            ],
             const Divider(height: 24),
             _SectionHeader('Wallpaper'),
             for (final wallpaper in Wallpaper.values)

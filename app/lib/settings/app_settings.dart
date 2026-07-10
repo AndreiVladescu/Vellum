@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'book_face.dart';
+import 'spine_art.dart';
 import 'wallpaper.dart';
 
 /// App-wide preferences stored on device.
@@ -10,6 +11,7 @@ class AppSettingsStore extends ChangeNotifier {
 
   static const _wallpaperKey = 'settings.wallpaper';
   static const _bookFaceKey = 'settings.bookFace';
+  static const _spineArtKey = 'settings.spineArt';
 
   final SharedPreferences _prefs;
 
@@ -38,6 +40,20 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setBookFace(BookFace value) async {
     await _prefs.setString(_bookFaceKey, value.name);
+    notifyListeners();
+  }
+
+  /// How a spine-out book with cover art draws its spine (cover slice vs the
+  /// cover's dominant colour). Only applies in [BookFace.spine] mode — a
+  /// face-out shelf always shows the cover itself.
+  SpineArt get spineArt {
+    final stored = _prefs.getString(_spineArtKey);
+    return SpineArt.values.where((s) => s.name == stored).firstOrNull ??
+        SpineArt.coverSlice;
+  }
+
+  Future<void> setSpineArt(SpineArt value) async {
+    await _prefs.setString(_spineArtKey, value.name);
     notifyListeners();
   }
 }

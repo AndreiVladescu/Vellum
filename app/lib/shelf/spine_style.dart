@@ -16,10 +16,15 @@ class SpineStyle {
     required this.width,
     required this.heightFactor,
     required this.variant,
+    this.coverColor,
   });
 
   final Color color;
   final Color textColor;
+
+  /// Dominant colour extracted from the book's cover art, when it has any —
+  /// the alternative spine colouring behind the "Dominant colour" preference.
+  final Color? coverColor;
 
   /// Spine thickness in logical pixels (driven by page count).
   final double width;
@@ -73,17 +78,40 @@ class SpineStyle {
     if (json == null || json.isEmpty) return generate(title: title);
     try {
       final m = jsonDecode(json) as Map<String, dynamic>;
+      final cover = m['coverColor'] as String?;
       return SpineStyle(
         color: _parseHex(m['color'] as String),
         textColor: _parseHex(m['textColor'] as String),
         width: (m['width'] as num).toDouble(),
         heightFactor: (m['heightFactor'] as num).toDouble(),
         variant: m['variant'] as int,
+        coverColor: cover == null ? null : _parseHex(cover),
       );
     } catch (_) {
       return generate(title: title);
     }
   }
+
+  /// The same style with the cover's dominant colour attached (or cleared).
+  SpineStyle withCoverColor(Color? cover) => SpineStyle(
+        color: color,
+        textColor: textColor,
+        width: width,
+        heightFactor: heightFactor,
+        variant: variant,
+        coverColor: cover,
+      );
+
+  /// The same shape (width/height/variant) painted in a different colour —
+  /// how the dominant-colour preference restyles a covered book's spine.
+  SpineStyle recolored(Color newColor, Color newTextColor) => SpineStyle(
+        color: newColor,
+        textColor: newTextColor,
+        width: width,
+        heightFactor: heightFactor,
+        variant: variant,
+        coverColor: coverColor,
+      );
 
   String toJson() => jsonEncode({
         'color': _toHex(color),
@@ -91,6 +119,7 @@ class SpineStyle {
         'width': width,
         'heightFactor': heightFactor,
         'variant': variant,
+        if (coverColor != null) 'coverColor': _toHex(coverColor!),
       });
 
   static Color _parseHex(String hex) =>

@@ -99,6 +99,8 @@ class _LibraryPageState extends State<LibraryPage> {
   void initState() {
     super.initState();
     _autoSync();
+    // Catch up covers that predate dominant-colour extraction (no-op once done).
+    widget.repository.backfillCoverColors();
   }
 
   /// Best-effort sync on launch when a server is connected. Quiet by design:
@@ -279,6 +281,7 @@ class _LibraryPageState extends State<LibraryPage> {
             return ShelfView(
               books: books,
               bookFace: widget.settings.bookFace,
+              spineArt: widget.settings.spineArt,
               coverFileOf: repository.coverFileOf,
               detailBuilder: (book) =>
                   BookDetailPage(book: book, repository: repository),

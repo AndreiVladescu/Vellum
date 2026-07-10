@@ -249,6 +249,8 @@ class SyncService {
           await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
             BooksCompanion(coverPath: Value(rel), coverEtag: Value(res.etag)),
           );
+          // Keep the dominant-colour spine in step with the new art.
+          await repository.updateCoverColor(b.id, res.bytes!);
         }
       } catch (e) {
         // Leave this book cover-less; it still shows a generated spine.

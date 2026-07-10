@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../settings/book_face.dart';
+import '../settings/spine_art.dart';
 import 'book_open_route.dart';
+import 'cover_color.dart';
 import 'spine_style.dart';
 
 const _bookAreaHeight = 175.0;
@@ -24,6 +26,7 @@ class ShelfView extends StatelessWidget {
     required this.books,
     required this.detailBuilder,
     this.bookFace = BookFace.spine,
+    this.spineArt = SpineArt.coverSlice,
     this.coverFileOf,
   });
 
@@ -31,6 +34,9 @@ class ShelfView extends StatelessWidget {
 
   /// Whether books stand spine-out or face-out with their front cover.
   final BookFace bookFace;
+
+  /// In spine mode: cover-slice spines or dominant-colour spines.
+  final SpineArt spineArt;
 
   /// Builds the page a book opens into (container-transform animation).
   final Widget Function(Book) detailBuilder;
@@ -52,6 +58,7 @@ class ShelfView extends StatelessWidget {
         itemBuilder: (context, i) => _ShelfRow(
           row: rows[i],
           bookFace: bookFace,
+          spineArt: spineArt,
           detailBuilder: detailBuilder,
           coverFileOf: coverFileOf,
         ),
@@ -83,12 +90,14 @@ class _ShelfRow extends StatelessWidget {
   const _ShelfRow({
     required this.row,
     required this.bookFace,
+    required this.spineArt,
     required this.detailBuilder,
     required this.coverFileOf,
   });
 
   final List<Book> row;
   final BookFace bookFace;
+  final SpineArt spineArt;
   final Widget Function(Book) detailBuilder;
   final File? Function(Book)? coverFileOf;
 
@@ -131,6 +140,7 @@ class _ShelfRow extends StatelessWidget {
                               : BookSpine(
                                   book: book,
                                   coverFile: coverFile,
+                                  spineArt: spineArt,
                                   onTap: onTap);
                       return face(
                         onTap: () => _openBook(bookContext, book, face()),
@@ -173,11 +183,13 @@ class BookSpine extends StatelessWidget {
     required this.book,
     this.onTap,
     this.coverFile,
+    this.spineArt = SpineArt.coverSlice,
   });
 
   final Book book;
   final VoidCallback? onTap;
   final File? coverFile;
+  final SpineArt spineArt;
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +202,12 @@ class BookSpine extends StatelessWidget {
         child: SizedBox(
           width: style.width,
           height: _bookAreaHeight * style.heightFactor,
-          child: SpineFace(book: book, coverFile: coverFile, style: style),
+          child: SpineFace(
+            book: book,
+            coverFile: coverFile,
+            style: style,
+            spineArt: spineArt,
+          ),
         ),
       ),
     );
@@ -206,11 +223,17 @@ class SpineFace extends StatelessWidget {
     required this.book,
     this.coverFile,
     this.style,
+    this.spineArt = SpineArt.coverSlice,
   });
 
   final Book book;
   final File? coverFile;
   final SpineStyle? style;
+
+  /// How a covered book draws its spine. [SpineArt.dominantColor] uses the
+  /// generated spine in the cover's extracted colour; until that colour has
+  /// been extracted it falls back to the cover slice.
+  final SpineArt spineArt;
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +242,14 @@ class SpineFace extends StatelessWidget {
     // No filesystem call in build: a non-null path means "has a cover". If the
     // file is actually missing (rare orphaned path), Image.file's errorBuilder
     // falls back to the generated spine.
-    return cover != null ? _coverSpine(context, cover, s) : _generatedSpine(s);
+    if (cover == null) return _generatedSpine(s);
+    final dominant = s.coverColor;
+    if (spineArt == SpineArt.dominantColor && dominant != null) {
+      return _generatedSpine(
+        s.withCoverColor(null).recolored(dominant, spineTextColorFor(dominant)),
+      );
+    }
+    return _coverSpine(context, cover, s);
   }
 
   /// Spine drawn from the left edge of the cover image.

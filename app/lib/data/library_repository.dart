@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../physical/layout_repository.dart';
+import '../shelf/cover_color.dart';
 import '../shelf/spine_style.dart';
 import 'database.dart';
 import 'metadata.dart';
@@ -264,7 +265,9 @@ class LibraryRepository {
     );
   }
 
-  /// Replaces a book's cover from raw image bytes.
+  /// Replaces a book's cover from raw image bytes. Also extracts the cover's
+  /// dominant colour into the spine style, for the "Dominant colour" spine
+  /// preference.
   Future<void> setCoverBytes(String bookId, Uint8List bytes) async {
     final rel = p.join('covers', '$bookId.jpg');
     await File(p.join(_dataDir.path, rel)).writeAsBytes(bytes);
@@ -275,6 +278,45 @@ class LibraryRepository {
         needsPush: const Value(true),
       ),
     );
+    await updateCoverColor(bookId, bytes);
+  }
+
+  /// Stores the dominant colour of [coverBytes] in the book's spine style.
+  /// Purely cosmetic and device-derivable, so it deliberately does NOT bump
+  /// the sync clock or the dirty flag. A no-op when the bytes don't decode.
+  Future<void> updateCoverColor(String bookId, Uint8List coverBytes) async {
+    final color = await dominantColorOf(coverBytes);
+    if (color == null) return;
+    final row = await (db.select(
+      db.books,
+    )..where((b) => b.id.equals(bookId))).getSingleOrNull();
+    if (row == null) return;
+    final style = SpineStyle.fromJson(row.spineStyle, title: row.title)
+        .withCoverColor(color);
+    await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+      BooksCompanion(spineStyle: Value(style.toJson())),
+    );
+  }
+
+  /// One-time catch-up for covers that predate dominant-colour extraction:
+  /// computes and stores the colour for every covered book whose spine style
+  /// lacks one. Cheap when there's nothing to do; run fire-and-forget at
+  /// startup.
+  Future<void> backfillCoverColors() async {
+    final rows = await (db.select(
+      db.books,
+    )..where((b) => b.coverPath.isNotNull())).get();
+    for (final row in rows) {
+      final style = SpineStyle.fromJson(row.spineStyle, title: row.title);
+      if (style.coverColor != null) continue;
+      final cover = coverFileOf(row);
+      if (cover == null || !await cover.exists()) continue;
+      try {
+        await updateCoverColor(row.id, await cover.readAsBytes());
+      } catch (_) {
+        // A single unreadable cover shouldn't stop the sweep.
+      }
+    }
   }
 
   Future<void> setCoverFromFile(String bookId, String sourcePath) async =>
