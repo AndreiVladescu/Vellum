@@ -17,6 +17,12 @@ class BackupService {
 
   final LibraryRepository repository;
 
+  /// Blob types that are already compressed; deflating them again burns CPU for
+  /// ~0% gain, so they're stored (not recompressed) in the archive.
+  static const _storedExtensions = {
+    'pdf', 'epub', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip',
+  };
+
   /// Test seam: the live database file to replace on restore. Defaults to
   /// where `driftDatabase(name: 'vellum')` puts it (documents dir).
   final File? _databaseFileOverride;
@@ -52,7 +58,19 @@ class BackupService {
         await for (final entry in dir.list()) {
           // Skip transfer leftovers; everything else in these dirs is a blob.
           if (entry is File && !entry.path.endsWith('.part')) {
-            await encoder.addFile(entry, '$sub/${p.basename(entry.path)}');
+            final ext = p.extension(entry.path).replaceFirst('.', '').toLowerCase();
+            final name = '$sub/${p.basename(entry.path)}';
+            if (_storedExtensions.contains(ext)) {
+              // Already-compressed: store it (the archive's compression method
+              // is set on the entry, not via addFile's deflate-level argument).
+              // Streamed from disk so a big file isn't read into memory.
+              encoder.addArchiveFile(
+                ArchiveFile.stream(name, InputFileStream(entry.path))
+                  ..compression = CompressionType.none,
+              );
+            } else {
+              await encoder.addFile(entry, name); // deflate the rest
+            }
           }
         }
       }

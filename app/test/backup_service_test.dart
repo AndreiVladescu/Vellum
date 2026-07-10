@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -55,6 +56,28 @@ void main() {
       [1, 2, 3, 4],
     );
     await reopened.db.close();
+  });
+
+  test('already-compressed blobs are stored, not recompressed, and exact',
+      () async {
+    final repo = await _repo(dir, 'lib.sqlite');
+    final filesDir = Directory(p.join(dir.path, 'files'))
+      ..createSync(recursive: true);
+    final pdfBytes = <int>[
+      0x25, 0x50, 0x44, 0x46, // %PDF
+      for (var i = 0; i < 2000; i++) (i * 37) % 256,
+    ];
+    File(p.join(filesDir.path, 'book.pdf')).writeAsBytesSync(pdfBytes);
+
+    final zip = File(p.join(dir.path, 'backup.zip'));
+    await BackupService(repo).exportTo(zip);
+    await repo.db.close();
+
+    final archive = ZipDecoder().decodeBytes(zip.readAsBytesSync());
+    final pdf = archive.files.firstWhere((f) => f.name == 'files/book.pdf');
+    expect(pdf.content, pdfBytes, reason: 'byte-identical round-trip');
+    expect(pdf.compression, CompressionType.none,
+        reason: 'a .pdf is stored, not deflated');
   });
 
   test('restore rejects a zip that is not a Vellum backup', () async {
