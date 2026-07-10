@@ -224,8 +224,11 @@ class SpineFace extends StatelessWidget {
 
   /// Spine drawn from the left edge of the cover image.
   Widget _coverSpine(BuildContext context, File cover, SpineStyle s) {
-    // Decode the cover at roughly the spine's on-screen width instead of full
-    // resolution — a first-page render is ~11 MB of decoded RGBA otherwise.
+    // Decode below full resolution to bound memory, but size the budget by the
+    // spine's *height*: BoxFit.cover on a tall, narrow box is height-driven and
+    // shows a full-height vertical slice, so a width-based budget would upscale
+    // a tiny bitmap and look blurry. LayoutBuilder gives the real on-screen
+    // height (the spine size varies: digital shelf vs. zoomed physical view).
     final dpr = MediaQuery.devicePixelRatioOf(context);
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
@@ -234,13 +237,19 @@ class SpineFace extends StatelessWidget {
         children: [
           // BoxFit.cover scales the image to fill the tall, narrow spine;
           // centerLeft alignment keeps the cover's left edge visible.
-          Image.file(cover,
-              fit: BoxFit.cover,
-              alignment: Alignment.centerLeft,
-              cacheWidth: (s.width * dpr).round(),
-              // Orphaned path: fall back to a plain fill; the shading and title
-              // overlays below still render, so it reads as a coverless spine.
-              errorBuilder: (_, _, _) => ColoredBox(color: s.color)),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final h =
+                  constraints.maxHeight.isFinite ? constraints.maxHeight : _bookAreaHeight;
+              return Image.file(cover,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.centerLeft,
+                  cacheHeight: (h * dpr).round(),
+                  // Orphaned path: fall back to a plain fill; the shading and
+                  // title overlays below still render (coverless spine look).
+                  errorBuilder: (_, _, _) => ColoredBox(color: s.color));
+            },
+          ),
           // Cylindrical shading: highlight near the left, shade to the right.
           const DecoratedBox(
             decoration: BoxDecoration(
@@ -380,13 +389,14 @@ class BookCover extends StatelessWidget {
           height: _bookAreaHeight,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            // Non-null path means "has a cover"; decode at the face-out width
-            // rather than full res, and fall back to a generated cover if the
-            // file is missing. No filesystem call in build.
+            // Non-null path means "has a cover"; decode below full res but by
+            // the box *height* (a 2:3 cover in this taller box is height-driven,
+            // so a width budget would leave it soft). Fall back to a generated
+            // cover if the file is missing. No filesystem call in build.
             child: cover != null
                 ? Image.file(cover,
                     fit: BoxFit.cover,
-                    cacheWidth: (_coverWidth * dpr).round(),
+                    cacheHeight: (_bookAreaHeight * dpr).round(),
                     errorBuilder: (_, _, _) => _generatedCover())
                 : _generatedCover(),
           ),
