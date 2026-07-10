@@ -229,15 +229,27 @@ class VellumServerClient {
     );
   }
 
-  /// The book's cover bytes, or null if it has none (404). Throws on other
-  /// errors.
-  Future<Uint8List?> downloadCover(String bookId) async {
+  /// The book's cover bytes and its ETag. Pass the previously stored [etag] to
+  /// let the server answer `304 Not Modified` for an unchanged cover — then
+  /// [bytes] is null and the caller keeps what it has. [bytes] is also null when
+  /// the book has no cover (404). Throws on other errors.
+  Future<({Uint8List? bytes, String? etag})> downloadCover(
+    String bookId, {
+    String? etag,
+  }) async {
+    final headers = {
+      ..._headers,
+      'if-none-match': ?etag,
+    };
     final res = await _http.get(
       _uri('/api/books/$bookId/cover'),
-      headers: _headers,
+      headers: headers,
     );
-    if (res.statusCode == 404) return null;
-    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
+    if (res.statusCode == 304) return (bytes: null, etag: etag);
+    if (res.statusCode == 404) return (bytes: null, etag: null);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return (bytes: res.bodyBytes, etag: res.headers['etag']);
+    }
     throw ServerException('Cover download failed (HTTP ${res.statusCode})');
   }
 

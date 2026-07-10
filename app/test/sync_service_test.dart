@@ -376,4 +376,55 @@ void main() {
     expect(deleted, ['x'], reason: 'server delete should be called');
     expect(await db.select(db.localDeletions).get(), isEmpty, reason: 'tombstone cleared');
   });
+
+  test('cover pull stores the ETag, then revalidates with 304', () async {
+    final repo = await _repo(dir);
+    var coverRequests = 0;
+    var sentBytes = 0;
+    // A cover server that returns the art with an ETag, and 304 when the
+    // client presents that same ETag on a later request.
+    http.Response handler(http.Request req) {
+      final path = req.url.path;
+      if (req.method == 'GET' && path == '/api/books') {
+        return http.Response(
+          jsonEncode({
+            'server_now': '2024-06-01 00:00:00',
+            'books': [
+              {
+                ..._serverBook('b1', 'Dune', '2024-01-01 00:00:00'),
+                'cover_path': 'covers/b1.jpg',
+              },
+            ],
+          }),
+          200,
+        );
+      }
+      if (req.method == 'GET' && path == '/api/deletions') return http.Response('[]', 200);
+      if (req.method == 'GET' && path == '/api/books/b1/cover') {
+        coverRequests++;
+        if (req.headers['if-none-match'] == '"v1"') {
+          return http.Response('', 304, headers: {'etag': '"v1"'});
+        }
+        sentBytes++;
+        return http.Response.bytes(
+          [1, 2, 3, 4],
+          200,
+          headers: {'etag': '"v1"', 'content-type': 'image/jpeg'},
+        );
+      }
+      return http.Response('{"error":"unexpected $path"}', 404);
+    }
+
+    final client = _client((req) async => handler(req));
+    await SyncService(repo).pull(client);
+    var book = await repo.watchBook('b1').first;
+    expect(book?.coverEtag, '"v1"', reason: 'ETag stored after first download');
+    expect(sentBytes, 1);
+
+    // Second pull: the stored ETag is sent, the server 304s, no re-download.
+    await SyncService(repo).pull(client);
+    book = await repo.watchBook('b1').first;
+    expect(sentBytes, 1, reason: 'unchanged cover is not re-downloaded');
+    expect(coverRequests, 2, reason: 'but it is revalidated each pull');
+  });
 }

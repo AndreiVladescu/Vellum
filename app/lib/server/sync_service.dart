@@ -134,10 +134,11 @@ class SyncService {
       for (final d in await db.select(db.localDeletions).get()) d.bookId,
     };
 
-    // Local timestamps, to avoid clobbering edits made on this device.
-    final localUpdatedAt = {
-      for (final row in await db.select(db.books).get()) row.id: row.updatedAt,
-    };
+    // Local timestamps (to avoid clobbering edits made on this device) and the
+    // cover ETag we last stored per book (to revalidate covers cheaply below).
+    final localRows = await db.select(db.books).get();
+    final localUpdatedAt = {for (final row in localRows) row.id: row.updatedAt};
+    final localCoverEtag = {for (final row in localRows) row.id: row.coverEtag};
 
     // Books whose metadata we actually applied this pull; their authors/genres
     // are replaced afterwards (outside the metadata transaction).
@@ -197,14 +198,17 @@ class SyncService {
     final coverBooks = books.where((b) => b.hasCover).toList();
     for (final (i, b) in coverBooks.indexed) {
       onProgress?.call(i, coverBooks.length, 'Downloading covers');
-      final local = File(p.join(_dataDir.path, 'covers', '${b.id}.jpg'));
-      if (await local.exists()) continue;
       try {
-        final bytes = await client.downloadCover(b.id);
-        if (bytes == null) continue;
-        await local.writeAsBytes(bytes);
+        // Always revalidate with the stored ETag rather than trusting a local
+        // file to be current: a cover changed on the server (console edit,
+        // better art) must reach a device that already holds an old one. A 304
+        // is cheap — the server's 304 path never opens the file.
+        final res = await client.downloadCover(b.id, etag: localCoverEtag[b.id]);
+        if (res.bytes == null) continue; // 304 unchanged, or 404 no cover
+        final rel = p.join('covers', '${b.id}.jpg');
+        await File(p.join(_dataDir.path, rel)).writeAsBytes(res.bytes!);
         await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
-          BooksCompanion(coverPath: Value(p.join('covers', '${b.id}.jpg'))),
+          BooksCompanion(coverPath: Value(rel), coverEtag: Value(res.etag)),
         );
       } catch (e) {
         // Leave this book cover-less; it still shows a generated spine.
