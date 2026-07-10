@@ -43,3 +43,20 @@ jobs:
       - run: git diff --exit-code -- lib/data/database.g.dart
       - run: flutter analyze
       - run: flutter test
+
+  # Cross-stack smoke test: a real server + the real client over the wire,
+  # catching wire-format regressions a fake-only suite would miss.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
+      - run: bash scripts/e2e_sync.sh

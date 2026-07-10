@@ -1,0 +1,7 @@
+# The `e2e` tag marks tests that need a real running server. They skip
+# themselves unless VELLUM_E2E_URL is set (see test/e2e_sync_test.dart), so a
+# plain `flutter test` reports them skipped rather than failing. The dedicated
+# CI job runs `flutter test --tags e2e` with a server launched by
+# scripts/e2e_sync.sh.
+tags:
+  e2e:
