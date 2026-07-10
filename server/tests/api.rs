@@ -278,6 +278,64 @@ async fn oversized_login_body_is_rejected() {
 }
 
 #[tokio::test]
+async fn query_token_is_rejected_off_blob_gets() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // A ?token= on a non-blob GET is not accepted (header still required).
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/books?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    // ...and never on a mutating method, so a leaked URL can't replay a delete.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/books/{book}?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    // The cover GET still works with a query token.
+    let put = Request::builder()
+        .method("PUT")
+        .uri(format!("/api/books/{book}/cover"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "image/png")
+        .body(Body::from(b"\x89PNG\r\n\x1a\n fake".to_vec()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(put).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/books/{book}/cover?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn requires_a_token() {
     let app = test_app().await;
     let (status, _) = call(&app, "GET", "/api/books", None, None).await;

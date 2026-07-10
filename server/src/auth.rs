@@ -53,12 +53,24 @@ impl FromRequestParts<AppState> for AuthUser {
         }
 
         // Fallback: a `?token=` query param, so browser <img> and <a download>
-        // links to authenticated blobs (covers, file downloads) work.
-        if let Some(token) = query_token(parts.uri.query()) {
+        // links to authenticated blobs (covers, file downloads) work. Scoped to
+        // exactly those GETs, so a token leaked into a proxy log or browser
+        // history can't be replayed against a mutating endpoint (e.g. a DELETE).
+        if let Some(token) = query_token(parts.uri.query())
+            && is_blob_get(&parts.method, parts.uri.path())
+        {
             return user_from_token(state, token).await;
         }
         Err(AppError::Unauthorized("missing credentials".into()))
     }
+}
+
+/// Whether `?token=` is allowed here: only `GET`s for a book cover
+/// (`/api/books/{id}/cover`) or a file download (`/api/files/...`).
+fn is_blob_get(method: &axum::http::Method, path: &str) -> bool {
+    method == axum::http::Method::GET
+        && (path.starts_with("/api/files/")
+            || (path.starts_with("/api/books/") && path.ends_with("/cover")))
 }
 
 /// Extracts a `token` value from a URL query string (tokens are hex, so no
