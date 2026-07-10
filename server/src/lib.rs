@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
+use axum::handler::Handler;
 use axum::routing::{delete, get, post, put};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
@@ -89,14 +90,19 @@ pub fn router(state: AppState) -> Router {
                 .patch(books::update)
                 .delete(books::delete),
         )
-        // Cover images and book files (filesystem-backed blobs).
+        // Cover images and book files (filesystem-backed blobs). The big upload
+        // limit is scoped to just these two write handlers, so every other
+        // endpoint — including unauthenticated ones like login — keeps axum's
+        // small default and can't be used to buffer gigabytes of body in RAM.
         .route(
             "/api/books/{id}/cover",
-            put(blobs::put_cover).get(blobs::get_cover),
+            put(blobs::put_cover.layer(DefaultBodyLimit::max(32 * 1024 * 1024)))
+                .get(blobs::get_cover),
         )
         .route(
             "/api/books/{id}/files",
-            get(blobs::list_files).post(blobs::upload_file),
+            get(blobs::list_files)
+                .post(blobs::upload_file.layer(DefaultBodyLimit::max(max_upload))),
         )
         .route("/api/files/{file_id}", get(blobs::download_file))
         // Book groups.
@@ -122,7 +128,6 @@ pub fn router(state: AppState) -> Router {
         .route("/opds", get(opds::feed))
         // Book detail (metadata + authors + genres + files) for the console.
         .route("/api/books/{id}/detail", get(books::detail))
-        .layer(DefaultBodyLimit::max(max_upload))
         .with_state(state)
 }
 

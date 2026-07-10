@@ -216,6 +216,24 @@ async fn repeated_failed_logins_are_throttled() {
 }
 
 #[tokio::test]
+async fn oversized_login_body_is_rejected() {
+    let app = test_app().await;
+    // 8 MB to an unauthenticated JSON endpoint must hit the small default body
+    // limit (the 2 GB cap is scoped to file uploads only), not buffer in RAM.
+    let big = "x".repeat(8 * 1024 * 1024);
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/auth/login")
+        .header("content-type", "application/json")
+        .body(Body::from(format!(
+            "{{\"email\":\"a@b.c\",\"password\":\"{big}\"}}"
+        )))
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[tokio::test]
 async fn requires_a_token() {
     let app = test_app().await;
     let (status, _) = call(&app, "GET", "/api/books", None, None).await;
