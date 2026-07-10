@@ -460,6 +460,50 @@ async fn upsert_ignores_a_stale_timestamped_push() {
 }
 
 #[tokio::test]
+async fn upsert_replaces_authors_and_genres() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    // A push carrying authors + genres stores them (get-or-create by name).
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/books/ag-1",
+        Some(&master),
+        Some(json!({
+            "title": "Dune",
+            "authors": ["Frank Herbert", "Kevin Anderson"],
+            "genres": ["Sci-Fi"]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, detail) = call(&app, "GET", "/api/books/ag-1/detail", Some(&master), None).await;
+    assert_eq!(detail["authors"], json!(["Frank Herbert", "Kevin Anderson"]));
+    assert_eq!(detail["genres"], json!(["Sci-Fi"]));
+
+    // The books list is enriched with both, for the app's pull.
+    let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    assert_eq!(list[0]["authors"], json!(["Frank Herbert", "Kevin Anderson"]));
+    assert_eq!(list[0]["genres"], json!(["Sci-Fi"]));
+
+    // Re-pushing with a shorter author list replaces rather than appends;
+    // omitting genres leaves the existing genre joins untouched.
+    call(
+        &app,
+        "PUT",
+        "/api/books/ag-1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "authors": ["Frank Herbert"] })),
+    )
+    .await;
+    let (_, detail) = call(&app, "GET", "/api/books/ag-1/detail", Some(&master), None).await;
+    assert_eq!(detail["authors"], json!(["Frank Herbert"]));
+    assert_eq!(detail["genres"], json!(["Sci-Fi"]), "omitted genres kept");
+}
+
+#[tokio::test]
 async fn book_detail_and_query_token_download() {
     let app = test_app().await;
     let master = register_master(&app).await;

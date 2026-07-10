@@ -45,6 +45,14 @@ pub struct BookInput {
     /// clients, which keeps the always-overwrite behavior.
     #[serde(default)]
     pub updated_at: Option<String>,
+    /// Author names in cover order. When present, [`upsert`] replaces the book's
+    /// author joins with these (get-or-create by name). `None` (older clients)
+    /// leaves existing joins untouched.
+    #[serde(default)]
+    pub authors: Option<Vec<String>>,
+    /// Genre names. Same replace-or-leave semantics as [`authors`].
+    #[serde(default)]
+    pub genres: Option<Vec<String>>,
 }
 
 /// Partial update: every field optional; omitted fields are left unchanged.
@@ -93,6 +101,7 @@ pub struct BookListItem {
     #[serde(flatten)]
     pub book: BookDto,
     pub authors: Vec<String>,
+    pub genres: Vec<String>,
     pub file_count: i64,
 }
 
@@ -124,6 +133,24 @@ pub async fn list(
             .push(row.name);
     }
 
+    // Same grouped-scan pattern for genres, so the app's pull can carry them.
+    #[derive(sqlx::FromRow)]
+    struct GenreRow {
+        book_id: String,
+        name: String,
+    }
+    let genre_rows = sqlx::query_as::<_, GenreRow>(
+        "SELECT bg.book_id, g.name FROM genre g \
+         JOIN book_genre bg ON bg.genre_id = g.id ORDER BY bg.book_id, g.name",
+    )
+    .fetch_all(&state.db)
+    .await?;
+    let mut genres_by_book: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for row in genre_rows {
+        genres_by_book.entry(row.book_id).or_default().push(row.name);
+    }
+
     #[derive(sqlx::FromRow)]
     struct CountRow {
         book_id: String,
@@ -141,10 +168,12 @@ pub async fn list(
         .into_iter()
         .map(|book| {
             let authors = authors_by_book.get(&book.id).cloned().unwrap_or_default();
+            let genres = genres_by_book.get(&book.id).cloned().unwrap_or_default();
             let file_count = counts_by_book.get(&book.id).copied().unwrap_or(0);
             BookListItem {
                 book,
                 authors,
+                genres,
                 file_count,
             }
         })
@@ -201,7 +230,7 @@ pub async fn upsert(
             .fetch_optional(&state.db)
             .await?;
 
-    match existing {
+    let is_update = match &existing {
         Some((_owner, stored_updated_at)) => {
             if !book_access(&state, &user, &id).await?.can_edit() {
                 return Err(AppError::Forbidden(
@@ -217,55 +246,141 @@ pub async fn upsert(
             {
                 return fetch_book(&state, &id).await;
             }
-            sqlx::query(
-                "UPDATE book SET title = ?, subtitle = ?, description = ?, isbn = ?, \
-                    publisher = ?, published_year = ?, page_count = ?, \
-                    cover_path = COALESCE(?, cover_path), \
-                    spine_style = COALESCE(?, spine_style), \
-                    updated_at = datetime('now') \
-                 WHERE id = ?",
-            )
-            .bind(input.title.trim())
-            .bind(&input.subtitle)
-            .bind(&input.description)
-            .bind(&input.isbn)
-            .bind(&input.publisher)
-            .bind(input.published_year)
-            .bind(input.page_count)
-            .bind(&input.cover_path)
-            .bind(&input.spine_style)
-            .bind(&id)
-            .execute(&state.db)
-            .await?;
+            true
         }
-        None => {
+        None => false,
+    };
+
+    // Metadata write and author/genre join replacement share one transaction so
+    // a book never lands with half its relations, or with the tombstone of a
+    // revived id still live.
+    let mut tx = state.db.begin().await?;
+    if is_update {
+        sqlx::query(
+            "UPDATE book SET title = ?, subtitle = ?, description = ?, isbn = ?, \
+                publisher = ?, published_year = ?, page_count = ?, \
+                cover_path = COALESCE(?, cover_path), \
+                spine_style = COALESCE(?, spine_style), \
+                updated_at = datetime('now') \
+             WHERE id = ?",
+        )
+        .bind(input.title.trim())
+        .bind(&input.subtitle)
+        .bind(&input.description)
+        .bind(&input.isbn)
+        .bind(&input.publisher)
+        .bind(input.published_year)
+        .bind(input.page_count)
+        .bind(&input.cover_path)
+        .bind(&input.spine_style)
+        .bind(&id)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        sqlx::query(
+            "INSERT INTO book (id, title, subtitle, description, isbn, publisher, \
+                published_year, page_count, cover_path, spine_style, owner_id) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(input.title.trim())
+        .bind(&input.subtitle)
+        .bind(&input.description)
+        .bind(&input.isbn)
+        .bind(&input.publisher)
+        .bind(input.published_year)
+        .bind(input.page_count)
+        .bind(&input.cover_path)
+        .bind(&input.spine_style)
+        .bind(&user.id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    // Re-creating a book at a tombstoned id revives it — drop the tombstone so
+    // it isn't deleted again on the next pull. Cleared on both branches so a
+    // revived-then-updated id can't leave a stale tombstone behind.
+    sqlx::query("DELETE FROM deletion WHERE book_id = ?")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Authors / genres: replace the joins when the push carried them, else leave
+    // whatever is there (an old client, or a metadata-only edit).
+    if let Some(authors) = &input.authors {
+        sqlx::query("DELETE FROM book_author WHERE book_id = ?")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
+        let mut position: i64 = 0;
+        for name in authors {
+            let name = name.trim();
+            if name.is_empty() {
+                continue;
+            }
+            let author_id = id_for_name_tx(&mut tx, "author", name).await?;
             sqlx::query(
-                "INSERT INTO book (id, title, subtitle, description, isbn, publisher, \
-                    published_year, page_count, cover_path, spine_style, owner_id) \
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO book_author (book_id, author_id, position) \
+                 VALUES (?, ?, ?)",
             )
             .bind(&id)
-            .bind(input.title.trim())
-            .bind(&input.subtitle)
-            .bind(&input.description)
-            .bind(&input.isbn)
-            .bind(&input.publisher)
-            .bind(input.published_year)
-            .bind(input.page_count)
-            .bind(&input.cover_path)
-            .bind(&input.spine_style)
-            .bind(&user.id)
-            .execute(&state.db)
+            .bind(&author_id)
+            .bind(position)
+            .execute(&mut *tx)
             .await?;
-            // Re-creating a book at a tombstoned id revives it — drop the
-            // tombstone so it isn't deleted again on the next pull.
-            sqlx::query("DELETE FROM deletion WHERE book_id = ?")
+            position += 1;
+        }
+    }
+    if let Some(genres) = &input.genres {
+        sqlx::query("DELETE FROM book_genre WHERE book_id = ?")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
+        for name in genres {
+            let name = name.trim();
+            if name.is_empty() {
+                continue;
+            }
+            let genre_id = id_for_name_tx(&mut tx, "genre", name).await?;
+            sqlx::query("INSERT OR IGNORE INTO book_genre (book_id, genre_id) VALUES (?, ?)")
                 .bind(&id)
-                .execute(&state.db)
+                .bind(&genre_id)
+                .execute(&mut *tx)
                 .await?;
         }
     }
+    tx.commit().await?;
     fetch_book(&state, &id).await
+}
+
+/// Get-or-create a name-keyed row (author / genre) inside a transaction and
+/// return its id. `table` is always a fixed literal, never user input.
+async fn id_for_name_tx(
+    conn: &mut sqlx::SqliteConnection,
+    table: &str,
+    name: &str,
+) -> AppResult<String> {
+    let existing: Option<String> =
+        sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = ?"))
+            .bind(name)
+            .fetch_optional(&mut *conn)
+            .await?;
+    if let Some(id) = existing {
+        return Ok(id);
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    sqlx::query(&format!(
+        "INSERT INTO {table} (id, name) VALUES (?, ?) ON CONFLICT(name) DO NOTHING"
+    ))
+    .bind(&id)
+    .bind(name)
+    .execute(&mut *conn)
+    .await?;
+    // A concurrent insert may have won the race; re-read to get the real id.
+    let id: String = sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = ?"))
+        .bind(name)
+        .fetch_one(&mut *conn)
+        .await?;
+    Ok(id)
 }
 
 /// Full detail for the console's book view: metadata + authors + genres + files.

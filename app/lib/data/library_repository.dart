@@ -183,6 +183,25 @@ class LibraryRepository {
     });
   }
 
+  /// Replaces a book's genres with [names]. Blank names are ignored. Mirror of
+  /// [setAuthors]; genres carry no explicit order (the server sorts by name).
+  Future<void> setGenres(String bookId, List<String> names) async {
+    await db.transaction(() async {
+      await db.customStatement(
+        'DELETE FROM book_genres WHERE book_id = ?',
+        [bookId],
+      );
+      for (final raw in names) {
+        final name = raw.trim();
+        if (name.isEmpty) continue;
+        final genreId = await _idForName(db.genres, name);
+        await db
+            .into(db.bookGenres)
+            .insert(BookGenresCompanion.insert(bookId: bookId, genreId: genreId));
+      }
+    });
+  }
+
   /// Personal notes — stored locally only, never pushed to a server.
   Future<void> setReaderNotes(String bookId, String? notes) async {
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
