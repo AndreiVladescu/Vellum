@@ -54,6 +54,44 @@ impl LoginThrottle {
     }
 }
 
+/// A generic per-key sliding-window rate limiter (a generalization of
+/// [`LoginThrottle`] that counts *every* call, not just failures). Used to cap
+/// the anonymous public endpoints per-IP and metadata search per-user.
+pub struct RateLimiter {
+    max: usize,
+    window: Duration,
+    hits: Mutex<HashMap<String, Vec<Instant>>>,
+}
+
+impl RateLimiter {
+    pub fn new(max: usize, window: Duration) -> Self {
+        Self {
+            max,
+            window,
+            hits: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Records a call for `key` and returns whether it is within the limit.
+    pub fn check(&self, key: &str) -> bool {
+        let mut map = self.hits.lock().unwrap();
+        let now = Instant::now();
+        if map.len() > MAX_KEYS {
+            map.retain(|_, hits| {
+                hits.retain(|t| now.duration_since(*t) < self.window);
+                !hits.is_empty()
+            });
+        }
+        let hits = map.entry(key.to_string()).or_default();
+        hits.retain(|t| now.duration_since(*t) < self.window);
+        if hits.len() >= self.max {
+            return false;
+        }
+        hits.push(now);
+        true
+    }
+}
+
 #[cfg(test)]
 impl LoginThrottle {
     /// Seed a stale (fully aged-out) entry, for the prune test.

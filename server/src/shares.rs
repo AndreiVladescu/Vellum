@@ -330,8 +330,12 @@ const LINK_VALID: &str = "revoked = 0 \
 /// landing page shouldn't burn a one-time link — only downloading does).
 pub async fn public_book(
     State(state): State<AppState>,
+    client: crate::auth::ClientKey,
     Path(token): Path<String>,
 ) -> AppResult<Json<PublicBook>> {
+    if !state.public_limiter.check(&client.0) {
+        return Err(AppError::TooManyRequests("too many requests".into()));
+    }
     let row: Option<(String, Option<i64>)> = sqlx::query_as(&format!(
         "SELECT book_id, max_uses FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
     ))
@@ -377,11 +381,15 @@ pub async fn public_book(
 /// use, so a one-time link can only be downloaded once even under concurrency.
 pub async fn public_file(
     State(state): State<AppState>,
+    client: crate::auth::ClientKey,
     Path(token): Path<String>,
 ) -> AppResult<axum::response::Response> {
     use axum::http::header;
     use axum::response::IntoResponse;
 
+    if !state.public_limiter.check(&client.0) {
+        return Err(AppError::TooManyRequests("too many requests".into()));
+    }
     let hash = sha256_hex(&token);
 
     // Which book, and does it have a file? (No consume yet.)

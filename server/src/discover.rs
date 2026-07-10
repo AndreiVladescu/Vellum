@@ -20,9 +20,16 @@ pub struct SearchQuery {
 /// Search Open Library / Google Books. Requires a logged-in user.
 pub async fn search(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Query(query): Query<SearchQuery>,
 ) -> AppResult<Json<Vec<BookSearchResult>>> {
+    // Per-user cap: a misbehaving client can't burn the shared outbound quota
+    // (Open Library / Google Books) with a fan-out of searches.
+    if !state.search_limiter.check(&user.id) {
+        return Err(AppError::TooManyRequests(
+            "too many searches — slow down".into(),
+        ));
+    }
     let q = query.q.trim();
     if q.is_empty() {
         return Ok(Json(Vec::new()));

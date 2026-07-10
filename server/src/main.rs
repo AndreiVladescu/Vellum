@@ -25,6 +25,14 @@ async fn main() -> anyhow::Result<()> {
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
         basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            60,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
     };
 
     // Sweep temp files left by uploads a previous run couldn't finish.
@@ -37,13 +45,18 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("vellum-server listening on http://{addr} (db: {db_path})");
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    // `into_make_service_with_connect_info` surfaces the peer socket address to
+    // handlers (the per-IP rate limiter reads it when no X-Forwarded-For is set).
     // Graceful shutdown on Ctrl-C / SIGINT lets in-flight uploads finish instead
     // of guaranteeing fresh `.tmp-*` junk on every restart.
-    axum::serve(listener, router(state))
-        .with_graceful_shutdown(async {
-            tokio::signal::ctrl_c().await.ok();
-        })
-        .await?;
+    axum::serve(
+        listener,
+        router(state).into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        tokio::signal::ctrl_c().await.ok();
+    })
+    .await?;
     Ok(())
 }
 

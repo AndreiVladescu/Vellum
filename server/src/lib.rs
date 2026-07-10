@@ -22,6 +22,8 @@ mod shares;
 mod throttle;
 mod web;
 
+pub use throttle::RateLimiter;
+
 /// Shared handler state: the database pool, the base URL used to build public
 /// share links (`VELLUM_PUBLIC_URL`), and the directory holding cover/file
 /// blobs (`VELLUM_DATA_DIR`).
@@ -42,6 +44,11 @@ pub struct AppState {
     /// Short-lived cache of successful Basic-auth verifications, so per-request
     /// OPDS Basic auth doesn't cost an Argon2 verify every time.
     pub basic_cache: std::sync::Arc<auth::BasicAuthCache>,
+    /// Per-IP limiter for the unauthenticated public-link endpoints.
+    pub public_limiter: std::sync::Arc<throttle::RateLimiter>,
+    /// Per-user limiter for outbound metadata search (shared Open Library /
+    /// Google Books quota).
+    pub search_limiter: std::sync::Arc<throttle::RateLimiter>,
 }
 
 /// Open (creating if missing) the SQLite database at `path` and run migrations.

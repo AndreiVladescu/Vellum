@@ -73,6 +73,36 @@ fn is_blob_get(method: &axum::http::Method, path: &str) -> bool {
             || (path.starts_with("/api/books/") && path.ends_with("/cover")))
 }
 
+/// The caller's IP for per-client rate limiting. Prefers the first hop of
+/// `X-Forwarded-For` (DESIGN mandates a reverse proxy), falling back to the
+/// direct socket address (present when the server runs with
+/// `into_make_service_with_connect_info`), then a constant. Never fails, so it
+/// composes with handlers and works in tests without connect info.
+pub struct ClientKey(pub String);
+
+impl<S: Sync> FromRequestParts<S> for ClientKey {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let forwarded = parts
+            .headers
+            .get("x-forwarded-for")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(',').next())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        let ip = forwarded
+            .or_else(|| {
+                parts
+                    .extensions
+                    .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+                    .map(|c| c.0.ip().to_string())
+            })
+            .unwrap_or_else(|| "unknown".to_string());
+        Ok(ClientKey(ip))
+    }
+}
+
 /// Extracts a `token` value from a URL query string (tokens are hex, so no
 /// percent-decoding is needed).
 fn query_token(query: Option<&str>) -> Option<&str> {

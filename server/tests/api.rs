@@ -24,6 +24,14 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
         basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            60,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
     });
     (app, data_dir)
 }
@@ -185,6 +193,14 @@ async fn session_expiry_slides_forward_on_use() {
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
         basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            60,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
     });
     let token = register_master(&app).await;
 
@@ -921,6 +937,14 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
         basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            60,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
     });
     let master = register_master(&app).await;
 
@@ -1391,6 +1415,43 @@ async fn opds_feed_needs_basic_auth_and_lists_books() {
     let xml = String::from_utf8(bytes.to_vec()).unwrap();
     assert!(xml.contains("<title>Dune</title>"));
     assert!(xml.contains("opds-spec.org"));
+}
+
+#[tokio::test]
+async fn public_endpoint_is_rate_limited_per_client() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    let (_, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    // The 60/min per-IP cap trips within 61 anonymous requests (all share the
+    // "unknown" client key under oneshot: no X-Forwarded-For / peer addr).
+    let mut saw_429 = false;
+    for _ in 0..61 {
+        let (status, _) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            saw_429 = true;
+            break;
+        }
+    }
+    assert!(
+        saw_429,
+        "public endpoint should rate-limit a hammering client"
+    );
 }
 
 #[tokio::test]
