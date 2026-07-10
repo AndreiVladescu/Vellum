@@ -90,6 +90,18 @@ class ServerBook {
   );
 }
 
+/// Formats a local [DateTime] as the server's UTC `"YYYY-MM-DD HH:MM:SS"` wire
+/// form — the inverse of [ServerBook._parseServerTime]. Null in, null out (the
+/// caller then omits the field, preserving the old always-overwrite behavior
+/// for servers/clients that predate timestamp-guarded push).
+String? formatServerTime(DateTime? dt) {
+  if (dt == null) return null;
+  final u = dt.toUtc();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${u.year.toString().padLeft(4, '0')}-${two(u.month)}-${two(u.day)} '
+      '${two(u.hour)}:${two(u.minute)}:${two(u.second)}';
+}
+
 /// Thin REST client for a Vellum sync server. Stateless apart from [baseUrl] and
 /// an optional bearer [token]; create a new one when either changes.
 class VellumServerClient {
@@ -186,6 +198,9 @@ class VellumServerClient {
   }
 
   /// Upsert a book at [id] (create or update). Used to push local books up.
+  /// [updatedAt] is the local row's sync clock; the server only overwrites an
+  /// existing row when this is strictly newer than its stored timestamp
+  /// (last-write-wins), so a stale push can't clobber a fresher remote edit.
   Future<void> pushBook({
     required String id,
     required String title,
@@ -196,6 +211,7 @@ class VellumServerClient {
     int? publishedYear,
     int? pageCount,
     String? spineStyle,
+    DateTime? updatedAt,
   }) async {
     final res = await _http.put(
       _uri('/api/books/$id'),
@@ -209,6 +225,7 @@ class VellumServerClient {
         'published_year': publishedYear,
         'page_count': pageCount,
         'spine_style': spineStyle,
+        'updated_at': ?formatServerTime(updatedAt),
       }),
     );
     _body(res);

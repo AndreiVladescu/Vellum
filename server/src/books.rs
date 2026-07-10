@@ -38,6 +38,13 @@ pub struct BookInput {
     pub page_count: Option<i64>,
     pub cover_path: Option<String>,
     pub spine_style: Option<String>,
+    /// The pushing client's sync clock as `"YYYY-MM-DD HH:MM:SS"` UTC (the same
+    /// fixed-width form SQLite's `datetime('now')` produces, so lexical order is
+    /// chronological). When present, [`upsert`] only overwrites an existing row
+    /// if this is strictly newer than the stored `updated_at`. Absent for older
+    /// clients, which keeps the always-overwrite behavior.
+    #[serde(default)]
+    pub updated_at: Option<String>,
 }
 
 /// Partial update: every field optional; omitted fields are left unchanged.
@@ -188,18 +195,27 @@ pub async fn upsert(
     if input.title.trim().is_empty() {
         return Err(AppError::BadRequest("title is required".into()));
     }
-    let owner: Option<Option<String>> =
-        sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")
+    let existing: Option<(Option<String>, String)> =
+        sqlx::query_as("SELECT owner_id, updated_at FROM book WHERE id = ?")
             .bind(&id)
             .fetch_optional(&state.db)
             .await?;
 
-    match owner {
-        Some(_) => {
+    match existing {
+        Some((_owner, stored_updated_at)) => {
             if !book_access(&state, &user, &id).await?.can_edit() {
                 return Err(AppError::Forbidden(
                     "you have read-only access to this book".into(),
                 ));
+            }
+            // Last-write-wins guard: when the client sends its sync clock, only
+            // overwrite if it is strictly newer than what we hold. A stale push
+            // (e.g. after a console edit) then leaves the remote edit intact.
+            // Both timestamps are fixed-width UTC, so a byte compare suffices.
+            if let Some(incoming) = input.updated_at.as_deref()
+                && incoming <= stored_updated_at.as_str()
+            {
+                return fetch_book(&state, &id).await;
             }
             sqlx::query(
                 "UPDATE book SET title = ?, subtitle = ?, description = ?, isbn = ?, \
