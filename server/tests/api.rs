@@ -22,6 +22,7 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
         http: reqwest::Client::new(),
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
+        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
     });
     (app, data_dir)
 }
@@ -788,6 +789,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
         http: reqwest::Client::new(),
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
+        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
     });
     let master = register_master(&app).await;
 

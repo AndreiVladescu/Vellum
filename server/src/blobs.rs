@@ -266,43 +266,6 @@ pub async fn upload_file(
     .execute(&state.db)
     .await?;
 
-    // A PDF carries its own page count, which is ground truth for a digital
-    // copy, so it overrides whatever an online guess supplied. Parsing runs off
-    // the async runtime (it's CPU-bound), reading the file back from disk.
-    if ext == "pdf" {
-        let path = full.clone();
-        let pages = tokio::task::spawn_blocking(move || pdf_page_count_at(&path))
-            .await
-            .ok()
-            .flatten();
-        if let Some(pages) = pages {
-            sqlx::query(
-                "UPDATE book SET page_count = ?, updated_at = datetime('now') WHERE id = ?",
-            )
-            .bind(pages)
-            .bind(&id)
-            .execute(&state.db)
-            .await?;
-        }
-
-        // The PDF's own first page is the preferred cover: render it now and
-        // set it, overriding any online cover a prior lookup may have stored.
-        if let Some(rel) = render_pdf_cover(&state, &id).await {
-            sqlx::query(
-                "UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?",
-            )
-            .bind(&rel)
-            .bind(&id)
-            .execute(&state.db)
-            .await?;
-        }
-    }
-
-    // Pull author / title / publisher / year out of the file name convention,
-    // filling only what the book is still missing (so a later online lookup can
-    // search a clean title).
-    crate::discover::apply_filename_metadata(&state, &id, &q.filename).await?;
-
     let file = sqlx::query_as::<_, FileDto>(
         "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
          FROM book_file WHERE id = ?",
@@ -310,6 +273,52 @@ pub async fn upload_file(
     .bind(&file_id)
     .fetch_one(&state.db)
     .await?;
+
+    // The heavy enrichment — page-count parse, first-page cover render (a
+    // shell-out that can take seconds), and file-name metadata — runs in a
+    // detached task *after* the response, so a big upload's HTTP reply isn't
+    // held open by Ghostscript. The book_file row and blob are already
+    // committed; the console refetches the row and the app pushes its own, so
+    // nothing user-visible is lost if this fails.
+    let bg = state.clone();
+    let bg_id = id.clone();
+    let bg_full = full.clone();
+    let bg_filename = q.filename.clone();
+    let is_pdf = ext == "pdf";
+    tokio::spawn(async move {
+        if is_pdf {
+            // A PDF's page count is ground truth for the digital copy; parse it
+            // off the async runtime (CPU-bound), reading the file back from disk.
+            let pages = tokio::task::spawn_blocking(move || pdf_page_count_at(&bg_full))
+                .await
+                .ok()
+                .flatten();
+            if let Some(pages) = pages {
+                let _ = sqlx::query(
+                    "UPDATE book SET page_count = ?, updated_at = datetime('now') WHERE id = ?",
+                )
+                .bind(pages)
+                .bind(&bg_id)
+                .execute(&bg.db)
+                .await;
+            }
+            // The PDF's own first page is the preferred cover, overriding any
+            // online cover a prior lookup may have stored.
+            if let Some(rel) = render_pdf_cover(&bg, &bg_id).await {
+                let _ = sqlx::query(
+                    "UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?",
+                )
+                .bind(&rel)
+                .bind(&bg_id)
+                .execute(&bg.db)
+                .await;
+            }
+        }
+        // Fill still-missing author / title / publisher / year from the file-name
+        // convention (so a later online lookup can search a clean title).
+        let _ = crate::discover::apply_filename_metadata(&bg, &bg_id, &bg_filename).await;
+    });
+
     Ok(Json(file))
 }
 
@@ -346,14 +355,48 @@ pub(crate) async fn render_pdf_cover(state: &AppState, book_id: &str) -> Option<
     .flatten();
     let input = state.data_dir.join(rel?);
 
+    // What the cover is now, so we can delete it if the render stores a
+    // different extension (e.g. an earlier uploaded .png cover).
+    let previous: Option<String> = sqlx::query_scalar("SELECT cover_path FROM book WHERE id = ?")
+        .bind(book_id)
+        .fetch_optional(&state.db)
+        .await
+        .ok()
+        .flatten();
+
     let out_rel = format!("covers/{book_id}.jpg");
     let out_full = state.data_dir.join(&out_rel);
     if let Some(parent) = out_full.parent() {
         let _ = tokio::fs::create_dir_all(parent).await;
     }
-    render_first_page(&input, &out_full)
-        .await
-        .then_some(out_rel)
+
+    // Bound concurrent shell-outs: ten parallel uploads shouldn't fork ten `gs`.
+    let _permit = state.render_semaphore.acquire().await.ok()?;
+    let ok = render_first_page(&input, &out_full).await;
+    drop(_permit);
+    if !ok {
+        return None;
+    }
+
+    // Replicate put_cover's cleanup: drop a stale cover under a different name.
+    if let Some(old) = previous
+        && old != out_rel
+    {
+        let _ = tokio::fs::remove_file(state.data_dir.join(&old)).await;
+    }
+    Some(out_rel)
+}
+
+/// Run one render command with a hard timeout, reaping the child if it hangs on
+/// a pathological PDF. `kill_on_drop` means a timed-out (dropped) child is
+/// killed rather than leaked.
+async fn run_render(mut cmd: Command) -> bool {
+    cmd.kill_on_drop(true);
+    match tokio::time::timeout(std::time::Duration::from_secs(30), cmd.status()).await {
+        Ok(Ok(status)) => status.success(),
+        // Timed out (child killed on drop) or failed to spawn.
+        _ => false,
+    }
 }
 
 /// Try each known PDF CLI in turn until one writes a non-empty JPEG.
@@ -362,61 +405,49 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
     let prefix = out_jpg.with_extension("");
     for tool in ["pdftoppm", "pdftocairo"] {
         let _ = tokio::fs::remove_file(out_jpg).await;
-        let ran = Command::new(tool)
-            .args([
-                "-jpeg",
-                "-f",
-                "1",
-                "-l",
-                "1",
-                "-singlefile",
-                "-scale-to",
-                "1400",
-            ])
-            .arg(input)
-            .arg(&prefix)
-            .status()
-            .await
-            .map(|s| s.success())
-            .unwrap_or(false);
-        if ran && nonempty(out_jpg).await {
+        let mut cmd = Command::new(tool);
+        cmd.args([
+            "-jpeg",
+            "-f",
+            "1",
+            "-l",
+            "1",
+            "-singlefile",
+            "-scale-to",
+            "1400",
+        ])
+        .arg(input)
+        .arg(&prefix);
+        if run_render(cmd).await && nonempty(out_jpg).await {
             return true;
         }
     }
     // MuPDF: writes exactly to -o.
     let _ = tokio::fs::remove_file(out_jpg).await;
-    let ran = Command::new("mutool")
-        .args(["draw", "-F", "jpeg", "-w", "1400", "-o"])
+    let mut cmd = Command::new("mutool");
+    cmd.args(["draw", "-F", "jpeg", "-w", "1400", "-o"])
         .arg(out_jpg)
         .arg(input)
-        .arg("1")
-        .status()
-        .await
-        .map(|s| s.success())
-        .unwrap_or(false);
-    if ran && nonempty(out_jpg).await {
+        .arg("1");
+    if run_render(cmd).await && nonempty(out_jpg).await {
         return true;
     }
     // Ghostscript.
     let _ = tokio::fs::remove_file(out_jpg).await;
-    let ran = Command::new("gs")
-        .args([
-            "-q",
-            "-dSAFER",
-            "-dBATCH",
-            "-dNOPAUSE",
-            "-sDEVICE=jpeg",
-            "-dFirstPage=1",
-            "-dLastPage=1",
-            "-r150",
-        ])
-        .arg(format!("-sOutputFile={}", out_jpg.display()))
-        .arg(input)
-        .status()
-        .await
-        .map(|s| s.success())
-        .unwrap_or(false);
-    ran && nonempty(out_jpg).await
+    let mut cmd = Command::new("gs");
+    cmd.args([
+        "-q",
+        "-dSAFER",
+        "-dBATCH",
+        "-dNOPAUSE",
+        "-sDEVICE=jpeg",
+        "-dFirstPage=1",
+        "-dLastPage=1",
+        "-r150",
+    ])
+    .arg(format!("-sOutputFile={}", out_jpg.display()))
+    .arg(input);
+    run_render(cmd).await && nonempty(out_jpg).await
 }
 
 async fn nonempty(p: &Path) -> bool {

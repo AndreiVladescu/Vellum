@@ -36,6 +36,9 @@ pub struct AppState {
     pub max_upload_bytes: usize,
     /// In-memory failed-login limiter, shared across requests.
     pub throttle: std::sync::Arc<throttle::LoginThrottle>,
+    /// Bounds concurrent PDF-cover shell-outs so many parallel uploads can't
+    /// fork many `gs`/`mutool` processes at once.
+    pub render_semaphore: std::sync::Arc<tokio::sync::Semaphore>,
 }
 
 /// Open (creating if missing) the SQLite database at `path` and run migrations.
