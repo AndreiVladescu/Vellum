@@ -828,6 +828,78 @@ async fn upsert_and_delete_gc_orphaned_authors() {
     );
 }
 
+/// A minimal EPUB (zip) declaring its cover via the EPUB2 `<meta name="cover">`
+/// convention, pointing at a PNG entry.
+fn make_epub_with_cover() -> Vec<u8> {
+    use std::io::Write;
+    const CONTAINER: &str = "<?xml version=\"1.0\"?>\
+        <container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\
+        <rootfiles><rootfile full-path=\"content.opf\" \
+        media-type=\"application/oebps-package+xml\"/></rootfiles></container>";
+    const OPF: &str = "<?xml version=\"1.0\"?>\
+        <package xmlns=\"http://www.idpf.org/2007/opf\" version=\"2.0\">\
+        <metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\
+        <dc:title>Tiny</dc:title><meta name=\"cover\" content=\"cov\"/></metadata>\
+        <manifest>\
+        <item id=\"cov\" href=\"cover.png\" media-type=\"image/png\"/>\
+        <item id=\"c1\" href=\"ch1.xhtml\" media-type=\"application/xhtml+xml\"/>\
+        </manifest><spine><itemref idref=\"c1\"/></spine></package>";
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    for (name, data) in [
+        ("mimetype", b"application/epub+zip".to_vec()),
+        ("META-INF/container.xml", CONTAINER.as_bytes().to_vec()),
+        ("content.opf", OPF.as_bytes().to_vec()),
+        ("cover.png", b"\x89PNG\r\n\x1a\n fake-cover-bytes".to_vec()),
+        ("ch1.xhtml", b"<html><body>hi</body></html>".to_vec()),
+    ] {
+        zw.start_file(name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zw.write_all(&data).unwrap();
+    }
+    zw.finish().unwrap().into_inner()
+}
+
+#[tokio::test]
+async fn epub_upload_extracts_declared_cover() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Tiny").await;
+
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=tiny.epub"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "application/epub+zip")
+        .body(Body::from(make_epub_with_cover()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::OK
+    );
+
+    // The cover is extracted in a background task after the response; poll for it.
+    let mut got_cover = false;
+    for _ in 0..50 {
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/books/{book}/cover"))
+                    .header("authorization", format!("Bearer {master}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        if res.status() == StatusCode::OK {
+            got_cover = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert!(got_cover, "the EPUB's declared cover should be served");
+}
+
 #[tokio::test]
 async fn book_detail_and_query_token_download() {
     let app = test_app().await;

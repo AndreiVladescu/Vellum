@@ -330,7 +330,7 @@ class SyncService {
       var localCover = row.coverPath;
       if (localCover == null) {
         try {
-          if (await repository.setCoverFromFirstPage(b.id)) {
+          if (await repository.setCoverFromEmbedded(b.id)) {
             localCover = p.join('covers', '${b.id}.jpg');
           }
         } catch (e) {

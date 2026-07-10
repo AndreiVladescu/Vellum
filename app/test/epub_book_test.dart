@@ -28,6 +28,7 @@ File _makeEpub(Directory dir) {
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>Tiny Book</dc:title>
+    <meta name="cover" content="img"/>
   </metadata>
   <manifest>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
@@ -82,6 +83,32 @@ void main() {
     final epub = await EpubBook.open(_makeEpub(dir));
     expect(epub.chapters[0].html, contains('src="data:image/png;base64,'));
     expect(epub.chapters[0].html, isNot(contains('../images')));
+  });
+
+  test('extracts the declared cover image (EPUB2 meta)', () async {
+    final bytes = await EpubBook.coverBytes(_makeEpub(dir));
+    expect(bytes, isNotNull);
+    // PNG magic bytes — it round-trips the manifest-declared cover.
+    expect(bytes!.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+  });
+
+  test('returns null when no cover is declared', () async {
+    // An EPUB whose OPF has no cover meta and no cover-image property.
+    final archive = Archive();
+    void add(String path, String content) {
+      final b = utf8.encode(content);
+      archive.addFile(ArchiveFile(path, b.length, b));
+    }
+    add('META-INF/container.xml',
+        '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+        '<rootfiles><rootfile full-path="content.opf"/></rootfiles></container>');
+    add('content.opf',
+        '<package xmlns="http://www.idpf.org/2007/opf"><manifest>'
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>'
+        '</manifest><spine><itemref idref="c1"/></spine></package>');
+    final file = File(p.join(dir.path, 'nocover.epub'))
+      ..writeAsBytesSync(ZipEncoder().encode(archive));
+    expect(await EpubBook.coverBytes(file), isNull);
   });
 
   test('rejects a zip that is not an EPUB', () async {

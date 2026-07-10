@@ -357,6 +357,7 @@ pub async fn upload_file(
     let bg_full = full.clone();
     let bg_filename = q.filename.clone();
     let is_pdf = ext == "pdf";
+    let is_epub = ext == "epub";
     tokio::spawn(async move {
         if is_pdf {
             // A PDF's page count is ground truth for the digital copy; parse it
@@ -385,6 +386,10 @@ pub async fn upload_file(
                 .execute(&bg.db)
                 .await;
             }
+        } else if is_epub {
+            // An EPUB declares its cover in the OPF manifest; extract and store
+            // it (store_epub_cover updates cover_path itself).
+            let _ = store_epub_cover(&bg, &bg_id).await;
         }
         // Fill still-missing author / title / publisher / year from the file-name
         // convention (so a later online lookup can search a clean title).
@@ -458,6 +463,195 @@ pub(crate) async fn render_pdf_cover(state: &AppState, book_id: &str) -> Option<
     }
     invalidate_thumbs(state, book_id).await;
     Some(out_rel)
+}
+
+/// Extract the declared cover image from the book's newest EPUB and store it as
+/// the cover. Mirrors [`render_pdf_cover`] for EPUBs — but an EPUB *declares*
+/// its cover in the OPF manifest, so it's a plain zip read, no renderer. Returns
+/// the stored cover path, or None when there's no EPUB, none is declared, or the
+/// bytes aren't a supported image.
+pub(crate) async fn store_epub_cover(state: &AppState, book_id: &str) -> Option<String> {
+    let rel: Option<String> = sqlx::query_scalar(
+        "SELECT path FROM book_file WHERE book_id = ? AND format = 'epub' \
+         ORDER BY added_at DESC LIMIT 1",
+    )
+    .bind(book_id)
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
+    let input = state.data_dir.join(rel?);
+
+    // Zip IO is blocking; keep it off the async runtime.
+    let bytes = tokio::task::spawn_blocking(move || epub_cover_bytes(&input))
+        .await
+        .ok()
+        .flatten()?;
+    // Only images we can serve back (the app's covers are the same set).
+    let ext = image_ext(sniff(&bytes))?;
+
+    let previous: Option<String> = sqlx::query_scalar("SELECT cover_path FROM book WHERE id = ?")
+        .bind(book_id)
+        .fetch_optional(&state.db)
+        .await
+        .ok()
+        .flatten();
+
+    let out_rel = format!("covers/{book_id}.{ext}");
+    write_blob(state, &out_rel, &bytes).await.ok()?;
+    sqlx::query("UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(&out_rel)
+        .bind(book_id)
+        .execute(&state.db)
+        .await
+        .ok()?;
+    if let Some(old) = previous
+        && old != out_rel
+    {
+        let _ = tokio::fs::remove_file(state.data_dir.join(&old)).await;
+    }
+    invalidate_thumbs(state, book_id).await;
+    Some(out_rel)
+}
+
+/// Pull an EPUB's declared cover-image bytes out of its zip (EPUB3
+/// `properties="cover-image"`, else the EPUB2 `<meta name="cover" content=..>`
+/// convention). Best-effort, blocking — returns None on any parse failure. The
+/// OPF is scanned rather than fully parsed to avoid pulling in an XML crate; the
+/// app's parser (reader/epub_book.dart) is the robust path and pushes covers
+/// back on sync.
+fn epub_cover_bytes(path: &Path) -> Option<Vec<u8>> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut zip = zip::ZipArchive::new(file).ok()?;
+
+    fn entry(zip: &mut zip::ZipArchive<std::fs::File>, name: &str) -> Option<Vec<u8>> {
+        use std::io::Read;
+        let mut f = zip.by_name(name).ok()?;
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf).ok()?;
+        Some(buf)
+    }
+
+    // container.xml names the OPF package file.
+    let container = String::from_utf8(entry(&mut zip, "META-INF/container.xml")?).ok()?;
+    let opf_path = tag_attr(find_tag(&container, "rootfile")?, "full-path")?.to_string();
+    let opf = String::from_utf8(entry(&mut zip, &opf_path)?).ok()?;
+    let opf_dir = opf_path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+
+    // EPUB3: the manifest <item> flagged properties="cover-image".
+    let mut cover_href: Option<String> = None;
+    for tag in item_tags(&opf) {
+        if tag_attr(tag, "properties")
+            .map(|p| p.split_whitespace().any(|w| w == "cover-image"))
+            .unwrap_or(false)
+        {
+            cover_href = tag_attr(tag, "href").map(str::to_string);
+            break;
+        }
+    }
+    // EPUB2: <meta name="cover" content="<id>"/> -> that item's href.
+    if cover_href.is_none()
+        && let Some(cover_id) = meta_content(&opf, "cover")
+    {
+        for tag in item_tags(&opf) {
+            if tag_attr(tag, "id") == Some(cover_id) {
+                cover_href = tag_attr(tag, "href").map(str::to_string);
+                break;
+            }
+        }
+    }
+    let href = cover_href?;
+    let full = join_posix(opf_dir, &href);
+    entry(&mut zip, &full)
+}
+
+/// The substring `<name ...>` for the first element called `name`, or None. The
+/// character after the name must end it, so `rootfile` won't match `rootfiles`.
+fn find_tag<'a>(xml: &'a str, name: &str) -> Option<&'a str> {
+    let needle = format!("<{name}");
+    let mut from = 0;
+    while let Some(rel) = xml[from..].find(&needle) {
+        let start = from + rel;
+        let after = start + needle.len();
+        let ends = matches!(
+            xml.as_bytes().get(after),
+            Some(c) if c.is_ascii_whitespace() || *c == b'>' || *c == b'/'
+        );
+        if ends {
+            let rest = &xml[start..];
+            return rest.find('>').map(|end| &rest[..end]);
+        }
+        from = after;
+    }
+    None
+}
+
+/// Every `<item ...>` element tag (not `<itemref>`), as raw substrings.
+fn item_tags(opf: &str) -> impl Iterator<Item = &str> {
+    opf.match_indices("<item").filter_map(|(i, _)| {
+        let rest = &opf[i..];
+        // Skip `<itemref>`: the char after "<item" must end the name.
+        match rest.as_bytes().get(5) {
+            Some(c) if c.is_ascii_whitespace() || *c == b'/' || *c == b'>' => {}
+            _ => return None,
+        }
+        let end = rest.find('>')?;
+        Some(&rest[..end])
+    })
+}
+
+/// The `content` of the first `<meta name="<name>" .../>` element, or None.
+fn meta_content<'a>(opf: &'a str, name: &str) -> Option<&'a str> {
+    for (i, _) in opf.match_indices("<meta") {
+        let rest = &opf[i..];
+        let end = match rest.find('>') {
+            Some(e) => e,
+            None => continue,
+        };
+        let tag = &rest[..end];
+        if tag_attr(tag, "name") == Some(name) {
+            return tag_attr(tag, "content");
+        }
+    }
+    None
+}
+
+/// Read attribute `name` out of a single element tag substring. Matches a
+/// space-delimited `name="value"` (or single-quoted), so it won't match an
+/// attribute that merely ends in `name`.
+fn tag_attr<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+    let key = format!(" {name}=");
+    let at = tag.find(&key)? + key.len();
+    let rest = &tag[at..];
+    let quote = rest.as_bytes().first().copied()?;
+    if quote != b'"' && quote != b'\'' {
+        return None;
+    }
+    let rest = &rest[1..];
+    let end = rest.find(quote as char)?;
+    Some(&rest[..end])
+}
+
+/// Join an EPUB-internal href to its base directory, resolving `.`/`..`. Paths
+/// inside an EPUB are always posix.
+fn join_posix(base: &str, href: &str) -> String {
+    let href = href.split('#').next().unwrap_or(href);
+    let combined = if base.is_empty() {
+        href.to_string()
+    } else {
+        format!("{base}/{href}")
+    };
+    let mut parts: Vec<&str> = Vec::new();
+    for seg in combined.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            other => parts.push(other),
+        }
+    }
+    parts.join("/")
 }
 
 /// Run one render command with a hard timeout, reaping the child if it hangs on
@@ -834,5 +1028,36 @@ mod tests {
         assert_eq!(image_ext(Sniffed::WebP), Some("webp"));
         assert_eq!(image_ext(Sniffed::Pdf), None);
         assert_eq!(image_ext(Sniffed::Unknown), None);
+    }
+
+    #[test]
+    fn epub_cover_bytes_reads_the_declared_cover() {
+        use std::io::Write;
+        const CONTAINER: &str = "<?xml version=\"1.0\"?>\
+            <container><rootfiles><rootfile full-path=\"content.opf\"/></rootfiles></container>";
+        const OPF: &str = "<?xml version=\"1.0\"?>\
+            <package version=\"2.0\"><metadata><meta name=\"cover\" content=\"cov\"/></metadata>\
+            <manifest><item id=\"cov\" href=\"cover.png\" media-type=\"image/png\"/>\
+            <item id=\"c1\" href=\"ch1.xhtml\" media-type=\"application/xhtml+xml\"/></manifest>\
+            <spine><itemref idref=\"c1\"/></spine></package>";
+        let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (name, data) in [
+            ("META-INF/container.xml", CONTAINER.as_bytes().to_vec()),
+            ("content.opf", OPF.as_bytes().to_vec()),
+            ("cover.png", b"\x89PNG\r\n\x1a\n cover".to_vec()),
+        ] {
+            zw.start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zw.write_all(&data).unwrap();
+        }
+        let bytes = zw.finish().unwrap().into_inner();
+        let dir = std::env::temp_dir().join(format!("vellum_epub_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("book.epub");
+        std::fs::write(&path, &bytes).unwrap();
+
+        let cover = epub_cover_bytes(&path).expect("cover extracted");
+        assert_eq!(sniff(&cover), Sniffed::Png);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

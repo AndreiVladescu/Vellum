@@ -97,6 +97,73 @@ class EpubBook {
     return EpubBook(title: bookTitle, chapters: chapters);
   }
 
+  /// The EPUB's declared cover-image bytes, or null when it declares none.
+  /// Reads only the container + OPF manifest (EPUB3 `properties="cover-image"`,
+  /// else the EPUB2 `<meta name="cover" content="id"/>` convention) and one zip
+  /// entry — no chapter parsing, no renderer. Best-effort: any parse failure
+  /// returns null.
+  static Future<Uint8List?> coverBytes(File file) async {
+    final Archive archive;
+    try {
+      archive = ZipDecoder().decodeBytes(await file.readAsBytes());
+    } catch (_) {
+      return null;
+    }
+    final byPath = {
+      for (final f in archive.files)
+        if (f.isFile) p.posix.normalize(f.name): f,
+    };
+    Uint8List? read(String path) => byPath[p.posix.normalize(path)]?.content;
+    String? readText(String path) {
+      final bytes = read(path);
+      return bytes == null ? null : utf8.decode(bytes, allowMalformed: true);
+    }
+
+    final container = readText('META-INF/container.xml');
+    if (container == null) return null;
+    String? opfPath;
+    for (final rf in XmlDocument.parse(container).findAllElements('rootfile')) {
+      opfPath = rf.getAttribute('full-path');
+      if (opfPath != null) break;
+    }
+    final opfText = opfPath == null ? null : readText(opfPath);
+    if (opfPath == null || opfText == null) return null;
+    final opf = XmlDocument.parse(opfText);
+    final opfDir = p.posix.dirname(opfPath);
+    String resolve(String href) => p.posix.normalize(
+        p.posix.join(opfDir, Uri.decodeComponent(href.split('#').first)));
+
+    // EPUB3: the manifest item flagged properties="cover-image".
+    String? coverHref;
+    for (final item in opf.findAllElements('item')) {
+      final props = (item.getAttribute('properties') ?? '').split(RegExp(r'\s+'));
+      if (props.contains('cover-image')) {
+        coverHref = item.getAttribute('href');
+        break;
+      }
+    }
+    // EPUB2: <meta name="cover" content="<id>"/> -> that manifest item's href.
+    if (coverHref == null) {
+      String? coverId;
+      for (final meta in opf.findAllElements('meta')) {
+        if (meta.getAttribute('name') == 'cover') {
+          coverId = meta.getAttribute('content');
+          break;
+        }
+      }
+      if (coverId != null) {
+        for (final item in opf.findAllElements('item')) {
+          if (item.getAttribute('id') == coverId) {
+            coverHref = item.getAttribute('href');
+            break;
+          }
+        }
+      }
+    }
+    if (coverHref == null) return null;
+    return read(resolve(coverHref));
+  }
+
   /// Chapter path -> human title, from the NCX (`<navPoint>`) or the EPUB3
   /// nav document (`<nav>` links). Best-effort; absent entries fall back to
   /// "Chapter N".

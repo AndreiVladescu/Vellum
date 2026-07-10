@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../physical/layout_repository.dart';
+import '../reader/epub_book.dart';
 import '../shelf/cover_color.dart';
 import '../shelf/spine_style.dart';
 import 'database.dart';
@@ -114,16 +115,17 @@ class LibraryRepository {
             sha256: digest.toString(),
           ),
         );
-    // A new file is synced data, so the book needs pushing (setCoverFromFirstPage
-    // below also marks it, but a non-PDF or cover-having book wouldn't).
+    // A new file is synced data, so the book needs pushing (setCoverFromEmbedded
+    // below also marks it, but a cover-having book wouldn't).
     await _markNeedsPush(bookId);
-    // A cover-less book that just got a PDF: use its first page as the cover.
-    if (ext == 'pdf') {
+    // A cover-less book that just got a PDF or EPUB: derive a cover from it (the
+    // PDF's first page, or the EPUB's declared cover image).
+    if (ext == 'pdf' || ext == 'epub') {
       final book = await (db.select(
         db.books,
       )..where((b) => b.id.equals(bookId))).getSingleOrNull();
       if (book != null && book.coverPath == null) {
-        await setCoverFromFirstPage(bookId);
+        await setCoverFromEmbedded(bookId);
       }
     }
   }
@@ -322,6 +324,14 @@ class LibraryRepository {
   Future<void> setCoverFromFile(String bookId, String sourcePath) async =>
       setCoverBytes(bookId, await File(sourcePath).readAsBytes());
 
+  /// Derives a cover from the book's own attached files, no network needed: a
+  /// PDF's rendered first page, else an EPUB's declared cover image. Returns
+  /// false when neither is available or extraction fails.
+  Future<bool> setCoverFromEmbedded(String bookId) async {
+    if (await setCoverFromFirstPage(bookId)) return true;
+    return setCoverFromEpub(bookId);
+  }
+
   /// Renders the first page of one of the book's attached PDFs and uses it as
   /// the cover. Returns false if the book has no PDF or rendering fails.
   Future<bool> setCoverFromFirstPage(String bookId) async {
@@ -335,6 +345,26 @@ class LibraryRepository {
     if (png == null) return false;
     await setCoverBytes(bookId, png);
     return true;
+  }
+
+  /// Extracts the declared cover image from one of the book's attached EPUBs
+  /// (a plain zip read, no renderer) and uses it. Returns false if the book has
+  /// no EPUB, the EPUB declares no cover, or extraction fails.
+  Future<bool> setCoverFromEpub(String bookId) async {
+    final files = await (db.select(
+      db.bookFiles,
+    )..where((f) => f.bookId.equals(bookId) & f.format.equals('epub'))).get();
+    if (files.isEmpty) return false;
+    try {
+      final bytes = await EpubBook.coverBytes(
+        File(p.join(_dataDir.path, files.first.path)),
+      );
+      if (bytes == null) return false;
+      await setCoverBytes(bookId, bytes);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// The page count read from one of the book's attached PDFs, or null if it
