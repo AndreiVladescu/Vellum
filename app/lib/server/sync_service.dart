@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
+import 'package:pool/pool.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
@@ -58,6 +59,11 @@ class SyncService {
   SyncService(this.repository);
 
   final LibraryRepository repository;
+
+  /// How many blob transfers (cover/file up/downloads) run at once. Independent
+  /// transfers otherwise serialize into a sum-of-latencies; 4 keeps a personal
+  /// server comfortable. DB writes still serialize inside drift.
+  static const _blobConcurrency = 4;
 
   /// True while a pull or push is in flight; a second concurrent call throws.
   bool _running = false;
@@ -196,20 +202,21 @@ class SyncService {
     // Fetch cover art outside the transaction; a failed cover never fails the
     // whole pull.
     final coverBooks = books.where((b) => b.hasCover).toList();
-    for (final (i, b) in coverBooks.indexed) {
-      onProgress?.call(i, coverBooks.length, 'Downloading covers');
+    var coverDone = 0;
+    await _forEachBounded(coverBooks, (b) async {
       try {
         // Always revalidate with the stored ETag rather than trusting a local
         // file to be current: a cover changed on the server (console edit,
         // better art) must reach a device that already holds an old one. A 304
         // is cheap — the server's 304 path never opens the file.
         final res = await client.downloadCover(b.id, etag: localCoverEtag[b.id]);
-        if (res.bytes == null) continue; // 304 unchanged, or 404 no cover
-        final rel = p.join('covers', '${b.id}.jpg');
-        await File(p.join(_dataDir.path, rel)).writeAsBytes(res.bytes!);
-        await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
-          BooksCompanion(coverPath: Value(rel), coverEtag: Value(res.etag)),
-        );
+        if (res.bytes != null) {
+          final rel = p.join('covers', '${b.id}.jpg');
+          await File(p.join(_dataDir.path, rel)).writeAsBytes(res.bytes!);
+          await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
+            BooksCompanion(coverPath: Value(rel), coverEtag: Value(res.etag)),
+          );
+        }
       } catch (e) {
         // Leave this book cover-less; it still shows a generated spine.
         issues.add(SyncIssue(
@@ -218,13 +225,17 @@ class SyncService {
           stage: 'cover',
           message: '$e',
         ));
+      } finally {
+        onProgress?.call(++coverDone, coverBooks.length, 'Downloading covers');
       }
-    }
+    });
 
     // Download digital files the device doesn't already have. Dedup by content
     // hash, so a file pushed under a different id isn't downloaded twice.
-    for (final (i, b) in books.indexed) {
-      onProgress?.call(i, books.length, 'Downloading files');
+    // Books run concurrently; a book's own files stay ordered (each row is
+    // recorded only after its .part is renamed into place).
+    var fileDone = 0;
+    await _forEachBounded(books, (b) async {
       try {
         // Files come from the books-list enrichment, so no per-book round-trip.
         for (final f in b.files) {
@@ -262,8 +273,10 @@ class SyncService {
           stage: 'file',
           message: '$e',
         ));
+      } finally {
+        onProgress?.call(++fileDone, books.length, 'Downloading files');
       }
-    }
+    });
 
     // For books the server has no cover for (e.g. PDFs uploaded on the server,
     // which can't render covers there): make sure we have a local cover
@@ -388,8 +401,10 @@ class SyncService {
     }
 
     var pushed = 0;
-    for (final (i, b) in books.indexed) {
-      onProgress?.call(i, books.length, 'Pushing books');
+    var pushDone = 0;
+    // Books push concurrently; the metadata upsert, cover, and files for one
+    // book stay ordered within its task.
+    await _forEachBounded(books, (b) async {
       try {
         final details = await repository.detailsFor(b.id);
         await client.pushBook(
@@ -445,12 +460,31 @@ class SyncService {
           stage: 'push',
           message: e is ServerException ? e.message : '$e',
         ));
+      } finally {
+        onProgress?.call(++pushDone, books.length, 'Pushing books');
       }
-    }
+    });
     return SyncReport(
       pushed: pushed,
       deletedRemotely: deletedRemotely,
       issues: issues,
     );
+  }
+
+  /// Runs [action] over [items] with at most [_blobConcurrency] in flight at
+  /// once, completing when all have finished. Each task owns its own error
+  /// handling; a failure in one doesn't cancel the others.
+  Future<void> _forEachBounded<T>(
+    Iterable<T> items,
+    Future<void> Function(T) action,
+  ) async {
+    final pool = Pool(_blobConcurrency);
+    try {
+      await Future.wait([
+        for (final item in items) pool.withResource(() => action(item)),
+      ]);
+    } finally {
+      await pool.close();
+    }
   }
 }

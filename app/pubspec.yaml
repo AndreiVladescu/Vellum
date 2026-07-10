@@ -46,6 +46,7 @@ dependencies:
   pdfrx: ^2.4.4
   desktop_drop: ^0.7.1
   flutter_secure_storage: ^9.2.0
+  pool: ^1.5.1
 
 dev_dependencies:
   flutter_test:
