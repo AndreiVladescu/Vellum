@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 
@@ -34,5 +35,19 @@ void main() {
     expect(await repo.watchBook('b1').first, isNull);
     expect(await db.select(db.physicalCopies).get(), isEmpty);
     expect(await db.select(db.bookPlacements).get(), isEmpty);
+  });
+
+  test('opening the library sweeps leftover .part downloads', () async {
+    final filesDir = Directory(p.join(dir.path, 'files'))
+      ..createSync(recursive: true);
+    final part = File(p.join(filesDir.path, 'abc.pdf.part'))
+      ..writeAsStringSync('partial');
+    final complete = File(p.join(filesDir.path, 'abc.pdf'))
+      ..writeAsStringSync('done');
+
+    await _repo(dir); // opening the repository runs the sweep
+
+    expect(part.existsSync(), false, reason: 'interrupted .part removed');
+    expect(complete.existsSync(), true, reason: 'complete file kept');
   });
 }
