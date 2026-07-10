@@ -39,7 +39,10 @@ class AppDrawer extends StatelessWidget {
   void _openPreferences(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => PreferencesPage(settings: settings)),
+      MaterialPageRoute(
+        builder: (_) =>
+            PreferencesPage(settings: settings, repository: repository),
+      ),
     );
   }
 
