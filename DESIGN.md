@@ -137,8 +137,11 @@ a TLS reverse proxy (Caddy, nginx, Traefik) so credentials, book files, and
 `localhost`. Other knobs: `VELLUM_PORT` (bind port, default 3000, on `0.0.0.0`),
 `VELLUM_DB` (SQLite file), `VELLUM_DATA_DIR` (blob store), `VELLUM_MAX_UPLOAD_MB`
 (default 2048). Back up the `.db` file and the data dir together — the database
-stores blob *paths*, so the two are only meaningful as a pair. The app defaults
-new server URLs to `https://` and warns when a URL is unencrypted.
+stores blob *paths*, so the two are only meaningful as a pair. The database runs
+in **WAL mode**, so its `-wal`/`-shm` sidecar files are part of the state: back
+them up alongside the `.db`, or run `PRAGMA wal_checkpoint(TRUNCATE)` before
+copying the `.db` on its own. The app defaults new server URLs to `https://` and
+warns when a URL is unencrypted.
 
 ## Data model
 

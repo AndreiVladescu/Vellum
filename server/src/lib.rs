@@ -42,7 +42,14 @@ pub async fn connect_db(path: &str) -> anyhow::Result<SqlitePool> {
     let options = SqliteConnectOptions::new()
         .filename(path)
         .create_if_missing(true)
-        .foreign_keys(true);
+        .foreign_keys(true)
+        // WAL lets readers (the console's list, OPDS) run concurrently with a
+        // writer (a streaming upload's INSERT); NORMAL sync is the standard WAL
+        // pairing (durable except in a narrow power-loss window). A busy timeout
+        // turns a transient lock into a short wait instead of a SQLITE_BUSY 500.
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+        .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+        .busy_timeout(std::time::Duration::from_secs(5));
     let db = SqlitePoolOptions::new().connect_with(options).await?;
     sqlx::migrate!().run(&db).await?;
     // Drop already-expired sessions so the table doesn't grow without bound.
