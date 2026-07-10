@@ -73,6 +73,12 @@ class _ServerPageState extends State<ServerPage> {
       } else if (mounted) {
         setState(() => _error = e.message);
       }
+    } on StateError {
+      // A sync (usually the launch auto-sync) is already in flight — the server
+      // is fine, so don't render the internal "Bad state" message.
+      if (mounted) {
+        setState(() => _error = 'A sync is already running — try again in a moment.');
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Could not reach the server.\n$e');
     } finally {
