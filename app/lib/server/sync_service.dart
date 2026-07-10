@@ -222,7 +222,8 @@ class SyncService {
     for (final (i, b) in books.indexed) {
       onProgress?.call(i, books.length, 'Downloading files');
       try {
-        for (final f in await client.listFiles(b.id)) {
+        // Files come from the books-list enrichment, so no per-book round-trip.
+        for (final f in b.files) {
           final have =
               await (db.select(db.bookFiles)..where(
                     (x) => x.bookId.equals(b.id) & x.sha256.equals(f.sha256),
@@ -372,6 +373,16 @@ class SyncService {
     // server's no-op guard keeps that first sweep from churning timestamps.
     final books =
         await (db.select(db.books)..where((b) => b.needsPush.equals(true))).get();
+
+    // One list fetch gives the server's existing file hashes per book, so we
+    // skip re-uploading files it already has without a `GET .../files` each.
+    final remoteHashesByBook = <String, Set<String>>{};
+    if (books.isNotEmpty) {
+      for (final sb in (await client.listBooks()).books) {
+        remoteHashesByBook[sb.id] = {for (final f in sb.files) f.sha256};
+      }
+    }
+
     var pushed = 0;
     for (final (i, b) in books.indexed) {
       onProgress?.call(i, books.length, 'Pushing books');
@@ -407,9 +418,7 @@ class SyncService {
           db.bookFiles,
         )..where((f) => f.bookId.equals(b.id))).get();
         if (localFiles.isNotEmpty) {
-          final remoteHashes = (await client.listFiles(
-            b.id,
-          )).map((f) => f.sha256).toSet();
+          final remoteHashes = remoteHashesByBook[b.id] ?? const {};
           for (final lf in localFiles) {
             if (remoteHashes.contains(lf.sha256)) continue;
             final file = repository.fileOf(lf);

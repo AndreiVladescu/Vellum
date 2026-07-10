@@ -194,6 +194,53 @@ void main() {
     expect(stored, '2025-06-01 12:00:00', reason: 'new server clock persisted');
   });
 
+  test('pull downloads files from the inline list, not a per-book call', () async {
+    final repo = await _repo(dir);
+    var perBookFilesCalled = false;
+    final client = _client((req) async {
+      final path = req.url.path;
+      if (req.method == 'GET' && path == '/api/books') {
+        return http.Response(
+          jsonEncode({
+            'server_now': '2024-06-01 00:00:00',
+            'books': [
+              {
+                'id': 'b1',
+                'title': 'Dune',
+                'updated_at': '2024-01-01 00:00:00',
+                'files': [
+                  {
+                    'id': 'f1',
+                    'book_id': 'b1',
+                    'format': 'pdf',
+                    'size_bytes': 5,
+                    'sha256': 'abc',
+                  },
+                ],
+              },
+            ],
+          }),
+          200,
+        );
+      }
+      if (req.method == 'GET' && path.endsWith('/files')) {
+        perBookFilesCalled = true;
+        return http.Response('[]', 200);
+      }
+      if (req.method == 'GET' && path == '/api/files/f1') {
+        return http.Response('hello', 200);
+      }
+      return http.Response('[]', 200);
+    });
+
+    await SyncService(repo).pull(client);
+
+    expect(perBookFilesCalled, false, reason: 'no per-book files round-trip');
+    final files = await repo.db.select(repo.db.bookFiles).get();
+    expect(files.length, 1);
+    expect(files.first.sha256, 'abc');
+  });
+
   test('a failed cover download is recorded as an issue, not swallowed', () async {
     final repo = await _repo(dir);
     final client = _client((req) async {

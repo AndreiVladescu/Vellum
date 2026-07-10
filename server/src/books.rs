@@ -154,14 +154,17 @@ pub async fn files_map(
     Ok(map)
 }
 
-/// A book plus the two aggregates the console's table needs to render its
-/// Author and file columns without a per-row `/detail` round-trip.
+/// A book plus the aggregates a client needs without a per-row round-trip: the
+/// console renders Author/file columns from these, and the app's pull reads
+/// `files` instead of a `GET .../files` per book.
 #[derive(Serialize)]
 pub struct BookListItem {
     #[serde(flatten)]
     pub book: BookDto,
     pub authors: Vec<String>,
     pub genres: Vec<String>,
+    pub files: Vec<crate::blobs::FileDto>,
+    /// Retained for the console; now just `files.len()`, no separate scan.
     pub file_count: i64,
 }
 
@@ -207,29 +210,33 @@ pub async fn list(
             .push(row.name);
     }
 
-    #[derive(sqlx::FromRow)]
-    struct CountRow {
-        book_id: String,
-        n: i64,
-    }
-    let count_rows = sqlx::query_as::<_, CountRow>(
-        "SELECT book_id, COUNT(*) AS n FROM book_file GROUP BY book_id",
+    // One scan of every file, grouped by book, so the list carries full file
+    // rows (id/format/size/hash) — the app dedups and downloads from these, and
+    // file_count is just their length (no separate COUNT scan).
+    let file_rows = sqlx::query_as::<_, crate::blobs::FileDto>(
+        "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
+         FROM book_file ORDER BY book_id, added_at",
     )
     .fetch_all(&state.db)
     .await?;
-    let counts_by_book: std::collections::HashMap<String, i64> =
-        count_rows.into_iter().map(|r| (r.book_id, r.n)).collect();
+    let mut files_by_book: std::collections::HashMap<String, Vec<crate::blobs::FileDto>> =
+        std::collections::HashMap::new();
+    for f in file_rows {
+        files_by_book.entry(f.book_id.clone()).or_default().push(f);
+    }
 
     let items = books
         .into_iter()
         .map(|book| {
             let authors = authors_by_book.get(&book.id).cloned().unwrap_or_default();
             let genres = genres_by_book.get(&book.id).cloned().unwrap_or_default();
-            let file_count = counts_by_book.get(&book.id).copied().unwrap_or(0);
+            let files = files_by_book.remove(&book.id).unwrap_or_default();
+            let file_count = files.len() as i64;
             BookListItem {
                 book,
                 authors,
                 genres,
+                files,
                 file_count,
             }
         })

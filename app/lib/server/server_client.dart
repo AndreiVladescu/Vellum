@@ -51,6 +51,7 @@ class ServerBook {
     this.updatedAt,
     this.authors,
     this.genres,
+    this.files = const [],
   });
 
   final String id;
@@ -69,6 +70,10 @@ class ServerBook {
   /// (leave local alone).
   final List<String>? authors;
   final List<String>? genres;
+
+  /// The book's files from the list enrichment, so a pull/push needn't do a
+  /// `GET .../files` per book. Empty when the server predates carrying them.
+  final List<ServerFile> files;
 
   /// Server-relative cover path; non-null means a cover is available to fetch.
   final String? coverPath;
@@ -98,6 +103,12 @@ class ServerBook {
     updatedAt: _parseServerTime(j['updated_at'] as String?),
     authors: _stringList(j['authors']),
     genres: _stringList(j['genres']),
+    files: j['files'] is List
+        ? [
+            for (final f in j['files'] as List)
+              ServerFile.fromJson(f as Map<String, dynamic>),
+          ]
+        : const [],
   );
 
   static List<String>? _stringList(dynamic v) =>
