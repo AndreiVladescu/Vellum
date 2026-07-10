@@ -88,6 +88,9 @@ class LibraryRepository {
             sha256: digest.toString(),
           ),
         );
+    // A new file is synced data, so the book needs pushing (setCoverFromFirstPage
+    // below also marks it, but a non-PDF or cover-having book wouldn't).
+    await _markNeedsPush(bookId);
     // A cover-less book that just got a PDF: use its first page as the cover.
     if (ext == 'pdf') {
       final book = await (db.select(
@@ -153,7 +156,19 @@ class LibraryRepository {
         pageCount: Value(pageCount),
         description: Value(_blankToNull(description)),
         updatedAt: Value(DateTime.now()),
+        needsPush: const Value(true),
       ),
+    );
+  }
+
+  /// Marks a book's synced data as changed since the last push, so the next
+  /// sync uploads it. Used by mutations that don't already write the books row
+  /// (author/genre joins, file attaches). Local-only setters never call this.
+  Future<void> _markNeedsPush(String bookId) async {
+    await (db.update(
+      db.books,
+    )..where((b) => b.id.equals(bookId))).write(
+      const BooksCompanion(needsPush: Value(true)),
     );
   }
 
@@ -181,6 +196,7 @@ class LibraryRepository {
             );
       }
     });
+    await _markNeedsPush(bookId);
   }
 
   /// Replaces a book's genres with [names]. Blank names are ignored. Mirror of
@@ -200,6 +216,7 @@ class LibraryRepository {
             .insert(BookGenresCompanion.insert(bookId: bookId, genreId: genreId));
       }
     });
+    await _markNeedsPush(bookId);
   }
 
   /// Personal notes — stored locally only, never pushed to a server.
@@ -214,7 +231,11 @@ class LibraryRepository {
     final rel = p.join('covers', '$bookId.jpg');
     await File(p.join(_dataDir.path, rel)).writeAsBytes(bytes);
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
-      BooksCompanion(coverPath: Value(rel), updatedAt: Value(DateTime.now())),
+      BooksCompanion(
+        coverPath: Value(rel),
+        updatedAt: Value(DateTime.now()),
+        needsPush: const Value(true),
+      ),
     );
   }
 
@@ -269,6 +290,7 @@ class LibraryRepository {
         publishedYear: Value(m['publishedYear'] as int?),
         pageCount: Value(m['pageCount'] as int?),
         updatedAt: Value(DateTime.now()),
+        needsPush: const Value(true),
       ),
     );
     final coverUrl = m['coverUrl'] as String?;

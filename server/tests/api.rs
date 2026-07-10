@@ -460,6 +460,52 @@ async fn upsert_ignores_a_stale_timestamped_push() {
 }
 
 #[tokio::test]
+async fn upsert_is_a_noop_when_nothing_changed() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (_, first) = call(
+        &app,
+        "PUT",
+        "/api/books/noop-1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "authors": ["Frank Herbert"] })),
+    )
+    .await;
+    let stamp1 = first["updated_at"].as_str().unwrap().to_string();
+
+    // updated_at has one-second resolution, so let the clock move on: a genuine
+    // write would now stamp a strictly-later time, making the no-op observable.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+    // Re-pushing byte-identical metadata + authors must not bump updated_at.
+    let (_, second) = call(
+        &app,
+        "PUT",
+        "/api/books/noop-1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "authors": ["Frank Herbert"] })),
+    )
+    .await;
+    assert_eq!(
+        second["updated_at"].as_str().unwrap(),
+        stamp1,
+        "redundant push must not churn updated_at"
+    );
+
+    // A real change still bumps it (>1s has elapsed since stamp1).
+    let (_, third) = call(
+        &app,
+        "PUT",
+        "/api/books/noop-1",
+        Some(&master),
+        Some(json!({ "title": "Dune Messiah", "authors": ["Frank Herbert"] })),
+    )
+    .await;
+    assert_ne!(third["updated_at"].as_str().unwrap(), stamp1);
+}
+
+#[tokio::test]
 async fn upsert_replaces_authors_and_genres() {
     let app = test_app().await;
     let master = register_master(&app).await;

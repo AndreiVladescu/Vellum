@@ -94,6 +94,8 @@ class SyncService {
 
     // Replace authors/genres for the rows we adopted. Null means the server
     // didn't send them (old server) — leave the local joins untouched.
+    // setAuthors/setGenres mark the row dirty; the needsPush clear below undoes
+    // that, since adopting server state leaves nothing local to push.
     for (final b in applied) {
       if (b.authors != null) await repository.setAuthors(b.id, b.authors!);
       if (b.genres != null) await repository.setGenres(b.id, b.genres!);
@@ -180,6 +182,15 @@ class SyncService {
         }
       }
     }
+
+    // Everything we adopted now matches the server, so clear the dirty flag the
+    // metadata/authors/genres writes set — there is nothing local to push for
+    // these rows. Books we kept (local newer, not in `applied`) keep their flag.
+    if (applied.isNotEmpty) {
+      await (db.update(db.books)
+            ..where((x) => x.id.isIn([for (final b in applied) b.id])))
+          .write(const BooksCompanion(needsPush: Value(false)));
+    }
     return books.length;
   }
 
@@ -205,7 +216,11 @@ class SyncService {
       )..where((t) => t.bookId.equals(d.bookId))).go();
     }
 
-    final books = await db.select(db.books).get();
+    // Only push books changed since their last successful push. `needsPush`
+    // defaults true, so a fresh library still pushes everything once; the
+    // server's no-op guard keeps that first sweep from churning timestamps.
+    final books =
+        await (db.select(db.books)..where((b) => b.needsPush.equals(true))).get();
     var pushed = 0;
     for (final b in books) {
       try {
@@ -251,9 +266,14 @@ class SyncService {
             }
           }
         }
+        // Fully pushed: clear the dirty flag so the next sync skips this book
+        // until it changes again.
+        await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
+          const BooksCompanion(needsPush: Value(false)),
+        );
         pushed++;
       } on ServerException {
-        // Read-only or rejected — leave it and keep going.
+        // Read-only or rejected — leave it dirty and keep going.
       }
     }
     return pushed;

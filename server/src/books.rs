@@ -251,6 +251,46 @@ pub async fn upsert(
         None => false,
     };
 
+    // No-op guard: if an update wouldn't change the stored row or its joins,
+    // skip the write so `updated_at` (and thus every client's pull cursor) isn't
+    // churned by a redundant push — notably the first post-upgrade sweep, which
+    // re-pushes every book once. New books (INSERT path) always write.
+    if is_update {
+        let current = fetch_book(&state, &id).await?.0;
+        let meta_same = current.title == input.title.trim()
+            && current.subtitle == input.subtitle
+            && current.description == input.description
+            && current.isbn == input.isbn
+            && current.publisher == input.publisher
+            && current.published_year == input.published_year
+            && current.page_count == input.page_count
+            // cover_path / spine_style only overwrite when provided (COALESCE).
+            && input
+                .cover_path
+                .as_ref()
+                .is_none_or(|c| current.cover_path.as_ref() == Some(c))
+            && input
+                .spine_style
+                .as_ref()
+                .is_none_or(|s| current.spine_style.as_ref() == Some(s));
+        let authors_same = match &input.authors {
+            None => true,
+            Some(a) => book_author_names(&state, &id).await? == normalize_names(a),
+        };
+        let genres_same = match &input.genres {
+            None => true,
+            Some(g) => {
+                let mut want = normalize_names(g);
+                want.sort();
+                want.dedup();
+                book_genre_names(&state, &id).await? == want
+            }
+        };
+        if meta_same && authors_same && genres_same {
+            return Ok(Json(current));
+        }
+    }
+
     // Metadata write and author/genre join replacement share one transaction so
     // a book never lands with half its relations, or with the tombstone of a
     // revived id still live.
@@ -350,6 +390,38 @@ pub async fn upsert(
     }
     tx.commit().await?;
     fetch_book(&state, &id).await
+}
+
+/// Trim each name and drop the blanks — the same normalization the join
+/// replacement applies, so the no-op guard compares like with like.
+fn normalize_names(names: &[String]) -> Vec<String> {
+    names
+        .iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+/// A book's author names in cover order.
+async fn book_author_names(state: &AppState, id: &str) -> AppResult<Vec<String>> {
+    Ok(sqlx::query_scalar(
+        "SELECT a.name FROM author a JOIN book_author ba ON ba.author_id = a.id \
+         WHERE ba.book_id = ? ORDER BY ba.position",
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await?)
+}
+
+/// A book's genre names, sorted by name (the order the joins are compared in).
+async fn book_genre_names(state: &AppState, id: &str) -> AppResult<Vec<String>> {
+    Ok(sqlx::query_scalar(
+        "SELECT g.name FROM genre g JOIN book_genre bg ON bg.genre_id = g.id \
+         WHERE bg.book_id = ? ORDER BY g.name",
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await?)
 }
 
 /// Get-or-create a name-keyed row (author / genre) inside a transaction and

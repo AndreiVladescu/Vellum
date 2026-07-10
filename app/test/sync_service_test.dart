@@ -171,6 +171,61 @@ void main() {
     expect(await db.select(db.localDeletions).get(), isEmpty);
   });
 
+  test('push sends only books that need pushing, and clears the flag', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(
+      BooksCompanion.insert(
+        id: 'clean',
+        title: 'Clean',
+        needsPush: const Value(false),
+      ),
+    );
+    // Default needsPush is true, so this one is dirty.
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'dirty', title: 'Dirty'));
+
+    final pushed = <String>[];
+    final client = _client((req) async {
+      final path = req.url.path;
+      if (req.method == 'PUT' &&
+          path.startsWith('/api/books/') &&
+          !path.endsWith('/cover')) {
+        pushed.add(path.split('/').last);
+        return http.Response('{}', 200);
+      }
+      if (req.method == 'GET' && path == '/api/deletions') {
+        return http.Response('[]', 200);
+      }
+      return http.Response('[]', 200);
+    });
+
+    final n = await SyncService(repo).push(client);
+    expect(pushed, ['dirty'], reason: 'clean book is skipped');
+    expect(n, 1);
+    expect((await repo.watchBook('dirty').first)?.needsPush, false);
+  });
+
+  test('pull clears the dirty flag on adopted books', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(
+      BooksCompanion.insert(
+        id: 'b1',
+        title: 'Old local',
+        updatedAt: Value(DateTime.utc(2024, 1, 1)),
+      ),
+    );
+
+    final client = _client(
+      _server(books: [_serverBook('b1', 'Newer server', '2025-01-01 00:00:00')]),
+    );
+    await SyncService(repo).pull(client);
+
+    final b = await repo.watchBook('b1').first;
+    expect(b?.title, 'Newer server');
+    expect(b?.needsPush, false, reason: 'adopted rows have nothing local to push');
+  });
+
   test('push propagates a local deletion then clears the tombstone', () async {
     final repo = await _repo(dir);
     final db = repo.db;

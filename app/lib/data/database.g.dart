@@ -191,6 +191,32 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _needsPushMeta = const VerificationMeta(
+    'needsPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPush = GeneratedColumn<bool>(
+    'needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _coverEtagMeta = const VerificationMeta(
+    'coverEtag',
+  );
+  @override
+  late final GeneratedColumn<String> coverEtag = GeneratedColumn<String>(
+    'cover_etag',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -210,6 +236,8 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     sourceMetadata,
     createdAt,
     updatedAt,
+    needsPush,
+    coverEtag,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -347,6 +375,18 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('needs_push')) {
+      context.handle(
+        _needsPushMeta,
+        needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
+      );
+    }
+    if (data.containsKey('cover_etag')) {
+      context.handle(
+        _coverEtagMeta,
+        coverEtag.isAcceptableOrUnknown(data['cover_etag']!, _coverEtagMeta),
+      );
+    }
     return context;
   }
 
@@ -424,6 +464,14 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_push'],
+      )!,
+      coverEtag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_etag'],
+      ),
     );
   }
 
@@ -451,6 +499,8 @@ class Book extends DataClass implements Insertable<Book> {
   final String? sourceMetadata;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool needsPush;
+  final String? coverEtag;
   const Book({
     required this.id,
     required this.title,
@@ -469,6 +519,8 @@ class Book extends DataClass implements Insertable<Book> {
     this.sourceMetadata,
     required this.createdAt,
     required this.updatedAt,
+    required this.needsPush,
+    this.coverEtag,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -516,6 +568,10 @@ class Book extends DataClass implements Insertable<Book> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['needs_push'] = Variable<bool>(needsPush);
+    if (!nullToAbsent || coverEtag != null) {
+      map['cover_etag'] = Variable<String>(coverEtag);
+    }
     return map;
   }
 
@@ -562,6 +618,10 @@ class Book extends DataClass implements Insertable<Book> {
           : Value(sourceMetadata),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
+      coverEtag: coverEtag == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverEtag),
     );
   }
 
@@ -588,6 +648,8 @@ class Book extends DataClass implements Insertable<Book> {
       sourceMetadata: serializer.fromJson<String?>(json['sourceMetadata']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      needsPush: serializer.fromJson<bool>(json['needsPush']),
+      coverEtag: serializer.fromJson<String?>(json['coverEtag']),
     );
   }
   @override
@@ -611,6 +673,8 @@ class Book extends DataClass implements Insertable<Book> {
       'sourceMetadata': serializer.toJson<String?>(sourceMetadata),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'needsPush': serializer.toJson<bool>(needsPush),
+      'coverEtag': serializer.toJson<String?>(coverEtag),
     };
   }
 
@@ -632,6 +696,8 @@ class Book extends DataClass implements Insertable<Book> {
     Value<String?> sourceMetadata = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? needsPush,
+    Value<String?> coverEtag = const Value.absent(),
   }) => Book(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -656,6 +722,8 @@ class Book extends DataClass implements Insertable<Book> {
         : this.sourceMetadata,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
+    coverEtag: coverEtag.present ? coverEtag.value : this.coverEtag,
   );
   Book copyWithCompanion(BooksCompanion data) {
     return Book(
@@ -692,6 +760,8 @@ class Book extends DataClass implements Insertable<Book> {
           : this.sourceMetadata,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
+      coverEtag: data.coverEtag.present ? data.coverEtag.value : this.coverEtag,
     );
   }
 
@@ -714,7 +784,9 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('readerNotes: $readerNotes, ')
           ..write('sourceMetadata: $sourceMetadata, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('coverEtag: $coverEtag')
           ..write(')'))
         .toString();
   }
@@ -738,6 +810,8 @@ class Book extends DataClass implements Insertable<Book> {
     sourceMetadata,
     createdAt,
     updatedAt,
+    needsPush,
+    coverEtag,
   );
   @override
   bool operator ==(Object other) =>
@@ -759,7 +833,9 @@ class Book extends DataClass implements Insertable<Book> {
           other.readerNotes == this.readerNotes &&
           other.sourceMetadata == this.sourceMetadata &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush &&
+          other.coverEtag == this.coverEtag);
 }
 
 class BooksCompanion extends UpdateCompanion<Book> {
@@ -780,6 +856,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<String?> sourceMetadata;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<bool> needsPush;
+  final Value<String?> coverEtag;
   final Value<int> rowid;
   const BooksCompanion({
     this.id = const Value.absent(),
@@ -799,6 +877,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.sourceMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.coverEtag = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BooksCompanion.insert({
@@ -819,6 +899,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.sourceMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.coverEtag = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -840,6 +922,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<String>? sourceMetadata,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<bool>? needsPush,
+    Expression<String>? coverEtag,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -860,6 +944,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (sourceMetadata != null) 'source_metadata': sourceMetadata,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
+      if (coverEtag != null) 'cover_etag': coverEtag,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -882,6 +968,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<String?>? sourceMetadata,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<bool>? needsPush,
+    Value<String?>? coverEtag,
     Value<int>? rowid,
   }) {
     return BooksCompanion(
@@ -902,6 +990,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       sourceMetadata: sourceMetadata ?? this.sourceMetadata,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
+      coverEtag: coverEtag ?? this.coverEtag,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -960,6 +1050,12 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<bool>(needsPush.value);
+    }
+    if (coverEtag.present) {
+      map['cover_etag'] = Variable<String>(coverEtag.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -986,6 +1082,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('sourceMetadata: $sourceMetadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('coverEtag: $coverEtag, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5268,6 +5366,8 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<String?> sourceMetadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<bool> needsPush,
+      Value<String?> coverEtag,
       Value<int> rowid,
     });
 typedef $$BooksTableUpdateCompanionBuilder =
@@ -5289,6 +5389,8 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<String?> sourceMetadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<bool> needsPush,
+      Value<String?> coverEtag,
       Value<int> rowid,
     });
 
@@ -5479,6 +5581,16 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coverEtag => $composableBuilder(
+    column: $table.coverEtag,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5701,6 +5813,16 @@ class $$BooksTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get coverEtag => $composableBuilder(
+    column: $table.coverEtag,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BooksTableAnnotationComposer
@@ -5778,6 +5900,12 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsPush =>
+      $composableBuilder(column: $table.needsPush, builder: (column) => column);
+
+  GeneratedColumn<String> get coverEtag =>
+      $composableBuilder(column: $table.coverEtag, builder: (column) => column);
 
   Expression<T> bookAuthorsRefs<T extends Object>(
     Expression<T> Function($$BookAuthorsTableAnnotationComposer a) f,
@@ -5956,6 +6084,8 @@ class $$BooksTableTableManager
                 Value<String?> sourceMetadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
+                Value<String?> coverEtag = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion(
                 id: id,
@@ -5975,6 +6105,8 @@ class $$BooksTableTableManager
                 sourceMetadata: sourceMetadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                needsPush: needsPush,
+                coverEtag: coverEtag,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5996,6 +6128,8 @@ class $$BooksTableTableManager
                 Value<String?> sourceMetadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
+                Value<String?> coverEtag = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion.insert(
                 id: id,
@@ -6015,6 +6149,8 @@ class $$BooksTableTableManager
                 sourceMetadata: sourceMetadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                needsPush: needsPush,
+                coverEtag: coverEtag,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

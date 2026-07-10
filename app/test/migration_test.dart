@@ -46,7 +46,7 @@ void main() {
     db.execute('PRAGMA user_version = 3');
     db.close();
 
-    // Open through drift — this triggers onUpgrade(3 -> 6).
+    // Open through drift — this triggers onUpgrade(3 -> 7).
     final vellum = VellumDatabase(NativeDatabase(file));
     // Forcing a query runs the migration; it must not throw "already exists".
     final books = await vellum.select(vellum.books).get();

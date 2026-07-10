@@ -27,6 +27,14 @@ class Books extends Table {
   TextColumn get sourceMetadata => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  // Sync bookkeeping — app-local only, never mirrored on the server (like
+  // reading state / readerNotes). `needsPush` marks a book whose synced
+  // metadata, authors/genres, cover, or files changed since the last successful
+  // push; it defaults true so every pre-existing row pushes once after upgrade.
+  // `coverEtag` is the server ETag of the cover we last downloaded, for
+  // conditional cover pulls (see IMPROVEMENT_PLAN_2 §D24).
+  BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
+  TextColumn get coverEtag => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -219,7 +227,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -279,6 +287,10 @@ class VellumDatabase extends _$VellumDatabase {
             if (!tables.contains('local_deletions')) {
               await m.createTable(localDeletions);
             }
+          }
+          if (from < 7) {
+            await addBookColumn('needs_push', books.needsPush);
+            await addBookColumn('cover_etag', books.coverEtag);
           }
         },
         beforeOpen: (details) async {
