@@ -41,6 +41,34 @@ async fn test_app() -> axum::Router {
     test_app_with_dir().await.0
 }
 
+/// A fresh app plus a clone of its database pool, for tests that assert on
+/// tables the HTTP API doesn't expose (e.g. orphan cleanup).
+async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
+    let id = uuid::Uuid::new_v4();
+    let path = std::env::temp_dir().join(format!("vellum_test_{id}.db"));
+    let data_dir = std::env::temp_dir().join(format!("vellum_test_data_{id}"));
+    let db = connect_db(path.to_str().unwrap()).await.unwrap();
+    let app = router(AppState {
+        db: db.clone(),
+        public_base_url: "http://test.local".into(),
+        data_dir,
+        http: reqwest::Client::new(),
+        max_upload_bytes: 512 * 1024 * 1024,
+        throttle: std::sync::Arc::default(),
+        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            60,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
+    });
+    (app, db)
+}
+
 /// Send one request and return the status plus the parsed JSON body (or Null).
 async fn call(
     app: &axum::Router,
@@ -750,6 +778,54 @@ async fn upsert_replaces_authors_and_genres() {
     let (_, detail) = call(&app, "GET", "/api/books/ag-1/detail", Some(&master), None).await;
     assert_eq!(detail["authors"], json!(["Frank Herbert"]));
     assert_eq!(detail["genres"], json!(["Sci-Fi"]), "omitted genres kept");
+}
+
+#[tokio::test]
+async fn upsert_and_delete_gc_orphaned_authors() {
+    let (app, db) = test_app_with_db().await;
+    let master = register_master(&app).await;
+
+    // Two books sharing one author and each having a unique one.
+    for (id, extra) in [("gc-1", "Only On One"), ("gc-2", "Solo Two")] {
+        call(
+            &app,
+            "PUT",
+            &format!("/api/books/{id}"),
+            Some(&master),
+            Some(json!({ "title": id, "authors": ["Shared", extra] })),
+        )
+        .await;
+    }
+    let count = |db: sqlx::SqlitePool| async move {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM author")
+            .fetch_one(&db)
+            .await
+            .unwrap()
+    };
+    assert_eq!(count(db.clone()).await, 3, "Shared + two uniques");
+
+    // Re-tag gc-1 to just Shared: "Only On One" is now orphaned and swept.
+    call(
+        &app,
+        "PUT",
+        "/api/books/gc-1",
+        Some(&master),
+        Some(json!({ "title": "gc-1", "authors": ["Shared"] })),
+    )
+    .await;
+    assert_eq!(
+        count(db.clone()).await,
+        2,
+        "orphaned author removed on re-tag"
+    );
+
+    // Deleting gc-2 orphans "Solo Two"; "Shared" survives (gc-1 still has it).
+    call(&app, "DELETE", "/api/books/gc-2", Some(&master), None).await;
+    assert_eq!(
+        count(db.clone()).await,
+        1,
+        "delete sweeps its orphaned author"
+    );
 }
 
 #[tokio::test]

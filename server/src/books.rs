@@ -454,6 +454,11 @@ pub async fn upsert(
             .await?;
             position += 1;
         }
+        // Drop author names no book references any more (re-tagging can orphan
+        // the old one), so the unique-name table doesn't grow forever.
+        sqlx::query("DELETE FROM author WHERE id NOT IN (SELECT author_id FROM book_author)")
+            .execute(&mut *tx)
+            .await?;
     }
     if let Some(genres) = &input.genres {
         sqlx::query("DELETE FROM book_genre WHERE book_id = ?")
@@ -472,6 +477,9 @@ pub async fn upsert(
                 .execute(&mut *tx)
                 .await?;
         }
+        sqlx::query("DELETE FROM genre WHERE id NOT IN (SELECT genre_id FROM book_genre)")
+            .execute(&mut *tx)
+            .await?;
     }
     tx.commit().await?;
     fetch_book(&state, &id).await
@@ -691,6 +699,14 @@ pub async fn delete(
         .await?;
     sqlx::query("DELETE FROM book WHERE id = ?")
         .bind(&id)
+        .execute(&mut *tx)
+        .await?;
+    // The cascade removed this book's join rows; sweep any author/genre name
+    // left with no book referencing it so the tables don't grow forever.
+    sqlx::query("DELETE FROM author WHERE id NOT IN (SELECT author_id FROM book_author)")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM genre WHERE id NOT IN (SELECT genre_id FROM book_genre)")
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;

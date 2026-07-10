@@ -212,6 +212,7 @@ class LibraryRepository {
               ),
             );
       }
+      await _gcOrphanAuthors();
     });
     await _markNeedsPush(bookId);
   }
@@ -232,9 +233,21 @@ class LibraryRepository {
             .into(db.bookGenres)
             .insert(BookGenresCompanion.insert(bookId: bookId, genreId: genreId));
       }
+      await _gcOrphanGenres();
     });
     await _markNeedsPush(bookId);
   }
+
+  /// Removes author/genre name rows no book references any more, so the
+  /// unique-name tables don't grow monotonically as books are re-tagged or
+  /// deleted. Sub-millisecond at this scale (the subselect hits the join PK).
+  Future<void> _gcOrphanAuthors() => db.customStatement(
+    'DELETE FROM authors WHERE id NOT IN (SELECT author_id FROM book_authors)',
+  );
+
+  Future<void> _gcOrphanGenres() => db.customStatement(
+    'DELETE FROM genres WHERE id NOT IN (SELECT genre_id FROM book_genres)',
+  );
 
   /// Personal notes — stored locally only, never pushed to a server.
   Future<void> setReaderNotes(String bookId, String? notes) async {
@@ -748,6 +761,9 @@ class LibraryRepository {
           book.id,
         ]);
       }
+      // A deleted book may have held the last reference to an author or genre.
+      await _gcOrphanAuthors();
+      await _gcOrphanGenres();
       await db.customStatement(
         'DELETE FROM loans WHERE copy_id IN '
         '(SELECT id FROM physical_copies WHERE book_id = ?)',

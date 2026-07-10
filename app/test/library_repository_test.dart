@@ -37,6 +37,27 @@ void main() {
     expect(await db.select(db.bookPlacements).get(), isEmpty);
   });
 
+  test('re-tagging and deleting sweep orphaned author rows', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'A'));
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b2', title: 'B'));
+
+    await repo.setAuthors('b1', ['Shared', 'Only One']);
+    await repo.setAuthors('b2', ['Shared']);
+    expect((await db.select(db.authors).get()).length, 2);
+
+    // Re-tag b1 to drop "Only One" — it's now referenced by nothing.
+    await repo.setAuthors('b1', ['Shared']);
+    final names = [for (final a in await db.select(db.authors).get()) a.name];
+    expect(names, ['Shared'], reason: 'orphaned author swept');
+
+    // Deleting the last book referencing "Shared" removes it too.
+    await repo.deleteBook(await repo.watchBook('b1').first as Book);
+    await repo.deleteBook(await repo.watchBook('b2').first as Book);
+    expect(await db.select(db.authors).get(), isEmpty);
+  });
+
   test('opening the library sweeps leftover .part downloads', () async {
     final filesDir = Directory(p.join(dir.path, 'files'))
       ..createSync(recursive: true);
