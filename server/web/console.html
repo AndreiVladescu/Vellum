@@ -419,7 +419,7 @@ function render(){
         <td><input type="checkbox" ${S.selected.has(b.id)?'checked':''} onchange="toggleRow('${b.id}',this.checked)"></td>`;
       if (S.cols.has('cover'))
         r += `<td>${b.cover_path
-          ? `<img class="thumb" src="/api/books/${b.id}/cover?token=${tok}&t=${encodeURIComponent(b.updated_at||'')}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nothumb'}))">`
+          ? `<img class="thumb" src="/api/books/${b.id}/cover?w=160&token=${tok}&t=${encodeURIComponent(b.updated_at||'')}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nothumb'}))">`
           : '<span class="nothumb"></span>'}</td>`;
       r += `<td><span class="link" onclick="titleClick('${b.id}')" ondblclick="titleDbl(event,'${b.id}')">${esc(b.title)}</span></td>`;
       if (S.cols.has('author')) r += `<td class="muted">${authorStr(b)?esc(authorStr(b)):'<span class="dim">—</span>'}</td>`;

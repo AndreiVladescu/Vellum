@@ -70,7 +70,7 @@ fn entry_xml(
     if book.cover_path.is_some() {
         links.push_str(&format!(
             "    <link rel=\"http://opds-spec.org/image\" href=\"{base}/api/books/{id}/cover\"/>\n\
-             \x20   <link rel=\"http://opds-spec.org/image/thumbnail\" href=\"{base}/api/books/{id}/cover\"/>\n",
+             \x20   <link rel=\"http://opds-spec.org/image/thumbnail\" href=\"{base}/api/books/{id}/cover?w=160\"/>\n",
             id = escape(&book.id)
         ));
     }

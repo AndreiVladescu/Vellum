@@ -23,6 +23,14 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 lopdf = "0.43.0"
 tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
+# Pure-Rust image decode/encode for cached cover thumbnails (keeps the
+# single-binary story — no shelling out). Only the codecs covers can be.
+image = { version = "0.25", default-features = false, features = [
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

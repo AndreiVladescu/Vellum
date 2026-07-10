@@ -1097,6 +1097,60 @@ async fn file_download_supports_etag_304() {
 }
 
 #[tokio::test]
+async fn cover_thumbnail_is_generated_scaled_and_cached() {
+    let (app, data_dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // Upload a real 200x300 PNG cover.
+    let img = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+        200,
+        300,
+        image::Rgb([120, 120, 120]),
+    ));
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    let put = Request::builder()
+        .method("PUT")
+        .uri(format!("/api/books/{book}/cover"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "image/png")
+        .body(Body::from(buf.into_inner()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(put).await.unwrap().status(),
+        StatusCode::OK
+    );
+
+    // ?w=160 returns a JPEG scaled to width 160.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/books/{book}/cover?w=160&token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers().get("content-type").unwrap(), "image/jpeg");
+    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let thumb = image::load_from_memory(&bytes).unwrap();
+    assert_eq!(thumb.width(), 160);
+
+    // The thumbnail was cached on disk for the next request.
+    assert!(
+        data_dir
+            .join("covers/thumbs")
+            .join(format!("{book}-w160.jpg"))
+            .exists()
+    );
+}
+
+#[tokio::test]
 async fn cover_upload_and_download_round_trips() {
     let app = test_app().await;
     let master = register_master(&app).await;

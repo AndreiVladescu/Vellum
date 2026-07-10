@@ -125,13 +125,26 @@ pub async fn put_cover(
     {
         let _ = tokio::fs::remove_file(state.data_dir.join(&old)).await;
     }
+    // The cover changed, so any cached thumbnails are stale.
+    invalidate_thumbs(&state, &id).await;
     Ok(Json(serde_json::json!({ "cover_path": rel })))
+}
+
+/// Thumbnail widths we generate and cache. A whitelist so a caller can't drive
+/// arbitrary-size renders; add sizes here as the UI needs them.
+const THUMB_WIDTHS: &[u32] = &[160];
+
+#[derive(Deserialize)]
+pub struct CoverQuery {
+    /// Optional cached thumbnail width (must be in [`THUMB_WIDTHS`]).
+    pub w: Option<u32>,
 }
 
 pub async fn get_cover(
     State(state): State<AppState>,
     user: AuthUser,
     AxPath(id): AxPath<String>,
+    Query(q): Query<CoverQuery>,
     headers: HeaderMap,
 ) -> AppResult<Response> {
     require_view(&state, &user, &id).await?;
@@ -143,25 +156,82 @@ pub async fn get_cover(
     let rel = rel
         .flatten()
         .ok_or_else(|| AppError::NotFound("no cover".into()))?;
+
+    // A whitelisted ?w= serves a cached, downscaled JPEG so a table of 40px
+    // thumbnails doesn't pull hundreds of MB of full first-page renders.
+    let serve_rel = match q.w {
+        Some(w) if THUMB_WIDTHS.contains(&w) => ensure_thumb(&state, &id, &rel, w).await?,
+        _ => rel,
+    };
+
     // Covers have no stored hash, so use a weak size+mtime validator.
-    let etag = tokio::fs::metadata(state.data_dir.join(&rel))
-        .await
-        .ok()
-        .map(|m| {
-            let mtime = m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            format!("W/\"{}-{mtime}\"", m.len())
-        });
+    let etag = weak_etag(&state, &serve_rel).await;
     let inm = headers
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
     let range = headers.get(header::RANGE).and_then(|v| v.to_str().ok());
     let if_range = headers.get(header::IF_RANGE).and_then(|v| v.to_str().ok());
-    serve_blob(&state, &rel, etag, inm, range, if_range).await
+    serve_blob(&state, &serve_rel, etag, inm, range, if_range).await
+}
+
+/// Relative path of a book's cached thumbnail at width `w`.
+fn thumb_rel(id: &str, w: u32) -> String {
+    format!("covers/thumbs/{id}-w{w}.jpg")
+}
+
+/// A weak size+mtime ETag for the blob at `rel`, or None if it can't be stat'd.
+async fn weak_etag(state: &AppState, rel: &str) -> Option<String> {
+    let m = tokio::fs::metadata(state.data_dir.join(rel)).await.ok()?;
+    let mtime = m
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Some(format!("W/\"{}-{mtime}\"", m.len()))
+}
+
+/// Ensure a cached thumbnail exists for the cover and return its relative path.
+/// Generates it (decode → downscale → JPEG) on first request; on any failure
+/// falls back to serving the full cover so a thumbnail can never 500 a row.
+async fn ensure_thumb(state: &AppState, id: &str, cover_rel: &str, w: u32) -> AppResult<String> {
+    let rel = thumb_rel(id, w);
+    let thumb_full = state.data_dir.join(&rel);
+    if tokio::fs::metadata(&thumb_full).await.is_ok() {
+        return Ok(rel); // already cached
+    }
+    if let Some(parent) = thumb_full.parent() {
+        let _ = tokio::fs::create_dir_all(parent).await;
+    }
+    let cover_full = state.data_dir.join(cover_rel);
+    let out = thumb_full.clone();
+    // Decode + encode is CPU-bound; keep it off the async runtime.
+    let made = tokio::task::spawn_blocking(move || make_thumb(&cover_full, &out, w))
+        .await
+        .unwrap_or(false);
+    Ok(if made { rel } else { cover_rel.to_string() })
+}
+
+/// Decode `cover`, downscale to fit width `w` (aspect-preserving), and write a
+/// JPEG to `out`. Returns whether it succeeded.
+fn make_thumb(cover: &Path, out: &Path, w: u32) -> bool {
+    let Ok(img) = image::open(cover) else {
+        return false;
+    };
+    // A tall height cap so width is the binding dimension for portrait covers.
+    let thumb = img.thumbnail(w, w * 4);
+    let Ok(mut file) = std::fs::File::create(out) else {
+        return false;
+    };
+    thumb.write_to(&mut file, image::ImageFormat::Jpeg).is_ok()
+}
+
+/// Delete every cached thumbnail for a book, so a changed cover isn't served
+/// stale. Called whenever the cover blob is replaced.
+async fn invalidate_thumbs(state: &AppState, id: &str) {
+    for &w in THUMB_WIDTHS {
+        let _ = tokio::fs::remove_file(state.data_dir.join(thumb_rel(id, w))).await;
+    }
 }
 
 // ---- book files -----------------------------------------------------------
@@ -386,6 +456,7 @@ pub(crate) async fn render_pdf_cover(state: &AppState, book_id: &str) -> Option<
     {
         let _ = tokio::fs::remove_file(state.data_dir.join(&old)).await;
     }
+    invalidate_thumbs(state, book_id).await;
     Some(out_rel)
 }
 
