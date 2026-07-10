@@ -13,10 +13,15 @@ class ServerPage extends StatefulWidget {
     super.key,
     required this.connection,
     required this.repository,
+    required this.sync,
   });
 
   final ServerConnection connection;
   final LibraryRepository repository;
+
+  /// The app-wide sync service (shared with the launch auto-sync, so its
+  /// re-entrancy guard spans both).
+  final SyncService sync;
 
   @override
   State<ServerPage> createState() => _ServerPageState();
@@ -32,9 +37,7 @@ class _ServerPageState extends State<ServerPage> {
   final _displayName = TextEditingController();
   final _password = TextEditingController();
 
-  // One sync service instance, so its re-entrancy guard actually spans the pull
-  // and push buttons (a fresh instance per call couldn't guard anything).
-  late final SyncService _sync = SyncService(widget.repository);
+  SyncService get _sync => widget.sync;
 
   bool _busy = false;
   bool _registerMode = false;
@@ -161,6 +164,35 @@ class _ServerPageState extends State<ServerPage> {
         await widget.connection.saveSession(url: url, auth: auth);
       });
 
+  Future<void> _syncNow() => _run(() async {
+        final client = widget.connection.client;
+        if (client == null) return;
+        final report = await _sync.sync(
+          client,
+          cursor: widget.connection.syncCursor,
+          onCursor: widget.connection.setSyncCursor,
+          onProgress: _onProgress,
+        );
+        if (!mounted) return;
+        final n = report.issues.length;
+        final changed = report.pulled + report.pushed;
+        final msg = changed == 0 && !report.hasIssues
+            ? 'Already up to date.'
+            : 'Pulled ${report.pulled}, pushed ${report.pushed}'
+                '${report.hasIssues ? ', $n issue${n == 1 ? '' : 's'}' : ''}.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            action: report.hasIssues
+                ? SnackBarAction(
+                    label: 'Details',
+                    onPressed: () => _showIssues(report.issues),
+                  )
+                : null,
+          ),
+        );
+      });
+
   Future<void> _pull() => _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
@@ -216,28 +248,46 @@ class _ServerPageState extends State<ServerPage> {
         Text('Sync', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         const Text(
-            'Pull the books shared with you into your local shelf, or push your '
-            'local books up to the server. Neither side deletes.'),
+            'Sync pulls the books shared with you into your local shelf, then '
+            'pushes your local changes up to the server. It also runs '
+            'automatically when the app starts.'),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: _busy ? null : _syncNow,
+            icon: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.sync),
+            label: const Text('Sync now'),
+          ),
+        ),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          shape: const Border(),
+          title: Text('Advanced', style: theme.textTheme.titleSmall),
+          subtitle: const Text('Run only one direction of the sync'),
           children: [
-            FilledButton.icon(
-              onPressed: _busy ? null : _pull,
-              icon: _busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.download),
-              label: const Text('Pull library'),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _pull,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Pull library'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _push,
+                  icon: const Icon(Icons.upload),
+                  label: const Text('Push my books'),
+                ),
+              ],
             ),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _push,
-              icon: const Icon(Icons.upload),
-              label: const Text('Push my books'),
-            ),
+            const SizedBox(height: 12),
           ],
         ),
         if (_busy) ...[

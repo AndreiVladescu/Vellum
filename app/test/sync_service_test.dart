@@ -294,6 +294,59 @@ void main() {
     await first;
   });
 
+  test('sync pulls then pushes in one run and merges the reports', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    // A dirty local book to push (needsPush defaults true)...
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'mine', title: 'Local'));
+
+    // ...and a server book to pull.
+    final pushed = <String>[];
+    final client = _client((req) async {
+      final path = req.url.path;
+      if (req.method == 'GET' && path == '/api/books') {
+        return http.Response(
+          jsonEncode({
+            'server_now': '2024-06-01 00:00:00',
+            'books': [_serverBook('theirs', 'Remote', '2024-01-01 00:00:00')],
+          }),
+          200,
+        );
+      }
+      if (req.method == 'PUT' &&
+          path.startsWith('/api/books/') &&
+          !path.endsWith('/cover')) {
+        pushed.add(path.split('/').last);
+        return http.Response('{}', 200);
+      }
+      return http.Response('[]', 200);
+    });
+
+    final report = await SyncService(repo).sync(client);
+    expect(report.pulled, 1);
+    expect(report.pushed, 1);
+    expect(pushed, ['mine']);
+    expect((await repo.watchBook('theirs').first)?.title, 'Remote');
+  });
+
+  test('a sync blocks a concurrent pull under the same guard', () async {
+    final repo = await _repo(dir);
+    final gate = Completer<void>();
+    final client = _client((req) async {
+      if (req.url.path == '/api/books') {
+        await gate.future;
+        return http.Response(jsonEncode({'server_now': 'x', 'books': []}), 200);
+      }
+      return http.Response('[]', 200);
+    });
+
+    final sync = SyncService(repo);
+    final first = sync.sync(client);
+    await expectLater(() => sync.pull(client), throwsStateError);
+    gate.complete();
+    await first;
+  });
+
   test('a server deletion removes the local book', () async {
     final repo = await _repo(dir);
     final db = repo.db;

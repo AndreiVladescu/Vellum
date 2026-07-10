@@ -102,6 +102,39 @@ class SyncService {
     }
   }
 
+  /// Full two-way sync in one guarded run: pull first (the server is the
+  /// ground truth for anything edited elsewhere), then push whatever is still
+  /// locally dirty. Returns the two phases' reports merged into one.
+  Future<SyncReport> sync(
+    VellumServerClient client, {
+    String? cursor,
+    void Function(String serverNow)? onCursor,
+    SyncProgress? onProgress,
+  }) async {
+    if (_running) {
+      throw StateError('a sync is already in progress');
+    }
+    _running = true;
+    try {
+      final pulled = await _pull(
+        client,
+        cursor: cursor,
+        onCursor: onCursor,
+        onProgress: onProgress,
+      );
+      final pushed = await _push(client, onProgress: onProgress);
+      return SyncReport(
+        pulled: pulled.pulled,
+        pushed: pushed.pushed,
+        deletedLocally: pulled.deletedLocally,
+        deletedRemotely: pushed.deletedRemotely,
+        issues: [...pulled.issues, ...pushed.issues],
+      );
+    } finally {
+      _running = false;
+    }
+  }
+
   Future<SyncReport> _pull(
     VellumServerClient client, {
     String? cursor,

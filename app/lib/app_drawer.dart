@@ -5,6 +5,7 @@ import 'account/user_profile.dart';
 import 'data/library_repository.dart';
 import 'server/connection_store.dart';
 import 'server/server_page.dart';
+import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/preferences_page.dart';
 
@@ -15,17 +16,23 @@ class AppDrawer extends StatelessWidget {
     required this.settings,
     required this.connection,
     required this.repository,
+    required this.sync,
   });
 
   final UserProfileStore profile;
   final AppSettingsStore settings;
   final ServerConnection connection;
   final LibraryRepository repository;
+  final SyncService sync;
 
   void _openServer(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ServerPage(connection: connection, repository: repository),
+      builder: (_) => ServerPage(
+        connection: connection,
+        repository: repository,
+        sync: sync,
+      ),
     ));
   }
 

@@ -10,6 +10,8 @@ import 'data/database.dart';
 import 'data/library_repository.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/connection_store.dart';
+import 'server/server_client.dart';
+import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/wallpaper.dart';
 import 'shelf/shelf_view.dart';
@@ -87,7 +89,53 @@ class _LibraryPageState extends State<LibraryPage> {
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
   Timer? _searchDebounce;
 
+  // One sync service for the whole app (launch auto-sync + the server page),
+  // so its re-entrancy guard spans every way a sync can start.
+  late final SyncService _sync = SyncService(widget.repository);
+
   LibraryRepository get repository => widget.repository;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoSync();
+  }
+
+  /// Best-effort sync on launch when a server is connected. Quiet by design:
+  /// the app is local-first, so an unreachable server is normal — only a
+  /// result worth knowing about (changes or issues) surfaces a snackbar.
+  Future<void> _autoSync() async {
+    final conn = widget.connection;
+    final client = conn.client;
+    if (client == null) return;
+    try {
+      final report = await _sync.sync(
+        client,
+        cursor: conn.syncCursor,
+        onCursor: conn.setSyncCursor,
+      );
+      if (!mounted) return;
+      final changed = report.pulled +
+          report.pushed +
+          report.deletedLocally +
+          report.deletedRemotely;
+      if (changed == 0 && !report.hasIssues) return;
+      final n = report.issues.length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Synced — pulled ${report.pulled}, pushed ${report.pushed}'
+            '${report.hasIssues ? ', $n issue${n == 1 ? '' : 's'}' : ''}.',
+          ),
+        ),
+      );
+    } on ServerException catch (e) {
+      // A dead session drops the token so the server page shows sign-in.
+      if (e.isUnauthorized) await conn.clearExpiredSession();
+    } catch (_) {
+      // Offline or unreachable — stay quiet, the local library works as is.
+    }
+  }
 
   @override
   void dispose() {
@@ -134,6 +182,7 @@ class _LibraryPageState extends State<LibraryPage> {
         settings: widget.settings,
         connection: widget.connection,
         repository: widget.repository,
+        sync: _sync,
       ),
       appBar: _tab == 0
           ? AppBar(
