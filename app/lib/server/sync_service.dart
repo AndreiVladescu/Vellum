@@ -23,14 +23,23 @@ class SyncService {
   /// Pulls the server library onto this device: applies the server's deletions,
   /// upserts book metadata (last-write-wins by `updatedAt`), downloads covers
   /// and files we don't already hold, and renders+pushes back covers for books
-  /// the server has none for. Returns the number of books seen on the server.
-  Future<int> pull(VellumServerClient client) async {
+  /// the server has none for. Returns the number of changed books applied.
+  ///
+  /// [cursor] is the server clock from the previous pull; when set, only rows
+  /// changed since it are fetched (delta pull). On success [onCursor] is called
+  /// with the new server clock to persist for next time.
+  Future<int> pull(
+    VellumServerClient client, {
+    String? cursor,
+    void Function(String serverNow)? onCursor,
+  }) async {
     final db = _db;
-    final books = await client.listBooks();
+    final listed = await client.listBooks(cursor: cursor);
+    final books = listed.books;
 
     // Apply the server's deletions locally. The server already knows, so pass
     // recordTombstone: false — otherwise we'd re-push this delete forever.
-    for (final id in await client.listDeletions()) {
+    for (final id in await client.listDeletions(since: cursor)) {
       final row = await (db.select(
         db.books,
       )..where((b) => b.id.equals(id))).getSingleOrNull();
@@ -191,6 +200,12 @@ class SyncService {
             ..where((x) => x.id.isIn([for (final b in applied) b.id])))
           .write(const BooksCompanion(needsPush: Value(false)));
     }
+
+    // Advance the cursor to the server's clock so the next pull is a delta.
+    // Done last, so a mid-pull failure leaves the old cursor and the next pull
+    // safely re-fetches this window.
+    final serverNow = listed.serverNow;
+    if (serverNow != null && onCursor != null) onCursor(serverNow);
     return books.length;
   }
 

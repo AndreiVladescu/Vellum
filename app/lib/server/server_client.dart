@@ -190,13 +190,26 @@ class VellumServerClient {
     _body(res);
   }
 
-  /// Every book visible to the authenticated user (owned + shared).
-  Future<List<ServerBook>> listBooks() async {
-    final res = await _http.get(_uri('/api/books'), headers: _headers);
-    final list = _body(res) as List;
-    return [
-      for (final b in list) ServerBook.fromJson(b as Map<String, dynamic>),
-    ];
+  /// The visible library (owned + shared) plus the server's clock, as the
+  /// delta-pull envelope `{ server_now, books }`. Always sends `cursor` (empty
+  /// for a first/full pull) so the server includes `server_now`; a non-empty
+  /// [cursor] asks for only rows changed since it. Falls back gracefully to a
+  /// bare array (server_now null) from a server that predates the cursor.
+  Future<({String? serverNow, List<ServerBook> books})> listBooks({
+    String? cursor,
+  }) async {
+    final uri = _uri(
+      '/api/books',
+    ).replace(queryParameters: {'cursor': cursor ?? ''});
+    final res = await _http.get(uri, headers: _headers);
+    final body = _body(res);
+    final list = (body is Map ? body['books'] as List? : body as List?) ?? const [];
+    return (
+      serverNow: body is Map ? body['server_now'] as String? : null,
+      books: [
+        for (final b in list) ServerBook.fromJson(b as Map<String, dynamic>),
+      ],
+    );
   }
 
   /// The book's cover bytes, or null if it has none (404). Throws on other
@@ -252,8 +265,12 @@ class VellumServerClient {
   }
 
   /// Book ids the server has tombstoned, so a pull can delete them locally.
-  Future<List<String>> listDeletions() async {
-    final res = await _http.get(_uri('/api/deletions'), headers: _headers);
+  /// A non-empty [since] cursor narrows to tombstones at or after it.
+  Future<List<String>> listDeletions({String? since}) async {
+    final uri = (since == null || since.isEmpty)
+        ? _uri('/api/deletions')
+        : _uri('/api/deletions').replace(queryParameters: {'since': since});
+    final res = await _http.get(uri, headers: _headers);
     return [
       for (final d in _body(res) as List) (d as Map<String, dynamic>)['book_id'] as String,
     ];

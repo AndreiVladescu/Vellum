@@ -72,10 +72,26 @@ pub struct BookUpdate {
 /// Every book the caller can see: the ones they own, plus everything reachable
 /// through a share (whole-library, group, or single-book), plus everything if
 /// they are the master. Shared by the JSON list and the OPDS feed.
-pub async fn visible_books(state: &AppState, user: &AuthUser) -> AppResult<Vec<BookDto>> {
-    let books = sqlx::query_as::<_, BookDto>(&format!(
+///
+/// `updated_since` (for the app's delta pull) narrows to rows touched at or
+/// after a cursor. `>=` rather than `>`: SQLite timestamps are second-resolution,
+/// so `>` could skip a row edited in the very second the cursor was minted; the
+/// small overlap is deduped by the client's per-row last-write-wins compare.
+pub async fn visible_books(
+    state: &AppState,
+    user: &AuthUser,
+    updated_since: Option<&str>,
+) -> AppResult<Vec<BookDto>> {
+    let filter = if updated_since.is_some() {
+        " AND b.updated_at >= ?"
+    } else {
+        ""
+    };
+    // Access predicate wrapped in parens so the optional filter ANDs with the
+    // whole OR-group, not just its last term.
+    let sql = format!(
         "SELECT {BOOK_COLUMNS} FROM book b \
-         WHERE b.owner_id = ? \
+         WHERE ( b.owner_id = ? \
             OR ? = 1 \
             OR EXISTS ( \
                 SELECT 1 FROM share s WHERE s.grantee_id = ? AND ( \
@@ -83,15 +99,18 @@ pub async fn visible_books(state: &AppState, user: &AuthUser) -> AppResult<Vec<B
                     (s.scope = 'book'  AND s.scope_id = b.id) OR \
                     (s.scope = 'group' AND EXISTS ( \
                         SELECT 1 FROM book_group_item gi \
-                        WHERE gi.group_id = s.scope_id AND gi.book_id = b.id)) )) \
+                        WHERE gi.group_id = s.scope_id AND gi.book_id = b.id)) )) ) \
+            {filter} \
          ORDER BY b.title"
-    ))
-    .bind(&user.id)
-    .bind(user.is_master)
-    .bind(&user.id)
-    .fetch_all(&state.db)
-    .await?;
-    Ok(books)
+    );
+    let mut query = sqlx::query_as::<_, BookDto>(&sql)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id);
+    if let Some(ts) = updated_since {
+        query = query.bind(ts.to_string());
+    }
+    Ok(query.fetch_all(&state.db).await?)
 }
 
 /// A book plus the two aggregates the console's table needs to render its
@@ -105,11 +124,22 @@ pub struct BookListItem {
     pub file_count: i64,
 }
 
+/// Query params for the books list. `cursor` is the app's delta-pull marker:
+/// its presence switches the response to the `{ server_now, books }` envelope
+/// (so the client can learn the server clock), and a non-empty value filters to
+/// rows changed since it. Absent entirely (the console) → today's bare array.
+#[derive(Deserialize)]
+pub struct ListQuery {
+    pub cursor: Option<String>,
+}
+
 pub async fn list(
     State(state): State<AppState>,
     user: AuthUser,
-) -> AppResult<Json<Vec<BookListItem>>> {
-    let books = visible_books(&state, &user).await?;
+    axum::extract::Query(q): axum::extract::Query<ListQuery>,
+) -> AppResult<Json<serde_json::Value>> {
+    let since = q.cursor.as_deref().map(str::trim).filter(|c| !c.is_empty());
+    let books = visible_books(&state, &user, since).await?;
 
     // Two grouped scans, folded into lookup maps, so the response is assembled
     // in Rust rather than with a per-book query. Fine for a personal library.
@@ -180,8 +210,23 @@ pub async fn list(
                 file_count,
             }
         })
-        .collect();
-    Ok(Json(items))
+        .collect::<Vec<_>>();
+
+    // With a cursor, wrap the array so the client can adopt `server_now` as its
+    // next cursor (device clock skew stops mattering — the marker is the
+    // server's own clock echoed back). Without one, keep the bare-array shape
+    // the console and older app clients expect.
+    if q.cursor.is_some() {
+        let server_now: String = sqlx::query_scalar("SELECT datetime('now')")
+            .fetch_one(&state.db)
+            .await?;
+        Ok(Json(serde_json::json!({
+            "server_now": server_now,
+            "books": items,
+        })))
+    } else {
+        Ok(Json(serde_json::to_value(items)?))
+    }
 }
 
 pub async fn create(
@@ -634,19 +679,34 @@ pub struct DeletionDto {
     pub deleted_at: String,
 }
 
+#[derive(Deserialize)]
+pub struct DeletionsQuery {
+    /// Delta-pull marker: only tombstones at or after this timestamp. `>=` for
+    /// the same second-resolution reason as [`visible_books`]; re-applying a
+    /// delete is idempotent, so the overlap is harmless.
+    pub since: Option<String>,
+}
+
 /// Every delete tombstone, so a client can propagate deletes on its next pull.
 /// Returns all tombstones to any authenticated caller — this leaks only the
 /// UUIDs of deleted books, which is acceptable on a personal server.
 pub async fn deletions(
     State(state): State<AppState>,
     _user: AuthUser,
+    axum::extract::Query(q): axum::extract::Query<DeletionsQuery>,
 ) -> AppResult<Json<Vec<DeletionDto>>> {
-    let rows = sqlx::query_as::<_, DeletionDto>(
-        "SELECT book_id, deleted_at FROM deletion ORDER BY deleted_at",
-    )
-    .fetch_all(&state.db)
-    .await?;
-    Ok(Json(rows))
+    let since = q.since.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let filter = if since.is_some() {
+        "WHERE deleted_at >= ?"
+    } else {
+        ""
+    };
+    let sql = format!("SELECT book_id, deleted_at FROM deletion {filter} ORDER BY deleted_at");
+    let mut query = sqlx::query_as::<_, DeletionDto>(&sql);
+    if let Some(ts) = since {
+        query = query.bind(ts.to_string());
+    }
+    Ok(Json(query.fetch_all(&state.db).await?))
 }
 
 pub(crate) async fn fetch_book(state: &AppState, id: &str) -> AppResult<Json<BookDto>> {

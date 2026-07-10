@@ -341,12 +341,30 @@ two-way sync of metadata, covers, and files.
 **Conflict handling & deletes.** A pull compares each book's server `updated_at`
 against the local row and only overwrites when the server copy is strictly
 newer (a missing server timestamp falls back to overwriting), so a local edit
-isn't clobbered before it's pushed. Deletes propagate through tombstones: the
-server keeps a `deletion` table (exposed at `GET /api/deletions`, cleared when a
-book is re-created at the same id) and the app keeps a local `local_deletions`
-table; a pull applies the server's tombstones, a push sends the app's. The
-app-local `local_deletions` table is **not** part of the server schema. Remaining
-polish is field-level merge and live updates.
+isn't clobbered before it's pushed. Reading state, `reader_notes`, and
+`source_metadata` are app-local and never bump `updated_at`, so merely reading a
+book can't win the next push over a genuine remote edit. A push sends the local
+`updated_at`; the server applies it only when strictly newer than the stored one
+(and skips a byte-for-byte no-op entirely), so a stale push can't clobber a
+newer console edit. Deletes propagate through tombstones: the server keeps a
+`deletion` table (exposed at `GET /api/deletions`, cleared on any upsert of that
+id) and the app keeps a local `local_deletions` table; a pull applies the
+server's tombstones, a push sends the app's. The app-local `local_deletions`
+table is **not** part of the server schema. Remaining polish is field-level
+merge and live updates.
+
+**Delta pull & the clock-skew caveat.** A pull is incremental: it sends the last
+**server-issued** cursor (`GET /api/books?cursor=<ts>` returns
+`{ server_now, books }`, and `GET /api/deletions?since=<ts>`), so only rows
+changed since the previous pull cross the wire. Because the cursor is the
+*server's* own clock echoed back, device wall-clock skew no longer affects which
+rows a pull selects; the per-row `updated_at` compare stays only as a tiebreaker.
+The filter is `>=` (SQLite timestamps are second-resolution, so `>` could skip a
+row edited in the cursor's own second) and the small overlap is deduped locally.
+One limitation: a book made newly **visible** by a *share* doesn't change its
+`updated_at`, so a delta pull wouldn't fetch it — the app therefore clears the
+cursor on each login (and disconnect), making the first pull of a session a full
+one.
 
 1. ✅ **Server blob storage** — upload/download endpoints for cover images and
    book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the

@@ -28,7 +28,10 @@ Future<http.Response> Function(http.Request) _server({
   return (req) async {
     final path = req.url.path;
     if (req.method == 'GET' && path == '/api/books') {
-      return http.Response(jsonEncode(books), 200);
+      return http.Response(
+        jsonEncode({'server_now': '2024-06-01 00:00:00', 'books': books}),
+        200,
+      );
     }
     if (req.method == 'GET' && path == '/api/deletions') {
       return http.Response(
@@ -156,6 +159,38 @@ void main() {
     final details = await repo.detailsFor('b1');
     expect(details.authors, ['Frank Herbert']);
     expect(details.genres, ['Sci-Fi']);
+  });
+
+  test('pull sends the cursor and persists the new server clock', () async {
+    final repo = await _repo(dir);
+    String? sentCursor;
+    String? sentSince;
+    String? stored;
+    final client = _client((req) async {
+      final path = req.url.path;
+      if (req.method == 'GET' && path == '/api/books') {
+        sentCursor = req.url.queryParameters['cursor'];
+        return http.Response(
+          jsonEncode({
+            'server_now': '2025-06-01 12:00:00',
+            'books': [_serverBook('b1', 'Dune', '2025-01-01 00:00:00')],
+          }),
+          200,
+        );
+      }
+      if (req.method == 'GET' && path == '/api/deletions') {
+        sentSince = req.url.queryParameters['since'];
+        return http.Response('[]', 200);
+      }
+      return http.Response('[]', 200);
+    });
+
+    await SyncService(
+      repo,
+    ).pull(client, cursor: 'CUR', onCursor: (n) => stored = n);
+    expect(sentCursor, 'CUR', reason: 'books request carries the cursor');
+    expect(sentSince, 'CUR', reason: 'deletions request carries the cursor');
+    expect(stored, '2025-06-01 12:00:00', reason: 'new server clock persisted');
   });
 
   test('a server deletion removes the local book', () async {

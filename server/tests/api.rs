@@ -464,6 +464,34 @@ async fn upsert_ignores_a_stale_timestamped_push() {
 }
 
 #[tokio::test]
+async fn books_list_supports_delta_cursor_envelope() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    create_book(&app, &master, "Dune").await;
+
+    // No cursor → the console's bare array is unchanged.
+    let (_, bare) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    assert!(bare.is_array());
+    assert_eq!(bare.as_array().unwrap().len(), 1);
+
+    // An (empty) cursor → the { server_now, books } envelope with everything.
+    let (_, env) = call(&app, "GET", "/api/books?cursor=", Some(&master), None).await;
+    assert!(env["server_now"].is_string());
+    assert_eq!(env["books"].as_array().unwrap().len(), 1);
+
+    // A future cursor filters everything out (delta pull sees no changes).
+    let (_, empty) = call(
+        &app,
+        "GET",
+        "/api/books?cursor=2999-01-01%2000:00:00",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert!(empty["books"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn upsert_is_a_noop_when_nothing_changed() {
     let app = test_app().await;
     let master = register_master(&app).await;

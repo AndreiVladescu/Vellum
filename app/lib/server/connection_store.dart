@@ -54,6 +54,21 @@ class ServerConnection extends ChangeNotifier {
 
   bool get isConnected => (_token?.isNotEmpty ?? false) && baseUrl.isNotEmpty;
 
+  String _cursorKey(String url) => 'sync.cursor.$url';
+
+  /// The last server clock a delta pull reached for the current connection, or
+  /// null to force a full pull. Keyed by base URL so distinct servers don't
+  /// share a cursor.
+  String? get syncCursor {
+    final url = baseUrl;
+    return url.isEmpty ? null : _prefs.getString(_cursorKey(url));
+  }
+
+  Future<void> setSyncCursor(String value) async {
+    final url = baseUrl;
+    if (url.isNotEmpty) await _prefs.setString(_cursorKey(url), value);
+  }
+
   /// A token-less client for [url], used to log in / register.
   VellumServerClient anonymousClient(String url) =>
       VellumServerClient(baseUrl: normalizeUrl(url));
@@ -67,9 +82,14 @@ class ServerConnection extends ChangeNotifier {
     required String url,
     required AuthResult auth,
   }) async {
-    await _prefs.setString(_urlKey, normalizeUrl(url));
+    final normalized = normalizeUrl(url);
+    await _prefs.setString(_urlKey, normalized);
     await _prefs.setString(_emailKey, auth.user.email);
     await _prefs.setBool(_masterKey, auth.user.isMaster);
+    // A fresh session starts with a full pull: the delta cursor can't tell that
+    // a book was newly *shared* with this account (sharing doesn't bump a book's
+    // updated_at), so clearing it here guarantees newly-visible books arrive.
+    await _prefs.remove(_cursorKey(normalized));
     _token = auth.token;
     try {
       await _storage.write(key: _tokenKey, value: auth.token);
@@ -98,6 +118,7 @@ class ServerConnection extends ChangeNotifier {
     await _prefs.remove(_tokenKey);
     await _prefs.remove(_emailKey);
     await _prefs.remove(_masterKey);
+    if (baseUrl.isNotEmpty) await _prefs.remove(_cursorKey(baseUrl));
     notifyListeners();
   }
 

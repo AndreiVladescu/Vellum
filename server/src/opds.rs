@@ -15,7 +15,7 @@ const OPDS_CONTENT_TYPE: &str = "application/atom+xml;profile=opds-catalog;kind=
 
 pub async fn feed(State(state): State<AppState>, user: AuthUser) -> AppResult<Response> {
     let base = state.public_base_url.trim_end_matches('/');
-    let books = visible_books(&state, &user).await?;
+    let books = visible_books(&state, &user, None).await?;
     let now = now_rfc3339(&state).await;
 
     let mut entries = String::new();
