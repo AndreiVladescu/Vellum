@@ -113,6 +113,47 @@ pub async fn visible_books(
     Ok(query.fetch_all(&state.db).await?)
 }
 
+/// All authors in the library, grouped by book id in cover order, from one
+/// scan. Shared by the books list and the OPDS feed so neither does a per-book
+/// author query (the OPDS N+1).
+pub async fn author_map(
+    state: &AppState,
+) -> AppResult<std::collections::HashMap<String, Vec<String>>> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        book_id: String,
+        name: String,
+    }
+    let rows = sqlx::query_as::<_, Row>(
+        "SELECT ba.book_id, a.name FROM author a \
+         JOIN book_author ba ON ba.author_id = a.id ORDER BY ba.book_id, ba.position",
+    )
+    .fetch_all(&state.db)
+    .await?;
+    let mut map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for row in rows {
+        map.entry(row.book_id).or_default().push(row.name);
+    }
+    Ok(map)
+}
+
+/// All book files, grouped by book id as `(file_id, format)` in added order,
+/// from one scan.
+pub async fn files_map(
+    state: &AppState,
+) -> AppResult<std::collections::HashMap<String, Vec<(String, String)>>> {
+    let rows: Vec<(String, String, String)> =
+        sqlx::query_as("SELECT book_id, id, format FROM book_file ORDER BY book_id, added_at")
+            .fetch_all(&state.db)
+            .await?;
+    let mut map: std::collections::HashMap<String, Vec<(String, String)>> =
+        std::collections::HashMap::new();
+    for (book_id, id, format) in rows {
+        map.entry(book_id).or_default().push((id, format));
+    }
+    Ok(map)
+}
+
 /// A book plus the two aggregates the console's table needs to render its
 /// Author and file columns without a per-row `/detail` round-trip.
 #[derive(Serialize)]
@@ -141,27 +182,9 @@ pub async fn list(
     let since = q.cursor.as_deref().map(str::trim).filter(|c| !c.is_empty());
     let books = visible_books(&state, &user, since).await?;
 
-    // Two grouped scans, folded into lookup maps, so the response is assembled
-    // in Rust rather than with a per-book query. Fine for a personal library.
-    #[derive(sqlx::FromRow)]
-    struct AuthorRow {
-        book_id: String,
-        name: String,
-    }
-    let author_rows = sqlx::query_as::<_, AuthorRow>(
-        "SELECT ba.book_id, a.name FROM author a \
-         JOIN book_author ba ON ba.author_id = a.id ORDER BY ba.book_id, ba.position",
-    )
-    .fetch_all(&state.db)
-    .await?;
-    let mut authors_by_book: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-    for row in author_rows {
-        authors_by_book
-            .entry(row.book_id)
-            .or_default()
-            .push(row.name);
-    }
+    // Grouped scans, folded into lookup maps, so the response is assembled in
+    // Rust rather than with a per-book query. Fine for a personal library.
+    let authors_by_book = author_map(&state).await?;
 
     // Same grouped-scan pattern for genres, so the app's pull can carry them.
     #[derive(sqlx::FromRow)]

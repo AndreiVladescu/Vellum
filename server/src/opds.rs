@@ -8,7 +8,7 @@ use axum::response::{IntoResponse, Response};
 
 use crate::AppState;
 use crate::auth::AuthUser;
-use crate::books::visible_books;
+use crate::books::{author_map, files_map, visible_books};
 use crate::error::AppResult;
 
 const OPDS_CONTENT_TYPE: &str = "application/atom+xml;profile=opds-catalog;kind=acquisition";
@@ -18,23 +18,22 @@ pub async fn feed(State(state): State<AppState>, user: AuthUser) -> AppResult<Re
     let books = visible_books(&state, &user, None).await?;
     let now = now_rfc3339(&state).await;
 
+    // Two library-wide scans instead of two queries per book (the OPDS N+1):
+    // a 1,000-book feed was 2,001 queries, now 3.
+    let authors_by_book = author_map(&state).await?;
+    let files_by_book = files_map(&state).await?;
+
     let mut entries = String::new();
     for book in &books {
-        let authors: Vec<String> = sqlx::query_scalar(
-            "SELECT a.name FROM author a JOIN book_author ba ON ba.author_id = a.id \
-             WHERE ba.book_id = ? ORDER BY ba.position",
-        )
-        .bind(&book.id)
-        .fetch_all(&state.db)
-        .await?;
-
-        let files: Vec<(String, String)> =
-            sqlx::query_as("SELECT id, format FROM book_file WHERE book_id = ?")
-                .bind(&book.id)
-                .fetch_all(&state.db)
-                .await?;
-
-        entries.push_str(&entry_xml(base, book, &authors, &files));
+        let authors = authors_by_book
+            .get(&book.id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        let files = files_by_book
+            .get(&book.id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        entries.push_str(&entry_xml(base, book, authors, files));
     }
 
     let xml = format!(
