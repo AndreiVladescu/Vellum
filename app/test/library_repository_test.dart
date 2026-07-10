@@ -21,9 +21,9 @@ void main() {
     await db
         .into(db.books)
         .insert(BooksCompanion.insert(id: 'b1', title: 'Placed'));
-    final envId = await repo.createEnvironment('Study');
+    final envId = await repo.layout.createEnvironment('Study');
     // placeBook mints a physical_copy and a placement referencing it.
-    await repo.placeBook(envId, 'b1', x: 0, y: 0);
+    await repo.layout.placeBook(envId, 'b1', x: 0, y: 0);
 
     expect(await db.select(db.physicalCopies).get(), isNotEmpty);
     expect(await db.select(db.bookPlacements).get(), isNotEmpty);

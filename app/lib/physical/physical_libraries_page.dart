@@ -19,7 +19,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
       initial: env.name,
     );
     if (name == null || name.trim().isEmpty) return;
-    await repository.renameEnvironment(env.id, name);
+    await repository.layout.renameEnvironment(env.id, name);
   }
 
   Future<void> _delete(BuildContext context, PhysicalEnvironment env) async {
@@ -43,14 +43,14 @@ class PhysicalLibrariesTab extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true) await repository.deleteEnvironment(env.id);
+    if (ok == true) await repository.layout.deleteEnvironment(env.id);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return StreamBuilder<List<PhysicalEnvironment>>(
-      stream: repository.watchEnvironments(),
+      stream: repository.layout.watchEnvironments(),
       builder: (context, snapshot) {
         final envs = snapshot.data ?? const [];
         if (envs.isEmpty) {
@@ -127,7 +127,7 @@ Future<void> promptCreateLibrary(
 ) async {
   final name = await _promptName(context, title: 'New library');
   if (name == null || name.trim().isEmpty) return;
-  final id = await repository.createEnvironment(name);
+  final id = await repository.layout.createEnvironment(name);
   if (!context.mounted) return;
   openEnvironment(context, repository, id, name.trim());
 }

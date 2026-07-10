@@ -239,7 +239,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       final s = _shelfStart;
       if (_moved && s != null) {
         () async {
-          await repo.updateShelf(
+          await repo.layout.updateShelf(
             s.id,
             x1: s.x1 + _shelfDelta.dx,
             y1: s.y1 + _shelfDelta.dy,
@@ -327,8 +327,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   /// correct right after a mutation. Falls to the floor (y = 0) if nothing is
   /// below (non-destructive).
   Future<void> _applyGravity() async {
-    final books = await repo.watchPlacedBooks(widget.environmentId).first;
-    final shelves = await repo.watchShelves(widget.environmentId).first;
+    final books = await repo.layout.watchPlacedBooks(widget.environmentId).first;
+    final shelves = await repo.layout.watchShelves(widget.environmentId).first;
     if (!mounted) return;
     books.sort((a, b) => a.placement.y.compareTo(b.placement.y));
     const tol = 0.02;
@@ -356,18 +356,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       }
       tops.add((x: x, w: f.w, topY: surface + f.h));
       if ((surface - bottom).abs() > 0.001) {
-        await repo.updatePlacement(pb.placement.id, y: surface);
+        await repo.layout.updatePlacement(pb.placement.id, y: surface);
       }
     }
   }
 
   Future<void> _removeAndSettle(BookPlacement p) async {
-    await repo.removePlacement(p);
+    await repo.layout.removePlacement(p);
     await _applyGravity();
   }
 
   Future<void> _moveAndSettle(String id, Offset pos) async {
-    await repo.updatePlacement(id, x: pos.dx, y: pos.dy);
+    await repo.layout.updatePlacement(id, x: pos.dx, y: pos.dy);
     await _applyGravity();
   }
 
@@ -383,7 +383,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       builder: (_) => _ShelfDialog(defaultY: double.parse(topY.toStringAsFixed(2))),
     );
     if (result == null) return;
-    await repo.addShelf(
+    await repo.layout.addShelf(
       widget.environmentId,
       x1: result.left,
       y1: result.y,
@@ -411,7 +411,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       w: f.w,
       h: f.h,
     );
-    await repo.placeBook(
+    await repo.layout.placeBook(
       widget.environmentId,
       book.id,
       x: settled.pos.dx,
@@ -435,7 +435,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       w: f.w,
       h: f.h,
     );
-    await repo.updatePlacement(
+    await repo.layout.updatePlacement(
       pb.placement.id,
       rotation: newRot,
       x: settled.pos.dx,
@@ -477,7 +477,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     final defH = PhysicalMetrics.height(pb.book, format: fmt);
     final t = result.thicknessCm / 100;
     final h = result.heightCm / 100;
-    await repo.updatePlacement(
+    await repo.layout.updatePlacement(
       pb.placement.id,
       format: Value(result.formatKey),
       widthOverride: (t - defT).abs() < 0.0005 ? const Value(null) : Value(t),
@@ -487,7 +487,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   }
 
   Future<void> _resetSize(PlacedBook pb) async {
-    await repo.updatePlacement(
+    await repo.layout.updatePlacement(
       pb.placement.id,
       format: const Value(null),
       widthOverride: const Value(null),
@@ -497,7 +497,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   }
 
   Future<void> _removeSelected(PlacedBook pb) async {
-    await repo.removePlacement(pb.placement);
+    await repo.layout.removePlacement(pb.placement);
     setState(() => _selectedId = null);
     await _applyGravity();
   }
@@ -581,7 +581,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     );
     if (choice == null || !mounted) return;
     if (choice == 'delete') {
-      await repo.deleteShelf(s.id);
+      await repo.layout.deleteShelf(s.id);
       await _applyGravity();
     } else {
       await _editShelf(s);
@@ -600,7 +600,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       ),
     );
     if (result == null) return;
-    await repo.updateShelf(
+    await repo.layout.updateShelf(
       s.id,
       x1: result.left,
       y1: result.y,
@@ -642,11 +642,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         ],
       ),
       body: StreamBuilder<List<PhysicalShelf>>(
-        stream: repo.watchShelves(widget.environmentId),
+        stream: repo.layout.watchShelves(widget.environmentId),
         builder: (context, shelfSnap) {
           _shelves = shelfSnap.data ?? const [];
           return StreamBuilder<List<PlacedBook>>(
-            stream: repo.watchPlacedBooks(widget.environmentId),
+            stream: repo.layout.watchPlacedBooks(widget.environmentId),
             builder: (context, bookSnap) {
               _placed = bookSnap.data ?? const [];
               return LayoutBuilder(
