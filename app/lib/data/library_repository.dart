@@ -695,6 +695,14 @@ class LibraryRepository {
         '(SELECT id FROM physical_copies WHERE book_id = ?)',
         [book.id],
       );
+      // Placements reference physical_copies (no ON DELETE), and foreign keys
+      // are enforced, so drop them before their copies or the delete aborts
+      // with an FK violation for any book placed in a physical environment.
+      await db.customStatement(
+        'DELETE FROM book_placements WHERE copy_id IN '
+        '(SELECT id FROM physical_copies WHERE book_id = ?)',
+        [book.id],
+      );
       await db.customStatement(
         'DELETE FROM physical_copies WHERE book_id = ?',
         [book.id],
