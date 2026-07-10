@@ -143,6 +143,88 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     ),
   );
 
+  /// A sheet listing custom shelves with checkmarks; tapping one toggles this
+  /// book's membership. Live via the shelves + membership streams.
+  void _openShelfPicker() => showModalBottomSheet<void>(
+    context: context,
+    builder: (sheetContext) => SafeArea(
+      child: StreamBuilder<List<Shelf>>(
+        stream: repository.watchShelves(),
+        builder: (context, shelvesSnap) {
+          final shelves = shelvesSnap.data ?? const [];
+          return StreamBuilder<Set<String>>(
+            stream: repository.watchShelfIdsFor(book.id),
+            builder: (context, memberSnap) {
+              final member = memberSnap.data ?? const <String>{};
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Add to shelf'),
+                    ),
+                  ),
+                  if (shelves.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No shelves yet — create one below.'),
+                    ),
+                  for (final shelf in shelves)
+                    CheckboxListTile(
+                      title: Text(shelf.name),
+                      value: member.contains(shelf.id),
+                      onChanged: (on) => (on ?? false)
+                          ? repository.addToShelf(book.id, shelf.id)
+                          : repository.removeFromShelf(book.id, shelf.id),
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.add),
+                    title: const Text('New shelf…'),
+                    onTap: () async {
+                      final name = await _promptNewShelfName();
+                      if (name != null && name.isNotEmpty) {
+                        final id = await repository.createShelf(name);
+                        await repository.addToShelf(book.id, id);
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    ),
+  );
+
+  Future<String?> _promptNewShelfName() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('New shelf'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Shelf name'),
+          onSubmitted: (v) => Navigator.pop(context, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _revert() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -182,6 +264,11 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       appBar: AppBar(
         title: Text(book.title),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'Add to shelf',
+            onPressed: _openShelfPicker,
+          ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Edit details',

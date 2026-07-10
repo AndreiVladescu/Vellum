@@ -240,54 +240,187 @@ class _LibraryPageState extends State<LibraryPage> {
       listenable: widget.settings,
       builder: (context, _) => WallpaperBackground(
         wallpaper: widget.settings.wallpaper,
-        child: StreamBuilder<List<Book>>(
-          stream: repository.watchAllBooks(),
-          builder: (context, snapshot) {
-            final all = snapshot.data ?? const [];
-            final theme = Theme.of(context);
-            if (all.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.auto_stories_outlined,
-                      size: 56,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                    ),
-                    const SizedBox(height: 16),
-                    Text('Your shelf is empty',
-                        style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Add your first book to see it here.',
-                      style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                  ],
+        child: StreamBuilder<List<Shelf>>(
+          stream: repository.watchShelves(),
+          builder: (context, shelvesSnap) {
+            final shelves = shelvesSnap.data ?? const [];
+            // The stored selection may point at a deleted shelf: fall back to
+            // "All" when it no longer exists.
+            final storedId = widget.settings.selectedShelfId;
+            final active =
+                shelves.any((s) => s.id == storedId) ? storedId : null;
+            return Column(
+              children: [
+                _shelfChips(shelves, active),
+                Expanded(
+                  child: StreamBuilder<List<Book>>(
+                    stream: active == null
+                        ? repository.watchAllBooks()
+                        : repository.watchBooksOnShelf(active),
+                    builder: (context, snapshot) =>
+                        _shelfBody(snapshot.data ?? const [], active != null),
+                  ),
                 ),
-              );
-            }
-            final books = _filter(all);
-            if (books.isEmpty) {
-              return Center(
-                child: Text(
-                  'No books match “${_query.trim()}”.',
-                  style:
-                      TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                ),
-              );
-            }
-            return ShelfView(
-              books: books,
-              bookFace: widget.settings.bookFace,
-              spineArt: widget.settings.spineArt,
-              coverFileOf: repository.coverFileOf,
-              detailBuilder: (book) =>
-                  BookDetailPage(book: book, repository: repository),
+              ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _shelfBody(List<Book> all, bool onCustomShelf) {
+    final theme = Theme.of(context);
+    if (all.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_stories_outlined,
+              size: 56,
+              color: theme.colorScheme.primary.withValues(alpha: 0.7),
+            ),
+            const SizedBox(height: 16),
+            Text(onCustomShelf ? 'This shelf is empty' : 'Your shelf is empty',
+                style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(
+              onCustomShelf
+                  ? 'Add books to it from their detail page.'
+                  : 'Add your first book to see it here.',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+    final books = _filter(all);
+    if (books.isEmpty) {
+      return Center(
+        child: Text(
+          'No books match “${_query.trim()}”.',
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        ),
+      );
+    }
+    return ShelfView(
+      books: books,
+      bookFace: widget.settings.bookFace,
+      spineArt: widget.settings.spineArt,
+      coverFileOf: repository.coverFileOf,
+      detailBuilder: (book) =>
+          BookDetailPage(book: book, repository: repository),
+    );
+  }
+
+  /// The horizontal chip row: All + each shelf + "New shelf". Selecting a chip
+  /// filters the shelf below; long-press a shelf chip to rename or delete it.
+  Widget _shelfChips(List<Shelf> shelves, String? active) {
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: ChoiceChip(
+              label: const Text('All'),
+              selected: active == null,
+              onSelected: (_) => widget.settings.setSelectedShelfId(null),
+            ),
+          ),
+          for (final shelf in shelves)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: GestureDetector(
+                onLongPress: () => _shelfMenu(shelf),
+                child: ChoiceChip(
+                  label: Text(shelf.name),
+                  selected: active == shelf.id,
+                  onSelected: (_) =>
+                      widget.settings.setSelectedShelfId(shelf.id),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: ActionChip(
+              avatar: const Icon(Icons.add, size: 18),
+              label: const Text('New shelf'),
+              onPressed: _promptNewShelf,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _promptNewShelf() async {
+    final name = await _promptShelfName('New shelf');
+    if (name == null || name.isEmpty) return;
+    final id = await repository.createShelf(name);
+    await widget.settings.setSelectedShelfId(id);
+  }
+
+  Future<void> _shelfMenu(Shelf shelf) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename shelf'),
+              onTap: () => Navigator.pop(context, 'rename'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete shelf'),
+              subtitle: const Text('The books stay in your library'),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == 'rename') {
+      final name = await _promptShelfName('Rename shelf', initial: shelf.name);
+      if (name != null && name.isNotEmpty) {
+        await repository.renameShelf(shelf.id, name);
+      }
+    } else if (action == 'delete') {
+      if (widget.settings.selectedShelfId == shelf.id) {
+        await widget.settings.setSelectedShelfId(null);
+      }
+      await repository.deleteShelf(shelf.id);
+    }
+  }
+
+  Future<String?> _promptShelfName(String title, {String initial = ''}) {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Shelf name'),
+          onSubmitted: (v) => Navigator.pop(context, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }

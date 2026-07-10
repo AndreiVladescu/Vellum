@@ -12,6 +12,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _wallpaperKey = 'settings.wallpaper';
   static const _bookFaceKey = 'settings.bookFace';
   static const _spineArtKey = 'settings.spineArt';
+  static const _selectedShelfKey = 'settings.selectedShelf';
 
   final SharedPreferences _prefs;
 
@@ -54,6 +55,20 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setSpineArt(SpineArt value) async {
     await _prefs.setString(_spineArtKey, value.name);
+    notifyListeners();
+  }
+
+  /// The custom shelf the digital tab last filtered by, or null for "All". The
+  /// selected shelf may have since been deleted; callers fall back to All when
+  /// the id no longer matches a shelf.
+  String? get selectedShelfId => _prefs.getString(_selectedShelfKey);
+
+  Future<void> setSelectedShelfId(String? value) async {
+    if (value == null) {
+      await _prefs.remove(_selectedShelfKey);
+    } else {
+      await _prefs.setString(_selectedShelfKey, value);
+    }
     notifyListeners();
   }
 }

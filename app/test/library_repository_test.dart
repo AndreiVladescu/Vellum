@@ -37,6 +37,37 @@ void main() {
     expect(await db.select(db.bookPlacements).get(), isEmpty);
   });
 
+  test('custom shelves: create, fill in order, browse, and delete', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    for (final id in ['b1', 'b2', 'b3']) {
+      await db.into(db.books).insert(BooksCompanion.insert(id: id, title: id));
+    }
+    final shelfId = await repo.createShelf('Favourites');
+
+    // Fill in a deliberate order; membership is idempotent.
+    await repo.addToShelf('b3', shelfId);
+    await repo.addToShelf('b1', shelfId);
+    await repo.addToShelf('b3', shelfId); // duplicate ignored
+    final onShelf = await repo.watchBooksOnShelf(shelfId).first;
+    expect([for (final b in onShelf) b.id], ['b3', 'b1'],
+        reason: 'insertion order preserved, no duplicate');
+
+    // Membership stream reflects which shelves a book is on.
+    expect(await repo.watchShelfIdsFor('b3').first, {shelfId});
+    expect(await repo.watchShelfIdsFor('b2').first, isEmpty);
+
+    await repo.removeFromShelf('b3', shelfId);
+    expect([for (final b in await repo.watchBooksOnShelf(shelfId).first) b.id],
+        ['b1']);
+
+    // Deleting a shelf drops membership but never the books.
+    await repo.deleteShelf(shelfId);
+    expect(await repo.watchShelves().first, isEmpty);
+    expect(await repo.watchAllBooks().first, hasLength(3),
+        reason: 'books survive shelf deletion');
+  });
+
   test('re-tagging and deleting sweep orphaned author rows', () async {
     final repo = await _repo(dir);
     final db = repo.db;
