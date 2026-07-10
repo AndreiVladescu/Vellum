@@ -44,15 +44,26 @@ visualisation, not concrete inventory tracking. Current behaviour (a fresh
 
 ---
 
+### ✅ 7. Cover-derived spine colours
+Done (July 2026): the cover's **dominant colour** is extracted on every cover
+set/pull (`cover_color.dart`, saturation-weighted histogram), cached in the
+spine-style JSON, and backfilled at startup. A **spine artwork** preference
+(spine mode only) switches covered books between the cover-slice spine (the
+default) and a generated spine in that dominant colour.
+
+---
+
 ## Open / possible follow-ups
 
-- **Cover-derived spine colours.** `DESIGN.md`’s spine section says colours are
-  “extracted from the cover”, but the code uses a **title-hash palette**. Item 4
-  reused that as-is; genuinely extracting dominant cover colours (for both
-  digital and physical) is still open.
-- **Cover-image slice as spine.** Follow-up to item 4: painting an actual slice
-  of the cover as the spine texture (vs. the cover-or-generated `SpineFace`).
 - **Books riding shelves.** Moving a shelf still leaves its books behind; they
-  keep their positions rather than travelling with the shelf.
+  keep their positions rather than travelling with the shelf. (An occupied
+  shelf is currently pinned against dragging, so this is only reachable via
+  shelf *edit*.)
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.
+- **EPUB reader polish.** The reader is chapter-at-a-time with resume-by-
+  chapter; in-chapter scroll position isn't saved, and heavy CSS-driven
+  layouts render approximately (`flutter_widget_from_html_core`).
+- **Dominant colour in the physical view.** The physical editor always draws
+  cover-slice spines; honouring the spine-artwork preference there too would
+  keep the two views identical.

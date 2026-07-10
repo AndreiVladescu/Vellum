@@ -14,7 +14,9 @@ shelf, instead of scrolling a grid of covers.
   and cover, or create a custom book and drop in your own PDF/EPUB. Edit any
   detail later (or use a PDF's first page as its cover), keep private reader
   notes, and revert an imported book to its library defaults.
-- **Integrated reader** — read your PDFs (EPUB coming later) right in the app.
+- **Integrated reader** — read your PDFs and EPUBs right in the app.
+- **Backed up** — export the whole library (database, covers, files) to a
+  single archive and restore it anywhere.
 - **Share it (optional)** — a self-hosted server adds accounts and roles, book
   groups, sharing (whole library, a group, or one book), public per-book links
   with expiry / one-time download, an OPDS feed for e-readers, and a web admin

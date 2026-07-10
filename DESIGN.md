@@ -15,7 +15,7 @@ where you browse **spines**, not cover grids.
   panes/collections/genres.
 - Automatic metadata fetch (title, authors, genre, description, cover) after
   adding a book.
-- Integrated reader: PDF first, EPUB later.
+- Integrated reader for PDF and EPUB.
 - Physical book tracking: where a book lives, who borrowed it and when.
 
 ## Stack
@@ -24,7 +24,8 @@ where you browse **spines**, not cover grids.
 |---|---|---|
 | App (desktop + Android) | Flutter / Dart | Single codebase, custom-drawn shelf UI |
 | App database | SQLite via `drift` | Typed queries, migrations, reactive streams |
-| PDF rendering | `pdfrx` | EPUB later |
+| PDF rendering | `pdfrx` | |
+| EPUB rendering | in-house parser + `flutter_widget_from_html_core` | an EPUB is a zip; `archive` + `xml` parse the OPF spine |
 | Server | Rust — `axum` + `sqlx` | Single static binary, easy self-hosting |
 | Server database | SQLite | One binary + one `.db` file; trivial backup |
 | Book files & images | Filesystem | DB stores paths + hashes, not blobs |
@@ -191,9 +192,14 @@ pick spine colours, render the title in a vertical typeface, and vary spine
 height/thickness by page count. Uniform, good-looking shelves for every book.
 The generated style is stored per-book (JSON) so users can tweak it later.
 
-> **Implementation note.** Colours today come from a **title-hash palette**
-> (`spine_style.dart`), not from the cover art. Extracting dominant colours from
-> the cover is a planned refinement — see [`docs/BACKLOG.md`](docs/BACKLOG.md).
+> **Implementation note.** A cover-less book gets its colour from a
+> **title-hash palette** (`spine_style.dart`). A book *with* cover art draws
+> its spine from the cover image itself (a shaded vertical slice) — or, behind
+> the **spine artwork preference** (Preferences → shelf, spine mode only), as a
+> generated spine in the cover's **dominant colour**, extracted once per cover
+> (`cover_color.dart`, saturation-weighted histogram) and cached in the
+> spine-style JSON; existing covers are backfilled at startup. The extracted
+> colour is cosmetic and device-derivable, so it never bumps the sync clock.
 
 ## Physical bookshelf layouts
 
@@ -327,17 +333,23 @@ Two things stay **on the device only** and are never synced to a server:
    book for PDFs not in any library), edit details/cover, drag-and-drop file
    uploads with format validation, personal reader notes, shelf view.
 2. ✅ Shelf UI — generated spines, packing into rows, pull-out open animation,
-   spine/cover display toggle, wallpapers.
+   spine/cover display toggle, spine-artwork preference (cover slice /
+   dominant colour), wallpapers.
 3. ✅ Metadata fetch on add — Open Library, falling back to Google Books.
-4. ✅ PDF reader (`pdfrx`) with saved reading position. EPUB still later.
+4. ✅ PDF reader (`pdfrx`) with saved reading position. EPUB reader
+   (chapter-at-a-time, in-house parser) with resume-by-chapter.
 5. ✅ Physical copies: locations + loan tracking (lend / return / history).
-6. ⏳ Android build, barcode scanning. **Not started.**
+6. ⏳ Android build, barcode scanning. **Not started** — desktop polish first.
 7. 🚧 Rust server + sync (connected mode), OPDS feed. In place: accounts, RBAC,
    groups, sharing, public links, blob storage, OPDS, and a web admin console,
    with API integration tests. The app logs in and syncs **both ways** —
-   metadata, covers, and files — and manages sharing on-device. Sync is
+   metadata, covers, and files — one-tap (pull then push) plus a quiet
+   auto-sync at launch, and manages sharing on-device. Sync is
    **last-write-wins by `updated_at`** with **delete tombstones** (below).
-   Remaining: field-level merge / real-time updates and the Android side.
+   Remaining: real-time updates and the Android side.
+8. ✅ Backup: export the whole library (database snapshot + covers + files) to
+   one `.zip` from Preferences; restore replaces the library and restarts the
+   app. The safety net for standalone (serverless) installs.
 
 ## Sync roadmap (connected mode)
 
@@ -356,8 +368,24 @@ newer console edit. Deletes propagate through tombstones: the server keeps a
 `deletion` table (exposed at `GET /api/deletions`, cleared on any upsert of that
 id) and the app keeps a local `local_deletions` table; a pull applies the
 server's tombstones, a push sends the app's. The app-local `local_deletions`
-table is **not** part of the server schema. Remaining polish is field-level
-merge and live updates.
+table is **not** part of the server schema.
+
+**Decision: row-level LWW is the final conflict model.** Field-level merge was
+considered and rejected (July 2026) as disproportionate for a personal
+library: on divergence the server is the ground truth (pull overwrites only
+when the server row is strictly newer), and an authorized client push wins
+only when its row is strictly newer than the server's. Concurrent edits to
+*different fields* of the same book on two devices resolve to the newer whole
+row — acceptable at this scale. Remaining polish is live updates
+(websocket/long-poll), not merging.
+
+**Syncing is one tap (and automatic).** The server page's primary action is
+**Sync** — a pull followed by a push under a single re-entrancy guard — with
+the one-directional Pull/Push kept under *Advanced*. The app also runs a
+quiet best-effort sync at launch whenever a server is connected: offline is
+normal for a local-first app, so failures stay silent (except an expired
+session, which drops to the sign-in screen); a snackbar appears only when
+something actually changed.
 
 **Delta pull & the clock-skew caveat.** A pull is incremental: it sends the last
 **server-issued** cursor (`GET /api/books?cursor=<ts>` returns
