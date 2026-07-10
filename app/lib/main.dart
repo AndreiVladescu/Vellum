@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'account/user_profile.dart';
@@ -83,8 +85,24 @@ class LibraryPage extends StatefulWidget {
 class _LibraryPageState extends State<LibraryPage> {
   String _query = '';
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
+  Timer? _searchDebounce;
 
   LibraryRepository get repository => widget.repository;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
+  // Re-packing the shelf rows on every keystroke is expensive; wait for a
+  // short pause in typing before filtering.
+  void _onQueryChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _query = value);
+    });
+  }
 
   Future<void> _openAddBook(BuildContext context) async {
     final addedTitle = await Navigator.of(context).push<String>(
@@ -120,7 +138,7 @@ class _LibraryPageState extends State<LibraryPage> {
       appBar: _tab == 0
           ? AppBar(
               title: TextField(
-                onChanged: (value) => setState(() => _query = value),
+                onChanged: _onQueryChanged,
                 decoration: const InputDecoration(
                   hintText: 'Search your shelf…',
                   icon: Icon(Icons.search),

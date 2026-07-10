@@ -685,7 +685,12 @@ class _CoverThumbState extends State<_CoverThumb> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cover = widget.cover;
-    final hasCover = cover != null && cover.existsSync();
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final placeholder = Container(
+      color: theme.colorScheme.surfaceContainerHighest,
+      alignment: Alignment.center,
+      child: Text('No cover', style: theme.textTheme.bodySmall),
+    );
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -700,14 +705,15 @@ class _CoverThumbState extends State<_CoverThumb> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (hasCover)
-                  Image.file(cover, fit: BoxFit.cover)
+                if (cover != null)
+                  // Detail view gets a more generous decode budget (2× the
+                  // 110px layout width) than the shelf spines.
+                  Image.file(cover,
+                      fit: BoxFit.cover,
+                      cacheWidth: (110 * 2 * dpr).round(),
+                      errorBuilder: (_, _, _) => placeholder)
                 else
-                  Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: Text('No cover', style: theme.textTheme.bodySmall),
-                  ),
+                  placeholder,
                 AnimatedOpacity(
                   opacity: _hover ? 1 : 0,
                   duration: const Duration(milliseconds: 120),

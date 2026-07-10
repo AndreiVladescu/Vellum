@@ -216,12 +216,17 @@ class SpineFace extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = style ?? SpineStyle.fromJson(book.spineStyle, title: book.title);
     final cover = coverFile;
-    final hasCover = cover != null && cover.existsSync();
-    return hasCover ? _coverSpine(cover) : _generatedSpine(s);
+    // No filesystem call in build: a non-null path means "has a cover". If the
+    // file is actually missing (rare orphaned path), Image.file's errorBuilder
+    // falls back to the generated spine.
+    return cover != null ? _coverSpine(context, cover, s) : _generatedSpine(s);
   }
 
   /// Spine drawn from the left edge of the cover image.
-  Widget _coverSpine(File cover) {
+  Widget _coverSpine(BuildContext context, File cover, SpineStyle s) {
+    // Decode the cover at roughly the spine's on-screen width instead of full
+    // resolution — a first-page render is ~11 MB of decoded RGBA otherwise.
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
       child: Stack(
@@ -229,7 +234,13 @@ class SpineFace extends StatelessWidget {
         children: [
           // BoxFit.cover scales the image to fill the tall, narrow spine;
           // centerLeft alignment keeps the cover's left edge visible.
-          Image.file(cover, fit: BoxFit.cover, alignment: Alignment.centerLeft),
+          Image.file(cover,
+              fit: BoxFit.cover,
+              alignment: Alignment.centerLeft,
+              cacheWidth: (s.width * dpr).round(),
+              // Orphaned path: fall back to a plain fill; the shading and title
+              // overlays below still render, so it reads as a coverless spine.
+              errorBuilder: (_, _, _) => ColoredBox(color: s.color)),
           // Cylindrical shading: highlight near the left, shade to the right.
           const DecoratedBox(
             decoration: BoxDecoration(
@@ -358,7 +369,7 @@ class BookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cover = coverFile;
-    final hasCover = cover != null && cover.existsSync();
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return GestureDetector(
       onTap: onTap,
       child: Tooltip(
@@ -369,8 +380,14 @@ class BookCover extends StatelessWidget {
           height: _bookAreaHeight,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: hasCover
-                ? Image.file(cover, fit: BoxFit.cover)
+            // Non-null path means "has a cover"; decode at the face-out width
+            // rather than full res, and fall back to a generated cover if the
+            // file is missing. No filesystem call in build.
+            child: cover != null
+                ? Image.file(cover,
+                    fit: BoxFit.cover,
+                    cacheWidth: (_coverWidth * dpr).round(),
+                    errorBuilder: (_, _, _) => _generatedCover())
                 : _generatedCover(),
           ),
         ),
