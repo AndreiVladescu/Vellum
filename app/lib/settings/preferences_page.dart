@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../data/backup_service.dart';
 import '../data/library_repository.dart';
+import '../server/connection_store.dart';
+import '../server/sync_service.dart';
 import 'app_settings.dart';
 import 'book_face.dart';
 import 'spine_art.dart';
@@ -18,10 +20,14 @@ class PreferencesPage extends StatelessWidget {
     super.key,
     required this.settings,
     required this.repository,
+    required this.connection,
+    required this.sync,
   });
 
   final AppSettingsStore settings;
   final LibraryRepository repository;
+  final ServerConnection connection;
+  final SyncService sync;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +93,11 @@ class PreferencesPage extends StatelessWidget {
               ),
             const Divider(height: 24),
             _SectionHeader('Backup'),
-            _BackupSection(repository: repository),
+            _BackupSection(
+              repository: repository,
+              connection: connection,
+              sync: sync,
+            ),
           ],
         ),
       ),
@@ -98,9 +108,15 @@ class PreferencesPage extends StatelessWidget {
 /// Export the library to a single archive, or restore one. Restore replaces
 /// everything and requires an app restart, so it double-confirms.
 class _BackupSection extends StatefulWidget {
-  const _BackupSection({required this.repository});
+  const _BackupSection({
+    required this.repository,
+    required this.connection,
+    required this.sync,
+  });
 
   final LibraryRepository repository;
+  final ServerConnection connection;
+  final SyncService sync;
 
   @override
   State<_BackupSection> createState() => _BackupSectionState();
@@ -187,6 +203,10 @@ class _BackupSectionState extends State<_BackupSection> {
         }
         return;
       }
+      // The restored database may predate the delta-pull cursor; clear all
+      // cursors so the next launch does a full pull and converges. Prefs survive
+      // the process swap, so this must happen before exit.
+      await widget.connection.clearAllSyncCursors();
       // The database connection is closed and the files are swapped; the only
       // safe next step is a fresh process.
       exit(0);

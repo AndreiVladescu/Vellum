@@ -41,7 +41,12 @@ class AppDrawer extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
-            PreferencesPage(settings: settings, repository: repository),
+            PreferencesPage(
+              settings: settings,
+              repository: repository,
+              connection: connection,
+              sync: sync,
+            ),
       ),
     );
   }

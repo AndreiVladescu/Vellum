@@ -69,6 +69,18 @@ class ServerConnection extends ChangeNotifier {
     if (url.isNotEmpty) await _prefs.setString(_cursorKey(url), value);
   }
 
+  /// Drops every delta-pull cursor (all servers), forcing a full pull next time.
+  /// Called after a restore: the swapped-in database may predate a cursor, so a
+  /// delta pull from it would silently skip everything changed in between. All
+  /// URLs (not just the current one) so a backup made against another server is
+  /// covered too.
+  Future<void> clearAllSyncCursors() async {
+    final keys = _prefs.getKeys().where((k) => k.startsWith('sync.cursor.'));
+    for (final k in keys) {
+      await _prefs.remove(k);
+    }
+  }
+
   /// A token-less client for [url], used to log in / register.
   VellumServerClient anonymousClient(String url) =>
       VellumServerClient(baseUrl: normalizeUrl(url));
