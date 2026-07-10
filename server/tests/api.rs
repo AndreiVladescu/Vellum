@@ -434,7 +434,11 @@ async fn upsert_ignores_a_stale_timestamped_push() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["title"], json!("Original"), "stale push must be ignored");
+    assert_eq!(
+        body["title"],
+        json!("Original"),
+        "stale push must be ignored"
+    );
 
     // A push carrying a strictly-newer timestamp applies.
     let (_, body) = call(
@@ -526,12 +530,18 @@ async fn upsert_replaces_authors_and_genres() {
     assert_eq!(status, StatusCode::OK);
 
     let (_, detail) = call(&app, "GET", "/api/books/ag-1/detail", Some(&master), None).await;
-    assert_eq!(detail["authors"], json!(["Frank Herbert", "Kevin Anderson"]));
+    assert_eq!(
+        detail["authors"],
+        json!(["Frank Herbert", "Kevin Anderson"])
+    );
     assert_eq!(detail["genres"], json!(["Sci-Fi"]));
 
     // The books list is enriched with both, for the app's pull.
     let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
-    assert_eq!(list[0]["authors"], json!(["Frank Herbert", "Kevin Anderson"]));
+    assert_eq!(
+        list[0]["authors"],
+        json!(["Frank Herbert", "Kevin Anderson"])
+    );
     assert_eq!(list[0]["genres"], json!(["Sci-Fi"]));
 
     // Re-pushing with a shorter author list replaces rather than appends;

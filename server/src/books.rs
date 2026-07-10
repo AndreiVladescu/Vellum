@@ -148,7 +148,10 @@ pub async fn list(
     let mut genres_by_book: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     for row in genre_rows {
-        genres_by_book.entry(row.book_id).or_default().push(row.name);
+        genres_by_book
+            .entry(row.book_id)
+            .or_default()
+            .push(row.name);
     }
 
     #[derive(sqlx::FromRow)]
