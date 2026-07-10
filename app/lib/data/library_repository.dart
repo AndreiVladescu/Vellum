@@ -156,6 +156,38 @@ class LibraryRepository {
           .watch()
           .map((rows) => {for (final sb in rows) sb.shelfId});
 
+  /// `bookId -> author names` (cover order) for the whole library, as a stream,
+  /// so the shelf can search by author without an N+1 of per-book queries.
+  Stream<Map<String, List<String>>> watchAuthorsByBook() {
+    final query = db.select(db.bookAuthors).join([
+      innerJoin(db.authors, db.authors.id.equalsExp(db.bookAuthors.authorId)),
+    ])
+      ..orderBy([OrderingTerm.asc(db.bookAuthors.position)]);
+    return query.watch().map((rows) {
+      final map = <String, List<String>>{};
+      for (final r in rows) {
+        final bookId = r.readTable(db.bookAuthors).bookId;
+        (map[bookId] ??= []).add(r.readTable(db.authors).name);
+      }
+      return map;
+    });
+  }
+
+  /// `bookId -> genre names` for the whole library, for the `genre:` filter.
+  Stream<Map<String, List<String>>> watchGenresByBook() {
+    final query = db.select(db.bookGenres).join([
+      innerJoin(db.genres, db.genres.id.equalsExp(db.bookGenres.genreId)),
+    ]);
+    return query.watch().map((rows) {
+      final map = <String, List<String>>{};
+      for (final r in rows) {
+        final bookId = r.readTable(db.bookGenres).bookId;
+        (map[bookId] ??= []).add(r.readTable(db.genres).name);
+      }
+      return map;
+    });
+  }
+
   Stream<Book?> watchBook(String id) =>
       (db.select(db.books)..where((b) => b.id.equals(id))).watchSingleOrNull();
 

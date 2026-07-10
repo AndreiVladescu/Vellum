@@ -19,11 +19,15 @@ class BookDetailPage extends StatelessWidget {
     super.key,
     required this.book,
     required this.repository,
+    this.onGenreTap,
   });
 
   /// Snapshot used before the first stream event arrives.
   final Book book;
   final LibraryRepository repository;
+
+  /// Tapping a genre chip closes this page and filters the shelf by that genre.
+  final void Function(String genre)? onGenreTap;
 
   @override
   Widget build(BuildContext context) {
@@ -37,17 +41,26 @@ class BookDetailPage extends StatelessWidget {
           // Book was deleted while this page was open.
           return const Scaffold(body: SizedBox.shrink());
         }
-        return _BookDetailBody(book: current, repository: repository);
+        return _BookDetailBody(
+          book: current,
+          repository: repository,
+          onGenreTap: onGenreTap,
+        );
       },
     );
   }
 }
 
 class _BookDetailBody extends StatefulWidget {
-  const _BookDetailBody({required this.book, required this.repository});
+  const _BookDetailBody({
+    required this.book,
+    required this.repository,
+    this.onGenreTap,
+  });
 
   final Book book;
   final LibraryRepository repository;
+  final void Function(String genre)? onGenreTap;
 
   @override
   State<_BookDetailBody> createState() => _BookDetailBodyState();
@@ -345,9 +358,16 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                                     runSpacing: 6,
                                     children: [
                                       for (final genre in details.genres)
-                                        Chip(
+                                        ActionChip(
                                           label: Text(genre),
                                           visualDensity: VisualDensity.compact,
+                                          // Filter the shelf by this genre.
+                                          onPressed: widget.onGenreTap == null
+                                              ? null
+                                              : () {
+                                                  Navigator.of(context).pop();
+                                                  widget.onGenreTap!(genre);
+                                                },
                                         ),
                                     ],
                                   ),

@@ -14,6 +14,7 @@ import 'server/server_client.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/wallpaper.dart';
+import 'shelf/shelf_filter.dart';
 import 'shelf/shelf_view.dart';
 
 Future<void> main() async {
@@ -88,6 +89,7 @@ class _LibraryPageState extends State<LibraryPage> {
   String _query = '';
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
   Timer? _searchDebounce;
+  final _searchController = TextEditingController();
 
   // One sync service for the whole app (launch auto-sync + the server page),
   // so its re-entrancy guard spans every way a sync can start.
@@ -142,6 +144,7 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -165,15 +168,25 @@ class _LibraryPageState extends State<LibraryPage> {
     }
   }
 
-  List<Book> _filter(List<Book> books) {
-    final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return books;
-    return [
-      for (final b in books)
-        if (b.title.toLowerCase().contains(q) ||
-            (b.subtitle?.toLowerCase().contains(q) ?? false))
-          b,
-    ];
+  List<Book> _filter(
+    List<Book> books,
+    Map<String, List<String>> authorsByBook,
+    Map<String, List<String>> genresByBook,
+  ) =>
+      filterBooks(
+        books: books,
+        query: _query,
+        authorsByBook: authorsByBook,
+        genresByBook: genresByBook,
+      );
+
+  /// Applies a `genre:` filter from a tapped genre chip: fills the search box
+  /// (so it's visible and clearable) and refreshes the shelf.
+  void _applyGenreFilter(String genre) {
+    _searchDebounce?.cancel();
+    final query = 'genre:$genre';
+    _searchController.text = query;
+    setState(() => _query = query);
   }
 
   @override
@@ -189,9 +202,10 @@ class _LibraryPageState extends State<LibraryPage> {
       appBar: _tab == 0
           ? AppBar(
               title: TextField(
+                controller: _searchController,
                 onChanged: _onQueryChanged,
                 decoration: const InputDecoration(
-                  hintText: 'Search your shelf…',
+                  hintText: 'Search title, author, or genre:…',
                   icon: Icon(Icons.search),
                   border: InputBorder.none,
                 ),
@@ -253,12 +267,28 @@ class _LibraryPageState extends State<LibraryPage> {
               children: [
                 _shelfChips(shelves, active),
                 Expanded(
-                  child: StreamBuilder<List<Book>>(
-                    stream: active == null
-                        ? repository.watchAllBooks()
-                        : repository.watchBooksOnShelf(active),
-                    builder: (context, snapshot) =>
-                        _shelfBody(snapshot.data ?? const [], active != null),
+                  child: StreamBuilder<Map<String, List<String>>>(
+                    stream: repository.watchAuthorsByBook(),
+                    builder: (context, authorsSnap) {
+                      final authors = authorsSnap.data ?? const {};
+                      return StreamBuilder<Map<String, List<String>>>(
+                        stream: repository.watchGenresByBook(),
+                        builder: (context, genresSnap) {
+                          final genres = genresSnap.data ?? const {};
+                          return StreamBuilder<List<Book>>(
+                            stream: active == null
+                                ? repository.watchAllBooks()
+                                : repository.watchBooksOnShelf(active),
+                            builder: (context, snapshot) => _shelfBody(
+                              snapshot.data ?? const [],
+                              active != null,
+                              authors,
+                              genres,
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
               ],
@@ -269,7 +299,12 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  Widget _shelfBody(List<Book> all, bool onCustomShelf) {
+  Widget _shelfBody(
+    List<Book> all,
+    bool onCustomShelf,
+    Map<String, List<String>> authorsByBook,
+    Map<String, List<String>> genresByBook,
+  ) {
     final theme = Theme.of(context);
     if (all.isEmpty) {
       return Center(
@@ -295,7 +330,7 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       );
     }
-    final books = _filter(all);
+    final books = _filter(all, authorsByBook, genresByBook);
     if (books.isEmpty) {
       return Center(
         child: Text(
@@ -309,8 +344,11 @@ class _LibraryPageState extends State<LibraryPage> {
       bookFace: widget.settings.bookFace,
       spineArt: widget.settings.spineArt,
       coverFileOf: repository.coverFileOf,
-      detailBuilder: (book) =>
-          BookDetailPage(book: book, repository: repository),
+      detailBuilder: (book) => BookDetailPage(
+        book: book,
+        repository: repository,
+        onGenreTap: _applyGenreFilter,
+      ),
     );
   }
 
