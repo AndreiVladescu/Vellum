@@ -119,6 +119,8 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
         .split_once(':')
         .ok_or_else(|| AppError::Unauthorized("malformed basic credentials".into()))?;
 
+    // Bound work before Argon2, so an over-long Basic password isn't free CPU.
+    check_password_length(password)?;
     let key = email.trim().to_lowercase();
     if !state.throttle.allowed(&key) {
         return Err(AppError::TooManyRequests(
@@ -307,6 +309,8 @@ pub async fn login(
     State(state): State<AppState>,
     Json(input): Json<LoginInput>,
 ) -> AppResult<Json<AuthResponse>> {
+    // Bound work before Argon2 runs, even for a wrong password.
+    check_password_length(&input.password)?;
     let key = input.email.trim().to_lowercase();
     if !state.throttle.allowed(&key) {
         return Err(AppError::TooManyRequests(
@@ -400,6 +404,25 @@ pub async fn list_users(
 
 // ---- helpers --------------------------------------------------------------
 
+/// Upper bound on password length. Argon2 will happily hash a multi-megabyte
+/// password; capping the length before hashing stops an unauthenticated caller
+/// from spending the server's CPU on a giant password (the login/basic verify
+/// paths hash whatever arrives, so the registration check alone can't protect
+/// them). 128 bytes is far more than any real passphrase needs.
+const MAX_PASSWORD_LEN: usize = 128;
+
+/// Reject an over-long password before it reaches Argon2. Kept separate from
+/// [`validate_credentials`] so the verify paths can call it without the
+/// registration-time minimum-length / email checks.
+fn check_password_length(password: &str) -> AppResult<()> {
+    if password.len() > MAX_PASSWORD_LEN {
+        return Err(AppError::BadRequest(format!(
+            "password must be at most {MAX_PASSWORD_LEN} bytes"
+        )));
+    }
+    Ok(())
+}
+
 fn validate_credentials(email: &str, password: &str) -> AppResult<()> {
     if !email.contains('@') {
         return Err(AppError::BadRequest("a valid email is required".into()));
@@ -409,7 +432,7 @@ fn validate_credentials(email: &str, password: &str) -> AppResult<()> {
             "password must be at least 8 characters".into(),
         ));
     }
-    Ok(())
+    check_password_length(password)
 }
 
 async fn insert_user<'e, E>(

@@ -357,6 +357,35 @@ async fn short_password_is_rejected() {
 }
 
 #[tokio::test]
+async fn overlong_password_is_rejected_before_hashing() {
+    let app = test_app().await;
+    register_master(&app).await;
+
+    let huge = "p".repeat(200); // > 128-byte cap
+    // Registration is closed after the master, but the length check fires first.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/auth/register",
+        None,
+        Some(json!({ "email": "a@b.c", "display_name": "A", "password": huge })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // Login rejects it too, before spending Argon2 on a wrong password.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "email": "master@lib.test", "password": huge })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn non_master_cannot_create_users() {
     let app = test_app().await;
     let master = register_master(&app).await;
