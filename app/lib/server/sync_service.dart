@@ -8,14 +8,59 @@ import '../data/library_repository.dart';
 import '../shelf/spine_style.dart';
 import 'server_client.dart';
 
+/// One thing that went wrong for a single book during a sync. Collected rather
+/// than swallowed, so a half-synced library is diagnosable instead of looking
+/// identical to a clean one.
+class SyncIssue {
+  SyncIssue({
+    required this.bookId,
+    required this.title,
+    required this.stage,
+    required this.message,
+  });
+
+  final String bookId;
+  final String title;
+
+  /// Where it failed: 'delete', 'cover', 'file', 'render', 'push', ...
+  final String stage;
+  final String message;
+}
+
+/// The outcome of a pull or push: counts plus any per-book failures.
+class SyncReport {
+  SyncReport({
+    this.pulled = 0,
+    this.pushed = 0,
+    this.deletedLocally = 0,
+    this.deletedRemotely = 0,
+    this.issues = const [],
+  });
+
+  final int pulled;
+  final int pushed;
+  final int deletedLocally;
+  final int deletedRemotely;
+  final List<SyncIssue> issues;
+
+  bool get hasIssues => issues.isNotEmpty;
+}
+
+/// Progress signal: [done] of [total] items processed in the named [phase].
+typedef SyncProgress = void Function(int done, int total, String phase);
+
 /// Two-way sync between the local library and a Vellum server. Owns no state of
-/// its own; it operates on the [repository]'s database and file store. Kept
-/// separate from [LibraryRepository] because sync has distinct dependencies (a
-/// server client) and side effects (a "pull" also pushes covers back).
+/// its own beyond a re-entrancy guard; it operates on the [repository]'s
+/// database and file store. Kept separate from [LibraryRepository] because sync
+/// has distinct dependencies (a server client) and side effects (a "pull" also
+/// pushes covers back). Reuse one instance so [pull]/[push] can't overlap.
 class SyncService {
   SyncService(this.repository);
 
   final LibraryRepository repository;
+
+  /// True while a pull or push is in flight; a second concurrent call throws.
+  bool _running = false;
 
   VellumDatabase get _db => repository.db;
   Directory get _dataDir => repository.dataDir;
@@ -23,27 +68,64 @@ class SyncService {
   /// Pulls the server library onto this device: applies the server's deletions,
   /// upserts book metadata (last-write-wins by `updatedAt`), downloads covers
   /// and files we don't already hold, and renders+pushes back covers for books
-  /// the server has none for. Returns the number of changed books applied.
+  /// the server has none for.
   ///
   /// [cursor] is the server clock from the previous pull; when set, only rows
   /// changed since it are fetched (delta pull). On success [onCursor] is called
-  /// with the new server clock to persist for next time.
-  Future<int> pull(
+  /// with the new server clock to persist for next time. [onProgress] reports
+  /// blob-transfer progress. Returns a [SyncReport] with counts and any issues.
+  Future<SyncReport> pull(
     VellumServerClient client, {
     String? cursor,
     void Function(String serverNow)? onCursor,
+    SyncProgress? onProgress,
+  }) async {
+    if (_running) {
+      throw StateError('a sync is already in progress');
+    }
+    _running = true;
+    try {
+      return await _pull(
+        client,
+        cursor: cursor,
+        onCursor: onCursor,
+        onProgress: onProgress,
+      );
+    } finally {
+      _running = false;
+    }
+  }
+
+  Future<SyncReport> _pull(
+    VellumServerClient client, {
+    String? cursor,
+    void Function(String serverNow)? onCursor,
+    SyncProgress? onProgress,
   }) async {
     final db = _db;
+    final issues = <SyncIssue>[];
     final listed = await client.listBooks(cursor: cursor);
     final books = listed.books;
 
     // Apply the server's deletions locally. The server already knows, so pass
     // recordTombstone: false — otherwise we'd re-push this delete forever.
+    var deletedLocally = 0;
     for (final id in await client.listDeletions(since: cursor)) {
       final row = await (db.select(
         db.books,
       )..where((b) => b.id.equals(id))).getSingleOrNull();
-      if (row != null) await repository.deleteBook(row, recordTombstone: false);
+      if (row == null) continue;
+      try {
+        await repository.deleteBook(row, recordTombstone: false);
+        deletedLocally++;
+      } catch (e) {
+        issues.add(SyncIssue(
+          bookId: id,
+          title: row.title,
+          stage: 'delete',
+          message: '$e',
+        ));
+      }
     }
 
     // Books deleted locally but not yet pushed: skip them below so a pull can't
@@ -112,7 +194,9 @@ class SyncService {
 
     // Fetch cover art outside the transaction; a failed cover never fails the
     // whole pull.
-    for (final b in books.where((b) => b.hasCover)) {
+    final coverBooks = books.where((b) => b.hasCover).toList();
+    for (final (i, b) in coverBooks.indexed) {
+      onProgress?.call(i, coverBooks.length, 'Downloading covers');
       final local = File(p.join(_dataDir.path, 'covers', '${b.id}.jpg'));
       if (await local.exists()) continue;
       try {
@@ -122,14 +206,21 @@ class SyncService {
         await (db.update(db.books)..where((x) => x.id.equals(b.id))).write(
           BooksCompanion(coverPath: Value(p.join('covers', '${b.id}.jpg'))),
         );
-      } catch (_) {
+      } catch (e) {
         // Leave this book cover-less; it still shows a generated spine.
+        issues.add(SyncIssue(
+          bookId: b.id,
+          title: b.title,
+          stage: 'cover',
+          message: '$e',
+        ));
       }
     }
 
     // Download digital files the device doesn't already have. Dedup by content
     // hash, so a file pushed under a different id isn't downloaded twice.
-    for (final b in books) {
+    for (final (i, b) in books.indexed) {
+      onProgress?.call(i, books.length, 'Downloading files');
       try {
         for (final f in await client.listFiles(b.id)) {
           final have =
@@ -158,8 +249,14 @@ class SyncService {
                 ),
               );
         }
-      } catch (_) {
+      } catch (e) {
         // Metadata and cover are already pulled; skip files on error.
+        issues.add(SyncIssue(
+          bookId: b.id,
+          title: b.title,
+          stage: 'file',
+          message: '$e',
+        ));
       }
     }
 
@@ -179,15 +276,28 @@ class SyncService {
           if (await repository.setCoverFromFirstPage(b.id)) {
             localCover = p.join('covers', '${b.id}.jpg');
           }
-        } catch (_) {}
+        } catch (e) {
+          issues.add(SyncIssue(
+            bookId: b.id,
+            title: b.title,
+            stage: 'render',
+            message: '$e',
+          ));
+        }
       }
       if (localCover == null) continue;
       final coverFile = File(p.join(_dataDir.path, localCover));
       if (await coverFile.exists()) {
         try {
           await client.uploadCover(b.id, await coverFile.readAsBytes());
-        } catch (_) {
+        } catch (e) {
           // View-only or offline — the cover stays local to this device.
+          issues.add(SyncIssue(
+            bookId: b.id,
+            title: b.title,
+            stage: 'cover',
+            message: '$e',
+          ));
         }
       }
     }
@@ -206,20 +316,45 @@ class SyncService {
     // safely re-fetches this window.
     final serverNow = listed.serverNow;
     if (serverNow != null && onCursor != null) onCursor(serverNow);
-    return books.length;
+    return SyncReport(
+      pulled: applied.length,
+      deletedLocally: deletedLocally,
+      issues: issues,
+    );
   }
 
   /// Pushes local books (and their covers/files) up to the server, propagating
   /// local deletes first and upserting by id so pull and push stay consistent.
-  /// Books the caller can't write on the server (e.g. shared read-only) are
-  /// skipped. Returns the number pushed.
-  Future<int> push(VellumServerClient client) async {
+  /// Only dirty books are sent. Books the caller can't write on the server (e.g.
+  /// shared read-only) are recorded as issues and skipped. [onProgress] reports
+  /// per-book progress. Returns a [SyncReport].
+  Future<SyncReport> push(
+    VellumServerClient client, {
+    SyncProgress? onProgress,
+  }) async {
+    if (_running) {
+      throw StateError('a sync is already in progress');
+    }
+    _running = true;
+    try {
+      return await _push(client, onProgress: onProgress);
+    } finally {
+      _running = false;
+    }
+  }
+
+  Future<SyncReport> _push(
+    VellumServerClient client, {
+    SyncProgress? onProgress,
+  }) async {
     final db = _db;
+    final issues = <SyncIssue>[];
 
     // Propagate local deletes first, then stop tracking them regardless of the
     // outcome: 404 = already gone; 403 = we don't own the server copy (deleting
     // a shared book locally is a local-only act — it will legitimately return
     // on the next pull).
+    var deletedRemotely = 0;
     for (final d in await db.select(db.localDeletions).get()) {
       try {
         await client.deleteBook(d.bookId);
@@ -229,6 +364,7 @@ class SyncService {
       await (db.delete(
         db.localDeletions,
       )..where((t) => t.bookId.equals(d.bookId))).go();
+      deletedRemotely++;
     }
 
     // Only push books changed since their last successful push. `needsPush`
@@ -237,7 +373,8 @@ class SyncService {
     final books =
         await (db.select(db.books)..where((b) => b.needsPush.equals(true))).get();
     var pushed = 0;
-    for (final b in books) {
+    for (final (i, b) in books.indexed) {
+      onProgress?.call(i, books.length, 'Pushing books');
       try {
         final details = await repository.detailsFor(b.id);
         await client.pushBook(
@@ -287,10 +424,20 @@ class SyncService {
           const BooksCompanion(needsPush: Value(false)),
         );
         pushed++;
-      } on ServerException {
-        // Read-only or rejected — leave it dirty and keep going.
+      } catch (e) {
+        // Read-only, rejected, or a blob error — leave it dirty and record it.
+        issues.add(SyncIssue(
+          bookId: b.id,
+          title: b.title,
+          stage: 'push',
+          message: e is ServerException ? e.message : '$e',
+        ));
       }
     }
-    return pushed;
+    return SyncReport(
+      pushed: pushed,
+      deletedRemotely: deletedRemotely,
+      issues: issues,
+    );
   }
 }

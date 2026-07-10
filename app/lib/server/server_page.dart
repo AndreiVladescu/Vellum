@@ -32,9 +32,17 @@ class _ServerPageState extends State<ServerPage> {
   final _displayName = TextEditingController();
   final _password = TextEditingController();
 
+  // One sync service instance, so its re-entrancy guard actually spans the pull
+  // and push buttons (a fresh instance per call couldn't guard anything).
+  late final SyncService _sync = SyncService(widget.repository);
+
   bool _busy = false;
   bool _registerMode = false;
   String? _error;
+
+  // Live sync progress: [0..1] fraction and the current phase label.
+  double? _progress;
+  String _phase = '';
 
   @override
   void dispose() {
@@ -57,8 +65,74 @@ class _ServerPageState extends State<ServerPage> {
     } catch (e) {
       if (mounted) setState(() => _error = 'Could not reach the server.\n$e');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _progress = null;
+          _phase = '';
+        });
+      }
     }
+  }
+
+  void _onProgress(int done, int total, String phase) {
+    if (!mounted) return;
+    setState(() {
+      _phase = phase;
+      _progress = total == 0 ? null : done / total;
+    });
+  }
+
+  /// Post-sync feedback: a count, plus a Details action when anything failed.
+  void _showReport(String verb, int count, SyncReport report) {
+    if (!mounted) return;
+    final n = report.issues.length;
+    final msg = report.hasIssues
+        ? '$verb $count book${count == 1 ? '' : 's'}, '
+              '$n issue${n == 1 ? '' : 's'}'
+        : (count == 0
+              ? 'Already up to date.'
+              : '$verb $count book${count == 1 ? '' : 's'}.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        action: report.hasIssues
+            ? SnackBarAction(
+                label: 'Details',
+                onPressed: () => _showIssues(report.issues),
+              )
+            : null,
+      ),
+    );
+  }
+
+  void _showIssues(List<SyncIssue> issues) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Sync issues (${issues.length})'),
+        content: SizedBox(
+          width: 400,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final i in issues)
+                ListTile(
+                  dense: true,
+                  title: Text(i.title.isEmpty ? i.bookId : i.title),
+                  subtitle: Text('${i.stage}: ${i.message}'),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _authenticate() => _run(() async {
@@ -82,30 +156,20 @@ class _ServerPageState extends State<ServerPage> {
   Future<void> _pull() => _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
-        final count = await SyncService(widget.repository).pull(
+        final report = await _sync.pull(
           client,
           cursor: widget.connection.syncCursor,
           onCursor: widget.connection.setSyncCursor,
+          onProgress: _onProgress,
         );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(count == 0
-                ? 'No books on the server yet.'
-                : 'Pulled $count book${count == 1 ? '' : 's'} onto this device.'),
-          ));
-        }
+        _showReport('Pulled', report.pulled, report);
       });
 
   Future<void> _push() => _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
-        final count = await SyncService(widget.repository).push(client);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Pushed $count book${count == 1 ? '' : 's'} '
-                'to the server.'),
-          ));
-        }
+        final report = await _sync.push(client, onProgress: _onProgress);
+        _showReport('Pushed', report.pushed, report);
       });
 
   @override
@@ -168,6 +232,14 @@ class _ServerPageState extends State<ServerPage> {
             ),
           ],
         ),
+        if (_busy) ...[
+          const SizedBox(height: 16),
+          LinearProgressIndicator(value: _progress),
+          if (_phase.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(_phase, style: theme.textTheme.bodySmall),
+          ],
+        ],
         if (_error != null) ...[
           const SizedBox(height: 16),
           Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
