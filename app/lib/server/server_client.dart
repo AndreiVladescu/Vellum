@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -47,6 +48,7 @@ class ServerBook {
     this.pageCount,
     this.spineStyle,
     this.coverPath,
+    this.updatedAt,
   });
 
   final String id;
@@ -62,7 +64,16 @@ class ServerBook {
   /// Server-relative cover path; non-null means a cover is available to fetch.
   final String? coverPath;
 
+  /// When the server last modified this book, used to decide whether a pull
+  /// should overwrite a local row. Null if the server sent no/blank timestamp.
+  final DateTime? updatedAt;
+
   bool get hasCover => coverPath != null && coverPath!.isNotEmpty;
+
+  /// Server timestamps are `datetime('now')` UTC strings ("YYYY-MM-DD HH:MM:SS").
+  static DateTime? _parseServerTime(String? s) => (s == null || s.isEmpty)
+      ? null
+      : DateTime.tryParse('${s.replaceFirst(' ', 'T')}Z');
 
   factory ServerBook.fromJson(Map<String, dynamic> j) => ServerBook(
     id: j['id'] as String,
@@ -75,6 +86,7 @@ class ServerBook {
     pageCount: j['page_count'] as int?,
     spineStyle: j['spine_style'] as String?,
     coverPath: j['cover_path'] as String?,
+    updatedAt: _parseServerTime(j['updated_at'] as String?),
   );
 }
 
@@ -145,6 +157,13 @@ class VellumServerClient {
     return ServerUser.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Invalidates the current session server-side. Best-effort: the caller still
+  /// clears local credentials even if this fails (e.g. offline).
+  Future<void> logout() async {
+    final res = await _http.post(_uri('/api/auth/logout'), headers: _headers);
+    _body(res);
+  }
+
   /// Every book visible to the authenticated user (owned + shared).
   Future<List<ServerBook>> listBooks() async {
     final res = await _http.get(_uri('/api/books'), headers: _headers);
@@ -195,6 +214,20 @@ class VellumServerClient {
     _body(res);
   }
 
+  /// Book ids the server has tombstoned, so a pull can delete them locally.
+  Future<List<String>> listDeletions() async {
+    final res = await _http.get(_uri('/api/deletions'), headers: _headers);
+    return [
+      for (final d in _body(res) as List) (d as Map<String, dynamic>)['book_id'] as String,
+    ];
+  }
+
+  /// Delete a book on the server (used to propagate a local delete up).
+  Future<void> deleteBook(String id) async {
+    final res = await _http.delete(_uri('/api/books/$id'), headers: _headers);
+    _body(res);
+  }
+
   /// Upload (replace) a book's cover image.
   Future<void> uploadCover(
     String bookId,
@@ -222,17 +255,29 @@ class VellumServerClient {
     ];
   }
 
-  /// Downloads a book file's bytes by its server id.
-  Future<Uint8List> downloadFile(String fileId) async {
-    final res = await _http.get(_uri('/api/files/$fileId'), headers: _headers);
-    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
-    throw ServerException('File download failed (HTTP ${res.statusCode})');
+  /// Streams a book file to [dest] by its server id, without holding the whole
+  /// file in memory.
+  Future<void> downloadFileTo(String fileId, File dest) async {
+    final req = http.Request('GET', _uri('/api/files/$fileId'));
+    final auth = _bearer;
+    if (auth != null) req.headers['authorization'] = auth;
+    final res = await _http.send(req);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw ServerException('File download failed (HTTP ${res.statusCode})');
+    }
+    final sink = dest.openWrite();
+    try {
+      await sink.addStream(res.stream);
+    } finally {
+      await sink.close();
+    }
   }
 
-  /// Uploads a book file. [format] (e.g. 'pdf') sets the stored extension.
-  Future<void> uploadFile(
+  /// Streams [source] up as a book file. [format] (e.g. 'pdf') sets the stored
+  /// extension.
+  Future<void> uploadFileFrom(
     String bookId,
-    Uint8List bytes, {
+    File source, {
     required String format,
   }) async {
     final mime = switch (format) {
@@ -241,11 +286,19 @@ class VellumServerClient {
       _ => 'application/octet-stream',
     };
     final filename = Uri.encodeQueryComponent('book.$format');
-    final res = await _http.post(
-      _uri('/api/books/$bookId/files?filename=$filename'),
-      headers: {'content-type': mime, 'authorization': ?_bearer},
-      body: bytes,
+    final req =
+        http.StreamedRequest('POST', _uri('/api/books/$bookId/files?filename=$filename'))
+          ..contentLength = await source.length()
+          ..headers['content-type'] = mime;
+    final auth = _bearer;
+    if (auth != null) req.headers['authorization'] = auth;
+    source.openRead().listen(
+      req.sink.add,
+      onError: req.sink.addError,
+      onDone: req.sink.close,
+      cancelOnError: true,
     );
+    final res = await http.Response.fromStream(await _http.send(req));
     _body(res);
   }
 

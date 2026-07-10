@@ -1,15 +1,22 @@
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
-use rand_core::{OsRng, RngCore};
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use axum::Json;
 use axum::extract::{FromRequestParts, State};
+use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
-use axum::Json;
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::{AppError, AppResult};
 use crate::AppState;
+use crate::error::{AppError, AppResult};
+
+/// A precomputed Argon2 hash used only to spend the same verification time when
+/// an email doesn't exist, so login/basic-auth timing can't confirm which
+/// emails have accounts.
+static DUMMY_HASH: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| hash_password("timing-equalizer-dummy").unwrap());
 
 /// The authenticated caller, extracted from the `Authorization: Bearer <token>`
 /// header. Any handler that takes an `AuthUser` argument requires a valid login.
@@ -29,13 +36,19 @@ impl FromRequestParts<AppState> for AuthUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         // Bearer for the app; Basic so OPDS e-readers (and file downloads) work.
-        if let Some(header) = parts.headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
+        if let Some(header) = parts
+            .headers
+            .get(AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+        {
             return if let Some(token) = header.strip_prefix("Bearer ") {
                 user_from_token(state, token).await
             } else if let Some(encoded) = header.strip_prefix("Basic ") {
                 user_from_basic(state, encoded).await
             } else {
-                Err(AppError::Unauthorized("unsupported authorization scheme".into()))
+                Err(AppError::Unauthorized(
+                    "unsupported authorization scheme".into(),
+                ))
             };
         }
 
@@ -51,7 +64,9 @@ impl FromRequestParts<AppState> for AuthUser {
 /// Extracts a `token` value from a URL query string (tokens are hex, so no
 /// percent-decoding is needed).
 fn query_token(query: Option<&str>) -> Option<&str> {
-    query?.split('&').find_map(|pair| pair.strip_prefix("token="))
+    query?
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("token="))
 }
 
 async fn user_from_token(state: &AppState, token: &str) -> AppResult<AuthUser> {
@@ -77,21 +92,37 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
         .split_once(':')
         .ok_or_else(|| AppError::Unauthorized("malformed basic credentials".into()))?;
 
+    let key = email.trim().to_lowercase();
+    if !state.throttle.allowed(&key) {
+        return Err(AppError::TooManyRequests(
+            "too many failed attempts — try again later".into(),
+        ));
+    }
+
     let row = sqlx::query_as::<_, (String, String, String, bool, String)>(
         "SELECT id, email, display_name, is_master, password_hash \
          FROM app_user WHERE email = ?",
     )
-    .bind(email.trim().to_lowercase())
+    .bind(&key)
     .fetch_optional(&state.db)
     .await?;
 
     let Some((id, email, display_name, is_master, password_hash)) = row else {
+        let _ = verify_password(password, &DUMMY_HASH); // equalize timing
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     };
     if !verify_password(password, &password_hash) {
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     }
-    Ok(AuthUser { id, email, display_name, is_master })
+    state.throttle.clear(&key);
+    Ok(AuthUser {
+        id,
+        email,
+        display_name,
+        is_master,
+    })
 }
 
 /// Rejects non-master callers — used to guard administrative endpoints.
@@ -165,9 +196,12 @@ pub async fn register(
 ) -> AppResult<Json<AuthResponse>> {
     validate_credentials(&input.email, &input.password)?;
 
+    // Check "is there a master yet?" and insert the first user in one
+    // transaction, so two simultaneous first-registrations can't both win.
+    let mut tx = state.db.begin().await?;
     let master_exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM app_user WHERE is_master = 1)")
-            .fetch_one(&state.db)
+            .fetch_one(&mut *tx)
             .await?;
     if master_exists {
         return Err(AppError::Forbidden(
@@ -175,7 +209,16 @@ pub async fn register(
         ));
     }
 
-    let user = insert_user(&state, &input.email, &input.display_name, &input.password, true).await?;
+    let user = insert_user(
+        &mut *tx,
+        &input.email,
+        &input.display_name,
+        &input.password,
+        true,
+    )
+    .await?;
+    tx.commit().await?;
+
     let token = issue_token(&state, &user.id).await?;
     Ok(Json(AuthResponse { token, user }))
 }
@@ -184,28 +227,62 @@ pub async fn login(
     State(state): State<AppState>,
     Json(input): Json<LoginInput>,
 ) -> AppResult<Json<AuthResponse>> {
+    let key = input.email.trim().to_lowercase();
+    if !state.throttle.allowed(&key) {
+        return Err(AppError::TooManyRequests(
+            "too many failed attempts — try again later".into(),
+        ));
+    }
+
     let row = sqlx::query_as::<_, (String, String, String, bool, String)>(
         "SELECT id, email, display_name, is_master, password_hash \
          FROM app_user WHERE email = ?",
     )
-    .bind(input.email.trim().to_lowercase())
+    .bind(&key)
     .fetch_optional(&state.db)
     .await?;
 
     let Some((id, email, display_name, is_master, password_hash)) = row else {
+        let _ = verify_password(&input.password, &DUMMY_HASH); // equalize timing
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     };
     if !verify_password(&input.password, &password_hash) {
+        state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     }
+    state.throttle.clear(&key);
 
-    let user = AuthUser { id, email, display_name, is_master };
+    let user = AuthUser {
+        id,
+        email,
+        display_name,
+        is_master,
+    };
     let token = issue_token(&state, &user.id).await?;
     Ok(Json(AuthResponse { token, user }))
 }
 
 pub async fn me(user: AuthUser) -> Json<AuthUser> {
     Json(user)
+}
+
+/// Invalidate the presented bearer session server-side (real logout). Succeeds
+/// even if the token was already gone, so the client can always clear locally.
+pub async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> AppResult<Json<serde_json::Value>> {
+    let token = headers
+        .get(AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
+    sqlx::query("DELETE FROM session WHERE token_hash = ?")
+        .bind(sha256_hex(token))
+        .execute(&state.db)
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
 }
 
 /// Master-only: create a member account. Returns the new user (no token — they
@@ -217,8 +294,14 @@ pub async fn create_user(
 ) -> AppResult<Json<AuthUser>> {
     require_master(&caller)?;
     validate_credentials(&input.email, &input.password)?;
-    let user =
-        insert_user(&state, &input.email, &input.display_name, &input.password, false).await?;
+    let user = insert_user(
+        &state.db,
+        &input.email,
+        &input.display_name,
+        &input.password,
+        false,
+    )
+    .await?;
     Ok(Json(user))
 }
 
@@ -249,13 +332,16 @@ fn validate_credentials(email: &str, password: &str) -> AppResult<()> {
     Ok(())
 }
 
-async fn insert_user(
-    state: &AppState,
+async fn insert_user<'e, E>(
+    executor: E,
     email: &str,
     display_name: &str,
     password: &str,
     is_master: bool,
-) -> AppResult<AuthUser> {
+) -> AppResult<AuthUser>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+{
     let id = uuid::Uuid::new_v4().to_string();
     let email = email.trim().to_lowercase();
     let display_name = display_name.trim();
@@ -270,13 +356,15 @@ async fn insert_user(
     .bind(display_name)
     .bind(&hash)
     .bind(is_master)
-    .execute(&state.db)
+    .execute(executor)
     .await;
 
     if let Err(sqlx::Error::Database(e)) = &result
         && e.is_unique_violation()
     {
-        return Err(AppError::Conflict("that email is already registered".into()));
+        return Err(AppError::Conflict(
+            "that email is already registered".into(),
+        ));
     }
     result?;
 

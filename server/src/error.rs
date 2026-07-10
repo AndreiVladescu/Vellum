@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
 use serde_json::json;
@@ -14,6 +14,7 @@ pub enum AppError {
     NotFound(String),
     BadRequest(String),
     Conflict(String),
+    TooManyRequests(String),
     Internal(String),
 }
 
@@ -36,6 +37,7 @@ impl IntoResponse for AppError {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m),
+            AppError::TooManyRequests(m) => (StatusCode::TOO_MANY_REQUESTS, m),
             AppError::Internal(m) => {
                 tracing::error!("internal error: {m}");
                 (

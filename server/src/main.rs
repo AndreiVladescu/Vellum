@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use vellum_server::{connect_db, router, AppState};
+use vellum_server::{AppState, connect_db, router};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,6 +22,7 @@ async fn main() -> anyhow::Result<()> {
         data_dir: data_dir.into(),
         http: reqwest::Client::new(),
         max_upload_bytes: max_upload_mb * 1024 * 1024,
+        throttle: std::sync::Arc::default(),
     };
 
     let port: u16 = std::env::var("VELLUM_PORT")

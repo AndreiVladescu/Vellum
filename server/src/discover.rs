@@ -1,16 +1,16 @@
 //! Book discovery: search the online metadata sources and add a chosen result
 //! as a real book (the console's search flow; the app has its own client).
 
-use axum::extract::{Path, Query, State};
 use axum::Json;
+use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 
+use crate::AppState;
 use crate::access::book_access;
 use crate::auth::AuthUser;
-use crate::books::{fetch_book, BookDto};
+use crate::books::{BookDto, fetch_book};
 use crate::error::{AppError, AppResult};
 use crate::metadata::{self, BookSearchResult};
-use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct SearchQuery {
@@ -215,10 +215,11 @@ pub async fn enrich(
     }
 
     let book = fetch_book(&state, &id).await?.0;
-    let author_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM book_author WHERE book_id = ?")
-        .bind(&id)
-        .fetch_one(&state.db)
-        .await?;
+    let author_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM book_author WHERE book_id = ?")
+            .bind(&id)
+            .fetch_one(&state.db)
+            .await?;
     let genre_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM book_genre WHERE book_id = ?")
         .bind(&id)
         .fetch_one(&state.db)
@@ -264,9 +265,7 @@ pub async fn enrich(
         Some(top) => top,
         None => {
             // No online match — still salvage a cover from the PDF if we can.
-            if need_cover
-                && let Some(rel) = crate::blobs::render_pdf_cover(&state, &id).await
-            {
+            if need_cover && let Some(rel) = crate::blobs::render_pdf_cover(&state, &id).await {
                 sqlx::query(
                     "UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?",
                 )

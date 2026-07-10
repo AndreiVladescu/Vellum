@@ -3,14 +3,14 @@
 //! embedded in the binary (no external assets, no CDN) and served same-origin,
 //! so `fetch` to `/api/*` just works.
 
+use axum::Json;
 use axum::extract::State;
 use axum::response::Html;
-use axum::Json;
 use serde::Serialize;
 
+use crate::AppState;
 use crate::auth::AuthUser;
 use crate::error::AppResult;
-use crate::AppState;
 
 pub async fn console() -> Html<&'static str> {
     Html(include_str!("../web/console.html"))

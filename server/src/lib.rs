@@ -3,9 +3,9 @@
 
 use std::path::PathBuf;
 
+use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, post, put};
-use axum::Router;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
 mod access;
@@ -18,6 +18,7 @@ mod groups;
 mod metadata;
 mod opds;
 mod shares;
+mod throttle;
 mod web;
 
 /// Shared handler state: the database pool, the base URL used to build public
@@ -32,6 +33,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     /// Largest upload (book file) accepted, in bytes (`VELLUM_MAX_UPLOAD_MB`).
     pub max_upload_bytes: usize,
+    /// In-memory failed-login limiter, shared across requests.
+    pub throttle: std::sync::Arc<throttle::LoginThrottle>,
 }
 
 /// Open (creating if missing) the SQLite database at `path` and run migrations.
@@ -42,6 +45,10 @@ pub async fn connect_db(path: &str) -> anyhow::Result<SqlitePool> {
         .foreign_keys(true);
     let db = SqlitePoolOptions::new().connect_with(options).await?;
     sqlx::migrate!().run(&db).await?;
+    // Drop already-expired sessions so the table doesn't grow without bound.
+    sqlx::query("DELETE FROM session WHERE expires_at <= datetime('now')")
+        .execute(&db)
+        .await?;
     Ok(db)
 }
 
@@ -57,6 +64,7 @@ pub fn router(state: AppState) -> Router {
         // Accounts & sessions.
         .route("/api/auth/register", post(auth::register))
         .route("/api/auth/login", post(auth::login))
+        .route("/api/auth/logout", post(auth::logout))
         .route("/api/auth/me", get(auth::me))
         .route("/api/users", get(auth::list_users).post(auth::create_user))
         // Online metadata search + add a chosen result.
@@ -65,6 +73,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/books/from-search", post(discover::add_from_search))
         .route("/api/books/{id}/enrich", post(discover::enrich))
         // Books (visibility-filtered by RBAC).
+        .route("/api/deletions", get(books::deletions))
         .route("/api/books", get(books::list).post(books::create))
         .route(
             "/api/books/{id}",
@@ -87,7 +96,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/groups", get(groups::list).post(groups::create))
         .route("/api/groups/{id}", get(groups::get).delete(groups::delete))
         .route("/api/groups/{id}/books", post(groups::add_book))
-        .route("/api/groups/{id}/books/{book_id}", delete(groups::remove_book))
+        .route(
+            "/api/groups/{id}/books/{book_id}",
+            delete(groups::remove_book),
+        )
         // User-to-user shares.
         .route("/api/shares", get(shares::list).post(shares::create))
         .route("/api/shares/{id}", delete(shares::delete))
