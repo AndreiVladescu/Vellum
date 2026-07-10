@@ -13,6 +13,7 @@ import 'server/connection_store.dart';
 import 'server/server_client.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
+import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
 import 'shelf/shelf_filter.dart';
 import 'shelf/shelf_view.dart';
@@ -210,6 +211,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   border: InputBorder.none,
                 ),
               ),
+              actions: [_sortMenu()],
             )
           : AppBar(title: const Text('Physical libraries')),
       body: IndexedStack(
@@ -248,6 +250,20 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
     );
   }
+
+  Widget _sortMenu() => PopupMenuButton<ShelfSort>(
+        icon: const Icon(Icons.sort),
+        tooltip: 'Sort',
+        initialValue: widget.settings.shelfSort,
+        onSelected: widget.settings.setShelfSort,
+        itemBuilder: (context) => [
+          for (final s in ShelfSort.values)
+            PopupMenuItem(
+              value: s,
+              child: Text('Sort by ${s.label.toLowerCase()}'),
+            ),
+        ],
+      );
 
   Widget _shelfTab(BuildContext context) {
     return ListenableBuilder(
@@ -330,7 +346,11 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       );
     }
-    final books = _filter(all, authorsByBook, genresByBook);
+    final books = sortBooks(
+      books: _filter(all, authorsByBook, genresByBook),
+      sort: widget.settings.shelfSort,
+      authorsByBook: authorsByBook,
+    );
     if (books.isEmpty) {
       return Center(
         child: Text(

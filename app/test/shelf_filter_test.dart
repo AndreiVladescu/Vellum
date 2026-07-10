@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/settings/shelf_sort.dart';
 import 'package:vellum/shelf/shelf_filter.dart';
 
 void main() {
@@ -42,5 +44,35 @@ void main() {
     expect(ids('genre:sci'), ['b1']);
     expect(ids(''), ['b1', 'b2'], reason: 'empty query returns all');
     expect(ids('nothingmatches'), isEmpty);
+  });
+
+  test('sorts by title, author, and year with missing keys last', () async {
+    final dir = Directory.systemTemp.createTempSync('vellum_sort_test');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final repo = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dir);
+    final db = repo.db;
+    // Zed (2000, Bunch), Alpha (1990, no author), Mid (no year, Adams).
+    await db.into(db.books).insert(BooksCompanion.insert(
+        id: 'z', title: 'Zed', publishedYear: const Value(2000)));
+    await db.into(db.books).insert(BooksCompanion.insert(
+        id: 'a', title: 'Alpha', publishedYear: const Value(1990)));
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'm', title: 'Mid'));
+    await repo.setAuthors('z', ['Bunch']);
+    await repo.setAuthors('m', ['Adams']);
+
+    final books = await repo.watchAllBooks().first;
+    final authors = await repo.watchAuthorsByBook().first;
+    List<String> ids(ShelfSort s) => [
+          for (final b
+              in sortBooks(books: books, sort: s, authorsByBook: authors))
+            b.id
+        ];
+
+    expect(ids(ShelfSort.title), ['a', 'm', 'z']);
+    expect(ids(ShelfSort.year), ['a', 'z', 'm'],
+        reason: '1990, 2000, then the year-less book last');
+    expect(ids(ShelfSort.author), ['m', 'z', 'a'],
+        reason: 'Adams, Bunch, then the author-less book last');
   });
 }

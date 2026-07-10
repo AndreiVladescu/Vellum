@@ -1,4 +1,5 @@
 import '../data/database.dart';
+import '../settings/shelf_sort.dart';
 
 /// Filters [books] by the shelf search [query]:
 ///
@@ -33,4 +34,43 @@ List<Book> filterBooks({
               .any((a) => a.toLowerCase().contains(q)))
         b,
   ];
+}
+
+/// Returns [books] ordered per [sort]. Author/year sorts put books that lack the
+/// key (no author, no year) last; ties fall back to title. Case-insensitive.
+/// Does not mutate [books].
+List<Book> sortBooks({
+  required List<Book> books,
+  required ShelfSort sort,
+  required Map<String, List<String>> authorsByBook,
+}) {
+  int byTitle(Book a, Book b) =>
+      a.title.toLowerCase().compareTo(b.title.toLowerCase());
+
+  final sorted = [...books];
+  switch (sort) {
+    case ShelfSort.title:
+      sorted.sort(byTitle);
+    case ShelfSort.author:
+      String firstAuthor(Book b) =>
+          (authorsByBook[b.id] ?? const []).firstOrNull?.toLowerCase() ?? '';
+      sorted.sort((a, b) {
+        final aa = firstAuthor(a);
+        final bb = firstAuthor(b);
+        // Author-less books sort last.
+        if (aa.isEmpty != bb.isEmpty) return aa.isEmpty ? 1 : -1;
+        final c = aa.compareTo(bb);
+        return c != 0 ? c : byTitle(a, b);
+      });
+    case ShelfSort.year:
+      sorted.sort((a, b) {
+        final ay = a.publishedYear;
+        final by = b.publishedYear;
+        // Year-less books sort last.
+        if ((ay == null) != (by == null)) return ay == null ? 1 : -1;
+        final c = (ay ?? 0).compareTo(by ?? 0);
+        return c != 0 ? c : byTitle(a, b);
+      });
+  }
+  return sorted;
 }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'book_face.dart';
+import 'shelf_sort.dart';
 import 'spine_art.dart';
 import 'wallpaper.dart';
 
@@ -13,6 +14,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _bookFaceKey = 'settings.bookFace';
   static const _spineArtKey = 'settings.spineArt';
   static const _selectedShelfKey = 'settings.selectedShelf';
+  static const _shelfSortKey = 'settings.shelfSort';
 
   final SharedPreferences _prefs;
 
@@ -69,6 +71,18 @@ class AppSettingsStore extends ChangeNotifier {
     } else {
       await _prefs.setString(_selectedShelfKey, value);
     }
+    notifyListeners();
+  }
+
+  /// How the digital shelf orders books (title by default).
+  ShelfSort get shelfSort {
+    final stored = _prefs.getString(_shelfSortKey);
+    return ShelfSort.values.where((s) => s.name == stored).firstOrNull ??
+        ShelfSort.title;
+  }
+
+  Future<void> setShelfSort(ShelfSort value) async {
+    await _prefs.setString(_shelfSortKey, value.name);
     notifyListeners();
   }
 }
