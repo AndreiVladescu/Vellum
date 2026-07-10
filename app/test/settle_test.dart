@@ -72,16 +72,38 @@ void main() {
         isFalse,
       );
     });
+
+    test('restsOnShelf identifies a shelf\'s riders (for shelf-edit carry)', () {
+      const on = SettleBox(x: 0.5, y: 1.0, w: 0.1, h: 0.2);
+      const above = SettleBox(x: 0.5, y: 1.6, w: 0.1, h: 0.2);
+      const beside = SettleBox(x: 3.0, y: 1.0, w: 0.1, h: 0.2);
+      expect(restsOnShelf(on, shelf), isTrue);
+      expect(restsOnShelf(above, shelf), isFalse, reason: 'different height');
+      expect(restsOnShelf(beside, shelf), isFalse, reason: 'no x-overlap');
+    });
   });
 
-  // --- Known bugs, pinned as tests (see docs/BACKLOG.md "Settle bounds"). ---
-  // When fixed, flip these expectations deliberately.
+  // --- Settle bounds: books stay on their shelf (was BACKLOG). ---
 
-  test('BACKLOG: nudging out of an overlap can push a book past the shelf end',
-      () {
-    // The shelf ends at x = 1.0. A book fills most of it; a second book dropped
-    // overlapping is shoved right, past the shelf's end, yet keeps the shelf
-    // height (it "floats" beyond the shelf rather than being clamped).
+  test('a book nudged sideways is clamped to stay within the shelf', () {
+    // Shelf [0, 1]. A book fills [0, 0.3]; a 0.1-wide book dropped overlapping
+    // it is shoved right to 0.3 — and stays within the shelf, not past its end.
+    final r = settle(
+      x: 0.25,
+      y: 1.02,
+      w: 0.1,
+      h: 0.2,
+      shelves: [shelfAt(1.0, 0, 1.0)],
+      others: const [SettleBox(x: 0.0, y: 1.0, w: 0.3, h: 0.2)],
+    );
+    expect(r.onSurface, isTrue);
+    expect(r.x, closeTo(0.3, 1e-9));
+    expect(r.x + 0.1, lessThanOrEqualTo(1.0 + 1e-9), reason: 'within the shelf');
+  });
+
+  test('a book that cannot fit the shelf falls through instead of floating', () {
+    // The shelf [0, 1] is nearly full ([0, 0.95]); a 0.1 book has no room. It no
+    // longer floats past the shelf end — with nothing below, it is not placed.
     final r = settle(
       x: 0.9,
       y: 1.02,
@@ -90,10 +112,21 @@ void main() {
       shelves: [shelfAt(1.0, 0, 1.0)],
       others: const [SettleBox(x: 0.0, y: 1.0, w: 0.95, h: 0.2)],
     );
+    expect(r.onSurface, isFalse);
+  });
+
+  test('a book that cannot fit the shelf lands on a lower surface', () {
+    // Same full high shelf, but an empty lower shelf [0, 2] at y = 0.5 catches
+    // the book instead of it floating past the high shelf's end.
+    final r = settle(
+      x: 0.9,
+      y: 1.02,
+      w: 0.1,
+      h: 0.2,
+      shelves: [shelfAt(1.0, 0, 1.0), shelfAt(0.5, 0, 2)],
+      others: const [SettleBox(x: 0.0, y: 1.0, w: 0.95, h: 0.2)],
+    );
     expect(r.onSurface, isTrue);
-    expect(r.y, closeTo(1.0, 1e-9));
-    expect(r.x, closeTo(0.95, 1e-9)); // pushed to the other book's right edge
-    // Bug: the book now extends past the shelf's right end (1.0).
-    expect(r.x + 0.1, greaterThan(1.0));
+    expect(r.y, closeTo(0.5, 1e-9));
   });
 }

@@ -632,6 +632,26 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       ),
     );
     if (result == null) return;
+
+    // Books resting on the shelf should travel with it, so an edit doesn't
+    // strand them in mid-air. Capture them (and the move delta) before the edit.
+    final oldSeg = SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2);
+    final dx = result.left - math.min(s.x1, s.x2);
+    final dy = result.y - math.max(s.y1, s.y2);
+    final riders = [
+      for (final pb in _placed)
+        if (restsOnShelf(
+          SettleBox(
+            x: pb.placement.x,
+            y: pb.placement.y,
+            w: _footOf(pb).w,
+            h: _footOf(pb).h,
+          ),
+          oldSeg,
+        ))
+          pb,
+    ];
+
     await repo.layout.updateShelf(
       s.id,
       x1: result.left,
@@ -640,6 +660,15 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       y2: result.y,
       label: Value(result.label),
     );
+    if (dx.abs() > 1e-9 || dy.abs() > 1e-9) {
+      for (final pb in riders) {
+        await repo.layout.updatePlacement(
+          pb.placement.id,
+          x: pb.placement.x + dx,
+          y: pb.placement.y + dy,
+        );
+      }
+    }
     await _applyGravity();
   }
 

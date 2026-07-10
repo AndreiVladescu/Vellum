@@ -61,16 +61,17 @@ bool shelfHasBooks(
   SettleSegment s,
   List<SettleBox> others, {
   double tol = 0.02,
-}) {
+}) =>
+    others.any((o) => restsOnShelf(o, s, tol: tol));
+
+/// True when book [o] is resting on shelf [s]: its bottom at the shelf top
+/// (within [tol]) and its footprint overlapping the shelf horizontally. Used to
+/// pin an occupied shelf and to carry its books along when the shelf is edited.
+bool restsOnShelf(SettleBox o, SettleSegment s, {double tol = 0.02}) {
   final left = math.min(s.x1, s.x2);
   final right = math.max(s.x1, s.x2);
   final top = math.max(s.y1, s.y2);
-  for (final o in others) {
-    if (o.x + o.w > left && o.x < right && (o.y - top).abs() <= tol) {
-      return true;
-    }
-  }
-  return false;
+  return o.x + o.w > left && o.x < right && (o.y - top).abs() <= tol;
 }
 
 SettleResult settle({
@@ -81,51 +82,73 @@ SettleResult settle({
   required List<SettleSegment> shelves,
   required List<SettleBox> others,
 }) {
-  var bx = x;
-  var by = y;
   const tol = 0.02; // 2 cm snap tolerance
 
-  // Vertical: highest shelf/book surface at or just below the bottom,
-  // overlapping in X. Null means nothing is under the book.
-  double? surface;
+  // Every surface under the release point (overlapping in X, at/below the
+  // bottom), highest first. Shelves keep their span so the book can be clamped
+  // to stay on them.
+  final candidates = <({double top, bool isShelf, double left, double right})>[];
   for (final s in shelves) {
     final left = math.min(s.x1, s.x2);
     final right = math.max(s.x1, s.x2);
     final top = math.max(s.y1, s.y2);
-    if (bx + w > left &&
-        bx < right &&
-        top <= by + tol &&
-        (surface == null || top > surface)) {
-      surface = top;
+    if (x + w > left && x < right && top <= y + tol) {
+      candidates.add((top: top, isShelf: true, left: left, right: right));
     }
   }
   for (final o in others) {
     final top = o.y + o.h;
-    if (bx + w > o.x &&
-        bx < o.x + o.w &&
-        top <= by + tol &&
-        (surface == null || top > surface)) {
-      surface = top;
+    if (x + w > o.x && x < o.x + o.w && top <= y + tol) {
+      candidates.add((top: top, isShelf: false, left: o.x, right: o.x + o.w));
     }
   }
-  final onSurface = surface != null;
-  by = surface ?? 0;
+  candidates.sort((a, b) => b.top.compareTo(a.top));
 
-  // Horizontal: shove out of overlaps with books at the same height.
-  for (var pass = 0; pass < 16; pass++) {
-    var moved = false;
-    for (final o in others) {
-      final ox = o.x, oy = o.y;
-      final vOverlap = by < oy + o.h - 1e-6 && by + h > oy + 1e-6;
-      final hOverlap = bx < ox + o.w - 1e-6 && bx + w > ox + 1e-6;
-      if (vOverlap && hOverlap) {
-        final pushRight = (ox + o.w) - bx;
-        final pushLeft = (bx + w) - ox;
-        bx = pushRight <= pushLeft ? ox + o.w : ox - w;
-        moved = true;
+  // Try to rest on each surface from highest down. Nudge out of overlaps, and
+  // on a shelf keep the book within its span; if it still overlaps there (the
+  // shelf is too full), fall through to the next surface below rather than
+  // floating past the shelf's end.
+  for (final c in candidates) {
+    final by = c.top;
+    var bx = x;
+    for (var pass = 0; pass < 16; pass++) {
+      var moved = false;
+      for (final o in others) {
+        final vOverlap = by < o.y + o.h - 1e-6 && by + h > o.y + 1e-6;
+        final hOverlap = bx < o.x + o.w - 1e-6 && bx + w > o.x + 1e-6;
+        if (vOverlap && hOverlap) {
+          final pushRight = (o.x + o.w) - bx;
+          final pushLeft = (bx + w) - o.x;
+          bx = pushRight <= pushLeft ? o.x + o.w : o.x - w;
+          moved = true;
+        }
       }
+      if (!moved) break;
     }
-    if (!moved) break;
+    // Clamp within the shelf, unless the book is wider than the shelf (nothing
+    // sensible to clamp to — leave it centred as dropped).
+    if (c.isShelf && w <= c.right - c.left) {
+      bx = bx.clamp(c.left, c.right - w);
+    }
+    if (!_overlapsAny(bx, by, w, h, others)) {
+      return SettleResult(x: bx, y: by, onSurface: true);
+    }
   }
-  return SettleResult(x: bx, y: by, onSurface: onSurface);
+  // Nothing holds it (or no surface had room): treat as dropped in empty space.
+  return SettleResult(x: x, y: 0, onSurface: false);
+}
+
+bool _overlapsAny(
+  double x,
+  double y,
+  double w,
+  double h,
+  List<SettleBox> others,
+) {
+  for (final o in others) {
+    final vOverlap = y < o.y + o.h - 1e-6 && y + h > o.y + 1e-6;
+    final hOverlap = x < o.x + o.w - 1e-6 && x + w > o.x + 1e-6;
+    if (vOverlap && hOverlap) return true;
+  }
+  return false;
 }
