@@ -171,6 +171,48 @@ async fn first_user_is_master_and_registration_then_closes() {
 }
 
 #[tokio::test]
+async fn session_expiry_slides_forward_on_use() {
+    let id = uuid::Uuid::new_v4();
+    let path = std::env::temp_dir().join(format!("vellum_test_{id}.db"));
+    let data_dir = std::env::temp_dir().join(format!("vellum_test_data_{id}"));
+    let db = connect_db(path.to_str().unwrap()).await.unwrap();
+    let app = router(AppState {
+        db: db.clone(),
+        public_base_url: "http://test.local".into(),
+        data_dir,
+        http: reqwest::Client::new(),
+        max_upload_bytes: 512 * 1024 * 1024,
+        throttle: std::sync::Arc::default(),
+        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        basic_cache: std::sync::Arc::default(),
+    });
+    let token = register_master(&app).await;
+
+    // Force the session into its final 15 days.
+    sqlx::query("UPDATE session SET expires_at = datetime('now', '+10 days')")
+        .execute(&db)
+        .await
+        .unwrap();
+    let before: String = sqlx::query_scalar("SELECT expires_at FROM session")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+
+    // Any authenticated request renews it back toward +30 days.
+    let (status, _) = call(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let after: String = sqlx::query_scalar("SELECT expires_at FROM session")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert!(
+        after > before,
+        "session expiry should slide forward on use ({after} > {before})"
+    );
+}
+
+#[tokio::test]
 async fn logout_invalidates_the_session_token() {
     let app = test_app().await;
     let token = register_master(&app).await;

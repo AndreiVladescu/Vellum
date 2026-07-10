@@ -122,6 +122,21 @@ class ServerConnection extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears just the session token after the server rejected it (a 401), so the
+  /// UI drops back to the sign-in screen. Keeps the URL/email as convenient
+  /// defaults for re-login, and skips the network logout (the token is dead).
+  Future<void> clearExpiredSession() async {
+    _token = null;
+    try {
+      await _storage.delete(key: _tokenKey);
+    } catch (_) {
+      // ignore: the prefs removal below clears any fallback copy.
+    }
+    await _prefs.remove(_tokenKey);
+    if (baseUrl.isNotEmpty) await _prefs.remove(_cursorKey(baseUrl));
+    notifyListeners();
+  }
+
   /// Adds a scheme if missing and trims a trailing slash so paths concatenate.
   /// Defaults to **https** — plain http must be typed explicitly, since it sends
   /// the password and library in cleartext.

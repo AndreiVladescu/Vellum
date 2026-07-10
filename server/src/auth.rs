@@ -70,15 +70,30 @@ fn query_token(query: Option<&str>) -> Option<&str> {
 }
 
 async fn user_from_token(state: &AppState, token: &str) -> AppResult<AuthUser> {
-    sqlx::query_as::<_, AuthUser>(
+    let hash = sha256_hex(token);
+    let user = sqlx::query_as::<_, AuthUser>(
         "SELECT u.id, u.email, u.display_name, u.is_master \
          FROM session s JOIN app_user u ON u.id = s.user_id \
          WHERE s.token_hash = ? AND s.expires_at > datetime('now')",
     )
-    .bind(sha256_hex(token))
+    .bind(&hash)
     .fetch_optional(&state.db)
     .await?
-    .ok_or_else(|| AppError::Unauthorized("invalid or expired token".into()))
+    .ok_or_else(|| AppError::Unauthorized("invalid or expired token".into()))?;
+
+    // Sliding expiry: once a live session enters its final 15 days, push its
+    // expiry back to 30 days out. The WHERE clause means at most one write per
+    // request, and only inside the renewal window — a daily-use app never hits
+    // the day-31 wall. Fire-and-forget: a failed renewal just retries next time.
+    let _ = sqlx::query(
+        "UPDATE session SET expires_at = datetime('now', '+30 days') \
+         WHERE token_hash = ? AND expires_at < datetime('now', '+15 days')",
+    )
+    .bind(&hash)
+    .execute(&state.db)
+    .await;
+
+    Ok(user)
 }
 
 async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser> {

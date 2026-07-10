@@ -61,7 +61,15 @@ class _ServerPageState extends State<ServerPage> {
     try {
       await action();
     } on ServerException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (e.isUnauthorized) {
+        // The session expired or was revoked — drop to the sign-in screen.
+        await widget.connection.clearExpiredSession();
+        if (mounted) {
+          setState(() => _error = 'Session expired — please log in again.');
+        }
+      } else if (mounted) {
+        setState(() => _error = e.message);
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Could not reach the server.\n$e');
     } finally {

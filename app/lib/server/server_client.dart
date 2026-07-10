@@ -6,9 +6,15 @@ import 'package:http/http.dart' as http;
 
 /// Raised when the server returns a non-2xx response; [message] is the server's
 /// `{"error": ...}` text when present, otherwise a generic status line.
+/// [statusCode] lets callers special-case e.g. a 401 (expired session).
 class ServerException implements Exception {
-  ServerException(this.message);
+  ServerException(this.message, {this.statusCode});
   final String message;
+  final int? statusCode;
+
+  /// True when the session is no longer valid and the user must log in again.
+  bool get isUnauthorized => statusCode == 401;
+
   @override
   String toString() => message;
 }
@@ -157,7 +163,7 @@ class VellumServerClient {
     final message = decoded is Map && decoded['error'] is String
         ? decoded['error'] as String
         : 'Server error (HTTP ${res.statusCode})';
-    throw ServerException(message);
+    throw ServerException(message, statusCode: res.statusCode);
   }
 
   Future<AuthResult> register({
