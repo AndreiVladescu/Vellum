@@ -68,6 +68,10 @@ class SyncService {
   /// True while a pull or push is in flight; a second concurrent call throws.
   bool _running = false;
 
+  /// Whether a pull/push/sync is currently in flight. Callers use this to
+  /// disable actions (e.g. restore) that must not run concurrently with a sync.
+  bool get isRunning => _running;
+
   VellumDatabase get _db => repository.db;
   Directory get _dataDir => repository.dataDir;
 

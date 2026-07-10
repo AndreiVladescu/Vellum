@@ -160,6 +160,14 @@ class _BackupSectionState extends State<_BackupSection> {
   }
 
   Future<void> _restore() async {
+    // A restore closes the database; doing that under a live launch/manual sync
+    // would throw mid-transaction. Export is safe (VACUUM INTO is a snapshot).
+    if (widget.sync.isRunning) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Wait for the sync to finish, then try again.')),
+      );
+      return;
+    }
     const group = XTypeGroup(label: 'Vellum backup', extensions: ['zip']);
     final picked = await openFile(acceptedTypeGroups: const [group]);
     if (picked == null || !mounted) return;
