@@ -37,5 +37,9 @@ jobs:
       # flutter_secure_storage needs libsecret on Linux.
       - run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
       - run: flutter pub get
+      # Fail if the committed drift codegen is stale — the easiest CLAUDE.md
+      # step to forget after editing database.dart.
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: git diff --exit-code -- lib/data/database.g.dart
       - run: flutter analyze
       - run: flutter test
