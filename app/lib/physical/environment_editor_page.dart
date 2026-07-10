@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -65,6 +66,20 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   // A shelf holding books was grabbed: it's pinned, so the gesture is swallowed
   // and the user is told to clear the books first.
   bool _lockedShelfGrab = false;
+
+  // In-flight drag positions, published without a whole-canvas setState: the
+  // dragged book's overlay listens to [_dragPosVN], and the room painter
+  // repaints from [_shelfDeltaVN]. A single setState enters "drag mode" on the
+  // first real movement; every frame after that only pokes a notifier.
+  final ValueNotifier<Offset> _dragPosVN = ValueNotifier(Offset.zero);
+  final ValueNotifier<Offset> _shelfDeltaVN = ValueNotifier(Offset.zero);
+
+  @override
+  void dispose() {
+    _dragPosVN.dispose();
+    _shelfDeltaVN.dispose();
+    super.dispose();
+  }
 
   LibraryRepository get repo => widget.repository;
 
@@ -199,16 +214,29 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       return;
     }
     if (_dragId != null) {
-      // Drag the grabbed book (camera fixed).
+      // Drag the grabbed book (camera fixed). Publish via the notifier so only
+      // the dragged book's overlay repaints, not every other book and the room.
       final delta = _screenToWorld(focal) - _grabWorld;
-      if (delta.distance > 0.002) _moved = true;
-      setState(() => _dragPos = _bookStart + delta);
+      _dragPos = _bookStart + delta;
+      _dragPosVN.value = _dragPos;
+      if (delta.distance > 0.002 && !_moved) {
+        // First real movement: one rebuild to enter drag mode (drop this book
+        // from the static list and show the moving overlay). Later frames only
+        // update the notifier above.
+        _moved = true;
+        setState(() {});
+      }
       return;
     }
-    // Drag the grabbed shelf.
+    // Drag the grabbed shelf — the painter repaints from _shelfDeltaVN.
     final delta = _screenToWorld(focal) - _shelfGrabWorld;
-    if (delta.distance > 0.002) _moved = true;
-    setState(() => _shelfDelta = delta);
+    _shelfDelta = delta;
+    _shelfDeltaVN.value = delta;
+    if (delta.distance > 0.002 && !_moved) {
+      // One rebuild so the painter picks up draggingShelfId; then notifier-only.
+      _moved = true;
+      setState(() {});
+    }
   }
 
   void _onScaleEnd(ScaleEndDetails d) {
@@ -249,6 +277,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
           await _applyGravity();
         }();
       }
+      _shelfDeltaVN.value = Offset.zero;
       setState(() => _shelfDelta = Offset.zero);
       return;
     }
@@ -746,15 +775,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
                   plank: theme.colorScheme.primary,
                   label: theme.colorScheme.onSurfaceVariant,
                   draggingShelfId: _dragShelfId,
-                  shelfDelta: _shelfDelta,
+                  shelfDelta: _shelfDeltaVN,
                 ),
                 size: Size.infinite,
               ),
             ),
           ),
         ),
-        // Books.
-        for (final pb in _placed) _bookWidget(pb),
+        // Books (each in its own RepaintBoundary; the one being dragged is
+        // drawn as a live overlay instead of in this static list).
+        for (final pb in _placed)
+          if (pb.placement.id != _dragId) _bookWidget(pb),
+        if (_dragId != null) _draggedBookOverlay(),
         // Empty-state hint.
         if (_placed.isEmpty && _shelves.isEmpty)
           Center(
@@ -811,49 +843,86 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     );
   }
 
+  /// A book resting at its stored placement. In its own RepaintBoundary so a
+  /// neighbour being dragged doesn't force it to re-raster.
   Widget _bookWidget(PlacedBook pb) {
-    final isDragging = _dragId == pb.placement.id;
     final f = _footOf(pb);
-    // While dragging, follow the finger from local drag state.
-    final bx = isDragging ? _dragPos.dx : pb.placement.x;
-    final by = isDragging ? _dragPos.dy : pb.placement.y;
-    final topLeft = _worldToScreen(Offset(bx, by + f.h));
-    final w = f.w * _scale;
-    final h = f.h * _scale;
-    final selected = _selectedId == pb.placement.id;
-    final flat = pb.placement.rotation == 90;
-
-    // The same spine artwork as the digital shelf (cover slice or generated).
-    // For a flat book, the standing spine is turned a quarter-turn anticlockwise
-    // so the title still reads left-to-right.
-    Widget spine = SpineFace(book: pb.book, coverFile: repo.coverFileOf(pb.book));
-    if (flat) spine = RotatedBox(quarterTurns: 3, child: spine);
-
+    final topLeft = _worldToScreen(Offset(pb.placement.x, pb.placement.y + f.h));
     return Positioned(
       left: topLeft.dx,
       top: topLeft.dy,
-      width: w,
-      height: h,
-      child: IgnorePointer(
-        // Gestures are handled by the canvas; this is purely visual.
-        child: Opacity(
-          opacity: isDragging ? 0.85 : 1,
-          child: Stack(
-            fit: StackFit.expand,
+      width: f.w * _scale,
+      height: f.h * _scale,
+      child: RepaintBoundary(child: _bookVisual(pb, dragging: false)),
+    );
+  }
+
+  /// The book currently under the finger, positioned live from [_dragPosVN] so
+  /// dragging repaints only this overlay — the rest of the canvas is untouched.
+  Widget _draggedBookOverlay() {
+    PlacedBook? dragged;
+    for (final pb in _placed) {
+      if (pb.placement.id == _dragId) {
+        dragged = pb;
+        break;
+      }
+    }
+    if (dragged == null) return const SizedBox.shrink();
+    final pb = dragged;
+    final f = _footOf(pb);
+    final w = f.w * _scale;
+    final h = f.h * _scale;
+    return Positioned.fill(
+      child: ValueListenableBuilder<Offset>(
+        valueListenable: _dragPosVN,
+        // `child` (the spine artwork) is built once and reused every frame; only
+        // the surrounding Positioned is recomputed from the drag position.
+        child: _bookVisual(pb, dragging: true),
+        builder: (context, dragPos, child) {
+          final topLeft = _worldToScreen(Offset(dragPos.dx, dragPos.dy + f.h));
+          return Stack(
             children: [
-              spine,
-              if (selected)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.secondary,
-                      width: 2.5,
-                    ),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
+              Positioned(
+                left: topLeft.dx,
+                top: topLeft.dy,
+                width: w,
+                height: h,
+                child: child!,
+              ),
             ],
-          ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// The visual for a placed book: the same spine artwork as the digital shelf
+  /// (cover slice or generated), a quarter-turn for a flat book so its title
+  /// still reads left-to-right, and a selection outline. Purely visual —
+  /// gestures are handled by the canvas.
+  Widget _bookVisual(PlacedBook pb, {required bool dragging}) {
+    final selected = _selectedId == pb.placement.id;
+    final flat = pb.placement.rotation == 90;
+    Widget spine = SpineFace(book: pb.book, coverFile: repo.coverFileOf(pb.book));
+    if (flat) spine = RotatedBox(quarterTurns: 3, child: spine);
+    return IgnorePointer(
+      child: Opacity(
+        opacity: dragging ? 0.85 : 1,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            spine,
+            if (selected)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.secondary,
+                    width: 2.5,
+                  ),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -871,8 +940,8 @@ class _RoomPainter extends CustomPainter {
     required this.plank,
     required this.label,
     this.draggingShelfId,
-    this.shelfDelta = Offset.zero,
-  });
+    required this.shelfDelta,
+  }) : super(repaint: shelfDelta);
 
   final List<PhysicalShelf> shelves;
   final Offset origin;
@@ -881,7 +950,9 @@ class _RoomPainter extends CustomPainter {
   final Color plank;
   final Color label;
   final String? draggingShelfId;
-  final Offset shelfDelta;
+  // A live drag offset for [draggingShelfId]; drives repaints without rebuilding
+  // the widget while a shelf is dragged.
+  final ValueListenable<Offset> shelfDelta;
 
   Offset _w2s(Offset w) =>
       Offset(origin.dx + w.dx * scale, origin.dy - w.dy * scale);
@@ -914,7 +985,7 @@ class _RoomPainter extends CustomPainter {
     // Shelves as planks (the one being dragged is shifted live).
     final plankPaint = Paint()..color = plank.withValues(alpha: 0.85);
     for (final s in shelves) {
-      final d = s.id == draggingShelfId ? shelfDelta : Offset.zero;
+      final d = s.id == draggingShelfId ? shelfDelta.value : Offset.zero;
       final p1 = _w2s(Offset(s.x1 + d.dx, s.y1 + d.dy));
       final p2 = _w2s(Offset(s.x2 + d.dx, s.y2 + d.dy));
       final left = math.min(p1.dx, p2.dx);
@@ -940,8 +1011,9 @@ class _RoomPainter extends CustomPainter {
       old.shelves != shelves ||
       old.origin != origin ||
       old.scale != scale ||
-      old.draggingShelfId != draggingShelfId ||
-      old.shelfDelta != shelfDelta;
+      old.draggingShelfId != draggingShelfId;
+  // shelfDelta drives repaints via `repaint:` (a Listenable), so it's not
+  // compared here.
 }
 
 // ---- scale bar ------------------------------------------------------------
