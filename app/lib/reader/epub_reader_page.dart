@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -27,22 +28,71 @@ class EpubReaderPage extends StatefulWidget {
 }
 
 class _EpubReaderPageState extends State<EpubReaderPage> {
-  late final Future<EpubBook> _epub = EpubBook.open(widget.file);
+  late final Future<EpubBook> _epub =
+      EpubBook.openCached(widget.book.id, widget.file);
   final _scroll = ScrollController();
   int _chapter = 0; // set from the saved position once the book loads
+  int _count = 0;
   bool _restored = false;
+  Timer? _saveDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
 
   @override
   void dispose() {
+    _saveDebounce?.cancel();
+    _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
+  }
+
+  double get _scrollFraction {
+    if (!_scroll.hasClients) return 0;
+    final max = _scroll.position.maxScrollExtent;
+    return max <= 0 ? 0 : (_scroll.offset / max).clamp(0.0, 1.0);
+  }
+
+  // Persist the in-chapter scroll position, debounced so a flick isn't a write
+  // storm. The chapter itself is saved eagerly on navigation in [_goTo].
+  void _onScroll() {
+    if (_count == 0) return;
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 500), () {
+      widget.repository.saveEpubPosition(
+        widget.book.id,
+        chapterIndex: _chapter,
+        chapterCount: _count,
+        scrollFraction: _scrollFraction,
+      );
+    });
   }
 
   void _goTo(int index, int count) {
     setState(() => _chapter = index.clamp(0, count - 1));
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    // Chapters play the role PDF pages do in the saved reading position.
-    widget.repository.saveReadingPosition(widget.book.id, _chapter + 1, count);
+    // A new chapter starts at the top; save immediately (fraction 0).
+    widget.repository.saveEpubPosition(
+      widget.book.id,
+      chapterIndex: _chapter,
+      chapterCount: count,
+      scrollFraction: 0,
+    );
+  }
+
+  /// Restore the saved in-chapter scroll after the first layout: the global
+  /// fraction minus the chapters below gives this chapter's fraction.
+  void _restoreScroll(int count) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final global = (widget.book.readingProgress ?? 0) * count;
+      final within = (global - _chapter).clamp(0.0, 1.0);
+      final max = _scroll.position.maxScrollExtent;
+      if (within > 0 && max > 0) _scroll.jumpTo(within * max);
+    });
   }
 
   Future<void> _pickChapter(EpubBook epub) async {
@@ -86,10 +136,13 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
           );
         }
         final count = epub.chapters.length;
+        _count = count;
         if (!_restored) {
           // Saved position is 1-based (like PDF pages); clamp for safety.
           _restored = true;
           _chapter = ((widget.book.lastReadPage ?? 1) - 1).clamp(0, count - 1);
+          // Restore the in-chapter scroll once this chapter has laid out.
+          _restoreScroll(count);
         }
         final chapter = epub.chapters[_chapter];
         return Scaffold(

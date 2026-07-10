@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -24,6 +25,34 @@ class EpubBook {
 
   final String? title;
   final List<EpubChapter> chapters;
+
+  // A tiny LRU of parsed books, keyed by book id: parsing (zip + XML + base64
+  // image inlining) is slow for a big EPUB, and reopening is common.
+  static final Map<String, EpubBook> _cache = {};
+  static const _cacheLimit = 2;
+
+  /// Parses [file] off the UI isolate (so a big EPUB doesn't jank the open
+  /// animation) and memoizes the result by [bookId]. A cache hit returns
+  /// synchronously-fast without touching disk.
+  static Future<EpubBook> openCached(String bookId, File file) async {
+    final hit = _cache.remove(bookId);
+    if (hit != null) {
+      _cache[bookId] = hit; // re-insert to mark most-recently used
+      return hit;
+    }
+    // Capture a plain path string (trivially sendable) and reopen inside the
+    // isolate; EpubBook holds only strings, so it ships back cheaply.
+    final path = file.path;
+    final book = await Isolate.run(() => EpubBook.open(File(path)));
+    _cache[bookId] = book;
+    while (_cache.length > _cacheLimit) {
+      _cache.remove(_cache.keys.first); // evict the oldest
+    }
+    return book;
+  }
+
+  /// Drops a book's cached parse (its EPUB was attached anew or deleted).
+  static void invalidateCache(String bookId) => _cache.remove(bookId);
 
   static Future<EpubBook> open(File file) async {
     final archive = ZipDecoder().decodeBytes(await file.readAsBytes());

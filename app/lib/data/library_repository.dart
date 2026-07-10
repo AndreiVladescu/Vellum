@@ -227,6 +227,8 @@ class LibraryRepository {
     // A new file is synced data, so the book needs pushing (setCoverFromEmbedded
     // below also marks it, but a cover-having book wouldn't).
     await _markNeedsPush(bookId);
+    // A newly attached EPUB invalidates any cached parse for this book.
+    if (ext == 'epub') EpubBook.invalidateCache(bookId);
     // A cover-less book that just got a PDF or EPUB: derive a cover from it (the
     // PDF's first page, or the EPUB's declared cover image).
     if (ext == 'pdf' || ext == 'epub') {
@@ -614,6 +616,30 @@ class LibraryRepository {
     );
   }
 
+  /// EPUB reading position: [lastReadPage] stays the 1-based chapter (so the
+  /// PDF-shaped "resume" logic still works), but [readingProgress] carries the
+  /// *global* fraction including in-chapter scroll, so resume can land mid-page.
+  /// App-local like [saveReadingPosition] — never bumps `updatedAt`.
+  Future<void> saveEpubPosition(
+    String bookId, {
+    required int chapterIndex,
+    required int chapterCount,
+    required double scrollFraction,
+  }) async {
+    final progress = chapterCount == 0
+        ? 0.0
+        : ((chapterIndex + scrollFraction.clamp(0, 1)) / chapterCount)
+            .clamp(0, 1)
+            .toDouble();
+    await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+      BooksCompanion(
+        readingProgress: Value(progress),
+        lastReadPage: Value(chapterIndex + 1),
+        lastReadAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Absolute file for a book's cover, or null if it has none.
   File? coverFileOf(Book book) => book.coverPath == null
       ? null
@@ -753,6 +779,7 @@ class LibraryRepository {
   /// pull-driven deletes (the server already knows) pass false to avoid
   /// re-pushing the deletion forever.
   Future<void> deleteBook(Book book, {bool recordTombstone = true}) async {
+    EpubBook.invalidateCache(book.id);
     final attachedFiles = await (db.select(
       db.bookFiles,
     )..where((f) => f.bookId.equals(book.id))).get();

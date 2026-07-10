@@ -68,6 +68,24 @@ void main() {
         reason: 'books survive shelf deletion');
   });
 
+  test('saveEpubPosition stores and round-trips the global reading fraction',
+      () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'e1', title: 'E'));
+
+    // Chapter 2 of 4 (index 1), halfway scrolled → (1 + 0.5) / 4 = 0.375.
+    await repo.saveEpubPosition('e1',
+        chapterIndex: 1, chapterCount: 4, scrollFraction: 0.5);
+    final book = await repo.watchBook('e1').first;
+    expect(book!.lastReadPage, 2, reason: '1-based chapter, like PDF pages');
+    expect(book.readingProgress, closeTo(0.375, 1e-9));
+
+    // The reader recovers the in-chapter fraction as progress*count - chapter.
+    final within = (book.readingProgress! * 4) - 1;
+    expect(within, closeTo(0.5, 1e-9));
+  });
+
   test('watchAllLoans joins the book and reflects active then returned', () async {
     final repo = await _repo(dir);
     final db = repo.db;
