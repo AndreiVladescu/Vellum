@@ -913,6 +913,104 @@ async fn large_file_streams_through_upload_and_download_intact() {
 }
 
 #[tokio::test]
+async fn file_download_supports_byte_ranges() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let pdf = b"%PDF-1.4 hello world".to_vec(); // 20 bytes
+    let upload = Request::builder()
+        .method("POST")
+        .uri(format!("/api/books/{book}/files?filename=dune.pdf"))
+        .header("authorization", format!("Bearer {master}"))
+        .body(Body::from(pdf.clone()))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(upload).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let (_, detail) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}/detail"),
+        Some(&master),
+        None,
+    )
+    .await;
+    let file_id = detail["files"][0]["id"].as_str().unwrap().to_string();
+
+    // A full fetch advertises Accept-Ranges.
+    let full = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(full.status(), StatusCode::OK);
+    assert_eq!(full.headers().get("accept-ranges").unwrap(), "bytes");
+
+    // bytes=0-3 → exactly 4 bytes with a 206 and a Content-Range.
+    let part = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .header("range", "bytes=0-3")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(part.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(part.headers().get("content-range").unwrap(), "bytes 0-3/20");
+    let bytes = axum::body::to_bytes(part.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(bytes.as_ref(), b"%PDF");
+
+    // A suffix range bytes=-5 → the last 5 bytes.
+    let suffix = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .header("range", "bytes=-5")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(suffix.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(
+        suffix.headers().get("content-range").unwrap(),
+        "bytes 15-19/20"
+    );
+    let bytes = axum::body::to_bytes(suffix.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(bytes.as_ref(), b"world");
+
+    // An unsatisfiable range → 416 with the full size echoed.
+    let bad = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/files/{file_id}?token={master}"))
+                .header("range", "bytes=100-200")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(bad.status(), StatusCode::RANGE_NOT_SATISFIABLE);
+    assert_eq!(bad.headers().get("content-range").unwrap(), "bytes */20");
+}
+
+#[tokio::test]
 async fn cover_upload_rejects_non_image_bytes() {
     let app = test_app().await;
     let master = register_master(&app).await;

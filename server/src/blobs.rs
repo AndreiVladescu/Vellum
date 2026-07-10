@@ -159,7 +159,9 @@ pub async fn get_cover(
     let inm = headers
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
-    serve_blob(&state, &rel, etag, inm).await
+    let range = headers.get(header::RANGE).and_then(|v| v.to_str().ok());
+    let if_range = headers.get(header::IF_RANGE).and_then(|v| v.to_str().ok());
+    serve_blob(&state, &rel, etag, inm, range, if_range).await
 }
 
 // ---- book files -----------------------------------------------------------
@@ -490,7 +492,17 @@ pub async fn download_file(
     let inm = headers
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
-    serve_blob(&state, &rel, Some(format!("\"{sha}\"")), inm).await
+    let range = headers.get(header::RANGE).and_then(|v| v.to_str().ok());
+    let if_range = headers.get(header::IF_RANGE).and_then(|v| v.to_str().ok());
+    serve_blob(
+        &state,
+        &rel,
+        Some(format!("\"{sha}\"")),
+        inm,
+        range,
+        if_range,
+    )
+    .await
 }
 
 // ---- helpers --------------------------------------------------------------
@@ -528,15 +540,78 @@ async fn write_blob(state: &AppState, rel: &str, body: &[u8]) -> AppResult<()> {
         .map_err(|e| AppError::Internal(e.to_string()))
 }
 
-/// Streams a stored blob to the client without reading it all into memory. When
-/// an [etag] is supplied it is sent on the response and honored: a matching
-/// `If-None-Match` short-circuits to `304 Not Modified` so the client reuses its
-/// cached copy instead of re-downloading the whole file.
+/// The outcome of interpreting a `Range` header against a known file size.
+enum RangeSpec {
+    /// No usable single range (absent, multipart, or garbage) — send the whole
+    /// file with `200`.
+    Full,
+    /// A satisfiable inclusive byte range `[start, end]`.
+    Partial(u64, u64),
+    /// A syntactically valid but out-of-bounds range — answer `416`.
+    Unsatisfiable,
+}
+
+/// Parse a single `bytes=a-b` / `bytes=a-` / `bytes=-N` (suffix) range. Multipart
+/// (comma) and unparseable values degrade to [`RangeSpec::Full`] so the caller
+/// just returns the whole body.
+fn parse_range(header: &str, total: u64) -> RangeSpec {
+    let Some(spec) = header.strip_prefix("bytes=") else {
+        return RangeSpec::Full;
+    };
+    if spec.contains(',') {
+        return RangeSpec::Full; // multipart ranges: send the full body
+    }
+    let Some((a, b)) = spec.split_once('-') else {
+        return RangeSpec::Full;
+    };
+    let (a, b) = (a.trim(), b.trim());
+    let (start, end) = if a.is_empty() {
+        // Suffix range: the last N bytes.
+        let Ok(n) = b.parse::<u64>() else {
+            return RangeSpec::Full;
+        };
+        if n == 0 || total == 0 {
+            return RangeSpec::Unsatisfiable;
+        }
+        (total.saturating_sub(n.min(total)), total - 1)
+    } else {
+        let Ok(start) = a.parse::<u64>() else {
+            return RangeSpec::Full;
+        };
+        let end = if b.is_empty() {
+            total.saturating_sub(1)
+        } else {
+            match b.parse::<u64>() {
+                Ok(e) => e,
+                Err(_) => return RangeSpec::Full,
+            }
+        };
+        (start, end)
+    };
+    if total == 0 || start >= total {
+        return RangeSpec::Unsatisfiable;
+    }
+    let end = end.min(total - 1);
+    if start > end {
+        return RangeSpec::Unsatisfiable;
+    }
+    RangeSpec::Partial(start, end)
+}
+
+/// Streams a stored blob to the client without reading it all into memory.
+///
+/// - A matching `If-None-Match` short-circuits to `304 Not Modified`.
+/// - A single `Range` header yields `206 Partial Content` (seek + take), so
+///   e-readers can resume interrupted downloads and viewers can load lazily; an
+///   `If-Range` that doesn't match the ETag makes the range be ignored, and an
+///   unsatisfiable range returns `416`. All `200`s advertise `Accept-Ranges`.
 async fn serve_blob(
     state: &AppState,
     rel: &str,
     etag: Option<String>,
     if_none_match: Option<&str>,
+    range: Option<&str>,
+    if_range: Option<&str>,
 ) -> AppResult<Response> {
     if let (Some(etag), Some(inm)) = (etag.as_deref(), if_none_match)
         && inm == etag
@@ -550,22 +625,70 @@ async fn serve_blob(
     }
 
     let full = state.data_dir.join(rel);
-    let file = tokio::fs::File::open(&full)
+    let mut file = tokio::fs::File::open(&full)
         .await
         .map_err(|_| AppError::NotFound("blob missing on disk".into()))?;
-    let len = file.metadata().await.ok().map(|m| m.len());
+    let total = file.metadata().await.ok().map(|m| m.len());
     let ext = Path::new(rel)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
+    let ctype = content_type_for_ext(ext);
+
+    // A range only applies when the size is known and any If-Range matches our
+    // ETag (an If-Range we can't validate means: ignore the range, send full).
+    let if_range_ok = match (if_range, etag.as_deref()) {
+        (Some(ir), Some(tag)) => ir == tag,
+        (Some(_), None) => false,
+        (None, _) => true,
+    };
+    if let (Some(total), Some(range_hdr)) = (total, range)
+        && if_range_ok
+    {
+        match parse_range(range_hdr, total) {
+            RangeSpec::Partial(start, end) => {
+                use tokio::io::{AsyncReadExt, AsyncSeekExt};
+                file.seek(std::io::SeekFrom::Start(start))
+                    .await
+                    .map_err(|e| AppError::Internal(e.to_string()))?;
+                let len = end - start + 1;
+                let body = axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(
+                    file.take(len),
+                ));
+                let mut response = Response::new(body);
+                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+                let h = response.headers_mut();
+                h.insert(header::CONTENT_TYPE, ctype.parse().unwrap());
+                h.insert(header::CONTENT_LENGTH, len.into());
+                h.insert(
+                    header::CONTENT_RANGE,
+                    format!("bytes {start}-{end}/{total}").parse().unwrap(),
+                );
+                h.insert(header::ACCEPT_RANGES, "bytes".parse().unwrap());
+                if let Some(etag) = etag {
+                    h.insert(header::ETAG, etag.parse().unwrap());
+                }
+                return Ok(response);
+            }
+            RangeSpec::Unsatisfiable => {
+                let mut response = Response::new(axum::body::Body::empty());
+                *response.status_mut() = StatusCode::RANGE_NOT_SATISFIABLE;
+                response.headers_mut().insert(
+                    header::CONTENT_RANGE,
+                    format!("bytes */{total}").parse().unwrap(),
+                );
+                return Ok(response);
+            }
+            RangeSpec::Full => {} // fall through to the full body
+        }
+    }
+
     let body = axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(file));
     let mut response = Response::new(body);
     let headers = response.headers_mut();
-    headers.insert(
-        header::CONTENT_TYPE,
-        content_type_for_ext(ext).parse().unwrap(),
-    );
-    if let Some(len) = len {
+    headers.insert(header::CONTENT_TYPE, ctype.parse().unwrap());
+    headers.insert(header::ACCEPT_RANGES, "bytes".parse().unwrap());
+    if let Some(len) = total {
         headers.insert(header::CONTENT_LENGTH, len.into());
     }
     if let Some(etag) = etag {

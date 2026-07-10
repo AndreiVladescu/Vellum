@@ -310,16 +310,25 @@ class VellumServerClient {
   }
 
   /// Streams a book file to [dest] by its server id, without holding the whole
-  /// file in memory.
+  /// file in memory. If [dest] already holds a partial download, resumes from
+  /// where it left off with a `Range` request; the server answers `206` (append)
+  /// or `200` (start over). Book files are content-addressed and immutable, so a
+  /// resume can't stitch together bytes from two different files.
   Future<void> downloadFileTo(String fileId, File dest) async {
+    final existing = await dest.exists() ? await dest.length() : 0;
     final req = http.Request('GET', _uri('/api/files/$fileId'));
     final auth = _bearer;
     if (auth != null) req.headers['authorization'] = auth;
+    if (existing > 0) req.headers['range'] = 'bytes=$existing-';
     final res = await _http.send(req);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw ServerException('File download failed (HTTP ${res.statusCode})');
     }
-    final sink = dest.openWrite();
+    // 206 continues the existing file; anything else (200) is a full body, so
+    // overwrite from the start.
+    final sink = res.statusCode == 206
+        ? dest.openWrite(mode: FileMode.append)
+        : dest.openWrite();
     try {
       await sink.addStream(res.stream);
     } finally {
