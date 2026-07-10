@@ -105,6 +105,36 @@ void main() {
     expect(book?.title, 'Newer server');
   });
 
+  test('a page-turn does not bump the sync clock, so a newer server edit wins', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(
+      BooksCompanion.insert(
+        id: 'b1',
+        title: 'Old local',
+        pageCount: const Value(100),
+        updatedAt: Value(DateTime.utc(2024, 1, 1)),
+      ),
+    );
+
+    // Reading is app-local state and must not touch updatedAt.
+    await repo.saveReadingPosition('b1', 50, 100);
+    final afterRead = await repo.watchBook('b1').first;
+    expect(
+      afterRead?.updatedAt.millisecondsSinceEpoch,
+      DateTime.utc(2024, 1, 1).millisecondsSinceEpoch,
+      reason: 'reading state must not bump the sync conflict clock',
+    );
+
+    // So a genuine console edit (newer) still wins on the next pull.
+    final client = _client(
+      _server(books: [_serverBook('b1', 'Console edit', '2025-06-01 00:00:00')]),
+    );
+    await SyncService(repo).pull(client);
+    final book = await repo.watchBook('b1').first;
+    expect(book?.title, 'Console edit');
+  });
+
   test('a server deletion removes the local book', () async {
     final repo = await _repo(dir);
     final db = repo.db;

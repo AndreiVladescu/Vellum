@@ -207,6 +207,7 @@ class SyncService {
           publishedYear: b.publishedYear,
           pageCount: b.pageCount,
           spineStyle: b.spineStyle,
+          updatedAt: b.updatedAt,
         );
         final cover = repository.coverFileOf(b);
         if (cover != null && await cover.exists()) {

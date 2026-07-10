@@ -510,19 +510,20 @@ class LibraryRepository {
     await (db.delete(db.physicalCopies)..where((c) => c.id.equals(copyId))).go();
   }
 
-  /// Called by the reader as the user turns pages.
+  /// Called by the reader as the user turns pages. Reading state is app-local
+  /// and never synced, so it must NOT bump [Book.updatedAt] — that column is
+  /// the sync conflict clock, and bumping it here would make a mere page-turn
+  /// win the next push over a genuine remote edit (see IMPROVEMENT_PLAN_2 §A1).
   Future<void> saveReadingPosition(
     String bookId,
     int page,
     int pageCount,
   ) async {
-    final now = DateTime.now();
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
       BooksCompanion(
         readingProgress: Value(pageCount == 0 ? 0 : page / pageCount),
         lastReadPage: Value(page),
-        lastReadAt: Value(now),
-        updatedAt: Value(now),
+        lastReadAt: Value(DateTime.now()),
       ),
     );
   }

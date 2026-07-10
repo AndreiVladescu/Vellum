@@ -409,6 +409,57 @@ async fn put_upserts_a_book_at_a_chosen_id() {
 }
 
 #[tokio::test]
+async fn upsert_ignores_a_stale_timestamped_push() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    // Create the row (its stored updated_at is ~now).
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/books/lww-1",
+        Some(&master),
+        Some(json!({ "title": "Original" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // A push carrying an older timestamp must not overwrite the row.
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/books/lww-1",
+        Some(&master),
+        Some(json!({ "title": "Stale", "updated_at": "2000-01-01 00:00:00" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["title"], json!("Original"), "stale push must be ignored");
+
+    // A push carrying a strictly-newer timestamp applies.
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/books/lww-1",
+        Some(&master),
+        Some(json!({ "title": "Fresh", "updated_at": "2999-01-01 00:00:00" })),
+    )
+    .await;
+    assert_eq!(body["title"], json!("Fresh"), "newer push must apply");
+
+    // A push with no timestamp still overwrites (old-client compatibility).
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/books/lww-1",
+        Some(&master),
+        Some(json!({ "title": "NoStamp" })),
+    )
+    .await;
+    assert_eq!(body["title"], json!("NoStamp"));
+}
+
+#[tokio::test]
 async fn book_detail_and_query_token_download() {
     let app = test_app().await;
     let master = register_master(&app).await;
