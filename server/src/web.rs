@@ -1,11 +1,13 @@
 //! The self-hosted web console and the public link landing page, plus the
-//! book↔group membership endpoint the console needs to render tags. The HTML is
-//! embedded in the binary (no external assets, no CDN) and served same-origin,
-//! so `fetch` to `/api/*` just works.
+//! book↔group membership endpoint the console needs to render tags. The console
+//! is split into html/css/js, all embedded in the binary (no external assets,
+//! no CDN) and served same-origin from `/assets/*`, so `fetch` to `/api/*` and
+//! the stylesheet/script loads just work.
 
 use axum::Json;
 use axum::extract::State;
-use axum::response::Html;
+use axum::http::header;
+use axum::response::{Html, IntoResponse};
 use serde::Serialize;
 
 use crate::AppState;
@@ -14,6 +16,20 @@ use crate::error::AppResult;
 
 pub async fn console() -> Html<&'static str> {
     Html(include_str!("../web/console.html"))
+}
+
+pub async fn console_css() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        include_str!("../web/console.css"),
+    )
+}
+
+pub async fn console_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("../web/console.js"),
+    )
 }
 
 pub async fn public_page() -> Html<&'static str> {

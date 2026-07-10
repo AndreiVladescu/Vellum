@@ -80,6 +80,8 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health))
         // Web admin console + public landing page.
         .route("/", get(web::console))
+        .route("/assets/console.css", get(web::console_css))
+        .route("/assets/console.js", get(web::console_js))
         .route("/p/{token}", get(web::public_page))
         .route("/api/memberships", get(web::memberships))
         // Accounts & sessions.
