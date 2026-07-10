@@ -218,7 +218,10 @@ class _LibraryPageState extends State<LibraryPage> {
         index: _tab,
         children: [
           _shelfTab(context),
-          PhysicalLibrariesTab(repository: repository),
+          PhysicalLibrariesTab(
+            repository: repository,
+            settings: widget.settings,
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -244,7 +247,8 @@ class _LibraryPageState extends State<LibraryPage> {
               label: const Text('Add book'),
             )
           : FloatingActionButton.extended(
-              onPressed: () => promptCreateLibrary(context, repository),
+              onPressed: () =>
+                  promptCreateLibrary(context, repository, widget.settings),
               icon: const Icon(Icons.add),
               label: const Text('New library'),
             ),

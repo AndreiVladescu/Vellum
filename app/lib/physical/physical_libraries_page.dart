@@ -2,15 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../settings/app_settings.dart';
 import 'environment_editor_page.dart';
 
 /// The Physical tab body: lists physical environments ("libraries") and lets
 /// you rename / delete them. Creation is driven by the host page's FAB via
 /// [promptCreateLibrary]. Tapping one opens its shelf editor.
 class PhysicalLibrariesTab extends StatelessWidget {
-  const PhysicalLibrariesTab({super.key, required this.repository});
+  const PhysicalLibrariesTab({
+    super.key,
+    required this.repository,
+    required this.settings,
+  });
 
   final LibraryRepository repository;
+  final AppSettingsStore settings;
 
   Future<void> _rename(BuildContext context, PhysicalEnvironment env) async {
     final name = await _promptName(
@@ -84,7 +90,8 @@ class PhysicalLibrariesTab extends StatelessWidget {
             return ListTile(
               leading: const Icon(Icons.grid_view_rounded),
               title: Text(env.name),
-              onTap: () => openEnvironment(context, repository, env.id, env.name),
+              onTap: () =>
+                  openEnvironment(context, repository, settings, env.id, env.name),
               trailing: PopupMenuButton<String>(
                 onSelected: (v) => v == 'rename'
                     ? _rename(context, env)
@@ -106,6 +113,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
 void openEnvironment(
   BuildContext context,
   LibraryRepository repository,
+  AppSettingsStore settings,
   String id,
   String name,
 ) {
@@ -113,6 +121,7 @@ void openEnvironment(
     MaterialPageRoute(
       builder: (_) => EnvironmentEditorPage(
         repository: repository,
+        settings: settings,
         environmentId: id,
         environmentName: name,
       ),
@@ -124,12 +133,13 @@ void openEnvironment(
 Future<void> promptCreateLibrary(
   BuildContext context,
   LibraryRepository repository,
+  AppSettingsStore settings,
 ) async {
   final name = await _promptName(context, title: 'New library');
   if (name == null || name.trim().isEmpty) return;
   final id = await repository.layout.createEnvironment(name);
   if (!context.mounted) return;
-  openEnvironment(context, repository, id, name.trim());
+  openEnvironment(context, repository, settings, id, name.trim());
 }
 
 /// Small single-field name prompt shared by create and rename.

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../book_detail/book_detail_page.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../settings/app_settings.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
 import 'book_picker.dart';
 import 'physical_metrics.dart';
@@ -27,11 +28,13 @@ class EnvironmentEditorPage extends StatefulWidget {
   const EnvironmentEditorPage({
     super.key,
     required this.repository,
+    required this.settings,
     required this.environmentId,
     required this.environmentName,
   });
 
   final LibraryRepository repository;
+  final AppSettingsStore settings;
   final String environmentId;
   final String environmentName;
 
@@ -702,23 +705,28 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
           ),
         ],
       ),
-      body: StreamBuilder<List<PhysicalShelf>>(
-        stream: repo.layout.watchShelves(widget.environmentId),
-        builder: (context, shelfSnap) {
-          _shelves = shelfSnap.data ?? const [];
-          return StreamBuilder<List<PlacedBook>>(
-            stream: repo.layout.watchPlacedBooks(widget.environmentId),
-            builder: (context, bookSnap) {
-              _placed = bookSnap.data ?? const [];
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  _origin ??= Offset(40, constraints.maxHeight - 90);
-                  return _buildCanvas(constraints);
-                },
-              );
-            },
-          );
-        },
+      // Listen to settings so a spine-artwork preference change repaints the
+      // books (they use widget.settings.spineArt in _bookVisual).
+      body: ListenableBuilder(
+        listenable: widget.settings,
+        builder: (context, _) => StreamBuilder<List<PhysicalShelf>>(
+          stream: repo.layout.watchShelves(widget.environmentId),
+          builder: (context, shelfSnap) {
+            _shelves = shelfSnap.data ?? const [];
+            return StreamBuilder<List<PlacedBook>>(
+              stream: repo.layout.watchPlacedBooks(widget.environmentId),
+              builder: (context, bookSnap) {
+                _placed = bookSnap.data ?? const [];
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    _origin ??= Offset(40, constraints.maxHeight - 90);
+                    return _buildCanvas(constraints);
+                  },
+                );
+              },
+            );
+          },
+        ),
       ),
       // Hidden while a book is selected, so it doesn't overlap the toolbar.
       floatingActionButton: _selectedId != null
@@ -935,7 +943,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   Widget _bookVisual(PlacedBook pb, {required bool dragging}) {
     final selected = _selectedId == pb.placement.id;
     final flat = pb.placement.rotation == 90;
-    Widget spine = SpineFace(book: pb.book, coverFile: repo.coverFileOf(pb.book));
+    Widget spine = SpineFace(
+      book: pb.book,
+      coverFile: repo.coverFileOf(pb.book),
+      spineArt: widget.settings.spineArt,
+    );
     if (flat) spine = RotatedBox(quarterTurns: 3, child: spine);
     return IgnorePointer(
       child: Opacity(
