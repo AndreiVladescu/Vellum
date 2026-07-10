@@ -286,7 +286,14 @@ pub async fn upsert(
                 book_genre_names(&state, &id).await? == want
             }
         };
-        if meta_same && authors_same && genres_same {
+        // A live tombstone for this id (a crashed delete) must still be cleared,
+        // so it isn't a no-op even when the data matches — fall through to write.
+        let tombstoned: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE book_id = ?)")
+                .bind(&id)
+                .fetch_one(&state.db)
+                .await?;
+        if meta_same && authors_same && genres_same && !tombstoned {
             return Ok(Json(current));
         }
     }
@@ -580,16 +587,21 @@ pub async fn delete(
         ));
     }
 
+    // Path collection, tombstone, and row delete run in one transaction so a
+    // crash can't leave a live book *and* its tombstone — a state that makes
+    // clients delete-then-re-download the book (and its blobs) on the next pull.
+    let mut tx = state.db.begin().await?;
+
     // Collect blob paths before the row (and its cascaded book_file rows) vanish,
     // so we can remove them from disk afterwards and not leak storage.
     let cover: Option<Option<String>> =
         sqlx::query_scalar("SELECT cover_path FROM book WHERE id = ?")
             .bind(&id)
-            .fetch_optional(&state.db)
+            .fetch_optional(&mut *tx)
             .await?;
     let files: Vec<String> = sqlx::query_scalar("SELECT path FROM book_file WHERE book_id = ?")
         .bind(&id)
-        .fetch_all(&state.db)
+        .fetch_all(&mut *tx)
         .await?;
 
     // Record a tombstone so a client that pulls after this delete removes the
@@ -597,13 +609,16 @@ pub async fn delete(
     sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id) VALUES (?, ?)")
         .bind(&id)
         .bind(&owner_id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM book WHERE id = ?")
         .bind(&id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
 
+    // Blob removal is best-effort and stays after the commit: a failed unlink
+    // only leaks a file, it must not roll back the (committed) delete.
     for rel in files.into_iter().chain(cover.flatten()) {
         let _ = tokio::fs::remove_file(state.data_dir.join(rel)).await;
     }

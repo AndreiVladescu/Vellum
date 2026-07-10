@@ -719,6 +719,58 @@ async fn deleting_a_book_records_a_tombstone_that_upsert_clears() {
 }
 
 #[tokio::test]
+async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
+    // Build the app while keeping a db handle, to plant the pathological state.
+    let id = uuid::Uuid::new_v4();
+    let path = std::env::temp_dir().join(format!("vellum_test_{id}.db"));
+    let data_dir = std::env::temp_dir().join(format!("vellum_test_data_{id}"));
+    let db = connect_db(path.to_str().unwrap()).await.unwrap();
+    let app = router(AppState {
+        db: db.clone(),
+        public_base_url: "http://test.local".into(),
+        data_dir,
+        http: reqwest::Client::new(),
+        max_upload_bytes: 512 * 1024 * 1024,
+        throttle: std::sync::Arc::default(),
+    });
+    let master = register_master(&app).await;
+
+    // A live book...
+    call(
+        &app,
+        "PUT",
+        "/api/books/stale-1",
+        Some(&master),
+        Some(json!({ "title": "Dune" })),
+    )
+    .await;
+
+    // ...with a tombstone alongside it, as a crash between the two delete
+    // statements would leave.
+    sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id) VALUES (?, NULL)")
+        .bind("stale-1")
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // An upsert (even with identical data) must clear the stale tombstone.
+    call(
+        &app,
+        "PUT",
+        "/api/books/stale-1",
+        Some(&master),
+        Some(json!({ "title": "Dune" })),
+    )
+    .await;
+
+    let (_, list) = call(&app, "GET", "/api/deletions", Some(&master), None).await;
+    assert!(
+        list.as_array().unwrap().is_empty(),
+        "stale tombstone should be cleared by the upsert"
+    );
+}
+
+#[tokio::test]
 async fn upload_rejects_a_file_that_is_not_a_real_pdf() {
     let app = test_app().await;
     let master = register_master(&app).await;
