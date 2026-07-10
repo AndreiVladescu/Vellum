@@ -23,6 +23,7 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        basic_cache: std::sync::Arc::default(),
     });
     (app, data_dir)
 }
@@ -790,6 +791,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        basic_cache: std::sync::Arc::default(),
     });
     let master = register_master(&app).await;
 
@@ -1129,6 +1131,35 @@ async fn cover_upload_and_download_round_trips() {
     // Anonymous callers can't read a private cover.
     let (status, _) = call(&app, "GET", &format!("/api/books/{book}/cover"), None, None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn basic_auth_cache_repeats_and_stays_password_specific() {
+    use base64::Engine;
+    let app = test_app().await;
+    register_master(&app).await; // master@lib.test / masterpass1
+
+    let good = base64::engine::general_purpose::STANDARD.encode("master@lib.test:masterpass1");
+    let bad = base64::engine::general_purpose::STANDARD.encode("master@lib.test:wrongpass1");
+    let opds = |cred: &str| {
+        Request::builder()
+            .uri("/opds")
+            .header("authorization", format!("Basic {cred}"))
+            .body(Body::empty())
+            .unwrap()
+    };
+
+    // First request runs Argon2 and primes the cache; the second hits the cache.
+    for _ in 0..2 {
+        let res = app.clone().oneshot(opds(&good)).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+    // The cache is password-specific: a wrong password is still rejected.
+    let res = app.clone().oneshot(opds(&bad)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    // And a correct password still works afterward.
+    let res = app.clone().oneshot(opds(&good)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
 }
 
 #[tokio::test]

@@ -39,6 +39,9 @@ pub struct AppState {
     /// Bounds concurrent PDF-cover shell-outs so many parallel uploads can't
     /// fork many `gs`/`mutool` processes at once.
     pub render_semaphore: std::sync::Arc<tokio::sync::Semaphore>,
+    /// Short-lived cache of successful Basic-auth verifications, so per-request
+    /// OPDS Basic auth doesn't cost an Argon2 verify every time.
+    pub basic_cache: std::sync::Arc<auth::BasicAuthCache>,
 }
 
 /// Open (creating if missing) the SQLite database at `path` and run migrations.

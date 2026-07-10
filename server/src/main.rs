@@ -24,6 +24,7 @@ async fn main() -> anyhow::Result<()> {
         max_upload_bytes: max_upload_mb * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        basic_cache: std::sync::Arc::default(),
     };
 
     // Sweep temp files left by uploads a previous run couldn't finish.

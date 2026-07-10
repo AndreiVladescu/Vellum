@@ -112,8 +112,18 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
         state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     };
-    if !verify_password(password, &password_hash) {
+    // Fast path: skip Argon2 when this exact password was verified recently.
+    // Otherwise run the full verify and, on success, prime the cache.
+    let ok = state.basic_cache.hit(&key, password) || {
+        let verified = verify_password(password, &password_hash);
+        if verified {
+            state.basic_cache.store(&key, password);
+        }
+        verified
+    };
+    if !ok {
         state.throttle.record_failure(&key);
+        state.basic_cache.forget(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     }
     state.throttle.clear(&key);
@@ -123,6 +133,49 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
         display_name,
         is_master,
     })
+}
+
+/// How long a successful Basic-auth verification is trusted before Argon2 runs
+/// again. Short enough that a (future) password change self-heals quickly.
+const BASIC_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Caches recent successful Basic-auth verifications so an e-reader that sends
+/// `Authorization: Basic` on *every* OPDS request doesn't cost an Argon2 verify
+/// (~10²ms of CPU) each time — which is both slow and a free CPU-amplification
+/// vector. Keyed by lowercase email → (sha256 of the password, when verified).
+/// The threat here is repeated *hashing cost*, not storage, so a TTL-gated
+/// SHA-256 of a high-entropy in-memory value is acceptable.
+#[derive(Default)]
+pub struct BasicAuthCache {
+    inner: std::sync::Mutex<std::collections::HashMap<String, (String, std::time::Instant)>>,
+}
+
+impl BasicAuthCache {
+    /// True when `email` was verified within the TTL with this exact password.
+    /// Drops the entry lazily when it has expired, so the map can't outgrow the
+    /// user count.
+    fn hit(&self, email: &str, password: &str) -> bool {
+        let mut map = self.inner.lock().unwrap();
+        match map.get(email) {
+            Some((hash, at)) if at.elapsed() < BASIC_CACHE_TTL => *hash == sha256_hex(password),
+            Some(_) => {
+                map.remove(email);
+                false
+            }
+            None => false,
+        }
+    }
+
+    fn store(&self, email: &str, password: &str) {
+        self.inner.lock().unwrap().insert(
+            email.to_string(),
+            (sha256_hex(password), std::time::Instant::now()),
+        );
+    }
+
+    fn forget(&self, email: &str) {
+        self.inner.lock().unwrap().remove(email);
+    }
 }
 
 /// Rejects non-master callers — used to guard administrative endpoints.
