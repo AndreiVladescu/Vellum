@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vellum — shared book</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root {
     color-scheme: light dark;
@@ -77,7 +78,9 @@
       const bits = [];
       if (b.published_year) bits.push(b.published_year);
       if (b.publisher) bits.push(esc(b.publisher));
-      let html = '<p class="eyebrow">Shared from a Vellum library</p>';
+      let html = '<img src="/assets/logo.svg" alt="" width="44" height="44" ' +
+        'style="display:block;margin:0 0 10px">';
+      html += '<p class="eyebrow">Shared from a Vellum library</p>';
       html += '<h1>' + esc(b.title) + '</h1>';
       if (b.subtitle) html += '<p class="subtitle">' + esc(b.subtitle) + '</p>';
       if (authors) html += '<p class="authors">' + esc(authors) + '</p>';

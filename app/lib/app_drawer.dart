@@ -68,7 +68,6 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -131,8 +130,8 @@ class AppDrawer extends StatelessWidget {
                 context: context,
                 applicationName: 'Vellum',
                 applicationVersion: '0.1.0',
-                applicationIcon: Icon(Icons.menu_book,
-                    color: theme.colorScheme.primary, size: 40),
+                applicationIcon:
+                    Image.asset('assets/logo.png', width: 48, height: 48),
                 children: const [
                   Text('A personal library for your digital and physical '
                       'books, shown the way books actually look: '

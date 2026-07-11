@@ -86,6 +86,8 @@ pub fn router(state: AppState) -> Router {
         .route("/", get(web::console))
         .route("/assets/console.css", get(web::console_css))
         .route("/assets/console.js", get(web::console_js))
+        .route("/assets/logo.svg", get(web::logo))
+        .route("/favicon.svg", get(web::favicon))
         .route("/p/{token}", get(web::public_page))
         .route("/api/memberships", get(web::memberships))
         // Accounts & sessions.

@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Vellum logo mark: an open book with a bookmark ribbon whose foot notches
+       into a "V". Brown ink on transparent, for light surfaces (console header,
+       in-app on the parchment theme). -->
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf7ef"/>
+      <stop offset="1" stop-color="#efe4cf"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a87b4c"/>
+      <stop offset="1" stop-color="#875f38"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M238 196 H274 V402 L256 380 L238 402 Z" fill="url(#ribbon)"/>
+
+  <path d="M256 178 C 210 152, 150 152, 104 174 L 104 346 C 150 324, 210 324, 256 350 Z"
+        fill="url(#page)" stroke="#5f4327" stroke-width="11" stroke-linejoin="round"/>
+  <path d="M256 178 C 302 152, 362 152, 408 174 L 408 346 C 362 324, 302 324, 256 350 Z"
+        fill="url(#page)" stroke="#5f4327" stroke-width="11" stroke-linejoin="round"/>
+  <path d="M256 178 L256 350" fill="none" stroke="#5f4327" stroke-width="11" stroke-linecap="round"/>
+
+  <g stroke="#a07c54" stroke-width="8" stroke-linecap="round">
+    <path d="M142 218 H222"/><path d="M142 256 H222"/><path d="M142 294 H206"/>
+    <path d="M290 218 H370"/><path d="M290 256 H370"/><path d="M306 294 H370"/>
+  </g>
+</svg>

@@ -36,6 +36,20 @@ pub async fn public_page() -> Html<&'static str> {
     Html(include_str!("../web/public.html"))
 }
 
+pub async fn favicon() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "image/svg+xml")],
+        include_str!("../web/favicon.svg"),
+    )
+}
+
+pub async fn logo() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "image/svg+xml")],
+        include_str!("../web/logo.svg"),
+    )
+}
+
 #[derive(Serialize, sqlx::FromRow)]
 pub struct Membership {
     pub group_id: String,
