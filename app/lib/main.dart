@@ -288,51 +288,65 @@ class _LibraryPageState extends State<LibraryPage> {
   /// to one (or clear it) without opening a book. The icon is tinted while a
   /// filter is active; the active genre also shows as a removable chip below.
   Widget _genreMenu() {
-    return StreamBuilder<Map<String, List<String>>>(
-      stream: repository.watchGenresByBook(),
-      builder: (context, snap) {
-        final all = <String>{
-          for (final gs in (snap.data ?? const {}).values) ...gs,
-        }.toList()
-          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-        final active = _genreFilter != null;
-        final theme = Theme.of(context);
-        return PopupMenuButton<String?>(
-          icon: Icon(
-            active ? Icons.filter_alt : Icons.filter_alt_outlined,
-            color: active ? theme.colorScheme.primary : null,
-          ),
-          tooltip: 'Filter by genre',
-          onSelected: (g) => setState(() => _genreFilter = g),
-          itemBuilder: (context) => [
-            if (all.isEmpty)
-              const PopupMenuItem<String?>(
-                enabled: false,
-                child: Text('No genres yet'),
+    // Only offer genres that actually belong to books currently in the library,
+    // so the menu never lists a genre that would match nothing. watchAllBooks
+    // gives the valid book ids; watchGenresByBook gives each book's genres.
+    return StreamBuilder<List<Book>>(
+      stream: repository.watchAllBooks(),
+      builder: (context, booksSnap) {
+        final bookIds = {
+          for (final b in booksSnap.data ?? const <Book>[]) b.id,
+        };
+        return StreamBuilder<Map<String, List<String>>>(
+          stream: repository.watchGenresByBook(),
+          builder: (context, snap) {
+            final all = <String>{
+              for (final e in (snap.data ?? const {}).entries)
+                if (bookIds.contains(e.key)) ...e.value,
+            }.toList()
+              ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+            final active = _genreFilter != null;
+            final theme = Theme.of(context);
+            return PopupMenuButton<String?>(
+              icon: Icon(
+                active ? Icons.filter_alt : Icons.filter_alt_outlined,
+                color: active ? theme.colorScheme.primary : null,
               ),
-            if (active)
-              const PopupMenuItem<String?>(
-                value: null,
-                child: Text('All genres'),
-              ),
-            for (final g in all)
-              PopupMenuItem<String?>(
-                value: g,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check,
-                      size: 18,
-                      color: g == _genreFilter
-                          ? theme.colorScheme.primary
-                          : Colors.transparent,
+              tooltip: 'Filter by genre',
+              // NOTE: PopupMenuButton.onSelected never fires for a null value
+              // (a null pop is indistinguishable from dismissing the menu), so
+              // each item clears/sets the filter via its own onTap instead.
+              itemBuilder: (context) => [
+                if (all.isEmpty)
+                  const PopupMenuItem<String?>(
+                    enabled: false,
+                    child: Text('No genres yet'),
+                  ),
+                if (active)
+                  PopupMenuItem<String?>(
+                    onTap: () => setState(() => _genreFilter = null),
+                    child: const Text('All genres'),
+                  ),
+                for (final g in all)
+                  PopupMenuItem<String?>(
+                    onTap: () => setState(() => _genreFilter = g),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check,
+                          size: 18,
+                          color: g == _genreFilter
+                              ? theme.colorScheme.primary
+                              : Colors.transparent,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(g),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(g),
-                  ],
-                ),
-              ),
-          ],
+                  ),
+              ],
+            );
+          },
         );
       },
     );
