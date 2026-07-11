@@ -66,6 +66,18 @@ def main():
     # (see linux/runner/my_application.cc).
     save(rounded(render(icon, 512)), APP / "assets/logo.png")
 
+    # Linux icon theme — named after the application ID so GTK can resolve it as
+    # a themed window icon (see linux/install-dev.sh). Scalable SVG + a few PNG
+    # sizes, installed under ~/.local/share/icons/hicolor by the install script.
+    app_id = "com.avladescu.vellum"
+    theme = APP / "linux/packaging/icons/hicolor"
+    (theme / "scalable/apps").mkdir(parents=True, exist_ok=True)
+    (theme / f"scalable/apps/{app_id}.svg").write_text(icon.read_text())
+    print("wrote", (theme / f"scalable/apps/{app_id}.svg").relative_to(ROOT))
+    for px in (48, 64, 128, 256):
+        save(rounded(render(icon, px)),
+             theme / f"{px}x{px}/apps/{app_id}.png")
+
     # Server console/public — favicon (tile) + header mark, as SVGs copied in.
     for src, dst in [(icon, "server/web/favicon.svg"),
                      (mark, "server/web/logo.svg")]:
