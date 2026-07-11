@@ -274,6 +274,17 @@ class _ServerPageState extends State<ServerPage> {
     );
   }
 
+  /// True when the entered URL is plain http to a non-loopback host on Android,
+  /// which the app's network_security_config blocks — so logging in would fail
+  /// with an opaque socket error. Used to disable Log in with a clear reason.
+  bool _httpBlockedOnAndroid(ThemeData theme) {
+    if (theme.platform != TargetPlatform.android) return false;
+    final url = ServerConnection.normalizeUrl(_url.text);
+    if (!url.startsWith('http://')) return false;
+    const loopback = {'localhost', '127.0.0.1', '10.0.2.2', '10.0.3.2', '::1'};
+    return !loopback.contains(Uri.tryParse(url)?.host ?? '');
+  }
+
   /// First few groups of a fingerprint, enough to eyeball against the server's.
   String _shortFingerprint(String fp) {
     final groups = fp.split(':');
@@ -533,8 +544,12 @@ class _ServerPageState extends State<ServerPage> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Unencrypted connection — your password and books are sent '
-                  'in cleartext.',
+                  _httpBlockedOnAndroid(theme)
+                      ? 'Android blocks unencrypted connections to a remote '
+                          'server. Enable TLS on the server (VELLUM_TLS=1) and '
+                          'connect over https.'
+                      : 'Unencrypted connection — your password and books are '
+                          'sent in cleartext.',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.error),
                 ),
@@ -566,7 +581,8 @@ class _ServerPageState extends State<ServerPage> {
         TextField(
           controller: _password,
           obscureText: true,
-          onSubmitted: (_) => _busy ? null : _authenticate(),
+          onSubmitted: (_) =>
+              (_busy || _httpBlockedOnAndroid(theme)) ? null : _authenticate(),
           decoration: const InputDecoration(
             labelText: 'Password',
             border: OutlineInputBorder(),
@@ -578,7 +594,8 @@ class _ServerPageState extends State<ServerPage> {
         ],
         const SizedBox(height: 20),
         FilledButton(
-          onPressed: _busy ? null : _authenticate,
+          onPressed:
+              (_busy || _httpBlockedOnAndroid(theme)) ? null : _authenticate,
           child: _busy
               ? const SizedBox(
                   height: 20,
