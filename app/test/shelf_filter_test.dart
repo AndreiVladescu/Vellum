@@ -46,6 +46,46 @@ void main() {
     expect(ids('nothingmatches'), isEmpty);
   });
 
+  test('genre facet is exact and composes with the text query (AND)', () async {
+    final dir = Directory.systemTemp.createTempSync('vellum_genre_facet_test');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final repo = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'Dune'));
+    await db.into(db.books).insert(
+        BooksCompanion.insert(id: 'b2', title: 'Neuromancer'));
+    await db.into(db.books).insert(
+        BooksCompanion.insert(id: 'b3', title: 'Foundation'));
+    await repo.setGenres('b1', ['Sci-Fi', 'Classic']);
+    await repo.setGenres('b2', ['Cyberpunk']);
+    await repo.setGenres('b3', ['Sci-Fi']);
+
+    final books = await repo.watchAllBooks().first;
+    final authors = await repo.watchAuthorsByBook().first;
+    final genres = await repo.watchGenresByBook().first;
+
+    List<String> ids({String q = '', String? genre}) => [
+          for (final b in filterBooks(
+            books: books,
+            query: q,
+            authorsByBook: authors,
+            genresByBook: genres,
+            genre: genre,
+          ))
+            b.id
+        ];
+
+    expect(ids(genre: 'Sci-Fi'), ['b1', 'b3'], reason: 'exact facet match');
+    expect(ids(genre: 'Sci'), isEmpty, reason: 'facet is exact, not substring');
+    expect(ids(genre: 'Sci-Fi', q: 'dune'), ['b1'],
+        reason: 'text narrows within the facet');
+    expect(ids(genre: 'Cyberpunk', q: 'dune'), isEmpty,
+        reason: 'facet and text composed with AND');
+    expect(ids(genre: null), ['b1', 'b3', 'b2'],
+        reason: 'no facet returns all, in the source (title) order');
+  });
+
   test('sorts by title, author, and year with missing keys last', () async {
     final dir = Directory.systemTemp.createTempSync('vellum_sort_test');
     addTearDown(() => dir.deleteSync(recursive: true));

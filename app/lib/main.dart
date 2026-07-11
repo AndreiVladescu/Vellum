@@ -89,6 +89,10 @@ class LibraryPage extends StatefulWidget {
 
 class _LibraryPageState extends State<LibraryPage> {
   String _query = '';
+  // The active genre facet, or null for "all genres". Kept separate from the
+  // text query so a genre filter and a text search can be on at once, and so it
+  // can be shown/cleared as a chip rather than hidden in the search box.
+  String? _genreFilter;
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
   Timer? _searchDebounce;
   final _searchController = TextEditingController();
@@ -191,15 +195,14 @@ class _LibraryPageState extends State<LibraryPage> {
         query: _query,
         authorsByBook: authorsByBook,
         genresByBook: genresByBook,
+        genre: _genreFilter,
       );
 
-  /// Applies a `genre:` filter from a tapped genre chip: fills the search box
-  /// (so it's visible and clearable) and refreshes the shelf.
+  /// Applies the genre facet from a tapped genre chip on a book's detail page.
+  /// Sets the dedicated filter (shown as a removable chip near the search)
+  /// rather than the search box, so any text search you had stays put.
   void _applyGenreFilter(String genre) {
-    _searchDebounce?.cancel();
-    final query = 'genre:$genre';
-    _searchController.text = query;
-    setState(() => _query = query);
+    setState(() => _genreFilter = genre);
   }
 
   @override
@@ -218,12 +221,12 @@ class _LibraryPageState extends State<LibraryPage> {
                 controller: _searchController,
                 onChanged: _onQueryChanged,
                 decoration: const InputDecoration(
-                  hintText: 'Search title, author, or genre:…',
+                  hintText: 'Search title or author…',
                   icon: Icon(Icons.search),
                   border: InputBorder.none,
                 ),
               ),
-              actions: [_sortMenu()],
+              actions: [_genreMenu(), _sortMenu()],
             )
           : AppBar(title: const Text('Physical libraries')),
       body: IndexedStack(
@@ -281,6 +284,76 @@ class _LibraryPageState extends State<LibraryPage> {
         ],
       );
 
+  /// Genre filter: lists every genre in the library so you can filter the shelf
+  /// to one (or clear it) without opening a book. The icon is tinted while a
+  /// filter is active; the active genre also shows as a removable chip below.
+  Widget _genreMenu() {
+    return StreamBuilder<Map<String, List<String>>>(
+      stream: repository.watchGenresByBook(),
+      builder: (context, snap) {
+        final all = <String>{
+          for (final gs in (snap.data ?? const {}).values) ...gs,
+        }.toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+        final active = _genreFilter != null;
+        final theme = Theme.of(context);
+        return PopupMenuButton<String?>(
+          icon: Icon(
+            active ? Icons.filter_alt : Icons.filter_alt_outlined,
+            color: active ? theme.colorScheme.primary : null,
+          ),
+          tooltip: 'Filter by genre',
+          onSelected: (g) => setState(() => _genreFilter = g),
+          itemBuilder: (context) => [
+            if (all.isEmpty)
+              const PopupMenuItem<String?>(
+                enabled: false,
+                child: Text('No genres yet'),
+              ),
+            if (active)
+              const PopupMenuItem<String?>(
+                value: null,
+                child: Text('All genres'),
+              ),
+            for (final g in all)
+              PopupMenuItem<String?>(
+                value: g,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check,
+                      size: 18,
+                      color: g == _genreFilter
+                          ? theme.colorScheme.primary
+                          : Colors.transparent,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(g),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// A removable chip shown under the app bar while a genre filter is active,
+  /// so the filter is visible and can be cleared with one tap.
+  Widget _activeGenreBar() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        child: InputChip(
+          avatar: const Icon(Icons.filter_alt, size: 18),
+          label: Text(_genreFilter!),
+          onDeleted: () => setState(() => _genreFilter = null),
+        ),
+      ),
+    );
+  }
+
   Widget _shelfTab(BuildContext context) {
     return ListenableBuilder(
       listenable: widget.settings,
@@ -297,6 +370,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 shelves.any((s) => s.id == storedId) ? storedId : null;
             return Column(
               children: [
+                if (_genreFilter != null) _activeGenreBar(),
                 _shelfChips(shelves, active),
                 Expanded(
                   child: StreamBuilder<Map<String, List<String>>>(
@@ -370,7 +444,8 @@ class _LibraryPageState extends State<LibraryPage> {
     if (books.isEmpty) {
       return Center(
         child: Text(
-          'No books match “${_query.trim()}”.',
+          _noMatchMessage(),
+          textAlign: TextAlign.center,
           style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
         ),
       );
@@ -386,6 +461,18 @@ class _LibraryPageState extends State<LibraryPage> {
         onGenreTap: _applyGenreFilter,
       ),
     );
+  }
+
+  /// Explains why the shelf is empty given the active genre filter and/or
+  /// search text, so the message matches whichever controls are in effect.
+  String _noMatchMessage() {
+    final q = _query.trim();
+    final genre = _genreFilter;
+    if (genre != null && q.isNotEmpty) {
+      return 'No “$genre” books match “$q”.';
+    }
+    if (genre != null) return 'No books tagged “$genre”.';
+    return 'No books match “$q”.';
   }
 
   /// The horizontal chip row: All + each shelf + "New shelf". Selecting a chip
