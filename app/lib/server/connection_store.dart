@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'cert_trust.dart';
 import 'server_client.dart';
 
 /// Persists the optional connection to a Vellum sync server: base URL, bearer
@@ -19,6 +20,7 @@ class ServerConnection extends ChangeNotifier {
   static const _tokenKey = 'server.token';
   static const _emailKey = 'server.email';
   static const _masterKey = 'server.isMaster';
+  static const _certPrefix = 'server.cert.';
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _storage;
@@ -81,13 +83,45 @@ class ServerConnection extends ChangeNotifier {
     }
   }
 
-  /// A token-less client for [url], used to log in / register.
-  VellumServerClient anonymousClient(String url) =>
-      VellumServerClient(baseUrl: normalizeUrl(url));
+  String _certKey(String url) => '$_certPrefix${normalizeUrl(url)}';
+
+  /// The imported self-signed certificate (PEM) the app should trust for [url],
+  /// or null to use only the system trust store. Kept in preferences (a public
+  /// certificate is not a secret), keyed by URL so distinct servers each keep
+  /// their own.
+  String? certFor(String url) {
+    final pem = _prefs.getString(_certKey(url));
+    return (pem != null && pem.isNotEmpty) ? pem : null;
+  }
+
+  /// The certificate trusted for the currently-configured server.
+  String? get serverCert => baseUrl.isEmpty ? null : certFor(baseUrl);
+
+  /// Import (or, with null/blank, forget) the trusted certificate for [url].
+  Future<void> setCert(String url, String? pem) async {
+    final key = _certKey(url);
+    if (pem == null || pem.trim().isEmpty) {
+      await _prefs.remove(key);
+    } else {
+      await _prefs.setString(key, pem.trim());
+    }
+    notifyListeners();
+  }
+
+  /// A token-less client for [url], used to log in / register. Trusts any
+  /// certificate imported for that URL.
+  VellumServerClient anonymousClient(String url) => VellumServerClient(
+    baseUrl: normalizeUrl(url),
+    httpClient: clientTrusting(certFor(url)),
+  );
 
   /// The authenticated client for the current session, or null if disconnected.
   VellumServerClient? get client => isConnected
-      ? VellumServerClient(baseUrl: baseUrl, token: _token)
+      ? VellumServerClient(
+          baseUrl: baseUrl,
+          token: _token,
+          httpClient: clientTrusting(serverCert),
+        )
       : null;
 
   Future<void> saveSession({

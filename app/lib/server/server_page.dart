@@ -1,6 +1,10 @@
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
+import 'cert_trust.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
 import 'sharing_page.dart';
@@ -218,6 +222,147 @@ class _ServerPageState extends State<ServerPage> {
         _showReport('Pushed', report.pushed, report);
       });
 
+  /// Certificate status + import control, shown for https URLs (a self-signed
+  /// server needs its certificate imported before the handshake can succeed).
+  Widget _certRow(ThemeData theme) {
+    final isHttps = ServerConnection.normalizeUrl(_url.text).startsWith('https://');
+    if (!isHttps) return const SizedBox.shrink();
+    final pem = widget.connection.certFor(_url.text);
+    final fp = pem == null ? null : fingerprintOf(pem);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Icon(
+            pem == null ? Icons.shield_outlined : Icons.verified_user,
+            size: 18,
+            color: pem == null
+                ? theme.colorScheme.outline
+                : theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              pem == null
+                  ? 'No certificate trusted — import it for a self-signed server.'
+                  : 'Trusted certificate ${_shortFingerprint(fp!)}',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          TextButton(
+            onPressed: _busy ? null : _importCert,
+            child: Text(pem == null ? 'Import' : 'Change'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// First few groups of a fingerprint, enough to eyeball against the server's.
+  String _shortFingerprint(String fp) {
+    final groups = fp.split(':');
+    return groups.length <= 6 ? fp : '${groups.take(6).join(':')}…';
+  }
+
+  /// Import the server's certificate for the current URL — pasted as PEM or read
+  /// from a chosen `.pem`/`.crt` file. Passing an empty result forgets it.
+  Future<void> _importCert() async {
+    final url = _url.text;
+    final controller =
+        TextEditingController(text: widget.connection.certFor(url) ?? '');
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (context) {
+        String? err;
+        return StatefulBuilder(
+          builder: (context, setLocal) => AlertDialog(
+            title: const Text('Trust server certificate'),
+            content: SizedBox(
+              width: 460,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Paste the server's certificate, or choose its cert.pem file. "
+                    'Check the fingerprint matches the one the server printed on '
+                    'startup before trusting it.',
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        const group = XTypeGroup(
+                          label: 'Certificate',
+                          extensions: ['pem', 'crt', 'cer'],
+                        );
+                        final file =
+                            await openFile(acceptedTypeGroups: const [group]);
+                        if (file != null) {
+                          controller.text = await File(file.path).readAsString();
+                          setLocal(() => err = null);
+                        }
+                      },
+                      icon: const Icon(Icons.folder_open),
+                      label: const Text('Choose file…'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controller,
+                    maxLines: 6,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: '-----BEGIN CERTIFICATE-----',
+                    ),
+                  ),
+                  if (err != null) ...[
+                    const SizedBox(height: 8),
+                    Text(err!,
+                        style:
+                            TextStyle(color: Theme.of(context).colorScheme.error)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              if (widget.connection.certFor(url) != null)
+                TextButton(
+                  onPressed: () => Navigator.pop(context, ''),
+                  child: const Text('Remove'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final pem = controller.text.trim();
+                  if (pem.isEmpty) {
+                    Navigator.pop(context, '');
+                    return;
+                  }
+                  if (fingerprintOf(pem) == null) {
+                    setLocal(() =>
+                        err = "That doesn't look like a PEM certificate.");
+                    return;
+                  }
+                  Navigator.pop(context, pem);
+                },
+                child: const Text('Trust'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (result == null) return; // cancelled
+    await widget.connection.setCert(url, result.isEmpty ? null : result);
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -379,6 +524,7 @@ class _ServerPageState extends State<ServerPage> {
             ],
           ),
         ],
+        _certRow(theme),
         const SizedBox(height: 12),
         TextField(
           controller: _email,
