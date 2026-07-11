@@ -66,3 +66,24 @@ jobs:
           cache: true
       - run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
       - run: bash scripts/e2e_sync.sh
+
+  # Fail the build when a server dependency has a known RustSec advisory, so a
+  # newly disclosed CVE surfaces here instead of lingering in a release. See
+  # docs/SECURITY_AUDIT.md (M4). Uses a prebuilt cargo-audit for speed.
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@cargo-audit
+      # Two advisories are ignored with cause; every *other* (and every new) one
+      # fails the build. Revisit these when upstream moves.
+      #  - RUSTSEC-2023-0071 (rsa "Marvin" timing attack): no fixed release
+      #    exists, and `rsa` is a lockfile-only artifact here — not in the
+      #    compiled tree (`cargo tree -i rsa` is empty) and Vellum performs no
+      #    RSA, so it is not reachable/exploitable.
+      #  - RUSTSEC-2026-0192 (ttf-parser unmaintained): pulled by lopdf for PDF
+      #    parsing; a maintenance warning, not a vulnerability, unfixable here.
+      - run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0192
