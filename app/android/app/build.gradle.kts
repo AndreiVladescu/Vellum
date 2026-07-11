@@ -15,11 +15,11 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.avladescu.vellum"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Pinned rather than inherited for reproducibility. 24 is Flutter's
+        // current floor and clears the plugin minimums (flutter_secure_storage's
+        // EncryptedSharedPreferences needs 23, pdfrx needs 21).
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -27,9 +27,19 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Signing with the debug keys for now, so `flutter run --release`
+            // works. Replace with a real keystore before distributing (see
+            // key.properties in the Flutter docs).
             signingConfig = signingConfigs.getByName("debug")
+            // Shrink + obfuscate with R8 and strip unused resources, so the
+            // release build is smaller. proguard-rules.pro keeps what the
+            // plugins need past the shrinker.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
