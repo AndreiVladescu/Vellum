@@ -1,7 +1,11 @@
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../data/backup_service.dart';
 import '../data/library_repository.dart';
@@ -155,6 +159,15 @@ class _BackupSectionState extends State<_BackupSection> {
   }
 
   Future<void> _export() async {
+    // file_selector can't offer a save location on Android/iOS, so on mobile we
+    // write the archive to a temp file and hand it to the system share sheet
+    // (save to Downloads/Drive/…). Desktop keeps the native save dialog.
+    final isMobile = defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    if (isMobile) {
+      await _exportViaShare();
+      return;
+    }
     final location = await getSaveLocation(
       suggestedName: _suggestedName(),
       acceptedTypeGroups: const [
@@ -170,6 +183,26 @@ class _BackupSectionState extends State<_BackupSection> {
           SnackBar(content: Text('Backup saved to ${location.path}')),
         );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Backup failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _exportViaShare() async {
+    setState(() => _busy = true);
+    try {
+      final tmp = File(
+          p.join((await getTemporaryDirectory()).path, _suggestedName()));
+      await BackupService(widget.repository).exportTo(tmp);
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(tmp.path, mimeType: 'application/zip')],
+        subject: 'Vellum backup',
+      ));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
