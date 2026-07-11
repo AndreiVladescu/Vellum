@@ -92,6 +92,16 @@ class PreferencesPage extends StatelessWidget {
                 onTap: () => settings.setWallpaper(wallpaper),
               ),
             const Divider(height: 24),
+            _SectionHeader('Sync'),
+            SwitchListTile(
+              secondary: const Icon(Icons.cloud_sync_outlined),
+              title: const Text('Push changes automatically'),
+              subtitle: const Text(
+                  'Send edits to the server in the background while connected'),
+              value: settings.autoPush,
+              onChanged: settings.setAutoPush,
+            ),
+            const Divider(height: 24),
             _SectionHeader('Backup'),
             _BackupSection(
               repository: repository,

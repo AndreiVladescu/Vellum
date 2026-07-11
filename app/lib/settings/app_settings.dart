@@ -15,6 +15,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _spineArtKey = 'settings.spineArt';
   static const _selectedShelfKey = 'settings.selectedShelf';
   static const _shelfSortKey = 'settings.shelfSort';
+  static const _autoPushKey = 'settings.autoPush';
 
   final SharedPreferences _prefs;
 
@@ -83,6 +84,16 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setShelfSort(ShelfSort value) async {
     await _prefs.setString(_shelfSortKey, value.name);
+    notifyListeners();
+  }
+
+  /// Whether to push dirty books to the server in the background shortly after
+  /// edits, while connected. On by default; only pushes (never pulls), so it
+  /// can't overwrite local state. See [AutoPusher].
+  bool get autoPush => _prefs.getBool(_autoPushKey) ?? true;
+
+  Future<void> setAutoPush(bool value) async {
+    await _prefs.setBool(_autoPushKey, value);
     notifyListeners();
   }
 }

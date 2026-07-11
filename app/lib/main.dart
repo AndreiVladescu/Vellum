@@ -9,6 +9,7 @@ import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
 import 'data/library_repository.dart';
 import 'physical/physical_libraries_page.dart';
+import 'server/auto_pusher.dart';
 import 'server/connection_store.dart';
 import 'server/server_client.dart';
 import 'server/sync_service.dart';
@@ -96,12 +97,22 @@ class _LibraryPageState extends State<LibraryPage> {
   // so its re-entrancy guard spans every way a sync can start.
   late final SyncService _sync = SyncService(widget.repository);
 
+  // Debounced background push of dirty books while connected, so a long editing
+  // session keeps the server/console fresh without waiting for the next launch.
+  late final AutoPusher _autoPusher = AutoPusher(
+    repository: widget.repository,
+    sync: _sync,
+    client: () => widget.connection.client,
+    enabled: () => widget.settings.autoPush,
+  );
+
   LibraryRepository get repository => widget.repository;
 
   @override
   void initState() {
     super.initState();
     _autoSync();
+    _autoPusher.start();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
   }
@@ -146,6 +157,7 @@ class _LibraryPageState extends State<LibraryPage> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _autoPusher.dispose();
     super.dispose();
   }
 

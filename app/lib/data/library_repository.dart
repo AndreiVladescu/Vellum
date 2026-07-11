@@ -85,6 +85,17 @@ class LibraryRepository {
 
   Stream<List<Book>> watchAllBooks() => db.watchAllBooks();
 
+  /// A live count of everything waiting to be pushed to the server: dirty books
+  /// plus pending local deletions. Drives the debounced background auto-push.
+  Stream<int> watchDirtyCount() => db
+      .customSelect(
+        'SELECT (SELECT COUNT(*) FROM books WHERE needs_push = 1) + '
+        '(SELECT COUNT(*) FROM local_deletions) AS n',
+        readsFrom: {db.books, db.localDeletions},
+      )
+      .watchSingle()
+      .map((row) => row.read<int>('n'));
+
   // ---- Custom shelves (app-local collections; not synced) -----------------
   // These are manual panes/collections, distinct from genres and from the
   // physical-layout "shelves". They order books explicitly and never delete the
