@@ -241,6 +241,52 @@ void main() {
     expect(files.first.sha256, 'abc');
   });
 
+  test('a server-supplied unsafe file id is skipped, not written to disk', () async {
+    final repo = await _repo(dir);
+    var fileDownloaded = false;
+    final client = _client((req) async {
+      final path = req.url.path;
+      if (req.method == 'GET' && path == '/api/books') {
+        return http.Response(
+          jsonEncode({
+            'server_now': '2024-06-01 00:00:00',
+            'books': [
+              {
+                'id': 'b1',
+                'title': 'Dune',
+                'updated_at': '2024-01-01 00:00:00',
+                'files': [
+                  {
+                    // A malicious/compromised server tries to steer the write
+                    // outside files/ via path traversal.
+                    'id': '../../evil',
+                    'book_id': 'b1',
+                    'format': 'pdf',
+                    'size_bytes': 5,
+                    'sha256': 'abc',
+                  },
+                ],
+              },
+            ],
+          }),
+          200,
+        );
+      }
+      if (req.method == 'GET' && path.startsWith('/api/files/')) {
+        fileDownloaded = true;
+        return http.Response('hello', 200);
+      }
+      return http.Response('[]', 200);
+    });
+
+    final report = await SyncService(repo).pull(client);
+    expect(fileDownloaded, false, reason: 'the unsafe file is never fetched');
+    expect(await repo.db.select(repo.db.bookFiles).get(), isEmpty,
+        reason: 'no file row is recorded for a traversal id');
+    expect(report.issues.any((i) => i.stage == 'file'), true,
+        reason: 'the skip is surfaced as an issue');
+  });
+
   test('a failed cover download is recorded as an issue, not swallowed', () async {
     final repo = await _repo(dir);
     final client = _client((req) async {
