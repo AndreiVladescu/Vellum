@@ -43,6 +43,12 @@ jobs:
       - run: git diff --exit-code -- lib/data/database.g.dart
       - run: flutter analyze
       - run: flutter test
+      # Compile the native desktop runner too: analyze + test build no native
+      # code, so a plugin/toolchain break (e.g. a bad flutter_secure_storage
+      # build) would land green and only fail on the user's machine. Debug — a
+      # compile check, not a release artifact.
+      - run: sudo apt-get install -y ninja-build libgtk-3-dev
+      - run: flutter build linux --debug
 
   # Cross-stack smoke test: a real server + the real client over the wire,
   # catching wire-format regressions a fake-only suite would miss.
