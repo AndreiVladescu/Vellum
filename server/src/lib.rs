@@ -24,6 +24,7 @@ mod metadata;
 mod opds;
 mod shares;
 mod throttle;
+pub mod tls;
 mod web;
 
 pub use throttle::RateLimiter;
