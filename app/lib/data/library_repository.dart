@@ -543,21 +543,25 @@ class LibraryRepository {
     return (t == null || t.isEmpty) ? null : t;
   }
 
-  Future<void> addPhysicalCopy(
+  /// Adds a physical copy and returns its new id (so a caller can, e.g., lend it
+  /// straight away).
+  Future<String> addPhysicalCopy(
     String bookId, {
     String? location,
     String? notes,
   }) async {
+    final id = _uuid.v4();
     await db
         .into(db.physicalCopies)
         .insert(
           PhysicalCopiesCompanion.insert(
-            id: _uuid.v4(),
+            id: id,
             bookId: bookId,
             location: Value(location),
             notes: Value(notes),
           ),
         );
+    return id;
   }
 
   /// Loan history for a physical copy, most recent first. The active loan (if

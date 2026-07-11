@@ -8,6 +8,7 @@ import '../data/library_repository.dart';
 import 'cover_thumb.dart';
 import 'edit_book_sheet.dart';
 import 'formats_section.dart';
+import 'lend_sheet.dart';
 import 'physical_copies_section.dart';
 import 'read_button.dart';
 import 'reader_notes_section.dart';
@@ -156,6 +157,15 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     ),
   );
 
+  /// The lend "mini menu": pick a physical copy to lend out or mark returned,
+  /// without hunting through the page. See [LendSheet].
+  void _openLendSheet() => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (_) => LendSheet(book: book, repository: repository),
+  );
+
   /// A sheet listing custom shelves with checkmarks; tapping one toggles this
   /// book's membership. Live via the shelves + membership streams.
   void _openShelfPicker() => showModalBottomSheet<void>(
@@ -277,6 +287,11 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       appBar: AppBar(
         title: Text(book.title),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.handshake_outlined),
+            tooltip: 'Lend or return',
+            onPressed: _openLendSheet,
+          ),
           IconButton(
             icon: const Icon(Icons.bookmark_add_outlined),
             tooltip: 'Add to shelf',

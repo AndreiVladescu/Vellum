@@ -106,6 +106,24 @@ void main() {
     expect(loans.first.loan.returnedAt, isNotNull, reason: 'now in history');
   });
 
+  test('addPhysicalCopy returns the new id so it can be lent immediately', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'Book'));
+
+    // The lend sheet's "no copy yet" path adds a copy and lends it in one go,
+    // which needs the new copy's id back from addPhysicalCopy.
+    final copyId = await repo.addPhysicalCopy('b1', location: 'Desk');
+    expect(copyId, isNotEmpty);
+
+    await repo.lendCopy(copyId, 'Bob');
+    final active = (await repo.watchLoansOf(copyId).first)
+        .where((l) => l.returnedAt == null)
+        .toList();
+    expect(active, hasLength(1));
+    expect(active.single.borrower, 'Bob');
+  });
+
   test('re-tagging and deleting sweep orphaned author rows', () async {
     final repo = await _repo(dir);
     final db = repo.db;

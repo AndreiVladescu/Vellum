@@ -3,6 +3,41 @@ import 'package:flutter/material.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 
+/// Prompts for a borrower's name. Returns the trimmed name, or null if the user
+/// cancelled or left it blank. Shared by the inline copy tile and the lend sheet
+/// so both flows collect a borrower the same way.
+Future<String?> promptBorrower(BuildContext context) async {
+  final borrower = TextEditingController();
+  final name = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Lend this copy'),
+      content: TextField(
+        controller: borrower,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
+        decoration: const InputDecoration(
+          labelText: 'Borrower',
+          hintText: "Who's taking it?",
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(borrower.text.trim()),
+          child: const Text('Lend'),
+        ),
+      ],
+    ),
+  );
+  borrower.dispose();
+  return (name == null || name.isEmpty) ? null : name;
+}
+
 /// The "Physical copies" list: locations, lend/return, and loan history.
 class PhysicalCopiesSection extends StatelessWidget {
   const PhysicalCopiesSection({
@@ -120,36 +155,8 @@ class PhysicalCopyTile extends StatelessWidget {
       '${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _lend(BuildContext context) async {
-    final borrower = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Lend this copy'),
-        content: TextField(
-          controller: borrower,
-          autofocus: true,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
-          decoration: const InputDecoration(
-            labelText: 'Borrower',
-            hintText: "Who's taking it?",
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(borrower.text.trim()),
-            child: const Text('Lend'),
-          ),
-        ],
-      ),
-    );
-    borrower.dispose();
-    if (name != null && name.isNotEmpty) {
+    final name = await promptBorrower(context);
+    if (name != null) {
       await repository.lendCopy(copy.id, name);
     }
   }
