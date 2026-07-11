@@ -816,9 +816,7 @@ async fn require_edit(state: &AppState, user: &AuthUser, book_id: &str) -> AppRe
 /// docs/SECURITY_AUDIT.md (H1).
 pub(crate) fn is_safe_rel(rel: &str) -> bool {
     let p = Path::new(rel);
-    !rel.is_empty()
-        && !p.is_absolute()
-        && p.components().all(|c| matches!(c, Component::Normal(_)))
+    !rel.is_empty() && !p.is_absolute() && p.components().all(|c| matches!(c, Component::Normal(_)))
 }
 
 async fn write_blob(state: &AppState, rel: &str, body: &[u8]) -> AppResult<()> {
