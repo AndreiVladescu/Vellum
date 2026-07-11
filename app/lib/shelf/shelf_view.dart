@@ -48,22 +48,26 @@ class ShelfView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final rowWidth = constraints.maxWidth - 2 * _shelfPadding;
-      final rows = _packIntoRows(rowWidth);
-      return ListView.builder(
-        padding: const EdgeInsets.symmetric(
-            horizontal: _shelfPadding, vertical: 24),
-        itemCount: rows.length,
-        itemBuilder: (context, i) => _ShelfRow(
-          row: rows[i],
-          bookFace: bookFace,
-          spineArt: spineArt,
-          detailBuilder: detailBuilder,
-          coverFileOf: coverFileOf,
-        ),
-      );
-    });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final rowWidth = constraints.maxWidth - 2 * _shelfPadding;
+        final rows = _packIntoRows(rowWidth);
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _shelfPadding,
+            vertical: 24,
+          ),
+          itemCount: rows.length,
+          itemBuilder: (context, i) => _ShelfRow(
+            row: rows[i],
+            bookFace: bookFace,
+            spineArt: spineArt,
+            detailBuilder: detailBuilder,
+            coverFileOf: coverFileOf,
+          ),
+        );
+      },
+    );
   }
 
   double _widthOf(Book book) => bookFace == BookFace.cover
@@ -104,11 +108,13 @@ class _ShelfRow extends StatelessWidget {
   void _openBook(BuildContext bookContext, Book book, Widget face) {
     final box = bookContext.findRenderObject()! as RenderBox;
     final rect = box.localToGlobal(Offset.zero) & box.size;
-    Navigator.of(bookContext).push(BookOpenRoute(
-      bookRect: rect,
-      bookFace: face,
-      detailBuilder: (_) => detailBuilder(book),
-    ));
+    Navigator.of(bookContext).push(
+      BookOpenRoute(
+        bookRect: rect,
+        bookFace: face,
+        detailBuilder: (_) => detailBuilder(book),
+      ),
+    );
   }
 
   @override
@@ -133,15 +139,17 @@ class _ShelfRow extends StatelessWidget {
                       final coverFile = coverFileOf?.call(book);
                       Widget face({VoidCallback? onTap}) =>
                           bookFace == BookFace.cover
-                              ? BookCover(
-                                  book: book,
-                                  coverFile: coverFile,
-                                  onTap: onTap)
-                              : BookSpine(
-                                  book: book,
-                                  coverFile: coverFile,
-                                  spineArt: spineArt,
-                                  onTap: onTap);
+                          ? BookCover(
+                              book: book,
+                              coverFile: coverFile,
+                              onTap: onTap,
+                            )
+                          : BookSpine(
+                              book: book,
+                              coverFile: coverFile,
+                              spineArt: spineArt,
+                              onTap: onTap,
+                            );
                       return face(
                         onTap: () => _openBook(bookContext, book, face()),
                       );
@@ -171,6 +179,12 @@ class _ShelfRow extends StatelessWidget {
   }
 }
 
+/// A screen-reader label for a book: its title, plus the subtitle when present.
+/// Authors aren't on the shelf's `Book` row (separate table), so title +
+/// subtitle is what's available without a per-spine query.
+String bookSemanticLabel(String title, String? subtitle) =>
+    (subtitle != null && subtitle.isNotEmpty) ? '$title: $subtitle' : title;
+
 /// A single book spine standing on the shelf.
 ///
 /// With a [coverFile], the spine is drawn from the cover art itself (real
@@ -194,19 +208,27 @@ class BookSpine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = SpineStyle.fromJson(book.spineStyle, title: book.title);
-    return GestureDetector(
+    return Semantics(
+      label: bookSemanticLabel(book.title, book.subtitle),
+      button: onTap != null,
       onTap: onTap,
-      child: Tooltip(
-        message: book.title,
-        waitDuration: const Duration(milliseconds: 600),
-        child: SizedBox(
-          width: style.width,
-          height: _bookAreaHeight * style.heightFactor,
-          child: SpineFace(
-            book: book,
-            coverFile: coverFile,
-            style: style,
-            spineArt: spineArt,
+      // The title is painted into the spine art; screen readers get it from the
+      // label above, so drop the child semantics (incl. the Tooltip's message).
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Tooltip(
+          message: book.title,
+          waitDuration: const Duration(milliseconds: 600),
+          child: SizedBox(
+            width: style.width,
+            height: _bookAreaHeight * style.heightFactor,
+            child: SpineFace(
+              book: book,
+              coverFile: coverFile,
+              style: style,
+              spineArt: spineArt,
+            ),
           ),
         ),
       ),
@@ -269,15 +291,18 @@ class SpineFace extends StatelessWidget {
           // centerLeft alignment keeps the cover's left edge visible.
           LayoutBuilder(
             builder: (context, constraints) {
-              final h =
-                  constraints.maxHeight.isFinite ? constraints.maxHeight : _bookAreaHeight;
-              return Image.file(cover,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.centerLeft,
-                  cacheHeight: (h * dpr).round(),
-                  // Orphaned path: fall back to a plain fill; the shading and
-                  // title overlays below still render (coverless spine look).
-                  errorBuilder: (_, _, _) => ColoredBox(color: s.color));
+              final h = constraints.maxHeight.isFinite
+                  ? constraints.maxHeight
+                  : _bookAreaHeight;
+              return Image.file(
+                cover,
+                fit: BoxFit.cover,
+                alignment: Alignment.centerLeft,
+                cacheHeight: (h * dpr).round(),
+                // Orphaned path: fall back to a plain fill; the shading and
+                // title overlays below still render (coverless spine look).
+                errorBuilder: (_, _, _) => ColoredBox(color: s.color),
+              );
             },
           ),
           // Cylindrical shading: highlight near the left, shade to the right.
@@ -311,9 +336,7 @@ class SpineFace extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.4,
-                    shadows: [
-                      Shadow(blurRadius: 4, color: Color(0xB3000000)),
-                    ],
+                    shadows: [Shadow(blurRadius: 4, color: Color(0xB3000000))],
                   ),
                 ),
               ),
@@ -369,37 +392,32 @@ class SpineFace extends StatelessWidget {
   }
 
   Widget _band(Color accent) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-        child: Column(
-          children: [
-            Container(height: 2, color: accent),
-            const SizedBox(height: 2),
-            Container(height: 1, color: accent),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+    child: Column(
+      children: [
+        Container(height: 2, color: accent),
+        const SizedBox(height: 2),
+        Container(height: 1, color: accent),
+      ],
+    ),
+  );
 
   Widget _label(Color accent) => Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        width: 18,
-        height: 26,
-        decoration: BoxDecoration(
-          border: Border.all(color: accent, width: 1.5),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
+    margin: const EdgeInsets.only(bottom: 6),
+    width: 18,
+    height: 26,
+    decoration: BoxDecoration(
+      border: Border.all(color: accent, width: 1.5),
+      borderRadius: BorderRadius.circular(2),
+    ),
+  );
 }
 
 /// A single book shown face-out with its front cover — the downloaded cover
 /// image if there is one, otherwise a cover generated in the book's spine
 /// style. Used when the shelf is in [BookFace.cover] mode.
 class BookCover extends StatelessWidget {
-  const BookCover({
-    super.key,
-    required this.book,
-    this.onTap,
-    this.coverFile,
-  });
+  const BookCover({super.key, required this.book, this.onTap, this.coverFile});
 
   final Book book;
   final VoidCallback? onTap;
@@ -409,26 +427,34 @@ class BookCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = coverFile;
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    return GestureDetector(
+    return Semantics(
+      label: bookSemanticLabel(book.title, book.subtitle),
+      button: onTap != null,
       onTap: onTap,
-      child: Tooltip(
-        message: book.title,
-        waitDuration: const Duration(milliseconds: 600),
-        child: SizedBox(
-          width: _coverWidth,
-          height: _bookAreaHeight,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            // Non-null path means "has a cover"; decode below full res but by
-            // the box *height* (a 2:3 cover in this taller box is height-driven,
-            // so a width budget would leave it soft). Fall back to a generated
-            // cover if the file is missing. No filesystem call in build.
-            child: cover != null
-                ? Image.file(cover,
-                    fit: BoxFit.cover,
-                    cacheHeight: (_bookAreaHeight * dpr).round(),
-                    errorBuilder: (_, _, _) => _generatedCover())
-                : _generatedCover(),
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Tooltip(
+          message: book.title,
+          waitDuration: const Duration(milliseconds: 600),
+          child: SizedBox(
+            width: _coverWidth,
+            height: _bookAreaHeight,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              // Non-null path means "has a cover"; decode below full res but by
+              // the box *height* (a 2:3 cover in this taller box is height-driven,
+              // so a width budget would leave it soft). Fall back to a generated
+              // cover if the file is missing. No filesystem call in build.
+              child: cover != null
+                  ? Image.file(
+                      cover,
+                      fit: BoxFit.cover,
+                      cacheHeight: (_bookAreaHeight * dpr).round(),
+                      errorBuilder: (_, _, _) => _generatedCover(),
+                    )
+                  : _generatedCover(),
+            ),
           ),
         ),
       ),
