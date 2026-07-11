@@ -17,6 +17,21 @@ import 'package:vellum/server/sync_service.dart';
 /// launches one and sets it (see the `e2e` CI job).
 void main() {
   final url = Platform.environment['VELLUM_E2E_URL'];
+  final skip = url == null
+      ? 'set VELLUM_E2E_URL to a running Vellum server (see scripts/e2e_sync.sh)'
+      : false;
+
+  // A fresh server accepts only the *first* registration (it becomes master),
+  // so register once and share the authenticated client across cases. Guarded
+  // so it's a no-op when the suite is skipped.
+  late final VellumServerClient client;
+  setUpAll(() async {
+    if (url == null) return;
+    final email = 'e2e+${DateTime.now().microsecondsSinceEpoch}@lib.test';
+    final auth = await VellumServerClient(baseUrl: url)
+        .register(email: email, displayName: 'E2E', password: 'password1');
+    client = VellumServerClient(baseUrl: url, token: auth.token);
+  });
 
   test('push on one device, pull on another: metadata, author, file, delete', () async {
     final dirA = Directory.systemTemp.createTempSync('vellum_e2e_a');
@@ -25,12 +40,6 @@ void main() {
       dirA.deleteSync(recursive: true);
       dirB.deleteSync(recursive: true);
     });
-
-    // A fresh server accepts the first registration as master.
-    final email = 'e2e+${DateTime.now().microsecondsSinceEpoch}@lib.test';
-    final auth = await VellumServerClient(baseUrl: url!)
-        .register(email: email, displayName: 'E2E', password: 'password1');
-    final client = VellumServerClient(baseUrl: url, token: auth.token);
 
     // Device A: a book with an author and an attached file.
     final repoA =
@@ -75,8 +84,41 @@ void main() {
     await SyncService(repoB).pull(client);
     expect(await repoB.watchBook(bookId).first, isNull,
         reason: 'a delete on A must reach B');
-  },
-      skip: url == null
-          ? 'set VELLUM_E2E_URL to a running Vellum server (see scripts/e2e_sync.sh)'
-          : false);
+  }, skip: skip);
+
+  // The one-tap sync() (pull-then-push) is what users and the launch hook run;
+  // exercise the full loop through the real wire format, both directions.
+  test('one-tap sync carries a book each way between two devices', () async {
+    final dirA = Directory.systemTemp.createTempSync('vellum_e2e_sync_a');
+    final dirB = Directory.systemTemp.createTempSync('vellum_e2e_sync_b');
+    addTearDown(() {
+      dirA.deleteSync(recursive: true);
+      dirB.deleteSync(recursive: true);
+    });
+
+    final repoA = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirA);
+    final repoB = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirB);
+
+    // A creates a book and pushes it up via the combined sync.
+    final idA =
+        await repoA.createCustomBook(title: 'Foundation', author: 'Isaac Asimov');
+    await SyncService(repoA).sync(client);
+
+    // B syncs and sees A's book (the pull half of B's sync).
+    await SyncService(repoB).sync(client);
+    expect((await repoB.watchBook(idA).first)?.title, 'Foundation',
+        reason: "B's sync pulls A's pushed book");
+
+    // B creates its own book and syncs it up (the push half of B's sync).
+    final idB = await repoB.createCustomBook(
+        title: 'Snow Crash', author: 'Neal Stephenson');
+    await SyncService(repoB).sync(client);
+
+    // A syncs again and sees B's book — the full loop is closed.
+    await SyncService(repoA).sync(client);
+    expect((await repoA.watchBook(idB).first)?.title, 'Snow Crash',
+        reason: "A's next sync pulls B's pushed book");
+  }, skip: skip);
 }
