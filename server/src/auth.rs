@@ -18,6 +18,31 @@ use crate::error::{AppError, AppResult};
 static DUMMY_HASH: std::sync::LazyLock<String> =
     std::sync::LazyLock::new(|| hash_password("timing-equalizer-dummy").unwrap());
 
+/// Optional operator-set secret (`VELLUM_BOOTSTRAP_TOKEN`) that the very first
+/// (master) registration must present. When unset, first-registration is open
+/// as before; when set, it closes the "whoever hits the port first becomes
+/// master" window on a freshly exposed instance. See docs/SECURITY_AUDIT.md (M3).
+static BOOTSTRAP_TOKEN: std::sync::LazyLock<Option<String>> = std::sync::LazyLock::new(|| {
+    std::env::var("VELLUM_BOOTSTRAP_TOKEN")
+        .ok()
+        .filter(|s| !s.is_empty())
+});
+
+/// Enforce the bootstrap token when one is configured. Compares the SHA-256 of
+/// each side so the equality check runs over fixed-length hex (a timing leak
+/// there reveals nothing about the secret).
+fn require_bootstrap_token(provided: Option<&str>) -> AppResult<()> {
+    let Some(expected) = &*BOOTSTRAP_TOKEN else {
+        return Ok(());
+    };
+    match provided {
+        Some(p) if sha256_hex(p) == sha256_hex(expected) => Ok(()),
+        _ => Err(AppError::Forbidden(
+            "registration requires the bootstrap token".into(),
+        )),
+    }
+}
+
 /// The authenticated caller, extracted from the `Authorization: Bearer <token>`
 /// header. Any handler that takes an `AuthUser` argument requires a valid login.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -284,6 +309,10 @@ pub struct RegisterInput {
     pub email: String,
     pub display_name: String,
     pub password: String,
+    /// Required only for the first registration and only when the operator set
+    /// `VELLUM_BOOTSTRAP_TOKEN`; ignored otherwise (and by `create_user`).
+    #[serde(default)]
+    pub bootstrap_token: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -307,6 +336,7 @@ pub async fn register(
     Json(input): Json<RegisterInput>,
 ) -> AppResult<Json<AuthResponse>> {
     validate_credentials(&input.email, &input.password)?;
+    require_bootstrap_token(input.bootstrap_token.as_deref())?;
 
     // Check "is there a master yet?" and insert the first user in one
     // transaction, so two simultaneous first-registrations can't both win.
@@ -337,12 +367,18 @@ pub async fn register(
 
 pub async fn login(
     State(state): State<AppState>,
+    client: ClientKey,
     Json(input): Json<LoginInput>,
 ) -> AppResult<Json<AuthResponse>> {
     // Bound work before Argon2 runs, even for a wrong password.
     check_password_length(&input.password)?;
     let key = input.email.trim().to_lowercase();
-    if !state.throttle.allowed(&key) {
+    // Throttle failed logins per email *and* per source IP, so a password spray
+    // across many distinct emails from one host is also capped (the email-only
+    // limiter wouldn't catch it). See docs/SECURITY_AUDIT.md (L4). Reuses the
+    // existing failure limiter under a namespaced key — no new shared state.
+    let ip_key = format!("ip:{}", client.0);
+    if !state.throttle.allowed(&key) || !state.throttle.allowed(&ip_key) {
         return Err(AppError::TooManyRequests(
             "too many failed attempts — try again later".into(),
         ));
@@ -359,13 +395,16 @@ pub async fn login(
     let Some((id, email, display_name, is_master, password_hash)) = row else {
         let _ = verify_password(&input.password, &DUMMY_HASH); // equalize timing
         state.throttle.record_failure(&key);
+        state.throttle.record_failure(&ip_key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     };
     if !verify_password(&input.password, &password_hash) {
         state.throttle.record_failure(&key);
+        state.throttle.record_failure(&ip_key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     }
     state.throttle.clear(&key);
+    state.throttle.clear(&ip_key);
 
     let user = AuthUser {
         id,
@@ -520,4 +559,17 @@ async fn issue_token(state: &AppState, user_id: &str) -> AppResult<String> {
     .execute(&state.db)
     .await?;
     Ok(token)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::require_bootstrap_token;
+
+    #[test]
+    fn bootstrap_open_when_env_unset() {
+        // VELLUM_BOOTSTRAP_TOKEN is unset in the test process, so first-time
+        // registration stays open regardless of what the caller sends.
+        assert!(require_bootstrap_token(None).is_ok());
+        assert!(require_bootstrap_token(Some("anything")).is_ok());
+    }
 }
