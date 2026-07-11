@@ -167,6 +167,29 @@ void main() {
     expect(canonicalGenreName('   '), '');
   });
 
+  test('addGenre/removeGenre tag a book, canonicalize, and dedup', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'X'));
+
+    Future<List<String>> genres() => repo.watchGenresOf('b1').first;
+
+    await repo.addGenre('b1', 'engineering');
+    await repo.addGenre('b1', 'Engineering'); // same canonical -> no-op
+    await repo.addGenre('b1', '  '); // blank -> ignored
+    expect(await genres(), ['Engineering'], reason: 'canonicalized, deduped');
+
+    await repo.addGenre('b1', 'fiction');
+    expect(await genres(), ['Engineering', 'Fiction'],
+        reason: 'ordered by name');
+    expect(await repo.watchAllGenreNames().first, ['Engineering', 'Fiction']);
+
+    await repo.removeGenre('b1', 'ENGINEERING'); // case-insensitive removal
+    expect(await genres(), ['Fiction']);
+    // Removing the last book with "Engineering" swept the orphaned genre.
+    expect(await repo.watchAllGenreNames().first, ['Fiction']);
+  });
+
   test('setGenres canonicalizes and dedups case/spacing variants', () async {
     final repo = await _repo(dir);
     final db = repo.db;

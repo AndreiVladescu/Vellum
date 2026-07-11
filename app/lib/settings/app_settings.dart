@@ -16,6 +16,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _selectedShelfKey = 'settings.selectedShelf';
   static const _shelfSortKey = 'settings.shelfSort';
   static const _autoPushKey = 'settings.autoPush';
+  static const _importGenresKey = 'settings.importOpenLibraryGenres';
 
   final SharedPreferences _prefs;
 
@@ -94,6 +95,17 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setAutoPush(bool value) async {
     await _prefs.setBool(_autoPushKey, value);
+    notifyListeners();
+  }
+
+  /// Whether adding a book from search also imports Open Library's "subjects"
+  /// as genres. Off by default: those subjects are noisy and inconsistent
+  /// (odd one-offs, casing variants), so genres are yours to assign by hand.
+  bool get importOpenLibraryGenres =>
+      _prefs.getBool(_importGenresKey) ?? false;
+
+  Future<void> setImportOpenLibraryGenres(bool value) async {
+    await _prefs.setBool(_importGenresKey, value);
     notifyListeners();
   }
 }

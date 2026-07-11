@@ -375,6 +375,68 @@ class LibraryRepository {
     await _markNeedsPush(bookId);
   }
 
+  /// Adds one genre to a book (get-or-create the genre by canonical name).
+  /// No-op if the name is blank or the book already has it.
+  Future<void> addGenre(String bookId, String name) async {
+    final canon = canonicalGenreName(name);
+    if (canon.isEmpty) return;
+    await db.transaction(() async {
+      final genreId = await _idForName(db.genres, canon);
+      await db.into(db.bookGenres).insert(
+            BookGenresCompanion.insert(bookId: bookId, genreId: genreId),
+            mode: InsertMode.insertOrIgnore,
+          );
+    });
+    await _markNeedsPush(bookId);
+  }
+
+  /// Removes one genre from a book, then sweeps the genre if no book uses it.
+  Future<void> removeGenre(String bookId, String name) async {
+    final canon = canonicalGenreName(name);
+    if (canon.isEmpty) return;
+    await db.transaction(() async {
+      final genre = await (db.select(db.genres)
+            ..where((g) => g.name.equals(canon)))
+          .getSingleOrNull();
+      if (genre == null) return;
+      // Typed delete (not raw SQL) so drift invalidates the book_genres query
+      // streams — watchGenresOf/watchAllGenreNames update immediately.
+      await (db.delete(db.bookGenres)
+            ..where((bg) =>
+                bg.bookId.equals(bookId) & bg.genreId.equals(genre.id)))
+          .go();
+      await _gcOrphanGenres();
+    });
+    await _markNeedsPush(bookId);
+  }
+
+  /// The genre names on one book, ordered by name — reactive so the detail
+  /// page's editable chips update the moment a genre is added or removed.
+  Stream<List<String>> watchGenresOf(String bookId) {
+    final q = db.select(db.genres).join([
+      innerJoin(db.bookGenres, db.bookGenres.genreId.equalsExp(db.genres.id)),
+    ])
+      ..where(db.bookGenres.bookId.equals(bookId))
+      ..orderBy([OrderingTerm(expression: db.genres.name)]);
+    return q
+        .watch()
+        .map((rows) => [for (final r in rows) r.readTable(db.genres).name]);
+  }
+
+  /// Every genre name currently used by some book, ordered — powers the
+  /// add-genre suggestions so you reuse existing tags instead of minting
+  /// near-duplicates. Joined through book_genres (rather than reading the
+  /// genres table directly) so drift refreshes it on any tag add/remove.
+  Stream<List<String>> watchAllGenreNames() {
+    final q = db.selectOnly(db.genres, distinct: true)
+      ..addColumns([db.genres.name])
+      ..join([
+        innerJoin(db.bookGenres, db.bookGenres.genreId.equalsExp(db.genres.id)),
+      ])
+      ..orderBy([OrderingTerm(expression: db.genres.name)]);
+    return q.watch().map((rows) => [for (final r in rows) r.read(db.genres.name)!]);
+  }
+
   /// Removes author/genre name rows no book references any more, so the
   /// unique-name tables don't grow monotonically as books are re-tagged or
   /// deleted. Sub-millisecond at this scale (the subselect hits the join PK).
@@ -666,7 +728,13 @@ class LibraryRepository {
 
   /// Adds a book picked from online search results: fetches the description
   /// and cover over the network, generates a spine, and stores everything.
-  Future<String> addFromSearch(BookSearchResult result) async {
+  /// Adds a book from a search result. [importGenres] controls whether Open
+  /// Library's noisy "subjects" are pulled in as genres (off by default; the
+  /// caller passes the user's preference); genres are otherwise manual.
+  Future<String> addFromSearch(
+    BookSearchResult result, {
+    bool importGenres = false,
+  }) async {
     final id = _uuid.v4();
 
     // Network work first, outside the transaction.
@@ -729,19 +797,21 @@ class LibraryRepository {
             );
       }
 
-      // Open Library "subjects" are noisy; keep the first few short ones, and
-      // canonicalize so case/spacing variants across books share one genre.
-      final genres = result.subjects
-          .where((s) => s.length <= 28 && !s.contains(':'))
-          .map(canonicalGenreName)
-          .where((s) => s.isNotEmpty)
-          .take(3);
-      for (final name in genres) {
-        final genreId = await _idForName(db.genres, name);
-        await db.into(db.bookGenres).insert(
-              BookGenresCompanion.insert(bookId: id, genreId: genreId),
-              mode: InsertMode.insertOrIgnore,
-            );
+      if (importGenres) {
+        // Open Library "subjects" are noisy; keep the first few short ones, and
+        // canonicalize so case/spacing variants across books share one genre.
+        final genres = result.subjects
+            .where((s) => s.length <= 28 && !s.contains(':'))
+            .map(canonicalGenreName)
+            .where((s) => s.isNotEmpty)
+            .take(3);
+        for (final name in genres) {
+          final genreId = await _idForName(db.genres, name);
+          await db.into(db.bookGenres).insert(
+                BookGenresCompanion.insert(bookId: id, genreId: genreId),
+                mode: InsertMode.insertOrIgnore,
+              );
+        }
       }
     });
     return id;

@@ -5,13 +5,19 @@ import 'package:flutter/material.dart';
 import '../data/book_file_validation.dart';
 import '../data/library_repository.dart';
 import '../data/metadata.dart';
+import '../settings/app_settings.dart';
 
 /// Add a book: search Open Library / Google Books and pick an edition, or create
 /// one yourself (for a PDF no library has) — optionally attaching the file.
 class AddBookPage extends StatefulWidget {
-  const AddBookPage({super.key, required this.repository});
+  const AddBookPage({
+    super.key,
+    required this.repository,
+    required this.settings,
+  });
 
   final LibraryRepository repository;
+  final AppSettingsStore settings;
 
   @override
   State<AddBookPage> createState() => _AddBookPageState();
@@ -100,7 +106,10 @@ class _AddBookPageState extends State<AddBookPage> {
   Future<void> _add(BookSearchResult result) async {
     setState(() => _addingWorkKey = result.workKey);
     try {
-      final id = await widget.repository.addFromSearch(result);
+      final id = await widget.repository.addFromSearch(
+        result,
+        importGenres: widget.settings.importOpenLibraryGenres,
+      );
       if (_filePath != null) await widget.repository.attachFile(id, _filePath!);
       if (!mounted) return;
       Navigator.of(context).pop(result.title);

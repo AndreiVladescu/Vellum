@@ -176,7 +176,10 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<void> _openAddBook(BuildContext context) async {
     final addedTitle = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => AddBookPage(repository: repository)),
+      MaterialPageRoute(
+        builder: (_) =>
+            AddBookPage(repository: repository, settings: widget.settings),
+      ),
     );
     if (addedTitle != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

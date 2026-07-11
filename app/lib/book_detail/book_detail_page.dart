@@ -8,6 +8,7 @@ import '../data/library_repository.dart';
 import 'cover_thumb.dart';
 import 'edit_book_sheet.dart';
 import 'formats_section.dart';
+import 'genres_section.dart';
 import 'lend_sheet.dart';
 import 'physical_copies_section.dart';
 import 'read_button.dart';
@@ -365,28 +366,12 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                                     'ISBN ${book.isbn}',
                                     style: theme.textTheme.bodySmall,
                                   ),
-                                if (details != null &&
-                                    details.genres.isNotEmpty) ...[
-                                  const SizedBox(height: 10),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: [
-                                      for (final genre in details.genres)
-                                        ActionChip(
-                                          label: Text(genre),
-                                          visualDensity: VisualDensity.compact,
-                                          // Filter the shelf by this genre.
-                                          onPressed: widget.onGenreTap == null
-                                              ? null
-                                              : () {
-                                                  Navigator.of(context).pop();
-                                                  widget.onGenreTap!(genre);
-                                                },
-                                        ),
-                                    ],
-                                  ),
-                                ],
+                                const SizedBox(height: 10),
+                                GenresSection(
+                                  repository: repository,
+                                  bookId: book.id,
+                                  onGenreTap: widget.onGenreTap,
+                                ),
                               ],
                             );
                           },

@@ -92,6 +92,17 @@ class PreferencesPage extends StatelessWidget {
                 onTap: () => settings.setWallpaper(wallpaper),
               ),
             const Divider(height: 24),
+            _SectionHeader('Genres'),
+            SwitchListTile(
+              secondary: const Icon(Icons.sell_outlined),
+              title: const Text('Import genres from Open Library'),
+              subtitle: const Text(
+                  'Auto-tag new books with Open Library’s subjects. Off by '
+                  'default — those are noisy; assign your own genres instead'),
+              value: settings.importOpenLibraryGenres,
+              onChanged: settings.setImportOpenLibraryGenres,
+            ),
+            const Divider(height: 24),
             _SectionHeader('Sync'),
             SwitchListTile(
               secondary: const Icon(Icons.cloud_sync_outlined),
