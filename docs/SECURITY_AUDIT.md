@@ -30,19 +30,23 @@ environment — running them is a recommendation below.
 
 ## Findings at a glance
 
-| ID | Sev | Title | Location |
-|----|-----|-------|----------|
-| H1 | 🔴 | Arbitrary file read via client-controlled `cover_path` (path traversal) | `server/src/books.rs`, `server/src/blobs.rs` |
-| M1 | 🟠 | Decompression / pixel bombs on untrusted covers & EPUB zips (DoS) | `server/src/blobs.rs` |
-| M2 | 🟠 | Client-side path traversal on sync pull (server-supplied ids unvalidated) | `app/lib/server/sync_service.dart` |
-| M3 | 🟠 | Master-bootstrap takeover window (first registrant becomes owner) | `server/src/auth.rs` + deployment |
-| M4 | 🟠 | Dependencies behind latest; no automated advisory scanning in CI | `server/Cargo.toml`, `app/pubspec.yaml` |
-| L1 | 🟡 | `?token=` in URL leaks into proxy logs / browser history | `server/src/auth.rs` |
-| L2 | 🟡 | Session token plaintext fallback when no OS keyring | `app/lib/server/connection_store.dart` |
-| L3 | 🟡 | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/web.rs` |
-| L4 | 🟡 | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
-| L5 | 🟡 | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
-| L6 | 🟡 | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
+| ID | Sev | Status | Title | Location |
+|----|-----|--------|-------|----------|
+| H1 | 🔴 | ✅ Fixed (2026-07-11) | Arbitrary file read via client-controlled `cover_path` (path traversal) | `server/src/books.rs`, `server/src/blobs.rs` |
+| M1 | 🟠 | ✅ Fixed (2026-07-11) | Decompression / pixel bombs on untrusted covers & EPUB zips (DoS) | `server/src/blobs.rs` |
+| M2 | 🟠 | ✅ Fixed (2026-07-11) | Client-side path traversal on sync pull (server-supplied ids unvalidated) | `app/lib/server/sync_service.dart` |
+| M3 | 🟠 | Open | Master-bootstrap takeover window (first registrant becomes owner) | `server/src/auth.rs` + deployment |
+| M4 | 🟠 | Open | Dependencies behind latest; no automated advisory scanning in CI | `server/Cargo.toml`, `app/pubspec.yaml` |
+| L1 | 🟡 | Open | `?token=` in URL leaks into proxy logs / browser history | `server/src/auth.rs` |
+| L2 | 🟡 | Open | Session token plaintext fallback when no OS keyring | `app/lib/server/connection_store.dart` |
+| L3 | 🟡 | Open | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/web.rs` |
+| L4 | 🟡 | Open | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
+| L5 | 🟡 | Open | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
+| L6 | 🟡 | Open | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
+
+> **Remediation note (2026-07-11):** H1, M1, and M2 — the destructive, low-effort
+> findings — have been hardened (see the ✅ notes in each section below). M3–M4
+> and the L-items remain open.
 
 ---
 
@@ -86,6 +90,13 @@ absolute path, and after canonicalization still inside `data_dir`). The same
 guard should apply to `spine_style` only insofar as it is never used as a path
 (it isn't today — it is opaque JSON — so it's fine).
 
+**✅ Fix applied (2026-07-11):** `books.rs::validate_cover_path` rejects any
+client-supplied `cover_path` that isn't a single `covers/<name>` segment (no
+`/`, `\`, `..`, or NUL), called from `create`/`upsert`/`update`. As a
+defence-in-depth backstop, `blobs.rs::is_safe_rel` now gates `serve_blob` (and
+the anonymous `public_file` download), so even a pre-existing poisoned row can't
+resolve outside the data dir. Unit tests cover both helpers.
+
 ---
 
 ### 🟠 M1 — Decompression / pixel bombs on untrusted media (DoS)
@@ -113,6 +124,12 @@ but an allocation failure aborts the whole process.
   book-file limit (covers already use a 32 MB `DefaultBodyLimit`, which bounds
   the *compressed* input but not the *decoded* size).
 
+**✅ Fix applied (2026-07-11):** the EPUB cover extractor now caps each zip
+entry read at 32 MiB via `Read::take` (zip-bomb guard), and `make_thumb` decodes
+through `image::ImageReader` with explicit `Limits` (max 12000×12000 px, 256 MiB
+alloc) so a small "pixel bomb" cover can't OOM the process. A generic cover
+upload-size cap (last bullet) is still worth adding.
+
 ---
 
 ### 🟠 M2 — Client-side path traversal on sync pull
@@ -138,6 +155,13 @@ library" is a supported flow.
 against the `{pdf, epub}` allow-list before using them in a path; reject/skip
 rows that fail. (Mirror the server's own discipline of only ever generating
 UUID-named blobs.)
+
+**✅ Fix applied (2026-07-11):** `sync_service.dart::_isSafeSegment` rejects any
+id/format containing a path separator, `..`, whitespace, or that is `.`/empty,
+and now guards all three pull sites that build `covers/<id>.jpg` and
+`files/<id>.<format>` — an unsafe value is skipped and surfaced as a `SyncIssue`
+rather than written. A regression test drives a traversal file id through a fake
+server and asserts nothing is fetched or recorded.
 
 ---
 
