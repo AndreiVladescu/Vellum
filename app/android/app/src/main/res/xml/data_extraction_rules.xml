@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup/transfer rules. Small settings (the app's SharedPreferences)
+  back up fine; two things are deliberately excluded:
+    - FlutterSecureStorage.xml : Keystore-encrypted (the session token). The
+      Keystore key can't be restored to another device, so a backed-up copy
+      would be undecryptable garbage — exclude it and let the app re-authenticate.
+    - the "file" domain : the drift database and the book/cover file store. These
+      are large and device-local; a re-synced device pulls them from the server.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="file" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="file" path="." />
+    </device-transfer>
+</data-extraction-rules>
