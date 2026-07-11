@@ -1749,3 +1749,28 @@ async fn one_time_link_downloads_exactly_once() {
     let (status, _) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn responses_carry_baseline_security_headers() {
+    let app = test_app().await;
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let h = res.headers();
+    assert_eq!(h.get("x-content-type-options").unwrap(), "nosniff");
+    assert_eq!(h.get("x-frame-options").unwrap(), "DENY");
+    assert!(
+        h.get("content-security-policy")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("frame-ancestors 'none'")
+    );
+}

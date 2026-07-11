@@ -4,8 +4,12 @@
 use std::path::PathBuf;
 
 use axum::Router;
-use axum::extract::DefaultBodyLimit;
+use axum::extract::{DefaultBodyLimit, Request};
 use axum::handler::Handler;
+use axum::http::HeaderValue;
+use axum::http::header::{CONTENT_SECURITY_POLICY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS};
+use axum::middleware::Next;
+use axum::response::Response;
 use axum::routing::{delete, get, post, put};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
@@ -144,6 +148,29 @@ pub fn router(state: AppState) -> Router {
         // Book detail (metadata + authors + genres + files) for the console.
         .route("/api/books/{id}/detail", get(books::detail))
         .with_state(state)
+        // Baseline security headers on every response (defence in depth for the
+        // console/public pages and blob downloads). See docs/SECURITY_AUDIT.md (L3).
+        .layer(axum::middleware::from_fn(security_headers))
+}
+
+/// A restrictive Content-Security-Policy that still lets the self-hosted console
+/// and public landing page work: everything loads from same-origin, images may
+/// also be `data:` (inline placeholders/thumbnails), and the pages' inline
+/// `<style>`/`<script>` (no external/CDN assets) are permitted. `object-src` and
+/// framing are denied outright.
+const CSP: &str = "default-src 'self'; img-src 'self' data:; \
+    style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; \
+    object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
+/// Adds baseline hardening headers to every response: block MIME-sniffing,
+/// forbid framing (clickjacking), and apply the CSP above.
+async fn security_headers(req: Request, next: Next) -> Response {
+    let mut res = next.run(req).await;
+    let h = res.headers_mut();
+    h.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    h.insert(CONTENT_SECURITY_POLICY, HeaderValue::from_static(CSP));
+    res
 }
 
 async fn health() -> &'static str {
