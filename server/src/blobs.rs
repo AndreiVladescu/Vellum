@@ -3,7 +3,7 @@
 //! hashes. Every endpoint is access-checked against the book the blob belongs
 //! to, exactly like the book metadata.
 
-use std::path::Path;
+use std::path::{Component, Path};
 
 use axum::Json;
 use axum::body::Bytes;
@@ -215,7 +215,19 @@ async fn ensure_thumb(state: &AppState, id: &str, cover_rel: &str, w: u32) -> Ap
 /// Decode `cover`, downscale to fit width `w` (aspect-preserving), and write a
 /// JPEG to `out`. Returns whether it succeeded.
 fn make_thumb(cover: &Path, out: &Path, w: u32) -> bool {
-    let Ok(img) = image::open(cover) else {
+    // Bound decode work so a small "pixel bomb" cover (valid header, enormous
+    // declared dimensions) can't allocate gigabytes and OOM-kill the process.
+    // See docs/SECURITY_AUDIT.md (M1).
+    let mut limits = image::Limits::no_limits();
+    limits.max_image_width = Some(12_000);
+    limits.max_image_height = Some(12_000);
+    limits.max_alloc = Some(256 * 1024 * 1024);
+    let Ok(mut reader) = image::ImageReader::open(cover).and_then(|r| r.with_guessed_format())
+    else {
+        return false;
+    };
+    reader.limits(limits);
+    let Ok(img) = reader.decode() else {
         return false;
     };
     // A tall height cap so width is the binding dimension for portrait covers.
@@ -526,9 +538,13 @@ fn epub_cover_bytes(path: &Path) -> Option<Vec<u8>> {
 
     fn entry(zip: &mut zip::ZipArchive<std::fs::File>, name: &str) -> Option<Vec<u8>> {
         use std::io::Read;
-        let mut f = zip.by_name(name).ok()?;
+        // Cap the *decompressed* read so a zip-bomb entry (a tiny compressed
+        // blob that inflates to gigabytes) can't exhaust memory. The OPF and
+        // container are tiny; a real cover is well under this. See M1.
+        const MAX_ENTRY_BYTES: u64 = 32 * 1024 * 1024;
+        let f = zip.by_name(name).ok()?;
         let mut buf = Vec::new();
-        f.read_to_end(&mut buf).ok()?;
+        f.take(MAX_ENTRY_BYTES).read_to_end(&mut buf).ok()?;
         Some(buf)
     }
 
@@ -793,6 +809,18 @@ async fn require_edit(state: &AppState, user: &AuthUser, book_id: &str) -> AppRe
     Ok(())
 }
 
+/// Whether a stored relative blob path is safe to resolve under the data dir: a
+/// non-empty *relative* path made only of normal segments — no `..`, no absolute
+/// root, no Windows prefix. A defence-in-depth backstop so that even a poisoned
+/// `cover_path` row can't turn a blob read into an arbitrary-file read. See
+/// docs/SECURITY_AUDIT.md (H1).
+pub(crate) fn is_safe_rel(rel: &str) -> bool {
+    let p = Path::new(rel);
+    !rel.is_empty()
+        && !p.is_absolute()
+        && p.components().all(|c| matches!(c, Component::Normal(_)))
+}
+
 async fn write_blob(state: &AppState, rel: &str, body: &[u8]) -> AppResult<()> {
     let full = state.data_dir.join(rel);
     if let Some(parent) = full.parent() {
@@ -878,6 +906,10 @@ async fn serve_blob(
     range: Option<&str>,
     if_range: Option<&str>,
 ) -> AppResult<Response> {
+    // Never resolve a path that escapes the blob store, whatever the DB holds.
+    if !is_safe_rel(rel) {
+        return Err(AppError::NotFound("blob missing on disk".into()));
+    }
     if let (Some(etag), Some(inm)) = (etag.as_deref(), if_none_match)
         && inm == etag
     {
@@ -1019,6 +1051,20 @@ mod tests {
         assert_eq!(sniff(b"RIFF\0\0\0\0WEBPVP8 "), Sniffed::WebP);
         assert_eq!(sniff(b"not a known format"), Sniffed::Unknown);
         assert_eq!(sniff(b""), Sniffed::Unknown);
+    }
+
+    #[test]
+    fn is_safe_rel_blocks_traversal() {
+        // Legitimate server-generated blob paths.
+        assert!(is_safe_rel("covers/abc.jpg"));
+        assert!(is_safe_rel("covers/thumbs/abc-w160.jpg"));
+        assert!(is_safe_rel("files/abc.pdf"));
+        // Traversal / absolute / empty must all be rejected.
+        assert!(!is_safe_rel("../vellum.db"));
+        assert!(!is_safe_rel("covers/../../etc/passwd"));
+        assert!(!is_safe_rel("/etc/passwd"));
+        assert!(!is_safe_rel(".."));
+        assert!(!is_safe_rel(""));
     }
 
     #[test]

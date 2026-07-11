@@ -267,6 +267,7 @@ pub async fn create(
     if input.title.trim().is_empty() {
         return Err(AppError::BadRequest("title is required".into()));
     }
+    validate_cover_path(input.cover_path.as_deref())?;
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO book (id, title, subtitle, description, isbn, publisher, \
@@ -302,6 +303,7 @@ pub async fn upsert(
     if input.title.trim().is_empty() {
         return Err(AppError::BadRequest("title is required".into()));
     }
+    validate_cover_path(input.cover_path.as_deref())?;
     let existing: Option<(Option<String>, String)> =
         sqlx::query_as("SELECT owner_id, updated_at FROM book WHERE id = ?")
             .bind(&id)
@@ -624,6 +626,7 @@ pub async fn update(
             "you have read-only access to this book".into(),
         ));
     }
+    validate_cover_path(input.cover_path.as_deref())?;
     sqlx::query(
         "UPDATE book SET \
             title = COALESCE(?, title), \
@@ -772,5 +775,49 @@ fn nullable(value: String) -> Option<String> {
         None
     } else {
         Some(trimmed.to_string())
+    }
+}
+
+/// Reject a client-supplied `cover_path` that could escape the blob store.
+///
+/// Covers are set server-side (upload, or the PDF/EPUB first-page render); a
+/// legitimate client only ever sends `None`. When a value *is* present we accept
+/// only the server's own shape — a single `covers/<name>` segment with no path
+/// separators or `..` — so a crafted `../../vellum.db` can't be stored and then
+/// streamed straight back by [`crate::blobs::get_cover`] as an arbitrary-file
+/// read. See docs/SECURITY_AUDIT.md (H1).
+fn validate_cover_path(cover_path: Option<&str>) -> AppResult<()> {
+    let Some(p) = cover_path else {
+        return Ok(());
+    };
+    let safe = p.strip_prefix("covers/").is_some_and(|name| {
+        !name.is_empty()
+            && !name.contains('/')
+            && !name.contains('\\')
+            && !name.contains("..")
+            && !name.contains('\0')
+    });
+    if safe {
+        Ok(())
+    } else {
+        Err(AppError::BadRequest("invalid cover_path".into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_cover_path;
+
+    #[test]
+    fn cover_path_validation_blocks_traversal() {
+        // Omitted or server-shaped values are fine.
+        assert!(validate_cover_path(None).is_ok());
+        assert!(validate_cover_path(Some("covers/9e1c-uuid.jpg")).is_ok());
+        // Anything that could escape the covers/ dir is rejected.
+        assert!(validate_cover_path(Some("../vellum.db")).is_err());
+        assert!(validate_cover_path(Some("covers/../../etc/passwd")).is_err());
+        assert!(validate_cover_path(Some("/etc/passwd")).is_err());
+        assert!(validate_cover_path(Some("files/x.pdf")).is_err());
+        assert!(validate_cover_path(Some("covers/")).is_err());
     }
 }

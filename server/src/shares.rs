@@ -410,6 +410,9 @@ pub async fn public_file(
     .await?;
     let (rel, format) =
         file.ok_or_else(|| AppError::NotFound("this book has no file to download".into()))?;
+    if !crate::blobs::is_safe_rel(&rel) {
+        return Err(AppError::NotFound("file missing on disk".into()));
+    }
 
     // Open the file BEFORE consuming a use, so a blob missing on disk can't burn
     // a one-time link on a download that then fails.
