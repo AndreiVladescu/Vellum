@@ -83,6 +83,15 @@ class _ServerPageState extends State<ServerPage> {
       if (mounted) {
         setState(() => _error = 'A sync is already running — try again in a moment.');
       }
+    } on TlsException {
+      // Covers HandshakeException / CertificateException: the imported/pinned
+      // server certificate didn't match (rotated, regenerated, or never
+      // imported). Point the user at the fix rather than a raw exception.
+      if (mounted) {
+        setState(() => _error =
+            "The server's certificate isn't trusted or has changed — "
+            'import the current certificate below.');
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Could not reach the server.\n$e');
     } finally {
@@ -227,12 +236,14 @@ class _ServerPageState extends State<ServerPage> {
         _showReport('Pushed', report.pushed, report);
       });
 
-  /// Certificate status + import control, shown for https URLs (a self-signed
-  /// server needs its certificate imported before the handshake can succeed).
-  Widget _certRow(ThemeData theme) {
-    final isHttps = ServerConnection.normalizeUrl(_url.text).startsWith('https://');
+  /// Certificate status + import control for [url], shown for https URLs (a
+  /// self-signed server needs its certificate imported before the handshake can
+  /// succeed). Used on both the sign-in screen and the connected view, so a
+  /// rotated certificate can be re-imported without disconnecting.
+  Widget _certRow(ThemeData theme, String url) {
+    final isHttps = ServerConnection.normalizeUrl(url).startsWith('https://');
     if (!isHttps) return const SizedBox.shrink();
-    final pem = widget.connection.certFor(_url.text);
+    final pem = widget.connection.certFor(url);
     final fp = pem == null ? null : fingerprintOf(pem);
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -255,7 +266,7 @@ class _ServerPageState extends State<ServerPage> {
             ),
           ),
           TextButton(
-            onPressed: _busy ? null : _importCert,
+            onPressed: _busy ? null : () => _importCert(url),
             child: Text(pem == null ? 'Import' : 'Change'),
           ),
         ],
@@ -269,10 +280,9 @@ class _ServerPageState extends State<ServerPage> {
     return groups.length <= 6 ? fp : '${groups.take(6).join(':')}…';
   }
 
-  /// Import the server's certificate for the current URL — pasted as PEM or read
-  /// from a chosen `.pem`/`.crt` file. Passing an empty result forgets it.
-  Future<void> _importCert() async {
-    final url = _url.text;
+  /// Import the server's certificate for [url] — pasted as PEM or read from a
+  /// chosen `.pem`/`.crt` file. Passing an empty result forgets it.
+  Future<void> _importCert(String url) async {
     final controller =
         TextEditingController(text: widget.connection.certFor(url) ?? '');
     final result = await showDialog<String?>(
@@ -400,6 +410,9 @@ class _ServerPageState extends State<ServerPage> {
                 : null,
           ),
         ),
+        // Lets a rotated/regenerated server certificate be re-imported without
+        // disconnecting (an https server only).
+        _certRow(theme, conn.baseUrl),
         const SizedBox(height: 24),
         Text('Sync', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
@@ -529,7 +542,7 @@ class _ServerPageState extends State<ServerPage> {
             ],
           ),
         ],
-        _certRow(theme),
+        _certRow(theme, _url.text),
         const SizedBox(height: 12),
         TextField(
           controller: _email,
