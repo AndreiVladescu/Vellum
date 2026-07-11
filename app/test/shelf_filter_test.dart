@@ -57,9 +57,11 @@ void main() {
         BooksCompanion.insert(id: 'b2', title: 'Neuromancer'));
     await db.into(db.books).insert(
         BooksCompanion.insert(id: 'b3', title: 'Foundation'));
-    await repo.setGenres('b1', ['Sci-Fi', 'Classic']);
+    // setGenres canonicalizes names to Title Case, so the facet must match the
+    // canonical form ("Science Fiction"), not the raw input.
+    await repo.setGenres('b1', ['Science Fiction', 'Classic']);
     await repo.setGenres('b2', ['Cyberpunk']);
-    await repo.setGenres('b3', ['Sci-Fi']);
+    await repo.setGenres('b3', ['science fiction']);
 
     final books = await repo.watchAllBooks().first;
     final authors = await repo.watchAuthorsByBook().first;
@@ -76,9 +78,11 @@ void main() {
             b.id
         ];
 
-    expect(ids(genre: 'Sci-Fi'), ['b1', 'b3'], reason: 'exact facet match');
-    expect(ids(genre: 'Sci'), isEmpty, reason: 'facet is exact, not substring');
-    expect(ids(genre: 'Sci-Fi', q: 'dune'), ['b1'],
+    expect(ids(genre: 'Science Fiction'), ['b1', 'b3'],
+        reason: 'exact facet match, case-variant inputs merged');
+    expect(ids(genre: 'Science'), isEmpty,
+        reason: 'facet is exact, not substring');
+    expect(ids(genre: 'Science Fiction', q: 'dune'), ['b1'],
         reason: 'text narrows within the facet');
     expect(ids(genre: 'Cyberpunk', q: 'dune'), isEmpty,
         reason: 'facet and text composed with AND');

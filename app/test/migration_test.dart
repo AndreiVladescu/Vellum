@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages — transitive via drift, test-only fixture
@@ -57,6 +58,54 @@ void main() {
         .into(vellum.localDeletions)
         .insert(LocalDeletionsCompanion.insert(bookId: 'b1'));
     expect((await vellum.select(vellum.localDeletions).get()).length, 1);
+
+    await vellum.close();
+    dir.deleteSync(recursive: true);
+  });
+
+  test('v8 merges genres that differ only by case into one canonical row',
+      () async {
+    final dir = Directory.systemTemp.createTempSync('vellum_genre_merge_test');
+    final file = File('${dir.path}/vellum.sqlite');
+
+    // Seed two genres that differ only by case, both tagging the same book —
+    // raw inserts bypass the write-path canonicalization so we recreate the
+    // pre-v8 state exactly.
+    final setup = VellumDatabase(NativeDatabase(file));
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    await setup.customStatement(
+      "INSERT INTO books (id, title, created_at, updated_at) "
+      "VALUES ('b1', 'Dune', $now, $now)",
+    );
+    await setup.customStatement(
+      "INSERT INTO genres (id, name) VALUES ('g1', 'computer security')",
+    );
+    await setup.customStatement(
+      "INSERT INTO genres (id, name) VALUES ('g2', 'Computer Security')",
+    );
+    await setup.customStatement(
+      "INSERT INTO book_genres (book_id, genre_id) VALUES ('b1', 'g1')",
+    );
+    await setup.customStatement(
+      "INSERT INTO book_genres (book_id, genre_id) VALUES ('b1', 'g2')",
+    );
+    // Rewind user_version so opening again re-runs the v8 data migration.
+    await setup.customStatement('PRAGMA user_version = 7');
+    await setup.close();
+
+    final vellum = VellumDatabase(NativeDatabase(file));
+    final genres =
+        await vellum.customSelect('SELECT name FROM genres').get();
+    expect(
+      genres.map((r) => r.read<String>('name')),
+      ['Computer Security'],
+      reason: 'the two case variants collapse into one canonical genre',
+    );
+    final links = await vellum.customSelect(
+      'SELECT genre_id FROM book_genres WHERE book_id = ?',
+      variables: [Variable.withString('b1')],
+    ).get();
+    expect(links.length, 1, reason: 'the book keeps the genre exactly once');
 
     await vellum.close();
     dir.deleteSync(recursive: true);

@@ -65,6 +65,18 @@ class Genres extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Canonical display form for a genre name: trimmed, internal whitespace
+/// collapsed to single spaces, and Title Cased. So spacing/case variants like
+/// "computer  security" and "Computer Security" collapse to one canonical
+/// "Computer Security", keeping the genre set small and tidy. Applied on every
+/// write and by the v8 data migration that merges pre-existing duplicates.
+String canonicalGenreName(String raw) => raw
+    .trim()
+    .split(RegExp(r'\s+'))
+    .where((w) => w.isNotEmpty)
+    .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+    .join(' ');
+
 class BookGenres extends Table {
   TextColumn get bookId => text().references(Books, #id)();
   TextColumn get genreId => text().references(Genres, #id)();
@@ -227,7 +239,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -292,11 +304,65 @@ class VellumDatabase extends _$VellumDatabase {
             await addBookColumn('needs_push', books.needsPush);
             await addBookColumn('cover_etag', books.coverEtag);
           }
+          if (from < 8) {
+            // Data-only: no schema change, so no matching server migration.
+            await _mergeDuplicateGenres();
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
         },
       );
+
+  /// One-time cleanup: collapse genres that differ only by case/spacing into a
+  /// single canonical row (e.g. "computer security" + "Computer Security" ->
+  /// "Computer Security"). Duplicates are deleted *before* the keeper is renamed
+  /// so the `UNIQUE(name)` constraint can't fire, and book_genres rows are
+  /// repointed with OR IGNORE so a book tagged with both variants keeps one.
+  Future<void> _mergeDuplicateGenres() async {
+    // Defensive, like the rest of onUpgrade: a partially-built database may not
+    // have these tables yet — nothing to merge if so.
+    final present = {
+      for (final r in await customSelect(
+              "SELECT name FROM sqlite_master WHERE type='table' "
+              "AND name IN ('genres', 'book_genres')")
+          .get())
+        r.read<String>('name'),
+    };
+    if (!present.contains('genres') || !present.contains('book_genres')) return;
+
+    final rows = await customSelect('SELECT id, name FROM genres').get();
+    final groups = <String, List<String>>{}; // canonical name -> genre ids
+    final nameById = <String, String>{};
+    for (final r in rows) {
+      final id = r.read<String>('id');
+      final name = r.read<String>('name');
+      nameById[id] = name;
+      (groups[canonicalGenreName(name)] ??= []).add(id);
+    }
+    for (final entry in groups.entries) {
+      final canon = entry.key;
+      final ids = entry.value;
+      final keeper = ids.first;
+      for (final dup in ids.skip(1)) {
+        await customStatement(
+          'UPDATE OR IGNORE book_genres SET genre_id = ? WHERE genre_id = ?',
+          [keeper, dup],
+        );
+        await customStatement(
+          'DELETE FROM book_genres WHERE genre_id = ?',
+          [dup],
+        );
+        await customStatement('DELETE FROM genres WHERE id = ?', [dup]);
+      }
+      if (nameById[keeper] != canon) {
+        await customStatement(
+          'UPDATE genres SET name = ? WHERE id = ?',
+          [canon, keeper],
+        );
+      }
+    }
+  }
 
   /// All books, alphabetically — reactive: the shelf UI rebuilds on changes.
   Stream<List<Book>> watchAllBooks() =>

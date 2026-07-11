@@ -159,7 +159,9 @@ void main() {
 
     final details = await repo.detailsFor('b1');
     expect(details.authors, ['Frank Herbert']);
-    expect(details.genres, ['Sci-Fi']);
+    // Genres are canonicalized (Title Case) on write, so the shelf's genre set
+    // stays tidy regardless of how the server cased them.
+    expect(details.genres, ['Sci-fi']);
   });
 
   test('pull sends the cursor and persists the new server clock', () async {

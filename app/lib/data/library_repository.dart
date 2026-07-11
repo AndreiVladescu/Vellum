@@ -359,12 +359,16 @@ class LibraryRepository {
         [bookId],
       );
       for (final raw in names) {
-        final name = raw.trim();
+        final name = canonicalGenreName(raw);
         if (name.isEmpty) continue;
         final genreId = await _idForName(db.genres, name);
-        await db
-            .into(db.bookGenres)
-            .insert(BookGenresCompanion.insert(bookId: bookId, genreId: genreId));
+        // insertOrIgnore: two input names may canonicalize to the same genre
+        // (e.g. "Sci-Fi" and "sci-fi"), which would otherwise clash on the
+        // (bookId, genreId) primary key.
+        await db.into(db.bookGenres).insert(
+              BookGenresCompanion.insert(bookId: bookId, genreId: genreId),
+              mode: InsertMode.insertOrIgnore,
+            );
       }
       await _gcOrphanGenres();
     });
@@ -725,15 +729,19 @@ class LibraryRepository {
             );
       }
 
-      // Open Library "subjects" are noisy; keep the first few short ones.
+      // Open Library "subjects" are noisy; keep the first few short ones, and
+      // canonicalize so case/spacing variants across books share one genre.
       final genres = result.subjects
           .where((s) => s.length <= 28 && !s.contains(':'))
+          .map(canonicalGenreName)
+          .where((s) => s.isNotEmpty)
           .take(3);
       for (final name in genres) {
         final genreId = await _idForName(db.genres, name);
-        await db
-            .into(db.bookGenres)
-            .insert(BookGenresCompanion.insert(bookId: id, genreId: genreId));
+        await db.into(db.bookGenres).insert(
+              BookGenresCompanion.insert(bookId: id, genreId: genreId),
+              mode: InsertMode.insertOrIgnore,
+            );
       }
     });
     return id;

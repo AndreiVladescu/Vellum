@@ -158,4 +158,27 @@ void main() {
     expect(part.existsSync(), false, reason: 'interrupted .part removed');
     expect(complete.existsSync(), true, reason: 'complete file kept');
   });
+
+  test('canonicalGenreName trims, collapses spaces, and Title Cases', () {
+    expect(canonicalGenreName('computer security'), 'Computer Security');
+    expect(canonicalGenreName('Computer Security'), 'Computer Security');
+    expect(canonicalGenreName('  COMPUTER   SECURITY  '), 'Computer Security');
+    expect(canonicalGenreName(''), '');
+    expect(canonicalGenreName('   '), '');
+  });
+
+  test('setGenres canonicalizes and dedups case/spacing variants', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'X'));
+
+    // Variants that all canonicalize to the same genre must yield one row.
+    await repo.setGenres('b1', ['computer security', 'Computer Security', '  ']);
+
+    final genres = [for (final g in await db.select(db.genres).get()) g.name];
+    expect(genres, ['Computer Security'],
+        reason: 'one canonical genre, empties dropped');
+    expect((await db.select(db.bookGenres).get()).length, 1,
+        reason: 'book tagged with it exactly once');
+  });
 }
