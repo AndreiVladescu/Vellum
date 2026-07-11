@@ -54,10 +54,14 @@ class VellumApp extends StatelessWidget {
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF7A5C3E), // leather-ish brown
         brightness: Brightness.light,
+        // Guarantee ≥48dp tap targets on every platform (not just the mobile
+        // default) so touch/accessibility targets are always reachable.
+        materialTapTargetSize: MaterialTapTargetSize.padded,
       ),
       darkTheme: ThemeData(
         colorSchemeSeed: const Color(0xFF7A5C3E),
         brightness: Brightness.dark,
+        materialTapTargetSize: MaterialTapTargetSize.padded,
       ),
       home: LibraryPage(
         repository: repository,
