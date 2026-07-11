@@ -35,18 +35,19 @@ environment — running them is a recommendation below.
 | H1 | 🔴 | ✅ Fixed (2026-07-11) | Arbitrary file read via client-controlled `cover_path` (path traversal) | `server/src/books.rs`, `server/src/blobs.rs` |
 | M1 | 🟠 | ✅ Fixed (2026-07-11) | Decompression / pixel bombs on untrusted covers & EPUB zips (DoS) | `server/src/blobs.rs` |
 | M2 | 🟠 | ✅ Fixed (2026-07-11) | Client-side path traversal on sync pull (server-supplied ids unvalidated) | `app/lib/server/sync_service.dart` |
-| M3 | 🟠 | Open | Master-bootstrap takeover window (first registrant becomes owner) | `server/src/auth.rs` + deployment |
-| M4 | 🟠 | Open | Dependencies behind latest; no automated advisory scanning in CI | `server/Cargo.toml`, `app/pubspec.yaml` |
+| M3 | 🟠 | ✅ Mitigated (opt-in, 2026-07-11) | Master-bootstrap takeover window (first registrant becomes owner) | `server/src/auth.rs` + deployment |
+| M4 | 🟠 | ✅ Fixed (2026-07-11) | Dependencies behind latest; no automated advisory scanning in CI | `server/Cargo.toml`, `app/pubspec.yaml` |
 | L1 | 🟡 | Open | `?token=` in URL leaks into proxy logs / browser history | `server/src/auth.rs` |
 | L2 | 🟡 | Open | Session token plaintext fallback when no OS keyring | `app/lib/server/connection_store.dart` |
-| L3 | 🟡 | Open | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/web.rs` |
-| L4 | 🟡 | Open | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
+| L3 | 🟡 | ✅ Fixed (2026-07-11) | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/lib.rs` |
+| L4 | 🟡 | ✅ Fixed (2026-07-11) | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
 | L5 | 🟡 | Open | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
 | L6 | 🟡 | Open | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
 
-> **Remediation note (2026-07-11):** H1, M1, and M2 — the destructive, low-effort
-> findings — have been hardened (see the ✅ notes in each section below). M3–M4
-> and the L-items remain open.
+> **Remediation note (2026-07-11):** H1, M1, M2 (destructive, low-effort) plus a
+> second round — M3 (opt-in), M4, L3, L4 — have been hardened (see the ✅ notes in
+> each section). Still open: M4's `flutter_secure_storage` major upgrade, and
+> L1, L2, L5, L6.
 
 ---
 
@@ -182,6 +183,14 @@ the very first registration behind a one-time bootstrap secret
 (`VELLUM_BOOTSTRAP_TOKEN` env var checked in `register` until a master exists),
 so an open port alone can't be claimed.
 
+**✅ Mitigated (opt-in, 2026-07-11):** `auth.rs::require_bootstrap_token` now
+enforces a `VELLUM_BOOTSTRAP_TOKEN` env secret on `register` when it is set —
+the first registration must present a matching `bootstrap_token` (compared as
+SHA-256 to avoid a length/timing tell). Unset ⇒ behaviour unchanged, so this is
+opt-in: operators exposing a fresh instance should set it. (The app's register
+screen would need a token field to use it interactively; today the bootstrap
+registration is done via curl/console.)
+
 ---
 
 ### 🟠 M4 — Dependency currency & no automated advisory scanning
@@ -203,6 +212,12 @@ version behind** (10.x is available); `drift`, `archive`, `pdfrx`,
 **Fix:** Add `cargo audit` (or `cargo deny check advisories`) and a
 `flutter pub outdated`/dependency-review step to CI so a newly-disclosed CVE in a
 dependency fails the build. Plan the `flutter_secure_storage` 9→10 upgrade.
+
+**✅ Fixed (2026-07-11):** a new `audit` CI job runs `cargo audit` (prebuilt via
+`taiki-e/install-action`) against `server/Cargo.lock`, so a newly-disclosed
+RustSec advisory now fails CI. *Still open:* the `flutter_secure_storage` 9→10
+major upgrade, and a Dart-side advisory check (no first-party tool exists;
+`flutter pub outdated` remains informational).
 
 ---
 
@@ -232,6 +247,12 @@ warning the user when the secure store is unavailable, or refusing to persist.
 would need work because the console uses inline handlers, but at minimum add
 `X-Content-Type-Options: nosniff` (blobs are served same-origin) and a
 frame-ancestors/`X-Frame-Options: DENY` to blunt clickjacking and MIME-sniffing.
+
+**✅ Fixed (2026-07-11):** a `security_headers` middleware in `lib.rs::router`
+now sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and a CSP
+(`default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none';
+frame-ancestors 'none'`; inline styles/scripts allowed so the console/public
+pages still work) on every response. An integration test asserts their presence.
 
 ### 🟡 L4 — Login throttle keyed by email only
 
