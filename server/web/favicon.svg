@@ -1,34 +1,37 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <!-- Vellum app-icon tile: a cream open book with a gold bookmark ribbon on a
-       warm ink tile. Full-bleed background so launcher masks (circle/squircle)
-       crop cleanly. -->
+  <!-- Vellum app-icon tile: an open book drawn as two cream page-leaves parted
+       by a fine ink crease, with a gold bookmark ribbon notched into a "V", on a
+       warm ink tile. Full-bleed background so launcher masks crop cleanly.
+       Refined/flat: no heavy outlines, no scribbled text lines. -->
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6b4e32"/>
-      <stop offset="1" stop-color="#4f3924"/>
+      <stop offset="0" stop-color="#6a4d31"/>
+      <stop offset="1" stop-color="#493420"/>
     </linearGradient>
     <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f7efdd"/>
-      <stop offset="1" stop-color="#e7d9bd"/>
+      <stop offset="0" stop-color="#f4ead2"/>
+      <stop offset="1" stop-color="#e6d5b4"/>
     </linearGradient>
     <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#d8a860"/>
-      <stop offset="1" stop-color="#b9863f"/>
+      <stop offset="0" stop-color="#d5a55c"/>
+      <stop offset="1" stop-color="#bd8940"/>
     </linearGradient>
   </defs>
 
-  <rect x="0" y="0" width="512" height="512" fill="url(#tile)"/>
+  <rect width="512" height="512" fill="url(#tile)"/>
 
-  <path d="M238 196 H274 V402 L256 380 L238 402 Z" fill="url(#ribbon)"/>
+  <!-- Bookmark ribbon: sits behind the leaves, emerges below with a V foot. -->
+  <path d="M244 198 H268 V408 L256 386 L244 408 Z" fill="url(#ribbon)"/>
 
-  <path d="M256 178 C 210 152, 150 152, 104 174 L 104 346 C 150 324, 210 324, 256 350 Z"
-        fill="url(#page)" stroke="#3d2c1a" stroke-width="11" stroke-linejoin="round"/>
-  <path d="M256 178 C 302 152, 362 152, 408 174 L 408 346 C 362 324, 302 324, 256 350 Z"
-        fill="url(#page)" stroke="#3d2c1a" stroke-width="11" stroke-linejoin="round"/>
-  <path d="M256 178 L256 350" fill="none" stroke="#3d2c1a" stroke-width="11" stroke-linecap="round"/>
-
-  <g stroke="#b07f4e" stroke-width="8" stroke-linecap="round">
-    <path d="M142 218 H222"/><path d="M142 256 H222"/><path d="M142 294 H206"/>
-    <path d="M290 218 H370"/><path d="M290 256 H370"/><path d="M306 294 H370"/>
+  <!-- Page-leaf thickness: faint stacked edges beneath each leaf. -->
+  <g fill="none" stroke="#c9b184" stroke-width="6" stroke-linecap="round" opacity="0.55">
+    <path d="M104 344 C 150 330, 208 328, 250 342"/>
+    <path d="M408 344 C 362 330, 304 328, 262 342"/>
   </g>
+
+  <!-- Two page-leaves, parted by a fine ink crease at the spine. -->
+  <path d="M250 198 C 206 174, 150 172, 104 184 L 104 336 C 150 324, 206 322, 250 336 Z"
+        fill="url(#page)"/>
+  <path d="M262 198 C 306 174, 362 172, 408 184 L 408 336 C 362 324, 306 322, 262 336 Z"
+        fill="url(#page)"/>
 </svg>
