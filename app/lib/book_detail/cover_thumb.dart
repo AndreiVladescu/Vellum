@@ -23,6 +23,11 @@ class CoverThumbState extends State<CoverThumb> {
     final theme = Theme.of(context);
     final cover = widget.cover;
     final dpr = MediaQuery.devicePixelRatioOf(context);
+    // Touch platforms never hover, so the "Change cover" overlay would never
+    // appear — show a persistent edit badge instead so it's discoverable.
+    final isTouch = theme.platform == TargetPlatform.android ||
+        theme.platform == TargetPlatform.iOS ||
+        theme.platform == TargetPlatform.fuchsia;
     final placeholder = Container(
       color: theme.colorScheme.surfaceContainerHighest,
       alignment: Alignment.center,
@@ -66,6 +71,20 @@ class CoverThumbState extends State<CoverThumb> {
                     ),
                   ),
                 ),
+                if (isTouch)
+                  Positioned(
+                    right: 6,
+                    bottom: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.edit,
+                          size: 15, color: Colors.white),
+                    ),
+                  ),
               ],
             ),
           ),

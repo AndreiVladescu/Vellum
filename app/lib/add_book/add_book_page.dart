@@ -265,6 +265,12 @@ class _AddBookPageState extends State<AddBookPage> {
     );
   }
 
+  /// Touch platforms can't drag-and-drop; the pane is tap-to-pick there.
+  bool _isTouch(ThemeData theme) =>
+      theme.platform == TargetPlatform.android ||
+      theme.platform == TargetPlatform.iOS ||
+      theme.platform == TargetPlatform.fuchsia;
+
   Widget _fileDropPane(ThemeData theme) {
     return DropTarget(
       onDragEntered: (_) => setState(() => _dragging = true),
@@ -293,7 +299,9 @@ class _AddBookPageState extends State<AddBookPage> {
           child: Center(
             child: Text(
               _fileName == null
-                  ? 'Attach a file (optional): drop a PDF/EPUB here or click'
+                  ? (_isTouch(theme)
+                      ? 'Attach a file (optional): tap to choose a PDF/EPUB'
+                      : 'Attach a file (optional): drop a PDF/EPUB here or click')
                   : 'Attached: $_fileName',
               style: theme.textTheme.bodyMedium,
             ),
