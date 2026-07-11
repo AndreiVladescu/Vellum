@@ -33,6 +33,15 @@ def rounded(im: Image.Image, radius_frac: float = 0.22) -> Image.Image:
     return out
 
 
+def rounded_svg(svg_text: str) -> str:
+    """Give the full-bleed tile its own rounded corners, so the SVG outputs
+    (favicon, scalable theme icon) match the rounded raster icons instead of
+    showing hard square corners. ~0.22 of the side, matching rounded()."""
+    return svg_text.replace(
+        '<rect width="512" height="512" fill="url(#tile)"/>',
+        '<rect width="512" height="512" rx="112" ry="112" fill="url(#tile)"/>')
+
+
 def save(im: Image.Image, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     im.save(path)
@@ -72,18 +81,18 @@ def main():
     app_id = "com.avladescu.vellum"
     theme = APP / "linux/packaging/icons/hicolor"
     (theme / "scalable/apps").mkdir(parents=True, exist_ok=True)
-    (theme / f"scalable/apps/{app_id}.svg").write_text(icon.read_text())
+    (theme / f"scalable/apps/{app_id}.svg").write_text(rounded_svg(icon.read_text()))
     print("wrote", (theme / f"scalable/apps/{app_id}.svg").relative_to(ROOT))
     for px in (48, 64, 128, 256):
         save(rounded(render(icon, px)),
              theme / f"{px}x{px}/apps/{app_id}.png")
 
-    # Server console/public — favicon (tile) + header mark, as SVGs copied in.
-    for src, dst in [(icon, "server/web/favicon.svg"),
-                     (mark, "server/web/logo.svg")]:
+    # Server console/public — favicon (rounded tile) + header mark, as SVGs.
+    for text, dst in [(rounded_svg(icon.read_text()), "server/web/favicon.svg"),
+                      (mark.read_text(), "server/web/logo.svg")]:
         out = ROOT / dst
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(src.read_text())
+        out.write_text(text)
         print("wrote", dst)
 
 
