@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Adaptive-icon FOREGROUND layer: the open book + ribbon on transparent, to
+       be composited over logo-adaptive-background.svg. The book sits within the
+       inner ~66% of the 108dp canvas (the adaptive-icon safe zone), so launcher
+       masks and animations never crop it. -->
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4ead2"/>
+      <stop offset="1" stop-color="#e6d5b4"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d5a55c"/>
+      <stop offset="1" stop-color="#bd8940"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M244 198 H268 V408 L256 386 L244 408 Z" fill="url(#ribbon)"/>
+
+  <g fill="none" stroke="#c9b184" stroke-width="6" stroke-linecap="round" opacity="0.55">
+    <path d="M104 344 C 150 330, 208 328, 250 342"/>
+    <path d="M408 344 C 362 330, 304 328, 262 342"/>
+  </g>
+
+  <path d="M250 198 C 206 174, 150 172, 104 184 L 104 336 C 150 324, 206 322, 250 336 Z"
+        fill="url(#page)"/>
+  <path d="M262 198 C 306 174, 362 172, 408 184 L 408 336 C 362 324, 306 322, 262 336 Z"
+        fill="url(#page)"/>
+</svg>

@@ -52,11 +52,40 @@ def main():
     icon = DESIGN / "logo-icon.svg"
     mark = DESIGN / "logo-mark.svg"
 
-    # Android — square, full-bleed (the launcher applies its own mask).
+    # Android — legacy square launcher icon, full-bleed (pre-API 26 launchers
+    # apply their own mask).
     for name, px in {"mdpi": 48, "hdpi": 72, "xhdpi": 96,
                      "xxhdpi": 144, "xxxhdpi": 192}.items():
         save(render(icon, px),
              APP / f"android/app/src/main/res/mipmap-{name}/ic_launcher.png")
+
+    # Android adaptive icon (API 26+): separate foreground (book) + background
+    # (ink tile) layers on the 108dp canvas, plus a monochrome layer for the
+    # Android 13+ themed-icon treatment. Densities are 108dp * bucket scale.
+    fg = DESIGN / "logo-adaptive-foreground.svg"
+    bg = DESIGN / "logo-adaptive-background.svg"
+    for name, px in {"mdpi": 108, "hdpi": 162, "xhdpi": 216,
+                     "xxhdpi": 324, "xxxhdpi": 432}.items():
+        d = APP / f"android/app/src/main/res/mipmap-{name}"
+        save(render(bg, px), d / "ic_launcher_background.png")
+        fg_img = render(fg, px)
+        save(fg_img, d / "ic_launcher_foreground.png")
+        # Monochrome = the foreground silhouette in one flat colour; the system
+        # tints it. Keep only the alpha, fill it solid black.
+        mono = Image.new("RGBA", fg_img.size, (0, 0, 0, 0))
+        mono.paste((0, 0, 0, 255), (0, 0), fg_img.split()[3])
+        save(mono, d / "ic_launcher_monochrome.png")
+
+    adaptive = APP / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+    adaptive.parent.mkdir(parents=True, exist_ok=True)
+    adaptive.write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <background android:drawable="@mipmap/ic_launcher_background" />\n'
+        '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n'
+        '    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />\n'
+        '</adaptive-icon>\n')
+    print("wrote", adaptive.relative_to(ROOT))
 
     # macOS — rounded, shown as-is in the dock.
     for px in (16, 32, 64, 128, 256, 512, 1024):
