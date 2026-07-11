@@ -127,13 +127,18 @@ class _ServerPageState extends State<ServerPage> {
     );
   }
 
+  /// A dialog-content width that caps at [max] on desktop but shrinks to fit a
+  /// phone screen (an AlertDialog reserves ~80px of horizontal inset padding).
+  double _dialogWidth(BuildContext context, double max) =>
+      (MediaQuery.sizeOf(context).width - 80).clamp(0.0, max);
+
   void _showIssues(List<SyncIssue> issues) {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Sync issues (${issues.length})'),
         content: SizedBox(
-          width: 400,
+          width: _dialogWidth(context, 400),
           child: ListView(
             shrinkWrap: true,
             children: [
@@ -278,7 +283,7 @@ class _ServerPageState extends State<ServerPage> {
           builder: (context, setLocal) => AlertDialog(
             title: const Text('Trust server certificate'),
             content: SizedBox(
-              width: 460,
+              width: _dialogWidth(context, 460),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
