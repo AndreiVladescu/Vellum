@@ -2,11 +2,14 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value, Variable;
 import 'package:drift/native.dart';
+import 'package:drift_dev/api/migrations_native.dart' as verify;
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages — transitive via drift, test-only fixture
 import 'package:sqlite3/sqlite3.dart' as raw;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/search_index.dart';
+
+import 'generated/drift_schema_versions/schema.dart' as versions;
 
 /// Recreates the corrupted state seen in the wild: a database whose
 /// `user_version` is stuck at 3 while the v4/v5 objects (the physical tables,
@@ -171,5 +174,37 @@ void main() {
 
     await vellum.close();
     dir.deleteSync(recursive: true);
+  });
+
+  // Snapshots in test/drift_schemas/ (one per schemaVersion ever shipped,
+  // dumped with `dart run drift_dev schema dump` from the historical commit
+  // that introduced each version) plus the generated verifier in
+  // test/generated/drift_schema_versions/ (`dart run drift_dev schema
+  // generate`) let every one of them be replayed here, not just the ones a
+  // handwritten fixture happens to cover. This is what an early user who
+  // hasn't opened the app since v1 actually does on upgrade: the case above
+  // (v3-stuck-with-v4-objects) is a *recovery* from a corrupted intermediate
+  // state that no clean schemaAt(N) snapshot can reproduce, so it stays as
+  // its own test rather than folding into this group.
+  //
+  // To add a version: bump schemaVersion, write the migration, then run
+  //   dart run drift_dev schema dump lib/data/database.dart test/drift_schemas
+  //   dart run drift_dev schema generate test/drift_schemas \
+  //     test/generated/drift_schema_versions --data-classes --companions
+  group('every historical schema version migrates cleanly to the latest', () {
+    final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
+    final latest = versions.GeneratedHelper.versions.last;
+
+    for (final version in versions.GeneratedHelper.versions) {
+      test('v$version -> v$latest', () async {
+        final connection = await verifier.startAt(version);
+        final db = VellumDatabase(connection);
+        addTearDown(db.close);
+        // Runs the real VellumDatabase.migration strategy (the same
+        // onUpgrade/beforeOpen a real app launch would run) and compares the
+        // resulting sqlite_schema against what v$latest's tables declare.
+        await verifier.migrateAndValidate(db, latest);
+      });
+    }
   });
 }
