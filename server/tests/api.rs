@@ -691,6 +691,99 @@ async fn books_list_supports_delta_cursor_envelope() {
 }
 
 #[tokio::test]
+async fn books_list_page_param_is_inert_when_a_cursor_is_present() {
+    // §3: page/limit must never apply when cursor is present in any form --
+    // an empty cursor is the app's *first* sync, and letting a page limit
+    // apply to it would silently truncate that pull.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    for i in 0..3 {
+        create_book(&app, &master, &format!("Book {i}")).await;
+    }
+
+    for cursor_qs in ["cursor=", "cursor=2000-01-01%2000:00:00"] {
+        let (_, env) = call(
+            &app,
+            "GET",
+            &format!("/api/books?{cursor_qs}&page=1&limit=1"),
+            Some(&master),
+            None,
+        )
+        .await;
+        assert_eq!(
+            env["books"].as_array().unwrap().len(),
+            3,
+            "cursor pull truncated by page/limit ({cursor_qs})"
+        );
+        assert!(
+            env["items"].is_null(),
+            "cursor pull must keep the envelope shape, not the paged one"
+        );
+    }
+}
+
+#[tokio::test]
+async fn books_list_paginates_stably_with_total_and_next() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    // Titles chosen so the list's ORDER BY (title, id) gives a predictable
+    // order regardless of creation order.
+    create_book(&app, &master, "Charlie").await;
+    create_book(&app, &master, "Alpha").await;
+    create_book(&app, &master, "Bravo").await;
+
+    let (_, page1) =
+        call(&app, "GET", "/api/books?page=1&limit=2", Some(&master), None).await;
+    assert_eq!(page1["total"], json!(3));
+    assert_eq!(page1["next"], json!(2));
+    assert_eq!(titles(&page1["items"]), vec!["Alpha", "Bravo"]);
+
+    let (_, page2) =
+        call(&app, "GET", "/api/books?page=2&limit=2", Some(&master), None).await;
+    assert_eq!(page2["total"], json!(3));
+    assert_eq!(page2["next"], Value::Null, "last page has no next");
+    assert_eq!(titles(&page2["items"]), vec!["Charlie"]);
+}
+
+#[tokio::test]
+async fn books_list_scopes_authors_genres_to_each_returned_book() {
+    // §3: the authors/genres/files aggregation is now looked up scoped to
+    // the returned book ids in one pass rather than a per-list full-table
+    // scan -- pins that scoping doesn't cross-contaminate books sharing that
+    // one lookup pass.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    call(
+        &app,
+        "PUT",
+        "/api/books/sc-1",
+        Some(&master),
+        Some(json!({ "title": "One", "authors": ["Ann"], "genres": ["Sci-Fi"] })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/books/sc-2",
+        Some(&master),
+        Some(json!({ "title": "Two", "authors": ["Bob"], "genres": ["Poetry"] })),
+    )
+    .await;
+
+    let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    let by_id: std::collections::HashMap<String, Value> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| (b["id"].as_str().unwrap().to_string(), b.clone()))
+        .collect();
+    assert_eq!(by_id["sc-1"]["authors"], json!(["Ann"]));
+    assert_eq!(by_id["sc-1"]["genres"], json!(["Sci-Fi"]));
+    assert_eq!(by_id["sc-2"]["authors"], json!(["Bob"]));
+    assert_eq!(by_id["sc-2"]["genres"], json!(["Poetry"]));
+}
+
+#[tokio::test]
 async fn upsert_is_a_noop_when_nothing_changed() {
     let app = test_app().await;
     let master = register_master(&app).await;

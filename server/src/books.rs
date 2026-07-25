@@ -87,21 +87,9 @@ pub async fn visible_books(
     } else {
         ""
     };
-    // Access predicate wrapped in parens so the optional filter ANDs with the
-    // whole OR-group, not just its last term.
     let sql = format!(
-        "SELECT {BOOK_COLUMNS} FROM book b \
-         WHERE ( b.owner_id = ? \
-            OR ? = 1 \
-            OR EXISTS ( \
-                SELECT 1 FROM share s WHERE s.grantee_id = ? AND ( \
-                    (s.scope = 'all'   AND s.owner_id = b.owner_id) OR \
-                    (s.scope = 'book'  AND s.scope_id = b.id) OR \
-                    (s.scope = 'group' AND EXISTS ( \
-                        SELECT 1 FROM book_group_item gi \
-                        WHERE gi.group_id = s.scope_id AND gi.book_id = b.id)) )) ) \
-            {filter} \
-         ORDER BY b.title"
+        "SELECT {BOOK_COLUMNS} FROM book b WHERE {} {filter} ORDER BY b.title, b.id",
+        access_predicate()
     );
     let mut query = sqlx::query_as::<_, BookDto>(&sql)
         .bind(&user.id)
@@ -111,6 +99,56 @@ pub async fn visible_books(
         query = query.bind(ts.to_string());
     }
     Ok(query.fetch_all(&state.db).await?)
+}
+
+/// The share/ownership predicate `visible_books` and `visible_books_page`
+/// both filter on, factored out so the two can't drift apart. Binds (in
+/// order): `user.id`, `user.is_master`, `user.id`. Wrapped in parens so a
+/// caller ANDing another condition onto it doesn't just AND the last OR-term.
+fn access_predicate() -> &'static str {
+    "( b.owner_id = ? \
+        OR ? = 1 \
+        OR EXISTS ( \
+            SELECT 1 FROM share s WHERE s.grantee_id = ? AND ( \
+                (s.scope = 'all'   AND s.owner_id = b.owner_id) OR \
+                (s.scope = 'book'  AND s.scope_id = b.id) OR \
+                (s.scope = 'group' AND EXISTS ( \
+                    SELECT 1 FROM book_group_item gi \
+                    WHERE gi.group_id = s.scope_id AND gi.book_id = b.id)) )) )"
+}
+
+/// A page of visible books (stable `title, id` order) plus the total count of
+/// visible books under the same predicate — the console's paged fetch (§3).
+/// Unlike `visible_books`, never used for the app's delta pull: paging must
+/// never apply there, or a pull would silently stop short of its window.
+pub async fn visible_books_page(
+    state: &AppState,
+    user: &AuthUser,
+    limit: i64,
+    offset: i64,
+) -> AppResult<(Vec<BookDto>, i64)> {
+    let sql = format!(
+        "SELECT {BOOK_COLUMNS} FROM book b WHERE {} ORDER BY b.title, b.id LIMIT ? OFFSET ?",
+        access_predicate()
+    );
+    let items = sqlx::query_as::<_, BookDto>(&sql)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await?;
+
+    let count_sql = format!("SELECT COUNT(*) FROM book b WHERE {}", access_predicate());
+    let total: i64 = sqlx::query_scalar(&count_sql)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok((items, total))
 }
 
 /// All authors in the library, grouped by book id in cover order, from one
@@ -154,6 +192,112 @@ pub async fn files_map(
     Ok(map)
 }
 
+/// SQLite's default `SQLITE_MAX_VARIABLE_NUMBER` is 999 (raised in newer
+/// builds, but this repo doesn't assume that) — chunk `IN (?,?,…)` lists to
+/// stay under it with room for a query's other binds.
+const ID_CHUNK: usize = 900;
+
+fn in_placeholders(n: usize) -> String {
+    std::iter::repeat_n("?", n).collect::<Vec<_>>().join(",")
+}
+
+/// Authors for exactly `ids`, grouped by book id in cover order — `list`'s
+/// scoped counterpart to `author_map` (§3: a one-book delta pull shouldn't
+/// scan every author join in the library). A TEMP TABLE join would also work
+/// but needs a transaction to survive across statements on a pooled
+/// connection; a chunked `IN` list needs neither and reads no differently.
+pub async fn author_map_for(
+    state: &AppState,
+    ids: &[String],
+) -> AppResult<std::collections::HashMap<String, Vec<String>>> {
+    let mut map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    if ids.is_empty() {
+        return Ok(map);
+    }
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        book_id: String,
+        name: String,
+    }
+    for chunk in ids.chunks(ID_CHUNK) {
+        let sql = format!(
+            "SELECT ba.book_id, a.name FROM author a \
+             JOIN book_author ba ON ba.author_id = a.id \
+             WHERE ba.book_id IN ({}) ORDER BY ba.book_id, ba.position",
+            in_placeholders(chunk.len())
+        );
+        let mut query = sqlx::query_as::<_, Row>(&sql);
+        for id in chunk {
+            query = query.bind(id);
+        }
+        for row in query.fetch_all(&state.db).await? {
+            map.entry(row.book_id).or_default().push(row.name);
+        }
+    }
+    Ok(map)
+}
+
+/// Genres for exactly `ids`, grouped by book id — scoped counterpart to a
+/// full genre scan, same reasoning as `author_map_for`.
+pub async fn genre_map_for(
+    state: &AppState,
+    ids: &[String],
+) -> AppResult<std::collections::HashMap<String, Vec<String>>> {
+    let mut map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    if ids.is_empty() {
+        return Ok(map);
+    }
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        book_id: String,
+        name: String,
+    }
+    for chunk in ids.chunks(ID_CHUNK) {
+        let sql = format!(
+            "SELECT bg.book_id, g.name FROM genre g \
+             JOIN book_genre bg ON bg.genre_id = g.id \
+             WHERE bg.book_id IN ({}) ORDER BY bg.book_id, g.name",
+            in_placeholders(chunk.len())
+        );
+        let mut query = sqlx::query_as::<_, Row>(&sql);
+        for id in chunk {
+            query = query.bind(id);
+        }
+        for row in query.fetch_all(&state.db).await? {
+            map.entry(row.book_id).or_default().push(row.name);
+        }
+    }
+    Ok(map)
+}
+
+/// Files for exactly `ids`, grouped by book id — scoped counterpart to a full
+/// file scan, same reasoning as `author_map_for`.
+pub async fn files_full_map_for(
+    state: &AppState,
+    ids: &[String],
+) -> AppResult<std::collections::HashMap<String, Vec<crate::blobs::FileDto>>> {
+    let mut map: std::collections::HashMap<String, Vec<crate::blobs::FileDto>> =
+        std::collections::HashMap::new();
+    if ids.is_empty() {
+        return Ok(map);
+    }
+    for chunk in ids.chunks(ID_CHUNK) {
+        let sql = format!(
+            "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
+             FROM book_file WHERE book_id IN ({}) ORDER BY book_id, added_at",
+            in_placeholders(chunk.len())
+        );
+        let mut query = sqlx::query_as::<_, crate::blobs::FileDto>(&sql);
+        for id in chunk {
+            query = query.bind(id);
+        }
+        for f in query.fetch_all(&state.db).await? {
+            map.entry(f.book_id.clone()).or_default().push(f);
+        }
+    }
+    Ok(map)
+}
+
 /// A book plus the aggregates a client needs without a per-row round-trip: the
 /// console renders Author/file columns from these, and the app's pull reads
 /// `files` instead of a `GET .../files` per book.
@@ -168,64 +312,88 @@ pub struct BookListItem {
     pub file_count: i64,
 }
 
-/// Query params for the books list. `cursor` is the app's delta-pull marker:
-/// its presence switches the response to the `{ server_now, books }` envelope
-/// (so the client can learn the server clock), and a non-empty value filters to
-/// rows changed since it. Absent entirely (the console) → today's bare array.
+/// Query params for the books list.
+///
+/// `cursor`'s **presence** (even empty) is what selects the `{ server_now,
+/// books }` envelope for the app's delta pull, and a non-empty value further
+/// filters to rows changed since it; an empty cursor is the app's *first*
+/// sync — still the envelope shape, still unbounded. Whenever `cursor` is
+/// present at all, `page`/`limit` are ignored: a delta pull must never
+/// silently stop short of its window.
+///
+/// `page` (1-based) requests the paged `{ items, total, next }` shape instead
+/// of today's bare array — gated behind this explicit param so existing
+/// console clients keep working until moved over (§3), then the flag drops.
+/// `limit` overrides the default page size, clamped to `MAX_PAGE_SIZE`.
 #[derive(Deserialize)]
 pub struct ListQuery {
     pub cursor: Option<String>,
+    pub page: Option<u32>,
+    pub limit: Option<u32>,
 }
+
+const DEFAULT_PAGE_SIZE: i64 = 200;
+const MAX_PAGE_SIZE: i64 = 2000;
 
 pub async fn list(
     State(state): State<AppState>,
     user: AuthUser,
     axum::extract::Query(q): axum::extract::Query<ListQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let since = q.cursor.as_deref().map(str::trim).filter(|c| !c.is_empty());
-    let books = visible_books(&state, &user, since).await?;
-
-    // Grouped scans, folded into lookup maps, so the response is assembled in
-    // Rust rather than with a per-book query. Fine for a personal library.
-    let authors_by_book = author_map(&state).await?;
-
-    // Same grouped-scan pattern for genres, so the app's pull can carry them.
-    #[derive(sqlx::FromRow)]
-    struct GenreRow {
-        book_id: String,
-        name: String,
-    }
-    let genre_rows = sqlx::query_as::<_, GenreRow>(
-        "SELECT bg.book_id, g.name FROM genre g \
-         JOIN book_genre bg ON bg.genre_id = g.id ORDER BY bg.book_id, g.name",
-    )
-    .fetch_all(&state.db)
-    .await?;
-    let mut genres_by_book: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-    for row in genre_rows {
-        genres_by_book
-            .entry(row.book_id)
-            .or_default()
-            .push(row.name);
+    // Gate on `q.cursor.is_some()` alone, once, up front — not on whether the
+    // cursor is non-empty. An empty `?cursor=` still means "delta-pull
+    // envelope, unbounded"; letting `page` apply to it would silently
+    // truncate a client's first sync.
+    if let Some(cursor) = &q.cursor {
+        let since = cursor.trim();
+        let since = if since.is_empty() { None } else { Some(since) };
+        let books = visible_books(&state, &user, since).await?;
+        let items = assemble_items(&state, books).await?;
+        let server_now: String = sqlx::query_scalar("SELECT datetime('now')")
+            .fetch_one(&state.db)
+            .await?;
+        return Ok(Json(serde_json::json!({
+            "server_now": server_now,
+            "books": items,
+        })));
     }
 
-    // One scan of every file, grouped by book, so the list carries full file
-    // rows (id/format/size/hash) — the app dedups and downloads from these, and
-    // file_count is just their length (no separate COUNT scan).
-    let file_rows = sqlx::query_as::<_, crate::blobs::FileDto>(
-        "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
-         FROM book_file ORDER BY book_id, added_at",
-    )
-    .fetch_all(&state.db)
-    .await?;
-    let mut files_by_book: std::collections::HashMap<String, Vec<crate::blobs::FileDto>> =
-        std::collections::HashMap::new();
-    for f in file_rows {
-        files_by_book.entry(f.book_id.clone()).or_default().push(f);
+    if let Some(page) = q.page {
+        let limit =
+            (q.limit.unwrap_or(DEFAULT_PAGE_SIZE as u32) as i64).clamp(1, MAX_PAGE_SIZE);
+        let page = page.max(1) as i64;
+        let offset = (page - 1) * limit;
+        let (books, total) = visible_books_page(&state, &user, limit, offset).await?;
+        let next = if offset + (books.len() as i64) < total {
+            Some(page + 1)
+        } else {
+            None
+        };
+        let items = assemble_items(&state, books).await?;
+        return Ok(Json(serde_json::json!({
+            "items": items,
+            "total": total,
+            "next": next,
+        })));
     }
 
-    let items = books
+    // Neither cursor nor page: today's unbounded bare array, kept for console
+    // clients until they're moved onto `?page=1`.
+    let books = visible_books(&state, &user, None).await?;
+    let items = assemble_items(&state, books).await?;
+    Ok(Json(serde_json::to_value(items)?))
+}
+
+/// Assembles `BookListItem`s for exactly `books`, scoping the authors/genres/
+/// files aggregation to their ids (§3) instead of scanning the whole library
+/// regardless of how few books the caller actually asked for.
+async fn assemble_items(state: &AppState, books: Vec<BookDto>) -> AppResult<Vec<BookListItem>> {
+    let ids: Vec<String> = books.iter().map(|b| b.id.clone()).collect();
+    let authors_by_book = author_map_for(state, &ids).await?;
+    let genres_by_book = genre_map_for(state, &ids).await?;
+    let mut files_by_book = files_full_map_for(state, &ids).await?;
+
+    Ok(books
         .into_iter()
         .map(|book| {
             let authors = authors_by_book.get(&book.id).cloned().unwrap_or_default();
@@ -240,23 +408,7 @@ pub async fn list(
                 file_count,
             }
         })
-        .collect::<Vec<_>>();
-
-    // With a cursor, wrap the array so the client can adopt `server_now` as its
-    // next cursor (device clock skew stops mattering — the marker is the
-    // server's own clock echoed back). Without one, keep the bare-array shape
-    // the console and older app clients expect.
-    if q.cursor.is_some() {
-        let server_now: String = sqlx::query_scalar("SELECT datetime('now')")
-            .fetch_one(&state.db)
-            .await?;
-        Ok(Json(serde_json::json!({
-            "server_now": server_now,
-            "books": items,
-        })))
-    } else {
-        Ok(Json(serde_json::to_value(items)?))
-    }
+        .collect())
 }
 
 pub async fn create(

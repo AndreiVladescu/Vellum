@@ -1,6 +1,11 @@
 const S = { token: localStorage.getItem('vellum_token'), email: localStorage.getItem('vellum_email'),
             books: [], groups: [], members: new Set(), selected: new Set(),
             view: [], cursor: -1,
+            // /api/books?page=1 (§3) loads the library a page at a time instead
+            // of unbounded; nextPage is the next page to fetch via "Load more",
+            // null once every book is loaded. total is the server's count of
+            // every visible book, independent of how many pages are in S.books.
+            nextPage: 1, total: 0,
             q: '', sort: { col: 'title', dir: 'asc' },
             fTags: new Set(), fUntagged: false, fMissing: new Set(),
             cols: new Set(JSON.parse(localStorage.getItem('vellum_cols') || 'null') || ['author','year','status']),
@@ -100,14 +105,28 @@ function showApp(){
 
 async function loadAll(){
   try {
-    const [books, groups, members] = await Promise.all([
-      api('GET','/api/books'), api('GET','/api/groups'), api('GET','/api/memberships'),
+    const [page, groups, members] = await Promise.all([
+      api('GET','/api/books?page=1'), api('GET','/api/groups'), api('GET','/api/memberships'),
     ]);
-    S.books = books; S.groups = groups;
+    S.books = page.items; S.nextPage = page.next; S.total = page.total;
+    S.groups = groups;
     S.members = new Set(members.map(m=>key(m.group_id,m.book_id)));
-    S.selected = new Set([...S.selected].filter(id=>books.some(b=>b.id===id)));
+    S.selected = new Set([...S.selected].filter(id=>S.books.some(b=>b.id===id)));
     S.fTags = new Set([...S.fTags].filter(id=>groups.some(g=>g.id===id)));
     renderFilters(); render();
+  } catch(e){ toast(e.message); }
+}
+
+// Appends the next page onto S.books (§3's paged /api/books) -- any other
+// mutation reloads via loadAll() and resets back to the first page, so this
+// only grows what's shown within the current session.
+async function loadMoreBooks(){
+  if (S.nextPage == null) return;
+  try {
+    const page = await api('GET','/api/books?page='+S.nextPage);
+    S.books = S.books.concat(page.items);
+    S.nextPage = page.next; S.total = page.total;
+    render();
   } catch(e){ toast(e.message); }
 }
 
@@ -271,8 +290,19 @@ function render(){
 
   const selShown = S.view.filter(b=>S.selected.has(b.id)).length;
   document.getElementById('count').textContent =
-    `${S.view.length} shown · ${S.books.length} total · ${S.selected.size} selected`;
+    `${S.view.length} shown · ${S.total} total · ${S.selected.size} selected`;
   document.getElementById('selall').checked = S.view.length>0 && selShown===S.view.length;
+
+  // Filtering/search/sort/tagging all run client-side over S.books, so while
+  // more pages remain (S.nextPage != null) a filter can show "no matches"
+  // even though a later page would have some -- "Load more" is how the user
+  // resolves that, same tradeoff every client-side-filtered paged list has.
+  const more = document.getElementById('loadmore');
+  if (more){
+    more.classList.toggle('hidden', S.nextPage == null);
+    if (S.nextPage != null)
+      more.querySelector('button').textContent = `Load more (${S.books.length} of ${S.total} loaded)`;
+  }
 
   // keep the sticky table header parked just below the (variable-height) toolbar
   const tb = document.getElementById('topbar');
@@ -500,7 +530,12 @@ async function createBook(){
 
 // ---- CSV import ---------------------------------------------------------
 
-function openImport(){
+// Import's duplicate-title check (parseImport below) only sees S.books, so
+// with pages still unloaded (§3) it would miss dupes past the first page and
+// create real duplicates -- load everything before the dialog opens rather
+// than caveat around a wrong dedupe result.
+async function openImport(){
+  while (S.nextPage != null) await loadMoreBooks();
   IMP.items = [];
   document.getElementById('modal-root').innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
@@ -614,9 +649,15 @@ function csvCell(v){
   v = String(v);
   return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
 }
+// Exports only cover what's loaded into S.books (§3's paged /api/books), so
+// a library with more pages remaining needs "Load more" clicked first or the
+// export silently leaves books out -- warn rather than let that pass quietly.
+function exportCaveat(){
+  return S.nextPage == null ? '' : ` (${S.total-S.books.length} more not loaded — click "Load more" first for a full export)`;
+}
 function exportJSON(){
   download('vellum-books.json', JSON.stringify(S.view, null, 2), 'application/json');
-  toast('Exported '+S.view.length+' book(s)');
+  toast('Exported '+S.view.length+' book(s)'+exportCaveat());
 }
 function exportCSV(){
   const cols = ['title','subtitle','authors','published_year','publisher','isbn','page_count','file_count','has_cover','tags','created_at'];
@@ -627,7 +668,7 @@ function exportCSV(){
     lines.push(cols.map(c=>csvCell(rec[c])).join(','));
   }
   download('vellum-books.csv', lines.join('\n'), 'text/csv');
-  toast('Exported '+S.view.length+' book(s)');
+  toast('Exported '+S.view.length+' book(s)'+exportCaveat());
 }
 
 // ---- columns + density --------------------------------------------------
