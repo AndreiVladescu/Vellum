@@ -107,15 +107,16 @@ class LibraryRepository {
     }
     final metadata = MetadataService();
     final covers = CoverService(db, dir);
+    final physical = PhysicalService(db);
     return LibraryRepository._(
       db: db,
       metadata: metadata,
       dataDir: dir,
-      layout: LayoutRepository(db),
+      layout: LayoutRepository(db, physical),
       queries: LibraryQueries(db),
       covers: covers,
       shelves: ShelfService(db),
-      physical: PhysicalService(db),
+      physical: physical,
       files: FileService(db, dir, covers),
       writes: BookWriteService(db, dir, metadata, covers),
     );
@@ -248,6 +249,8 @@ class LibraryRepository {
   Future<void> lendCopy(String copyId, String borrower) =>
       physical.lendCopy(copyId, borrower);
   Future<void> returnLoan(String loanId) => physical.returnLoan(loanId);
+  Future<void> deletePhysicalCopy(String id, {bool recordTombstone = true}) =>
+      physical.deletePhysicalCopy(id, recordTombstone: recordTombstone);
 
   /// The library's data directory (covers/ and files/ live under it). Exposed
   /// for the sync service and tests.

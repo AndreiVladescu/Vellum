@@ -463,6 +463,61 @@ class VellumServerClient {
     _body(res);
   }
 
+  // ---- physical copies (plan 5 #4) -----------------------------------------
+
+  /// The visible copies (of owned + shared books) plus the server's clock, as
+  /// the delta-pull envelope `{ server_now, copies }` — same cursor
+  /// convention as [listShelves]: no pre-cursor history, so always the
+  /// envelope shape.
+  Future<({String? serverNow, List<ServerCopy> copies})> listCopies({
+    String? cursor,
+  }) async {
+    final uri = _uri(
+      '/api/copies',
+    ).replace(queryParameters: {'cursor': cursor ?? ''});
+    final res = await _http.get(uri, headers: _headers);
+    final map = _body(res) as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      copies: [
+        for (final c in map['copies'] as List)
+          ServerCopy.fromJson(c as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  /// Upsert a copy at [id] (create or update) — same LWW convention as
+  /// [pushBook]/[pushShelf]. [bookId] is only meaningful at creation; the
+  /// server rejects a push that tries to move an existing copy to a
+  /// different book.
+  Future<void> pushCopy({
+    required String id,
+    required String bookId,
+    String? location,
+    String? condition,
+    String? notes,
+    DateTime? updatedAt,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/copies/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        'book_id': bookId,
+        'location': location,
+        'condition': condition,
+        'notes': notes,
+        'updated_at': ?formatServerTime(updatedAt),
+      }),
+    );
+    _body(res);
+  }
+
+  /// Delete a copy on the server (used to propagate a local delete up).
+  Future<void> deleteCopy(String id) async {
+    final res = await _http.delete(_uri('/api/copies/$id'), headers: _headers);
+    _body(res);
+  }
+
   // ---- groups -------------------------------------------------------------
 
   Future<List<ServerGroup>> listGroups() async {
@@ -591,6 +646,35 @@ class ServerShelf {
     name: j['name'] as String? ?? '',
     sortOrder: j['sort_order'] as int? ?? 0,
     bookIds: [for (final id in (j['book_ids'] as List? ?? const [])) id as String],
+    updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
+  );
+}
+
+/// A physical copy from the server (plan 5 #4). No owner of its own — access
+/// derives from [bookId]'s book.
+class ServerCopy {
+  ServerCopy({
+    required this.id,
+    required this.bookId,
+    this.location,
+    this.condition,
+    this.notes,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String bookId;
+  final String? location;
+  final String? condition;
+  final String? notes;
+  final DateTime? updatedAt;
+
+  factory ServerCopy.fromJson(Map<String, dynamic> j) => ServerCopy(
+    id: j['id'] as String,
+    bookId: j['book_id'] as String,
+    location: j['location'] as String?,
+    condition: j['condition'] as String?,
+    notes: j['notes'] as String?,
     updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
   );
 }

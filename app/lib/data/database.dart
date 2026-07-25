@@ -109,6 +109,11 @@ class PhysicalCopies extends Table {
   TextColumn get location => text().nullable()(); // e.g. "living room, shelf 3"
   TextColumn get condition => text().nullable()();
   TextColumn get notes => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  // Sync bookkeeping since plan 5 #4 (second of three), same convention as
+  // Shelves.needsPush: set at creation, cleared once a push succeeds. There
+  // is no edit UI for a copy's fields yet, so this only ever goes true once.
+  BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -221,8 +226,8 @@ class BookPlacements extends Table {
 class LocalDeletions extends Table {
   TextColumn get bookId => text()();
   DateTimeColumn get deletedAt => dateTime().withDefault(currentDateAndTime)();
-  // 'book' or 'shelf' (plan 5 #4) — which server endpoint the next push tells
-  // about this id. Named to match the server's `deletion.kind` column.
+  // 'book', 'shelf', or 'copy' (plan 5 #4) — which server endpoint the next
+  // push tells about this id. Named to match the server's `deletion.kind`.
   TextColumn get kind => text().withDefault(const Constant('book'))();
 
   @override
@@ -250,7 +255,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -349,6 +354,24 @@ class VellumDatabase extends _$VellumDatabase {
               await m.createTable(localDeletions);
             } else if (!(await columnsOf('local_deletions')).contains('kind')) {
               await m.addColumn(localDeletions, localDeletions.kind);
+            }
+          }
+          if (from < 11) {
+            // Physical copies start syncing (plan 5 #4, second of three);
+            // needsPush defaults true so every pre-existing copy pushes once,
+            // same reasoning as shelves at v10. Guarded the same way: a
+            // database stuck partway through an older migration may not have
+            // `physical_copies` at all yet.
+            if (!tables.contains('physical_copies')) {
+              await m.createTable(physicalCopies);
+            } else {
+              final copyCols = await columnsOf('physical_copies');
+              if (!copyCols.contains('updated_at')) {
+                await m.addColumn(physicalCopies, physicalCopies.updatedAt);
+              }
+              if (!copyCols.contains('needs_push')) {
+                await m.addColumn(physicalCopies, physicalCopies.needsPush);
+              }
             }
           }
         },

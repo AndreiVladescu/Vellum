@@ -105,7 +105,9 @@ pub async fn visible_books(
 /// both filter on, factored out so the two can't drift apart. Binds (in
 /// order): `user.id`, `user.is_master`, `user.id`. Wrapped in parens so a
 /// caller ANDing another condition onto it doesn't just AND the last OR-term.
-fn access_predicate() -> &'static str {
+/// `pub(crate)`: `physical_copies::visible_copies` reuses it verbatim (joined
+/// on `book b`), since a copy's visibility is exactly its book's.
+pub(crate) fn access_predicate() -> &'static str {
     "( b.owner_id = ? \
         OR ? = 1 \
         OR EXISTS ( \

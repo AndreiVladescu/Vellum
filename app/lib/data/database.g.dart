@@ -2490,6 +2490,33 @@ class $PhysicalCopiesTable extends PhysicalCopies
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _needsPushMeta = const VerificationMeta(
+    'needsPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPush = GeneratedColumn<bool>(
+    'needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2497,6 +2524,8 @@ class $PhysicalCopiesTable extends PhysicalCopies
     location,
     condition,
     notes,
+    updatedAt,
+    needsPush,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2541,6 +2570,18 @@ class $PhysicalCopiesTable extends PhysicalCopies
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_push')) {
+      context.handle(
+        _needsPushMeta,
+        needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
+      );
+    }
     return context;
   }
 
@@ -2570,6 +2611,14 @@ class $PhysicalCopiesTable extends PhysicalCopies
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_push'],
+      )!,
     );
   }
 
@@ -2585,12 +2634,16 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
   final String? location;
   final String? condition;
   final String? notes;
+  final DateTime updatedAt;
+  final bool needsPush;
   const PhysicalCopy({
     required this.id,
     required this.bookId,
     this.location,
     this.condition,
     this.notes,
+    required this.updatedAt,
+    required this.needsPush,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2606,6 +2659,8 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
 
@@ -2622,6 +2677,8 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
     );
   }
 
@@ -2636,6 +2693,8 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
       location: serializer.fromJson<String?>(json['location']),
       condition: serializer.fromJson<String?>(json['condition']),
       notes: serializer.fromJson<String?>(json['notes']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
   @override
@@ -2647,6 +2706,8 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
       'location': serializer.toJson<String?>(location),
       'condition': serializer.toJson<String?>(condition),
       'notes': serializer.toJson<String?>(notes),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
 
@@ -2656,12 +2717,16 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
     Value<String?> location = const Value.absent(),
     Value<String?> condition = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    DateTime? updatedAt,
+    bool? needsPush,
   }) => PhysicalCopy(
     id: id ?? this.id,
     bookId: bookId ?? this.bookId,
     location: location.present ? location.value : this.location,
     condition: condition.present ? condition.value : this.condition,
     notes: notes.present ? notes.value : this.notes,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
   );
   PhysicalCopy copyWithCompanion(PhysicalCopiesCompanion data) {
     return PhysicalCopy(
@@ -2670,6 +2735,8 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
       location: data.location.present ? data.location.value : this.location,
       condition: data.condition.present ? data.condition.value : this.condition,
       notes: data.notes.present ? data.notes.value : this.notes,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
 
@@ -2680,13 +2747,16 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
           ..write('bookId: $bookId, ')
           ..write('location: $location, ')
           ..write('condition: $condition, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, bookId, location, condition, notes);
+  int get hashCode =>
+      Object.hash(id, bookId, location, condition, notes, updatedAt, needsPush);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2695,7 +2765,9 @@ class PhysicalCopy extends DataClass implements Insertable<PhysicalCopy> {
           other.bookId == this.bookId &&
           other.location == this.location &&
           other.condition == this.condition &&
-          other.notes == this.notes);
+          other.notes == this.notes &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush);
 }
 
 class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
@@ -2704,6 +2776,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
   final Value<String?> location;
   final Value<String?> condition;
   final Value<String?> notes;
+  final Value<DateTime> updatedAt;
+  final Value<bool> needsPush;
   final Value<int> rowid;
   const PhysicalCopiesCompanion({
     this.id = const Value.absent(),
@@ -2711,6 +2785,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
     this.location = const Value.absent(),
     this.condition = const Value.absent(),
     this.notes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PhysicalCopiesCompanion.insert({
@@ -2719,6 +2795,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
     this.location = const Value.absent(),
     this.condition = const Value.absent(),
     this.notes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        bookId = Value(bookId);
@@ -2728,6 +2806,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
     Expression<String>? location,
     Expression<String>? condition,
     Expression<String>? notes,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2736,6 +2816,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
       if (location != null) 'location': location,
       if (condition != null) 'condition': condition,
       if (notes != null) 'notes': notes,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2746,6 +2828,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
     Value<String?>? location,
     Value<String?>? condition,
     Value<String?>? notes,
+    Value<DateTime>? updatedAt,
+    Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
     return PhysicalCopiesCompanion(
@@ -2754,6 +2838,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
       location: location ?? this.location,
       condition: condition ?? this.condition,
       notes: notes ?? this.notes,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2776,6 +2862,12 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<bool>(needsPush.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2790,6 +2882,8 @@ class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopy> {
           ..write('location: $location, ')
           ..write('condition: $condition, ')
           ..write('notes: $notes, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7983,6 +8077,8 @@ typedef $$PhysicalCopiesTableCreateCompanionBuilder =
       Value<String?> location,
       Value<String?> condition,
       Value<String?> notes,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 typedef $$PhysicalCopiesTableUpdateCompanionBuilder =
@@ -7992,6 +8088,8 @@ typedef $$PhysicalCopiesTableUpdateCompanionBuilder =
       Value<String?> location,
       Value<String?> condition,
       Value<String?> notes,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 
@@ -8086,6 +8184,16 @@ class $$PhysicalCopiesTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8192,6 +8300,16 @@ class $$PhysicalCopiesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$BooksTableOrderingComposer get bookId {
     final $$BooksTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -8236,6 +8354,12 @@ class $$PhysicalCopiesTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsPush =>
+      $composableBuilder(column: $table.needsPush, builder: (column) => column);
 
   $$BooksTableAnnotationComposer get bookId {
     final $$BooksTableAnnotationComposer composer = $composerBuilder(
@@ -8350,6 +8474,8 @@ class $$PhysicalCopiesTableTableManager
                 Value<String?> location = const Value.absent(),
                 Value<String?> condition = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalCopiesCompanion(
                 id: id,
@@ -8357,6 +8483,8 @@ class $$PhysicalCopiesTableTableManager
                 location: location,
                 condition: condition,
                 notes: notes,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8366,6 +8494,8 @@ class $$PhysicalCopiesTableTableManager
                 Value<String?> location = const Value.absent(),
                 Value<String?> condition = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalCopiesCompanion.insert(
                 id: id,
@@ -8373,6 +8503,8 @@ class $$PhysicalCopiesTableTableManager
                 location: location,
                 condition: condition,
                 notes: notes,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

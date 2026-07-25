@@ -92,6 +92,22 @@ pub async fn group_access(state: &AppState, user: &AuthUser, group_id: &str) -> 
     Ok(if shared { Access::Viewer } else { Access::None })
 }
 
+/// The caller's access to a physical copy. Unlike shelf/group, a copy has no
+/// owner of its own — it belongs to exactly one book — so this is just
+/// `book_access` on that book, keeping share semantics (viewer vs. editor,
+/// book/group/all scope) identical for a book and its copies.
+pub async fn copy_access(state: &AppState, user: &AuthUser, copy_id: &str) -> AppResult<Access> {
+    let book_id: Option<String> =
+        sqlx::query_scalar("SELECT book_id FROM physical_copy WHERE id = ?")
+            .bind(copy_id)
+            .fetch_optional(&state.db)
+            .await?;
+    match book_id {
+        Some(book_id) => book_access(state, user, &book_id).await,
+        None => Ok(Access::None),
+    }
+}
+
 /// The caller's access to a shelf. Owner/master may manage it (`Editor`); an
 /// all-scoped share (the whole library) grants `Viewer` — unlike books and
 /// groups, there is no shelf-scoped share type, so this reduces to just

@@ -699,9 +699,10 @@ async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
     assert_eq!(body["sync_protocol"], json!(1));
     let features = body["features"].as_array().unwrap();
     assert!(features.contains(&json!("delta_pull")));
-    // shelf_sync shipped in plan 5 #4, after this handshake -- confirms the
-    // list tracks what's actually built rather than staying frozen.
+    // shelf_sync and copy_sync shipped in plan 5 #4, after this handshake --
+    // confirms the list tracks what's actually built rather than staying frozen.
     assert!(features.contains(&json!("shelf_sync")));
+    assert!(features.contains(&json!("copy_sync")));
     // Never advertised: not built (content_search, mail, batch_push) or
     // deliberately never synced (reading_progress) -- a capability handshake
     // that claims one of these would be worse than none.
@@ -1057,6 +1058,198 @@ async fn shelves_list_supports_delta_cursor_envelope() {
     )
     .await;
     assert!(future["shelves"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn copies_put_creates_and_is_visible_only_through_its_book() {
+    // Plan 5 #4, third of the shelf/copy/loan trio: a copy has no owner of
+    // its own -- visibility comes entirely from access::copy_access delegating
+    // to the parent book.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let (status, copy) = call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book, "location": "Living room" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{copy}");
+    assert_eq!(copy["book_id"], json!(book));
+    assert_eq!(copy["location"], json!("Living room"));
+
+    let (_, list) = call(&app, "GET", "/api/copies", Some(&master), None).await;
+    let listed = list.as_array().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["id"], json!("c-1"));
+}
+
+#[tokio::test]
+async fn copies_put_rejects_moving_an_existing_copy_to_a_different_book() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book1 = create_book(&app, &master, "Dune").await;
+    let book2 = create_book(&app, &master, "Neuromancer").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book1 })),
+    )
+    .await;
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book2 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn copies_editor_book_share_may_edit_but_not_delete() {
+    // A copy has no share type of its own: editor access to its book is
+    // editor access to the copy (access::copy_access), same as any other
+    // book-scoped resource; only the book's owner/master may delete it.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+    let book = create_book(&app, &master, "Neuromancer").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book, "location": "Shelf 3" })),
+    )
+    .await;
+
+    // Before sharing, Alice sees nothing.
+    let (_, before) = call(&app, "GET", "/api/copies", Some(&alice), None).await;
+    assert!(before.as_array().unwrap().is_empty());
+
+    call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": "alice@lib.test", "permission": "editor"
+        })),
+    )
+    .await;
+
+    let (status, copy) = call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&alice),
+        Some(json!({ "book_id": book, "location": "Moved by Alice" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{copy}");
+    assert_eq!(copy["location"], json!("Moved by Alice"));
+
+    let (status, _) = call(&app, "DELETE", "/api/copies/c-1", Some(&alice), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn copies_delete_records_a_kind_tagged_tombstone() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+
+    let (status, _) = call(&app, "DELETE", "/api/copies/c-1", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, kind_only) = call(&app, "GET", "/api/deletions?kind=copy", Some(&master), None).await;
+    let entries = kind_only.as_array().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["book_id"], json!("c-1"));
+
+    let (_, list) = call(&app, "GET", "/api/copies", Some(&master), None).await;
+    assert!(list.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn copies_put_is_a_noop_when_unchanged() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book, "location": "Desk" })),
+    )
+    .await;
+    let (_, first) = call(&app, "GET", "/api/copies", Some(&master), None).await;
+    let stamp1 = first.as_array().unwrap()[0]["updated_at"].clone();
+
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book, "location": "Desk" })),
+    )
+    .await;
+    let (_, second) = call(&app, "GET", "/api/copies", Some(&master), None).await;
+    assert_eq!(
+        second.as_array().unwrap()[0]["updated_at"],
+        stamp1,
+        "an unchanged re-push must not churn updated_at"
+    );
+}
+
+#[tokio::test]
+async fn copies_list_supports_delta_cursor_envelope() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+
+    let (_, bare) = call(&app, "GET", "/api/copies", Some(&master), None).await;
+    assert!(bare.is_array());
+
+    let (_, env) = call(&app, "GET", "/api/copies?cursor=", Some(&master), None).await;
+    assert!(env["server_now"].is_string());
+    assert_eq!(env["copies"].as_array().unwrap().len(), 1);
+
+    let (_, future) = call(
+        &app,
+        "GET",
+        "/api/copies?cursor=2999-01-01%2000:00:00",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert!(future["copies"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]

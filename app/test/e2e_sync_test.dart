@@ -170,4 +170,40 @@ void main() {
     expect([for (final book in onShelfA) book.id], [aId, b, c],
         reason: "A's pull adopts B's reordered shelf");
   }, skip: skip);
+
+  // Plan 5 #4, second of three: physical copies sync too now, over the real
+  // wire, with no owner of their own (access derives from the book).
+  test('physical copy sync carries a copy between two devices', () async {
+    final dirA = Directory.systemTemp.createTempSync('vellum_e2e_copy_a');
+    final dirB = Directory.systemTemp.createTempSync('vellum_e2e_copy_b');
+    addTearDown(() {
+      dirA.deleteSync(recursive: true);
+      dirB.deleteSync(recursive: true);
+    });
+
+    final repoA = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirA);
+    final repoB = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirB);
+
+    final bookId = await repoA.createCustomBook(title: 'Dune');
+    final copyId =
+        await repoA.addPhysicalCopy(bookId, location: 'Living room');
+    await SyncService(repoA).sync(client);
+
+    // B syncs and sees the copy, once it has the book to hold (both halves
+    // of one sync round — see SyncService._pullCopies).
+    await SyncService(repoB).sync(client);
+    final copyB = await repoB.watchCopiesOf(bookId).first;
+    expect(copyB, hasLength(1));
+    expect(copyB.single.location, 'Living room');
+
+    // Deleting on A propagates to B, including its (empty) loan history and
+    // any dependent rows PhysicalService.deletePhysicalCopy must clear.
+    await repoA.deletePhysicalCopy(copyId);
+    await SyncService(repoA).sync(client);
+    await SyncService(repoB).sync(client);
+    expect(await repoB.watchCopiesOf(bookId).first, isEmpty,
+        reason: 'a delete on A must reach B');
+  }, skip: skip);
 }

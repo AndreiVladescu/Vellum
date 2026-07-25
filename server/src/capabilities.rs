@@ -30,9 +30,10 @@ pub struct Capabilities {
 /// - `mail`: SMTP/password-reset is planned (docs/BACKLOG.md) but not built.
 /// - `batch_push`: plan 5 #7, not implemented yet — add it there when it is.
 ///
-/// `shelf_sync` (plan 5 #4) is the first entry that became true after this
-/// handshake shipped, exactly as its original commit predicted: shelves now
-/// sync (`shelves.rs`) instead of living on one device only.
+/// `shelf_sync` and `copy_sync` (plan 5 #4) are the entries that became true
+/// after this handshake shipped, exactly as its original commit predicted:
+/// shelves and now physical copies sync (`shelves.rs`, `physical_copies.rs`)
+/// instead of living on one device only.
 const FEATURES: &[&str] = &[
     "delta_pull",
     "deletions",
@@ -41,6 +42,7 @@ const FEATURES: &[&str] = &[
     "share_links",
     "opds",
     "shelf_sync",
+    "copy_sync",
 ];
 
 pub async fn get() -> Json<Capabilities> {

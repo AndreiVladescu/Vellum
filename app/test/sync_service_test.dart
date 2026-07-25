@@ -26,10 +26,17 @@ http.Response _noShelves() => http.Response(
       200,
     );
 
+/// `{ server_now, copies: [] }` — same reasoning as [_noShelves], for tests
+/// predating copy sync.
+http.Response _noCopies() => http.Response(
+      jsonEncode({'server_now': '2024-01-01 00:00:00', 'copies': []}),
+      200,
+    );
+
 /// A JSON handler that serves a fixed book list + deletions, and empty file
-/// lists, so pull's cover/file passes are no-ops. Shelves default to an empty
-/// list so tests that don't care about shelf sync (most of this file) aren't
-/// affected by _pull/_push's unconditional shelf pass.
+/// lists, so pull's cover/file passes are no-ops. Shelves and copies default
+/// to an empty list so tests that don't care about them (most of this file)
+/// aren't affected by _pull/_push's unconditional shelf/copy passes.
 Future<http.Response> Function(http.Request) _server({
   required List<Map<String, dynamic>> books,
   List<String> deletions = const [],
@@ -38,6 +45,10 @@ Future<http.Response> Function(http.Request) _server({
   List<String> shelfDeletions = const [],
   List<Map<String, dynamic>>? pushedShelvesCollector,
   List<String>? deletedShelvesCollector,
+  List<Map<String, dynamic>> copies = const [],
+  List<String> copyDeletions = const [],
+  List<Map<String, dynamic>>? pushedCopiesCollector,
+  List<String>? deletedCopiesCollector,
 }) {
   return (req) async {
     final path = req.url.path;
@@ -49,11 +60,12 @@ Future<http.Response> Function(http.Request) _server({
     }
     if (req.method == 'GET' && path == '/api/deletions') {
       final kind = req.url.queryParameters['kind'];
-      final ids = kind == 'shelf'
-          ? shelfDeletions
-          : kind == 'book'
-              ? deletions
-              : [...deletions, ...shelfDeletions];
+      final ids = switch (kind) {
+        'shelf' => shelfDeletions,
+        'copy' => copyDeletions,
+        'book' => deletions,
+        _ => [...deletions, ...shelfDeletions, ...copyDeletions],
+      };
       return http.Response(
         jsonEncode([for (final id in ids) {'book_id': id, 'deleted_at': '2020-01-01 00:00:00'}]),
         200,
@@ -62,6 +74,12 @@ Future<http.Response> Function(http.Request) _server({
     if (req.method == 'GET' && path == '/api/shelves') {
       return http.Response(
         jsonEncode({'server_now': '2024-06-01 00:00:00', 'shelves': shelves}),
+        200,
+      );
+    }
+    if (req.method == 'GET' && path == '/api/copies') {
+      return http.Response(
+        jsonEncode({'server_now': '2024-06-01 00:00:00', 'copies': copies}),
         200,
       );
     }
@@ -74,6 +92,14 @@ Future<http.Response> Function(http.Request) _server({
     }
     if (req.method == 'DELETE' && path.startsWith('/api/shelves/')) {
       deletedShelvesCollector?.add(path.split('/').last);
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'PUT' && path.startsWith('/api/copies/')) {
+      pushedCopiesCollector?.add(jsonDecode(req.body) as Map<String, dynamic>);
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'DELETE' && path.startsWith('/api/copies/')) {
+      deletedCopiesCollector?.add(path.split('/').last);
       return http.Response('{}', 200);
     }
     if (req.method == 'DELETE' && path.startsWith('/api/books/')) {
@@ -95,6 +121,18 @@ Map<String, dynamic> _serverShelf(
   'name': name,
   'sort_order': sortOrder,
   'book_ids': bookIds,
+  'updated_at': ?updatedAt,
+};
+
+Map<String, dynamic> _serverCopy(
+  String id,
+  String bookId, {
+  String? location,
+  String? updatedAt,
+}) => {
+  'id': id,
+  'book_id': bookId,
+  'location': location,
   'updated_at': ?updatedAt,
 };
 
@@ -233,6 +271,7 @@ void main() {
         return http.Response('[]', 200);
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -281,6 +320,7 @@ void main() {
         return http.Response('hello', 200);
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -328,6 +368,7 @@ void main() {
         return http.Response('hello', 200);
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -363,6 +404,7 @@ void main() {
         return http.Response('boom', 500); // cover download fails
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -384,6 +426,7 @@ void main() {
         );
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -420,6 +463,7 @@ void main() {
         return http.Response('{}', 200);
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -439,6 +483,7 @@ void main() {
         return http.Response(jsonEncode({'server_now': 'x', 'books': []}), 200);
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -488,6 +533,7 @@ void main() {
         return http.Response('[]', 200);
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
       return http.Response('[]', 200);
     });
 
@@ -559,6 +605,12 @@ void main() {
       if (req.method == 'GET' && path == '/api/shelves') {
         return http.Response(
           jsonEncode({'server_now': '2024-06-01 00:00:00', 'shelves': []}),
+          200,
+        );
+      }
+      if (req.method == 'GET' && path == '/api/copies') {
+        return http.Response(
+          jsonEncode({'server_now': '2024-06-01 00:00:00', 'copies': []}),
           200,
         );
       }
@@ -696,6 +748,123 @@ void main() {
     await SyncService(repo).push(client);
 
     expect(deletedShelves, [shelfId]);
+    expect(await db.select(db.localDeletions).get(), isEmpty);
+  });
+
+  // ---- physical copies (plan 5 #4) -------------------------------------
+
+  test('pull adopts a copy for a book this device has', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    final client = _client(_server(
+      books: const [],
+      copies: [
+        _serverCopy('c1', 'b1', location: 'Shelf 3', updatedAt: '2024-01-01 00:00:00'),
+      ],
+    ));
+
+    final report = await SyncService(repo).pull(client);
+    expect(report.pulled, 1);
+
+    final copy =
+        await (db.select(db.physicalCopies)..where((c) => c.id.equals('c1'))).getSingle();
+    expect(copy.location, 'Shelf 3');
+    expect(copy.needsPush, false, reason: 'adopting the server copy leaves nothing to push');
+  });
+
+  test('pull records an issue (not a silent skip) for a copy naming a book '
+      'this device does not have', () async {
+    // A silent skip would be permanent: the cursor still advances past this
+    // pull window, so an unflagged copy would never be retried again.
+    final repo = await _repo(dir);
+    final db = repo.db;
+    // 'b1' is intentionally never inserted locally.
+    final client = _client(_server(
+      books: const [],
+      copies: [_serverCopy('c1', 'b1', updatedAt: '2024-01-01 00:00:00')],
+    ));
+
+    final report = await SyncService(repo).pull(client);
+
+    expect(await db.select(db.physicalCopies).get(), isEmpty);
+    expect(report.issues, hasLength(1));
+    expect(report.issues.single.stage, 'copy');
+    expect(report.issues.single.bookId, 'c1');
+  });
+
+  test('pull does not clobber a locally newer copy edit', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    await db.into(db.physicalCopies).insert(PhysicalCopiesCompanion.insert(
+          id: 'c1',
+          bookId: 'b1',
+          location: const Value('Local desk'),
+          updatedAt: Value(DateTime.utc(2025, 1, 1)),
+        ));
+    final client = _client(_server(
+      books: const [],
+      copies: [
+        _serverCopy('c1', 'b1', location: 'Server shelf', updatedAt: '2024-01-01 00:00:00'),
+      ],
+    ));
+
+    await SyncService(repo).pull(client);
+
+    final copy =
+        await (db.select(db.physicalCopies)..where((c) => c.id.equals('c1'))).getSingle();
+    expect(copy.location, 'Local desk', reason: 'local edit is newer, must win');
+  });
+
+  test('pull applies a copy tombstone locally', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    await db
+        .into(db.physicalCopies)
+        .insert(PhysicalCopiesCompanion.insert(id: 'c1', bookId: 'b1'));
+    final client = _client(_server(books: const [], copyDeletions: ['c1']));
+
+    final report = await SyncService(repo).pull(client);
+    expect(report.deletedLocally, 1);
+    expect(await (db.select(db.physicalCopies)..where((c) => c.id.equals('c1'))).get(), isEmpty);
+    expect(await db.select(db.localDeletions).get(), isEmpty,
+        reason: 'a server-driven delete must not be recorded to push back');
+  });
+
+  test('push sends a dirty copy', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    final copyId = await repo.addPhysicalCopy('b1', location: 'Desk');
+
+    final pushed = <Map<String, dynamic>>[];
+    final client = _client(_server(books: const [], pushedCopiesCollector: pushed));
+
+    final report = await SyncService(repo).push(client);
+    expect(report.pushed, 1);
+    expect(pushed, hasLength(1));
+    expect(pushed.single['book_id'], 'b1');
+    expect(pushed.single['location'], 'Desk');
+
+    final copy =
+        await (db.select(db.physicalCopies)..where((c) => c.id.equals(copyId))).getSingle();
+    expect(copy.needsPush, false);
+  });
+
+  test('push propagates a local copy deletion then clears the tombstone', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    final copyId = await repo.addPhysicalCopy('b1');
+    await repo.deletePhysicalCopy(copyId);
+
+    final deletedCopies = <String>[];
+    final client = _client(_server(books: const [], deletedCopiesCollector: deletedCopies));
+    await SyncService(repo).push(client);
+
+    expect(deletedCopies, [copyId]);
     expect(await db.select(db.localDeletions).get(), isEmpty);
   });
 }

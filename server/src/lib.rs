@@ -23,6 +23,7 @@ mod error;
 mod groups;
 mod metadata;
 mod opds;
+mod physical_copies;
 mod shares;
 mod shelves;
 mod throttle;
@@ -152,6 +153,13 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route(
             "/shelves/{id}",
             put(shelves::upsert).delete(shelves::delete),
+        )
+        // Physical copies (plan 5 #4) — same cursor-pull/upsert/delete shape
+        // as shelves, but no owner of its own (access derives from the book).
+        .route("/copies", get(physical_copies::list))
+        .route(
+            "/copies/{id}",
+            put(physical_copies::upsert).delete(physical_copies::delete),
         )
         // User-to-user shares.
         .route("/shares", get(shares::list).post(shares::create))

@@ -7,7 +7,9 @@ import 'database.dart';
 typedef LoanEntry = ({Loan loan, Book book});
 
 /// Physical copies and loan history. Split out of `LibraryRepository`
-/// (plan 5 §A10) — and the seam plan 5 §A4 would extend to sync them.
+/// (plan 5 §A10). Copies sync since plan 5 #4 (second of three: shelves,
+/// copies, then loans) — LWW on `updatedAt`, no owner of its own (access
+/// derives from the parent book server-side).
 class PhysicalService {
   PhysicalService(this.db);
 
@@ -20,7 +22,7 @@ class PhysicalService {
   )..where((c) => c.bookId.equals(bookId))).watch();
 
   /// Adds a physical copy and returns its new id (so a caller can, e.g., lend it
-  /// straight away).
+  /// straight away). `needsPush` defaults true, so the next push sends it.
   Future<String> addPhysicalCopy(
     String bookId, {
     String? location,
@@ -38,6 +40,28 @@ class PhysicalService {
           ),
         );
     return id;
+  }
+
+  /// Deletes a physical copy along with its loan history and any layout
+  /// placement referencing it. Both `Loans.copyId` and `BookPlacements.copyId`
+  /// reference this row with no cascade, so either left behind would make the
+  /// final delete throw a foreign-key error — notably on a pull-driven delete,
+  /// which must not fail. [recordTombstone] is false for that pull-driven case
+  /// (the server already knows), same convention as deleteShelf/deleteBook.
+  Future<void> deletePhysicalCopy(String id, {bool recordTombstone = true}) async {
+    await db.transaction(() async {
+      if (recordTombstone) {
+        await db.into(db.localDeletions).insertOnConflictUpdate(
+              LocalDeletionsCompanion.insert(
+                bookId: id,
+                kind: const Value('copy'),
+              ),
+            );
+      }
+      await (db.delete(db.bookPlacements)..where((p) => p.copyId.equals(id))).go();
+      await (db.delete(db.loans)..where((l) => l.copyId.equals(id))).go();
+      await (db.delete(db.physicalCopies)..where((c) => c.id.equals(id))).go();
+    });
   }
 
   /// Loan history for a physical copy, most recent first. The active loan (if

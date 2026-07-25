@@ -74,6 +74,19 @@ async fn synced_tables_have_the_expected_columns() {
             &["id", "owner_id", "name", "sort_order", "updated_at"],
         ),
         ("shelf_book", &["shelf_id", "book_id", "position"]),
+        // Synced since migration 0009 (plan 5 #4, second of three) -- no
+        // owner_id: a copy's access derives from its book (access::copy_access).
+        (
+            "physical_copy",
+            &[
+                "id",
+                "book_id",
+                "location",
+                "condition",
+                "notes",
+                "updated_at",
+            ],
+        ),
     ];
 
     for (table, cols) in expected {

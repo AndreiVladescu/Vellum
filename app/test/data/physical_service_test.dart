@@ -51,4 +51,55 @@ void main() {
     expect(active, hasLength(1));
     expect(active.single.borrower, 'Bob');
   });
+
+  test('deletePhysicalCopy records a kind=copy tombstone and clears dependents',
+      () async {
+    // Regression: Loans.copyId and BookPlacements.copyId both reference
+    // physical_copy with no cascade (plan 5 #4). Deleting a copy that still
+    // has a loan or a placement pointing at it must not throw an FK error --
+    // notably on a pull-driven delete, which must never fail.
+    final db = VellumDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final physical = PhysicalService(db);
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    final copyId = await physical.addPhysicalCopy('b1');
+    await physical.lendCopy(copyId, 'Alice');
+    await db.into(db.physicalEnvironments).insert(
+          PhysicalEnvironmentsCompanion.insert(id: 'env1', name: 'Room'),
+        );
+    await db.into(db.bookPlacements).insert(
+          BookPlacementsCompanion.insert(
+            id: 'p1',
+            environmentId: 'env1',
+            copyId: copyId,
+            x: 0,
+            y: 0,
+          ),
+        );
+
+    await physical.deletePhysicalCopy(copyId);
+
+    expect(await (db.select(db.physicalCopies)..where((c) => c.id.equals(copyId))).get(),
+        isEmpty);
+    expect(await (db.select(db.loans)..where((l) => l.copyId.equals(copyId))).get(), isEmpty);
+    expect(await (db.select(db.bookPlacements)..where((p) => p.copyId.equals(copyId))).get(),
+        isEmpty);
+    final tombstone = await (db.select(db.localDeletions)
+          ..where((d) => d.bookId.equals(copyId)))
+        .getSingle();
+    expect(tombstone.kind, 'copy');
+  });
+
+  test('a pull-driven copy delete (recordTombstone: false) leaves no tombstone',
+      () async {
+    final db = VellumDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final physical = PhysicalService(db);
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    final copyId = await physical.addPhysicalCopy('b1');
+
+    await physical.deletePhysicalCopy(copyId, recordTombstone: false);
+
+    expect(await db.select(db.localDeletions).get(), isEmpty);
+  });
 }

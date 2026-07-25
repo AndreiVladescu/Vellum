@@ -157,11 +157,16 @@ warns when a URL is unencrypted.
 - **book_file** — 0..n per book: format, path, size, content hash. A book can
   be physical-only, digital-only, or both.
 - **physical_copy** — 0..n per book: location (room/shelf), condition, notes.
-  App-local only for now (plan 5 #4 chose to sync shelves first; copies and
-  loans are the same decision, not yet implemented).
+  **Synced** (plan 5 #4, second of three): LWW on `physical_copy.updated_at`.
+  Unlike shelf, a copy has no owner of its own — it belongs to exactly one
+  book, so visibility/edit rights derive entirely from that book's share
+  rules (`server/src/access.rs::copy_access` delegates to `book_access`;
+  `physical_copies.rs::visible_copies` reuses `books::access_predicate`
+  joined on `book`). A copy can't change which book it belongs to on an
+  update (rejected outright, not silently ignored).
 - **loan** — per physical copy: borrower, loaned_at, returned_at. Loans are
-  their own table so lending *history* comes for free. App-local only, same
-  status as physical_copy above.
+  their own table so lending *history* comes for free. App-local only for
+  now — the third and last piece of plan 5 #4's Option A, not yet done.
 - **shelf** + **shelf_book** — manual collections/panes with explicit book
   ordering, independent of genres. **Synced** (plan 5 #4): LWW on
   `shelf.updated_at`, membership replaced wholesale on push (the app always
@@ -181,16 +186,18 @@ the device. Reader notes and `source_metadata` were never on the server.)
 
 The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
 pins the column list of every synced table (`book`, `author`, `book_author`,
-`genre`, `book_genre`, `book_file`, `shelf`, `shelf_book`) and fails if the
+`genre`, `book_genre`, `book_file`, `shelf`, `shelf_book`, `physical_copy`)
+and fails if the
 server migrations drift from it — a prompt to update
 `app/lib/data/database.dart` too.
 
 **Deletion tombstones carry a `kind`** (`deletion.kind` server-side,
-`local_deletions.kind` app-side; both default `'book'`): one shared mechanism
-for every synced entity's deletes rather than a table per entity. Adding
-`kind` was additive — an app predating it only ever reads `book_id`/
-`deleted_at` and looks the id up in its own `books` table, so a non-book
-tombstone (e.g. a deleted shelf) is a harmless no-op there.
+`local_deletions.kind` app-side; both default `'book'`, and now also carry
+`'shelf'` and `'copy'`): one shared mechanism for every synced entity's
+deletes rather than a table per entity. Adding `kind` was additive — an app
+predating it only ever reads `book_id`/`deleted_at` and looks the id up in
+its own `books` table, so a non-book tombstone (e.g. a deleted shelf or
+copy) is a harmless no-op there.
 
 **App-local-only tables** for the physical bookshelf layouts (also never
 synced — a per-device arrangement of a real room, all lengths in **metres**):
@@ -259,8 +266,14 @@ that stays intentionally simple and data-driven so it's easy to extend.
 - **Reference, not inventory.** A placement is just “this copy sits here” for
   visualisation; it isn't concrete copy-tracking. Dropping a title in mints a
   fresh `physical_copy`, and the same title can be placed several times.
-- **Local-only.** None of this touches the server or sync — it's a per-device
-  view of a real room. The canvas and its gesture/settle logic live in
+- **Local-only layout, synced copies.** The environment/shelf/placement
+  tables never touch the server — a per-device view of a real room. The
+  `physical_copy` row a placement mints is a real physical object, though,
+  so (plan 5 #4) it syncs like any other copy; only its throwaway *placement*
+  stays local. Removing a placement deletes its copy through
+  `PhysicalService.deletePhysicalCopy` — the one path that also clears any
+  loan history and records a tombstone, rather than `layout_repository.dart`
+  deleting the row itself. The canvas and its gesture/settle logic live in
   `lib/physical/`.
 
 ## Metadata fetching
@@ -362,12 +375,12 @@ Two things stay **on the device only** and are never synced to a server:
 7. 🚧 Rust server + sync (connected mode), OPDS feed. In place: accounts, RBAC,
    groups, sharing, public links, blob storage, OPDS, and a web admin console,
    with API integration tests. The app logs in and syncs **both ways** —
-   metadata, covers, files, and (plan 5 #4) custom shelves — one-tap (pull
-   then push) plus a quiet auto-sync at launch, and manages sharing on-device.
-   Sync is **last-write-wins by `updated_at`** with **delete tombstones**
-   (below). Remaining: physical copies + loan history joining shelves as
-   synced (plan 5 #4's Option A, not yet done for those two), real-time
-   updates, and the Android side.
+   metadata, covers, files, and (plan 5 #4) custom shelves and physical
+   copies — one-tap (pull then push) plus a quiet auto-sync at launch, and
+   manages sharing on-device. Sync is **last-write-wins by `updated_at`**
+   with **delete tombstones** (below). Remaining: loan history joining
+   shelves and copies as synced (plan 5 #4's Option A, last of the three),
+   real-time updates, and the Android side.
 8. ✅ Backup: export the whole library (database snapshot + covers + files) to
    one `.zip` from Preferences; restore replaces the library and restarts the
    app. The safety net for standalone (serverless) installs.

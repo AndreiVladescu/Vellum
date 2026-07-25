@@ -2,20 +2,26 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/database.dart';
+import '../data/physical_service.dart';
 
 /// A placement joined with the book it shows, for rendering an environment.
 typedef PlacedBook = ({BookPlacement placement, Book book});
 
 /// CRUD for the app-local physical-layout model: environments, their shelves,
-/// and the placements of books onto them (each placement owns a throwaway
-/// physical copy so the same title can sit in several spots). Split out of
+/// and the placements of books onto them (each placement owns a physical copy
+/// so the same title can sit in several spots). Split out of
 /// [LibraryRepository] to keep that class focused on the digital library and
-/// sync; this holds no state beyond the shared [db] handle. None of this is
-/// synced — see database.dart.
+/// sync; this holds no state beyond the shared [db] handle. The
+/// environment/shelf/placement tables themselves are never synced — see
+/// database.dart — but the copy a placement mints is a real physical object,
+/// so (plan 5 #4) it syncs like any other copy; deletion goes through
+/// [PhysicalService.deletePhysicalCopy] so that stays true when a placement
+/// is removed.
 class LayoutRepository {
-  LayoutRepository(this.db);
+  LayoutRepository(this.db, this._physical);
 
   final VellumDatabase db;
+  final PhysicalService _physical;
   final _uuid = const Uuid();
 
   Stream<List<PhysicalEnvironment>> watchEnvironments() =>
@@ -205,8 +211,5 @@ class LayoutRepository {
     });
   }
 
-  Future<void> _deleteCopy(String copyId) async {
-    await db.customStatement('DELETE FROM loans WHERE copy_id = ?', [copyId]);
-    await (db.delete(db.physicalCopies)..where((c) => c.id.equals(copyId))).go();
-  }
+  Future<void> _deleteCopy(String copyId) => _physical.deletePhysicalCopy(copyId);
 }
