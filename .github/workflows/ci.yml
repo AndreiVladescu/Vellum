@@ -43,6 +43,10 @@ jobs:
       - run: git diff --exit-code -- lib/data/database.g.dart
       - run: flutter analyze
       - run: flutter test
+      # Already covered by `flutter test` above; run it again verbosely so its
+      # per-query timings (docs/PERFORMANCE.md) are visible in the CI log
+      # instead of buried in the full suite's output.
+      - run: flutter test test/benchmark/library_bench.dart -r expanded
       # Compile the native desktop runner too: analyze + test build no native
       # code, so a plugin/toolchain break (e.g. a bad flutter_secure_storage
       # build) would land green and only fail on the user's machine. Debug — a
