@@ -74,3 +74,26 @@ and typing a search query, and check against:
 If either regresses, `library_bench.dart`'s per-query timings (printed even
 when the test passes — run with `-r expanded`) usually point at which query
 grew, before reaching for the profiler.
+
+## §A1 finding: keep reading-state writes cheap on the shelf stream
+
+`saveReadingPosition`/`saveEpubPosition` write to `books` on every page turn,
+and reading progress isn't part of what the shelf filters or sorts by — but
+drift's stream invalidation is table-level, not column-level, so any `books`
+write still invalidates a stream that reads that table. Measured on a
+3,000-book library (`watchLibrary`, `LibraryQueries`):
+
+| Design | Cost per `books`-table write |
+|---|---|
+| Old: `watchAllBooks()` re-emits, Dart `filterBooks`/`sortBooks` re-runs | ~3.4 ms |
+| `watchLibrary` as one `customSelect` re-fetching authors/genres/shelves too | ~180 ms |
+| `watchLibrary` as independently-invalidating streams (shipped) | ~28 ms |
+
+The shipped version combines separate streams for the filtered/sorted books,
+`watchAuthorsByBook`, `watchGenresByBook`, shelves, and `allGenres`
+(`_combine6` in `library_queries.dart`) specifically so a reading-position
+write only re-runs the books query, not the authors/genres joins. The
+remaining ~28ms (vs. the old 3.4ms) is the SQL `ORDER BY` plus its
+per-row correlated subqueries (author-sort, `hasFile`) over the whole scope,
+inherent to filtering/sorting in SQL — bound this further only if a profile
+run shows it actually costing frames on the reading path.

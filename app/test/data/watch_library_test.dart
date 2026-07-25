@@ -173,6 +173,109 @@ void main() {
     expect(byId['b1'], isFalse);
   });
 
+  test('scopeEmpty is independent of the active filter', () async {
+    final db = VellumDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final queries = LibraryQueries(db);
+
+    // Empty library: scopeEmpty true, regardless of a filter that would also
+    // (trivially) match nothing.
+    var view = await queries.watchLibrary(query: 'anything').first;
+    expect(view.scopeEmpty, isTrue);
+    expect(view.entries, isEmpty);
+
+    // One book, but the query matches nothing: scopeEmpty must now be false —
+    // this is the "no match" case, distinct from a genuinely empty shelf.
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'Dune'));
+    view = await queries.watchLibrary(query: 'nonexistent').first;
+    expect(view.scopeEmpty, isFalse);
+    expect(view.entries, isEmpty);
+
+    // Unfiltered, the book shows and scopeEmpty is false.
+    view = await queries.watchLibrary().first;
+    expect(view.scopeEmpty, isFalse);
+    expect(view.entries, hasLength(1));
+  });
+
+  test('scopeEmpty is scoped to the shelf, not the whole library', () async {
+    final db = await _seeded(); // 5 books in the library
+    addTearDown(db.close);
+    final shelfId = await ShelfService(db).createShelf('Empty shelf');
+
+    final view = await LibraryQueries(db).watchLibrary(shelfId: shelfId).first;
+    expect(view.scopeEmpty, isTrue, reason: 'shelf has no books yet');
+    expect(
+      await LibraryQueries(db).watchLibrary().first.then((v) => v.scopeEmpty),
+      isFalse,
+      reason: 'the library itself is not empty',
+    );
+  });
+
+  test('a books-only write does not re-run the authors/genres joins',
+      () async {
+    // Regression guard: reading position writes to `books` on every page
+    // turn. An earlier version re-ran the authors/genres join queries on any
+    // `books` write (~180ms per emission on a 3k-book library); splitting
+    // watchLibrary into independently-invalidating streams means a
+    // books-only write only re-runs the cheaper filtered/sorted books query.
+    // This asserts the *symptom* directly: watchAuthorsByBook/
+    // watchGenresByBook (the expensive joins) must not re-emit from a write
+    // that never touches book_authors/authors/book_genres/genres.
+    final db = await _seeded();
+    addTearDown(db.close);
+    final queries = LibraryQueries(db);
+
+    var authorEmissions = 0;
+    var genreEmissions = 0;
+    final subs = [
+      queries.watchAuthorsByBook().listen((_) => authorEmissions++),
+      queries.watchGenresByBook().listen((_) => genreEmissions++),
+    ];
+    await pumpEventQueue();
+    authorEmissions = 0;
+    genreEmissions = 0;
+
+    // A books-only write, same shape as saveReadingPosition/
+    // saveEpubPosition's non-relational columns.
+    await (db.update(db.books)..where((b) => b.id.equals('b1'))).write(
+      const BooksCompanion(readingProgress: Value(0.5)),
+    );
+    await pumpEventQueue();
+
+    expect(authorEmissions, 0);
+    expect(genreEmissions, 0);
+    for (final s in subs) {
+      await s.cancel();
+    }
+  });
+
+  test('renaming an author refreshes the author sort', () async {
+    // The author-sort ORDER BY reads book_authors/authors through a raw SQL
+    // subquery, not drift's typed query builder — confirms the explicit
+    // readsFrom on the core query (not static analysis of the SQL string) is
+    // what drives invalidation here.
+    final db = VellumDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'X'));
+    await db.into(db.authors).insert(AuthorsCompanion.insert(id: 'a1', name: 'Zed'));
+    await db.into(db.bookAuthors).insert(
+        BookAuthorsCompanion.insert(bookId: 'b1', authorId: 'a1'));
+
+    final events = <String>[];
+    final sub = LibraryQueries(db)
+        .watchLibrary(sort: ShelfSort.author)
+        .listen((view) => events.add(view.entries.single.authors.single));
+    await pumpEventQueue();
+    expect(events, ['Zed']);
+
+    await (db.update(db.authors)..where((a) => a.id.equals('a1')))
+        .write(const AuthorsCompanion(name: Value('Amy')));
+    await pumpEventQueue();
+
+    expect(events.last, 'Amy');
+    await sub.cancel();
+  });
+
   test('allGenres and shelves are populated', () async {
     final db = await _seeded();
     addTearDown(db.close);

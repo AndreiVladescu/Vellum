@@ -417,11 +417,11 @@ class _LibraryPageState extends State<LibraryPage> {
     final theme = Theme.of(context);
     final entries = view.entries;
     if (entries.isEmpty) {
-      // A search/genre filter narrowed a non-empty scope to nothing shows the
-      // "no match" message; otherwise (nothing typed, no facet) the scope
-      // itself has zero books.
-      final filtered = _query.trim().isNotEmpty || _genreFilter != null;
-      if (filtered) {
+      // view.scopeEmpty is true only when the shelf/library itself has zero
+      // books, independent of any active filter — so a search or genre facet
+      // that merely matches nothing still gets the "no match" message below,
+      // exactly like the shelf genuinely being empty gets its own message.
+      if (!view.scopeEmpty) {
         return Center(
           child: Text(
             _noMatchMessage(),

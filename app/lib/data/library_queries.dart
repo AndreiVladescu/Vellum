@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 
 import '../settings/shelf_sort.dart';
@@ -26,13 +28,25 @@ class LibraryView {
     required this.entries,
     required this.shelves,
     required this.allGenres,
+    required this.scopeEmpty,
   });
 
   final List<LibraryEntry> entries; // already filtered + sorted
   final List<Shelf> shelves;
   final List<String> allGenres; // for the facet menu
 
-  static const empty = LibraryView(entries: [], shelves: [], allGenres: []);
+  /// True when the *unfiltered* scope (the whole library, or the selected
+  /// shelf) has no books at all — as opposed to [entries] being empty because
+  /// a search/genre filter matched nothing. The shelf UI shows a different
+  /// message for each case.
+  final bool scopeEmpty;
+
+  static const empty = LibraryView(
+    entries: [],
+    shelves: [],
+    allGenres: [],
+    scopeEmpty: true,
+  );
 }
 
 /// The library's read/watch side — the multi-table streams the shelf UI
@@ -70,14 +84,6 @@ class LibraryQueries {
     return query.watch().map(_groupAuthors);
   }
 
-  Future<Map<String, List<String>>> _authorsByBookOnce() async {
-    final query = db.select(db.bookAuthors).join([
-      innerJoin(db.authors, db.authors.id.equalsExp(db.bookAuthors.authorId)),
-    ])
-      ..orderBy([OrderingTerm.asc(db.bookAuthors.position)]);
-    return _groupAuthors(await query.get());
-  }
-
   Map<String, List<String>> _groupAuthors(List<TypedResult> rows) {
     final map = <String, List<String>>{};
     for (final r in rows) {
@@ -95,13 +101,6 @@ class LibraryQueries {
     return query.watch().map(_groupGenres);
   }
 
-  Future<Map<String, List<String>>> _genresByBookOnce() async {
-    final query = db.select(db.bookGenres).join([
-      innerJoin(db.genres, db.genres.id.equalsExp(db.bookGenres.genreId)),
-    ]);
-    return _groupGenres(await query.get());
-  }
-
   Map<String, List<String>> _groupGenres(List<TypedResult> rows) {
     final map = <String, List<String>>{};
     for (final r in rows) {
@@ -109,6 +108,23 @@ class LibraryQueries {
       (map[bookId] ??= []).add(r.readTable(db.genres).name);
     }
     return map;
+  }
+
+  Stream<List<Shelf>> _watchShelvesOrdered() => (db.select(db.shelves)
+        ..orderBy([
+          (s) => OrderingTerm.asc(s.sortOrder),
+          (s) => OrderingTerm.asc(s.name),
+        ]))
+      .watch();
+
+  Stream<List<String>> _watchAllGenreNames() {
+    final q = db.selectOnly(db.genres, distinct: true)
+      ..addColumns([db.genres.name])
+      ..orderBy([OrderingTerm(expression: db.genres.name)]);
+    return q.watch().map(
+          (rows) => [for (final r in rows) r.read(db.genres.name)!]
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase())),
+        );
   }
 
   /// One snapshot of the shelf: filtered (by [shelfId], [genre] facet, and
@@ -125,7 +141,68 @@ class LibraryQueries {
   /// replaces this method's free-text half). Sorting matches
   /// `shelf_filter.dart`'s contract: author-less/year-less books sort last,
   /// ties break on title, all case-insensitive.
+  ///
+  /// Combines several independently-invalidating streams rather than one
+  /// query reading every relevant table: reading position writes to `books`
+  /// on every page turn (never touching authors/genres/shelves), and an
+  /// earlier version that re-ran the authors/genres joins on any `books`
+  /// write cost ~180ms per keystroke-unrelated page turn on a 3k-book
+  /// library — see docs/PERFORMANCE.md. Splitting means a page turn now only
+  /// re-runs the filtered/sorted books query (~28ms at that scale), not the
+  /// joins.
   Stream<LibraryView> watchLibrary({
+    String? shelfId,
+    String query = '',
+    String? genre,
+    ShelfSort sort = ShelfSort.title,
+  }) {
+    return _combine6(
+      _watchFilteredSortedBooks(shelfId: shelfId, query: query, genre: genre, sort: sort),
+      watchAuthorsByBook(),
+      watchGenresByBook(),
+      _watchShelvesOrdered(),
+      _watchAllGenreNames(),
+      _watchScopeEmpty(shelfId),
+      (books, authorsByBook, genresByBook, shelves, allGenres, scopeEmpty) {
+        final entries = [
+          for (final b in books)
+            LibraryEntry(
+              book: b.book,
+              authors: authorsByBook[b.book.id] ?? const [],
+              genres: genresByBook[b.book.id] ?? const [],
+              hasFile: b.hasFile,
+            ),
+        ];
+        return LibraryView(
+          entries: entries,
+          shelves: shelves,
+          allGenres: allGenres,
+          scopeEmpty: scopeEmpty,
+        );
+      },
+    );
+  }
+
+  /// True when [shelfId] (or the whole library, if null) has zero books —
+  /// independent of any search/genre filter, so a page turn or a genre edit
+  /// never invalidates it, only a book actually entering/leaving the scope.
+  Stream<bool> _watchScopeEmpty(String? shelfId) {
+    final sql = shelfId == null
+        ? 'SELECT NOT EXISTS(SELECT 1 FROM books) AS empty'
+        : 'SELECT NOT EXISTS(SELECT 1 FROM shelf_books WHERE shelf_id = ?) AS empty';
+    return db
+        .customSelect(
+          sql,
+          variables: shelfId == null ? [] : [Variable.withString(shelfId)],
+          readsFrom: shelfId == null
+              ? {db.books}
+              : {db.shelfBooks},
+        )
+        .watchSingle()
+        .map((row) => row.read<bool>('empty'));
+  }
+
+  Stream<List<({Book book, bool hasFile})>> _watchFilteredSortedBooks({
     String? shelfId,
     String query = '',
     String? genre,
@@ -177,7 +254,7 @@ class LibraryQueries {
 
     // The first author's name (by position), for the author sort — exposed as
     // a select-list alias so ORDER BY can reference it without repeating the
-    // subquery (and without an extra query per book).
+    // subquery.
     const authorSortExpr = '(SELECT LOWER(a.name) FROM book_authors ba '
         'JOIN authors a ON a.id = ba.author_id '
         'WHERE ba.book_id = books.id ORDER BY ba.position LIMIT 1)';
@@ -199,6 +276,9 @@ class LibraryQueries {
         '${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}'} '
         'ORDER BY $orderBy';
 
+    // genre/text filtering reads book_authors/authors/book_genres/genres too
+    // (via EXISTS), so this must stay in readsFrom even though a plain
+    // unfiltered query wouldn't otherwise touch them.
     return db
         .customSelect(
           sql,
@@ -214,41 +294,86 @@ class LibraryQueries {
           },
         )
         .watch()
-        .asyncMap((rows) async {
-          final authorsByBook = await _authorsByBookOnce();
-          final genresByBook = await _genresByBookOnce();
-          final shelves = await (db.select(db.shelves)
-                ..orderBy([
-                  (s) => OrderingTerm.asc(s.sortOrder),
-                  (s) => OrderingTerm.asc(s.name),
-                ]))
-              .get();
-          final allGenres = [
-            for (final g in await (db.select(db.genres)
-                  ..orderBy([(g) => OrderingTerm.asc(g.name)]))
-                .get())
-              g.name,
-          ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
-          final entries = [
-            for (final row in rows)
-              LibraryEntry(
-                book: db.books.map(row.data),
-                authors: authorsByBook[row.read<String>('id')] ?? const [],
-                genres: genresByBook[row.read<String>('id')] ?? const [],
-                hasFile: row.read<bool>('has_file'),
-              ),
-          ];
-          return LibraryView(
-            entries: entries,
-            shelves: shelves,
-            allGenres: allGenres,
-          );
-        });
+        .map((rows) => [
+              for (final row in rows)
+                (book: db.books.map(row.data), hasFile: row.read<bool>('has_file')),
+            ]);
   }
 
   static String _escapeLike(String s) => s
       .replaceAll('\\', '\\\\')
       .replaceAll('%', '\\%')
       .replaceAll('_', '\\_');
+}
+
+/// Combines six streams into one, re-emitting `combine(...)` of the latest
+/// value from each whenever any of them fires, once all six have emitted at
+/// least once. A small hand-rolled `combineLatest` (no rxdart dependency) —
+/// `watchLibrary` is its only user.
+Stream<R> _combine6<A, B, C, D, E, F, R>(
+  Stream<A> sa,
+  Stream<B> sb,
+  Stream<C> sc,
+  Stream<D> sd,
+  Stream<E> se,
+  Stream<F> sf,
+  R Function(A, B, C, D, E, F) combine,
+) {
+  late final StreamController<R> controller;
+  A? a;
+  B? b;
+  C? c;
+  D? d;
+  E? e;
+  F? f;
+  var hasA = false, hasB = false, hasC = false, hasD = false, hasE = false, hasF = false;
+  final subs = <StreamSubscription<void>>[];
+
+  void emitIfReady() {
+    if (hasA && hasB && hasC && hasD && hasE && hasF) {
+      controller.add(combine(a as A, b as B, c as C, d as D, e as E, f as F));
+    }
+  }
+
+  controller = StreamController<R>(
+    onListen: () {
+      subs.add(sa.listen((v) {
+        a = v;
+        hasA = true;
+        emitIfReady();
+      }, onError: controller.addError));
+      subs.add(sb.listen((v) {
+        b = v;
+        hasB = true;
+        emitIfReady();
+      }, onError: controller.addError));
+      subs.add(sc.listen((v) {
+        c = v;
+        hasC = true;
+        emitIfReady();
+      }, onError: controller.addError));
+      subs.add(sd.listen((v) {
+        d = v;
+        hasD = true;
+        emitIfReady();
+      }, onError: controller.addError));
+      subs.add(se.listen((v) {
+        e = v;
+        hasE = true;
+        emitIfReady();
+      }, onError: controller.addError));
+      subs.add(sf.listen((v) {
+        f = v;
+        hasF = true;
+        emitIfReady();
+      }, onError: controller.addError));
+    },
+    onCancel: () async {
+      for (final s in subs) {
+        await s.cancel();
+      }
+      subs.clear();
+    },
+  );
+  return controller.stream;
 }
