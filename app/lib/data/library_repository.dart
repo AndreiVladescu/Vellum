@@ -15,6 +15,7 @@ import '../reader/epub_book.dart';
 import '../shelf/cover_color.dart';
 import '../shelf/spine_style.dart';
 import 'database.dart';
+import 'library_queries.dart';
 import 'metadata.dart';
 import 'pdf_cover.dart';
 
@@ -33,7 +34,8 @@ typedef LoanEntry = ({Loan loan, Book book});
 /// filesystem store (covers, later book files), and the metadata client.
 class LibraryRepository {
   LibraryRepository._(this.db, this.metadata, this._dataDir)
-    : layout = LayoutRepository(db);
+    : layout = LayoutRepository(db),
+      queries = LibraryQueries(db);
 
   final VellumDatabase db;
   final MetadataService metadata;
@@ -42,6 +44,10 @@ class LibraryRepository {
   /// Physical-layout (environments / shelves / placements) CRUD. Reached as
   /// `repository.layout` — this class no longer owns those methods.
   final LayoutRepository layout;
+
+  /// The library's read/watch side. Reached as `repository.queries`; kept
+  /// forwarded below too, so no call site needs to change.
+  final LibraryQueries queries;
 
   static const _uuid = Uuid();
 
@@ -84,18 +90,11 @@ class LibraryRepository {
     return LibraryRepository._(db, MetadataService(), dir);
   }
 
-  Stream<List<Book>> watchAllBooks() => db.watchAllBooks();
+  Stream<List<Book>> watchAllBooks() => queries.watchAllBooks();
 
   /// A live count of everything waiting to be pushed to the server: dirty books
   /// plus pending local deletions. Drives the debounced background auto-push.
-  Stream<int> watchDirtyCount() => db
-      .customSelect(
-        'SELECT (SELECT COUNT(*) FROM books WHERE needs_push = 1) + '
-        '(SELECT COUNT(*) FROM local_deletions) AS n',
-        readsFrom: {db.books, db.localDeletions},
-      )
-      .watchSingle()
-      .map((row) => row.read<int>('n'));
+  Stream<int> watchDirtyCount() => queries.watchDirtyCount();
 
   // ---- Custom shelves (app-local collections; not synced) -----------------
   // These are manual panes/collections, distinct from genres and from the
@@ -173,35 +172,12 @@ class LibraryRepository {
 
   /// `bookId -> author names` (cover order) for the whole library, as a stream,
   /// so the shelf can search by author without an N+1 of per-book queries.
-  Stream<Map<String, List<String>>> watchAuthorsByBook() {
-    final query = db.select(db.bookAuthors).join([
-      innerJoin(db.authors, db.authors.id.equalsExp(db.bookAuthors.authorId)),
-    ])
-      ..orderBy([OrderingTerm.asc(db.bookAuthors.position)]);
-    return query.watch().map((rows) {
-      final map = <String, List<String>>{};
-      for (final r in rows) {
-        final bookId = r.readTable(db.bookAuthors).bookId;
-        (map[bookId] ??= []).add(r.readTable(db.authors).name);
-      }
-      return map;
-    });
-  }
+  Stream<Map<String, List<String>>> watchAuthorsByBook() =>
+      queries.watchAuthorsByBook();
 
   /// `bookId -> genre names` for the whole library, for the `genre:` filter.
-  Stream<Map<String, List<String>>> watchGenresByBook() {
-    final query = db.select(db.bookGenres).join([
-      innerJoin(db.genres, db.genres.id.equalsExp(db.bookGenres.genreId)),
-    ]);
-    return query.watch().map((rows) {
-      final map = <String, List<String>>{};
-      for (final r in rows) {
-        final bookId = r.readTable(db.bookGenres).bookId;
-        (map[bookId] ??= []).add(r.readTable(db.genres).name);
-      }
-      return map;
-    });
-  }
+  Stream<Map<String, List<String>>> watchGenresByBook() =>
+      queries.watchGenresByBook();
 
   Stream<Book?> watchBook(String id) =>
       (db.select(db.books)..where((b) => b.id.equals(id))).watchSingleOrNull();
