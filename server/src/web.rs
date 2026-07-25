@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use crate::AppState;
 use crate::auth::AuthUser;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 pub async fn console() -> Html<&'static str> {
     Html(include_str!("../web/console.html"))
@@ -78,4 +78,79 @@ pub async fn memberships(
     .fetch_all(&state.db)
     .await?;
     Ok(Json(rows))
+}
+
+#[derive(Serialize)]
+pub struct ServerCert {
+    /// The certificate in PEM form, ready to paste into the app's import dialog.
+    pub pem: String,
+    /// SHA-256 fingerprint (uppercase, colon-grouped) to eyeball against the
+    /// value the server logged on startup and the one the app shows on import.
+    pub fingerprint: String,
+}
+
+/// The active TLS certificate (public — presented in every handshake), so the
+/// console can hand it to the user for import into the app instead of them
+/// copying `cert.pem` off the server by hand. Requires a logged-in console user;
+/// 404 when the server runs over plain HTTP (nothing to import).
+pub async fn server_cert(
+    State(state): State<AppState>,
+    _user: AuthUser,
+) -> AppResult<Json<ServerCert>> {
+    let info = state
+        .tls_cert
+        .as_ref()
+        .ok_or_else(|| AppError::NotFound("server is not using TLS".into()))?;
+    let pem = tokio::fs::read_to_string(&info.cert_path)
+        .await
+        .map_err(|e| AppError::Internal(format!("reading certificate: {e}")))?;
+    Ok(Json(ServerCert {
+        // Only the CERTIFICATE blocks, so a private key can never leak even if
+        // the configured cert file happens to also contain one.
+        pem: certificates_only(&pem),
+        fingerprint: info.fingerprint.clone(),
+    }))
+}
+
+/// Keep only the `CERTIFICATE` PEM blocks from `pem`, dropping anything else.
+fn certificates_only(pem: &str) -> String {
+    const BEGIN: &str = "-----BEGIN CERTIFICATE-----";
+    const END: &str = "-----END CERTIFICATE-----";
+    let mut out = String::new();
+    let mut rest = pem;
+    while let Some(s) = rest.find(BEGIN) {
+        let after = &rest[s..];
+        let Some(e) = after.find(END) else { break };
+        out.push_str(&after[..e + END.len()]);
+        out.push('\n');
+        rest = &after[e + END.len()..];
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::certificates_only;
+
+    #[test]
+    fn certificates_only_strips_a_private_key() {
+        let pem = "-----BEGIN PRIVATE KEY-----\nSECRET\n-----END PRIVATE KEY-----\n\
+                   -----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
+        let out = certificates_only(pem);
+        assert!(out.contains("BEGIN CERTIFICATE"));
+        assert!(out.contains("AAAA"));
+        assert!(
+            !out.contains("PRIVATE KEY"),
+            "the private key must be dropped"
+        );
+        assert!(!out.contains("SECRET"));
+    }
+
+    #[test]
+    fn certificates_only_keeps_a_full_chain() {
+        let pem = "-----BEGIN CERTIFICATE-----\nLEAF\n-----END CERTIFICATE-----\n\
+                   -----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----\n";
+        let out = certificates_only(pem);
+        assert!(out.contains("LEAF") && out.contains("CA"));
+    }
 }

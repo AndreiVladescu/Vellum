@@ -32,6 +32,7 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
             30,
             std::time::Duration::from_secs(60),
         )),
+        tls_cert: None,
     });
     (app, data_dir)
 }
@@ -65,6 +66,7 @@ async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
             30,
             std::time::Duration::from_secs(60),
         )),
+        tls_cert: None,
     });
     (app, db)
 }
@@ -229,6 +231,7 @@ async fn session_expiry_slides_forward_on_use() {
             30,
             std::time::Duration::from_secs(60),
         )),
+        tls_cert: None,
     });
     let token = register_master(&app).await;
 
@@ -375,6 +378,18 @@ async fn requires_a_token() {
     let app = test_app().await;
     let (status, _) = call(&app, "GET", "/api/books", None, None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn cert_endpoint_requires_auth_and_404s_without_tls() {
+    let app = test_app().await;
+    // The certificate is behind the console login (any authenticated user).
+    let (status, _) = call(&app, "GET", "/api/cert", None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    // Authenticated, but the test server runs without TLS → nothing to import.
+    let master = register_master(&app).await;
+    let (status, _) = call(&app, "GET", "/api/cert", Some(&master), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -1086,6 +1101,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
             30,
             std::time::Duration::from_secs(60),
         )),
+        tls_cert: None,
     });
     let master = register_master(&app).await;
 

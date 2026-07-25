@@ -54,6 +54,19 @@ pub struct AppState {
     /// Per-user limiter for outbound metadata search (shared Open Library /
     /// Google Books quota).
     pub search_limiter: std::sync::Arc<throttle::RateLimiter>,
+    /// When TLS is on, the served certificate's path + SHA-256 fingerprint, so
+    /// the web console can offer it for import into the app. `None` over plain
+    /// HTTP (nothing to import).
+    pub tls_cert: Option<TlsCertInfo>,
+}
+
+/// The active TLS leaf certificate, surfaced to the console's "import
+/// certificate" affordance. The certificate is public (presented in every
+/// handshake); the private key is never exposed.
+#[derive(Clone)]
+pub struct TlsCertInfo {
+    pub cert_path: PathBuf,
+    pub fingerprint: String,
 }
 
 /// Open (creating if missing) the SQLite database at `path` and run migrations.
@@ -91,6 +104,8 @@ pub fn router(state: AppState) -> Router {
         .route("/favicon.svg", get(web::favicon))
         .route("/p/{token}", get(web::public_page))
         .route("/api/memberships", get(web::memberships))
+        // The active TLS certificate (public), for the console's import affordance.
+        .route("/api/cert", get(web::server_cert))
         // Accounts & sessions.
         .route("/api/auth/register", post(auth::register))
         .route("/api/auth/login", post(auth::login))

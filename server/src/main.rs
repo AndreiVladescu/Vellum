@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use vellum_server::{AppState, connect_db, router, tls};
+use vellum_server::{AppState, TlsCertInfo, connect_db, router, tls};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,46 +18,16 @@ async fn main() -> anyhow::Result<()> {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(2048); // 2 GB default
-    let state = AppState {
-        db,
-        public_base_url,
-        data_dir: data_dir.into(),
-        http: reqwest::Client::new(),
-        max_upload_bytes: max_upload_mb * 1024 * 1024,
-        throttle: std::sync::Arc::default(),
-        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
-        basic_cache: std::sync::Arc::default(),
-        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
-            60,
-            std::time::Duration::from_secs(60),
-        )),
-        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
-            30,
-            std::time::Duration::from_secs(60),
-        )),
-    };
-
-    // Sweep temp files left by uploads a previous run couldn't finish.
-    sweep_tmp_files(&state.data_dir.join("files")).await;
-
-    let port: u16 = std::env::var("VELLUM_PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(3000);
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-
-    // `into_make_service_with_connect_info` surfaces the peer socket address to
-    // handlers (the per-IP rate limiter reads it when no X-Forwarded-For is set).
-    let make_service = router(state).into_make_service_with_connect_info::<SocketAddr>();
 
     // Opt-in TLS: needed for the Android app (which blocks cleartext) and for any
     // connection that leaves localhost. Off by default so the desktop local-first
-    // story keeps working over plain HTTP with no setup.
+    // story keeps working over plain HTTP with no setup. Resolve the certificate
+    // up front so both AppState (for the console's import affordance) and the
+    // serving block below can use it.
     let tls_on = std::env::var("VELLUM_TLS")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
-
-    if tls_on {
+    let tls = if tls_on {
         // ring provider so we don't need the aws-lc-rs C toolchain; must be the
         // process default before rustls builds any config.
         rustls::crypto::ring::default_provider()
@@ -77,8 +47,50 @@ async fn main() -> anyhow::Result<()> {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
-
         let cert = tls::ensure_self_signed(&cert_path, &key_path, &extra_sans)?;
+        Some((cert_path, key_path, cert))
+    } else {
+        None
+    };
+    let tls_cert = tls.as_ref().map(|(cert_path, _, cert)| TlsCertInfo {
+        cert_path: cert_path.clone(),
+        fingerprint: cert.fingerprint.clone(),
+    });
+
+    let state = AppState {
+        db,
+        public_base_url,
+        data_dir: data_dir.into(),
+        http: reqwest::Client::new(),
+        max_upload_bytes: max_upload_mb * 1024 * 1024,
+        throttle: std::sync::Arc::default(),
+        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            60,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
+        tls_cert,
+    };
+
+    // Sweep temp files left by uploads a previous run couldn't finish.
+    sweep_tmp_files(&state.data_dir.join("files")).await;
+
+    let port: u16 = std::env::var("VELLUM_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(3000);
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+
+    // `into_make_service_with_connect_info` surfaces the peer socket address to
+    // handlers (the per-IP rate limiter reads it when no X-Forwarded-For is set).
+    let make_service = router(state).into_make_service_with_connect_info::<SocketAddr>();
+
+    if let Some((cert_path, key_path, cert)) = tls {
         let config =
             axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_path, &key_path).await?;
 
