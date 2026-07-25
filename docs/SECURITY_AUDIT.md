@@ -41,7 +41,7 @@ environment — running them is a recommendation below.
 | L2 | 🟡 | Open | Session token plaintext fallback when no OS keyring | `app/lib/server/connection_store.dart` |
 | L3 | 🟡 | ✅ Fixed (2026-07-11) | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/lib.rs` |
 | L4 | 🟡 | ✅ Fixed (2026-07-11) | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
-| L5 | 🟡 | Open | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
+| L5 | 🟡 | ✅ Fixed (2026-07-25) | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
 | L6 | 🟡 | Open | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
 
 > **Remediation note (2026-07-11):** H1, M1, M2 (destructive, low-effort) plus a
@@ -270,11 +270,16 @@ it.
 
 ### 🟡 L5 — Basic-auth cache holds unsalted password hashes in memory
 
-`BasicAuthCache` stores `sha256(password)` (unsalted) with a 5-minute TTL to
-avoid an Argon2 verify on every OPDS request. The threat it addresses (Argon2
-CPU amplification) is real and the value is a short-lived in-memory SHA-256 of a
-high-entropy secret, so this is acceptable and documented — noted only for
-completeness. Keep the TTL short.
+`BasicAuthCache` stored `sha256(password)` (unsalted) with a 5-minute TTL to
+avoid an Argon2 verify on every OPDS request. A cached value that leaked (log,
+partial dump, swapped page) was an offline-crackable password hash.
+
+**✅ Fixed (2026-07-25):** the cache now stores `sha256(key ‖ password)` where
+`key` is a random 32-byte secret generated once per process (`CACHE_KEY`), never
+persisted or logged. Without the in-process key the fingerprint isn't
+precomputable, so it can't be cracked offline. Behaviour is unchanged (same
+TTL, same password-specific hit test); the fingerprint is used only to recognise
+the same password within the process, not as a MAC.
 
 ### 🟡 L6 — Untrusted-PDF cover render shells out to external tools
 

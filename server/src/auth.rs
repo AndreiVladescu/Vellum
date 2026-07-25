@@ -202,12 +202,33 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
 /// again. Short enough that a (future) password change self-heals quickly.
 const BASIC_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(300);
 
+/// A random secret generated once per process, used to key the Basic-auth
+/// cache's password fingerprints. It never leaves the process and is never
+/// persisted, so a cached value can't be lifted (via a log, a partial leak, or
+/// a swapped page) and cracked offline into the plaintext password.
+static CACHE_KEY: std::sync::LazyLock<[u8; 32]> = std::sync::LazyLock::new(|| {
+    let mut key = [0u8; 32];
+    OsRng.fill_bytes(&mut key);
+    key
+});
+
+/// A keyed fingerprint of `password` under [`CACHE_KEY`] — `sha256(key‖password)`.
+/// Used only to recognise the *same* password within the process (not as a MAC),
+/// so length-extension is irrelevant; the point is that without the secret key
+/// the value is not precomputable, i.e. useless for offline cracking.
+fn cache_fingerprint(password: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(*CACHE_KEY);
+    hasher.update(password.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
 /// Caches recent successful Basic-auth verifications so an e-reader that sends
 /// `Authorization: Basic` on *every* OPDS request doesn't cost an Argon2 verify
 /// (~10²ms of CPU) each time — which is both slow and a free CPU-amplification
-/// vector. Keyed by lowercase email → (sha256 of the password, when verified).
-/// The threat here is repeated *hashing cost*, not storage, so a TTL-gated
-/// SHA-256 of a high-entropy in-memory value is acceptable.
+/// vector. Keyed by lowercase email → (keyed fingerprint of the password, when
+/// verified). The stored fingerprint is salted by a per-process secret
+/// ([`cache_fingerprint`]), so it can't be cracked offline if it ever leaks.
 #[derive(Default)]
 pub struct BasicAuthCache {
     inner: std::sync::Mutex<std::collections::HashMap<String, (String, std::time::Instant)>>,
@@ -220,7 +241,7 @@ impl BasicAuthCache {
     fn hit(&self, email: &str, password: &str) -> bool {
         let mut map = self.inner.lock().unwrap();
         match map.get(email) {
-            Some((hash, at)) if at.elapsed() < BASIC_CACHE_TTL => *hash == sha256_hex(password),
+            Some((fp, at)) if at.elapsed() < BASIC_CACHE_TTL => *fp == cache_fingerprint(password),
             Some(_) => {
                 map.remove(email);
                 false
@@ -232,7 +253,7 @@ impl BasicAuthCache {
     fn store(&self, email: &str, password: &str) {
         self.inner.lock().unwrap().insert(
             email.to_string(),
-            (sha256_hex(password), std::time::Instant::now()),
+            (cache_fingerprint(password), std::time::Instant::now()),
         );
     }
 
