@@ -670,10 +670,45 @@ fn join_posix(base: &str, href: &str) -> String {
     parts.join("/")
 }
 
+/// Resource caps applied to each render subprocess before `exec` (Unix only):
+/// bound the address space, CPU time, output-file size, and forbid core dumps.
+/// These sandbox an attacker-supplied PDF so that even within the 30 s wall
+/// timeout it can't drive `gs`/`mutool`/poppler into exhausting host memory or
+/// filling the disk. Defence-in-depth alongside `-dSAFER` and the semaphore.
+/// See docs/SECURITY_AUDIT.md (L6).
+#[cfg(unix)]
+fn apply_render_rlimits(cmd: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+    // SAFETY: the closure runs in the forked child before exec and calls only
+    // async-signal-safe `setrlimit`. Failures are ignored — a cap we can't set
+    // just isn't applied; the wall timeout still bounds the child.
+    unsafe {
+        cmd.pre_exec(|| {
+            let set = |resource, limit: u64| {
+                let rl = libc::rlimit {
+                    rlim_cur: limit,
+                    rlim_max: limit,
+                };
+                libc::setrlimit(resource, &rl);
+            };
+            set(libc::RLIMIT_AS, 1024 * 1024 * 1024); // 1 GiB address space
+            set(libc::RLIMIT_CPU, 30); // 30 s CPU time
+            set(libc::RLIMIT_FSIZE, 64 * 1024 * 1024); // 64 MiB output file
+            set(libc::RLIMIT_CORE, 0); // no core dumps
+            Ok(())
+        });
+    }
+}
+
+#[cfg(not(unix))]
+fn apply_render_rlimits(_cmd: &mut std::process::Command) {}
+
 /// Run one render command with a hard timeout, reaping the child if it hangs on
-/// a pathological PDF. `kill_on_drop` means a timed-out (dropped) child is
-/// killed rather than leaked.
-async fn run_render(mut cmd: Command) -> bool {
+/// a pathological PDF. Applies per-process resource caps, then `kill_on_drop`
+/// means a timed-out (dropped) child is killed rather than leaked.
+async fn run_render(mut cmd: std::process::Command) -> bool {
+    apply_render_rlimits(&mut cmd);
+    let mut cmd = Command::from(cmd);
     cmd.kill_on_drop(true);
     match tokio::time::timeout(std::time::Duration::from_secs(30), cmd.status()).await {
         Ok(Ok(status)) => status.success(),
@@ -688,7 +723,7 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
     let prefix = out_jpg.with_extension("");
     for tool in ["pdftoppm", "pdftocairo"] {
         let _ = tokio::fs::remove_file(out_jpg).await;
-        let mut cmd = Command::new(tool);
+        let mut cmd = std::process::Command::new(tool);
         cmd.args([
             "-jpeg",
             "-f",
@@ -707,7 +742,7 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
     }
     // MuPDF: writes exactly to -o.
     let _ = tokio::fs::remove_file(out_jpg).await;
-    let mut cmd = Command::new("mutool");
+    let mut cmd = std::process::Command::new("mutool");
     cmd.args(["draw", "-F", "jpeg", "-w", "1400", "-o"])
         .arg(out_jpg)
         .arg(input)
@@ -715,9 +750,10 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
     if run_render(cmd).await && nonempty(out_jpg).await {
         return true;
     }
-    // Ghostscript.
+    // Ghostscript. -dSAFER (default since gs 9.50, set explicitly here) blocks
+    // file/pipe access from the PostScript/PDF program itself.
     let _ = tokio::fs::remove_file(out_jpg).await;
-    let mut cmd = Command::new("gs");
+    let mut cmd = std::process::Command::new("gs");
     cmd.args([
         "-q",
         "-dSAFER",

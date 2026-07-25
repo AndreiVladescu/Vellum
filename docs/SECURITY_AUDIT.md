@@ -42,7 +42,7 @@ environment — running them is a recommendation below.
 | L3 | 🟡 | ✅ Fixed (2026-07-11) | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/lib.rs` |
 | L4 | 🟡 | ✅ Fixed (2026-07-11) | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
 | L5 | 🟡 | ✅ Fixed (2026-07-25) | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
-| L6 | 🟡 | Open | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
+| L6 | 🟡 | ✅ Hardened (2026-07-25) | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
 
 > **Remediation note (2026-07-11):** H1, M1, M2 (destructive, low-effort) plus a
 > second round — M3 (opt-in), M4, L3, L4 — have been hardened (see the ✅ notes in
@@ -285,11 +285,19 @@ the same password within the process, not as a MAC.
 
 `render_first_page` invokes `pdftoppm`/`pdftocairo`/`mutool`/`gs` on uploaded
 PDFs. This is well-contained: a 30 s `timeout` with `kill_on_drop`, a
-concurrency semaphore (2), Ghostscript run with `-dSAFER`, and panic isolation
-via `spawn_blocking`. The residual risk is parsing attacker-controlled PDFs in a
-third-party binary (historically a rich bug source, esp. Ghostscript). Keep
-those host tools patched, or run the server in a container/seccomp sandbox where
-these render subprocesses have no network and a scratch-only filesystem.
+concurrency semaphore (2), and Ghostscript run with `-dSAFER`.
+
+**✅ Hardened (2026-07-25):** each render subprocess now also runs under
+`setrlimit` resource caps applied via `pre_exec` before `exec` (Unix):
+`RLIMIT_AS` 1 GiB, `RLIMIT_CPU` 30 s, `RLIMIT_FSIZE` 64 MiB, `RLIMIT_CORE` 0. So
+even within the wall timeout a malicious PDF can't exhaust host memory, spin CPU
+indefinitely, fill the disk, or dump core. The residual risk is parsing
+attacker-controlled PDFs in a third-party binary (historically a rich bug
+source, esp. Ghostscript) — the render is a pure convenience with **no**
+pure-Rust rasteriser available (`lopdf` only parses the page tree for the count,
+it can't render), so the shell-out stays optional. Keep those host tools
+patched, or run the server in a container/seccomp sandbox where these render
+subprocesses have no network and a scratch-only filesystem.
 
 ---
 

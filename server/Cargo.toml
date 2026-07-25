@@ -40,6 +40,11 @@ axum-server = { version = "0.8", default-features = false, features = ["tls-rust
 rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 
+# Used only to apply setrlimit resource caps to the PDF-render subprocesses on
+# Unix (see blobs.rs). Unused on other platforms.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
