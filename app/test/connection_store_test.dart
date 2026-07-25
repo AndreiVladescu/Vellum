@@ -26,4 +26,24 @@ void main() {
     expect(prefs.getString('server.url'), 'http://a.test',
         reason: 'unrelated prefs are untouched');
   });
+
+  test('warns once when the token loads from plaintext prefs (no keyring)',
+      () async {
+    // With no secure-storage platform channel registered, the read throws and
+    // load() falls back to the plaintext-prefs token — the insecure path (L2).
+    SharedPreferences.setMockInitialValues({
+      'server.url': 'http://a.test',
+      'server.token': 'plaintext-tok',
+      'server.email': 'reader@example.com',
+    });
+    final conn = await ServerConnection.load();
+
+    expect(conn.isConnected, true);
+    expect(conn.shouldWarnInsecureToken, true,
+        reason: 'a plaintext-loaded token arms the honesty notice');
+
+    await conn.dismissInsecureTokenWarning();
+    expect(conn.shouldWarnInsecureToken, false,
+        reason: 'dismissal is one-time and persists');
+  });
 }

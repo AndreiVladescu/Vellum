@@ -14,22 +14,29 @@ import 'server_client.dart';
 /// in [SharedPreferences]. If the secure store is unavailable (e.g. no keyring),
 /// it transparently falls back to preferences so the app still works.
 class ServerConnection extends ChangeNotifier {
-  ServerConnection._(this._prefs, this._storage, this._token);
+  ServerConnection._(this._prefs, this._storage, this._token, this._tokenInsecure);
 
   static const _urlKey = 'server.url';
   static const _tokenKey = 'server.token';
   static const _emailKey = 'server.email';
   static const _masterKey = 'server.isMaster';
   static const _certPrefix = 'server.cert.';
+  static const _insecureAckKey = 'server.insecureTokenAck';
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _storage;
   String? _token;
 
+  /// True when the session token is (or was loaded) in plaintext preferences
+  /// because the OS secure store was unavailable — a keyring-less headless Linux
+  /// box, typically. Drives the honesty notice on the server page (L2).
+  bool _tokenInsecure;
+
   static Future<ServerConnection> load() async {
     final prefs = await SharedPreferences.getInstance();
     const storage = FlutterSecureStorage();
     String? token;
+    var insecure = false;
     try {
       token = await storage.read(key: _tokenKey);
       // Migrate a token previously kept in plaintext prefs into the secure
@@ -43,10 +50,12 @@ class ServerConnection extends ChangeNotifier {
         await prefs.remove(_tokenKey);
       }
     } catch (_) {
-      // No keyring available — fall back to the prefs-stored token.
+      // No keyring available — fall back to the prefs-stored token, and flag
+      // that it's sitting there unencrypted.
       token = prefs.getString(_tokenKey);
+      insecure = token != null && token.isNotEmpty;
     }
-    return ServerConnection._(prefs, storage, token);
+    return ServerConnection._(prefs, storage, token, insecure);
   }
 
   String get baseUrl => _prefs.getString(_urlKey) ?? '';
@@ -55,6 +64,20 @@ class ServerConnection extends ChangeNotifier {
   bool get isMaster => _prefs.getBool(_masterKey) ?? false;
 
   bool get isConnected => (_token?.isNotEmpty ?? false) && baseUrl.isNotEmpty;
+
+  /// Whether to show the "secure storage unavailable" notice: the token is
+  /// stored in plaintext *and* the user hasn't dismissed the warning yet.
+  bool get shouldWarnInsecureToken =>
+      _tokenInsecure &&
+      isConnected &&
+      !(_prefs.getBool(_insecureAckKey) ?? false);
+
+  /// Records that the user has acknowledged the plaintext-token notice, so it
+  /// isn't shown again unless a new insecure session re-arms it.
+  Future<void> dismissInsecureTokenWarning() async {
+    await _prefs.setBool(_insecureAckKey, true);
+    notifyListeners();
+  }
 
   String _cursorKey(String url) => 'sync.cursor.$url';
 
@@ -139,9 +162,13 @@ class ServerConnection extends ChangeNotifier {
     _token = auth.token;
     try {
       await _storage.write(key: _tokenKey, value: auth.token);
+      _tokenInsecure = false;
     } catch (_) {
-      // fallback: keep it in prefs if the secure store is unavailable.
+      // fallback: keep it in prefs if the secure store is unavailable, and
+      // re-arm the honesty notice so the user learns their token is unencrypted.
       await _prefs.setString(_tokenKey, auth.token);
+      _tokenInsecure = true;
+      await _prefs.remove(_insecureAckKey);
     }
     notifyListeners();
   }
@@ -156,6 +183,7 @@ class ServerConnection extends ChangeNotifier {
       // Offline or already-invalid token — clearing locally is enough.
     }
     _token = null;
+    _tokenInsecure = false;
     try {
       await _storage.delete(key: _tokenKey);
     } catch (_) {
@@ -164,6 +192,7 @@ class ServerConnection extends ChangeNotifier {
     await _prefs.remove(_tokenKey);
     await _prefs.remove(_emailKey);
     await _prefs.remove(_masterKey);
+    await _prefs.remove(_insecureAckKey);
     if (baseUrl.isNotEmpty) await _prefs.remove(_cursorKey(baseUrl));
     notifyListeners();
   }

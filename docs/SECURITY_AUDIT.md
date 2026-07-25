@@ -38,7 +38,7 @@ environment — running them is a recommendation below.
 | M3 | 🟠 | ✅ Mitigated (opt-in, 2026-07-11) | Master-bootstrap takeover window (first registrant becomes owner) | `server/src/auth.rs` + deployment |
 | M4 | 🟠 | ✅ Fixed (2026-07-11) | Dependencies behind latest; no automated advisory scanning in CI | `server/Cargo.toml`, `app/pubspec.yaml` |
 | L1 | 🟡 | ✅ Fixed (2026-07-25) | `?token=` in URL leaks into proxy logs / browser history | `server/src/auth.rs` |
-| L2 | 🟡 | Open | Session token plaintext fallback when no OS keyring | `app/lib/server/connection_store.dart` |
+| L2 | 🟡 | ✅ Fixed (2026-07-25) | Session token plaintext fallback when no OS keyring | `app/lib/server/connection_store.dart` |
 | L3 | 🟡 | ✅ Fixed (2026-07-11) | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/lib.rs` |
 | L4 | 🟡 | ✅ Fixed (2026-07-11) | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
 | L5 | 🟡 | ✅ Fixed (2026-07-25) | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
@@ -241,8 +241,14 @@ query authenticates nothing, even on a cover GET.
 `connection_store.dart` stores the bearer token in the OS secure store
 (Keychain/libsecret/Keystore), but **falls back to `SharedPreferences`
 (plaintext on disk)** when no keyring is available. Reasonable for usability, but
-on a headless Linux box without a keyring the token sits in cleartext. Consider
-warning the user when the secure store is unavailable, or refusing to persist.
+on a headless Linux box without a keyring the token sits in cleartext, silently.
+
+**✅ Fixed (2026-07-25):** the fallback still happens (usability), but is no
+longer silent. `ServerConnection` tracks when the token was written/loaded in
+plaintext (`shouldWarnInsecureToken`) and the server page shows a one-time,
+dismissable notice — "Secure storage unavailable — the session token is stored
+unencrypted on this device" — pointing at disconnecting or installing a keyring.
+Android's Keystore is always present, so in practice this is desktop-only.
 
 ### 🟡 L3 — Missing HTTP security headers
 

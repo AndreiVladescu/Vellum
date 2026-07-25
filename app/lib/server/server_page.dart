@@ -402,6 +402,53 @@ class _ServerPageState extends State<ServerPage> {
     );
   }
 
+  /// Honesty banner shown when the session token had to be stored unencrypted
+  /// (no OS keyring). Dismissable — tapping "Got it" records the acknowledgement
+  /// so it isn't shown again until a new insecure session re-arms it.
+  Widget _insecureTokenNotice(ThemeData theme, ServerConnection conn) {
+    return Card(
+      color: theme.colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.lock_open,
+                    size: 18, color: theme.colorScheme.onErrorContainer),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Secure storage unavailable',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(color: theme.colorScheme.onErrorContainer),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'This device has no OS keyring, so the session token is stored '
+              'unencrypted on disk. Anyone with access to this account can read '
+              'it. Disconnect when you are done, or install a keyring '
+              '(e.g. gnome-keyring) for encrypted storage.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onErrorContainer),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: conn.dismissInsecureTokenWarning,
+                child: const Text('Got it'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildConnected(BuildContext context) {
     final theme = Theme.of(context);
     final conn = widget.connection;
@@ -421,6 +468,9 @@ class _ServerPageState extends State<ServerPage> {
                 : null,
           ),
         ),
+        // One-time honesty notice: the OS secure store was unavailable, so the
+        // session token is sitting in plaintext preferences (L2).
+        if (conn.shouldWarnInsecureToken) _insecureTokenNotice(theme, conn),
         // Lets a rotated/regenerated server certificate be re-imported without
         // disconnecting (an https server only).
         _certRow(theme, conn.baseUrl),
