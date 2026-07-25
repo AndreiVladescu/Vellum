@@ -173,32 +173,41 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               ),
             ),
           ),
+          // SafeArea(top:false) keeps the chapter controls above the Android
+          // gesture/nav bar under edge-to-edge; the bar grows by that inset
+          // rather than clipping, so no fixed height here.
           bottomNavigationBar: BottomAppBar(
-            height: 56,
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: 'Previous chapter',
-                  onPressed:
-                      _chapter > 0 ? () => _goTo(_chapter - 1, count) : null,
-                  icon: const Icon(Icons.chevron_left),
+            padding: EdgeInsets.zero,
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Previous chapter',
+                      onPressed:
+                          _chapter > 0 ? () => _goTo(_chapter - 1, count) : null,
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    Expanded(
+                      child: Text(
+                        chapter.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Next chapter',
+                      onPressed: _chapter < count - 1
+                          ? () => _goTo(_chapter + 1, count)
+                          : null,
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: Text(
-                    chapter.title,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Next chapter',
-                  onPressed: _chapter < count - 1
-                      ? () => _goTo(_chapter + 1, count)
-                      : null,
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
+              ),
             ),
           ),
         );

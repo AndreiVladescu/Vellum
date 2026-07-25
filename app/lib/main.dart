@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'account/user_profile.dart';
 import 'add_book/add_book_page.dart';
@@ -21,6 +22,11 @@ import 'shelf/shelf_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Draw behind the status/nav bars. Android 15 (targetSdk 35) enforces this
+  // anyway; setting it explicitly makes earlier Android versions match. The
+  // Material scaffolding (AppBar, NavigationBar, FAB, bottom sheets) already
+  // insets itself; custom bottom bars use SafeArea (see the EPUB reader).
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   final repository = await LibraryRepository.open(VellumDatabase());
   final profile = await UserProfileStore.load();
   final settings = await AppSettingsStore.load();
