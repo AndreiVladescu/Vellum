@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:drift/drift.dart' hide isNull;
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -33,10 +33,17 @@ http.Response _noCopies() => http.Response(
       200,
     );
 
+/// `{ server_now, loans: [] }` — same reasoning as [_noShelves], for tests
+/// predating loan sync.
+http.Response _noLoans() => http.Response(
+      jsonEncode({'server_now': '2024-01-01 00:00:00', 'loans': []}),
+      200,
+    );
+
 /// A JSON handler that serves a fixed book list + deletions, and empty file
-/// lists, so pull's cover/file passes are no-ops. Shelves and copies default
-/// to an empty list so tests that don't care about them (most of this file)
-/// aren't affected by _pull/_push's unconditional shelf/copy passes.
+/// lists, so pull's cover/file passes are no-ops. Shelves, copies, and loans
+/// default to an empty list so tests that don't care about them (most of
+/// this file) aren't affected by _pull/_push's unconditional passes.
 Future<http.Response> Function(http.Request) _server({
   required List<Map<String, dynamic>> books,
   List<String> deletions = const [],
@@ -49,6 +56,10 @@ Future<http.Response> Function(http.Request) _server({
   List<String> copyDeletions = const [],
   List<Map<String, dynamic>>? pushedCopiesCollector,
   List<String>? deletedCopiesCollector,
+  List<Map<String, dynamic>> loans = const [],
+  List<String> loanDeletions = const [],
+  List<Map<String, dynamic>>? pushedLoansCollector,
+  List<String>? deletedLoansCollector,
 }) {
   return (req) async {
     final path = req.url.path;
@@ -63,8 +74,9 @@ Future<http.Response> Function(http.Request) _server({
       final ids = switch (kind) {
         'shelf' => shelfDeletions,
         'copy' => copyDeletions,
+        'loan' => loanDeletions,
         'book' => deletions,
-        _ => [...deletions, ...shelfDeletions, ...copyDeletions],
+        _ => [...deletions, ...shelfDeletions, ...copyDeletions, ...loanDeletions],
       };
       return http.Response(
         jsonEncode([for (final id in ids) {'book_id': id, 'deleted_at': '2020-01-01 00:00:00'}]),
@@ -80,6 +92,12 @@ Future<http.Response> Function(http.Request) _server({
     if (req.method == 'GET' && path == '/api/copies') {
       return http.Response(
         jsonEncode({'server_now': '2024-06-01 00:00:00', 'copies': copies}),
+        200,
+      );
+    }
+    if (req.method == 'GET' && path == '/api/loans') {
+      return http.Response(
+        jsonEncode({'server_now': '2024-06-01 00:00:00', 'loans': loans}),
         200,
       );
     }
@@ -100,6 +118,14 @@ Future<http.Response> Function(http.Request) _server({
     }
     if (req.method == 'DELETE' && path.startsWith('/api/copies/')) {
       deletedCopiesCollector?.add(path.split('/').last);
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'PUT' && path.startsWith('/api/loans/')) {
+      pushedLoansCollector?.add(jsonDecode(req.body) as Map<String, dynamic>);
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'DELETE' && path.startsWith('/api/loans/')) {
+      deletedLoansCollector?.add(path.split('/').last);
       return http.Response('{}', 200);
     }
     if (req.method == 'DELETE' && path.startsWith('/api/books/')) {
@@ -133,6 +159,22 @@ Map<String, dynamic> _serverCopy(
   'id': id,
   'book_id': bookId,
   'location': location,
+  'updated_at': ?updatedAt,
+};
+
+Map<String, dynamic> _serverLoan(
+  String id,
+  String copyId, {
+  required String borrower,
+  required String loanedAt,
+  String? returnedAt,
+  String? updatedAt,
+}) => {
+  'id': id,
+  'copy_id': copyId,
+  'borrower': borrower,
+  'loaned_at': loanedAt,
+  'returned_at': ?returnedAt,
   'updated_at': ?updatedAt,
 };
 
@@ -272,6 +314,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -321,6 +364,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -369,6 +413,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -405,6 +450,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -427,6 +473,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -464,6 +511,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -484,6 +532,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -534,6 +583,7 @@ void main() {
       }
       if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       if (req.method == 'GET' && req.url.path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && req.url.path == '/api/loans') return _noLoans();
       return http.Response('[]', 200);
     });
 
@@ -611,6 +661,12 @@ void main() {
       if (req.method == 'GET' && path == '/api/copies') {
         return http.Response(
           jsonEncode({'server_now': '2024-06-01 00:00:00', 'copies': []}),
+          200,
+        );
+      }
+      if (req.method == 'GET' && path == '/api/loans') {
+        return http.Response(
+          jsonEncode({'server_now': '2024-06-01 00:00:00', 'loans': []}),
           200,
         );
       }
@@ -866,5 +922,137 @@ void main() {
 
     expect(deletedCopies, [copyId]);
     expect(await db.select(db.localDeletions).get(), isEmpty);
+  });
+
+  // ---- loans (plan 5 #4) -------------------------------------------------
+
+  test('pull adopts a loan for a copy this device has', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    await db
+        .into(db.physicalCopies)
+        .insert(PhysicalCopiesCompanion.insert(id: 'c1', bookId: 'b1'));
+    final client = _client(_server(
+      books: const [],
+      loans: [
+        _serverLoan('l1', 'c1',
+            borrower: 'Alice',
+            loanedAt: '2024-01-01 00:00:00',
+            updatedAt: '2024-01-01 00:00:00'),
+      ],
+    ));
+
+    final report = await SyncService(repo).pull(client);
+    expect(report.pulled, 1);
+
+    final loan = await (db.select(db.loans)..where((l) => l.id.equals('l1'))).getSingle();
+    expect(loan.borrower, 'Alice');
+    expect(loan.needsPush, false, reason: 'adopting the server copy leaves nothing to push');
+  });
+
+  test('pull records an issue (not a silent skip) for a loan naming a copy '
+      'this device does not have', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    // 'c1' is intentionally never inserted locally.
+    final client = _client(_server(
+      books: const [],
+      loans: [
+        _serverLoan('l1', 'c1',
+            borrower: 'Alice',
+            loanedAt: '2024-01-01 00:00:00',
+            updatedAt: '2024-01-01 00:00:00'),
+      ],
+    ));
+
+    final report = await SyncService(repo).pull(client);
+
+    expect(await db.select(db.loans).get(), isEmpty);
+    expect(report.issues, hasLength(1));
+    expect(report.issues.single.stage, 'loan');
+    expect(report.issues.single.bookId, 'l1');
+  });
+
+  test('pull does not clobber a locally newer return', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    await db
+        .into(db.physicalCopies)
+        .insert(PhysicalCopiesCompanion.insert(id: 'c1', bookId: 'b1'));
+    await db.into(db.loans).insert(LoansCompanion.insert(
+          id: 'l1',
+          copyId: 'c1',
+          borrower: 'Alice',
+          returnedAt: Value(DateTime.utc(2025, 6, 1)),
+          updatedAt: Value(DateTime.utc(2025, 1, 1)),
+        ));
+    final client = _client(_server(
+      books: const [],
+      loans: [
+        _serverLoan('l1', 'c1',
+            borrower: 'Alice',
+            loanedAt: '2024-01-01 00:00:00',
+            updatedAt: '2024-01-01 00:00:00'),
+      ],
+    ));
+
+    await SyncService(repo).pull(client);
+
+    final loan = await (db.select(db.loans)..where((l) => l.id.equals('l1'))).getSingle();
+    expect(loan.returnedAt, isNotNull, reason: 'local return is newer, must win');
+  });
+
+  test('push sends a dirty loan', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    // needsPush: false -- this test is about the loan push, not the book's;
+    // _server() has no /api/books PUT stub, so a dirty book here would add
+    // an unrelated issue to the report.
+    await db.into(db.books).insert(BooksCompanion.insert(
+          id: 'b1',
+          title: 'b1',
+          needsPush: const Value(false),
+        ));
+    final copyId = await repo.addPhysicalCopy('b1');
+    await (db.update(db.physicalCopies)..where((c) => c.id.equals(copyId)))
+        .write(const PhysicalCopiesCompanion(needsPush: Value(false)));
+    await repo.lendCopy(copyId, 'Alice');
+
+    final pushed = <Map<String, dynamic>>[];
+    final client = _client(_server(books: const [], pushedLoansCollector: pushed));
+
+    final report = await SyncService(repo).push(client);
+    expect(pushed, hasLength(1));
+    expect(pushed.single['copy_id'], copyId);
+    expect(pushed.single['borrower'], 'Alice');
+    expect(pushed.single['returned_at'], isNull);
+    expect(report.issues, isEmpty);
+
+    final loan =
+        await (db.select(db.loans)..where((l) => l.copyId.equals(copyId))).getSingle();
+    expect(loan.needsPush, false);
+  });
+
+  test('returnLoan dirties the loan so a return actually pushes', () async {
+    // Regression risk: returnLoan is a db.update, and column defaults (which
+    // cover lendCopy's insert) don't re-run on one -- an unbumped return
+    // would silently never reach the server.
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    final copyId = await repo.addPhysicalCopy('b1');
+    await repo.lendCopy(copyId, 'Alice');
+    final loanId =
+        (await (db.select(db.loans)..where((l) => l.copyId.equals(copyId))).getSingle()).id;
+    await (db.update(db.loans)..where((l) => l.id.equals(loanId)))
+        .write(const LoansCompanion(needsPush: Value(false)));
+
+    await repo.returnLoan(loanId);
+
+    final loan = await (db.select(db.loans)..where((l) => l.id.equals(loanId))).getSingle();
+    expect(loan.needsPush, true);
+    expect(loan.returnedAt, isNotNull);
   });
 }

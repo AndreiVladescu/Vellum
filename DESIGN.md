@@ -165,8 +165,18 @@ warns when a URL is unencrypted.
   joined on `book`). A copy can't change which book it belongs to on an
   update (rejected outright, not silently ignored).
 - **loan** — per physical copy: borrower, loaned_at, returned_at. Loans are
-  their own table so lending *history* comes for free. App-local only for
-  now — the third and last piece of plan 5 #4's Option A, not yet done.
+  their own table so lending *history* comes for free. **Synced** (plan 5
+  #4, third and last of the trio): LWW on `loan.updated_at` (the plan calls
+  this "LWW on `returned_at`", but that field is nullable and can't order
+  anything before a return happens — it's the field that actually changes,
+  not the comparison key). No owner of its own, same as physical_copy —
+  access derives from the loan's copy's book
+  (`server/src/access.rs::loan_access` joins copy → book). `loaned_at` comes
+  from the client at creation (a loan can predate this device's first sync)
+  and, like `copy_id`, can't change on a later push. A loan is deleted only
+  via its copy's `ON DELETE CASCADE` — no per-loan tombstone is emitted for
+  that path; `DELETE /api/loans/{id}` exists for completeness but nothing
+  in the app calls it today.
 - **shelf** + **shelf_book** — manual collections/panes with explicit book
   ordering, independent of genres. **Synced** (plan 5 #4): LWW on
   `shelf.updated_at`, membership replaced wholesale on push (the app always
@@ -186,18 +196,18 @@ the device. Reader notes and `source_metadata` were never on the server.)
 
 The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
 pins the column list of every synced table (`book`, `author`, `book_author`,
-`genre`, `book_genre`, `book_file`, `shelf`, `shelf_book`, `physical_copy`)
-and fails if the
+`genre`, `book_genre`, `book_file`, `shelf`, `shelf_book`, `physical_copy`,
+`loan`) and fails if the
 server migrations drift from it — a prompt to update
 `app/lib/data/database.dart` too.
 
 **Deletion tombstones carry a `kind`** (`deletion.kind` server-side,
 `local_deletions.kind` app-side; both default `'book'`, and now also carry
-`'shelf'` and `'copy'`): one shared mechanism for every synced entity's
-deletes rather than a table per entity. Adding `kind` was additive — an app
-predating it only ever reads `book_id`/`deleted_at` and looks the id up in
-its own `books` table, so a non-book tombstone (e.g. a deleted shelf or
-copy) is a harmless no-op there.
+`'shelf'`, `'copy'`, and `'loan'`): one shared mechanism for every synced
+entity's deletes rather than a table per entity. Adding `kind` was
+additive — an app predating it only ever reads `book_id`/`deleted_at` and
+looks the id up in its own `books` table, so a non-book tombstone (e.g. a
+deleted shelf or copy) is a harmless no-op there.
 
 **App-local-only tables** for the physical bookshelf layouts (also never
 synced — a per-device arrangement of a real room, all lengths in **metres**):
@@ -375,12 +385,11 @@ Two things stay **on the device only** and are never synced to a server:
 7. 🚧 Rust server + sync (connected mode), OPDS feed. In place: accounts, RBAC,
    groups, sharing, public links, blob storage, OPDS, and a web admin console,
    with API integration tests. The app logs in and syncs **both ways** —
-   metadata, covers, files, and (plan 5 #4) custom shelves and physical
-   copies — one-tap (pull then push) plus a quiet auto-sync at launch, and
-   manages sharing on-device. Sync is **last-write-wins by `updated_at`**
-   with **delete tombstones** (below). Remaining: loan history joining
-   shelves and copies as synced (plan 5 #4's Option A, last of the three),
-   real-time updates, and the Android side.
+   metadata, covers, files, and (plan 5 #4) custom shelves, physical copies,
+   and loan history — one-tap (pull then push) plus a quiet auto-sync at
+   launch, and manages sharing on-device. Sync is **last-write-wins by
+   `updated_at`** with **delete tombstones** (below); plan 5 #4's Option A
+   is now fully done. Remaining: real-time updates and the Android side.
 8. ✅ Backup: export the whole library (database snapshot + covers + files) to
    one `.zip` from Preferences; restore replaces the library and restarts the
    app. The safety net for standalone (serverless) installs.

@@ -2950,6 +2950,33 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _needsPushMeta = const VerificationMeta(
+    'needsPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPush = GeneratedColumn<bool>(
+    'needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2957,6 +2984,8 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
     borrower,
     loanedAt,
     returnedAt,
+    updatedAt,
+    needsPush,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3003,6 +3032,18 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
         returnedAt.isAcceptableOrUnknown(data['returned_at']!, _returnedAtMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_push')) {
+      context.handle(
+        _needsPushMeta,
+        needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
+      );
+    }
     return context;
   }
 
@@ -3032,6 +3073,14 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}returned_at'],
       ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_push'],
+      )!,
     );
   }
 
@@ -3047,12 +3096,16 @@ class Loan extends DataClass implements Insertable<Loan> {
   final String borrower;
   final DateTime loanedAt;
   final DateTime? returnedAt;
+  final DateTime updatedAt;
+  final bool needsPush;
   const Loan({
     required this.id,
     required this.copyId,
     required this.borrower,
     required this.loanedAt,
     this.returnedAt,
+    required this.updatedAt,
+    required this.needsPush,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3064,6 +3117,8 @@ class Loan extends DataClass implements Insertable<Loan> {
     if (!nullToAbsent || returnedAt != null) {
       map['returned_at'] = Variable<DateTime>(returnedAt);
     }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
 
@@ -3076,6 +3131,8 @@ class Loan extends DataClass implements Insertable<Loan> {
       returnedAt: returnedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(returnedAt),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
     );
   }
 
@@ -3090,6 +3147,8 @@ class Loan extends DataClass implements Insertable<Loan> {
       borrower: serializer.fromJson<String>(json['borrower']),
       loanedAt: serializer.fromJson<DateTime>(json['loanedAt']),
       returnedAt: serializer.fromJson<DateTime?>(json['returnedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
   @override
@@ -3101,6 +3160,8 @@ class Loan extends DataClass implements Insertable<Loan> {
       'borrower': serializer.toJson<String>(borrower),
       'loanedAt': serializer.toJson<DateTime>(loanedAt),
       'returnedAt': serializer.toJson<DateTime?>(returnedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
 
@@ -3110,12 +3171,16 @@ class Loan extends DataClass implements Insertable<Loan> {
     String? borrower,
     DateTime? loanedAt,
     Value<DateTime?> returnedAt = const Value.absent(),
+    DateTime? updatedAt,
+    bool? needsPush,
   }) => Loan(
     id: id ?? this.id,
     copyId: copyId ?? this.copyId,
     borrower: borrower ?? this.borrower,
     loanedAt: loanedAt ?? this.loanedAt,
     returnedAt: returnedAt.present ? returnedAt.value : this.returnedAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
   );
   Loan copyWithCompanion(LoansCompanion data) {
     return Loan(
@@ -3126,6 +3191,8 @@ class Loan extends DataClass implements Insertable<Loan> {
       returnedAt: data.returnedAt.present
           ? data.returnedAt.value
           : this.returnedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
 
@@ -3136,13 +3203,23 @@ class Loan extends DataClass implements Insertable<Loan> {
           ..write('copyId: $copyId, ')
           ..write('borrower: $borrower, ')
           ..write('loanedAt: $loanedAt, ')
-          ..write('returnedAt: $returnedAt')
+          ..write('returnedAt: $returnedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, copyId, borrower, loanedAt, returnedAt);
+  int get hashCode => Object.hash(
+    id,
+    copyId,
+    borrower,
+    loanedAt,
+    returnedAt,
+    updatedAt,
+    needsPush,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3151,7 +3228,9 @@ class Loan extends DataClass implements Insertable<Loan> {
           other.copyId == this.copyId &&
           other.borrower == this.borrower &&
           other.loanedAt == this.loanedAt &&
-          other.returnedAt == this.returnedAt);
+          other.returnedAt == this.returnedAt &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush);
 }
 
 class LoansCompanion extends UpdateCompanion<Loan> {
@@ -3160,6 +3239,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
   final Value<String> borrower;
   final Value<DateTime> loanedAt;
   final Value<DateTime?> returnedAt;
+  final Value<DateTime> updatedAt;
+  final Value<bool> needsPush;
   final Value<int> rowid;
   const LoansCompanion({
     this.id = const Value.absent(),
@@ -3167,6 +3248,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     this.borrower = const Value.absent(),
     this.loanedAt = const Value.absent(),
     this.returnedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LoansCompanion.insert({
@@ -3175,6 +3258,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     required String borrower,
     this.loanedAt = const Value.absent(),
     this.returnedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        copyId = Value(copyId),
@@ -3185,6 +3270,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     Expression<String>? borrower,
     Expression<DateTime>? loanedAt,
     Expression<DateTime>? returnedAt,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3193,6 +3280,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
       if (borrower != null) 'borrower': borrower,
       if (loanedAt != null) 'loaned_at': loanedAt,
       if (returnedAt != null) 'returned_at': returnedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3203,6 +3292,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     Value<String>? borrower,
     Value<DateTime>? loanedAt,
     Value<DateTime?>? returnedAt,
+    Value<DateTime>? updatedAt,
+    Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
     return LoansCompanion(
@@ -3211,6 +3302,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
       borrower: borrower ?? this.borrower,
       loanedAt: loanedAt ?? this.loanedAt,
       returnedAt: returnedAt ?? this.returnedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3233,6 +3326,12 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     if (returnedAt.present) {
       map['returned_at'] = Variable<DateTime>(returnedAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<bool>(needsPush.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3247,6 +3346,8 @@ class LoansCompanion extends UpdateCompanion<Loan> {
           ..write('borrower: $borrower, ')
           ..write('loanedAt: $loanedAt, ')
           ..write('returnedAt: $returnedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8638,6 +8739,8 @@ typedef $$LoansTableCreateCompanionBuilder =
       required String borrower,
       Value<DateTime> loanedAt,
       Value<DateTime?> returnedAt,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 typedef $$LoansTableUpdateCompanionBuilder =
@@ -8647,6 +8750,8 @@ typedef $$LoansTableUpdateCompanionBuilder =
       Value<String> borrower,
       Value<DateTime> loanedAt,
       Value<DateTime?> returnedAt,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 
@@ -8698,6 +8803,16 @@ class $$LoansTableFilterComposer
 
   ColumnFilters<DateTime> get returnedAt => $composableBuilder(
     column: $table.returnedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8754,6 +8869,16 @@ class $$LoansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PhysicalCopiesTableOrderingComposer get copyId {
     final $$PhysicalCopiesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -8800,6 +8925,12 @@ class $$LoansTableAnnotationComposer
     column: $table.returnedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsPush =>
+      $composableBuilder(column: $table.needsPush, builder: (column) => column);
 
   $$PhysicalCopiesTableAnnotationComposer get copyId {
     final $$PhysicalCopiesTableAnnotationComposer composer = $composerBuilder(
@@ -8858,6 +8989,8 @@ class $$LoansTableTableManager
                 Value<String> borrower = const Value.absent(),
                 Value<DateTime> loanedAt = const Value.absent(),
                 Value<DateTime?> returnedAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LoansCompanion(
                 id: id,
@@ -8865,6 +8998,8 @@ class $$LoansTableTableManager
                 borrower: borrower,
                 loanedAt: loanedAt,
                 returnedAt: returnedAt,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8874,6 +9009,8 @@ class $$LoansTableTableManager
                 required String borrower,
                 Value<DateTime> loanedAt = const Value.absent(),
                 Value<DateTime?> returnedAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LoansCompanion.insert(
                 id: id,
@@ -8881,6 +9018,8 @@ class $$LoansTableTableManager
                 borrower: borrower,
                 loanedAt: loanedAt,
                 returnedAt: returnedAt,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

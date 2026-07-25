@@ -7,9 +7,9 @@ import 'database.dart';
 typedef LoanEntry = ({Loan loan, Book book});
 
 /// Physical copies and loan history. Split out of `LibraryRepository`
-/// (plan 5 §A10). Copies sync since plan 5 #4 (second of three: shelves,
-/// copies, then loans) — LWW on `updatedAt`, no owner of its own (access
-/// derives from the parent book server-side).
+/// (plan 5 §A10). Both sync since plan 5 #4 (copies, then loans) — LWW on
+/// `updatedAt`, no owner of their own (access derives from the parent book
+/// server-side, and for a loan, from its copy's book).
 class PhysicalService {
   PhysicalService(this.db);
 
@@ -93,7 +93,8 @@ class PhysicalService {
   }
 
   /// Lends a copy to [borrower]. Callers only offer this when the copy has no
-  /// active loan, so no additional check is needed here.
+  /// active loan, so no additional check is needed here. `needsPush` defaults
+  /// true (an insert), so the next push sends it.
   Future<void> lendCopy(String copyId, String borrower) async {
     await db
         .into(db.loans)
@@ -106,10 +107,17 @@ class PhysicalService {
         );
   }
 
-  /// Marks a loan returned as of now, keeping it in the history.
+  /// Marks a loan returned as of now, keeping it in the history. `needsPush`
+  /// and `updatedAt` are bumped explicitly, same reasoning as
+  /// `ShelfService._touch`: this is an update, and column defaults don't
+  /// re-run on one -- an unbumped return would never reach the server.
   Future<void> returnLoan(String loanId) async {
     await (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
-      LoansCompanion(returnedAt: Value(DateTime.now())),
+      LoansCompanion(
+        returnedAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+        needsPush: const Value(true),
+      ),
     );
   }
 }

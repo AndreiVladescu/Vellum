@@ -127,6 +127,12 @@ class Loans extends Table {
   TextColumn get borrower => text()();
   DateTimeColumn get loanedAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get returnedAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  // Sync bookkeeping since plan 5 #4 (third of three), same convention as
+  // PhysicalCopies.needsPush: set at creation and by returnLoan (an update,
+  // so this must be bumped explicitly -- column defaults don't re-run),
+  // cleared once a push succeeds.
+  BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -255,7 +261,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -371,6 +377,22 @@ class VellumDatabase extends _$VellumDatabase {
               }
               if (!copyCols.contains('needs_push')) {
                 await m.addColumn(physicalCopies, physicalCopies.needsPush);
+              }
+            }
+          }
+          if (from < 12) {
+            // Loans start syncing (plan 5 #4, third and last); needsPush
+            // defaults true so every pre-existing loan pushes once, same
+            // reasoning as shelves/copies before it. Guarded the same way.
+            if (!tables.contains('loans')) {
+              await m.createTable(loans);
+            } else {
+              final loanCols = await columnsOf('loans');
+              if (!loanCols.contains('updated_at')) {
+                await m.addColumn(loans, loans.updatedAt);
+              }
+              if (!loanCols.contains('needs_push')) {
+                await m.addColumn(loans, loans.needsPush);
               }
             }
           }

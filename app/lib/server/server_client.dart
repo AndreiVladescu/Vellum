@@ -518,6 +518,62 @@ class VellumServerClient {
     _body(res);
   }
 
+  // ---- loans (plan 5 #4) ----------------------------------------------------
+
+  /// The visible loans (of owned + shared copies) plus the server's clock, as
+  /// the delta-pull envelope `{ server_now, loans }` — same cursor convention
+  /// as [listCopies].
+  Future<({String? serverNow, List<ServerLoan> loans})> listLoans({
+    String? cursor,
+  }) async {
+    final uri = _uri(
+      '/api/loans',
+    ).replace(queryParameters: {'cursor': cursor ?? ''});
+    final res = await _http.get(uri, headers: _headers);
+    final map = _body(res) as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      loans: [
+        for (final l in map['loans'] as List)
+          ServerLoan.fromJson(l as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  /// Upsert a loan at [id] (create or update) — same LWW convention as
+  /// [pushCopy]. [copyId]/[loanedAt] are only meaningful at creation; the
+  /// server rejects a push that tries to move an existing loan to a
+  /// different copy.
+  Future<void> pushLoan({
+    required String id,
+    required String copyId,
+    required String borrower,
+    required DateTime loanedAt,
+    DateTime? returnedAt,
+    DateTime? updatedAt,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/loans/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        'copy_id': copyId,
+        'borrower': borrower,
+        'loaned_at': formatServerTime(loanedAt),
+        'returned_at': ?formatServerTime(returnedAt),
+        'updated_at': ?formatServerTime(updatedAt),
+      }),
+    );
+    _body(res);
+  }
+
+  /// Delete a loan on the server. No app code path calls this today (a loan
+  /// is removed only via its copy's cascade), but it's exposed for parity
+  /// with the other synced entities' `delete*` methods.
+  Future<void> deleteLoan(String id) async {
+    final res = await _http.delete(_uri('/api/loans/$id'), headers: _headers);
+    _body(res);
+  }
+
   // ---- groups -------------------------------------------------------------
 
   Future<List<ServerGroup>> listGroups() async {
@@ -675,6 +731,35 @@ class ServerCopy {
     location: j['location'] as String?,
     condition: j['condition'] as String?,
     notes: j['notes'] as String?,
+    updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
+  );
+}
+
+/// A loan from the server (plan 5 #4). No owner of its own — access derives
+/// from its copy's book.
+class ServerLoan {
+  ServerLoan({
+    required this.id,
+    required this.copyId,
+    required this.borrower,
+    required this.loanedAt,
+    this.returnedAt,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String copyId;
+  final String borrower;
+  final DateTime loanedAt;
+  final DateTime? returnedAt;
+  final DateTime? updatedAt;
+
+  factory ServerLoan.fromJson(Map<String, dynamic> j) => ServerLoan(
+    id: j['id'] as String,
+    copyId: j['copy_id'] as String,
+    borrower: j['borrower'] as String? ?? '',
+    loanedAt: ServerBook._parseServerTime(j['loaned_at'] as String?) ?? DateTime.now(),
+    returnedAt: ServerBook._parseServerTime(j['returned_at'] as String?),
     updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
   );
 }

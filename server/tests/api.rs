@@ -703,6 +703,7 @@ async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
     // confirms the list tracks what's actually built rather than staying frozen.
     assert!(features.contains(&json!("shelf_sync")));
     assert!(features.contains(&json!("copy_sync")));
+    assert!(features.contains(&json!("loan_sync")));
     // Never advertised: not built (content_search, mail, batch_push) or
     // deliberately never synced (reading_progress) -- a capability handshake
     // that claims one of these would be worse than none.
@@ -1250,6 +1251,303 @@ async fn copies_list_supports_delta_cursor_envelope() {
     )
     .await;
     assert!(future["copies"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn loans_put_creates_and_is_visible_only_through_its_copy() {
+    // Plan 5 #4, third and last of the trio: a loan has no owner of its own
+    // -- visibility comes from access::loan_access joining copy -> book.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+
+    let (status, loan) = call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{loan}");
+    assert_eq!(loan["borrower"], json!("Alice"));
+    assert_eq!(loan["returned_at"], json!(null));
+
+    let (_, list) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    let listed = list.as_array().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["id"], json!("l-1"));
+}
+
+#[tokio::test]
+async fn loans_put_rejects_moving_an_existing_loan_to_a_different_copy() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-2",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-2", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn loans_editor_book_share_may_edit_but_not_delete() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+    let book = create_book(&app, &master, "Neuromancer").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Bob", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+
+    call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": "alice@lib.test", "permission": "editor"
+        })),
+    )
+    .await;
+
+    let (status, loan) = call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&alice),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Bob",
+            "returned_at": "2024-02-01 00:00:00", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{loan}");
+    assert_eq!(loan["returned_at"], json!("2024-02-01 00:00:00"));
+
+    let (status, _) = call(&app, "DELETE", "/api/loans/l-1", Some(&alice), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn loans_delete_records_a_kind_tagged_tombstone() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+
+    let (status, _) = call(&app, "DELETE", "/api/loans/l-1", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, kind_only) = call(&app, "GET", "/api/deletions?kind=loan", Some(&master), None).await;
+    let entries = kind_only.as_array().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["book_id"], json!("l-1"));
+
+    let (_, list) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    assert!(list.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn loans_delete_cascades_when_its_copy_is_deleted() {
+    // loan.copy_id has ON DELETE CASCADE -- deleting the copy removes its
+    // loans without needing a per-loan tombstone (the copy's own tombstone
+    // is what a pull acts on; see SyncService._pullLoans's FK-safety skip).
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+
+    call(&app, "DELETE", "/api/copies/c-1", Some(&master), None).await;
+
+    let (_, list) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    assert!(list.as_array().unwrap().is_empty());
+    let (_, loan_tombstones) =
+        call(&app, "GET", "/api/deletions?kind=loan", Some(&master), None).await;
+    assert!(
+        loan_tombstones.as_array().unwrap().is_empty(),
+        "the copy's cascade removes the loan silently -- no per-loan tombstone is emitted"
+    );
+}
+
+#[tokio::test]
+async fn loans_put_is_a_noop_when_unchanged() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+    let (_, first) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    let stamp1 = first.as_array().unwrap()[0]["updated_at"].clone();
+
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+    let (_, second) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    assert_eq!(
+        second.as_array().unwrap()[0]["updated_at"],
+        stamp1,
+        "an unchanged re-push must not churn updated_at"
+    );
+}
+
+#[tokio::test]
+async fn loans_list_supports_delta_cursor_envelope() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l-1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1", "borrower": "Alice", "loaned_at": "2024-01-01 00:00:00"
+        })),
+    )
+    .await;
+
+    let (_, bare) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    assert!(bare.is_array());
+
+    let (_, env) = call(&app, "GET", "/api/loans?cursor=", Some(&master), None).await;
+    assert!(env["server_now"].is_string());
+    assert_eq!(env["loans"].as_array().unwrap().len(), 1);
+
+    let (_, future) = call(
+        &app,
+        "GET",
+        "/api/loans?cursor=2999-01-01%2000:00:00",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert!(future["loans"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]

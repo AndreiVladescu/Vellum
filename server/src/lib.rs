@@ -21,6 +21,7 @@ mod capabilities;
 mod discover;
 mod error;
 mod groups;
+mod loans;
 mod metadata;
 mod opds;
 mod physical_copies;
@@ -161,6 +162,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             "/copies/{id}",
             put(physical_copies::upsert).delete(physical_copies::delete),
         )
+        // Loan history (plan 5 #4, last of the trio) — same shape again.
+        .route("/loans", get(loans::list))
+        .route("/loans/{id}", put(loans::upsert).delete(loans::delete))
         // User-to-user shares.
         .route("/shares", get(shares::list).post(shares::create))
         .route("/shares/{id}", delete(shares::delete))

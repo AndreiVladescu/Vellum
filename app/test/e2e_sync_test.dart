@@ -206,4 +206,48 @@ void main() {
     expect(await repoB.watchCopiesOf(bookId).first, isEmpty,
         reason: 'a delete on A must reach B');
   }, skip: skip);
+
+  // Plan 5 #4, third and last of the trio: loan history syncs too now, over
+  // the real wire, with no owner of its own (access derives from the copy's
+  // book, same as the copy itself).
+  test('loan sync carries a lend then a return between two devices', () async {
+    final dirA = Directory.systemTemp.createTempSync('vellum_e2e_loan_a');
+    final dirB = Directory.systemTemp.createTempSync('vellum_e2e_loan_b');
+    addTearDown(() {
+      dirA.deleteSync(recursive: true);
+      dirB.deleteSync(recursive: true);
+    });
+
+    final repoA = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirA);
+    final repoB = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirB);
+
+    final bookId = await repoA.createCustomBook(title: 'Dune');
+    final copyId = await repoA.addPhysicalCopy(bookId);
+    await repoA.lendCopy(copyId, 'Alice');
+    await SyncService(repoA).sync(client);
+
+    // B syncs and sees the loan, once it has the copy to hold (both halves
+    // of one sync round — see SyncService._pullLoans).
+    await SyncService(repoB).sync(client);
+    final loansB = await repoB.watchLoansOf(copyId).first;
+    expect(loansB, hasLength(1));
+    expect(loansB.single.borrower, 'Alice');
+    expect(loansB.single.returnedAt, isNull);
+
+    // A returns it; B's next sync sees the return (returnLoan must dirty the
+    // row for this to reach the server at all — see PhysicalService). The
+    // gap avoids the same second-resolution LWW tie the shelf-reorder e2e
+    // test hits: without it, A's return can land in the same wall-clock
+    // second as A's original lend-push and get skipped as "not strictly
+    // newer" — a real e2e timing edge, not a design flaw.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await repoA.returnLoan(loansB.single.id);
+    await SyncService(repoA).sync(client);
+    await SyncService(repoB).sync(client);
+    final returnedB = await repoB.watchLoansOf(copyId).first;
+    expect(returnedB.single.returnedAt, isNotNull,
+        reason: "A's return must reach B");
+  }, skip: skip);
 }

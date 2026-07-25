@@ -87,6 +87,20 @@ async fn synced_tables_have_the_expected_columns() {
                 "updated_at",
             ],
         ),
+        // Synced since migration 0010 (plan 5 #4, third and last of the
+        // trio) -- ALTERed in place (nothing referenced loan, unlike
+        // physical_copy at 0009).
+        (
+            "loan",
+            &[
+                "id",
+                "copy_id",
+                "borrower",
+                "loaned_at",
+                "returned_at",
+                "updated_at",
+            ],
+        ),
     ];
 
     for (table, cols) in expected {

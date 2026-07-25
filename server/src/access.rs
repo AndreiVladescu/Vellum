@@ -108,6 +108,24 @@ pub async fn copy_access(state: &AppState, user: &AuthUser, copy_id: &str) -> Ap
     }
 }
 
+/// The caller's access to a loan. Same reasoning as `copy_access`: a loan has
+/// no owner of its own — it belongs to a copy, which belongs to a book — so
+/// this joins through both to reach `book_access`.
+pub async fn loan_access(state: &AppState, user: &AuthUser, loan_id: &str) -> AppResult<Access> {
+    let book_id: Option<String> = sqlx::query_scalar(
+        "SELECT pc.book_id FROM loan l \
+         JOIN physical_copy pc ON pc.id = l.copy_id \
+         WHERE l.id = ?",
+    )
+    .bind(loan_id)
+    .fetch_optional(&state.db)
+    .await?;
+    match book_id {
+        Some(book_id) => book_access(state, user, &book_id).await,
+        None => Ok(Access::None),
+    }
+}
+
 /// The caller's access to a shelf. Owner/master may manage it (`Editor`); an
 /// all-scoped share (the whole library) grants `Viewer` — unlike books and
 /// groups, there is no shelf-scoped share type, so this reduces to just
