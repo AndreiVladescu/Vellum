@@ -1,10 +1,13 @@
 // watchLibrary() replaces main.dart's four nested StreamBuilders plus its
 // per-rebuild filterBooks()/sortBooks() scan (plan 5 §A1) by doing the same
-// filtering/sorting in SQL. shelf_filter_test.dart keeps covering
-// filterBooks/sortBooks directly (they stay the in-memory fallback); this
-// file checks watchLibrary() both against hand-computed expectations and,
-// in the sweep at the bottom, against filterBooks/sortBooks themselves — the
-// one test that would catch a silent semantic drift between the two paths.
+// filtering/sorting in SQL, and (§A2) its free-text/genre: matching runs
+// through the book_search FTS5 index instead of Dart substring scans.
+// shelf_filter_test.dart keeps covering filterBooks/sortBooks directly (they
+// stay the in-memory fallback); this file checks watchLibrary() against
+// hand-computed expectations, against filterBooks/sortBooks themselves where
+// the two are expected to agree (the sweep near the bottom), and against the
+// one place they're expected to *disagree* (FTS5 prefix vs. Dart substring
+// matching, its own test below).
 import 'package:drift/drift.dart' show InsertMode, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,7 +110,7 @@ void main() {
     expect(_ids(view), ['b5', 'b1']);
   });
 
-  test('genre: query prefix is a substring match on genre name', () async {
+  test('genre: query prefix is a token-prefix match on genre name', () async {
     final db = await _seeded();
     addTearDown(db.close);
     final view = await LibraryQueries(db)
@@ -130,17 +133,52 @@ void main() {
     expect(_ids(byTitle), ['b5', 'b1']);
   });
 
-  test('a literal % or _ in the query is matched literally', () async {
+  test('FTS5 query-syntax characters in the query do not crash the query',
+      () async {
     final db = await _seeded();
     addTearDown(db.close);
     await db.into(db.books).insert(BooksCompanion.insert(
           id: 'b6',
-          title: '100% Done_deal',
+          title: 'Sci-Fi: A Retrospective (2020)',
         ));
+    // Hyphen, colon, parens and a literal double-quote are FTS5 query-syntax
+    // characters; ftsMatchQuery quotes every token, so these must be matched
+    // (or safely not matched) rather than throwing.
     final view = await LibraryQueries(db)
-        .watchLibrary(query: '0% do', sort: ShelfSort.title)
+        .watchLibrary(query: 'sci-fi: a "quote" (2020)', sort: ShelfSort.title)
         .first;
-    expect(_ids(view), ['b6']);
+    expect(view, isNotNull);
+  });
+
+  // FTS5 does *prefix* matching, not the old Dart path's arbitrary-substring
+  // matching — this is the one deliberate semantic change #A2 makes, so it
+  // gets its own test rather than living inside the equivalence sweep below.
+  test('a mid-word fragment no longer matches (intentional — search_index.dart)',
+      () async {
+    final db = await _seeded();
+    addTearDown(db.close);
+    final queries = LibraryQueries(db);
+
+    // Sanity: the old path *would* match "erbert" against "Frank Herbert"
+    // (arbitrary substring).
+    final allBooks = await db.select(db.books).get();
+    final authorsByBook = await queries.watchAuthorsByBook().first;
+    final genresByBook = await queries.watchGenresByBook().first;
+    expect(
+      filterBooks(
+        books: allBooks,
+        query: 'erbert',
+        authorsByBook: authorsByBook,
+        genresByBook: genresByBook,
+      ),
+      isNotEmpty,
+      reason: 'old substring path matches mid-word',
+    );
+
+    // The new FTS5 path only matches token prefixes, so it must not.
+    final view =
+        await queries.watchLibrary(query: 'erbert', sort: ShelfSort.title).first;
+    expect(view.entries, isEmpty, reason: 'FTS5 prefix match, not substring');
   });
 
   test('shelfId scopes to the shelf, sort still applies', () async {
@@ -288,7 +326,12 @@ void main() {
 
   // The equivalence sweep: for a matrix of (query, genre, sort), watchLibrary
   // must return the same book-id order as running filterBooks then sortBooks
-  // over the raw table data — the two paths must never silently diverge.
+  // over the raw table data. Since #A2, the two paths are only equivalent
+  // where FTS5 prefix matching and Dart substring matching happen to agree —
+  // every case below is a *whole word* (a token's own prefix is itself), so
+  // they coincide here; the deliberate divergence (a mid-word fragment) has
+  // its own test above rather than being folded into — or silently loosening
+  // — this sweep.
   test('matches filterBooks/sortBooks across a matrix of queries', () async {
     final db = await _seeded();
     addTearDown(db.close);

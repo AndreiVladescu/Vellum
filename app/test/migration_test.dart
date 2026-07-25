@@ -1,11 +1,12 @@
 import 'dart:io';
 
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages — transitive via drift, test-only fixture
 import 'package:sqlite3/sqlite3.dart' as raw;
 import 'package:vellum/data/database.dart';
+import 'package:vellum/data/search_index.dart';
 
 /// Recreates the corrupted state seen in the wild: a database whose
 /// `user_version` is stuck at 3 while the v4/v5 objects (the physical tables,
@@ -106,6 +107,67 @@ void main() {
       variables: [Variable.withString('b1')],
     ).get();
     expect(links.length, 1, reason: 'the book keeps the genre exactly once');
+
+    await vellum.close();
+    dir.deleteSync(recursive: true);
+  });
+
+  test('v9 creates book_search and backfills existing books', () async {
+    final dir = Directory.systemTemp.createTempSync('vellum_fts_migration_test');
+    final file = File('${dir.path}/vellum.sqlite');
+
+    // A book with an author and a genre, written the normal way (so
+    // book_search is populated by the triggers as a side effect) — then
+    // simulate "this database predates the search index" by dropping it and
+    // rewinding user_version, so the next open must recreate it from scratch
+    // via the backfill, not the triggers.
+    final setup = VellumDatabase(NativeDatabase(file));
+    await setup.into(setup.books).insert(
+        BooksCompanion.insert(id: 'b1', title: 'Dune', subtitle: const Value('A Novel')));
+    await setup
+        .into(setup.authors)
+        .insert(AuthorsCompanion.insert(id: 'a1', name: 'Frank Herbert'));
+    await setup.into(setup.bookAuthors).insert(
+        BookAuthorsCompanion.insert(bookId: 'b1', authorId: 'a1'));
+    await setup
+        .into(setup.genres)
+        .insert(GenresCompanion.insert(id: 'g1', name: 'Science Fiction'));
+    await setup.into(setup.bookGenres).insert(
+        BookGenresCompanion.insert(bookId: 'b1', genreId: 'g1'));
+
+    await setup.customStatement('DROP TABLE book_search');
+    for (final name in bookSearchTriggers.keys) {
+      await setup.customStatement('DROP TRIGGER $name');
+    }
+    await setup.customStatement('PRAGMA user_version = 8');
+    await setup.close();
+
+    final vellum = VellumDatabase(NativeDatabase(file));
+    final byTitle = await vellum
+        .customSelect(
+          'SELECT book_id FROM book_search WHERE book_search MATCH ?',
+          variables: [Variable.withString('"dune"*')],
+        )
+        .get();
+    expect(byTitle.map((r) => r.read<String>('book_id')), ['b1']);
+
+    final byAuthor = await vellum
+        .customSelect(
+          'SELECT book_id FROM book_search WHERE book_search MATCH ?',
+          variables: [Variable.withString('"herbert"*')],
+        )
+        .get();
+    expect(byAuthor.map((r) => r.read<String>('book_id')), ['b1'],
+        reason: 'backfill computed the authors column, not just title');
+
+    final byGenre = await vellum
+        .customSelect(
+          'SELECT book_id FROM book_search WHERE book_search MATCH ?',
+          variables: [Variable.withString('genres:"science"*')],
+        )
+        .get();
+    expect(byGenre.map((r) => r.read<String>('book_id')), ['b1'],
+        reason: 'backfill computed the genres column too');
 
     await vellum.close();
     dir.deleteSync(recursive: true);

@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 
 import '../settings/shelf_sort.dart';
 import 'database.dart';
+import 'search_index.dart';
 
 /// One shelf row's worth of data, denormalised once in the data layer so the
 /// shelf never has to look authors/genres up per book.
@@ -136,11 +137,15 @@ class LibraryQueries {
   /// shelf itself no longer calls them.
   ///
   /// [genre] is an exact match; [query]'s `genre:<name>` form and free-text
-  /// match are substring, case-insensitive for ASCII (SQLite's `LIKE`
-  /// default — non-ASCII case-folding is deferred to #2's FTS5 index, which
-  /// replaces this method's free-text half). Sorting matches
+  /// match go through the `book_search` FTS5 index (see `search_index.dart`,
+  /// plan 5 §A2): each whitespace-separated token becomes a quoted prefix
+  /// match, ANDed together, diacritics-folded by the `unicode61` tokenizer.
+  /// This is **prefix** matching, not the old Dart implementation's
+  /// arbitrary-substring matching — typing "her" matches "Herbert" (a
+  /// token-prefix), but "erbert" alone no longer would. Sorting matches
   /// `shelf_filter.dart`'s contract: author-less/year-less books sort last,
-  /// ties break on title, all case-insensitive.
+  /// ties break on title, all case-insensitive (SQL `LOWER()`, ASCII-only —
+  /// unlike the FTS5 index, sort order doesn't get diacritic folding).
   ///
   /// Combines several independently-invalidating streams rather than one
   /// query reading every relevant table: reading position writes to `books`
@@ -229,26 +234,21 @@ class LibraryQueries {
       final lower = q.toLowerCase();
       if (lower.startsWith('genre:')) {
         final wanted = lower.substring('genre:'.length).trim();
-        if (wanted.isNotEmpty) {
+        final match = ftsMatchQuery(wanted, column: 'genres');
+        if (match != null) {
           where.add(
-            'EXISTS (SELECT 1 FROM book_genres bg JOIN genres g '
-            'ON g.id = bg.genre_id WHERE bg.book_id = books.id '
-            "AND g.name LIKE ? ESCAPE '\\')",
+            'books.id IN (SELECT book_id FROM book_search WHERE book_search MATCH ?)',
           );
-          vars.add(Variable.withString('%${_escapeLike(wanted)}%'));
+          vars.add(Variable.withString(match));
         }
       } else {
-        where.add(
-          "(books.title LIKE ? ESCAPE '\\' OR books.subtitle LIKE ? ESCAPE '\\' OR "
-          'EXISTS (SELECT 1 FROM book_authors ba JOIN authors a '
-          "ON a.id = ba.author_id WHERE ba.book_id = books.id AND a.name LIKE ? ESCAPE '\\'))",
-        );
-        final pattern = '%${_escapeLike(q)}%';
-        vars.addAll([
-          Variable.withString(pattern),
-          Variable.withString(pattern),
-          Variable.withString(pattern),
-        ]);
+        final match = ftsMatchQuery(q);
+        if (match != null) {
+          where.add(
+            'books.id IN (SELECT book_id FROM book_search WHERE book_search MATCH ?)',
+          );
+          vars.add(Variable.withString(match));
+        }
       }
     }
 
@@ -299,11 +299,6 @@ class LibraryQueries {
                 (book: db.books.map(row.data), hasFile: row.read<bool>('has_file')),
             ]);
   }
-
-  static String _escapeLike(String s) => s
-      .replaceAll('\\', '\\\\')
-      .replaceAll('%', '\\%')
-      .replaceAll('_', '\\_');
 }
 
 /// Combines six streams into one, re-emitting `combine(...)` of the latest

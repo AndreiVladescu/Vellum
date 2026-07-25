@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
+import 'search_index.dart';
+
 part 'database.g.dart';
 
 // Mirrors server/migrations/0001_init.sql — keep the two in sync (DESIGN.md).
@@ -239,7 +241,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -308,11 +310,49 @@ class VellumDatabase extends _$VellumDatabase {
             // Data-only: no schema change, so no matching server migration.
             await _mergeDuplicateGenres();
           }
+          if (from < 9) {
+            // App-local: no server migration (search_index.dart's doc
+            // comment). Also guarded from beforeOpen below, so a fresh
+            // install (which never runs onUpgrade) still gets it.
+            await _ensureSearchIndex();
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
+          await _ensureSearchIndex();
         },
       );
+
+  /// Creates `book_search` and its triggers if missing, then backfills —
+  /// idempotent, like the rest of `onUpgrade`. Runs from `beforeOpen` (every
+  /// open, cheap once the table exists) so a fresh install is covered too,
+  /// not just an upgrade from an older `schemaVersion`.
+  ///
+  /// Bails out if `book_authors`/`authors`/`book_genres`/`genres` aren't
+  /// present yet: the triggers reference them, and (like
+  /// `_mergeDuplicateGenres`) a partially-migrated database can reach here
+  /// without them — this runs from `beforeOpen`, on every launch, so a throw
+  /// here would brick the app rather than just miss the search index.
+  Future<void> _ensureSearchIndex() async {
+    final present = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type IN ('table', 'trigger')",
+    ).get();
+    final names = {for (final row in present) row.read<String>('name')};
+    const required = {'book_authors', 'authors', 'book_genres', 'genres'};
+    if (!required.every(names.contains)) return;
+
+    if (!names.contains('book_search')) {
+      await customStatement(createBookSearchTable);
+    }
+    for (final entry in bookSearchTriggers.entries) {
+      if (!names.contains(entry.key)) await customStatement(entry.value);
+    }
+    if (!names.contains('book_search')) {
+      // Only on first creation — an existing table already has its rows
+      // (kept current by the triggers above).
+      await customStatement(backfillBookSearch);
+    }
+  }
 
   /// One-time cleanup: collapse genres that differ only by case/spacing into a
   /// single canonical row (e.g. "computer security" + "Computer Security" ->

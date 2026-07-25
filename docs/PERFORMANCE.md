@@ -112,3 +112,17 @@ fresh in `build()` too. Left as-is because #A2 (FTS5) changes the query's
 `WHERE` clause shape anyway; if a profile run shows this costing frames,
 the fix is caching the four params-independent sub-streams (authors, genres,
 shelves, allGenres) instead of recreating them per `watchLibrary()` call.
+
+## §A2 finding: the FTS5 triggers cost write-path time, not read-path
+
+`book_search`'s triggers fire on every `books`/`book_authors`/`book_genres`
+insert, each running a correlated subquery to recompute the affected book's
+`authors`/`genres` text. This shows up in `seedLibrary`'s own cost: seeding
+3,000 books went from ~220ms to **~3.7s** once the triggers landed — a write-
+path cost, invisible to `watchLibrary`'s read-path numbers above. Still well
+inside the benchmark's budget (seeding isn't the thing under test there), but
+worth knowing before #15 (bulk folder import): importing a few hundred books
+one at a time will each pay this per-row trigger cost. If that turns out to
+matter in practice, batch the author/genre link inserts per book inside one
+transaction (already how `seedLibrary` and the repository's write paths
+work) rather than reaching for a wholesale index-maintenance redesign first.
