@@ -41,6 +41,37 @@ void main() {
         reason: 'books survive shelf deletion');
   });
 
+  test('removing from the middle then re-adding does not collide positions',
+      () async {
+    // Regression: removeFromShelf used to leave a gap in `position` (no
+    // renumbering), so addToShelf's next position (existing.length) could
+    // collide with a row already occupying that value -- two books tied on
+    // `position`, with the tie broken by SQLite's arbitrary row order. Caught
+    // by e2e_sync_test.dart's shelf-reorder case flaking 3/5 runs.
+    final db = VellumDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final shelves = ShelfService(db);
+    for (final id in ['c', 'a', 'b']) {
+      await db.into(db.books).insert(BooksCompanion.insert(id: id, title: id));
+    }
+    final shelfId = await shelves.createShelf('Reading order');
+    await shelves.addToShelf('c', shelfId);
+    await shelves.addToShelf('a', shelfId);
+    await shelves.addToShelf('b', shelfId);
+
+    await shelves.removeFromShelf('c', shelfId);
+    await shelves.addToShelf('c', shelfId);
+
+    final positions = await (db.select(db.shelfBooks)
+          ..where((sb) => sb.shelfId.equals(shelfId)))
+        .get();
+    expect(positions.map((sb) => sb.position).toSet(), hasLength(3),
+        reason: 'no two rows may share a position');
+    expect(
+        [for (final b in await shelves.watchBooksOnShelf(shelfId).first) b.id],
+        ['a', 'b', 'c']);
+  });
+
   test('rename, reorder, and delete all mark the shelf dirty for push',
       () async {
     // Plan 5 #4: shelves now sync, so every write path that changes what a

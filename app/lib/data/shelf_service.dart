@@ -83,10 +83,35 @@ class ShelfService {
   }
 
   Future<void> removeFromShelf(String bookId, String shelfId) async {
-    await (db.delete(db.shelfBooks)
-          ..where((sb) => sb.shelfId.equals(shelfId) & sb.bookId.equals(bookId)))
-        .go();
+    await db.transaction(() async {
+      await (db.delete(db.shelfBooks)
+            ..where((sb) => sb.shelfId.equals(shelfId) & sb.bookId.equals(bookId)))
+          .go();
+      // Close the gap left behind: addToShelf's next position is
+      // `existing.length`, so a stale gap (positions 1, 2 with none at 0)
+      // makes the next append collide with an already-occupied position,
+      // and ties break on SQLite's arbitrary internal row order.
+      await _renumber(shelfId);
+    });
     await _touch(shelfId);
+  }
+
+  /// Reassigns [shelfId]'s membership to consecutive positions 0..n-1,
+  /// preserving current order. Keeps `addToShelf`'s `existing.length`
+  /// next-position always distinct from every row already present.
+  Future<void> _renumber(String shelfId) async {
+    final rows = await (db.select(db.shelfBooks)
+          ..where((sb) => sb.shelfId.equals(shelfId))
+          ..orderBy([(sb) => OrderingTerm.asc(sb.position)]))
+        .get();
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].position != i) {
+        await (db.update(db.shelfBooks)
+              ..where((sb) =>
+                  sb.shelfId.equals(shelfId) & sb.bookId.equals(rows[i].bookId)))
+            .write(ShelfBooksCompanion(position: Value(i)));
+      }
+    }
   }
 
   /// The books on [shelfId], in the shelf's explicit order.
