@@ -1,0 +1,20 @@
+# Release signing config for the Android app. Copy this file to
+# `android/key.properties` (which is gitignored) and fill in the real values.
+# When this file is absent the release build falls back to the debug key, so a
+# fresh checkout can still `flutter run --release` — it just isn't distributable.
+#
+# 1. Generate an upload/signing keystore (once, keep it safe and backed up — if
+#    you lose it you can't publish updates to the same app):
+#
+#      keytool -genkey -v -keystore ~/vellum-upload.jks \
+#        -keyalg RSA -keysize 2048 -validity 10000 -alias vellum
+#
+# 2. Point `storeFile` at that keystore (absolute path, or relative to the
+#    `android/` directory) and set the passwords/alias you chose above.
+#
+# NEVER commit the keystore or the filled-in key.properties.
+
+storePassword=changeit
+keyPassword=changeit
+keyAlias=vellum
+storeFile=/absolute/path/to/vellum-upload.jks

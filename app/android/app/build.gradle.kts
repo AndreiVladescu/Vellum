@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Release signing is read from a gitignored `android/key.properties` (see
+// key.properties.example). When it's absent — a fresh checkout, or CI without
+// the secret — we fall back to the debug key so `flutter run --release` still
+// works; such a build just isn't distributable/updatable.
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val hasReleaseKeystore = keystoreProperties.getProperty("storeFile") != null
 
 android {
     namespace = "com.avladescu.vellum"
@@ -25,12 +37,29 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        // Defined only when key.properties is present; otherwise the release
+        // build falls back to the debug signing config below.
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release`
-            // works. Replace with a real keystore before distributing (see
-            // key.properties in the Flutter docs).
-            signingConfig = signingConfigs.getByName("debug")
+            // A real release keystore when key.properties exists, else the debug
+            // key so `flutter run --release` still works on a fresh checkout (a
+            // debug-signed build is not distributable — see key.properties.example).
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             // Shrink + obfuscate with R8 and strip unused resources, so the
             // release build is smaller. proguard-rules.pro keeps what the
             // plugins need past the shrinker.
