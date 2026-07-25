@@ -50,7 +50,7 @@ void main() {
       () => repo.watchGenresByBook().first,
     );
 
-    await _time('filterBooks() + sortBooks() over the full library', () async {
+    await _time('filterBooks() + sortBooks(), one pass', () async {
       final filtered = filterBooks(
         books: books,
         query: 'the',
@@ -63,6 +63,33 @@ void main() {
         authorsByBook: authorsByBook,
       );
     });
+
+    // §0.1/§0.2's actual problem isn't one pass — it's that today's four
+    // nested StreamBuilders re-run filter+sort over the *whole* library on
+    // every one of their independent emissions. 20 passes stands in for a
+    // burst of shelf mutations (e.g. a folder import), so this is the number
+    // §A1/§A2's view-model + FTS work should visibly beat, not the one-pass
+    // figure above.
+    const rebuildBurst = 20;
+    await _time(
+      'filterBooks() + sortBooks(), $rebuildBurst-rebuild burst',
+      () async {
+        for (var i = 0; i < rebuildBurst; i++) {
+          final filtered = filterBooks(
+            books: books,
+            query: 'the',
+            authorsByBook: authorsByBook,
+            genresByBook: genresByBook,
+          );
+          sortBooks(
+            books: filtered,
+            sort: ShelfSort.author,
+            authorsByBook: authorsByBook,
+          );
+        }
+      },
+      budgetMillis: _maxStepMillis * 4,
+    );
   }, timeout: const Timeout(Duration(minutes: 2)));
 }
 

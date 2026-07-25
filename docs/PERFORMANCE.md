@@ -10,10 +10,16 @@ after each of those lands rather than trusting the target numbers alone.
 `app/test/benchmark/library_bench.dart` seeds a 3,000-book in-memory library
 (`seedLibrary`, see below) and times the query paths §0 of plan 5 calls out:
 `watchAllBooks()`, `watchAuthorsByBook()`, `watchGenresByBook()`, and
-`filterBooks()`/`sortBooks()` over the full result. Each step asserts a
-generous (4 s) upper bound — a regression guard against an accidental
-O(n²) or a dropped index, not a frame-time target; CI runners are too
-variable to assert tight numbers.
+`filterBooks()`/`sortBooks()` — both one pass and a 20-rebuild burst. The
+burst is the number that matters: §0.1/§0.2's actual complaint is that
+today's four nested `StreamBuilder`s re-run filter+sort over the whole
+library on *every* independent emission, so a single pass looks fine in any
+harness and still costs real frames on a phone during a burst of shelf
+mutations (e.g. a folder import). §A1/§A2 should visibly beat the burst
+number, not the one-pass number. Each step asserts a generous upper bound (4 s,
+16 s for the burst) — a regression guard against an accidental O(n²) or a
+dropped index, not a frame-time target; CI runners are too variable to assert
+tight numbers.
 
 Run it directly:
 
@@ -44,9 +50,13 @@ SEED_LIBRARY_COUNT=5000 flutter test test/tool/seed_library_tool.dart
 To profile the real app against it: quit the app, back up your real
 database, then copy the seeded file over it. The default location is
 `<ApplicationDocumentsDirectory>/vellum.sqlite` (drift_flutter's
-`driftDatabase(name: 'vellum')`) — on Linux desktop that's typically
-`~/.local/share/com.avladescu.vellum/vellum.sqlite`; run the app once first if
-the directory doesn't exist yet. Restore your backup afterwards.
+`driftDatabase(name: 'vellum')`) — **not** the app-support directory covers
+and files live under (`LibraryRepository.open` uses a different
+`path_provider` call for those). On Linux desktop, `getApplicationDocumentsDirectory`
+resolves to the XDG `DOCUMENTS` user directory, typically `~/Documents`, so
+the file is usually `~/Documents/vellum.sqlite` — but XDG config can move
+that, so if it's not there: `find ~ -maxdepth 3 -name vellum.sqlite`. Run the
+app once first if the file doesn't exist yet. Restore your backup afterwards.
 
 ## Profiling recipe
 
