@@ -27,6 +27,15 @@ class ServerConnection extends ChangeNotifier {
   final FlutterSecureStorage _storage;
   String? _token;
 
+  /// The server's `GET /api/capabilities` response (plan 5 #6), fetched once
+  /// per connect via [fetchCapabilities] and cached here for the life of the
+  /// session — `client` mints a fresh [VellumServerClient] on every access,
+  /// so nowhere else to cache it. Null until fetched, or if the server
+  /// predates the endpoint / is unreachable; callers should treat that as
+  /// "no info available", not an error.
+  Capabilities? _capabilities;
+  Capabilities? get capabilities => _capabilities;
+
   /// True when the session token is (or was loaded) in plaintext preferences
   /// because the OS secure store was unavailable — a keyring-less headless Linux
   /// box, typically. Drives the honesty notice on the server page (L2).
@@ -147,6 +156,22 @@ class ServerConnection extends ChangeNotifier {
         )
       : null;
 
+  /// Fetches and caches [capabilities] for the current connection. Best-effort
+  /// and silent on failure (offline, or a server old enough to predate the
+  /// endpoint) — this is informational only and must never block or fail a
+  /// sign-in or sync because of it. Call once per connect; a `ListenableBuilder`
+  /// on this connection picks up the result once it arrives.
+  Future<void> fetchCapabilities() async {
+    final c = client;
+    if (c == null) return;
+    try {
+      _capabilities = await c.capabilities();
+      notifyListeners();
+    } catch (_) {
+      // Leave whatever was cached (possibly null) — see the doc comment.
+    }
+  }
+
   Future<void> saveSession({
     required String url,
     required AuthResult auth,
@@ -159,6 +184,7 @@ class ServerConnection extends ChangeNotifier {
     // a book was newly *shared* with this account (sharing doesn't bump a book's
     // updated_at), so clearing it here guarantees newly-visible books arrive.
     await _prefs.remove(_cursorKey(normalized));
+    _capabilities = null;
     _token = auth.token;
     try {
       await _storage.write(key: _tokenKey, value: auth.token);
@@ -184,6 +210,7 @@ class ServerConnection extends ChangeNotifier {
     }
     _token = null;
     _tokenInsecure = false;
+    _capabilities = null;
     try {
       await _storage.delete(key: _tokenKey);
     } catch (_) {

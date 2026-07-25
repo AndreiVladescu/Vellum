@@ -52,6 +52,17 @@ class _ServerPageState extends State<ServerPage> {
   String _phase = '';
 
   @override
+  void initState() {
+    super.initState();
+    // Covers the app-restart case: _authenticate() (below) only runs on a
+    // fresh sign-in, but a resumed session is "connected" without it ever
+    // running this session. Best-effort and silent — see fetchCapabilities.
+    if (widget.connection.isConnected) {
+      widget.connection.fetchCapabilities();
+    }
+  }
+
+  @override
   void dispose() {
     _url.dispose();
     _email.dispose();
@@ -186,6 +197,7 @@ class _ServerPageState extends State<ServerPage> {
                 password: _password.text,
               );
         await widget.connection.saveSession(url: url, auth: auth);
+        await widget.connection.fetchCapabilities();
       });
 
   Future<void> _syncNow() => _run(() async {
@@ -449,9 +461,37 @@ class _ServerPageState extends State<ServerPage> {
     );
   }
 
+  /// Shown when `capabilities.sync_protocol` is newer than this app build
+  /// knows (`kKnownSyncProtocol`) — one clear line rather than letting sync
+  /// silently miss whatever the protocol bump was for.
+  Widget _newerServerNotice(ThemeData theme) {
+    return Card(
+      color: theme.colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline,
+                size: 18, color: theme.colorScheme.onSecondaryContainer),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'This server is newer than the app — update Vellum to sync '
+                'everything.',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildConnected(BuildContext context) {
     final theme = Theme.of(context);
     final conn = widget.connection;
+    final caps = conn.capabilities;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -459,7 +499,11 @@ class _ServerPageState extends State<ServerPage> {
           child: ListTile(
             leading: const Icon(Icons.cloud_done_outlined),
             title: Text(conn.email),
-            subtitle: Text(conn.baseUrl),
+            subtitle: Text(
+              caps == null
+                  ? conn.baseUrl
+                  : '${conn.baseUrl} · server v${caps.serverVersion}',
+            ),
             trailing: conn.isMaster
                 ? Chip(
                     label: const Text('Master'),
@@ -471,6 +515,13 @@ class _ServerPageState extends State<ServerPage> {
         // One-time honesty notice: the OS secure store was unavailable, so the
         // session token is sitting in plaintext preferences (L2).
         if (conn.shouldWarnInsecureToken) _insecureTokenNotice(theme, conn),
+        // The one real consequence of the capability handshake today: a
+        // server on a newer sync protocol than this app build understands
+        // should say so plainly rather than have sync silently miss whatever
+        // changed (plan 5 #6). Feature-gating individual sync phases is left
+        // for whichever future item first ships an optional one — nothing
+        // the app does today is actually optional yet.
+        if (caps?.isNewerThanApp ?? false) _newerServerNotice(theme),
         // Lets a rotated/regenerated server certificate be re-imported without
         // disconnecting (an https server only).
         _certRow(theme, conn.baseUrl),

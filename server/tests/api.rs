@@ -691,6 +691,55 @@ async fn books_list_supports_delta_cursor_envelope() {
 }
 
 #[tokio::test]
+async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
+    let app = test_app().await;
+    let (status, body) = call(&app, "GET", "/api/capabilities", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["server_version"].is_string());
+    assert_eq!(body["sync_protocol"], json!(1));
+    let features = body["features"].as_array().unwrap();
+    assert!(features.contains(&json!("delta_pull")));
+    // Never advertised: not built (content_search, mail, batch_push) or
+    // deliberately never synced (shelf_sync, reading_progress) -- a
+    // capability handshake that claims one of these would be worse than none.
+    for absent in ["shelf_sync", "reading_progress", "content_search", "mail", "batch_push"] {
+        assert!(
+            !features.contains(&json!(absent)),
+            "{absent} isn't a real server feature yet"
+        );
+    }
+}
+
+#[tokio::test]
+async fn api_v1_prefix_is_equivalent_to_the_unprefixed_alias() {
+    // §6: /api/v1/* is `nest`ed from the exact same routes as /api/* (see
+    // api_routes() in lib.rs) -- both must answer identically, and the
+    // handful of routes that deliberately stay unversioned (/opds, /health,
+    // /) must not have moved under either prefix.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    create_book(&app, &master, "Dune").await;
+
+    let (s1, unprefixed) = call(&app, "GET", "/api/capabilities", None, None).await;
+    let (s2, v1) = call(&app, "GET", "/api/v1/capabilities", None, None).await;
+    assert_eq!((s1, &unprefixed), (s2, &v1));
+
+    let (s1, unprefixed) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    let (s2, v1) = call(&app, "GET", "/api/v1/books", Some(&master), None).await;
+    assert_eq!((s1, &unprefixed), (s2, &v1));
+
+    let (status, _) = call(&app, "GET", "/health", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = call(&app, "GET", "/api/v1/health", None, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "/health must not move under /api");
+
+    let (status, _) = call(&app, "GET", "/opds", None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "reachable, just needs Basic auth");
+    let (status, _) = call(&app, "GET", "/api/opds", None, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "/opds must not move under /api either");
+}
+
+#[tokio::test]
 async fn books_list_page_param_is_inert_when_a_cursor_is_present() {
     // §3: page/limit must never apply when cursor is present in any form --
     // an empty cursor is the app's *first* sync, and letting a page limit

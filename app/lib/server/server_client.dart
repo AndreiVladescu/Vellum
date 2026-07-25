@@ -200,6 +200,15 @@ class VellumServerClient {
     return ServerUser.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Unauthenticated — a client needs to know what a server supports before
+  /// it has (or instead of) a session. Throws [ServerException] on a server
+  /// old enough to predate this endpoint (404); callers treat that as "no
+  /// capability info available" rather than a hard failure.
+  Future<Capabilities> capabilities() async {
+    final res = await _http.get(_uri('/api/capabilities'));
+    return Capabilities.fromJson(_body(res) as Map<String, dynamic>);
+  }
+
   /// Invalidates the current session server-side. Best-effort: the caller still
   /// clears local credentials even if this fails (e.g. offline).
   Future<void> logout() async {
@@ -545,6 +554,42 @@ class ServerFile {
     format: j['format'] as String? ?? 'bin',
     sizeBytes: j['size_bytes'] as int? ?? 0,
     sha256: j['sha256'] as String? ?? '',
+  );
+}
+
+/// The `sync_protocol` this app build understands (plan 5 #6). Bump only when
+/// adopting a breaking server response-shape change; compared against
+/// [Capabilities.syncProtocol] to show "this server is newer than the app"
+/// instead of failing sync opaquely partway through.
+const kKnownSyncProtocol = 1;
+
+/// The server's `GET /api/capabilities` response: version info plus which
+/// optional sync features it actually supports. Fetched once per connect and
+/// cached on [ServerConnection] — see `connection_store.dart`.
+class Capabilities {
+  Capabilities({
+    required this.serverVersion,
+    required this.syncProtocol,
+    required this.features,
+  });
+
+  final String serverVersion;
+  final int syncProtocol;
+  final List<String> features;
+
+  bool hasFeature(String name) => features.contains(name);
+
+  /// Whether this server speaks a newer sync protocol than this app build
+  /// understands — the one case the app should say something about, rather
+  /// than silently missing whatever changed.
+  bool get isNewerThanApp => syncProtocol > kKnownSyncProtocol;
+
+  factory Capabilities.fromJson(Map<String, dynamic> j) => Capabilities(
+    serverVersion: j['server_version'] as String? ?? '',
+    syncProtocol: j['sync_protocol'] as int? ?? 1,
+    features: [
+      for (final f in (j['features'] as List? ?? const [])) f.toString(),
+    ],
   );
 }
 
