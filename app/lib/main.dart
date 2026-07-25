@@ -8,6 +8,7 @@ import 'add_book/add_book_page.dart';
 import 'app_drawer.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
+import 'data/library_queries.dart';
 import 'data/library_repository.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
@@ -17,7 +18,6 @@ import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
-import 'shelf/shelf_filter.dart';
 import 'shelf/shelf_view.dart';
 
 Future<void> main() async {
@@ -198,19 +198,6 @@ class _LibraryPageState extends State<LibraryPage> {
     }
   }
 
-  List<Book> _filter(
-    List<Book> books,
-    Map<String, List<String>> authorsByBook,
-    Map<String, List<String>> genresByBook,
-  ) =>
-      filterBooks(
-        books: books,
-        query: _query,
-        authorsByBook: authorsByBook,
-        genresByBook: genresByBook,
-        genre: _genreFilter,
-      );
-
   /// Applies the genre facet from a tapped genre chip on a book's detail page.
   /// Sets the dedicated filter (shown as a removable chip near the search)
   /// rather than the search box, so any text search you had stays put.
@@ -386,6 +373,11 @@ class _LibraryPageState extends State<LibraryPage> {
       listenable: widget.settings,
       builder: (context, _) => WallpaperBackground(
         wallpaper: widget.settings.wallpaper,
+        // Shelves drive the chip row and decide which scope `watchLibrary`
+        // reads (a stored shelf selection can point at a since-deleted
+        // shelf); everything else — filtering, sorting, and the
+        // authors/genres each book needs — is one further stream, done in
+        // SQL rather than re-run in Dart on every rebuild (plan 5 §A1).
         child: StreamBuilder<List<Shelf>>(
           stream: repository.watchShelves(),
           builder: (context, shelvesSnap) {
@@ -400,28 +392,17 @@ class _LibraryPageState extends State<LibraryPage> {
                 if (_genreFilter != null) _activeGenreBar(),
                 _shelfChips(shelves, active),
                 Expanded(
-                  child: StreamBuilder<Map<String, List<String>>>(
-                    stream: repository.watchAuthorsByBook(),
-                    builder: (context, authorsSnap) {
-                      final authors = authorsSnap.data ?? const {};
-                      return StreamBuilder<Map<String, List<String>>>(
-                        stream: repository.watchGenresByBook(),
-                        builder: (context, genresSnap) {
-                          final genres = genresSnap.data ?? const {};
-                          return StreamBuilder<List<Book>>(
-                            stream: active == null
-                                ? repository.watchAllBooks()
-                                : repository.watchBooksOnShelf(active),
-                            builder: (context, snapshot) => _shelfBody(
-                              snapshot.data ?? const [],
-                              active != null,
-                              authors,
-                              genres,
-                            ),
-                          );
-                        },
-                      );
-                    },
+                  child: StreamBuilder<LibraryView>(
+                    stream: repository.queries.watchLibrary(
+                      shelfId: active,
+                      query: _query,
+                      genre: _genreFilter,
+                      sort: widget.settings.shelfSort,
+                    ),
+                    builder: (context, snapshot) => _shelfBody(
+                      snapshot.data ?? LibraryView.empty,
+                      active != null,
+                    ),
                   ),
                 ),
               ],
@@ -432,14 +413,23 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  Widget _shelfBody(
-    List<Book> all,
-    bool onCustomShelf,
-    Map<String, List<String>> authorsByBook,
-    Map<String, List<String>> genresByBook,
-  ) {
+  Widget _shelfBody(LibraryView view, bool onCustomShelf) {
     final theme = Theme.of(context);
-    if (all.isEmpty) {
+    final entries = view.entries;
+    if (entries.isEmpty) {
+      // A search/genre filter narrowed a non-empty scope to nothing shows the
+      // "no match" message; otherwise (nothing typed, no facet) the scope
+      // itself has zero books.
+      final filtered = _query.trim().isNotEmpty || _genreFilter != null;
+      if (filtered) {
+        return Center(
+          child: Text(
+            _noMatchMessage(),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        );
+      }
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -463,22 +453,8 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       );
     }
-    final books = sortBooks(
-      books: _filter(all, authorsByBook, genresByBook),
-      sort: widget.settings.shelfSort,
-      authorsByBook: authorsByBook,
-    );
-    if (books.isEmpty) {
-      return Center(
-        child: Text(
-          _noMatchMessage(),
-          textAlign: TextAlign.center,
-          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-        ),
-      );
-    }
     return ShelfView(
-      books: books,
+      books: [for (final e in entries) e.book],
       bookFace: widget.settings.bookFace,
       spineArt: widget.settings.spineArt,
       coverFileOf: repository.coverFileOf,
