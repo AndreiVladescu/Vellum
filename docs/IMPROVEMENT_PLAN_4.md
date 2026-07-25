@@ -309,6 +309,41 @@ fixes the profile shows.
 
 ---
 
+## G. Future patches (deferred — not this round)
+
+### 19. Transactional email (SMTP), then password reset & invites
+
+**Goal.** Let the server send email so it can support **password reset** ("forgot
+password" → emailed reset link) and **member invites** (master emails a join
+link instead of hand-creating accounts + sharing a password out of band).
+
+**Plan (in order):**
+1. **SMTP plumbing first.** Add an opt-in mailer configured by env
+   (`VELLUM_SMTP_HOST/PORT/USER/PASS`, `VELLUM_MAIL_FROM`), disabled by default so
+   the LAN/local-first story is unchanged. A Gmail setup works via
+   `smtp.gmail.com:587` + a **Google App Password** (not the account password;
+   requires 2FA) — document that. Use a maintained Rust SMTP crate (e.g.
+   `lettre`, async + STARTTLS/`rustls`, reusing our ring provider). Health-check
+   the config on boot and log clearly when mail is off.
+2. **Password reset.** `POST /api/auth/forgot` issues a single-use, short-TTL
+   token (store only its hash, like sessions), emails `${PUBLIC_URL}/reset/<tok>`;
+   `POST /api/auth/reset` consumes it and sets a new Argon2 hash. Always answer
+   "if that email exists, a link was sent" (no account-existence leak); throttle
+   per email + IP like login. A minimal `reset.html` page in `web/`.
+3. **Invites.** Master-only `POST /api/invites` (scope like a share) mints a
+   token, emails a join link; the app/console redeems it to register the member
+   and apply the grant. Reuses the token pattern above.
+
+**Notes.** Email is a new outbound-network + secret surface — keep it strictly
+opt-in, never log credentials or tokens, and treat SMTP creds like the DB path
+(env only). App-side: a "Forgot password?" link on the sign-in screen and an
+"Invite member" action in the sharing page. **Deferred to a later patch.**
+
+**Commits (later):** `server: opt-in SMTP mailer`, then
+`server+app: password reset by email`, then `server+app: emailed member invites`
+
+---
+
 ## Suggested order
 
 1. **§A 1–3** (correctness: cert-rotation UX, Android http guard, mobile backup).
