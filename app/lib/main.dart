@@ -221,7 +221,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 controller: _searchController,
                 onChanged: _onQueryChanged,
                 decoration: const InputDecoration(
-                  hintText: 'Search title or author…',
+                  hintText: 'Search your library…',
                   icon: Icon(Icons.search),
                   border: InputBorder.none,
                 ),

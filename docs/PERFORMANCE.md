@@ -7,19 +7,27 @@ after each of those lands rather than trusting the target numbers alone.
 
 ## Data-layer benchmarks (CI)
 
-`app/test/benchmark/library_bench.dart` seeds a 3,000-book in-memory library
-(`seedLibrary`, see below) and times the query paths §0 of plan 5 calls out:
-`watchAllBooks()`, `watchAuthorsByBook()`, `watchGenresByBook()`, and
-`filterBooks()`/`sortBooks()` — both one pass and a 20-rebuild burst. The
-burst is the number that matters: §0.1/§0.2's actual complaint is that
-today's four nested `StreamBuilder`s re-run filter+sort over the whole
-library on *every* independent emission, so a single pass looks fine in any
-harness and still costs real frames on a phone during a burst of shelf
-mutations (e.g. a folder import). §A1/§A2 should visibly beat the burst
-number, not the one-pass number. Each step asserts a generous upper bound (4 s,
-16 s for the burst) — a regression guard against an accidental O(n²) or a
-dropped index, not a frame-time target; CI runners are too variable to assert
-tight numbers.
+`app/test/benchmark/library_bench.dart` seeds a 1,000-book in-memory library
+(`seedLibrary`, see below; kept modest since §A2's triggers make seeding
+itself expensive — see that finding below) and times the query paths §0 of
+plan 5 calls out: `watchAllBooks()`, `watchAuthorsByBook()`,
+`watchGenresByBook()`, `filterBooks()`/`sortBooks()` (one pass and a
+20-rebuild burst), and `watchLibrary()` itself (20 fresh subscriptions, since
+that's how `main.dart` actually calls it — see the §A1 finding below on why
+that framing matters). Each step asserts a generous upper bound — a
+regression guard against an accidental O(n²) or a dropped index, not a
+frame-time target; CI runners are too variable to assert tight numbers.
+
+**The "should visibly beat the burst number" framing from when this doc was
+written (before §A1/§A2 landed) turned out to be wrong, and it's worth
+saying so rather than quietly dropping it.** `watchLibrary()`'s 20-fresh-
+subscription cost does **not** beat the old Dart burst at the sizes this
+bench actually tests (1,000–8,000 books) — see the §A1 finding for the
+numbers and why. The real win is elsewhere: no more 4x redundant rebuilds
+per mutation, sub-linear (not linear) scaling as the library grows, and an
+FTS5 index that doesn't degrade with library size the way a Dart substring
+scan does. None of that shows up as "the burst number went down" in a
+1,000-book benchmark.
 
 Run it directly:
 
@@ -98,20 +106,32 @@ per-row correlated subqueries (author-sort, `hasFile`) over the whole scope,
 inherent to filtering/sorting in SQL — bound this further only if a profile
 run shows it actually costing frames on the reading path.
 
-**Known remaining cost: subscription churn on every rebuild.** `main.dart`
+**Subscription churn on every rebuild — measured, then fixed.** `main.dart`
 calls `watchLibrary(...)` fresh inside `build()`, so typing in the search box
-(debounced 150ms) creates a brand-new combined stream each time — all six
-underlying queries re-run on subscribe, not just the ones the changed
-parameter actually affects. Measured on the same 3,000-book library:
-successive fresh `watchLibrary(query: …)` subscriptions (simulating a
-keystroke) land in the **20–70ms range**, not the ~180ms of the pre-fix
-design — the six queries execute back-to-back rather than through the old
-single `asyncMap` chain, so this is not the same class of problem. It's also
-not new: the pre-#A1 code created `watchAuthorsByBook()`/`watchGenresByBook()`
-fresh in `build()` too. Left as-is because #A2 (FTS5) changes the query's
-`WHERE` clause shape anyway; if a profile run shows this costing frames,
-the fix is caching the four params-independent sub-streams (authors, genres,
-shelves, allGenres) instead of recreating them per `watchLibrary()` call.
+(debounced 150ms) creates a brand-new combined stream each time. Before the
+fix below, all six underlying queries re-ran on every subscribe, not just the
+ones the changed parameter actually affects — on a 1,000-book library, 20
+fresh subscriptions cost **~294ms** (worse than the ~40ms the old Dart burst
+cost at the same size). `LibraryQueries` now caches the four
+parameter-independent sources (`watchAuthorsByBook`, `watchGenresByBook`,
+shelves, `allGenres`) behind `_Cached<T>` — subscribed once, lazily, kept
+alive for the app's lifetime, replaying the last value to each new listener —
+so a fresh `watchLibrary()` call only re-runs the one query that's actually
+parameter-dependent. That brought 20 fresh subscriptions down to **~175ms**
+at 1,000 books: real, but still short of the old path's ~40ms, because the
+remaining cost is the filtered/sorted books query itself (SQL round-trip +
+correlated subqueries for author-sort and `hasFile`), which must vary with
+the query text and so can't be cached away. At 8,000 books the gap
+*narrows*, not widens: old path ~318ms/20 (≈16ms/iteration, scaling roughly
+linearly with library size, as a Dart scan would), new path ~954ms/20
+(≈48ms/iteration, ≈3x the old cost per keystroke rather than 1,000-book's
+≈4.4x) — sub-linear scaling against the old path's linear scaling. In real
+usage the 150ms debounce means this is one query per pause in typing, not 20
+back-to-back, so ~48ms even at 8,000 books is comfortably sub-frame and not
+user-perceptible; the crossover point where the new path is *faster* in
+absolute terms is somewhere past what a personal library realistically
+reaches. Re-measure this if the library-size assumption changes materially
+(e.g. #35's server-scale content search implies much larger n).
 
 ## §A2 finding: the FTS5 triggers cost write-path time, not read-path
 

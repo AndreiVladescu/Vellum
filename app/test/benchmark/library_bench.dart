@@ -7,12 +7,18 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
+import 'package:vellum/data/library_queries.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/data/seed_library.dart';
 import 'package:vellum/settings/shelf_sort.dart';
 import 'package:vellum/shelf/shelf_filter.dart';
 
-const _bookCount = 3000;
+// Kept modest since #A2's FTS5 triggers fire per insert: seeding 3,000 books
+// went from ~220ms to ~3.7s locally (docs/PERFORMANCE.md), and CI's
+// write-heavy SQLite performance is more variable than a desktop's — 1,000 is
+// still enough library to catch an O(n^2) or a dropped index on the
+// *read*-path timings this bench actually cares about.
+const _bookCount = 1000;
 // Regression guard, not a perf target: generous so a loaded CI runner never
 // flakes, tight enough to catch an accidental O(n^2) or a dropped index.
 const _maxStepMillis = 4000;
@@ -86,6 +92,23 @@ void main() {
             sort: ShelfSort.author,
             authorsByBook: authorsByBook,
           );
+        }
+      },
+      budgetMillis: _maxStepMillis * 4,
+    );
+
+    // §A1/§A2's actual deliverable: watchLibrary() does the filter+sort (and,
+    // for free text, the FTS5 match) in SQL instead of the Dart burst above.
+    // A fresh subscription each time (not one long-lived stream) matches how
+    // main.dart actually calls it — a new stream object per build() — so
+    // this is the number that should beat the burst figure above, not an
+    // idealized steady-state number.
+    final queries = LibraryQueries(db);
+    await _time(
+      'watchLibrary(query: "the"), $rebuildBurst fresh subscriptions',
+      () async {
+        for (var i = 0; i < rebuildBurst; i++) {
+          await queries.watchLibrary(query: 'the', sort: ShelfSort.author).first;
         }
       },
       budgetMillis: _maxStepMillis * 4,

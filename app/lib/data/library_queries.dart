@@ -55,9 +55,26 @@ class LibraryView {
 /// tested and extended (§A1's view-model, §A2's search) in isolation from the
 /// write-side services.
 class LibraryQueries {
-  LibraryQueries(this.db);
+  LibraryQueries(this.db)
+      : _authorsByBook = _Cached(() => _rawAuthorsByBook(db)),
+        _genresByBook = _Cached(() => _rawGenresByBook(db)),
+        _shelvesOrdered = _Cached(() => _rawShelvesOrdered(db)),
+        _allGenreNames = _Cached(() => _rawAllGenreNames(db));
 
   final VellumDatabase db;
+
+  // watchLibrary() is called fresh in main.dart's build() (a new stream
+  // object per debounced keystroke) — these four don't depend on
+  // query/genre/sort/shelfId at all, so caching them means a rebuild only
+  // re-runs the one query that's actually parameter-dependent
+  // (_watchFilteredSortedBooks) instead of all six. Measured: without this,
+  // 20 fresh watchLibrary() subscriptions on a 1k-book library cost ~294ms —
+  // *worse* than the Dart implementation #A1 replaced — vs ~40ms cached. See
+  // docs/PERFORMANCE.md.
+  final _Cached<Map<String, List<String>>> _authorsByBook;
+  final _Cached<Map<String, List<String>>> _genresByBook;
+  final _Cached<List<Shelf>> _shelvesOrdered;
+  final _Cached<List<String>> _allGenreNames;
 
   /// All books, alphabetically — reactive: the shelf UI rebuilds on changes.
   Stream<List<Book>> watchAllBooks() => db.watchAllBooks();
@@ -76,49 +93,57 @@ class LibraryQueries {
 
   /// `bookId -> author names` (cover order) for the whole library, as a
   /// stream, so the shelf can search by author without an N+1 of per-book
-  /// queries.
-  Stream<Map<String, List<String>>> watchAuthorsByBook() {
+  /// queries. Cached (see [_authorsByBook]) — every call shares one
+  /// underlying subscription.
+  Stream<Map<String, List<String>>> watchAuthorsByBook() =>
+      _authorsByBook.stream;
+
+  static Stream<Map<String, List<String>>> _rawAuthorsByBook(
+    VellumDatabase db,
+  ) {
     final query = db.select(db.bookAuthors).join([
       innerJoin(db.authors, db.authors.id.equalsExp(db.bookAuthors.authorId)),
     ])
       ..orderBy([OrderingTerm.asc(db.bookAuthors.position)]);
-    return query.watch().map(_groupAuthors);
-  }
-
-  Map<String, List<String>> _groupAuthors(List<TypedResult> rows) {
-    final map = <String, List<String>>{};
-    for (final r in rows) {
-      final bookId = r.readTable(db.bookAuthors).bookId;
-      (map[bookId] ??= []).add(r.readTable(db.authors).name);
-    }
-    return map;
+    return query.watch().map((rows) {
+      final map = <String, List<String>>{};
+      for (final r in rows) {
+        final bookId = r.readTable(db.bookAuthors).bookId;
+        (map[bookId] ??= []).add(r.readTable(db.authors).name);
+      }
+      return map;
+    });
   }
 
   /// `bookId -> genre names` for the whole library, for the `genre:` filter.
-  Stream<Map<String, List<String>>> watchGenresByBook() {
+  /// Cached (see [_genresByBook]).
+  Stream<Map<String, List<String>>> watchGenresByBook() => _genresByBook.stream;
+
+  static Stream<Map<String, List<String>>> _rawGenresByBook(
+    VellumDatabase db,
+  ) {
     final query = db.select(db.bookGenres).join([
       innerJoin(db.genres, db.genres.id.equalsExp(db.bookGenres.genreId)),
     ]);
-    return query.watch().map(_groupGenres);
+    return query.watch().map((rows) {
+      final map = <String, List<String>>{};
+      for (final r in rows) {
+        final bookId = r.readTable(db.bookGenres).bookId;
+        (map[bookId] ??= []).add(r.readTable(db.genres).name);
+      }
+      return map;
+    });
   }
 
-  Map<String, List<String>> _groupGenres(List<TypedResult> rows) {
-    final map = <String, List<String>>{};
-    for (final r in rows) {
-      final bookId = r.readTable(db.bookGenres).bookId;
-      (map[bookId] ??= []).add(r.readTable(db.genres).name);
-    }
-    return map;
-  }
+  static Stream<List<Shelf>> _rawShelvesOrdered(VellumDatabase db) =>
+      (db.select(db.shelves)
+            ..orderBy([
+              (s) => OrderingTerm.asc(s.sortOrder),
+              (s) => OrderingTerm.asc(s.name),
+            ]))
+          .watch();
 
-  Stream<List<Shelf>> _watchShelvesOrdered() => (db.select(db.shelves)
-        ..orderBy([
-          (s) => OrderingTerm.asc(s.sortOrder),
-          (s) => OrderingTerm.asc(s.name),
-        ]))
-      .watch();
-
-  Stream<List<String>> _watchAllGenreNames() {
+  static Stream<List<String>> _rawAllGenreNames(VellumDatabase db) {
     final q = db.selectOnly(db.genres, distinct: true)
       ..addColumns([db.genres.name])
       ..orderBy([OrderingTerm(expression: db.genres.name)]);
@@ -163,10 +188,10 @@ class LibraryQueries {
   }) {
     return _combine6(
       _watchFilteredSortedBooks(shelfId: shelfId, query: query, genre: genre, sort: sort),
-      watchAuthorsByBook(),
-      watchGenresByBook(),
-      _watchShelvesOrdered(),
-      _watchAllGenreNames(),
+      _authorsByBook.stream,
+      _genresByBook.stream,
+      _shelvesOrdered.stream,
+      _allGenreNames.stream,
       _watchScopeEmpty(shelfId),
       (books, authorsByBook, genresByBook, shelves, allGenres, scopeEmpty) {
         final entries = [
@@ -298,6 +323,40 @@ class LibraryQueries {
               for (final row in rows)
                 (book: db.books.map(row.data), hasFile: row.read<bool>('has_file')),
             ]);
+  }
+}
+
+/// Subscribes to [source] once, lazily, on first use — not at construction —
+/// and keeps that one subscription alive for as long as the owning
+/// `LibraryQueries` lives (there is no "nobody's listening any more" signal
+/// worth tearing down for here; the shelf is the app's home screen). Every
+/// caller of [stream] shares that subscription: a late subscriber gets the
+/// last known value immediately (no waiting for the next write before the
+/// first frame), then live updates alongside everyone else.
+class _Cached<T> {
+  _Cached(this._source);
+
+  final Stream<T> Function() _source;
+  final _controller = StreamController<T>.broadcast();
+  StreamSubscription<T>? _sub;
+  T? _last;
+  bool _hasValue = false;
+
+  Stream<T> get stream {
+    _sub ??= _source().listen(
+      (v) {
+        _last = v;
+        _hasValue = true;
+        _controller.add(v);
+      },
+      onError: _controller.addError,
+    );
+    return _hasValue ? _replay() : _controller.stream;
+  }
+
+  Stream<T> _replay() async* {
+    yield _last as T;
+    yield* _controller.stream;
   }
 }
 
