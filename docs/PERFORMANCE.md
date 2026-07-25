@@ -97,3 +97,18 @@ remaining ~28ms (vs. the old 3.4ms) is the SQL `ORDER BY` plus its
 per-row correlated subqueries (author-sort, `hasFile`) over the whole scope,
 inherent to filtering/sorting in SQL — bound this further only if a profile
 run shows it actually costing frames on the reading path.
+
+**Known remaining cost: subscription churn on every rebuild.** `main.dart`
+calls `watchLibrary(...)` fresh inside `build()`, so typing in the search box
+(debounced 150ms) creates a brand-new combined stream each time — all six
+underlying queries re-run on subscribe, not just the ones the changed
+parameter actually affects. Measured on the same 3,000-book library:
+successive fresh `watchLibrary(query: …)` subscriptions (simulating a
+keystroke) land in the **20–70ms range**, not the ~180ms of the pre-fix
+design — the six queries execute back-to-back rather than through the old
+single `asyncMap` chain, so this is not the same class of problem. It's also
+not new: the pre-#A1 code created `watchAuthorsByBook()`/`watchGenresByBook()`
+fresh in `build()` too. Left as-is because #A2 (FTS5) changes the query's
+`WHERE` clause shape anyway; if a profile run shows this costing frames,
+the fix is caching the four params-independent sub-streams (authors, genres,
+shelves, allGenres) instead of recreating them per `watchLibrary()` call.
