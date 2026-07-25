@@ -38,12 +38,12 @@
     <div class="toolbar">
       <button class="btn primary" onclick="openAddBook()">＋ Add book</button>
       <button class="btn" onclick="openImport()">Import CSV</button>
-      <span class="muted">|</span>
+      <span class="sep"></span>
       <div class="group">
         <input id="newtag" type="text" placeholder="New tag name" style="width:140px">
         <button class="btn" onclick="createTag()">Create tag</button>
       </div>
-      <span class="muted">|</span>
+      <span class="sep"></span>
       <div class="group">
         <select id="bulktag"></select>
         <button class="btn" onclick="bulkTag(true)">Tag</button>
@@ -65,7 +65,7 @@
              oninput="setQ(this.value)" style="width:240px" autocomplete="off">
       <span class="muted">Tags:</span>
       <span id="tagfilters"></span>
-      <span class="muted">|</span>
+      <span class="sep"></span>
       <span id="missingfilters"></span>
       <button class="btn sm" onclick="clearFilters()">Clear filters</button>
     </div>

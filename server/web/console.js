@@ -253,7 +253,7 @@ function render(){
         r += `<td>${b.cover_path
           ? `<img class="thumb" data-src="/api/books/${b.id}/cover?w=160&t=${encodeURIComponent(b.updated_at||'')}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nothumb'}))">`
           : '<span class="nothumb"></span>'}</td>`;
-      r += `<td><span class="link" onclick="titleClick('${b.id}')" ondblclick="titleDbl(event,'${b.id}')">${esc(b.title)}</span></td>`;
+      r += `<td class="title"><span class="link" onclick="titleClick('${b.id}')" ondblclick="titleDbl(event,'${b.id}')">${esc(b.title)}</span></td>`;
       if (S.cols.has('author')) r += `<td class="muted">${authorStr(b)?esc(authorStr(b)):'<span class="dim">—</span>'}</td>`;
       if (S.cols.has('year'))   r += `<td class="year editable" ondblclick="startEdit(event,'${b.id}','year')">${b.published_year??''}</td>`;
       if (S.cols.has('pages'))  r += `<td class="year">${b.page_count??''}</td>`;

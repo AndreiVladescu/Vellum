@@ -1,23 +1,57 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <!-- Vellum logo mark: an open book of two page-leaves parted by a fine crease,
-       with a gold bookmark ribbon notched into a "V". Cream fill + a fine sepia
-       outline so it reads on light or medium surfaces (console header, in-app).
-       Refined/monoline: thin even stroke, no scribbled text lines. -->
+  <!-- Vellum logo mark (transparent): an open hardcover seen slightly from
+       above — dark leather boards peeking around a thick cream page block,
+       open leaves swooping into a centre gutter, and an oxblood bookmark
+       ribbon hanging over the fore-edge, notched into a "V". Flat, sombre
+       tones; no outlines. -->
   <defs>
+    <linearGradient id="leather" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4e3a27"/>
+      <stop offset="1" stop-color="#31251a"/>
+    </linearGradient>
+    <linearGradient id="stack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e0d2ae"/>
+      <stop offset="1" stop-color="#c2b088"/>
+    </linearGradient>
     <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fbf7ef"/>
-      <stop offset="1" stop-color="#efe4cf"/>
+      <stop offset="0" stop-color="#f0e6cc"/>
+      <stop offset="1" stop-color="#d6c6a1"/>
     </linearGradient>
     <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#a87b4c"/>
-      <stop offset="1" stop-color="#875f38"/>
+      <stop offset="0" stop-color="#7b3d31"/>
+      <stop offset="1" stop-color="#5c2c23"/>
     </linearGradient>
   </defs>
 
-  <path d="M244 198 H268 V408 L256 386 L244 408 Z" fill="url(#ribbon)"/>
+  <!-- Leather boards: a rim of cover visible left, right, and below. -->
+  <path d="M 44 204 Q 44 194 52 194 L 460 194 Q 468 194 468 204
+           C 468 320 464 376 448 402 C 374 434 294 444 256 444
+           C 218 444 138 434 64 402 C 48 376 44 320 44 204 Z"
+        fill="url(#leather)"/>
+  <!-- Spine notch where the boards meet, bottom centre. -->
+  <ellipse cx="256" cy="440" rx="24" ry="8" fill="#241a11"/>
 
-  <g fill="url(#page)" stroke="#5f4327" stroke-width="8" stroke-linejoin="round">
-    <path d="M250 198 C 206 174, 150 172, 104 184 L 104 336 C 150 324, 206 322, 250 336 Z"/>
-    <path d="M262 198 C 306 174, 362 172, 408 184 L 408 336 C 362 324, 306 322, 262 336 Z"/>
+  <!-- The closed page block: thickness under the open leaves. -->
+  <path d="M 62 196 C 62 310 66 360 78 384 C 146 412 220 420 256 420
+           C 292 420 366 412 434 384 C 446 360 450 310 450 196 Z"
+        fill="url(#stack)"/>
+  <!-- Stacked page edges along the fore-edge. -->
+  <g fill="none" stroke="#a3916e" stroke-width="4" stroke-linecap="round" opacity="0.7">
+    <path d="M 84 370 C 150 396 222 404 256 404 C 290 404 362 396 428 370"/>
+    <path d="M 80 354 C 146 380 222 388 256 388 C 290 388 366 380 432 354"/>
+    <path d="M 90 384 C 154 408 224 414 256 414"/>
   </g>
+
+  <!-- Open leaves, swooping up from the gutter and back down at the corners. -->
+  <path d="M 254 168 C 214 138 136 132 66 154 L 62 348
+           C 128 326 214 332 254 366 Z" fill="url(#page)"/>
+  <path d="M 258 168 C 298 138 376 132 446 154 L 450 348
+           C 384 326 298 332 258 366 Z" fill="url(#page)"/>
+  <!-- Gutter crease. -->
+  <path d="M 256 166 C 251 230 251 306 256 370" fill="none"
+        stroke="#7a684a" stroke-width="3.5" opacity="0.75"/>
+
+  <!-- Bookmark ribbon: out of the gutter, over the fore-edge, V-notched. -->
+  <path d="M 242 356 L 270 356 L 270 484 L 256 460 L 242 484 Z"
+        fill="url(#ribbon)"/>
 </svg>
