@@ -3,6 +3,11 @@
 Planned work and known issues. Resolved items are kept briefly for history;
 architecture lives in [`DESIGN.md`](../DESIGN.md).
 
+> The forward-looking roadmap — architecture changes and new features — is
+> [`IMPROVEMENT_PLAN_5.md`](IMPROVEMENT_PLAN_5.md). The open items at the bottom
+> of this file are carried there (EPUB reader polish → #23, dominant colour in
+> the physical view → landed).
+
 ---
 
 ## Resolved
