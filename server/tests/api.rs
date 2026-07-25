@@ -734,12 +734,24 @@ async fn api_v1_prefix_is_equivalent_to_the_unprefixed_alias() {
     let (status, _) = call(&app, "GET", "/health", None, None).await;
     assert_eq!(status, StatusCode::OK);
     let (status, _) = call(&app, "GET", "/api/v1/health", None, None).await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "/health must not move under /api");
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "/health must not move under /api"
+    );
 
     let (status, _) = call(&app, "GET", "/opds", None, None).await;
-    assert_eq!(status, StatusCode::UNAUTHORIZED, "reachable, just needs Basic auth");
+    assert_eq!(
+        status,
+        StatusCode::UNAUTHORIZED,
+        "reachable, just needs Basic auth"
+    );
     let (status, _) = call(&app, "GET", "/api/opds", None, None).await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "/opds must not move under /api either");
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "/opds must not move under /api either"
+    );
 }
 
 #[tokio::test]
@@ -784,14 +796,26 @@ async fn books_list_paginates_stably_with_total_and_next() {
     create_book(&app, &master, "Alpha").await;
     create_book(&app, &master, "Bravo").await;
 
-    let (_, page1) =
-        call(&app, "GET", "/api/books?page=1&limit=2", Some(&master), None).await;
+    let (_, page1) = call(
+        &app,
+        "GET",
+        "/api/books?page=1&limit=2",
+        Some(&master),
+        None,
+    )
+    .await;
     assert_eq!(page1["total"], json!(3));
     assert_eq!(page1["next"], json!(2));
     assert_eq!(titles(&page1["items"]), vec!["Alpha", "Bravo"]);
 
-    let (_, page2) =
-        call(&app, "GET", "/api/books?page=2&limit=2", Some(&master), None).await;
+    let (_, page2) = call(
+        &app,
+        "GET",
+        "/api/books?page=2&limit=2",
+        Some(&master),
+        None,
+    )
+    .await;
     assert_eq!(page2["total"], json!(3));
     assert_eq!(page2["next"], Value::Null, "last page has no next");
     assert_eq!(titles(&page2["items"]), vec!["Charlie"]);
@@ -953,11 +977,16 @@ async fn shelves_delete_records_a_kind_tagged_tombstone() {
     assert_eq!(shelf_entry["kind"], json!("shelf"));
 
     // ?kind=shelf filters to just this kind.
-    let (_, shelf_only) =
-        call(&app, "GET", "/api/deletions?kind=shelf", Some(&master), None).await;
+    let (_, shelf_only) = call(
+        &app,
+        "GET",
+        "/api/deletions?kind=shelf",
+        Some(&master),
+        None,
+    )
+    .await;
     assert_eq!(shelf_only.as_array().unwrap().len(), 1);
-    let (_, book_only) =
-        call(&app, "GET", "/api/deletions?kind=book", Some(&master), None).await;
+    let (_, book_only) = call(&app, "GET", "/api/deletions?kind=book", Some(&master), None).await;
     assert!(book_only.as_array().unwrap().is_empty());
 
     // Gone from the live list too.

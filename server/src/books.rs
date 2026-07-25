@@ -359,8 +359,7 @@ pub async fn list(
     }
 
     if let Some(page) = q.page {
-        let limit =
-            (q.limit.unwrap_or(DEFAULT_PAGE_SIZE as u32) as i64).clamp(1, MAX_PAGE_SIZE);
+        let limit = (q.limit.unwrap_or(DEFAULT_PAGE_SIZE as u32) as i64).clamp(1, MAX_PAGE_SIZE);
         let page = page.max(1) as i64;
         let offset = (page - 1) * limit;
         let (books, total) = visible_books_page(&state, &user, limit, offset).await?;

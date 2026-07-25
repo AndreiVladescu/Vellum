@@ -225,15 +225,13 @@ pub async fn upsert(
         .execute(&mut *tx)
         .await?;
     } else {
-        sqlx::query(
-            "INSERT INTO shelf (id, owner_id, name, sort_order) VALUES (?, ?, ?, ?)",
-        )
-        .bind(&id)
-        .bind(&user.id)
-        .bind(input.name.trim())
-        .bind(input.sort_order)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("INSERT INTO shelf (id, owner_id, name, sort_order) VALUES (?, ?, ?, ?)")
+            .bind(&id)
+            .bind(&user.id)
+            .bind(input.name.trim())
+            .bind(input.sort_order)
+            .execute(&mut *tx)
+            .await?;
     }
     // Re-creating a shelf at a tombstoned id revives it, same as books::upsert.
     sqlx::query("DELETE FROM deletion WHERE book_id = ? AND kind = 'shelf'")
@@ -246,14 +244,12 @@ pub async fn upsert(
         .execute(&mut *tx)
         .await?;
     for (position, book_id) in valid_book_ids.iter().enumerate() {
-        sqlx::query(
-            "INSERT INTO shelf_book (shelf_id, book_id, position) VALUES (?, ?, ?)",
-        )
-        .bind(&id)
-        .bind(book_id)
-        .bind(position as i64)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("INSERT INTO shelf_book (shelf_id, book_id, position) VALUES (?, ?, ?)")
+            .bind(&id)
+            .bind(book_id)
+            .bind(position as i64)
+            .execute(&mut *tx)
+            .await?;
     }
     tx.commit().await?;
 
@@ -274,8 +270,13 @@ async fn existing_book_ids(state: &AppState, ids: &[String]) -> AppResult<Vec<St
     for id in ids {
         query = query.bind(id);
     }
-    let present: std::collections::HashSet<String> = query.fetch_all(&state.db).await?.into_iter().collect();
-    Ok(ids.iter().filter(|id| present.contains(*id)).cloned().collect())
+    let present: std::collections::HashSet<String> =
+        query.fetch_all(&state.db).await?.into_iter().collect();
+    Ok(ids
+        .iter()
+        .filter(|id| present.contains(*id))
+        .cloned()
+        .collect())
 }
 
 pub async fn delete(
@@ -327,4 +328,3 @@ async fn fetch_shelf(state: &AppState, id: &str) -> AppResult<Json<ShelfDto>> {
     .await?;
     Ok(Json(ShelfDto { shelf, book_ids }))
 }
-
