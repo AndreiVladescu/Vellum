@@ -49,18 +49,14 @@ class _BookOpenTransition extends StatelessWidget {
         final v = curved.value;
 
         // Grow the book, keeping its base on the shelf so it enlarges upward
-        // and outward — the "pulled a bit off the shelf" look. At v == 0 the
-        // rect equals the book's spot, so the motion starts seamlessly.
+        // and outward — the "pulled a bit off the shelf" look. Done with a
+        // Transform.scale rather than by resizing the rect, so *everything*
+        // painted on the spine scales together — including the title text (a
+        // fixed-size Text that would otherwise stay small while the spine grew).
+        // At v == 0 the scale is 1, so the motion starts seamlessly from the
+        // book's spot on the shelf.
         const maxGrow = 0.22; // up to 1.22x at full open
         final scale = 1.0 + maxGrow * v;
-        final w = bookRect.width * scale;
-        final h = bookRect.height * scale;
-        final rect = Rect.fromLTWH(
-          bookRect.center.dx - w / 2,
-          bookRect.bottom - h,
-          w,
-          h,
-        );
 
         // The page fades in over the second half; the book fades out as it
         // does, so none of it is left painted over the open page. On pop this
@@ -73,22 +69,27 @@ class _BookOpenTransition extends StatelessWidget {
             Opacity(opacity: pageOpacity, child: page),
             if (bookOpacity > 0)
               Positioned.fromRect(
-                rect: rect,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: bookOpacity,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.35 * v),
-                            blurRadius: 20 * v,
-                            offset: Offset(0, 8 * v),
-                          ),
-                        ],
+                rect: bookRect,
+                child: Transform.scale(
+                  scale: scale,
+                  // Anchor the bottom edge so the spine grows off the shelf.
+                  alignment: Alignment.bottomCenter,
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: bookOpacity,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35 * v),
+                              blurRadius: 20 * v,
+                              offset: Offset(0, 8 * v),
+                            ),
+                          ],
+                        ),
+                        child: bookFace,
                       ),
-                      child: bookFace,
                     ),
                   ),
                 ),
