@@ -69,6 +69,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Ship only a symbol table for the native libs (pdfium, sqlite3):
+            // enough for Play's native crash symbolication, without the full
+            // debug info that bloats the artifact.
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 }

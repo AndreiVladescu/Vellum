@@ -44,6 +44,25 @@ cd app
 flutter run          # launches on the connected device / desktop
 ```
 
+#### Building for Android
+
+Release builds need a signing keystore. Copy
+[`android/key.properties.example`](app/android/key.properties.example) to
+`android/key.properties` (gitignored) and fill it in — that file documents the
+one-time `keytool` command. Without it, release builds fall back to the debug
+key so a fresh checkout still runs, but such a build isn't distributable.
+
+```sh
+cd app
+flutter build appbundle --release        # distribution artifact for Play
+                                         # (Play delivers per-ABI, ~30 MB)
+flutter build apk --release --split-per-abi   # sideload APKs, one per ABI
+```
+
+Prefer the app bundle for the store: the single fat APK carries every ABI
+(arm64 + armeabi-v7a + x86_64 + pdfium/sqlite natives, ~87 MB), while Play
+delivers only the device's ABI from a bundle.
+
 ### Server (`server/`)
 
 Requires [Rust](https://rustup.rs/).
