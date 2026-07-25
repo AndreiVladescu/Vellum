@@ -158,10 +158,12 @@ pub fn router(state: AppState) -> Router {
 
 /// A restrictive Content-Security-Policy that still lets the self-hosted console
 /// and public landing page work: everything loads from same-origin, images may
-/// also be `data:` (inline placeholders/thumbnails), and the pages' inline
+/// also be `data:` (inline placeholders) or `blob:` (the console fetches
+/// authenticated covers with an `Authorization` header and shows them via an
+/// object URL, so the token never rides the URL), and the pages' inline
 /// `<style>`/`<script>` (no external/CDN assets) are permitted. `object-src` and
 /// framing are denied outright.
-const CSP: &str = "default-src 'self'; img-src 'self' data:; \
+const CSP: &str = "default-src 'self'; img-src 'self' data: blob:; \
     style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; \
     object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 

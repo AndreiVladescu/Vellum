@@ -32,6 +32,44 @@ async function api(method, path, body){
   return data;
 }
 
+// Fetch an authenticated blob and hand back an object URL. The session token
+// rides the Authorization header (never the URL), so it can't leak into proxy
+// logs or history; the caller is responsible for revoking the URL.
+async function authBlobUrl(path){
+  const res = await fetch(path, { headers: S.token?{authorization:'Bearer '+S.token}:{} });
+  if (res.status === 401) { logout(); throw new Error('Session expired'); }
+  if (!res.ok) throw new Error('HTTP '+res.status);
+  return URL.createObjectURL(await res.blob());
+}
+
+// Load every `<img data-src>` under `root` with an auth-header fetch, swapping
+// in an object URL once fetched (and revoking it after the image decodes). On
+// failure we invoke the element's own onerror, so the no-cover placeholder
+// still appears exactly as it did with a direct `src`.
+function hydrateImages(root){
+  for (const img of root.querySelectorAll('img[data-src]')){
+    const path = img.getAttribute('data-src');
+    img.removeAttribute('data-src');
+    authBlobUrl(path).then(url=>{
+      img.addEventListener('load', ()=>URL.revokeObjectURL(url), { once:true });
+      img.src = url;
+    }).catch(()=>{ if (typeof img.onerror === 'function') img.onerror(); });
+  }
+}
+
+// Download an authenticated file by fetching it with the auth header and
+// triggering a save from the resulting object URL, so the token stays out of
+// the `<a href>`.
+async function downloadFile(fileId, filename){
+  try {
+    const url = await authBlobUrl('/api/files/'+fileId);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename || 'download';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 10000);
+  } catch(e){ toast('Download failed'); }
+}
+
 async function login(){
   const email = document.getElementById('l-email').value.trim();
   const pass = document.getElementById('l-pass').value;
@@ -194,7 +232,6 @@ function render(){
   S.view = computeRows();
   if (S.cursor >= S.view.length) S.cursor = -1;
 
-  const tok = encodeURIComponent(S.token);
   const rows = document.getElementById('rows');
   if (!S.books.length){
     rows.innerHTML = `<tr class="empty"><td colspan="${colCount()}" class="muted"
@@ -214,7 +251,7 @@ function render(){
         <td><input type="checkbox" ${S.selected.has(b.id)?'checked':''} onchange="toggleRow('${b.id}',this.checked)"></td>`;
       if (S.cols.has('cover'))
         r += `<td>${b.cover_path
-          ? `<img class="thumb" src="/api/books/${b.id}/cover?w=160&token=${tok}&t=${encodeURIComponent(b.updated_at||'')}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nothumb'}))">`
+          ? `<img class="thumb" data-src="/api/books/${b.id}/cover?w=160&t=${encodeURIComponent(b.updated_at||'')}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nothumb'}))">`
           : '<span class="nothumb"></span>'}</td>`;
       r += `<td><span class="link" onclick="titleClick('${b.id}')" ondblclick="titleDbl(event,'${b.id}')">${esc(b.title)}</span></td>`;
       if (S.cols.has('author')) r += `<td class="muted">${authorStr(b)?esc(authorStr(b)):'<span class="dim">—</span>'}</td>`;
@@ -229,6 +266,7 @@ function render(){
       </td></tr>`;
       return r;
     }).join('');
+    hydrateImages(rows);
   }
 
   const selShown = S.view.filter(b=>S.selected.has(b.id)).length;
@@ -841,12 +879,11 @@ async function openDetail(id){
   let d;
   try { d = await api('GET','/api/books/'+id+'/detail'); }
   catch(e){ toast(e.message); return; }
-  const tok = encodeURIComponent(S.token);
   const authors = (d.authors||[]).join(', ');
   const genres = (d.genres||[]);
   const list = (d.files||[]).map(f =>
     '<div class="ab-item"><div style="flex:1">'+esc(f.format.toUpperCase())+' · '+fmtSize(f.size_bytes)+'</div>'+
-    '<a class="btn" href="/api/files/'+f.id+'?token='+tok+'" download="'+esc(d.title)+'.'+esc(f.format)+'">Download</a></div>'
+    '<button class="btn" data-fid="'+esc(f.id)+'" data-fname="'+esc(d.title+'.'+f.format)+'">Download</button></div>'
   ).join('');
   const upBtn = '<button class="btn" onclick="detailPick(\''+id+'\',\'.pdf,.epub\')">Upload</button>';
   const files = list
@@ -858,7 +895,7 @@ async function openDetail(id){
       <div style="display:flex; gap:16px">
         <div class="cover-box" onclick="detailPick('${id}','image/*')">
           <span class="hint">No cover</span>
-          <img src="/api/books/${id}/cover?token=${tok}&t=${Date.now()}" alt="" onerror="this.remove()">
+          <img data-src="/api/books/${id}/cover?t=${Date.now()}" alt="" onerror="this.remove()">
           <div class="overlay">Change cover</div>
         </div>
         <div style="flex:1; min-width:0">
@@ -887,6 +924,10 @@ async function openDetail(id){
       </div>
     </div>
    </div>`;
+  const modalRoot = document.getElementById('modal-root');
+  hydrateImages(modalRoot);
+  modalRoot.querySelectorAll('button[data-fid]').forEach(btn =>
+    btn.onclick = () => downloadFile(btn.dataset.fid, btn.dataset.fname));
 }
 
 function detailPick(id, accept){

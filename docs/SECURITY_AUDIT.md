@@ -37,7 +37,7 @@ environment — running them is a recommendation below.
 | M2 | 🟠 | ✅ Fixed (2026-07-11) | Client-side path traversal on sync pull (server-supplied ids unvalidated) | `app/lib/server/sync_service.dart` |
 | M3 | 🟠 | ✅ Mitigated (opt-in, 2026-07-11) | Master-bootstrap takeover window (first registrant becomes owner) | `server/src/auth.rs` + deployment |
 | M4 | 🟠 | ✅ Fixed (2026-07-11) | Dependencies behind latest; no automated advisory scanning in CI | `server/Cargo.toml`, `app/pubspec.yaml` |
-| L1 | 🟡 | Open | `?token=` in URL leaks into proxy logs / browser history | `server/src/auth.rs` |
+| L1 | 🟡 | ✅ Fixed (2026-07-25) | `?token=` in URL leaks into proxy logs / browser history | `server/src/auth.rs` |
 | L2 | 🟡 | Open | Session token plaintext fallback when no OS keyring | `app/lib/server/connection_store.dart` |
 | L3 | 🟡 | ✅ Fixed (2026-07-11) | Missing HTTP security headers (CSP, nosniff, frame-options) | `server/src/lib.rs` |
 | L4 | 🟡 | ✅ Fixed (2026-07-11) | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
@@ -223,12 +223,18 @@ major upgrade, and a Dart-side advisory check (no first-party tool exists;
 
 ### 🟡 L1 — `?token=` in URL can leak into logs/history
 
-`auth.rs` accepts a session token as a `?token=` query param, deliberately
-scoped to **GET** requests for covers/file downloads only (so a leaked token
-can't be replayed against a mutating call). This is a sound trade-off, but query
-strings still land in reverse-proxy access logs and browser history. DESIGN.md
-already flags short-lived per-resource tokens as the future refinement — worth
-tracking. Keep the scoping exactly as-is in the meantime.
+`auth.rs` used to accept a session token as a `?token=` query param (scoped to
+cover/download **GET**s) so a browser `<img src>`/`<a download>` could reach an
+authenticated blob. Query strings land in reverse-proxy access logs and browser
+history, so that path leaked the token.
+
+**✅ Fixed (2026-07-25):** the token is now read **only** from the
+`Authorization` header — the query fallback (and its `is_blob_get`/`query_token`
+helpers) is gone. The web console loads covers and downloads with an
+`Authorization: Bearer` `fetch()` into an object URL (`blob:`) rather than a
+bare `src`/`href`, so the token never enters a URL. The CSP's `img-src` now
+allows `blob:` for those object URLs; an integration test asserts a `?token=`
+query authenticates nothing, even on a cover GET.
 
 ### 🟡 L2 — Session token plaintext fallback
 
@@ -301,9 +307,9 @@ These are genuine strengths worth preserving:
 - **Access control.** Resolved per request against owner/master/shares;
   "no access" and "not found" are indistinguishable, so book-id existence isn't
   leaked. Deletes require ownership; edits require editor.
-- **CSRF.** Mutating endpoints authenticate via the `Authorization` header (not
-  cookies), so a cross-site page can't forge them; the `?token=` shortcut is
-  confined to GET blob reads.
+- **CSRF.** All endpoints authenticate via the `Authorization` header (not
+  cookies), so a cross-site page can't forge them; there is no query-string
+  token shortcut (see L1).
 - **Resource bounds.** The 2 GB body limit is scoped to just the two upload
   handlers (every other route keeps axum's small default); uploads stream to a
   temp file and are hashed/validated before commit (never buffered whole in

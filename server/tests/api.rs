@@ -322,39 +322,14 @@ async fn oversized_login_body_is_rejected() {
 }
 
 #[tokio::test]
-async fn query_token_is_rejected_off_blob_gets() {
+async fn query_token_is_never_accepted() {
     let app = test_app().await;
     let master = register_master(&app).await;
     let book = create_book(&app, &master, "Dune").await;
 
-    // A ?token= on a non-blob GET is not accepted (header still required).
-    let res = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri(format!("/api/books?token={master}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-
-    // ...and never on a mutating method, so a leaked URL can't replay a delete.
-    let res = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("DELETE")
-                .uri(format!("/api/books/{book}?token={master}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-
-    // The cover GET still works with a query token.
+    // The session token is only ever read from the Authorization header, so a
+    // `?token=` query param authenticates nothing — not even a blob GET (which
+    // used to accept it). This keeps the token out of proxy logs / history.
     let put = Request::builder()
         .method("PUT")
         .uri(format!("/api/books/{book}/cover"))
@@ -366,11 +341,27 @@ async fn query_token_is_rejected_off_blob_gets() {
         app.clone().oneshot(put).await.unwrap().status(),
         StatusCode::OK
     );
+
+    // A `?token=` on the cover GET is now rejected...
     let res = app
         .clone()
         .oneshot(
             Request::builder()
                 .uri(format!("/api/books/{book}/cover?token={master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    // ...and the same GET succeeds only with the Authorization header.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/books/{book}/cover"))
+                .header("authorization", format!("Bearer {master}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -935,12 +926,14 @@ async fn book_detail_and_query_token_download() {
     assert_eq!(files.len(), 1);
     let file_id = files[0]["id"].as_str().unwrap().to_string();
 
-    // A `?token=` query authenticates a plain download (no Authorization header).
+    // A download authenticates via the Authorization header (the token is never
+    // read from the URL).
     let download = app
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -952,18 +945,18 @@ async fn book_detail_and_query_token_download() {
         .unwrap();
     assert_eq!(bytes.as_ref(), pdf.as_slice());
 
-    // A bad token is rejected.
-    let bad = app
+    // A `?token=` query is not accepted, even with a valid token value.
+    let via_query = app
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token=nope"))
+                .uri(format!("/api/files/{file_id}?token={master}"))
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(bad.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(via_query.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -1201,7 +1194,8 @@ async fn large_file_streams_through_upload_and_download_intact() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -1247,7 +1241,8 @@ async fn file_download_supports_byte_ranges() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -1261,7 +1256,8 @@ async fn file_download_supports_byte_ranges() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .header("range", "bytes=0-3")
                 .body(Body::empty())
                 .unwrap(),
@@ -1280,7 +1276,8 @@ async fn file_download_supports_byte_ranges() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .header("range", "bytes=-5")
                 .body(Body::empty())
                 .unwrap(),
@@ -1302,7 +1299,8 @@ async fn file_download_supports_byte_ranges() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .header("range", "bytes=100-200")
                 .body(Body::empty())
                 .unwrap(),
@@ -1363,7 +1361,8 @@ async fn file_download_supports_etag_304() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -1383,7 +1382,8 @@ async fn file_download_supports_etag_304() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/files/{file_id}?token={master}"))
+                .uri(format!("/api/files/{file_id}"))
+                .header("authorization", format!("Bearer {master}"))
                 .header("if-none-match", &etag)
                 .body(Body::empty())
                 .unwrap(),
@@ -1428,7 +1428,8 @@ async fn cover_thumbnail_is_generated_scaled_and_cached() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/books/{book}/cover?w=160&token={master}"))
+                .uri(format!("/api/books/{book}/cover?w=160"))
+                .header("authorization", format!("Bearer {master}"))
                 .body(Body::empty())
                 .unwrap(),
         )
