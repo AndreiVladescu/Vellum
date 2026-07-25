@@ -56,7 +56,7 @@ class SettleResult {
 /// tested in isolation; the environment editor adapts its models to it.
 /// True when any book in [others] is resting on shelf [s] — its bottom at the
 /// shelf's top (within [tol]) and its footprint overlapping the shelf
-/// horizontally. Used to pin a shelf that still holds books.
+/// horizontally. A convenience predicate over [restsOnShelf].
 bool shelfHasBooks(
   SettleSegment s,
   List<SettleBox> others, {

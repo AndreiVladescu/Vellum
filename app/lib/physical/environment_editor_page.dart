@@ -69,9 +69,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   PhysicalShelf? _shelfStart;
   Offset _shelfGrabWorld = Offset.zero;
   Offset _shelfDelta = Offset.zero; // world offset applied while dragging
-  // A shelf holding books was grabbed: it's pinned, so the gesture is swallowed
-  // and the user is told to clear the books first.
-  bool _lockedShelfGrab = false;
+  // Placement ids of the books resting on the shelf being dragged, so they ride
+  // along with it — live via [_shelfDeltaVN], then persisted on release.
+  Set<String> _ridingIds = const {};
 
   // In-flight drag positions, published without a whole-canvas setState: the
   // dragged book's overlay listens to [_dragPosVN], and the room painter
@@ -128,17 +128,31 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     return Rect.fromLTRB(left - 6, top - 10, right + 6, top + 12);
   }
 
-  /// True when a placed book is resting on [s] (see [shelfHasBooks]). Such a
-  /// shelf is pinned: moving it would strand its books.
-  bool _shelfHasBooks(PhysicalShelf s) {
-    final others = _placed.map((pb) {
-      final f = _footOf(pb);
-      return SettleBox(x: pb.placement.x, y: pb.placement.y, w: f.w, h: f.h);
-    }).toList();
-    return shelfHasBooks(
-      SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2),
-      others,
-    );
+  /// The placed books resting on shelf [s], so they can travel with it when it
+  /// is moved (dragged or edited) instead of being stranded in mid-air.
+  List<PlacedBook> _ridersOf(PhysicalShelf s) {
+    final seg = SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2);
+    return [
+      for (final pb in _placed)
+        if (restsOnShelf(
+          SettleBox(
+            x: pb.placement.x,
+            y: pb.placement.y,
+            w: _footOf(pb).w,
+            h: _footOf(pb).h,
+          ),
+          seg,
+        ))
+          pb,
+    ];
+  }
+
+  /// Keep a shelf move on or above the floor (y = 0): a horizontal shelf can't
+  /// be dragged below the ground. The room is open sideways, so x is free.
+  Offset _clampShelfDelta(PhysicalShelf s, Offset delta) {
+    final base = math.min(s.y1, s.y2);
+    final dy = base + delta.dy < 0 ? -base : delta.dy;
+    return Offset(delta.dx, dy);
   }
 
   // ---- camera -------------------------------------------------------------
@@ -161,7 +175,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     // Topmost book under the finger, if any.
     _dragId = null;
     _dragShelfId = null;
-    _lockedShelfGrab = false;
+    _ridingIds = const {};
     for (final pb in _placed.reversed) {
       if (_screenRectOf(pb).contains(focal)) {
         _dragId = pb.placement.id;
@@ -171,19 +185,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         break;
       }
     }
-    // Otherwise a shelf, so empty shelves can be dragged too. A shelf holding
-    // books is pinned — grabbing it locks the gesture instead of moving it.
+    // Otherwise a shelf — any shelf can be dragged, and the books resting on it
+    // ride along (captured here so they follow live and persist on release).
     if (_dragId == null) {
       for (final s in _shelves.reversed) {
         if (_shelfHitRect(s).contains(focal)) {
-          if (_shelfHasBooks(s)) {
-            _lockedShelfGrab = true;
-          } else {
-            _dragShelfId = s.id;
-            _shelfStart = s;
-            _shelfGrabWorld = _screenToWorld(focal);
-            _shelfDelta = Offset.zero;
-          }
+          _dragShelfId = s.id;
+          _shelfStart = s;
+          _shelfGrabWorld = _screenToWorld(focal);
+          _shelfDelta = Offset.zero;
+          _ridingIds = {for (final pb in _ridersOf(s)) pb.placement.id};
           break;
         }
       }
@@ -194,19 +205,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
     final focal = d.localFocalPoint;
-    // A pinned (occupied) shelf was grabbed with one finger: swallow the pan so
-    // the shelf stays put and the view doesn't slide. A pinch still zooms.
-    if (_lockedShelfGrab && d.scale == 1.0 && d.pointerCount < 2) {
-      if ((_screenToWorld(focal) - _camWorldFocal).distance > 0.002) {
-        _moved = true;
-      }
-      return;
-    }
     final draggingItem = _dragId != null || _dragShelfId != null;
     if (d.scale != 1.0 || d.pointerCount >= 2 || !draggingItem) {
-      // A pinch that began on a pinned shelf is a zoom, not a move attempt —
-      // release the lock so no "shelf is pinned" hint fires on release.
-      _lockedShelfGrab = false;
       // Pan + zoom the camera, anchoring the world point grabbed at start.
       final newScale = (_camStartScale * d.scale).clamp(_minScale, _maxScale);
       setState(() {
@@ -234,8 +234,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       }
       return;
     }
-    // Drag the grabbed shelf — the painter repaints from _shelfDeltaVN.
-    final delta = _screenToWorld(focal) - _shelfGrabWorld;
+    // Drag the grabbed shelf — the painter and any riding books repaint from
+    // _shelfDeltaVN. Clamp so the shelf can't be pushed below the floor.
+    final delta = _clampShelfDelta(_shelfStart!, _screenToWorld(focal) - _shelfGrabWorld);
     _shelfDelta = delta;
     _shelfDeltaVN.value = delta;
     if (delta.distance > 0.002 && !_moved) {
@@ -248,38 +249,35 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   void _onScaleEnd(ScaleEndDetails d) {
     final dragId = _dragId;
     final dragShelfId = _dragShelfId;
-    final lockedShelfGrab = _lockedShelfGrab;
+    final riders = [
+      for (final pb in _placed)
+        if (_ridingIds.contains(pb.placement.id)) pb,
+    ];
     _dragId = null;
     _dragShelfId = null;
-    _lockedShelfGrab = false;
+    _ridingIds = const {};
 
-    // Tried to drag a shelf that holds books: it stayed put — explain why.
-    if (lockedShelfGrab) {
-      if (_moved) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This shelf holds books — move them off to reposition it.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        setState(() => _selectedId = null);
-      }
-      return;
-    }
-
-    // Finished dragging a shelf: persist the shifted endpoints, then settle.
+    // Finished dragging a shelf: persist the shifted endpoints and carry every
+    // book that was resting on it by the same delta, then settle.
     if (dragShelfId != null) {
       final s = _shelfStart;
+      final delta = _shelfDelta;
       if (_moved && s != null) {
         () async {
           await repo.layout.updateShelf(
             s.id,
-            x1: s.x1 + _shelfDelta.dx,
-            y1: s.y1 + _shelfDelta.dy,
-            x2: s.x2 + _shelfDelta.dx,
-            y2: s.y2 + _shelfDelta.dy,
+            x1: s.x1 + delta.dx,
+            y1: s.y1 + delta.dy,
+            x2: s.x2 + delta.dx,
+            y2: s.y2 + delta.dy,
           );
+          for (final pb in riders) {
+            await repo.layout.updatePlacement(
+              pb.placement.id,
+              x: pb.placement.x + delta.dx,
+              y: pb.placement.y + delta.dy,
+            );
+          }
           await _applyGravity();
         }();
       }
@@ -638,22 +636,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
 
     // Books resting on the shelf should travel with it, so an edit doesn't
     // strand them in mid-air. Capture them (and the move delta) before the edit.
-    final oldSeg = SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2);
     final dx = result.left - math.min(s.x1, s.x2);
     final dy = result.y - math.max(s.y1, s.y2);
-    final riders = [
-      for (final pb in _placed)
-        if (restsOnShelf(
-          SettleBox(
-            x: pb.placement.x,
-            y: pb.placement.y,
-            w: _footOf(pb).w,
-            h: _footOf(pb).h,
-          ),
-          oldSeg,
-        ))
-          pb,
-    ];
+    final riders = _ridersOf(s);
 
     await repo.layout.updateShelf(
       s.id,
@@ -755,8 +740,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
           'on top of another book.\n'
           '• Tap a book to select it (rotate / resize / remove).\n'
           '• Right-click or long-press a book or shelf to edit it.\n'
-          '• Drag an empty shelf to move it — a shelf with books on it is '
-          'pinned until you clear them.',
+          '• Drag a shelf to move it — the books on it ride along.',
         ),
         actions: [
           FilledButton(
@@ -825,7 +809,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
         // Books (each in its own RepaintBoundary; the one being dragged is
         // drawn as a live overlay instead of in this static list).
         for (final pb in _placed)
-          if (pb.placement.id != _dragId) _bookWidget(pb),
+          if (pb.placement.id != _dragId)
+            (_dragShelfId != null && _ridingIds.contains(pb.placement.id))
+                ? _ridingBookWidget(pb)
+                : _bookWidget(pb),
         if (_dragId != null) _draggedBookOverlay(),
         // Empty-state hint.
         if (_placed.isEmpty && _shelves.isEmpty)
@@ -894,6 +881,37 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       width: f.w * _scale,
       height: f.h * _scale,
       child: RepaintBoundary(child: _bookVisual(pb, dragging: false)),
+    );
+  }
+
+  /// A book riding a shelf that's being dragged: positioned live from
+  /// [_shelfDeltaVN] so it follows the plank frame-for-frame, mirroring the
+  /// dragged-book overlay. On release its new position is persisted.
+  Widget _ridingBookWidget(PlacedBook pb) {
+    final f = _footOf(pb);
+    final w = f.w * _scale;
+    final h = f.h * _scale;
+    return Positioned.fill(
+      child: ValueListenableBuilder<Offset>(
+        valueListenable: _shelfDeltaVN,
+        child: RepaintBoundary(child: _bookVisual(pb, dragging: false)),
+        builder: (context, delta, child) {
+          final topLeft = _worldToScreen(
+            Offset(pb.placement.x + delta.dx, pb.placement.y + delta.dy + f.h),
+          );
+          return Stack(
+            children: [
+              Positioned(
+                left: topLeft.dx,
+                top: topLeft.dy,
+                width: w,
+                height: h,
+                child: child!,
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
