@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -488,14 +489,26 @@ class LibraryRepository {
     );
   }
 
+  /// How many covers the startup colour backfill decodes before yielding a
+  /// frame. Small enough that a cold sweep of a large library can't monopolise
+  /// the UI isolate; large enough that the sweep still finishes promptly.
+  static const _colorBackfillBatch = 8;
+
   /// One-time catch-up for covers that predate dominant-colour extraction:
   /// computes and stores the colour for every covered book whose spine style
   /// lacks one. Cheap when there's nothing to do; run fire-and-forget at
   /// startup.
+  ///
+  /// The decode (`dominantColorOf`) needs the UI isolate's image codecs, so it
+  /// can't move to a background isolate; instead the sweep yields to the frame
+  /// scheduler every [_colorBackfillBatch] covers, so a cold first launch on a
+  /// large library stays responsive (each decode also re-emits the shelf
+  /// stream — batching per frame coalesces those rebuilds too).
   Future<void> backfillCoverColors() async {
     final rows = await (db.select(
       db.books,
     )..where((b) => b.coverPath.isNotNull())).get();
+    var sinceYield = 0;
     for (final row in rows) {
       final style = SpineStyle.fromJson(row.spineStyle, title: row.title);
       if (style.coverColor != null) continue;
@@ -505,6 +518,10 @@ class LibraryRepository {
         await updateCoverColor(row.id, await cover.readAsBytes());
       } catch (_) {
         // A single unreadable cover shouldn't stop the sweep.
+      }
+      if (++sinceYield >= _colorBackfillBatch) {
+        sinceYield = 0;
+        await SchedulerBinding.instance.endOfFrame;
       }
     }
   }

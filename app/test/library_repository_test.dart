@@ -1,10 +1,15 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/shelf/spine_style.dart';
 
 Future<LibraryRepository> _repo(Directory dir) async =>
     LibraryRepository.forTesting(VellumDatabase(NativeDatabase.memory()), dir);
@@ -204,4 +209,52 @@ void main() {
     expect((await db.select(db.bookGenres).get()).length, 1,
         reason: 'book tagged with it exactly once');
   });
+
+  test('backfillCoverColors fills missing spine colours and is idempotent',
+      () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+
+    // A covered book: write a real solid-blue PNG where the repo expects it.
+    final coversDir = Directory(p.join(dir.path, 'covers'))
+      ..createSync(recursive: true);
+    File(p.join(coversDir.path, 'b1.png'))
+        .writeAsBytesSync(await _solidPng(const Color(0xFF2E5A9C)));
+    await db.into(db.books).insert(BooksCompanion.insert(
+          id: 'b1',
+          title: 'Covered',
+          coverPath: const Value('covers/b1.png'),
+        ));
+    // A cover-less book must be skipped, not crash the sweep.
+    await db
+        .into(db.books)
+        .insert(BooksCompanion.insert(id: 'b2', title: 'No cover'));
+
+    await repo.backfillCoverColors();
+
+    final b1 = await repo.watchBook('b1').first as Book;
+    final color = SpineStyle.fromJson(b1.spineStyle, title: b1.title).coverColor;
+    expect(color, isNotNull, reason: 'the covered book got a dominant colour');
+
+    // A second sweep is a no-op: books that already have a colour are skipped
+    // before any decode, so the stored colour is unchanged.
+    await repo.backfillCoverColors();
+    final again = await repo.watchBook('b1').first as Book;
+    expect(SpineStyle.fromJson(again.spineStyle, title: again.title).coverColor,
+        color);
+  });
+}
+
+/// A solid-colour PNG via the engine codec, so backfill has a real image to
+/// decode (mirrors cover_color_test's helper).
+Future<Uint8List> _solidPng(Color color, {int size = 16}) async {
+  final recorder = ui.PictureRecorder();
+  Canvas(recorder).drawRect(
+    Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
+    Paint()..color = color,
+  );
+  final image = await recorder.endRecording().toImage(size, size);
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return data!.buffer.asUint8List();
 }
