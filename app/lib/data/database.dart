@@ -133,6 +133,12 @@ class Shelves extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  // Sync bookkeeping, same convention as Books.needsPush: set on every write
+  // (rename, reorder, or a membership change via ShelfBooks), cleared once a
+  // push succeeds. Membership itself dirties the parent shelf; ShelfBooks
+  // carries no sync columns of its own.
+  BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -215,6 +221,9 @@ class BookPlacements extends Table {
 class LocalDeletions extends Table {
   TextColumn get bookId => text()();
   DateTimeColumn get deletedAt => dateTime().withDefault(currentDateAndTime)();
+  // 'book' or 'shelf' (plan 5 #4) — which server endpoint the next push tells
+  // about this id. Named to match the server's `deletion.kind` column.
+  TextColumn get kind => text().withDefault(const Constant('book'))();
 
   @override
   Set<Column> get primaryKey => {bookId};
@@ -241,7 +250,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -315,6 +324,32 @@ class VellumDatabase extends _$VellumDatabase {
             // comment). Also guarded from beforeOpen below, so a fresh
             // install (which never runs onUpgrade) still gets it.
             await _ensureSearchIndex();
+          }
+          if (from < 10) {
+            // Shelves start syncing (plan 5 #4); needsPush defaults true so
+            // every pre-existing shelf pushes once, same as books at v7.
+            // Guarded like `physical_environments` etc. above: a database
+            // stuck partway through a much older migration (recovery test)
+            // may not have `shelves`/`local_deletions` yet either.
+            if (!tables.contains('shelves')) {
+              await m.createTable(shelves);
+            } else {
+              final shelfCols = await columnsOf('shelves');
+              if (!shelfCols.contains('updated_at')) {
+                await m.addColumn(shelves, shelves.updatedAt);
+              }
+              if (!shelfCols.contains('needs_push')) {
+                await m.addColumn(shelves, shelves.needsPush);
+              }
+            }
+            // Live check, not the `tables` snapshot from the top of this
+            // function: from < 6 above may have just created this table in
+            // this same run, which the stale snapshot wouldn't reflect.
+            if (!(await tableNames()).contains('local_deletions')) {
+              await m.createTable(localDeletions);
+            } else if (!(await columnsOf('local_deletions')).contains('kind')) {
+              await m.addColumn(localDeletions, localDeletions.kind);
+            }
           }
         },
         beforeOpen: (details) async {

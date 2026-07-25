@@ -878,6 +878,10 @@ pub async fn delete(
 pub struct DeletionDto {
     pub book_id: String,
     pub deleted_at: String,
+    /// 'book', 'shelf', ... (plan 5 #4). Purely additive: an old client reads
+    /// only `book_id`/`deleted_at` and looks the id up in its own `books`
+    /// table, so a non-book tombstone is a harmless no-op there.
+    pub kind: String,
 }
 
 #[derive(Deserialize)]
@@ -886,26 +890,41 @@ pub struct DeletionsQuery {
     /// the same second-resolution reason as [`visible_books`]; re-applying a
     /// delete is idempotent, so the overlap is harmless.
     pub since: Option<String>,
+    /// Restrict to one kind ('book', 'shelf', ...). Absent returns every kind
+    /// — what an old client that's never heard of `kind` still gets.
+    pub kind: Option<String>,
 }
 
 /// Every delete tombstone, so a client can propagate deletes on its next pull.
 /// Returns all tombstones to any authenticated caller — this leaks only the
-/// UUIDs of deleted books, which is acceptable on a personal server.
+/// UUIDs of deleted rows, which is acceptable on a personal server.
 pub async fn deletions(
     State(state): State<AppState>,
     _user: AuthUser,
     axum::extract::Query(q): axum::extract::Query<DeletionsQuery>,
 ) -> AppResult<Json<Vec<DeletionDto>>> {
     let since = q.since.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let filter = if since.is_some() {
-        "WHERE deleted_at >= ?"
+    let kind = q.kind.as_deref().map(str::trim).filter(|k| !k.is_empty());
+    let mut conditions = Vec::new();
+    if since.is_some() {
+        conditions.push("deleted_at >= ?");
+    }
+    if kind.is_some() {
+        conditions.push("kind = ?");
+    }
+    let filter = if conditions.is_empty() {
+        String::new()
     } else {
-        ""
+        format!("WHERE {}", conditions.join(" AND "))
     };
-    let sql = format!("SELECT book_id, deleted_at FROM deletion {filter} ORDER BY deleted_at");
+    let sql =
+        format!("SELECT book_id, deleted_at, kind FROM deletion {filter} ORDER BY deleted_at");
     let mut query = sqlx::query_as::<_, DeletionDto>(&sql);
     if let Some(ts) = since {
         query = query.bind(ts.to_string());
+    }
+    if let Some(k) = kind {
+        query = query.bind(k.to_string());
     }
     Ok(Json(query.fetch_all(&state.db).await?))
 }

@@ -24,6 +24,7 @@ mod groups;
 mod metadata;
 mod opds;
 mod shares;
+mod shelves;
 mod throttle;
 pub mod tls;
 mod web;
@@ -145,6 +146,10 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/groups/{id}", get(groups::get).delete(groups::delete))
         .route("/groups/{id}/books", post(groups::add_book))
         .route("/groups/{id}/books/{book_id}", delete(groups::remove_book))
+        // Custom shelves (plan 5 #4) — cursor-pull list, id-chosen upsert (a
+        // push always sends the whole ordered membership), delete.
+        .route("/shelves", get(shelves::list))
+        .route("/shelves/{id}", put(shelves::upsert).delete(shelves::delete))
         // User-to-user shares.
         .route("/shares", get(shares::list).post(shares::create))
         .route("/shares/{id}", delete(shares::delete))

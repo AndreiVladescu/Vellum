@@ -91,3 +91,32 @@ pub async fn group_access(state: &AppState, user: &AuthUser, group_id: &str) -> 
 
     Ok(if shared { Access::Viewer } else { Access::None })
 }
+
+/// The caller's access to a shelf. Owner/master may manage it (`Editor`); an
+/// all-scoped share (the whole library) grants `Viewer` — unlike books and
+/// groups, there is no shelf-scoped share type, so this reduces to just
+/// ownership vs. an all-scope grant.
+pub async fn shelf_access(state: &AppState, user: &AuthUser, shelf_id: &str) -> AppResult<Access> {
+    let owner: Option<String> = sqlx::query_scalar("SELECT owner_id FROM shelf WHERE id = ?")
+        .bind(shelf_id)
+        .fetch_optional(&state.db)
+        .await?;
+    let Some(owner_id) = owner else {
+        return Ok(Access::None);
+    };
+
+    if user.is_master || owner_id == user.id {
+        return Ok(Access::Editor);
+    }
+
+    let shared: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM share s \
+            WHERE s.grantee_id = ? AND s.scope = 'all' AND s.owner_id = ?)",
+    )
+    .bind(&user.id)
+    .bind(&owner_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(if shared { Access::Viewer } else { Access::None })
+}

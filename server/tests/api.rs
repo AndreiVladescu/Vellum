@@ -699,10 +699,13 @@ async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
     assert_eq!(body["sync_protocol"], json!(1));
     let features = body["features"].as_array().unwrap();
     assert!(features.contains(&json!("delta_pull")));
+    // shelf_sync shipped in plan 5 #4, after this handshake -- confirms the
+    // list tracks what's actually built rather than staying frozen.
+    assert!(features.contains(&json!("shelf_sync")));
     // Never advertised: not built (content_search, mail, batch_push) or
-    // deliberately never synced (shelf_sync, reading_progress) -- a
-    // capability handshake that claims one of these would be worse than none.
-    for absent in ["shelf_sync", "reading_progress", "content_search", "mail", "batch_push"] {
+    // deliberately never synced (reading_progress) -- a capability handshake
+    // that claims one of these would be worse than none.
+    for absent in ["reading_progress", "content_search", "mail", "batch_push"] {
         assert!(
             !features.contains(&json!(absent)),
             "{absent} isn't a real server feature yet"
@@ -830,6 +833,201 @@ async fn books_list_scopes_authors_genres_to_each_returned_book() {
     assert_eq!(by_id["sc-1"]["genres"], json!(["Sci-Fi"]));
     assert_eq!(by_id["sc-2"]["authors"], json!(["Bob"]));
     assert_eq!(by_id["sc-2"]["genres"], json!(["Poetry"]));
+}
+
+#[tokio::test]
+async fn shelves_put_creates_and_preserves_explicit_order() {
+    // §4: a push always sends the whole ordered membership and the server
+    // replaces it wholesale -- this is the test that would catch a set-replace
+    // silently losing order (books present but scrambled), which looks fine
+    // until a user notices their manual arrangement changed.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let b1 = create_book(&app, &master, "Charlie").await;
+    let b2 = create_book(&app, &master, "Alpha").await;
+    let b3 = create_book(&app, &master, "Bravo").await;
+
+    let (status, shelf) = call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&master),
+        Some(json!({ "name": "To read", "book_ids": [b1, b2, b3] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{shelf}");
+    assert_eq!(shelf["book_ids"], json!([b1, b2, b3]));
+
+    let (_, list) = call(&app, "GET", "/api/shelves", Some(&master), None).await;
+    let listed = list.as_array().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["book_ids"], json!([b1, b2, b3]));
+}
+
+#[tokio::test]
+async fn shelves_put_drops_book_ids_the_server_does_not_recognize() {
+    // shelf_book.book_id has a foreign key on book(id); a stale or
+    // never-pushed id in the membership list must be dropped, not fail the
+    // whole shelf (plan 5 #4's FK-safety net).
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let real = create_book(&app, &master, "Dune").await;
+
+    let (status, shelf) = call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&master),
+        Some(json!({ "name": "Mixed", "book_ids": [real, "no-such-book"] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{shelf}");
+    assert_eq!(shelf["book_ids"], json!([real]));
+}
+
+#[tokio::test]
+async fn shelves_all_scope_share_grants_viewer_not_editor() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let bob = add_member(&app, &master, "bob@lib.test").await;
+    call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&master),
+        Some(json!({ "name": "Master's shelf" })),
+    )
+    .await;
+
+    // Before sharing, Bob sees nothing.
+    let (_, before) = call(&app, "GET", "/api/shelves", Some(&bob), None).await;
+    assert!(before.as_array().unwrap().is_empty());
+
+    call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({ "scope": "all", "grantee_email": "bob@lib.test" })),
+    )
+    .await;
+
+    let (_, after) = call(&app, "GET", "/api/shelves", Some(&bob), None).await;
+    assert_eq!(after.as_array().unwrap().len(), 1);
+
+    // Read-only: Bob may not rename or delete master's shelf.
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&bob),
+        Some(json!({ "name": "Hijacked" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = call(&app, "DELETE", "/api/shelves/sh-1", Some(&bob), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn shelves_delete_records_a_kind_tagged_tombstone() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&master),
+        Some(json!({ "name": "Gone soon" })),
+    )
+    .await;
+
+    let (status, _) = call(&app, "DELETE", "/api/shelves/sh-1", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // The shared /api/deletions endpoint carries it, tagged so an old client
+    // (which only reads book_id/deleted_at) harmlessly no-ops on it.
+    let (_, all) = call(&app, "GET", "/api/deletions", Some(&master), None).await;
+    let entries = all.as_array().unwrap();
+    let shelf_entry = entries.iter().find(|e| e["book_id"] == "sh-1").unwrap();
+    assert_eq!(shelf_entry["kind"], json!("shelf"));
+
+    // ?kind=shelf filters to just this kind.
+    let (_, shelf_only) =
+        call(&app, "GET", "/api/deletions?kind=shelf", Some(&master), None).await;
+    assert_eq!(shelf_only.as_array().unwrap().len(), 1);
+    let (_, book_only) =
+        call(&app, "GET", "/api/deletions?kind=book", Some(&master), None).await;
+    assert!(book_only.as_array().unwrap().is_empty());
+
+    // Gone from the live list too.
+    let (_, list) = call(&app, "GET", "/api/shelves", Some(&master), None).await;
+    assert!(list.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn shelves_put_is_a_noop_when_unchanged_including_order() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let b1 = create_book(&app, &master, "A").await;
+    let b2 = create_book(&app, &master, "B").await;
+    call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&master),
+        Some(json!({ "name": "Stable", "book_ids": [b1, b2] })),
+    )
+    .await;
+    let (_, first) = call(&app, "GET", "/api/shelves", Some(&master), None).await;
+    let stamp1 = first.as_array().unwrap()[0]["updated_at"].clone();
+
+    // Re-push identical name/order.
+    call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&master),
+        Some(json!({ "name": "Stable", "book_ids": [b1, b2] })),
+    )
+    .await;
+    let (_, second) = call(&app, "GET", "/api/shelves", Some(&master), None).await;
+    assert_eq!(
+        second.as_array().unwrap()[0]["updated_at"],
+        stamp1,
+        "an unchanged re-push must not churn updated_at (and thus every pull cursor)"
+    );
+}
+
+#[tokio::test]
+async fn shelves_list_supports_delta_cursor_envelope() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    call(
+        &app,
+        "PUT",
+        "/api/shelves/sh-1",
+        Some(&master),
+        Some(json!({ "name": "Only shelf" })),
+    )
+    .await;
+
+    let (_, bare) = call(&app, "GET", "/api/shelves", Some(&master), None).await;
+    assert!(bare.is_array());
+
+    let (_, env) = call(&app, "GET", "/api/shelves?cursor=", Some(&master), None).await;
+    assert!(env["server_now"].is_string());
+    assert_eq!(env["shelves"].as_array().unwrap().len(), 1);
+
+    let (_, future) = call(
+        &app,
+        "GET",
+        "/api/shelves?cursor=2999-01-01%2000:00:00",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert!(future["shelves"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]

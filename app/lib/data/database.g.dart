@@ -3194,8 +3194,41 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, sortOrder];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _needsPushMeta = const VerificationMeta(
+    'needsPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPush = GeneratedColumn<bool>(
+    'needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    sortOrder,
+    updatedAt,
+    needsPush,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3227,6 +3260,18 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
         sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_push')) {
+      context.handle(
+        _needsPushMeta,
+        needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
+      );
+    }
     return context;
   }
 
@@ -3248,6 +3293,14 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_push'],
+      )!,
     );
   }
 
@@ -3261,13 +3314,23 @@ class Shelf extends DataClass implements Insertable<Shelf> {
   final String id;
   final String name;
   final int sortOrder;
-  const Shelf({required this.id, required this.name, required this.sortOrder});
+  final DateTime updatedAt;
+  final bool needsPush;
+  const Shelf({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+    required this.updatedAt,
+    required this.needsPush,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['sort_order'] = Variable<int>(sortOrder);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
 
@@ -3276,6 +3339,8 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       id: Value(id),
       name: Value(name),
       sortOrder: Value(sortOrder),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
     );
   }
 
@@ -3288,6 +3353,8 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
   @override
@@ -3297,19 +3364,31 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'sortOrder': serializer.toJson<int>(sortOrder),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
 
-  Shelf copyWith({String? id, String? name, int? sortOrder}) => Shelf(
+  Shelf copyWith({
+    String? id,
+    String? name,
+    int? sortOrder,
+    DateTime? updatedAt,
+    bool? needsPush,
+  }) => Shelf(
     id: id ?? this.id,
     name: name ?? this.name,
     sortOrder: sortOrder ?? this.sortOrder,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
   );
   Shelf copyWithCompanion(ShelvesCompanion data) {
     return Shelf(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
 
@@ -3318,37 +3397,47 @@ class Shelf extends DataClass implements Insertable<Shelf> {
     return (StringBuffer('Shelf(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('sortOrder: $sortOrder')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, sortOrder);
+  int get hashCode => Object.hash(id, name, sortOrder, updatedAt, needsPush);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Shelf &&
           other.id == this.id &&
           other.name == this.name &&
-          other.sortOrder == this.sortOrder);
+          other.sortOrder == this.sortOrder &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush);
 }
 
 class ShelvesCompanion extends UpdateCompanion<Shelf> {
   final Value<String> id;
   final Value<String> name;
   final Value<int> sortOrder;
+  final Value<DateTime> updatedAt;
+  final Value<bool> needsPush;
   final Value<int> rowid;
   const ShelvesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ShelvesCompanion.insert({
     required String id,
     required String name,
     this.sortOrder = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -3356,12 +3445,16 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<int>? sortOrder,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (sortOrder != null) 'sort_order': sortOrder,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3370,12 +3463,16 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     Value<String>? id,
     Value<String>? name,
     Value<int>? sortOrder,
+    Value<DateTime>? updatedAt,
+    Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
     return ShelvesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       sortOrder: sortOrder ?? this.sortOrder,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3392,6 +3489,12 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<bool>(needsPush.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3404,6 +3507,8 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5118,8 +5223,18 @@ class $LocalDeletionsTable extends LocalDeletions
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
   @override
-  List<GeneratedColumn> get $columns => [bookId, deletedAt];
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('book'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [bookId, deletedAt, kind];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -5146,6 +5261,12 @@ class $LocalDeletionsTable extends LocalDeletions
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
     return context;
   }
 
@@ -5163,6 +5284,10 @@ class $LocalDeletionsTable extends LocalDeletions
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
     );
   }
 
@@ -5175,12 +5300,18 @@ class $LocalDeletionsTable extends LocalDeletions
 class LocalDeletion extends DataClass implements Insertable<LocalDeletion> {
   final String bookId;
   final DateTime deletedAt;
-  const LocalDeletion({required this.bookId, required this.deletedAt});
+  final String kind;
+  const LocalDeletion({
+    required this.bookId,
+    required this.deletedAt,
+    required this.kind,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['book_id'] = Variable<String>(bookId);
     map['deleted_at'] = Variable<DateTime>(deletedAt);
+    map['kind'] = Variable<String>(kind);
     return map;
   }
 
@@ -5188,6 +5319,7 @@ class LocalDeletion extends DataClass implements Insertable<LocalDeletion> {
     return LocalDeletionsCompanion(
       bookId: Value(bookId),
       deletedAt: Value(deletedAt),
+      kind: Value(kind),
     );
   }
 
@@ -5199,6 +5331,7 @@ class LocalDeletion extends DataClass implements Insertable<LocalDeletion> {
     return LocalDeletion(
       bookId: serializer.fromJson<String>(json['bookId']),
       deletedAt: serializer.fromJson<DateTime>(json['deletedAt']),
+      kind: serializer.fromJson<String>(json['kind']),
     );
   }
   @override
@@ -5207,18 +5340,21 @@ class LocalDeletion extends DataClass implements Insertable<LocalDeletion> {
     return <String, dynamic>{
       'bookId': serializer.toJson<String>(bookId),
       'deletedAt': serializer.toJson<DateTime>(deletedAt),
+      'kind': serializer.toJson<String>(kind),
     };
   }
 
-  LocalDeletion copyWith({String? bookId, DateTime? deletedAt}) =>
+  LocalDeletion copyWith({String? bookId, DateTime? deletedAt, String? kind}) =>
       LocalDeletion(
         bookId: bookId ?? this.bookId,
         deletedAt: deletedAt ?? this.deletedAt,
+        kind: kind ?? this.kind,
       );
   LocalDeletion copyWithCompanion(LocalDeletionsCompanion data) {
     return LocalDeletion(
       bookId: data.bookId.present ? data.bookId.value : this.bookId,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      kind: data.kind.present ? data.kind.value : this.kind,
     );
   }
 
@@ -5226,43 +5362,50 @@ class LocalDeletion extends DataClass implements Insertable<LocalDeletion> {
   String toString() {
     return (StringBuffer('LocalDeletion(')
           ..write('bookId: $bookId, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('kind: $kind')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(bookId, deletedAt);
+  int get hashCode => Object.hash(bookId, deletedAt, kind);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LocalDeletion &&
           other.bookId == this.bookId &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.kind == this.kind);
 }
 
 class LocalDeletionsCompanion extends UpdateCompanion<LocalDeletion> {
   final Value<String> bookId;
   final Value<DateTime> deletedAt;
+  final Value<String> kind;
   final Value<int> rowid;
   const LocalDeletionsCompanion({
     this.bookId = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.kind = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalDeletionsCompanion.insert({
     required String bookId,
     this.deletedAt = const Value.absent(),
+    this.kind = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : bookId = Value(bookId);
   static Insertable<LocalDeletion> custom({
     Expression<String>? bookId,
     Expression<DateTime>? deletedAt,
+    Expression<String>? kind,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (bookId != null) 'book_id': bookId,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (kind != null) 'kind': kind,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5270,11 +5413,13 @@ class LocalDeletionsCompanion extends UpdateCompanion<LocalDeletion> {
   LocalDeletionsCompanion copyWith({
     Value<String>? bookId,
     Value<DateTime>? deletedAt,
+    Value<String>? kind,
     Value<int>? rowid,
   }) {
     return LocalDeletionsCompanion(
       bookId: bookId ?? this.bookId,
       deletedAt: deletedAt ?? this.deletedAt,
+      kind: kind ?? this.kind,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5288,6 +5433,9 @@ class LocalDeletionsCompanion extends UpdateCompanion<LocalDeletion> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5299,6 +5447,7 @@ class LocalDeletionsCompanion extends UpdateCompanion<LocalDeletion> {
     return (StringBuffer('LocalDeletionsCompanion(')
           ..write('bookId: $bookId, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('kind: $kind, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8672,6 +8821,8 @@ typedef $$ShelvesTableCreateCompanionBuilder =
       required String id,
       required String name,
       Value<int> sortOrder,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 typedef $$ShelvesTableUpdateCompanionBuilder =
@@ -8679,6 +8830,8 @@ typedef $$ShelvesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<int> sortOrder,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 
@@ -8726,6 +8879,16 @@ class $$ShelvesTableFilterComposer
 
   ColumnFilters<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8778,6 +8941,16 @@ class $$ShelvesTableOrderingComposer
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ShelvesTableAnnotationComposer
@@ -8797,6 +8970,12 @@ class $$ShelvesTableAnnotationComposer
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsPush =>
+      $composableBuilder(column: $table.needsPush, builder: (column) => column);
 
   Expression<T> shelfBooksRefs<T extends Object>(
     Expression<T> Function($$ShelfBooksTableAnnotationComposer a) f,
@@ -8855,11 +9034,15 @@ class $$ShelvesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShelvesCompanion(
                 id: id,
                 name: name,
                 sortOrder: sortOrder,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8867,11 +9050,15 @@ class $$ShelvesTableTableManager
                 required String id,
                 required String name,
                 Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShelvesCompanion.insert(
                 id: id,
                 name: name,
                 sortOrder: sortOrder,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10602,12 +10789,14 @@ typedef $$LocalDeletionsTableCreateCompanionBuilder =
     LocalDeletionsCompanion Function({
       required String bookId,
       Value<DateTime> deletedAt,
+      Value<String> kind,
       Value<int> rowid,
     });
 typedef $$LocalDeletionsTableUpdateCompanionBuilder =
     LocalDeletionsCompanion Function({
       Value<String> bookId,
       Value<DateTime> deletedAt,
+      Value<String> kind,
       Value<int> rowid,
     });
 
@@ -10627,6 +10816,11 @@ class $$LocalDeletionsTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -10649,6 +10843,11 @@ class $$LocalDeletionsTableOrderingComposer
     column: $table.deletedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalDeletionsTableAnnotationComposer
@@ -10665,6 +10864,9 @@ class $$LocalDeletionsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
 }
 
 class $$LocalDeletionsTableTableManager
@@ -10706,20 +10908,24 @@ class $$LocalDeletionsTableTableManager
               ({
                 Value<String> bookId = const Value.absent(),
                 Value<DateTime> deletedAt = const Value.absent(),
+                Value<String> kind = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalDeletionsCompanion(
                 bookId: bookId,
                 deletedAt: deletedAt,
+                kind: kind,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String bookId,
                 Value<DateTime> deletedAt = const Value.absent(),
+                Value<String> kind = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalDeletionsCompanion.insert(
                 bookId: bookId,
                 deletedAt: deletedAt,
+                kind: kind,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

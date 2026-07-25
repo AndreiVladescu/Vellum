@@ -121,4 +121,53 @@ void main() {
     expect((await repoA.watchBook(idB).first)?.title, 'Snow Crash',
         reason: "A's next sync pulls B's pushed book");
   }, skip: skip);
+
+  // Plan 5 #4: shelves sync too now, over the real wire, with their explicit
+  // order preserved — the failure mode a set-replace could hide (books
+  // present but scrambled) looks fine until compared against the sender's
+  // intended order.
+  test('shelf sync carries explicit book order between two devices', () async {
+    final dirA = Directory.systemTemp.createTempSync('vellum_e2e_shelf_a');
+    final dirB = Directory.systemTemp.createTempSync('vellum_e2e_shelf_b');
+    addTearDown(() {
+      dirA.deleteSync(recursive: true);
+      dirB.deleteSync(recursive: true);
+    });
+
+    final repoA = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirA);
+    final repoB = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirB);
+
+    // A creates three books and a shelf in a deliberate (non-alphabetical,
+    // non-insertion) order, then syncs.
+    final c = await repoA.createCustomBook(title: 'Charlie');
+    final aId = await repoA.createCustomBook(title: 'Alpha');
+    final b = await repoA.createCustomBook(title: 'Bravo');
+    final shelfId = await repoA.createShelf('Reading order');
+    await repoA.addToShelf(c, shelfId);
+    await repoA.addToShelf(aId, shelfId);
+    await repoA.addToShelf(b, shelfId);
+    await SyncService(repoA).sync(client);
+
+    // B syncs and sees the shelf with the same order, once it has the books
+    // to hold (both halves of one sync round — see SyncService._pullShelves).
+    await SyncService(repoB).sync(client);
+    final onShelfB = await repoB.watchBooksOnShelf(shelfId).first;
+    expect([for (final book in onShelfB) book.id], [c, aId, b]);
+
+    // B reorders and pushes; A pulls the new order back. The server's
+    // updated_at is second-resolution and LWW treats a tie as "local wins"
+    // (same convention as books), so without this gap B's reorder could land
+    // in the same second as A's original push and get skipped as "not
+    // strictly newer" — a real e2e timing edge, not a design flaw.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await repoB.removeFromShelf(c, shelfId);
+    await repoB.addToShelf(c, shelfId);
+    await SyncService(repoB).sync(client);
+    await SyncService(repoA).sync(client);
+    final onShelfA = await repoA.watchBooksOnShelf(shelfId).first;
+    expect([for (final book in onShelfA) book.id], [aId, b, c],
+        reason: "A's pull adopts B's reordered shelf");
+  }, skip: skip);
 }

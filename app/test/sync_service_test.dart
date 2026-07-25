@@ -19,12 +19,25 @@ Future<LibraryRepository> _repo(Directory dir) async =>
 VellumServerClient _client(Future<http.Response> Function(http.Request) handler) =>
     VellumServerClient(baseUrl: 'http://test', token: 't', httpClient: MockClient(handler));
 
+/// `{ server_now, shelves: [] }` — for the tests below that write their own
+/// inline handler (predating shelf sync) and don't otherwise care about it.
+http.Response _noShelves() => http.Response(
+      jsonEncode({'server_now': '2024-01-01 00:00:00', 'shelves': []}),
+      200,
+    );
+
 /// A JSON handler that serves a fixed book list + deletions, and empty file
-/// lists, so pull's cover/file passes are no-ops.
+/// lists, so pull's cover/file passes are no-ops. Shelves default to an empty
+/// list so tests that don't care about shelf sync (most of this file) aren't
+/// affected by _pull/_push's unconditional shelf pass.
 Future<http.Response> Function(http.Request) _server({
   required List<Map<String, dynamic>> books,
   List<String> deletions = const [],
   List<String>? deletedCollector,
+  List<Map<String, dynamic>> shelves = const [],
+  List<String> shelfDeletions = const [],
+  List<Map<String, dynamic>>? pushedShelvesCollector,
+  List<String>? deletedShelvesCollector,
 }) {
   return (req) async {
     final path = req.url.path;
@@ -35,13 +48,33 @@ Future<http.Response> Function(http.Request) _server({
       );
     }
     if (req.method == 'GET' && path == '/api/deletions') {
+      final kind = req.url.queryParameters['kind'];
+      final ids = kind == 'shelf'
+          ? shelfDeletions
+          : kind == 'book'
+              ? deletions
+              : [...deletions, ...shelfDeletions];
       return http.Response(
-        jsonEncode([for (final id in deletions) {'book_id': id, 'deleted_at': '2020-01-01 00:00:00'}]),
+        jsonEncode([for (final id in ids) {'book_id': id, 'deleted_at': '2020-01-01 00:00:00'}]),
+        200,
+      );
+    }
+    if (req.method == 'GET' && path == '/api/shelves') {
+      return http.Response(
+        jsonEncode({'server_now': '2024-06-01 00:00:00', 'shelves': shelves}),
         200,
       );
     }
     if (req.method == 'GET' && path.endsWith('/files')) {
       return http.Response('[]', 200);
+    }
+    if (req.method == 'PUT' && path.startsWith('/api/shelves/')) {
+      pushedShelvesCollector?.add(jsonDecode(req.body) as Map<String, dynamic>);
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'DELETE' && path.startsWith('/api/shelves/')) {
+      deletedShelvesCollector?.add(path.split('/').last);
+      return http.Response('{}', 200);
     }
     if (req.method == 'DELETE' && path.startsWith('/api/books/')) {
       deletedCollector?.add(path.split('/').last);
@@ -50,6 +83,20 @@ Future<http.Response> Function(http.Request) _server({
     return http.Response('{"error":"unexpected ${req.method} $path"}', 404);
   };
 }
+
+Map<String, dynamic> _serverShelf(
+  String id,
+  String name,
+  List<String> bookIds, {
+  String? updatedAt,
+  int sortOrder = 0,
+}) => {
+  'id': id,
+  'name': name,
+  'sort_order': sortOrder,
+  'book_ids': bookIds,
+  'updated_at': ?updatedAt,
+};
 
 Map<String, dynamic> _serverBook(String id, String title, String updatedAt) => {
   'id': id,
@@ -185,6 +232,7 @@ void main() {
         sentSince = req.url.queryParameters['since'];
         return http.Response('[]', 200);
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -232,6 +280,7 @@ void main() {
       if (req.method == 'GET' && path == '/api/files/f1') {
         return http.Response('hello', 200);
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -278,6 +327,7 @@ void main() {
         fileDownloaded = true;
         return http.Response('hello', 200);
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -312,6 +362,7 @@ void main() {
       if (req.method == 'GET' && path.endsWith('/cover')) {
         return http.Response('boom', 500); // cover download fails
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -332,6 +383,7 @@ void main() {
           200,
         );
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -367,6 +419,7 @@ void main() {
         pushed.add(path.split('/').last);
         return http.Response('{}', 200);
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -385,6 +438,7 @@ void main() {
         await gate.future;
         return http.Response(jsonEncode({'server_now': 'x', 'books': []}), 200);
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -433,6 +487,7 @@ void main() {
       if (req.method == 'GET' && path == '/api/deletions') {
         return http.Response('[]', 200);
       }
+      if (req.method == 'GET' && req.url.path == '/api/shelves') return _noShelves();
       return http.Response('[]', 200);
     });
 
@@ -501,6 +556,12 @@ void main() {
         );
       }
       if (req.method == 'GET' && path == '/api/deletions') return http.Response('[]', 200);
+      if (req.method == 'GET' && path == '/api/shelves') {
+        return http.Response(
+          jsonEncode({'server_now': '2024-06-01 00:00:00', 'shelves': []}),
+          200,
+        );
+      }
       if (req.method == 'GET' && path == '/api/books/b1/cover') {
         coverRequests++;
         if (req.headers['if-none-match'] == '"v1"') {
@@ -527,5 +588,114 @@ void main() {
     book = await repo.watchBook('b1').first;
     expect(sentBytes, 1, reason: 'unchanged cover is not re-downloaded');
     expect(coverRequests, 2, reason: 'but it is revalidated each pull');
+  });
+
+  // ---- shelves (plan 5 #4) --------------------------------------------
+
+  test('pull adopts a shelf, preserving explicit book order', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    for (final id in ['b1', 'b2', 'b3']) {
+      await db.into(db.books).insert(BooksCompanion.insert(id: id, title: id));
+    }
+    final client = _client(_server(
+      books: const [],
+      shelves: [_serverShelf('sh-1', 'To read', ['b3', 'b1', 'b2'], updatedAt: '2024-01-01 00:00:00')],
+    ));
+
+    final report = await SyncService(repo).pull(client);
+    expect(report.pulled, 1);
+
+    final members = await (db.select(db.shelfBooks)
+          ..where((sb) => sb.shelfId.equals('sh-1'))
+          ..orderBy([(sb) => OrderingTerm.asc(sb.position)]))
+        .get();
+    expect(members.map((m) => m.bookId), ['b3', 'b1', 'b2']);
+    final shelf = await (db.select(db.shelves)..where((s) => s.id.equals('sh-1'))).getSingle();
+    expect(shelf.needsPush, false, reason: 'adopting the server copy leaves nothing to push');
+  });
+
+  test('pull drops shelf membership for books this device does not have', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b1', title: 'b1'));
+    // 'b2' is intentionally never inserted locally.
+    final client = _client(_server(
+      books: const [],
+      shelves: [_serverShelf('sh-1', 'Mixed', ['b1', 'b2'], updatedAt: '2024-01-01 00:00:00')],
+    ));
+
+    await SyncService(repo).pull(client);
+
+    final members = await (db.select(db.shelfBooks)..where((sb) => sb.shelfId.equals('sh-1'))).get();
+    expect(members.map((m) => m.bookId), ['b1']);
+  });
+
+  test('pull does not clobber a locally newer shelf edit', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.shelves).insert(ShelvesCompanion.insert(
+          id: 'sh-1',
+          name: 'Local name',
+          updatedAt: Value(DateTime.utc(2025, 1, 1)),
+        ));
+    final client = _client(_server(
+      books: const [],
+      shelves: [_serverShelf('sh-1', 'Server name', const [], updatedAt: '2024-01-01 00:00:00')],
+    ));
+
+    await SyncService(repo).pull(client);
+
+    final shelf = await (db.select(db.shelves)..where((s) => s.id.equals('sh-1'))).getSingle();
+    expect(shelf.name, 'Local name', reason: 'local edit is newer, must win');
+  });
+
+  test('pull applies a shelf tombstone locally', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.shelves).insert(ShelvesCompanion.insert(id: 'sh-1', name: 'Gone'));
+    final client = _client(_server(books: const [], shelfDeletions: ['sh-1']));
+
+    final report = await SyncService(repo).pull(client);
+    expect(report.deletedLocally, 1);
+    expect(await (db.select(db.shelves)..where((s) => s.id.equals('sh-1'))).get(), isEmpty);
+    expect(await db.select(db.localDeletions).get(), isEmpty,
+        reason: 'a server-driven delete must not be recorded to push back');
+  });
+
+  test('push sends a dirty shelf with its full ordered membership', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    for (final id in ['b1', 'b2']) {
+      await db.into(db.books).insert(BooksCompanion.insert(id: id, title: id));
+    }
+    final shelfId = await repo.createShelf('Mine');
+    await repo.addToShelf('b2', shelfId);
+    await repo.addToShelf('b1', shelfId);
+
+    final pushed = <Map<String, dynamic>>[];
+    final client = _client(_server(books: const [], pushedShelvesCollector: pushed));
+
+    final report = await SyncService(repo).push(client);
+    expect(report.pushed, 1);
+    expect(pushed, hasLength(1));
+    expect(pushed.single['book_ids'], ['b2', 'b1']);
+
+    final shelf = await (db.select(db.shelves)..where((s) => s.id.equals(shelfId))).getSingle();
+    expect(shelf.needsPush, false);
+  });
+
+  test('push propagates a local shelf deletion then clears the tombstone', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    final shelfId = await repo.createShelf('Temp');
+    await repo.deleteShelf(shelfId);
+
+    final deletedShelves = <String>[];
+    final client = _client(_server(books: const [], deletedShelvesCollector: deletedShelves));
+    await SyncService(repo).push(client);
+
+    expect(deletedShelves, [shelfId]);
+    expect(await db.select(db.localDeletions).get(), isEmpty);
   });
 }

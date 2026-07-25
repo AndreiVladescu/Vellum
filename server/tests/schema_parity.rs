@@ -67,6 +67,13 @@ async fn synced_tables_have_the_expected_columns() {
                 "added_at",
             ],
         ),
+        // Synced since migration 0008 (plan 5 #4) — previously created in
+        // 0001_init.sql but never synced or touched by any client.
+        (
+            "shelf",
+            &["id", "owner_id", "name", "sort_order", "updated_at"],
+        ),
+        ("shelf_book", &["shelf_id", "book_id", "position"]),
     ];
 
     for (table, cols) in expected {

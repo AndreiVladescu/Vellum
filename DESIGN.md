@@ -73,7 +73,7 @@ single-user and offline. These tables are **server-only** (migration
   expiry. Sent as `Authorization: Bearer <token>`.
 - **book.owner_id** — every book belongs to the account that added it.
 - **book_group** / **book_group_item** — shareable collections, distinct from
-  the app's local `shelf` panes.
+  the (also synced, but unrelated) `shelf` panes.
 - **share** — a grant from an owner to another account. `scope` is `all`
   (the owner's whole library), `group`, or `book`; `permission` is `viewer`
   (read) or `editor` (read + modify).
@@ -157,10 +157,19 @@ warns when a URL is unencrypted.
 - **book_file** — 0..n per book: format, path, size, content hash. A book can
   be physical-only, digital-only, or both.
 - **physical_copy** — 0..n per book: location (room/shelf), condition, notes.
+  App-local only for now (plan 5 #4 chose to sync shelves first; copies and
+  loans are the same decision, not yet implemented).
 - **loan** — per physical copy: borrower, loaned_at, returned_at. Loans are
-  their own table so lending *history* comes for free.
-- **shelf** — manual collections/panes, with explicit book ordering,
-  independent of genres.
+  their own table so lending *history* comes for free. App-local only, same
+  status as physical_copy above.
+- **shelf** + **shelf_book** — manual collections/panes with explicit book
+  ordering, independent of genres. **Synced** (plan 5 #4): LWW on
+  `shelf.updated_at`, membership replaced wholesale on push (the app always
+  sends the full ordered list). Visible to whoever holds an all-scope share of
+  the owner's library — there is no shelf-scoped share type. A shelf naming a
+  book the receiving device doesn't hold yet drops that id from the local
+  membership rather than failing (`server/src/shelves.rs::existing_book_ids`
+  does the same server-side, since `shelf_book.book_id` has a foreign key).
 
 **App-local-only columns on `book`** (deliberately *not* synced): reading state
 (progress/page/last-read), **reader notes**, and **`source_metadata`** (a JSON
@@ -172,8 +181,16 @@ the device. Reader notes and `source_metadata` were never on the server.)
 
 The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
 pins the column list of every synced table (`book`, `author`, `book_author`,
-`genre`, `book_genre`, `book_file`) and fails if the server migrations drift
-from it — a prompt to update `app/lib/data/database.dart` too.
+`genre`, `book_genre`, `book_file`, `shelf`, `shelf_book`) and fails if the
+server migrations drift from it — a prompt to update
+`app/lib/data/database.dart` too.
+
+**Deletion tombstones carry a `kind`** (`deletion.kind` server-side,
+`local_deletions.kind` app-side; both default `'book'`): one shared mechanism
+for every synced entity's deletes rather than a table per entity. Adding
+`kind` was additive — an app predating it only ever reads `book_id`/
+`deleted_at` and looks the id up in its own `books` table, so a non-book
+tombstone (e.g. a deleted shelf) is a harmless no-op there.
 
 **App-local-only tables** for the physical bookshelf layouts (also never
 synced — a per-device arrangement of a real room, all lengths in **metres**):
@@ -345,10 +362,12 @@ Two things stay **on the device only** and are never synced to a server:
 7. 🚧 Rust server + sync (connected mode), OPDS feed. In place: accounts, RBAC,
    groups, sharing, public links, blob storage, OPDS, and a web admin console,
    with API integration tests. The app logs in and syncs **both ways** —
-   metadata, covers, and files — one-tap (pull then push) plus a quiet
-   auto-sync at launch, and manages sharing on-device. Sync is
-   **last-write-wins by `updated_at`** with **delete tombstones** (below).
-   Remaining: real-time updates and the Android side.
+   metadata, covers, files, and (plan 5 #4) custom shelves — one-tap (pull
+   then push) plus a quiet auto-sync at launch, and manages sharing on-device.
+   Sync is **last-write-wins by `updated_at`** with **delete tombstones**
+   (below). Remaining: physical copies + loan history joining shelves as
+   synced (plan 5 #4's Option A, not yet done for those two), real-time
+   updates, and the Android side.
 8. ✅ Backup: export the whole library (database snapshot + covers + files) to
    one `.zip` from Preferences; restore replaces the library and restarts the
    app. The safety net for standalone (serverless) installs.

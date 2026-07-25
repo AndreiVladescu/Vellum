@@ -302,12 +302,19 @@ class VellumServerClient {
     _body(res);
   }
 
-  /// Book ids the server has tombstoned, so a pull can delete them locally.
-  /// A non-empty [since] cursor narrows to tombstones at or after it.
-  Future<List<String>> listDeletions({String? since}) async {
-    final uri = (since == null || since.isEmpty)
+  /// Ids the server has tombstoned, so a pull can delete them locally. A
+  /// non-empty [since] cursor narrows to tombstones at or after it; [kind]
+  /// ('book', 'shelf', ...) narrows to just that entity type — omitted, this
+  /// returns every kind (what a server predating [kind] always did; this
+  /// client just reads `book_id` regardless, see plan 5 #4's deletion.kind).
+  Future<List<String>> listDeletions({String? since, String? kind}) async {
+    final params = {
+      if (since != null && since.isNotEmpty) 'since': since,
+      'kind': ?kind,
+    };
+    final uri = params.isEmpty
         ? _uri('/api/deletions')
-        : _uri('/api/deletions').replace(queryParameters: {'since': since});
+        : _uri('/api/deletions').replace(queryParameters: params);
     final res = await _http.get(uri, headers: _headers);
     return [
       for (final d in _body(res) as List) (d as Map<String, dynamic>)['book_id'] as String,
@@ -400,6 +407,59 @@ class VellumServerClient {
       cancelOnError: true,
     );
     final res = await http.Response.fromStream(await _http.send(req));
+    _body(res);
+  }
+
+  // ---- shelves (plan 5 #4) -------------------------------------------------
+
+  /// The visible shelves (owned + all-scope shared) plus the server's clock,
+  /// as the delta-pull envelope `{ server_now, shelves }` — same cursor
+  /// convention as [listBooks], minus that method's bare-array fallback:
+  /// `/api/shelves` has no pre-cursor history to be backward compatible with,
+  /// so a server that has this endpoint at all always sends the envelope.
+  Future<({String? serverNow, List<ServerShelf> shelves})> listShelves({
+    String? cursor,
+  }) async {
+    final uri = _uri(
+      '/api/shelves',
+    ).replace(queryParameters: {'cursor': cursor ?? ''});
+    final res = await _http.get(uri, headers: _headers);
+    final map = _body(res) as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      shelves: [
+        for (final s in map['shelves'] as List)
+          ServerShelf.fromJson(s as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  /// Upsert a shelf at [id] (create or update), replacing its membership
+  /// wholesale with [bookIds] in that exact order — same LWW convention as
+  /// [pushBook].
+  Future<void> pushShelf({
+    required String id,
+    required String name,
+    required int sortOrder,
+    required List<String> bookIds,
+    DateTime? updatedAt,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/shelves/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        'name': name,
+        'sort_order': sortOrder,
+        'book_ids': bookIds,
+        'updated_at': ?formatServerTime(updatedAt),
+      }),
+    );
+    _body(res);
+  }
+
+  /// Delete a shelf on the server (used to propagate a local delete up).
+  Future<void> deleteShelf(String id) async {
+    final res = await _http.delete(_uri('/api/shelves/$id'), headers: _headers);
     _body(res);
   }
 
@@ -506,6 +566,32 @@ class ServerGroup {
     id: j['id'] as String,
     name: j['name'] as String? ?? '',
     bookCount: j['book_count'] as int? ?? 0,
+  );
+}
+
+/// A custom shelf from the server (plan 5 #4): metadata plus its membership
+/// in explicit order.
+class ServerShelf {
+  ServerShelf({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+    required this.bookIds,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String name;
+  final int sortOrder;
+  final List<String> bookIds;
+  final DateTime? updatedAt;
+
+  factory ServerShelf.fromJson(Map<String, dynamic> j) => ServerShelf(
+    id: j['id'] as String,
+    name: j['name'] as String? ?? '',
+    sortOrder: j['sort_order'] as int? ?? 0,
+    bookIds: [for (final id in (j['book_ids'] as List? ?? const [])) id as String],
+    updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
   );
 }
 

@@ -23,12 +23,16 @@ pub struct Capabilities {
 /// Built from routes that actually exist in `lib.rs`, not from the plan's
 /// example list — a capability handshake that claims a feature no route
 /// backs is worse than not having one. Notably absent, and why:
-/// - `shelf_sync`, `reading_progress`: never sent to the server by design
-///   (reading state is app-local-only; see migration 0006 and CLAUDE.md).
+/// - `reading_progress`: never sent to the server by design (reading state
+///   is app-local-only; see migration 0006 and CLAUDE.md).
 /// - `content_search`: the FTS5 search index (plan 5 #2) is app-local only,
 ///   no server-side equivalent exists.
 /// - `mail`: SMTP/password-reset is planned (docs/BACKLOG.md) but not built.
 /// - `batch_push`: plan 5 #7, not implemented yet — add it there when it is.
+///
+/// `shelf_sync` (plan 5 #4) is the first entry that became true after this
+/// handshake shipped, exactly as its original commit predicted: shelves now
+/// sync (`shelves.rs`) instead of living on one device only.
 const FEATURES: &[&str] = &[
     "delta_pull",
     "deletions",
@@ -36,6 +40,7 @@ const FEATURES: &[&str] = &[
     "shares",
     "share_links",
     "opds",
+    "shelf_sync",
 ];
 
 pub async fn get() -> Json<Capabilities> {

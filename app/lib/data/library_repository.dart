@@ -134,7 +134,8 @@ class LibraryRepository {
   Future<String> createShelf(String name) => shelves.createShelf(name);
   Future<void> renameShelf(String id, String name) =>
       shelves.renameShelf(id, name);
-  Future<void> deleteShelf(String id) => shelves.deleteShelf(id);
+  Future<void> deleteShelf(String id, {bool recordTombstone = true}) =>
+      shelves.deleteShelf(id, recordTombstone: recordTombstone);
   Future<void> addToShelf(String bookId, String shelfId) =>
       shelves.addToShelf(bookId, shelfId);
   Future<void> removeFromShelf(String bookId, String shelfId) =>
