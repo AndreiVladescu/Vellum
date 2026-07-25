@@ -314,6 +314,34 @@ void main() {
     await sub.cancel();
   });
 
+  test('a genre added after the cache is warm reaches a live subscription',
+      () async {
+    // watchGenresByBook is one of the four sources LibraryQueries caches
+    // behind _Cached (library_queries.dart) so repeated watchLibrary() calls
+    // -- main.dart makes a fresh one on every build -- don't re-run the
+    // authors/genres joins each time. Nothing exercised that cached path
+    // through to LibraryView before: this pins that a genre added *after*
+    // the shared subscription is already warm still reaches an
+    // already-listening watchLibrary() stream, not just a fresh one.
+    final db = await _seeded();
+    addTearDown(db.close);
+    final queries = LibraryQueries(db);
+
+    final views = <LibraryView>[];
+    final sub = queries.watchLibrary(sort: ShelfSort.title).listen(views.add);
+    await pumpEventQueue();
+    expect(views, isNotEmpty); // cache now warm
+
+    await db.into(db.genres).insert(GenresCompanion.insert(id: 'g-Poetry', name: 'Poetry'));
+    await db.into(db.bookGenres).insert(
+        BookGenresCompanion.insert(bookId: 'b2', genreId: 'g-Poetry'));
+    await pumpEventQueue();
+
+    final b2 = views.last.entries.firstWhere((e) => e.book.id == 'b2');
+    expect(b2.genres, contains('Poetry'));
+    await sub.cancel();
+  });
+
   test('allGenres and shelves are populated', () async {
     final db = await _seeded();
     addTearDown(db.close);
