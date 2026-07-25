@@ -11,17 +11,28 @@ use std::path::Path;
 
 use anyhow::Context;
 
-/// Ensure a certificate + private key exist at the given paths. If either is
-/// missing, generate a self-signed pair valid for `localhost`, `127.0.0.1` and
+/// The outcome of [`ensure_self_signed`]: the leaf certificate's SHA-256
+/// fingerprint (uppercase, colon-grouped hex, for the user to verify on import)
+/// and whether it was freshly generated (vs. an existing one reused).
+pub struct EnsuredCert {
+    pub fingerprint: String,
+    pub generated: bool,
+}
+
+/// Ensure a certificate + private key exist at the given paths. If **both**
+/// already exist they are reused unchanged (so the fingerprint is stable across
+/// restarts and the app never needs to re-import); only when one is missing do
+/// we generate a fresh self-signed pair valid for `localhost`, `127.0.0.1` and
 /// any `extra_sans` (e.g. the LAN IP or hostname a phone will connect to).
 ///
-/// Returns the leaf certificate's SHA-256 fingerprint (uppercase, colon-grouped
-/// hex) so the caller can print it for the user to verify on import.
+/// To rotate the certificate, delete both files and restart. To use your own,
+/// drop your `cert.pem`/`key.pem` in place (or point `VELLUM_TLS_CERT`/`_KEY` at
+/// them) — an existing pair is always preferred over generating one.
 pub fn ensure_self_signed(
     cert_path: &Path,
     key_path: &Path,
     extra_sans: &[String],
-) -> anyhow::Result<String> {
+) -> anyhow::Result<EnsuredCert> {
     if cert_path.exists() && key_path.exists() {
         // Reuse the existing material (user-provided or generated earlier) and
         // just report its fingerprint.
@@ -29,7 +40,10 @@ pub fn ensure_self_signed(
             .with_context(|| format!("reading {}", cert_path.display()))?;
         let der = first_cert_der(&pem)
             .with_context(|| format!("no CERTIFICATE block in {}", cert_path.display()))?;
-        return Ok(fingerprint(&der));
+        return Ok(EnsuredCert {
+            fingerprint: fingerprint(&der),
+            generated: false,
+        });
     }
 
     let mut sans = vec!["localhost".to_string(), "127.0.0.1".to_string()];
@@ -57,7 +71,10 @@ pub fn ensure_self_signed(
         std::fs::set_permissions(key_path, std::fs::Permissions::from_mode(0o600)).ok();
     }
 
-    Ok(fingerprint(certified.cert.der()))
+    Ok(EnsuredCert {
+        fingerprint: fingerprint(certified.cert.der()),
+        generated: true,
+    })
 }
 
 /// Decode the first `-----BEGIN CERTIFICATE-----` block of a PEM string to DER.

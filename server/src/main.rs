@@ -13,6 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let public_base_url =
         std::env::var("VELLUM_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:3000".into());
     let data_dir = std::env::var("VELLUM_DATA_DIR").unwrap_or_else(|_| "data".into());
+    let data_path = PathBuf::from(&data_dir);
     let max_upload_mb: usize = std::env::var("VELLUM_MAX_UPLOAD_MB")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -63,12 +64,13 @@ async fn main() -> anyhow::Result<()> {
             .install_default()
             .ok();
 
+        let (default_cert, default_key) = default_tls_pair(&data_path);
         let cert_path = std::env::var("VELLUM_TLS_CERT")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("cert.pem"));
+            .unwrap_or(default_cert);
         let key_path = std::env::var("VELLUM_TLS_KEY")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("key.pem"));
+            .unwrap_or(default_key);
         let extra_sans: Vec<String> = std::env::var("VELLUM_TLS_SANS")
             .unwrap_or_default()
             .split(',')
@@ -76,15 +78,22 @@ async fn main() -> anyhow::Result<()> {
             .filter(|s| !s.is_empty())
             .collect();
 
-        let fingerprint = tls::ensure_self_signed(&cert_path, &key_path, &extra_sans)?;
+        let cert = tls::ensure_self_signed(&cert_path, &key_path, &extra_sans)?;
         let config =
             axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_path, &key_path).await?;
 
+        let origin = if cert.generated {
+            "generated a new self-signed certificate"
+        } else {
+            "reusing the existing certificate (stable across restarts)"
+        };
         tracing::info!(
             "vellum-server listening on https://{addr} (db: {db_path})\n  \
-             certificate: {}\n  SHA-256 fingerprint: {fingerprint}\n  \
-             Import this certificate (or pin the fingerprint) in the app to connect.",
+             certificate: {} — {origin}\n  SHA-256 fingerprint: {}\n  \
+             Import this certificate (or pin the fingerprint) in the app to \
+             connect. It persists across restarts; delete both files to rotate.",
             cert_path.display(),
+            cert.fingerprint,
         );
 
         // Graceful shutdown on Ctrl-C so in-flight uploads finish.
@@ -110,6 +119,22 @@ async fn main() -> anyhow::Result<()> {
             .await?;
     }
     Ok(())
+}
+
+/// Default locations for the TLS cert + key: under the data dir, so they live
+/// in one stable place that doesn't depend on the process's working directory
+/// (a re-run from elsewhere would otherwise not find a CWD-relative `cert.pem`
+/// and mint a fresh one, breaking the app's pinned copy). For backward
+/// compatibility, a `cert.pem`/`key.pem` pair an older version left in the CWD
+/// is reused instead of silently regenerating under the data dir.
+fn default_tls_pair(data_dir: &std::path::Path) -> (PathBuf, PathBuf) {
+    let in_data = (data_dir.join("cert.pem"), data_dir.join("key.pem"));
+    let legacy = (PathBuf::from("cert.pem"), PathBuf::from("key.pem"));
+    if !in_data.0.exists() && legacy.0.exists() && legacy.1.exists() {
+        legacy
+    } else {
+        in_data
+    }
 }
 
 /// Remove interrupted-upload temp files (`files/.tmp-*`) older than 24 hours.

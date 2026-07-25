@@ -72,6 +72,31 @@ cd server
 cargo run            # starts the API on http://localhost:3000
 ```
 
+#### Connecting the Android app (HTTPS)
+
+Android blocks cleartext to a remote host, so the phone needs TLS. Enable the
+server's built-in self-signed certificate — it's **generated once and reused on
+every restart**, so the app only imports it a single time:
+
+```sh
+cd server
+# Include the LAN IP the phone uses; the cert also lives under the data dir so
+# a re-run from anywhere reuses it (VELLUM_DATA_DIR overrides that location).
+VELLUM_TLS=1 VELLUM_TLS_SANS=192.168.1.50 cargo run
+```
+
+On startup it logs whether it **generated** or is **reusing** the certificate,
+its path, and the SHA-256 fingerprint. In the app, connect to
+`https://<LAN-IP>:3000`, tap **Import** on the certificate row, paste
+`cert.pem` (or choose the file), and verify the fingerprint matches.
+
+- The cert **persists** — don't delete it between runs, or the app will reject
+  the new one. Delete both `cert.pem` and `key.pem` only when you *want* to
+  rotate it (then re-import).
+- **Bring your own cert** by pointing `VELLUM_TLS_CERT` / `VELLUM_TLS_KEY` at
+  your files (or dropping `cert.pem`/`key.pem` in the data dir) — an existing
+  pair is always preferred over generating one.
+
 ## Status
 
 The standalone app is functional: add books with online metadata, a spine/cover
