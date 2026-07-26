@@ -15,8 +15,41 @@ against `main` @ `70d5f12`, after re-reading `DESIGN.md`, `CLAUDE.md`, plans 1�
 Where plans 1–4 were mostly **remedial** (sync correctness, performance,
 security, Android readiness), this plan is **forward-looking**: it proposes
 structural changes that make the next round of features cheap, then the features
-themselves. Nothing here is implemented — every item is written so it can be
-picked up cold.
+themselves. Every item is written so it can be picked up cold.
+
+## Progress (updated 2026-07-26)
+
+**Phases 1 and 2 of §I are done.** Each item's commit is listed so "still true?"
+is answerable from `git log`:
+
+| # | Item | Commits |
+|---|---|---|
+| 45 | Performance harness + synthetic library | `d5f6865`, `5948d21`, `5932e99` |
+| 10 | Split `LibraryRepository` | `7ca1f90`, `cf7c695` |
+| 1 | One library view-model stream | `0b818c2`, `388d0f0`, `1752512`, `b7c4502` |
+| 2 | FTS5 search | `c017654` |
+| 3 | Scoped + paginated server list | `314bcc9` |
+| 6 | API version + capability handshake | `8a3973e` |
+| 43 | Migration tests from every schema version | `78fd14f` |
+| 4 | Shelves / copies / loans sync (**Option A**) | `77605c9`, `9533a6f`, `ca48d1f` |
+| 5 | Optional cross-device reading position | `1cd874f` |
+| 7 | Batch book upsert on push | `b49b825`, `d915fa9` |
+| 44 | Model-based sync state machine tests | `0cc9f69` |
+
+**Next up: Phase 3 — the on-ramp.** #15 (folder import) → #16 (barcode) → #20
+(share target) → #21b (duplicate merge) → #25 (continue reading) → #41
+(onboarding). Nothing in Phases 3–6 has been started; #4's Option A and #6 (the
+two prerequisites §I calls out for §K) are both in place, so Phase 6 is
+unblocked whenever it comes up.
+
+Two notes for whoever picks this up:
+
+- #5 landed as specified, with one addition the plan didn't anticipate: rows
+  carry a `unit` (`page`/`chapter`), because a device reading the EPUB and one
+  reading the PDF mean different things by "page 214". The jump prompt only
+  appears when the units match.
+- #7's server cap is 200 per batch, mirrored in `SyncService._batchPushChunk`;
+  a single-book push deliberately skips both the handshake and the batch.
 
 **Status of plan 4:** §A 1–3, §B 4–6, §C 7–10, §D 11–13, §E 16–17 and §F 18 all
 landed. Still open and **carried into this plan unchanged**:
