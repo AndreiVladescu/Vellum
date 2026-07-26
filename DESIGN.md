@@ -332,6 +332,27 @@ and *counted*, so the app can say "3 books aren't on this device yet" instead of
 looking like data loss — and a copy minted for a not-yet-synced `copy_id` is not
 marked dirty, or the fetch would push the server's own data straight back.
 
+**Borrow requests** (both, plan 5 #49) finish the lending workflow: someone
+looking at your shared room could see the book they wanted and then had to leave
+the app and text you. Now they ask, and an approval **creates the loan** the
+physical side already models.
+
+Four decisions carry it. **Visibility is the gate** — you may request a book you
+can already see, so this adds no new way to learn what exists, and a book you
+can't see answers 404. **Approve is atomic**: the loan is created and the request
+closed in one transaction, because a request that looks decided with no loan
+behind it is worse than no feature at all. **One live request per person per
+book**, enforced by a partial unique index, so a refresh-happy requester can't
+become a queue of identical rows in someone's inbox. And **anonymous viewers get
+no button** — a public link has no account to hold a request, so the page says who
+to ask instead of pretending.
+
+Two smaller things worth knowing: approving a book whose copies are all out is
+*refused* rather than double-lending one, and the request stays pending so the
+owner can free a copy and approve later; and `requester_email` is denormalised so
+the owner's list still reads correctly after an account is deleted — the same
+reasoning as the audit log's `actor_email`.
+
 **Rooms you can look at in a browser** (server/console, plan 5 #48) render a
 published layout as inline SVG — shelf lines and one rectangle per book, pan and
 zoom, hover for a title. No rendering dependency: a room is rectangles, and the

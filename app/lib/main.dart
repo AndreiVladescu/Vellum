@@ -418,6 +418,7 @@ class _LibraryPageState extends State<LibraryPage> {
         book: book,
         repository: repository,
         settings: widget.settings,
+        connection: widget.connection,
         onGenreTap: _applyGenreFilter,
       ),
     ));
@@ -833,6 +834,7 @@ class _LibraryPageState extends State<LibraryPage> {
         book: book,
         repository: repository,
         settings: widget.settings,
+        connection: widget.connection,
         onGenreTap: _applyGenreFilter,
       ),
     );

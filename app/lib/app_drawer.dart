@@ -59,7 +59,8 @@ class AppDrawer extends StatelessWidget {
   void _openLoans(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => LoansPage(repository: repository),
+      builder: (_) =>
+          LoansPage(repository: repository, connection: connection),
     ));
   }
 

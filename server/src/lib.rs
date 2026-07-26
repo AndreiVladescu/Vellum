@@ -19,6 +19,7 @@ mod audit;
 mod auth;
 mod blobs;
 mod books;
+mod borrow;
 mod capabilities;
 mod discover;
 mod error;
@@ -231,6 +232,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // User-to-user shares.
         // Published room layouts (plan 5 #47). A document store: whole-document
         // publish with a revision, 409 on a stale base.
+        // Borrow requests (plan 5 #49).
+        .route("/borrow-requests", get(borrow::list).post(borrow::create))
+        .route("/borrow-requests/{id}/decide", post(borrow::decide))
         .route("/layouts", get(layouts::list))
         .route("/layouts/{id}/books", get(layouts::books))
         .route(

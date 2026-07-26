@@ -2,22 +2,48 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/library_repository.dart';
+import '../server/connection_store.dart';
+import 'borrow_requests.dart';
 import 'due_dates.dart';
 
 /// Cross-library view of physical loans: what's lent out right now (with a
 /// Return action), and a collapsed history of past loans. Loan data lives
 /// per-copy on the detail page; this is the "who has my books?" overview.
 class LoansPage extends StatelessWidget {
-  const LoansPage({super.key, required this.repository});
+  const LoansPage({super.key, required this.repository, this.connection});
 
   final LibraryRepository repository;
+
+  /// Needed only for borrow requests (plan 5 #49); the action is hidden
+  /// without a connection or against a server that doesn't offer them.
+  final ServerConnection? connection;
+
+  bool get _requestsAvailable =>
+      connection != null &&
+      connection!.isConnected &&
+      (connection!.capabilities?.hasFeature('borrow_requests') ?? false);
 
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Loans')),
+      appBar: AppBar(
+        title: const Text('Loans'),
+        actions: [
+          if (_requestsAvailable)
+            IconButton(
+              tooltip: 'Borrow requests',
+              icon: const Icon(Icons.pan_tool_alt_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      BorrowRequestsPage(connection: connection!),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: StreamBuilder<List<LoanEntry>>(
         stream: repository.watchAllLoans(),
         builder: (context, snapshot) {

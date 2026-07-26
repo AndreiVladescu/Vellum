@@ -1202,6 +1202,72 @@ function fmtBytes(n){
 // is exactly the annoyance this would otherwise create.
 function openReader(id){ window.open('/read/' + encodeURIComponent(id), '_blank', 'noopener'); }
 
+// ---- borrow requests (plan 5 #49) ---------------------------------------
+
+async function showRequests(){
+  let incoming;
+  try {
+    incoming = await api('GET','/api/borrow-requests?direction=incoming');
+  } catch(e){ toast(e.message); return; }
+
+  const pending = incoming.filter(r => r.status === 'pending');
+  const rows = pending.length ? pending.map(r => `
+    <div class="row" style="justify-content:space-between; gap:12px;
+        padding:8px 0; border-bottom:1px solid var(--line)">
+      <span>
+        <strong>${esc(r.book_title)}</strong>
+        <span class="muted">· ${esc(r.requester_email)}</span>
+        ${r.note ? `<div class="muted" style="font-size:12px">“${esc(r.note)}”</div>` : ''}
+      </span>
+      <span class="row" style="gap:6px">
+        <button class="btn sm" onclick="decideRequest('${r.id}','declined')">Decline</button>
+        <button class="btn sm primary" onclick="decideRequest('${r.id}','approved')">Lend it</button>
+      </span>
+    </div>`).join('')
+    : '<p class="muted">Nobody is waiting on you.</p>';
+
+  const answered = incoming.filter(r => r.status !== 'pending');
+  const history = answered.length ? `
+    <p class="muted" style="margin:14px 0 4px">Answered</p>` + answered.map(r => `
+    <div class="row" style="justify-content:space-between; gap:12px;
+        padding:4px 0; font-size:13px">
+      <span>${esc(r.book_title)} <span class="muted">· ${esc(r.requester_email)}</span></span>
+      <span class="muted">${esc(r.status)}</span>
+    </div>`).join('') : '';
+
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(620px,95vw)">
+      <h2 style="margin:0 0 4px">Borrow requests</h2>
+      <p class="muted" style="margin:0 0 12px">Approving creates the loan —
+        it appears under the book's copies with the due date you pick.</p>
+      <div style="max-height:55vh; overflow:auto">${rows}${history}</div>
+      <div class="row" style="justify-content:flex-end; margin-top:12px">
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div></div>`;
+}
+
+async function decideRequest(id, status){
+  const body = { status };
+  if (status === 'approved'){
+    // A date or nothing: "borrow it as long as you like" is a real
+    // arrangement, and forcing a date would describe one nobody made.
+    const raw = prompt('Due back on (YYYY-MM-DD), or leave blank for no date:', '');
+    if (raw === null) return;
+    if (raw.trim()) body.due_at = raw.trim() + ' 00:00:00';
+  } else {
+    const reply = prompt('Say why (optional):', '');
+    if (reply === null) return;
+    if (reply.trim()) body.reply = reply.trim();
+  }
+  try {
+    await api('POST','/api/borrow-requests/' + id + '/decide', body);
+  } catch(e){ toast(e.message); return; }
+  toast(status === 'approved' ? 'Lent — the loan is recorded' : 'Answered');
+  showRequests();
+}
+
 // ---- published rooms (plan 5 #47/#48) -----------------------------------
 
 async function showRooms(){

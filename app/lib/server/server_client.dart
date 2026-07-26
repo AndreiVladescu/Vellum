@@ -270,6 +270,60 @@ class VellumServerClient {
     return Capabilities.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Borrow requests (plan 5 #49). [direction] is 'incoming' (to answer) or
+  /// 'outgoing' (asked for).
+  Future<List<BorrowRequest>> listBorrowRequests({
+    String direction = 'incoming',
+    String? status,
+  }) async {
+    final query = {'direction': direction};
+    if (status != null) query['status'] = status;
+    final uri = _uri('/api/borrow-requests').replace(queryParameters: query);
+    final res = await _http.get(uri, headers: _headers);
+    final body = _body(res) as List? ?? const [];
+    return [
+      for (final r in body) BorrowRequest.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  Future<BorrowRequest> requestToBorrow({
+    required String bookId,
+    String? copyId,
+    String? note,
+  }) async {
+    final res = await _http.post(
+      _uri('/api/borrow-requests'),
+      headers: {..._headers, 'content-type': 'application/json'},
+      body: jsonEncode({
+        'book_id': bookId,
+        'copy_id': ?copyId,
+        if (note != null && note.isNotEmpty) 'note': note,
+      }),
+    );
+    return BorrowRequest.fromJson(_body(res) as Map<String, dynamic>);
+  }
+
+  /// Approve, decline or cancel. An approval creates the loan server-side.
+  Future<BorrowRequest> decideBorrowRequest(
+    String id, {
+    required String status,
+    String? reply,
+    DateTime? dueAt,
+  }) async {
+    final res = await _http.post(
+      _uri('/api/borrow-requests/$id/decide'),
+      headers: {..._headers, 'content-type': 'application/json'},
+      body: jsonEncode({
+        'status': status,
+        if (reply != null && reply.isNotEmpty) 'reply': reply,
+        if (dueAt != null)
+          'due_at': '${dueAt.year}-${dueAt.month.toString().padLeft(2, '0')}-'
+              '${dueAt.day.toString().padLeft(2, '0')} 00:00:00',
+      }),
+    );
+    return BorrowRequest.fromJson(_body(res) as Map<String, dynamic>);
+  }
+
   /// Rooms this account can see: its own, plus any shared with it (plan 5 #47).
   Future<List<ServerLayout>> listLayouts() async {
     final res = await _http.get(_uri('/api/layouts'), headers: _headers);
@@ -1160,6 +1214,47 @@ class ServerFile {
 /// [Capabilities.syncProtocol] to show "this server is newer than the app"
 /// instead of failing sync opaquely partway through.
 const kKnownSyncProtocol = 1;
+
+/// Someone asking to borrow a book (plan 5 #49).
+class BorrowRequest {
+  const BorrowRequest({
+    required this.id,
+    required this.bookId,
+    required this.bookTitle,
+    required this.requesterEmail,
+    required this.status,
+    required this.createdAt,
+    this.note,
+    this.reply,
+    this.copyId,
+  });
+
+  final String id;
+  final String bookId;
+  final String bookTitle;
+  final String requesterEmail;
+
+  /// 'pending' | 'approved' | 'declined' | 'cancelled'.
+  final String status;
+  final String createdAt;
+  final String? note;
+  final String? reply;
+  final String? copyId;
+
+  bool get isPending => status == 'pending';
+
+  factory BorrowRequest.fromJson(Map<String, dynamic> j) => BorrowRequest(
+        id: j['id'] as String,
+        bookId: j['book_id'] as String,
+        bookTitle: (j['book_title'] as String?) ?? 'A book',
+        requesterEmail: (j['requester_email'] as String?) ?? 'someone',
+        status: (j['status'] as String?) ?? 'pending',
+        createdAt: (j['created_at'] as String?) ?? '',
+        note: j['note'] as String?,
+        reply: j['reply'] as String?,
+        copyId: j['copy_id'] as String?,
+      );
+}
 
 /// A published room (plan 5 #47), with its document when fetched singly.
 class ServerLayout {

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../data/book_file_validation.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../loans/borrow_requests.dart';
 import '../physical/find_copy.dart';
+import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
 import 'cover_thumb.dart';
 import 'edit_book_sheet.dart';
@@ -25,12 +27,16 @@ class BookDetailPage extends StatelessWidget {
     required this.book,
     required this.repository,
     this.settings,
+    this.connection,
     this.onGenreTap,
   });
 
   /// Snapshot used before the first stream event arrives.
   final Book book;
   final LibraryRepository repository;
+
+  /// Needed only to ask to borrow a book someone else owns (plan 5 #49).
+  final ServerConnection? connection;
 
   /// Needed only to open the room editor for *Find my copy* (plan 5 #28); the
   /// action is hidden when a caller has no settings store to hand.
@@ -55,6 +61,7 @@ class BookDetailPage extends StatelessWidget {
           book: current,
           repository: repository,
           settings: settings,
+          connection: connection,
           onGenreTap: onGenreTap,
         );
       },
@@ -67,12 +74,14 @@ class _BookDetailBody extends StatefulWidget {
     required this.book,
     required this.repository,
     this.settings,
+    this.connection,
     this.onGenreTap,
   });
 
   final Book book;
   final LibraryRepository repository;
   final AppSettingsStore? settings;
+  final ServerConnection? connection;
   final void Function(String genre)? onGenreTap;
 
   @override
@@ -84,6 +93,16 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
 
   Book get book => widget.book;
   LibraryRepository get repository => widget.repository;
+
+  /// Whether to offer "Ask to borrow" (plan 5 #49). Needs a connected server
+  /// that supports it; the server itself refuses a request for a book you own,
+  /// which is the authoritative check — this only keeps the button honest.
+  bool get _canRequestBorrow {
+    final connection = widget.connection;
+    return connection != null &&
+        connection.isConnected &&
+        (connection.capabilities?.hasFeature('borrow_requests') ?? false);
+  }
 
   /// Handles files dropped anywhere on the page: images become the cover,
   /// PDFs/EPUBs are attached, anything else is rejected.
@@ -299,6 +318,19 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       appBar: AppBar(
         title: Text(book.title),
         actions: [
+          // Only for a book you don't own: asking to borrow your own book is a
+          // button that can only produce an error.
+          if (_canRequestBorrow)
+            IconButton(
+              icon: const Icon(Icons.pan_tool_alt_outlined),
+              tooltip: 'Ask to borrow',
+              onPressed: () => promptBorrowRequest(
+                context,
+                widget.connection!,
+                book.id,
+                book.title,
+              ),
+            ),
           if (widget.settings != null)
             IconButton(
               icon: const Icon(Icons.travel_explore_outlined),
