@@ -1079,6 +1079,122 @@ async fn deleting_a_book_takes_its_reading_progress_with_it() {
     assert!(left.as_array().unwrap().is_empty(), "{left}");
 }
 
+// ---- Request ids and stats (plan 5 #37) ------------------------------------
+
+/// Like [call], but returns the response headers too.
+async fn call_with_headers(
+    app: &axum::Router,
+    method: &str,
+    uri: &str,
+    token: Option<&str>,
+    request_id: Option<&str>,
+) -> (StatusCode, axum::http::HeaderMap, Value) {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(t) = token {
+        builder = builder.header("authorization", format!("Bearer {t}"));
+    }
+    if let Some(id) = request_id {
+        builder = builder.header("x-request-id", id);
+    }
+    let response = app
+        .clone()
+        .oneshot(builder.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    let headers = response.headers().clone();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let value = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    };
+    (status, headers, value)
+}
+
+#[tokio::test]
+async fn an_inbound_request_id_is_echoed_back() {
+    let app = test_app().await;
+    let (status, headers, _) =
+        call_with_headers(&app, "GET", "/health", None, Some("abc-123")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers.get("x-request-id").unwrap(), "abc-123");
+}
+
+#[tokio::test]
+async fn a_request_without_an_id_gets_one() {
+    let app = test_app().await;
+    let (_, headers, _) = call_with_headers(&app, "GET", "/health", None, None).await;
+    let id = headers
+        .get("x-request-id")
+        .expect("every response carries one");
+    assert!(!id.is_empty());
+}
+
+#[tokio::test]
+async fn an_error_body_carries_the_request_id() {
+    // The point of the feature: a user pastes one string into an issue and the
+    // operator finds the request. A header alone is invisible in an app's error.
+    let app = test_app().await;
+    let (status, headers, body) = call_with_headers(
+        &app,
+        "GET",
+        "/api/books",
+        None, // unauthenticated -> 401
+        Some("trace-me"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(headers.get("x-request-id").unwrap(), "trace-me");
+    assert_eq!(body["request_id"], json!("trace-me"));
+    // ...without losing the error message itself.
+    assert!(body["error"].is_string());
+}
+
+#[tokio::test]
+async fn a_hostile_request_id_is_sanitised() {
+    // An id goes straight into the log; newlines would let a caller forge log
+    // lines, and unbounded length would let them bloat every entry.
+    let app = test_app().await;
+    let (_, headers, _) =
+        call_with_headers(&app, "GET", "/health", None, Some("ok-part_1.2")).await;
+    assert_eq!(headers.get("x-request-id").unwrap(), "ok-part_1.2");
+
+    let long = "x".repeat(500);
+    let (_, headers, _) = call_with_headers(&app, "GET", "/health", None, Some(&long)).await;
+    assert_eq!(headers.get("x-request-id").unwrap().len(), 64);
+}
+
+#[tokio::test]
+async fn stats_are_master_only_and_count_the_library() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+    create_book(&app, &master, "Dune").await;
+    create_book(&app, &master, "Neuromancer").await;
+
+    let (status, _) = call(&app, "GET", "/api/admin/stats", Some(&alice), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "a member must not see this");
+
+    let (status, body) = call(&app, "GET", "/api/admin/stats", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["books"], json!(2));
+    assert_eq!(body["users"], json!(2));
+    assert!(body["server_version"].is_string());
+    // Sizes are reported even when they're zero on a fresh server.
+    assert!(body["blob_bytes"].is_number());
+    assert!(body["database_bytes"].is_number());
+}
+
+#[tokio::test]
+async fn stats_needs_a_session_at_all() {
+    let app = test_app().await;
+    let (status, _) = call(&app, "GET", "/api/admin/stats", None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
 // ---- Series and volume tracking (plan 5 #17) -------------------------------
 
 #[tokio::test]

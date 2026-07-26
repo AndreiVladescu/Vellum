@@ -134,6 +134,28 @@ while). It is the primary way to manage the library; the app's Sharing screen
 covers the same
 endpoints for on-device use.
 
+## Observability
+
+Every response carries an **`X-Request-Id`** (plan 5 #37) — echoed when the caller
+supplies one, generated otherwise — which appears in the server's log line for that
+request *and* in the body of an error response. That last part is the point: a user
+can paste one string from an app error into an issue, and the operator can find the
+request. An inbound id is sanitised (printable ASCII, 64 chars) before it reaches a
+log line, so a caller can't forge log entries with it.
+
+The middleware is a plain `axum::middleware::from_fn` rather than
+`tower-http`'s `TraceLayer`: it is one header, one span and one log line, and the
+server keeps its dependency surface deliberately small. One subtlety worth knowing
+if you touch it — the span must be attached with `.instrument()`, not
+`span.enter()`, because a guard is dropped at the first `.await` and the id would
+then be missing from exactly the slow requests worth diagnosing.
+
+`GET /api/admin/stats` (master-only) backs the console's **Server** dialog: library
+counts, blob bytes on disk, and database size *including its WAL sidecars* — in WAL
+mode the `-wal` file is part of the database, and reporting only the `.db`
+understates it badly right after a large import. No Prometheus, no OpenTelemetry:
+for a personal server, logs plus one stats endpoint are the right size.
+
 ## Deployment
 
 > The operator-facing guide — Docker, compose with automatic TLS, systemd, the

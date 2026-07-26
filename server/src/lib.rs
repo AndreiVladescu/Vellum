@@ -23,6 +23,7 @@ mod error;
 mod groups;
 mod loans;
 mod metadata;
+mod observability;
 mod opds;
 mod physical_copies;
 mod reading;
@@ -106,6 +107,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
     Router::new()
         .route("/capabilities", get(capabilities::get))
         .route("/memberships", get(web::memberships))
+        // Operator dashboard numbers (plan 5 #37). Master-only — see the
+        // handler; counts of other people's shares are not a member's business.
+        .route("/admin/stats", get(observability::stats))
         // The active TLS certificate (public), for the console's import affordance.
         .route("/cert", get(web::server_cert))
         // Accounts & sessions.
@@ -213,6 +217,9 @@ pub fn router(state: AppState) -> Router {
         // Baseline security headers on every response (defence in depth for the
         // console/public pages and blob downloads). See docs/SECURITY_AUDIT.md (L3).
         .layer(axum::middleware::from_fn(security_headers))
+        // Outermost, so every response — including one rejected before any
+        // handler runs — carries a request id (plan 5 #37).
+        .layer(axum::middleware::from_fn(observability::request_id))
 }
 
 /// A restrictive Content-Security-Policy that still lets the self-hosted console
