@@ -6229,6 +6229,620 @@ class RemoteReadingPositionsCompanion
   }
 }
 
+class $AnnotationsTable extends Annotations
+    with TableInfo<$AnnotationsTable, Annotation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AnnotationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bookIdMeta = const VerificationMeta('bookId');
+  @override
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES books (id)',
+    ),
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pageMeta = const VerificationMeta('page');
+  @override
+  late final GeneratedColumn<int> page = GeneratedColumn<int>(
+    'page',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _chapterMeta = const VerificationMeta(
+    'chapter',
+  );
+  @override
+  late final GeneratedColumn<int> chapter = GeneratedColumn<int>(
+    'chapter',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locatorMeta = const VerificationMeta(
+    'locator',
+  );
+  @override
+  late final GeneratedColumn<String> locator = GeneratedColumn<String>(
+    'locator',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quotedTextMeta = const VerificationMeta(
+    'quotedText',
+  );
+  @override
+  late final GeneratedColumn<String> quotedText = GeneratedColumn<String>(
+    'quoted_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<int> color = GeneratedColumn<int>(
+    'color',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    bookId,
+    kind,
+    page,
+    chapter,
+    locator,
+    quotedText,
+    note,
+    color,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'annotations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Annotation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('book_id')) {
+      context.handle(
+        _bookIdMeta,
+        bookId.isAcceptableOrUnknown(data['book_id']!, _bookIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('page')) {
+      context.handle(
+        _pageMeta,
+        page.isAcceptableOrUnknown(data['page']!, _pageMeta),
+      );
+    }
+    if (data.containsKey('chapter')) {
+      context.handle(
+        _chapterMeta,
+        chapter.isAcceptableOrUnknown(data['chapter']!, _chapterMeta),
+      );
+    }
+    if (data.containsKey('locator')) {
+      context.handle(
+        _locatorMeta,
+        locator.isAcceptableOrUnknown(data['locator']!, _locatorMeta),
+      );
+    }
+    if (data.containsKey('quoted_text')) {
+      context.handle(
+        _quotedTextMeta,
+        quotedText.isAcceptableOrUnknown(data['quoted_text']!, _quotedTextMeta),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Annotation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Annotation(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      page: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page'],
+      ),
+      chapter: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}chapter'],
+      ),
+      locator: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}locator'],
+      ),
+      quotedText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quoted_text'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}color'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AnnotationsTable createAlias(String alias) {
+    return $AnnotationsTable(attachedDatabase, alias);
+  }
+}
+
+class Annotation extends DataClass implements Insertable<Annotation> {
+  final String id;
+  final String bookId;
+
+  /// 'bookmark' | 'highlight' | 'note'.
+  final String kind;
+
+  /// Coarse location, kept as columns (not only inside [locator]) so the panel
+  /// can order and group without parsing JSON: the PDF page or the EPUB chapter.
+  final int? page;
+  final int? chapter;
+
+  /// Fine location as versioned JSON — see `annotation_locator.dart`. Versioned
+  /// because the EPUB offsets depend on this app's own text extraction, so a
+  /// parser change must be able to migrate them rather than orphan them.
+  final String? locator;
+  final String? quotedText;
+  final String? note;
+
+  /// Highlight colour as an ARGB int, or null for the default.
+  final int? color;
+  final DateTime createdAt;
+  const Annotation({
+    required this.id,
+    required this.bookId,
+    required this.kind,
+    this.page,
+    this.chapter,
+    this.locator,
+    this.quotedText,
+    this.note,
+    this.color,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['book_id'] = Variable<String>(bookId);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || page != null) {
+      map['page'] = Variable<int>(page);
+    }
+    if (!nullToAbsent || chapter != null) {
+      map['chapter'] = Variable<int>(chapter);
+    }
+    if (!nullToAbsent || locator != null) {
+      map['locator'] = Variable<String>(locator);
+    }
+    if (!nullToAbsent || quotedText != null) {
+      map['quoted_text'] = Variable<String>(quotedText);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<int>(color);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  AnnotationsCompanion toCompanion(bool nullToAbsent) {
+    return AnnotationsCompanion(
+      id: Value(id),
+      bookId: Value(bookId),
+      kind: Value(kind),
+      page: page == null && nullToAbsent ? const Value.absent() : Value(page),
+      chapter: chapter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chapter),
+      locator: locator == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locator),
+      quotedText: quotedText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quotedText),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Annotation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Annotation(
+      id: serializer.fromJson<String>(json['id']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      page: serializer.fromJson<int?>(json['page']),
+      chapter: serializer.fromJson<int?>(json['chapter']),
+      locator: serializer.fromJson<String?>(json['locator']),
+      quotedText: serializer.fromJson<String?>(json['quotedText']),
+      note: serializer.fromJson<String?>(json['note']),
+      color: serializer.fromJson<int?>(json['color']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bookId': serializer.toJson<String>(bookId),
+      'kind': serializer.toJson<String>(kind),
+      'page': serializer.toJson<int?>(page),
+      'chapter': serializer.toJson<int?>(chapter),
+      'locator': serializer.toJson<String?>(locator),
+      'quotedText': serializer.toJson<String?>(quotedText),
+      'note': serializer.toJson<String?>(note),
+      'color': serializer.toJson<int?>(color),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Annotation copyWith({
+    String? id,
+    String? bookId,
+    String? kind,
+    Value<int?> page = const Value.absent(),
+    Value<int?> chapter = const Value.absent(),
+    Value<String?> locator = const Value.absent(),
+    Value<String?> quotedText = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+    Value<int?> color = const Value.absent(),
+    DateTime? createdAt,
+  }) => Annotation(
+    id: id ?? this.id,
+    bookId: bookId ?? this.bookId,
+    kind: kind ?? this.kind,
+    page: page.present ? page.value : this.page,
+    chapter: chapter.present ? chapter.value : this.chapter,
+    locator: locator.present ? locator.value : this.locator,
+    quotedText: quotedText.present ? quotedText.value : this.quotedText,
+    note: note.present ? note.value : this.note,
+    color: color.present ? color.value : this.color,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  Annotation copyWithCompanion(AnnotationsCompanion data) {
+    return Annotation(
+      id: data.id.present ? data.id.value : this.id,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      page: data.page.present ? data.page.value : this.page,
+      chapter: data.chapter.present ? data.chapter.value : this.chapter,
+      locator: data.locator.present ? data.locator.value : this.locator,
+      quotedText: data.quotedText.present
+          ? data.quotedText.value
+          : this.quotedText,
+      note: data.note.present ? data.note.value : this.note,
+      color: data.color.present ? data.color.value : this.color,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Annotation(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('kind: $kind, ')
+          ..write('page: $page, ')
+          ..write('chapter: $chapter, ')
+          ..write('locator: $locator, ')
+          ..write('quotedText: $quotedText, ')
+          ..write('note: $note, ')
+          ..write('color: $color, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    bookId,
+    kind,
+    page,
+    chapter,
+    locator,
+    quotedText,
+    note,
+    color,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Annotation &&
+          other.id == this.id &&
+          other.bookId == this.bookId &&
+          other.kind == this.kind &&
+          other.page == this.page &&
+          other.chapter == this.chapter &&
+          other.locator == this.locator &&
+          other.quotedText == this.quotedText &&
+          other.note == this.note &&
+          other.color == this.color &&
+          other.createdAt == this.createdAt);
+}
+
+class AnnotationsCompanion extends UpdateCompanion<Annotation> {
+  final Value<String> id;
+  final Value<String> bookId;
+  final Value<String> kind;
+  final Value<int?> page;
+  final Value<int?> chapter;
+  final Value<String?> locator;
+  final Value<String?> quotedText;
+  final Value<String?> note;
+  final Value<int?> color;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const AnnotationsCompanion({
+    this.id = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.page = const Value.absent(),
+    this.chapter = const Value.absent(),
+    this.locator = const Value.absent(),
+    this.quotedText = const Value.absent(),
+    this.note = const Value.absent(),
+    this.color = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AnnotationsCompanion.insert({
+    required String id,
+    required String bookId,
+    required String kind,
+    this.page = const Value.absent(),
+    this.chapter = const Value.absent(),
+    this.locator = const Value.absent(),
+    this.quotedText = const Value.absent(),
+    this.note = const Value.absent(),
+    this.color = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bookId = Value(bookId),
+       kind = Value(kind);
+  static Insertable<Annotation> custom({
+    Expression<String>? id,
+    Expression<String>? bookId,
+    Expression<String>? kind,
+    Expression<int>? page,
+    Expression<int>? chapter,
+    Expression<String>? locator,
+    Expression<String>? quotedText,
+    Expression<String>? note,
+    Expression<int>? color,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bookId != null) 'book_id': bookId,
+      if (kind != null) 'kind': kind,
+      if (page != null) 'page': page,
+      if (chapter != null) 'chapter': chapter,
+      if (locator != null) 'locator': locator,
+      if (quotedText != null) 'quoted_text': quotedText,
+      if (note != null) 'note': note,
+      if (color != null) 'color': color,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AnnotationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bookId,
+    Value<String>? kind,
+    Value<int?>? page,
+    Value<int?>? chapter,
+    Value<String?>? locator,
+    Value<String?>? quotedText,
+    Value<String?>? note,
+    Value<int?>? color,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return AnnotationsCompanion(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      kind: kind ?? this.kind,
+      page: page ?? this.page,
+      chapter: chapter ?? this.chapter,
+      locator: locator ?? this.locator,
+      quotedText: quotedText ?? this.quotedText,
+      note: note ?? this.note,
+      color: color ?? this.color,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (page.present) {
+      map['page'] = Variable<int>(page.value);
+    }
+    if (chapter.present) {
+      map['chapter'] = Variable<int>(chapter.value);
+    }
+    if (locator.present) {
+      map['locator'] = Variable<String>(locator.value);
+    }
+    if (quotedText.present) {
+      map['quoted_text'] = Variable<String>(quotedText.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<int>(color.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AnnotationsCompanion(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('kind: $kind, ')
+          ..write('page: $page, ')
+          ..write('chapter: $chapter, ')
+          ..write('locator: $locator, ')
+          ..write('quotedText: $quotedText, ')
+          ..write('note: $note, ')
+          ..write('color: $color, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$VellumDatabase extends GeneratedDatabase {
   _$VellumDatabase(QueryExecutor e) : super(e);
   $VellumDatabaseManager get managers => $VellumDatabaseManager(this);
@@ -6251,6 +6865,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
   late final $LocalDeletionsTable localDeletions = $LocalDeletionsTable(this);
   late final $RemoteReadingPositionsTable remoteReadingPositions =
       $RemoteReadingPositionsTable(this);
+  late final $AnnotationsTable annotations = $AnnotationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6271,6 +6886,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     bookPlacements,
     localDeletions,
     remoteReadingPositions,
+    annotations,
   ];
 }
 
@@ -6413,6 +7029,24 @@ final class $$BooksTableReferences
     ).filter((f) => f.bookId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_shelfBooksRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$AnnotationsTable, List<Annotation>>
+  _annotationsRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
+    db.annotations,
+    aliasName: 'books__id__annotations__book_id',
+  );
+
+  $$AnnotationsTableProcessedTableManager get annotationsRefs {
+    final manager = $$AnnotationsTableTableManager(
+      $_db,
+      $_db.annotations,
+    ).filter((f) => f.bookId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_annotationsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -6644,6 +7278,31 @@ class $$BooksTableFilterComposer
           }) => $$ShelfBooksTableFilterComposer(
             $db: $db,
             $table: $db.shelfBooks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> annotationsRefs(
+    Expression<bool> Function($$AnnotationsTableFilterComposer f) f,
+  ) {
+    final $$AnnotationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.annotations,
+      getReferencedColumn: (t) => t.bookId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AnnotationsTableFilterComposer(
+            $db: $db,
+            $table: $db.annotations,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -6975,6 +7634,31 @@ class $$BooksTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> annotationsRefs<T extends Object>(
+    Expression<T> Function($$AnnotationsTableAnnotationComposer a) f,
+  ) {
+    final $$AnnotationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.annotations,
+      getReferencedColumn: (t) => t.bookId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AnnotationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.annotations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$BooksTableTableManager
@@ -6996,6 +7680,7 @@ class $$BooksTableTableManager
             bool bookFilesRefs,
             bool physicalCopiesRefs,
             bool shelfBooksRefs,
+            bool annotationsRefs,
           })
         > {
   $$BooksTableTableManager(_$VellumDatabase db, $BooksTable table)
@@ -7114,6 +7799,7 @@ class $$BooksTableTableManager
                 bookFilesRefs = false,
                 physicalCopiesRefs = false,
                 shelfBooksRefs = false,
+                annotationsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -7123,6 +7809,7 @@ class $$BooksTableTableManager
                     if (bookFilesRefs) db.bookFiles,
                     if (physicalCopiesRefs) db.physicalCopies,
                     if (shelfBooksRefs) db.shelfBooks,
+                    if (annotationsRefs) db.annotations,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -7220,6 +7907,27 @@ class $$BooksTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (annotationsRefs)
+                        await $_getPrefetchedData<
+                          Book,
+                          $BooksTable,
+                          Annotation
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BooksTableReferences
+                              ._annotationsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BooksTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).annotationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.bookId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -7246,6 +7954,7 @@ typedef $$BooksTableProcessedTableManager =
         bool bookFilesRefs,
         bool physicalCopiesRefs,
         bool shelfBooksRefs,
+        bool annotationsRefs,
       })
     >;
 typedef $$AuthorsTableCreateCompanionBuilder =
@@ -12106,6 +12815,420 @@ typedef $$RemoteReadingPositionsTableProcessedTableManager =
       RemoteReadingPosition,
       PrefetchHooks Function()
     >;
+typedef $$AnnotationsTableCreateCompanionBuilder =
+    AnnotationsCompanion Function({
+      required String id,
+      required String bookId,
+      required String kind,
+      Value<int?> page,
+      Value<int?> chapter,
+      Value<String?> locator,
+      Value<String?> quotedText,
+      Value<String?> note,
+      Value<int?> color,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$AnnotationsTableUpdateCompanionBuilder =
+    AnnotationsCompanion Function({
+      Value<String> id,
+      Value<String> bookId,
+      Value<String> kind,
+      Value<int?> page,
+      Value<int?> chapter,
+      Value<String?> locator,
+      Value<String?> quotedText,
+      Value<String?> note,
+      Value<int?> color,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$AnnotationsTableReferences
+    extends BaseReferences<_$VellumDatabase, $AnnotationsTable, Annotation> {
+  $$AnnotationsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $BooksTable _bookIdTable(_$VellumDatabase db) =>
+      db.books.createAlias('annotations__book_id__books__id');
+
+  $$BooksTableProcessedTableManager get bookId {
+    final $_column = $_itemColumn<String>('book_id')!;
+
+    final manager = $$BooksTableTableManager(
+      $_db,
+      $_db.books,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_bookIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$AnnotationsTableFilterComposer
+    extends Composer<_$VellumDatabase, $AnnotationsTable> {
+  $$AnnotationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get chapter => $composableBuilder(
+    column: $table.chapter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get locator => $composableBuilder(
+    column: $table.locator,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quotedText => $composableBuilder(
+    column: $table.quotedText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$BooksTableFilterComposer get bookId {
+    final $$BooksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.bookId,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableFilterComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AnnotationsTableOrderingComposer
+    extends Composer<_$VellumDatabase, $AnnotationsTable> {
+  $$AnnotationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get chapter => $composableBuilder(
+    column: $table.chapter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get locator => $composableBuilder(
+    column: $table.locator,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quotedText => $composableBuilder(
+    column: $table.quotedText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$BooksTableOrderingComposer get bookId {
+    final $$BooksTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.bookId,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableOrderingComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AnnotationsTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $AnnotationsTable> {
+  $$AnnotationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get page =>
+      $composableBuilder(column: $table.page, builder: (column) => column);
+
+  GeneratedColumn<int> get chapter =>
+      $composableBuilder(column: $table.chapter, builder: (column) => column);
+
+  GeneratedColumn<String> get locator =>
+      $composableBuilder(column: $table.locator, builder: (column) => column);
+
+  GeneratedColumn<String> get quotedText => $composableBuilder(
+    column: $table.quotedText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<int> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$BooksTableAnnotationComposer get bookId {
+    final $$BooksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.bookId,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AnnotationsTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $AnnotationsTable,
+          Annotation,
+          $$AnnotationsTableFilterComposer,
+          $$AnnotationsTableOrderingComposer,
+          $$AnnotationsTableAnnotationComposer,
+          $$AnnotationsTableCreateCompanionBuilder,
+          $$AnnotationsTableUpdateCompanionBuilder,
+          (Annotation, $$AnnotationsTableReferences),
+          Annotation,
+          PrefetchHooks Function({bool bookId})
+        > {
+  $$AnnotationsTableTableManager(_$VellumDatabase db, $AnnotationsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AnnotationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AnnotationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AnnotationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> bookId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<int?> page = const Value.absent(),
+                Value<int?> chapter = const Value.absent(),
+                Value<String?> locator = const Value.absent(),
+                Value<String?> quotedText = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<int?> color = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AnnotationsCompanion(
+                id: id,
+                bookId: bookId,
+                kind: kind,
+                page: page,
+                chapter: chapter,
+                locator: locator,
+                quotedText: quotedText,
+                note: note,
+                color: color,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String bookId,
+                required String kind,
+                Value<int?> page = const Value.absent(),
+                Value<int?> chapter = const Value.absent(),
+                Value<String?> locator = const Value.absent(),
+                Value<String?> quotedText = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<int?> color = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AnnotationsCompanion.insert(
+                id: id,
+                bookId: bookId,
+                kind: kind,
+                page: page,
+                chapter: chapter,
+                locator: locator,
+                quotedText: quotedText,
+                note: note,
+                color: color,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$AnnotationsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({bookId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (bookId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.bookId,
+                                referencedTable: $$AnnotationsTableReferences
+                                    ._bookIdTable(db),
+                                referencedColumn: $$AnnotationsTableReferences
+                                    ._bookIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AnnotationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $AnnotationsTable,
+      Annotation,
+      $$AnnotationsTableFilterComposer,
+      $$AnnotationsTableOrderingComposer,
+      $$AnnotationsTableAnnotationComposer,
+      $$AnnotationsTableCreateCompanionBuilder,
+      $$AnnotationsTableUpdateCompanionBuilder,
+      (Annotation, $$AnnotationsTableReferences),
+      Annotation,
+      PrefetchHooks Function({bool bookId})
+    >;
 
 class $VellumDatabaseManager {
   final _$VellumDatabase _db;
@@ -12143,4 +13266,6 @@ class $VellumDatabaseManager {
         _db,
         _db.remoteReadingPositions,
       );
+  $$AnnotationsTableTableManager get annotations =>
+      $$AnnotationsTableTableManager(_db, _db.annotations);
 }

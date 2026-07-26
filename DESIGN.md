@@ -186,6 +186,25 @@ warns when a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+**Annotations** (app, plan 5 #22) are bookmarks, highlights and notes, all in one
+app-local `annotations` table discriminated by `kind` — they differ only in which
+fields they carry. Personal marginalia, so they stay on the device like
+`readerNotes`; if they ever sync they get their own table and endpoint, never a
+column on the book row.
+
+Position is stored as **versioned JSON** (`annotation_locator.dart`) because the
+two formats are not equally trustworthy. A PDF locator is objective: a page plus a
+character range in the *PDF's own* extracted text, via `pdfrx`. An EPUB locator is
+not — its offsets index this app's plain-text extraction of a chapter
+(`EpubChapter.plainText`), so they are only as stable as that function, which is
+exactly what the version number exists to migrate. Every text annotation therefore
+also stores the quoted passage, and re-finding one is **quote-first**: the stored
+offsets are used only if the text there still matches, otherwise the nearest
+occurrence of the quote wins. A highlight that moves slightly beats one that
+points confidently at the wrong sentence. Annotations can be **exported as
+Markdown** per book or library-wide — a highlight nobody can get out of the app is
+a highlight held hostage.
+
 **App-local-only columns on `book`** (deliberately *not* synced): reading state
 (progress/page/last-read), **reader notes**, and **`source_metadata`** (a JSON
 snapshot of the online-library data a book was imported with, behind *revert to

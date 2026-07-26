@@ -14,6 +14,49 @@ class EpubChapter {
 
   final String title;
   final String html;
+
+  /// The chapter's visible text, with markup removed and whitespace collapsed.
+  ///
+  /// The anchor for EPUB annotations (plan 5 #22): highlight offsets are indices
+  /// into *this* string, so it has to be derived deterministically from [html]
+  /// and nothing else. That also makes it the dependency the locator's version
+  /// number protects — change this function and old offsets shift, which is why
+  /// `resolveOffsets` re-finds a highlight by its quoted text.
+  ///
+  /// Not cached on the instance: chapters are already cached per book
+  /// ([EpubBook.openCached]) and a highlight touches one chapter at a time.
+  String get plainText => stripHtml(html);
+}
+
+/// Strips tags, drops `<script>`/`<style>` bodies, decodes the handful of
+/// entities that actually appear in prose, and collapses whitespace.
+///
+/// Deliberately small and self-contained rather than a parse: it must produce
+/// the *same* string for the same input on every platform and across app
+/// versions, because annotation offsets are measured against it.
+String stripHtml(String html) {
+  final withoutScripts = html.replaceAll(
+    RegExp(r'<(script|style)[^>]*>.*?</\1>',
+        caseSensitive: false, dotAll: true),
+    ' ',
+  );
+  // Block-level ends become spaces so words don't run together.
+  final spaced = withoutScripts
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ')
+      .replaceAll(
+          RegExp(r'</(p|div|h[1-6]|li|tr|blockquote)>', caseSensitive: false),
+          ' ');
+  final text = spaced.replaceAll(RegExp(r'<[^>]*>'), '');
+  return text
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&apos;', "'")
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
 
 /// A parsed EPUB. An EPUB is a zip: `META-INF/container.xml` names the OPF

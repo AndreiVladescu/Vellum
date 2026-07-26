@@ -248,6 +248,17 @@ class MergeService {
       }
       if (addedGenres > 0) log.add('added $addedGenres genre(s)');
 
+      // ---- annotations ----
+      // Highlights and notes are about the *book*, so they follow it. Moved
+      // rather than dropped: losing someone's marginalia to a tidy-up would be
+      // the worst thing this operation could do.
+      final movedNotes = await db.customUpdate(
+        'UPDATE annotations SET book_id = ? WHERE book_id = ?',
+        variables: [Variable(keeperId), Variable(loserId)],
+        updates: {db.annotations},
+      );
+      if (movedNotes > 0) log.add('moved $movedNotes annotation(s)');
+
       // ---- reading state: keep whichever is further along ----
       // Reading state is app-local and never synced, but losing "you were on
       // page 300" because the merge kept the other row would still be a loss.
@@ -270,7 +281,13 @@ class MergeService {
       await db
           .into(db.localDeletions)
           .insertOnConflictUpdate(LocalDeletionsCompanion.insert(bookId: loserId));
-      for (final table in ['book_authors', 'book_genres', 'book_files', 'shelf_books']) {
+      for (final table in [
+        'book_authors',
+        'book_genres',
+        'book_files',
+        'shelf_books',
+        'annotations',
+      ]) {
         await db.customStatement('DELETE FROM $table WHERE book_id = ?', [loserId]);
       }
       await db.customStatement(

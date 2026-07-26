@@ -6,6 +6,8 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import 'annotations/annotation_locator.dart';
+import 'annotations/annotations_panel.dart';
 import 'epub_book.dart';
 
 /// The integrated EPUB reader: one chapter at a time, with previous/next
@@ -36,18 +38,189 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   bool _restored = false;
   Timer? _saveDebounce;
 
+  AnnotationStore get _annotations => widget.repository.annotations;
+
+  /// Reports the live text selection inside the chapter (plan 5 #22). The range
+  /// it gives is in characters of the *rendered* chapter text, which is what
+  /// makes an EPUB locator an approximation — see [_highlightSelection].
+  final _selectionNotifier = SelectionListenerNotifier();
+  ({int start, int end})? _selectionRange;
+
+  /// Whether this chapter is bookmarked, so the action toggles instead of
+  /// stacking. One bookmark per chapter: any finer and a long chapter collects
+  /// noise, and the locator's scroll fraction still returns you to the spot.
+  String? _bookmarkOnChapter;
+
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
+    _selectionNotifier.addListener(_onSelectionChanged);
   }
 
   @override
   void dispose() {
     _saveDebounce?.cancel();
     _scroll.removeListener(_onScroll);
+    _selectionNotifier.removeListener(_onSelectionChanged);
+    _selectionNotifier.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  void _onSelectionChanged() {
+    if (!_selectionNotifier.registered) return;
+    final range = _selectionNotifier.selection.range;
+    final next = range == null
+        ? null
+        : (start: range.startOffset, end: range.endOffset);
+    // Rebuild only when the presence of a selection changes; this fires
+    // continuously while dragging.
+    final had = _selectionRange != null;
+    _selectionRange = next;
+    if ((next != null) != had && mounted) setState(() {});
+  }
+
+  Future<void> _refreshBookmark() async {
+    final existing =
+        await _annotations.bookmarkAtChapter(widget.book.id, _chapter);
+    if (!mounted) return;
+    setState(() => _bookmarkOnChapter = existing?.id);
+  }
+
+  Future<void> _toggleBookmark() async {
+    final existing = _bookmarkOnChapter;
+    if (existing != null) {
+      await _annotations.delete(existing);
+      if (!mounted) return;
+      setState(() => _bookmarkOnChapter = null);
+      return;
+    }
+    final id = await _annotations.add(
+      bookId: widget.book.id,
+      kind: AnnotationKind.bookmark,
+      chapter: _chapter,
+      locator: EpubScrollLocator(chapter: _chapter, fraction: _scrollFraction),
+    );
+    if (!mounted) return;
+    setState(() => _bookmarkOnChapter = id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Bookmarked chapter ${_chapter + 1}')),
+    );
+  }
+
+  /// Stores the current selection as a highlight (optionally with a note).
+  ///
+  /// **Honest about its own precision.** The offsets come from Flutter's
+  /// selection, i.e. from the *rendered* chapter, while the quote is taken from
+  /// this app's plain-text extraction of the same chapter; whitespace handling
+  /// can make the two disagree by a few characters. That is exactly why the
+  /// locator is versioned and why [resolveOffsets] treats the quote as
+  /// authoritative and the offsets as a hint — a highlight that moves slightly
+  /// beats one that confidently points at the wrong sentence.
+  Future<void> _highlightSelection(EpubBook epub, {bool withNote = false}) async {
+    final range = _selectionRange;
+    if (range == null) return;
+    final plain = epub.chapters[_chapter].plainText;
+    final start = range.start.clamp(0, plain.length);
+    final end = range.end.clamp(start, plain.length);
+    final quote = plain.substring(start, end).trim();
+    if (quote.isEmpty) return;
+
+    String? note;
+    if (withNote) {
+      note = await _promptNote(quote);
+      if (note == null || !mounted) return;
+    }
+    await _annotations.add(
+      bookId: widget.book.id,
+      kind: withNote ? AnnotationKind.note : AnnotationKind.highlight,
+      chapter: _chapter,
+      locator: EpubTextLocator(chapter: _chapter, start: start, end: end),
+      quotedText: quote,
+      note: note,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(withNote ? 'Note saved' : 'Highlighted')),
+    );
+  }
+
+  Future<String?> _promptNote(String quote) async {
+    final controller = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Note on this passage'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '“${quote.length > 120 ? '${quote.substring(0, 120)}…' : quote}”',
+              style: const TextStyle(fontStyle: FontStyle.italic),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              minLines: 2,
+              maxLines: 5,
+              decoration: const InputDecoration(hintText: 'Your note'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    return saved == true ? controller.text : null;
+  }
+
+  void _openPanel(EpubBook epub) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: AnnotationsPanel(
+          book: widget.book,
+          store: _annotations,
+          onJump: (locator) {
+            final target = switch (locator) {
+              EpubScrollLocator(:final chapter, :final fraction) =>
+                (chapter: chapter, fraction: fraction),
+              EpubTextLocator(:final chapter, :final start) => (
+                  chapter: chapter,
+                  // Approximate: scroll to where that character sits in the
+                  // chapter's text. Good enough to land on the passage.
+                  fraction: epub.chapters[chapter].plainText.isEmpty
+                      ? 0.0
+                      : start / epub.chapters[chapter].plainText.length,
+                ),
+              _ => null,
+            };
+            Navigator.of(context).pop();
+            if (target == null) return;
+            _goTo(target.chapter, epub.chapters.length);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_scroll.hasClients) return;
+              final max = _scroll.position.maxScrollExtent;
+              if (max > 0) _scroll.jumpTo(target.fraction.clamp(0, 1) * max);
+            });
+          },
+        ),
+      ),
+    );
   }
 
   double get _scrollFraction {
@@ -73,6 +246,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
   void _goTo(int index, int count) {
     setState(() => _chapter = index.clamp(0, count - 1));
+    _refreshBookmark();
     if (_scroll.hasClients) _scroll.jumpTo(0);
     // A new chapter starts at the top; save immediately (fraction 0).
     widget.repository.saveEpubPosition(
@@ -143,6 +317,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
           _chapter = ((widget.book.lastReadPage ?? 1) - 1).clamp(0, count - 1);
           // Restore the in-chapter scroll once this chapter has laid out.
           _restoreScroll(count);
+          _refreshBookmark();
         }
         final chapter = epub.chapters[_chapter];
         return Scaffold(
@@ -154,6 +329,32 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                   padding: const EdgeInsets.only(right: 8),
                   child: Text('${_chapter + 1} / $count'),
                 ),
+              ),
+              if (_selectionRange != null) ...[
+                IconButton(
+                  tooltip: 'Highlight selection',
+                  icon: const Icon(Icons.format_color_text),
+                  onPressed: () => _highlightSelection(epub),
+                ),
+                IconButton(
+                  tooltip: 'Note on selection',
+                  icon: const Icon(Icons.sticky_note_2_outlined),
+                  onPressed: () => _highlightSelection(epub, withNote: true),
+                ),
+              ],
+              IconButton(
+                tooltip: _bookmarkOnChapter == null
+                    ? 'Bookmark this chapter'
+                    : 'Remove bookmark',
+                icon: Icon(_bookmarkOnChapter == null
+                    ? Icons.bookmark_outline
+                    : Icons.bookmark),
+                onPressed: _toggleBookmark,
+              ),
+              IconButton(
+                tooltip: 'Annotations',
+                icon: const Icon(Icons.list_alt),
+                onPressed: () => _openPanel(epub),
               ),
               IconButton(
                 tooltip: 'Chapters',
@@ -169,7 +370,14 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               child: ConstrainedBox(
                 // A comfortable measure on wide desktop windows.
                 constraints: const BoxConstraints(maxWidth: 720),
-                child: HtmlWidget(chapter.html),
+                // Selectable so passages can be highlighted; the listener is
+                // what turns a selection into character offsets (plan 5 #22).
+                child: SelectionArea(
+                  child: SelectionListener(
+                    selectionNotifier: _selectionNotifier,
+                    child: HtmlWidget(chapter.html),
+                  ),
+                ),
               ),
             ),
           ),

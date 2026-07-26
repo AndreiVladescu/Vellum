@@ -12,6 +12,7 @@ import 'file_service.dart';
 import 'library_queries.dart';
 import 'metadata.dart';
 import 'physical_service.dart';
+import '../reader/annotations/annotation_store.dart';
 import 'reading_position_service.dart';
 import 'shelf_service.dart';
 
@@ -22,6 +23,8 @@ import 'shelf_service.dart';
 export '../physical/layout_repository.dart' show LayoutRepository, PlacedBook;
 export 'book_write_service.dart' show BookDetails;
 export 'physical_service.dart' show LoanEntry;
+export '../reader/annotations/annotation_store.dart'
+    show AnnotationKind, AnnotationStore;
 export 'reading_position_service.dart'
     show ReadingJumpOffer, ReadingPositionService, readingUnitForFormats;
 
@@ -43,6 +46,7 @@ class LibraryRepository {
     required this.files,
     required this.writes,
     required this.readingPositions,
+    required this.annotations,
   });
 
   final VellumDatabase db;
@@ -77,6 +81,10 @@ class LibraryRepository {
   /// cached positions, the publish-dirty flag, and the jump offer. Reached as
   /// `repository.readingPositions`.
   final ReadingPositionService readingPositions;
+
+  /// Bookmarks, highlights and notes (plan 5 #22). Reached as
+  /// `repository.annotations`.
+  final AnnotationStore annotations;
 
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
@@ -139,6 +147,7 @@ class LibraryRepository {
       files: FileService(db, dir, covers),
       writes: BookWriteService(db, dir, metadataService, covers),
       readingPositions: ReadingPositionService(db),
+      annotations: AnnotationStore(db),
     );
   }
 

@@ -566,6 +566,9 @@ class BookWriteService {
         'book_genres',
         'book_files',
         'shelf_books',
+        // Marginalia go with the book they annotate (plan 5 #22); they are
+        // app-local, so there is no tombstone to record for them.
+        'annotations',
       ]) {
         await db.customStatement('DELETE FROM $table WHERE book_id = ?', [
           book.id,

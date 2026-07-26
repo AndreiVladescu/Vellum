@@ -12,6 +12,7 @@ import 'genres_section.dart';
 import 'lend_sheet.dart';
 import 'physical_copies_section.dart';
 import 'read_button.dart';
+import '../reader/annotations/annotations_panel.dart';
 import 'reader_notes_section.dart';
 
 /// Full-page book view: metadata, digital formats, physical copies, and the
@@ -395,6 +396,32 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               PhysicalCopiesSection(book: book, repository: repository),
               const SizedBox(height: 24),
               ReaderNotesSection(book: book, repository: repository),
+              // The reading record for this book (plan 5 #22). No onJump here:
+              // the detail page has nowhere to jump to, so entries are a record
+              // rather than navigation — tapping one would promise a jump the
+              // page can't make.
+              StreamBuilder<List<Annotation>>(
+                stream: repository.annotations.watchForBook(book.id),
+                builder: (context, snapshot) {
+                  final annotations = snapshot.data ?? const <Annotation>[];
+                  if (annotations.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: 320,
+                          child: AnnotationsPanel(
+                            book: book,
+                            store: repository.annotations,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               if (repository.canRevert(book)) ...[
                 const SizedBox(height: 12),
                 Align(

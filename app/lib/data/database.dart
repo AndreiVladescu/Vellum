@@ -276,6 +276,39 @@ class RemoteReadingPositions extends Table {
   Set<Column> get primaryKey => {bookId, deviceId};
 }
 
+/// Bookmarks, highlights and notes made while reading (plan 5 #22).
+///
+/// One table for all three kinds, discriminated by [kind], because they differ
+/// only in which fields they carry: a bookmark is a location, a highlight is a
+/// location plus quoted text, a note is either plus the user's own words.
+///
+/// **App-local, like `readerNotes`.** These are personal marginalia, not
+/// catalogue data. If they ever sync they get their own table and endpoint
+/// (the shape #5 established), never a column on the book row.
+@DataClassName('Annotation')
+class Annotations extends Table {
+  TextColumn get id => text()();
+  TextColumn get bookId => text().references(Books, #id)();
+  /// 'bookmark' | 'highlight' | 'note'.
+  TextColumn get kind => text()();
+  /// Coarse location, kept as columns (not only inside [locator]) so the panel
+  /// can order and group without parsing JSON: the PDF page or the EPUB chapter.
+  IntColumn get page => integer().nullable()();
+  IntColumn get chapter => integer().nullable()();
+  /// Fine location as versioned JSON — see `annotation_locator.dart`. Versioned
+  /// because the EPUB offsets depend on this app's own text extraction, so a
+  /// parser change must be able to migrate them rather than orphan them.
+  TextColumn get locator => text().nullable()();
+  TextColumn get quotedText => text().nullable()();
+  TextColumn get note => text().nullable()();
+  /// Highlight colour as an ARGB int, or null for the default.
+  IntColumn get color => integer().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
   Books,
   Authors,
@@ -292,13 +325,14 @@ class RemoteReadingPositions extends Table {
   BookPlacements,
   LocalDeletions,
   RemoteReadingPositions,
+  Annotations,
 ])
 class VellumDatabase extends _$VellumDatabase {
   VellumDatabase([QueryExecutor? executor])
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -444,6 +478,12 @@ class VellumDatabase extends _$VellumDatabase {
             );
             if (!(await tableNames()).contains('remote_reading_positions')) {
               await m.createTable(remoteReadingPositions);
+            }
+          }
+          if (from < 14) {
+            // Annotations (plan 5 #22): app-local, so no server migration.
+            if (!(await tableNames()).contains('annotations')) {
+              await m.createTable(annotations);
             }
           }
         },
