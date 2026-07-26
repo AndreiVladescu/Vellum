@@ -56,15 +56,15 @@ is answerable from `git log`:
 | 31 | SMTP mailer, password reset, emailed invites | `d031ffd`, `eda0843`, `cf349dc` |
 | 27 | Loan due dates, overdue badges, reminders* | `93574d5` |
 | 51 | Condition photos on copies | `0ebe05c` |
-| 28 | Find a copy, tidy a shelf, print labels | `HEAD` |
+| 28 | Find a copy, tidy a shelf, print labels | `c751607` |
+| 13 | Backup manifest + verify, rotation, encryption* | `HEAD` |
 
-**Phases 1–3 are done, 10 of Phase 4's 11 items, and 5 of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
-from the interleave list. **Still open in Phase 4** — each needs a new dependency or is substantial in its
-own right, which is why they were left rather than rushed:
+**Phase 4 is complete, and 5 of Phase 5's 9 items are done.** Everything §I lists for the on-ramp has landed, plus #14
+from the interleave list.
 
-| # | Item | What it needs |
-|---|---|---|
-| 13 | Backup manifest + verify, rotation, encryption | `cryptography` for the optional passphrase half |
+*#13's **incremental** half (step 4) is deliberately not built: the plan itself
+says to defer it until full backups measurably hurt, and to prefer "blobs in a
+sidecar folder + small db-only archives" over an incremental format if they do.
 
 **Still open in Phase 5:** #32 (server-side content search — an FTS5 index over
 extracted PDF/EPUB text), #35 (console scale: saved views, activity log), #34

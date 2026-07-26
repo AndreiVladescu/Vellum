@@ -294,6 +294,35 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**Backups that can be trusted** (app, plan 5 #13). An archive now carries a
+`manifest.json` with the drift schema version, counts, and a **SHA-256 per
+entry**, and *Verify a backup* re-hashes everything without restoring — the only
+way to learn a backup is bad before the moment you need it. (The manifest records
+the schema version rather than an app version: that is the number which decides
+whether a restored database opens at all, and it needs no extra platform plugin
+to read.) Archives written before this verify as *readable but unchecked* rather
+than being reported as fine.
+
+**Scheduled backups run at app start**, not on a timer: a desktop app that is
+open is one being used, and "back up if the last one is older than the interval"
+needs no background service or new platform permission. Rotation keeps N and
+deletes only files matching the `vellum-backup-<stamp>.zip` name it writes, sorted
+**by name rather than mtime** — copying a backup folder to another drive rewrites
+mtimes, and "keep 5" must never become "delete your other files". A failed run
+leaves the schedule due.
+
+**Encryption is optional and off by default.** A plain `.zip` opens in anything,
+forever, with no software of ours, and that inspectability is worth keeping as the
+default. When you do ask for it, the archive is sealed with AES-256-GCM under an
+Argon2id-derived key, **chunked** at 1 MiB with a per-chunk nonce and MAC — a
+single-message encryption would need the whole (possibly multi-gigabyte) library
+in memory. Each chunk authenticates `header ‖ counter ‖ isLast`, so reordering,
+splicing between backups and truncation are all detected rather than decrypting
+into a shorter valid-looking archive. Nothing about the passphrase is stored, the
+UI says so bluntly, and *scheduled* backups are always plain: encrypting them
+unattended would mean storing the passphrase, which is the same as not encrypting
+them.
+
 **Finding a book, tidying a shelf, printing labels** (app, plan 5 #28) turns the
 physical view from a map into a map with a "you are here". *Find my copy* on a
 book resolves book → copy → placement → environment, opens that room, points the

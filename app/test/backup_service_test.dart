@@ -4,9 +4,13 @@ import 'package:archive/archive.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vellum/data/backup_crypto.dart';
+import 'package:vellum/data/backup_schedule.dart';
 import 'package:vellum/data/backup_service.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/settings/app_settings.dart';
 
 /// A repository over a real on-disk database (backup needs `VACUUM INTO` and
 /// a file to swap, so `NativeDatabase.memory()` won't do here).
@@ -20,6 +24,248 @@ void main() {
   late Directory dir;
   setUp(() => dir = Directory.systemTemp.createTempSync('vellum_backup_test'));
   tearDown(() => dir.deleteSync(recursive: true));
+
+  // ---- manifest + verify (plan 5 #13) ------------------------------------
+
+  group('verify', () {
+    test('an untouched backup checks out, and reports what is in it', () async {
+      final source = await _repo(dir, 'source.sqlite');
+      await source.createCustomBook(title: 'Kept');
+      File(p.join(dir.path, 'covers', 'x.jpg')).writeAsBytesSync([1, 2, 3, 4]);
+      final zip = File(p.join(dir.path, 'backup.zip'));
+      await BackupService(source).exportTo(zip);
+
+      final check = await BackupService(source).verify(zip);
+      expect(check.ok, isTrue);
+      expect(check.hashesRecorded, isTrue);
+      expect(check.hasDatabase, isTrue);
+      expect(check.corrupt, isEmpty);
+      expect(check.missing, isEmpty);
+      // The database and the cover: everything the manifest listed.
+      expect(check.checked, 2);
+      expect(check.counts['books'], 1);
+      expect(check.schemaVersion, source.db.schemaVersion);
+      expect(check.created, isNotNull);
+      expect(check.describe(), contains('intact'));
+      await source.db.close();
+    });
+
+    test('a tampered blob is caught without restoring anything', () async {
+      // The whole point of verify: learn the backup is bad *before* you need
+      // it, and learn it without touching the live library.
+      final source = await _repo(dir, 'source.sqlite');
+      await source.createCustomBook(title: 'Kept');
+      File(p.join(dir.path, 'covers', 'x.jpg')).writeAsBytesSync([1, 2, 3, 4]);
+      final zip = File(p.join(dir.path, 'backup.zip'));
+      await BackupService(source).exportTo(zip);
+
+      // Rebuild the archive with one blob's bytes changed.
+      final archive = ZipDecoder().decodeBytes(zip.readAsBytesSync());
+      final rebuilt = Archive();
+      for (final entry in archive.files) {
+        rebuilt.add(entry.name == 'covers/x.jpg'
+            ? ArchiveFile.bytes('covers/x.jpg', [9, 9, 9, 9])
+            : entry);
+      }
+      zip.writeAsBytesSync(ZipEncoder().encodeBytes(rebuilt));
+
+      final check = await BackupService(source).verify(zip);
+      expect(check.ok, isFalse);
+      expect(check.corrupt, ['covers/x.jpg']);
+      expect(check.describe(), contains('not intact'));
+      await source.db.close();
+    });
+
+    test('a missing blob is caught too', () async {
+      final source = await _repo(dir, 'source.sqlite');
+      File(p.join(dir.path, 'covers', 'x.jpg')).writeAsBytesSync([1, 2, 3, 4]);
+      final zip = File(p.join(dir.path, 'backup.zip'));
+      await BackupService(source).exportTo(zip);
+
+      final archive = ZipDecoder().decodeBytes(zip.readAsBytesSync());
+      final rebuilt = Archive();
+      for (final entry in archive.files) {
+        if (entry.name != 'covers/x.jpg') rebuilt.add(entry);
+      }
+      zip.writeAsBytesSync(ZipEncoder().encodeBytes(rebuilt));
+
+      final check = await BackupService(source).verify(zip);
+      expect(check.ok, isFalse);
+      expect(check.missing, ['covers/x.jpg']);
+      await source.db.close();
+    });
+
+    test('a file that is not a Vellum backup is rejected, not crashed on',
+        () async {
+      final source = await _repo(dir, 'source.sqlite');
+      final junk = File(p.join(dir.path, 'junk.zip'))
+        ..writeAsStringSync('this is not a zip at all');
+      final check = await BackupService(source).verify(junk);
+      expect(check.ok, isFalse);
+      expect(check.readable, isFalse);
+      expect(check.describe(), isNotEmpty);
+      await source.db.close();
+    });
+
+    test('an archive with no checksums says so rather than claiming to be fine',
+        () async {
+      // Backups written before #13 are still restorable; reporting them as
+      // verified would be a lie about the one thing verify exists to answer.
+      final source = await _repo(dir, 'source.sqlite');
+      final zip = File(p.join(dir.path, 'old.zip'));
+      await BackupService(source).exportTo(zip);
+      final archive = ZipDecoder().decodeBytes(zip.readAsBytesSync());
+      final rebuilt = Archive();
+      for (final entry in archive.files) {
+        rebuilt.add(entry.name == 'manifest.json'
+            ? ArchiveFile.string('manifest.json',
+                '{"app":"vellum","created":"2026-01-01T00:00:00Z"}')
+            : entry);
+      }
+      zip.writeAsBytesSync(ZipEncoder().encodeBytes(rebuilt));
+
+      final check = await BackupService(source).verify(zip);
+      expect(check.readable, isTrue);
+      expect(check.hasDatabase, isTrue);
+      expect(check.hashesRecorded, isFalse);
+      expect(check.ok, isTrue, reason: 'nothing is known to be wrong');
+      expect(check.describe(), contains('could not be verified'));
+      await source.db.close();
+    });
+  });
+
+  // ---- encryption (plan 5 #13) -------------------------------------------
+
+  group('encrypted archives', () {
+    test('round-trip: export, verify and restore with a passphrase', () async {
+      final source = await _repo(dir, 'source.sqlite');
+      final id = await source.createCustomBook(title: 'Secret', author: 'Anon');
+      final sealed = File(p.join(dir.path, 'backup.vbk'));
+      await BackupService(source).exportTo(sealed, passphrase: 'open sesame');
+      await source.db.close();
+
+      expect(await BackupCrypto.isEncrypted(sealed), isTrue);
+
+      final destDir = Directory(p.join(dir.path, 'dest'))..createSync();
+      final destDbFile = File(p.join(destDir.path, 'vellum.sqlite'));
+      final dest = await _repo(destDir, 'vellum.sqlite');
+      final service = BackupService(dest, databaseFile: destDbFile);
+
+      final check = await service.verify(sealed, passphrase: 'open sesame');
+      expect(check.ok, isTrue);
+
+      expect(
+        await service.restoreFrom(sealed, passphrase: 'open sesame'),
+        isTrue,
+      );
+      final reopened = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase(destDbFile)),
+        destDir,
+      );
+      expect((await reopened.detailsFor(id)).authors, ['Anon']);
+      await reopened.db.close();
+    }, timeout: const Timeout(Duration(minutes: 2)));
+
+    test('a wrong passphrase leaves the library untouched', () async {
+      // The failure mode that would be unforgivable: a half-applied restore.
+      // Decryption happens before anything is replaced, so a bad passphrase
+      // costs nothing.
+      final source = await _repo(dir, 'source.sqlite');
+      await source.createCustomBook(title: 'Secret');
+      final sealed = File(p.join(dir.path, 'backup.vbk'));
+      await BackupService(source).exportTo(sealed, passphrase: 'right');
+      await source.db.close();
+
+      final destDir = Directory(p.join(dir.path, 'dest'))..createSync();
+      final destDbFile = File(p.join(destDir.path, 'vellum.sqlite'));
+      final dest = await _repo(destDir, 'vellum.sqlite');
+      await dest.createCustomBook(title: 'Still here');
+      final service = BackupService(dest, databaseFile: destDbFile);
+
+      await expectLater(
+        service.restoreFrom(sealed, passphrase: 'wrong'),
+        throwsA(isA<BackupDecryptException>()),
+      );
+      expect(
+        [for (final b in await dest.watchAllBooks().first) b.title],
+        ['Still here'],
+      );
+
+      // And verify reports it as a problem rather than throwing at the UI.
+      final check = await service.verify(sealed, passphrase: 'wrong');
+      expect(check.ok, isFalse);
+      expect(check.describe(), contains('passphrase'));
+
+      // No passphrase at all is a distinct, actionable message.
+      final noPass = await service.verify(sealed);
+      expect(noPass.describe(), contains('encrypted'));
+      await dest.db.close();
+    }, timeout: const Timeout(Duration(minutes: 2)));
+  });
+
+  // ---- the schedule end to end -------------------------------------------
+
+  group('scheduled runs', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('writes when due, skips when not, and rotates', () async {
+      final repo = await _repo(dir, 'source.sqlite');
+      await repo.createCustomBook(title: 'Kept');
+      final settings = await AppSettingsStore.load();
+      final folder = Directory(p.join(dir.path, 'backups'))..createSync();
+      await settings.setBackupFrequency('daily');
+      await settings.setBackupFolder(folder.path);
+      await settings.setBackupKeep(2);
+
+      var clock = DateTime(2026, 7, 26, 9);
+      final scheduler = BackupScheduler(
+        repository: repo,
+        settings: settings,
+        now: () => clock,
+      );
+
+      expect(await scheduler.runIfDue(), BackupRunResult.written);
+      expect(settings.lastBackupAt, clock);
+
+      // An hour later it is not due; a day later it is.
+      clock = clock.add(const Duration(hours: 1));
+      expect(await scheduler.runIfDue(), BackupRunResult.notDue);
+      clock = clock.add(const Duration(days: 1));
+      expect(await scheduler.runIfDue(), BackupRunResult.written);
+      clock = clock.add(const Duration(days: 1));
+      expect(await scheduler.runIfDue(), BackupRunResult.written);
+
+      // Three written, two kept.
+      expect(folder.listSync().length, 2);
+      await repo.db.close();
+    }, timeout: const Timeout(Duration(minutes: 2)));
+
+    test('does nothing without a folder or when switched off', () async {
+      final repo = await _repo(dir, 'source.sqlite');
+      final settings = await AppSettingsStore.load();
+      final scheduler = BackupScheduler(repository: repo, settings: settings);
+
+      expect(await scheduler.runIfDue(), BackupRunResult.disabled);
+      await settings.setBackupFrequency('weekly');
+      expect(await scheduler.runIfDue(), BackupRunResult.noFolder);
+      await repo.db.close();
+    });
+
+    test('a failed run leaves the backup due rather than skipping the interval',
+        () async {
+      final repo = await _repo(dir, 'source.sqlite');
+      final settings = await AppSettingsStore.load();
+      await settings.setBackupFrequency('daily');
+      // A path that cannot be created: a directory under a regular file.
+      final blocker = File(p.join(dir.path, 'blocker'))..writeAsStringSync('x');
+      await settings.setBackupFolder(p.join(blocker.path, 'nested'));
+
+      final scheduler = BackupScheduler(repository: repo, settings: settings);
+      expect(await scheduler.runIfDue(), BackupRunResult.failed);
+      expect(settings.lastBackupAt, isNull);
+      await repo.db.close();
+    });
+  });
 
   test('export/restore round-trips books and blobs', () async {
     // Source library: one custom book plus a fake cover blob.

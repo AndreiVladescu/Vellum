@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../data/backup_crypto.dart';
+import '../data/backup_schedule.dart';
 import '../data/backup_service.dart';
 import '../data/library_doctor.dart';
 import '../data/library_repository.dart';
@@ -131,6 +133,7 @@ class PreferencesPage extends StatelessWidget {
               repository: repository,
               connection: connection,
               sync: sync,
+              settings: settings,
             ),
           ],
         ),
@@ -367,11 +370,13 @@ class _BackupSection extends StatefulWidget {
     required this.repository,
     required this.connection,
     required this.sync,
+    required this.settings,
   });
 
   final LibraryRepository repository;
   final ServerConnection connection;
   final SyncService sync;
+  final AppSettingsStore settings;
 
   @override
   State<_BackupSection> createState() => _BackupSectionState();
@@ -380,34 +385,205 @@ class _BackupSection extends StatefulWidget {
 class _BackupSectionState extends State<_BackupSection> {
   bool _busy = false;
 
-  static String _suggestedName() {
+  static String _suggestedName({bool encrypted = false}) {
     final now = DateTime.now();
     final d = '${now.year}'
         '${now.month.toString().padLeft(2, '0')}'
         '${now.day.toString().padLeft(2, '0')}';
-    return 'vellum-backup-$d.zip';
+    return 'vellum-backup-$d.${encrypted ? 'vbk' : 'zip'}';
+  }
+
+  /// Asks for a passphrase, twice, or returns null if the user opts out.
+  ///
+  /// Two fields and a blunt warning, because there is no recovery path: nothing
+  /// about the passphrase is stored, so a typo in the only copy of it turns the
+  /// backup into noise. Returning an empty string means "no encryption".
+  Future<String?> _askPassphrase() async {
+    final first = TextEditingController();
+    final second = TextEditingController();
+    String? error;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setLocal) => AlertDialog(
+          title: const Text('Encrypt this backup?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'A backup holds your whole library, including your private '
+                  'reader notes. Encrypting it means only someone with the '
+                  'passphrase can read it.\n\n'
+                  'Vellum does not store the passphrase anywhere. If you lose '
+                  'it, the backup is gone — there is no recovery.\n\n'
+                  'Encrypting is real work for the processor, so a large '
+                  'library takes noticeably longer to export than a plain zip.',
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: first,
+                  autofocus: true,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Passphrase'),
+                ),
+                TextField(
+                  controller: second,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Repeat it'),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!,
+                      style: TextStyle(
+                          color: Theme.of(dialogContext).colorScheme.error)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(''),
+              child: const Text('No, plain .zip'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (first.text.isEmpty) {
+                  setLocal(() => error = 'Enter a passphrase, or choose plain.');
+                  return;
+                }
+                if (first.text != second.text) {
+                  setLocal(() => error = 'Those two do not match.');
+                  return;
+                }
+                Navigator.of(dialogContext).pop(first.text);
+              },
+              child: const Text('Encrypt'),
+            ),
+          ],
+        ),
+      ),
+    );
+    first.dispose();
+    second.dispose();
+    return result;
+  }
+
+  /// Asks for the passphrase of an existing archive.
+  Future<String?> _promptExistingPassphrase() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('This backup is encrypted'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Passphrase'),
+          onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('Open'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  /// Checks an archive without restoring it (plan 5 #13).
+  Future<void> _verify() async {
+    const group = XTypeGroup(
+      label: 'Vellum backup',
+      extensions: ['zip', 'vbk'],
+    );
+    final picked = await openFile(acceptedTypeGroups: const [group]);
+    if (picked == null || !mounted) return;
+    final file = File(picked.path);
+    String? passphrase;
+    if (await BackupCrypto.isEncrypted(file)) {
+      if (!mounted) return;
+      passphrase = await _promptExistingPassphrase();
+      if (passphrase == null || !mounted) return;
+    }
+    setState(() => _busy = true);
+    try {
+      final check =
+          await BackupService(widget.repository).verify(file, passphrase: passphrase);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(check.ok ? 'Backup checks out' : 'Backup has problems'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(check.describe()),
+                if (check.created != null) ...[
+                  const SizedBox(height: 8),
+                  Text('Written ${check.created!.toLocal()}'),
+                ],
+                for (final name in [...check.corrupt, ...check.missing].take(10))
+                  Text('• $name'),
+              ],
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _export() async {
     // file_selector can't offer a save location on Android/iOS, so on mobile we
     // write the archive to a temp file and hand it to the system share sheet
     // (save to Downloads/Drive/…). Desktop keeps the native save dialog.
+    final passphrase = await _askPassphrase();
+    if (passphrase == null || !mounted) return; // cancelled
+    final encrypted = passphrase.isNotEmpty;
+
     final isMobile = defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
     if (isMobile) {
-      await _exportViaShare();
+      await _exportViaShare(passphrase);
       return;
     }
     final location = await getSaveLocation(
-      suggestedName: _suggestedName(),
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Zip archive', extensions: ['zip']),
+      suggestedName: _suggestedName(encrypted: encrypted),
+      acceptedTypeGroups: [
+        XTypeGroup(
+          label: encrypted ? 'Encrypted Vellum backup' : 'Zip archive',
+          extensions: [encrypted ? 'vbk' : 'zip'],
+        ),
       ],
     );
     if (location == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await BackupService(widget.repository).exportTo(File(location.path));
+      await BackupService(widget.repository)
+          .exportTo(File(location.path), passphrase: passphrase);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Backup saved to ${location.path}')),
@@ -423,14 +599,20 @@ class _BackupSectionState extends State<_BackupSection> {
     }
   }
 
-  Future<void> _exportViaShare() async {
+  Future<void> _exportViaShare(String passphrase) async {
     setState(() => _busy = true);
     try {
-      final tmp = File(
-          p.join((await getTemporaryDirectory()).path, _suggestedName()));
-      await BackupService(widget.repository).exportTo(tmp);
+      final encrypted = passphrase.isNotEmpty;
+      final tmp = File(p.join((await getTemporaryDirectory()).path,
+          _suggestedName(encrypted: encrypted)));
+      await BackupService(widget.repository)
+          .exportTo(tmp, passphrase: passphrase);
       await SharePlus.instance.share(ShareParams(
-        files: [XFile(tmp.path, mimeType: 'application/zip')],
+        files: [
+          XFile(tmp.path,
+              mimeType:
+                  encrypted ? 'application/octet-stream' : 'application/zip'),
+        ],
         subject: 'Vellum backup',
       ));
     } catch (e) {
@@ -452,9 +634,19 @@ class _BackupSectionState extends State<_BackupSection> {
       );
       return;
     }
-    const group = XTypeGroup(label: 'Vellum backup', extensions: ['zip']);
+    const group =
+        XTypeGroup(label: 'Vellum backup', extensions: ['zip', 'vbk']);
     final picked = await openFile(acceptedTypeGroups: const [group]);
     if (picked == null || !mounted) return;
+    String? passphrase;
+    if (await BackupCrypto.isEncrypted(File(picked.path))) {
+      if (!mounted) return;
+      passphrase = await _promptExistingPassphrase();
+      // An empty passphrase would fail below anyway; treat it as a cancel so
+      // the confirm dialog isn't shown for a restore that cannot happen.
+      if (passphrase == null || passphrase.isEmpty) return;
+    }
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -483,8 +675,8 @@ class _BackupSectionState extends State<_BackupSection> {
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
-      final ok =
-          await BackupService(widget.repository).restoreFrom(File(picked.path));
+      final ok = await BackupService(widget.repository)
+          .restoreFrom(File(picked.path), passphrase: passphrase);
       if (!ok) {
         if (mounted) {
           setState(() => _busy = false);
@@ -546,13 +738,142 @@ class _BackupSectionState extends State<_BackupSection> {
               : null,
         ),
         ListTile(
+          leading: const Icon(Icons.fact_check_outlined),
+          title: const Text('Verify a backup…'),
+          subtitle: const Text(
+              'Re-checks every file against its checksum, without restoring'),
+          enabled: !_busy,
+          onTap: _verify,
+        ),
+        ListTile(
           leading: const Icon(Icons.unarchive_outlined),
           title: const Text('Restore from backup…'),
           subtitle: const Text('Replaces the current library, then restarts'),
           enabled: !_busy,
           onTap: _restore,
         ),
+        _ScheduledBackupTile(settings: widget.settings),
       ],
+    );
+  }
+}
+
+/// Unattended backups (plan 5 #13): how often, where, and how many to keep.
+///
+/// Desktop only, and shown as unavailable elsewhere rather than hidden: on
+/// Android there is no folder to write to without a picker and no moment to run
+/// in, so promising a schedule there would be promising something that doesn't
+/// happen.
+class _ScheduledBackupTile extends StatefulWidget {
+  const _ScheduledBackupTile({required this.settings});
+
+  final AppSettingsStore settings;
+
+  @override
+  State<_ScheduledBackupTile> createState() => _ScheduledBackupTileState();
+}
+
+class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
+  bool get _supported =>
+      defaultTargetPlatform != TargetPlatform.android &&
+      defaultTargetPlatform != TargetPlatform.iOS;
+
+  Future<void> _pickFolder() async {
+    final path = await getDirectoryPath();
+    if (path == null) return;
+    await widget.settings.setBackupFolder(path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = widget.settings;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        final frequency = BackupFrequency.parse(settings.backupFrequency);
+        final last = settings.lastBackupAt;
+        return ExpansionTile(
+          leading: const Icon(Icons.schedule),
+          title: const Text('Scheduled backups'),
+          subtitle: Text(
+            !_supported
+                ? 'Desktop only'
+                : frequency == BackupFrequency.off
+                    ? 'Off'
+                    : '${frequency.label}, keeping ${settings.backupKeep}'
+                        '${last == null ? '' : ' · last ${last.toLocal()}'}',
+          ),
+          children: [
+            if (!_supported)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  'A phone has no folder to write to unattended and no moment '
+                  'to run in. Use “Export library…” and save it wherever you '
+                  'keep things.',
+                ),
+              )
+            else ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Runs when Vellum starts, if the last backup is older than '
+                  'the interval — no background service. Scheduled archives '
+                  'are plain .zip: encrypting them would mean storing the '
+                  'passphrase, which is the same as not encrypting them.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Text('How often'),
+                    const Spacer(),
+                    DropdownButton<BackupFrequency>(
+                      value: frequency,
+                      onChanged: (value) => value == null
+                          ? null
+                          : settings.setBackupFrequency(value.key),
+                      items: [
+                        for (final option in BackupFrequency.values)
+                          DropdownMenuItem(
+                            value: option,
+                            child: Text(option.label),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                title: const Text('Folder'),
+                subtitle: Text(settings.backupFolder ?? 'Not chosen yet'),
+                trailing: const Icon(Icons.folder_open),
+                onTap: _pickFolder,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Row(
+                  children: [
+                    const Text('Keep'),
+                    const Spacer(),
+                    DropdownButton<int>(
+                      value: settings.backupKeep,
+                      onChanged: (value) =>
+                          value == null ? null : settings.setBackupKeep(value),
+                      items: [
+                        for (final n in [1, 3, 5, 10, 20])
+                          DropdownMenuItem(value: n, child: Text('$n')),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

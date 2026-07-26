@@ -54,6 +54,7 @@ dependencies:
   mobile_scanner: ^7.4.0
   image_picker: ^1.2.3
   qr: ^4.0.0
+  cryptography: ^2.9.0
 
 dev_dependencies:
   flutter_test:

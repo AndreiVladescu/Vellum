@@ -13,7 +13,6 @@ library;
 
 import 'dart:convert';
 
-import 'package:meta/meta.dart';
 import 'package:qr/qr.dart';
 
 import 'locate.dart';
@@ -145,7 +144,9 @@ $cards</div>
 /// with no base64 blobs, and vector so it prints crisply at any size — a
 /// rasterised QR at 18 mm is exactly the kind of thing that scans on screen and
 /// fails on paper.
-@visibleForTesting
+/// The QR SVG for [data], exposed so a test can parse the emitted path back
+/// into a matrix and check the orientation — a transposed QR still looks like
+/// one and simply never scans.
 String qrSvgForTesting(String data) => _qrSvg(data);
 
 String _qrSvg(String data) {

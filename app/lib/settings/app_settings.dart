@@ -25,6 +25,10 @@ class AppSettingsStore extends ChangeNotifier {
   static const _deviceLabelKey = 'settings.deviceLabel';
   static const _watchedFolderKey = 'settings.watchedImportFolder';
   static const _seenFirstRunKey = 'settings.hasSeenFirstRun';
+  static const _backupFrequencyKey = 'settings.backupFrequency';
+  static const _backupFolderKey = 'settings.backupFolder';
+  static const _backupKeepKey = 'settings.backupKeep';
+  static const _lastBackupAtKey = 'settings.lastBackupAt';
 
   final SharedPreferences _prefs;
 
@@ -178,6 +182,56 @@ class AppSettingsStore extends ChangeNotifier {
     } else {
       await _prefs.setString(_watchedFolderKey, path.trim());
     }
+    notifyListeners();
+  }
+
+  // ---- Scheduled backups (plan 5 #13) -------------------------------------
+  //
+  // Deliberately *not* a passphrase store: an encrypted scheduled backup would
+  // need the passphrase kept somewhere the app can read unattended, which is
+  // the same as not encrypting it. Scheduled archives are therefore plain zips
+  // and the UI says so; encryption stays a manual, you-are-present action.
+
+  /// 'off' | 'daily' | 'weekly'.
+  String get backupFrequency =>
+      _prefs.getString(_backupFrequencyKey) ?? 'off';
+
+  Future<void> setBackupFrequency(String value) async {
+    await _prefs.setString(_backupFrequencyKey, value);
+    notifyListeners();
+  }
+
+  String? get backupFolder {
+    final stored = _prefs.getString(_backupFolderKey);
+    return (stored == null || stored.isEmpty) ? null : stored;
+  }
+
+  Future<void> setBackupFolder(String? path) async {
+    if (path == null || path.trim().isEmpty) {
+      await _prefs.remove(_backupFolderKey);
+    } else {
+      await _prefs.setString(_backupFolderKey, path.trim());
+    }
+    notifyListeners();
+  }
+
+  /// How many scheduled archives to keep. Five by default — enough that a
+  /// problem noticed a few days late is still recoverable from, few enough that
+  /// a library's worth of zips doesn't quietly fill the disk.
+  int get backupKeep => _prefs.getInt(_backupKeepKey) ?? 5;
+
+  Future<void> setBackupKeep(int value) async {
+    await _prefs.setInt(_backupKeepKey, value.clamp(1, 30));
+    notifyListeners();
+  }
+
+  DateTime? get lastBackupAt {
+    final stored = _prefs.getString(_lastBackupAtKey);
+    return stored == null ? null : DateTime.tryParse(stored);
+  }
+
+  Future<void> setLastBackupAt(DateTime value) async {
+    await _prefs.setString(_lastBackupAtKey, value.toIso8601String());
     notifyListeners();
   }
 

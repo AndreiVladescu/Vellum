@@ -11,6 +11,7 @@ import 'app_drawer.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
 import 'data/library_queries.dart';
+import 'data/backup_schedule.dart';
 import 'data/library_repository.dart';
 import 'import/filename_metadata.dart';
 import 'import/folder_import_page.dart';
@@ -41,6 +42,11 @@ Future<void> main() async {
   final profile = await UserProfileStore.load();
   final settings = await AppSettingsStore.load();
   final connection = await ServerConnection.load();
+  // Unattended backup (plan 5 #13). Deliberately *not* awaited: a backup of a
+  // large library takes a while, and blocking the first frame on it would make
+  // the app look broken once a day. It also never throws — see `runIfDue`.
+  unawaited(BackupScheduler(repository: repository, settings: settings)
+      .runIfDue());
   runApp(VellumApp(
     repository: repository,
     profile: profile,
