@@ -1,4 +1,10 @@
-const S = { token: localStorage.getItem('vellum_token'), email: localStorage.getItem('vellum_email'),
+// The bearer token lives in sessionStorage, not localStorage (plan 5 #35,
+// §0.12): a token stolen through an XSS then dies with the tab instead of
+// persisting across every future visit. The CSP already blocks the obvious
+// exfiltration paths, so this is defence in depth rather than a fix for a known
+// hole — the cost is signing in again in a new tab, which is the right trade for
+// a management console.
+const S = { token: sessionStorage.getItem('vellum_token'), email: sessionStorage.getItem('vellum_email'),
             books: [], groups: [], members: new Set(), selected: new Set(),
             view: [], cursor: -1,
             // /api/books?page=1 (§3) loads the library a page at a time instead
@@ -6,8 +12,12 @@ const S = { token: localStorage.getItem('vellum_token'), email: localStorage.get
             // null once every book is loaded. total is the server's count of
             // every visible book, independent of how many pages are in S.books.
             nextPage: 1, total: 0,
+            // Search, sort and filters are now *server-side* (plan 5 #35): a
+            // 10,000-book library shouldn't have to reach the browser before it
+            // can be narrowed. One tag and one "missing" at a time, which is
+            // what the server takes and what people actually use.
             q: '', sort: { col: 'title', dir: 'asc' },
-            fTags: new Set(), fUntagged: false, fMissing: new Set(),
+            fTag: null, fMissing: null,
             cols: new Set(JSON.parse(localStorage.getItem('vellum_cols') || 'null') || ['author','year','status']),
             compact: localStorage.getItem('vellum_density') === '1' };
 const AB = { results: [], file: null, proposal: null };
@@ -83,14 +93,14 @@ async function login(){
   try {
     const r = await api('POST','/api/auth/login',{ email, password: pass });
     S.token = r.token; S.email = r.user.email;
-    localStorage.setItem('vellum_token', S.token);
-    localStorage.setItem('vellum_email', S.email);
+    sessionStorage.setItem('vellum_token', S.token);
+    sessionStorage.setItem('vellum_email', S.email);
     showApp();
   } catch(e){ err.textContent = e.message; }
 }
 
 function logout(){
-  S.token=null; localStorage.removeItem('vellum_token'); localStorage.removeItem('vellum_email');
+  S.token=null; sessionStorage.removeItem('vellum_token'); sessionStorage.removeItem('vellum_email');
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login').classList.remove('hidden');
 }
@@ -101,19 +111,32 @@ function showApp(){
   document.getElementById('who').textContent = S.email || '';
   document.getElementById('tbl').classList.toggle('compact', S.compact);
   revealContentSearch();
+  renderViews();
   loadAll();
+}
+
+// The query string every book fetch shares, so page 1 and "Load more" can
+// never disagree about what is being listed.
+function booksQuery(page){
+  const p = new URLSearchParams({ page: String(page), sort: S.sort.col, dir: S.sort.dir });
+  if (S.q.trim()) p.set('q', S.q.trim());
+  if (S.fTag) p.set('tag', S.fTag);
+  if (S.fMissing) p.set('missing', S.fMissing);
+  return '/api/books?' + p.toString();
 }
 
 async function loadAll(){
   try {
     const [page, groups, members] = await Promise.all([
-      api('GET','/api/books?page=1'), api('GET','/api/groups'), api('GET','/api/memberships'),
+      api('GET', booksQuery(1)), api('GET','/api/groups'), api('GET','/api/memberships'),
     ]);
     S.books = page.items; S.nextPage = page.next; S.total = page.total;
     S.groups = groups;
     S.members = new Set(members.map(m=>key(m.group_id,m.book_id)));
     S.selected = new Set([...S.selected].filter(id=>S.books.some(b=>b.id===id)));
-    S.fTags = new Set([...S.fTags].filter(id=>groups.some(g=>g.id===id)));
+    // A filter pointing at a tag that no longer exists would silently hide
+    // everything; drop it rather than show an empty library.
+    if (S.fTag && S.fTag !== 'untagged' && !groups.some(g=>g.id===S.fTag)) S.fTag = null;
     renderFilters(); render();
   } catch(e){ toast(e.message); }
 }
@@ -124,92 +147,65 @@ async function loadAll(){
 async function loadMoreBooks(){
   if (S.nextPage == null) return;
   try {
-    const page = await api('GET','/api/books?page='+S.nextPage);
+    const page = await api('GET', booksQuery(S.nextPage));
     S.books = S.books.concat(page.items);
     S.nextPage = page.next; S.total = page.total;
     render();
   } catch(e){ toast(e.message); }
 }
 
-// ---- filtering + sorting ------------------------------------------------
+// ---- filtering + sorting (server-side since plan 5 #35) ------------------
+//
+// The browser no longer filters or sorts: it asks the server for the page it
+// wants. `render()` therefore draws `S.books` as they arrived, and every
+// control that changes the query reloads from page 1 — which is also what makes
+// "no matches" trustworthy, since the old client-side filter could only ever
+// say "no matches *in the pages loaded so far*".
 
-function matches(b){
-  const q = S.q.trim().toLowerCase();
-  if (q){
-    const hay = [b.title, b.subtitle, authorStr(b), b.isbn, b.publisher]
-      .filter(Boolean).join(' ').toLowerCase();
-    if (!hay.includes(q)) return false;
-  }
-  const tags = bookTags(b);
-  if (S.fUntagged){ if (tags.length) return false; }
-  else if (S.fTags.size){ if (!tags.some(g=>S.fTags.has(g.id))) return false; }
-  for (const m of S.fMissing){
-    if (m==='file'   && b.file_count>0)          return false;
-    if (m==='cover'  && b.cover_path)             return false;
-    if (m==='year'   && b.published_year!=null)   return false;
-    if (m==='author' && authorStr(b))             return false;
-  }
-  return true;
-}
+function computeRows(){ return S.books; }
 
-function sortVal(b, col){
-  switch(col){
-    case 'author': return authorStr(b).toLowerCase();
-    case 'year':   return b.published_year ?? -Infinity;
-    case 'pages':  return b.page_count ?? -Infinity;
-    case 'status': return b.file_count || 0;
-    case 'added':  return b.created_at || '';
-    default:       return (b.title||'').toLowerCase();
-  }
-}
-
-function computeRows(){
-  const rows = S.books.filter(matches);
-  const { col, dir } = S.sort, mul = dir==='asc' ? 1 : -1;
-  rows.sort((a,b)=>{
-    const x = sortVal(a,col), y = sortVal(b,col);
-    if (x < y) return -mul;
-    if (x > y) return mul;
-    return (a.title||'').localeCompare(b.title||'');
-  });
-  return rows;
-}
+function reload(){ S.cursor = -1; S.nextPage = 1; S.books = []; loadAll(); }
 
 function sortBy(col){
   if (S.sort.col === col) S.sort.dir = S.sort.dir==='asc' ? 'desc' : 'asc';
   else S.sort = { col, dir: 'asc' };
-  render();
+  reload();
 }
 
-function setQ(v){ S.q = v; S.cursor = -1; render(); }
+// Debounced: every keystroke is a query on the server now, not a filter over an
+// array already in memory.
+let qTimer = null;
+function setQ(v){
+  S.q = v;
+  clearTimeout(qTimer);
+  qTimer = setTimeout(reload, 250);
+}
 
 function toggleTagFilter(id){
-  S.fUntagged = false;
-  S.fTags.has(id) ? S.fTags.delete(id) : S.fTags.add(id);
-  S.cursor = -1; renderFilters(); render();
+  S.fTag = S.fTag === id ? null : id;
+  renderFilters(); reload();
 }
 function toggleUntagged(){
-  S.fUntagged = !S.fUntagged;
-  if (S.fUntagged) S.fTags.clear();
-  S.cursor = -1; renderFilters(); render();
+  S.fTag = S.fTag === 'untagged' ? null : 'untagged';
+  renderFilters(); reload();
 }
 function toggleMissing(k){
-  S.fMissing.has(k) ? S.fMissing.delete(k) : S.fMissing.add(k);
-  S.cursor = -1; renderFilters(); render();
+  S.fMissing = S.fMissing === k ? null : k;
+  renderFilters(); reload();
 }
 function clearFilters(){
   S.q=''; document.getElementById('q').value='';
-  S.fTags.clear(); S.fUntagged=false; S.fMissing.clear(); S.cursor=-1;
-  renderFilters(); render();
+  S.fTag=null; S.fMissing=null;
+  renderFilters(); reload();
 }
 
 function renderFilters(){
   document.getElementById('tagfilters').innerHTML =
-    S.groups.map(g=>`<button class="fchip ${S.fTags.has(g.id)?'on':''}" onclick="toggleTagFilter('${g.id}')">${esc(g.name)}</button>`).join('')
-    + `<button class="fchip ${S.fUntagged?'on':''}" onclick="toggleUntagged()">Untagged</button>`;
+    S.groups.map(g=>`<button class="fchip ${S.fTag===g.id?'on':''}" onclick="toggleTagFilter('${g.id}')">${esc(g.name)}</button>`).join('')
+    + `<button class="fchip ${S.fTag==='untagged'?'on':''}" onclick="toggleUntagged()">Untagged</button>`;
   document.getElementById('missingfilters').innerHTML =
     [['file','No file'],['cover','No cover'],['year','No year'],['author','No author']]
-      .map(([k,l])=>`<button class="fchip ${S.fMissing.has(k)?'on':''}" onclick="toggleMissing('${k}')">${l}</button>`).join('');
+      .map(([k,l])=>`<button class="fchip ${S.fMissing===k?'on':''}" onclick="toggleMissing('${k}')">${l}</button>`).join('');
 }
 
 // ---- table --------------------------------------------------------------
@@ -294,10 +290,9 @@ function render(){
     `${S.view.length} shown · ${S.total} total · ${S.selected.size} selected`;
   document.getElementById('selall').checked = S.view.length>0 && selShown===S.view.length;
 
-  // Filtering/search/sort/tagging all run client-side over S.books, so while
-  // more pages remain (S.nextPage != null) a filter can show "no matches"
-  // even though a later page would have some -- "Load more" is how the user
-  // resolves that, same tradeoff every client-side-filtered paged list has.
+  // Search, sort and filters run on the server since plan 5 #35, so "no
+  // matches" now means no matches in the *library* rather than in the pages
+  // loaded so far, and the row count below is the real one.
   const more = document.getElementById('loadmore');
   if (more){
     more.classList.toggle('hidden', S.nextPage == null);
@@ -708,24 +703,35 @@ async function classify(file){
   return 'unsupported';
 }
 
-function showProgress(label){
+// `onCancel`, when given, adds a Stop button — a long bulk operation the user
+// cannot stop is a long bulk operation they learn not to start.
+function showProgress(label, onCancel){
   let el = document.getElementById('uprog');
   if (!el){
     el = document.createElement('div');
     el.id = 'uprog'; el.className = 'uprog';
-    el.innerHTML = '<div class="uprog-label"></div><div class="uprog-track"><div class="uprog-bar"></div></div><div class="uprog-pct"></div>';
+    el.innerHTML = '<div class="uprog-label"></div><div class="uprog-track"><div class="uprog-bar"></div></div><div class="uprog-pct"></div><button class="btn sm uprog-cancel hidden">Stop</button>';
     document.body.appendChild(el);
   }
   el.querySelector('.uprog-label').textContent = label;
   el.querySelector('.uprog-bar').style.width = '0%';
   el.querySelector('.uprog-pct').textContent = '0%';
+  const cancel = el.querySelector('.uprog-cancel');
+  cancel.classList.toggle('hidden', !onCancel);
+  cancel.onclick = onCancel || null;
   el.style.display = 'flex';
 }
-function setProgress(fraction){
+// `detail` names what is being worked on right now, so a stalled bulk run shows
+// *which* book it stalled on.
+function setProgress(fraction, detail){
   const el = document.getElementById('uprog'); if (!el) return;
   const pct = Math.round(fraction * 100);
   el.querySelector('.uprog-bar').style.width = pct + '%';
   el.querySelector('.uprog-pct').textContent = (pct >= 100 ? 'finishing…' : pct + '%');
+  if (detail !== undefined){
+    const label = el.querySelector('.uprog-label');
+    label.textContent = label.textContent.split(' — ')[0] + (detail ? ' — ' + detail : '');
+  }
 }
 function hideProgress(){ const el = document.getElementById('uprog'); if (el) el.style.display = 'none'; }
 
@@ -777,13 +783,55 @@ async function enrichBook(id){
   catch(_){ /* non-fatal — the upload/create still succeeded */ }
 }
 
+// Cancellable, with per-item results (plan 5 #35). Fetching metadata for 500
+// books used to be a spinner and hope: no way to know which ones failed, and no
+// way to stop. The cancel flag is checked between books rather than mid-request,
+// so a cancel never leaves a half-applied update.
+let bulkCancelled = false;
+function cancelBulk(){ bulkCancelled = true; toast('Stopping after this book…'); }
+
 async function enrichSelected(){
   if (!S.selected.size){ toast('Select some books first'); return; }
   const ids = [...S.selected];
-  showProgress('Fetching metadata…');
-  let done = 0;
-  for (const id of ids){ await enrichBook(id); setProgress(++done/ids.length); }
-  hideProgress(); await loadAll(); toast('Fetched metadata for '+ids.length+' book(s)');
+  const byId = new Map(S.books.map(b=>[b.id, b.title]));
+  bulkCancelled = false;
+  showProgress('Fetching metadata…', cancelBulk);
+
+  const failed = [];
+  let done = 0, ok = 0;
+  for (const id of ids){
+    if (bulkCancelled) break;
+    setProgress(done/ids.length, byId.get(id) || '');
+    try { await api('POST','/api/books/'+id+'/enrich'); ok++; }
+    catch(e){ failed.push({ title: byId.get(id) || id, error: e.message }); }
+    done++;
+  }
+  hideProgress();
+  await loadAll();
+
+  if (!failed.length){
+    toast(bulkCancelled
+      ? `Stopped after ${done} of ${ids.length} — ${ok} updated`
+      : `Fetched metadata for ${ok} book(s)`);
+    return;
+  }
+  // Per-item results, because "3 failed" without naming them is unactionable.
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(560px,95vw)">
+      <h2 style="margin:0 0 4px">Fetched ${ok} of ${done}</h2>
+      <p class="muted" style="margin:0 0 12px">These could not be looked up —
+        usually no ISBN, or nothing matched.</p>
+      <div style="max-height:50vh; overflow:auto">${
+        failed.map(f=>`<div class="row" style="justify-content:space-between; gap:12px;
+          padding:6px 0; border-bottom:1px solid var(--line)">
+          <span>${esc(f.title)}</span>
+          <span class="muted" style="font-size:12px">${esc(f.error)}</span></div>`).join('')
+      }</div>
+      <div class="row" style="justify-content:flex-end; margin-top:12px">
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div></div>`;
 }
 
 function pickUpload(id){
@@ -1146,6 +1194,103 @@ function fmtBytes(n){
   let i = 0, v = n;
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
   return (i === 0 ? v : v.toFixed(1)) + ' ' + units[i];
+}
+
+// ---- saved views (plan 5 #35) -------------------------------------------
+//
+// A view is a name for "how I like to look at the library": the search text,
+// the tag and missing filters, the sort, and which columns are shown. Kept in
+// localStorage rather than on the server on purpose — it is a *browser*
+// preference, like the density toggle, and putting it on the server would mean
+// a schema, an endpoint and a sync story for something nobody shares.
+
+function savedViews(){
+  try { return JSON.parse(localStorage.getItem('vellum_views') || '[]'); }
+  catch(_){ return []; }
+}
+
+function saveView(){
+  const name = (prompt('Name this view') || '').trim();
+  if (!name) return;
+  const views = savedViews().filter(v => v.name !== name); // overwrite by name
+  views.push({
+    name,
+    q: S.q, sort: { ...S.sort }, tag: S.fTag, missing: S.fMissing,
+    cols: [...S.cols],
+  });
+  localStorage.setItem('vellum_views', JSON.stringify(views));
+  renderViews();
+  toast('Saved “' + name + '”');
+}
+
+function applyView(name){
+  const view = savedViews().find(v => v.name === name);
+  if (!view) return;
+  S.q = view.q || '';
+  document.getElementById('q').value = S.q;
+  S.sort = view.sort || { col:'title', dir:'asc' };
+  S.fTag = view.tag || null;
+  S.fMissing = view.missing || null;
+  if (view.cols) { S.cols = new Set(view.cols); localStorage.setItem('vellum_cols', JSON.stringify([...S.cols])); }
+  renderFilters(); renderViews(); reload();
+}
+
+function deleteView(name){
+  localStorage.setItem('vellum_views',
+    JSON.stringify(savedViews().filter(v => v.name !== name)));
+  renderViews();
+}
+
+function renderViews(){
+  const host = document.getElementById('views');
+  if (!host) return;
+  const views = savedViews();
+  host.innerHTML = views.map(v =>
+    `<span class="fchip">
+       <span class="link" onclick="applyView('${esc(v.name).replace(/'/g,"&#39;")}')">${esc(v.name)}</span>
+       <button title="Forget this view" onclick="deleteView('${esc(v.name).replace(/'/g,"&#39;")}')">×</button>
+     </span>`).join('');
+}
+
+// ---- activity log (plan 5 #35) ------------------------------------------
+
+async function showActivity(before){
+  let body;
+  try {
+    body = await api('GET','/api/admin/audit?limit=100' + (before ? '&before='+before : ''));
+  } catch(e){
+    toast(/master/.test(e.message)
+      ? 'Only the library owner can read the activity log.'
+      : e.message);
+    return;
+  }
+  if (!body.enabled){
+    toast('The activity log is off on this server (set VELLUM_AUDIT=1).');
+    return;
+  }
+  const rows = (body.rows||[]).map(r => `
+    <div class="row" style="justify-content:space-between; gap:12px;
+        padding:6px 0; border-bottom:1px solid var(--line)">
+      <span><strong>${esc(r.action)}</strong>
+        ${r.detail ? '· ' + esc(r.detail) : ''}</span>
+      <span class="muted" style="font-size:12px; white-space:nowrap">
+        ${esc(r.actor_email || 'unknown')} · ${esc((r.at||'').replace('T',' '))}</span>
+    </div>`).join('') || '<p class="muted">Nothing recorded yet.</p>';
+
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(720px,95vw)">
+      <h2 style="margin:0 0 4px">Activity</h2>
+      <p class="muted" style="margin:0 0 12px">Who changed what on this server.
+        The oldest entries are trimmed automatically.</p>
+      <div style="max-height:60vh; overflow:auto">${rows}</div>
+      <div class="row" style="justify-content:space-between; margin-top:12px">
+        ${body.next_before
+          ? `<button class="btn" onclick="showActivity(${body.next_before})">Older</button>`
+          : '<span></span>'}
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div></div>`;
 }
 
 // ---- content search (plan 5 #32) ----------------------------------------

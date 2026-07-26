@@ -51,6 +51,7 @@ async fn test_app() -> (axum::Router, std::path::PathBuf) {
         )),
         mailer: None,
         index_text: true,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });

@@ -37,6 +37,7 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
         // it on.
         index_text: false,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
@@ -77,6 +78,7 @@ async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
         // it on.
         index_text: false,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
@@ -248,6 +250,7 @@ async fn session_expiry_slides_forward_on_use() {
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
         // it on.
         index_text: false,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
@@ -1145,6 +1148,7 @@ async fn mail_is_advertised_once_a_mailer_exists() {
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
         // it on.
         index_text: false,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
@@ -1188,6 +1192,7 @@ async fn test_app_with_mail() -> (axum::Router, sqlx::SqlitePool) {
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
         // it on.
         index_text: false,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         mailer: Some(vellum_server::test_mailer(
             "smtp.invalid.example",
@@ -3607,6 +3612,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
         // it on.
         index_text: false,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });

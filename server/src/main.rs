@@ -141,6 +141,20 @@ async fn main() -> anyhow::Result<()> {
         }
     );
 
+    // The activity log (plan 5 #35) is opt-in for the same reason the content
+    // index is: a single-user server should not pay for a table it never reads.
+    let audit = std::env::var("VELLUM_AUDIT")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    tracing::info!(
+        "activity log: {}",
+        if audit {
+            "on (VELLUM_AUDIT)"
+        } else {
+            "off (set VELLUM_AUDIT=1 to record who changed what)"
+        }
+    );
+
     let state = AppState {
         db,
         public_base_url,
@@ -160,6 +174,7 @@ async fn main() -> anyhow::Result<()> {
         )),
         mailer,
         index_text,
+        audit,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert,
     };

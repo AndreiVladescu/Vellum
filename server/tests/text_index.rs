@@ -35,6 +35,7 @@ async fn indexed_app(index_text: bool) -> (axum::Router, AppState) {
         )),
         mailer: None,
         index_text,
+        audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     };

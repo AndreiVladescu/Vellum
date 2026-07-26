@@ -150,6 +150,21 @@ A scanned PDF with no text layer records `no_text` and is simply not searchable.
 There is **no OCR** and there will not be — a tesseract dependency contradicts
 the single-binary story the rest of this server is built around.
 
+### Activity log (optional)
+
+Off unless switched on. When enabled, every mutation (book create/update/delete,
+file upload, user creation, share create/revoke) writes a row naming the actor,
+the action, the target and a short label — never a payload. The console's
+**Activity** button reads it; only the master account can.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VELLUM_AUDIT` | off | `1`/`true` records who changed what |
+
+Bounded on purpose: the oldest rows are trimmed beyond 50,000, so an unattended
+server cannot fill its disk with a log. Writes are best-effort — a failed audit
+row is logged and ignored rather than failing the request the user asked for.
+
 ### Email (optional)
 
 Off unless configured — a LAN server needs no mailer, and the app hides the

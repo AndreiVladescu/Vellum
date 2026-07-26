@@ -113,6 +113,15 @@ pub async fn create(
         .bind(&id)
         .fetch_one(&state.db)
         .await?;
+    crate::audit::record(
+        &state,
+        Some(&user),
+        "share.create",
+        "share",
+        &id,
+        Some(&format!("{} to {}", input.scope, input.grantee_email)),
+    )
+    .await;
     Ok(Json(share))
 }
 
@@ -136,6 +145,7 @@ pub async fn delete(
         .bind(&id)
         .execute(&state.db)
         .await?;
+    crate::audit::record(&state, Some(&user), "share.delete", "share", &id, None).await;
     Ok(Json(serde_json::json!({ "revoked": id })))
 }
 

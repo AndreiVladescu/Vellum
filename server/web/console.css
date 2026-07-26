@@ -341,3 +341,8 @@ td .celledit { width:100%; font-family:var(--sans); }
   *, *::before, *::after { transition-duration:.01ms !important; }
   tbody tr { transition:none; }
 }
+
+/* The Stop button on a long bulk run (plan 5 #35). Inside the progress strip
+   so it is where the user is already looking, not in a corner of the page. */
+.uprog-cancel { margin-left: 12px; }
+.uprog-cancel.hidden { display: none; }

@@ -59,17 +59,23 @@ is answerable from `git log`:
 | 28 | Find a copy, tidy a shelf, print labels | `c751607` |
 | 13 | Backup manifest + verify, rotation, encryption* | `4697d31` |
 | 32 | Server-side full-text search of book contents | `e194105` |
-| 34 | OPDS search, navigation feeds, and paging | `HEAD` |
+| 34 | OPDS search, navigation feeds, and paging | `3ac84a2` |
+| 35 | Console paging, saved views, activity log* | `HEAD` |
 
-**Phase 4 is complete, and 7 of Phase 5's 9 items are done.** Everything §I lists for the on-ramp has landed, plus #14
+**Phase 4 is complete, and 8 of Phase 5's 9 items are done.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list.
+
+*#35's **virtualised table body** is deliberately not built. It was proposed as
+the fix for a DOM holding the whole library — but with search, sort and filters
+moved onto the server, the console now holds one page (200 rows) unless the user
+presses "Load more". Windowing would be solving a problem that no longer exists;
+revisit only if someone loads enough pages to feel it.
 
 *#13's **incremental** half (step 4) is deliberately not built: the plan itself
 says to defer it until full backups measurably hurt, and to prefer "blobs in a
 sidecar folder + small db-only archives" over an incremental format if they do.
 
-**Still open in Phase 5:** #35 (console scale: saved views, activity log), #33
-(read in the browser).
+**Still open in Phase 5:** #33 (read in the browser).
 
 **#46 is done but its second half is deliberately partial.** `access.rs` is the
 compile-checked pilot; the rest is mechanical and can proceed module by module

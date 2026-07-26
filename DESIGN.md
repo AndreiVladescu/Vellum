@@ -301,6 +301,37 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**The console stopped loading the library** (console + server, plan 5 #35).
+Search, sort and the tag/missing filters are now **query params the server
+answers** — `?q=&sort=&dir=&tag=&missing=` on the paged `/api/books` — rather
+than a filter run in the browser over whatever pages happened to be loaded. That
+fixes a subtler bug than the DOM size: "no matches" used to mean "no matches in
+the pages loaded so far", which is a different and much less useful statement.
+Sort keys and directions are a **closed set** (they go straight into an ORDER BY),
+every ordering ends in `b.id` so paging is stable, and nullable keys sort their
+NULLs last in both directions — an unknown year is not year zero. The filters
+apply only to the paged path: a delta pull must never be narrowed, or a client
+loses rows forever as its cursor moves past them.
+
+Three smaller things ride along. **Saved views** name a search + filters + sort +
+columns and live in `localStorage`, like the density toggle — a browser
+preference, not something to give a schema and a sync story. **Bulk metadata
+fetch** got a cancel and per-item failures, because "3 failed" without naming
+them is unactionable and a long run you cannot stop is one you learn not to
+start; the cancel is checked *between* books, so it never leaves a half-applied
+update. And the console's bearer token moved to `sessionStorage`, so a token
+stolen through an XSS dies with the tab — defence in depth, not a fix for a known
+hole.
+
+The **activity log** (`VELLUM_AUDIT=1`) answers "who deleted that book?". A row
+per mutation with actor, action, target and a short label — never a payload, or
+the log becomes a second copy of the library with different access control. The
+actor's email is denormalised so a row stays readable after the account is
+deleted, which is exactly when you want to read it; it is master-only, keyset-
+paged (an offset would skip rows as the trim runs underneath a reader), bounded
+at 50,000 rows, and every write is best-effort: losing an audit row is small,
+failing a user's delete because its log entry couldn't be written is not.
+
 **OPDS grew a shape** (server, plan 5 #34). `/opds` was a flat acquisition feed,
 which is unusable on e-ink past a few hundred books — the device downloads and
 re-renders the whole thing to scroll. It is now a **navigation** feed (Recently

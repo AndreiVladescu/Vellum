@@ -461,6 +461,15 @@ pub async fn create_user(
         false,
     )
     .await?;
+    crate::audit::record(
+        &state,
+        Some(&caller),
+        "user.create",
+        "user",
+        &user.id,
+        Some(&user.email),
+    )
+    .await;
     Ok(Json(user))
 }
 

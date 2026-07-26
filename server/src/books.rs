@@ -146,31 +146,114 @@ pub(crate) fn access_predicate() -> &'static str {
 pub async fn visible_books_page(
     state: &AppState,
     user: &AuthUser,
+    q: &ListQuery,
     limit: i64,
     offset: i64,
 ) -> AppResult<(Vec<BookDto>, i64)> {
-    let sql = format!(
-        "SELECT {BOOK_COLUMNS} FROM book b WHERE {} ORDER BY b.title, b.id LIMIT ? OFFSET ?",
-        access_predicate()
-    );
-    let items = sqlx::query_as::<_, BookDto>(&sql)
-        .bind(&user.id)
-        .bind(user.is_master)
-        .bind(&user.id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&state.db)
-        .await?;
+    let (filter, binds) = list_filter(q);
+    let order = list_order(q.sort.as_deref(), q.dir.as_deref());
+    let where_sql = format!("{} {filter}", access_predicate());
 
-    let count_sql = format!("SELECT COUNT(*) FROM book b WHERE {}", access_predicate());
-    let total: i64 = sqlx::query_scalar(&count_sql)
+    let sql = format!(
+        "SELECT {BOOK_COLUMNS} FROM book b WHERE {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"
+    );
+    let mut query = sqlx::query_as::<_, BookDto>(&sql)
         .bind(&user.id)
         .bind(user.is_master)
+        .bind(&user.id);
+    for bind in &binds {
+        query = query.bind(bind.clone());
+    }
+    let items = query.bind(limit).bind(offset).fetch_all(&state.db).await?;
+
+    let count_sql = format!("SELECT COUNT(*) FROM book b WHERE {where_sql}");
+    let mut count = sqlx::query_scalar::<_, i64>(&count_sql)
         .bind(&user.id)
-        .fetch_one(&state.db)
-        .await?;
+        .bind(user.is_master)
+        .bind(&user.id);
+    for bind in &binds {
+        count = count.bind(bind.clone());
+    }
+    let total = count.fetch_one(&state.db).await?;
 
     Ok((items, total))
+}
+
+/// The `AND …` clauses for a filtered page, plus their binds.
+///
+/// Built by concatenating **fixed** SQL fragments and binding every value —
+/// never by interpolating user text, which is why `sort` is matched against a
+/// closed set below rather than passed through.
+fn list_filter(q: &ListQuery) -> (String, Vec<String>) {
+    let mut sql = String::new();
+    let mut binds: Vec<String> = Vec::new();
+
+    if let Some(term) = q.q.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        sql.push_str(
+            " AND (b.title LIKE ? OR b.subtitle LIKE ? OR b.isbn LIKE ? OR b.publisher LIKE ?              OR EXISTS (SELECT 1 FROM book_author ba JOIN author a ON a.id = ba.author_id                         WHERE ba.book_id = b.id AND a.name LIKE ?))",
+        );
+        let like = format!("%{term}%");
+        for _ in 0..5 {
+            binds.push(like.clone());
+        }
+    }
+
+    match q.tag.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        Some("untagged") => sql
+            .push_str(" AND NOT EXISTS (SELECT 1 FROM book_group_item gi WHERE gi.book_id = b.id)"),
+        Some(group_id) => {
+            sql.push_str(
+                " AND EXISTS (SELECT 1 FROM book_group_item gi                  WHERE gi.book_id = b.id AND gi.group_id = ?)",
+            );
+            binds.push(group_id.to_string());
+        }
+        None => {}
+    }
+
+    // A closed set: anything else is ignored rather than guessed at.
+    match q.missing.as_deref() {
+        Some("file") => {
+            sql.push_str(" AND NOT EXISTS (SELECT 1 FROM book_file f WHERE f.book_id = b.id)")
+        }
+        Some("cover") => sql.push_str(" AND (b.cover_path IS NULL OR b.cover_path = '')"),
+        Some("year") => sql.push_str(" AND b.published_year IS NULL"),
+        Some("author") => {
+            sql.push_str(" AND NOT EXISTS (SELECT 1 FROM book_author ba WHERE ba.book_id = b.id)")
+        }
+        _ => {}
+    }
+
+    (sql, binds)
+}
+
+/// Sort keys are a closed set for the obvious reason — `sort` and `dir` arrive
+/// from a query string and go straight into an ORDER BY, so neither is ever
+/// interpolated; both are matched against known values and anything else falls
+/// back to the default.
+///
+/// Every ordering ends in `b.id` so paging is **stable**: without a unique
+/// tiebreak, two books sharing a title can swap between page 1 and page 2, and
+/// one of them is then never seen at all. And every nullable key sorts its
+/// NULLs **last in both directions** — a book with no year is "unknown", not
+/// "year zero", and burying the unknowns is what a reader expects whichever way
+/// the arrow points.
+fn list_order(sort: Option<&str>, dir: Option<&str>) -> String {
+    let d = if dir == Some("desc") { "DESC" } else { "ASC" };
+    const FIRST_AUTHOR: &str = "(SELECT a.name FROM book_author ba \
+         JOIN author a ON a.id = ba.author_id \
+         WHERE ba.book_id = b.id ORDER BY ba.position LIMIT 1)";
+    match sort {
+        Some("added") => format!("b.created_at {d}, b.id"),
+        Some("year") => format!("b.published_year IS NULL, b.published_year {d}, b.title, b.id"),
+        Some("pages") => format!("b.page_count IS NULL, b.page_count {d}, b.title, b.id"),
+        Some("files") => {
+            format!("(SELECT COUNT(*) FROM book_file f WHERE f.book_id = b.id) {d}, b.title, b.id")
+        }
+        Some("author") => {
+            format!("{FIRST_AUTHOR} IS NULL, {FIRST_AUTHOR} {d}, b.title, b.id")
+        }
+        _ => format!("b.title {d}, b.id"),
+    }
 }
 
 /// All authors in the library, grouped by book id in cover order, from one
@@ -352,6 +435,19 @@ pub struct ListQuery {
     pub cursor: Option<String>,
     pub page: Option<u32>,
     pub limit: Option<u32>,
+    /// Console-side search/sort/filter, moved onto the server (plan 5 #35) so a
+    /// 10,000-book library doesn't have to reach the browser before it can be
+    /// filtered. All four apply **only** to the paged path: a delta pull must
+    /// never be narrowed, or a client would silently miss rows.
+    pub q: Option<String>,
+    /// 'title' (default) | 'author' | 'year' | 'pages' | 'files' | 'added'
+    pub sort: Option<String>,
+    /// 'asc' (default) | 'desc'
+    pub dir: Option<String>,
+    /// A group id, or the literal `untagged`.
+    pub tag: Option<String>,
+    /// 'file' | 'cover' | 'year' | 'author' — books *missing* that thing.
+    pub missing: Option<String>,
 }
 
 const DEFAULT_PAGE_SIZE: i64 = 200;
@@ -384,7 +480,7 @@ pub async fn list(
         let limit = (q.limit.unwrap_or(DEFAULT_PAGE_SIZE as u32) as i64).clamp(1, MAX_PAGE_SIZE);
         let page = page.max(1) as i64;
         let offset = (page - 1) * limit;
-        let (books, total) = visible_books_page(&state, &user, limit, offset).await?;
+        let (books, total) = visible_books_page(&state, &user, &q, limit, offset).await?;
         let next = if offset + (books.len() as i64) < total {
             Some(page + 1)
         } else {
@@ -460,6 +556,15 @@ pub async fn create(
     .bind(&user.id)
     .execute(&state.db)
     .await?;
+    crate::audit::record(
+        &state,
+        Some(&user),
+        "book.create",
+        "book",
+        &id,
+        Some(input.title.trim()),
+    )
+    .await;
     fetch_book(&state, &id).await
 }
 
@@ -998,6 +1103,13 @@ pub async fn delete(
     // clients delete-then-re-download the book (and its blobs) on the next pull.
     let mut tx = state.db.begin().await?;
 
+    // The title, for the activity log (plan 5 #35) — read before the row goes,
+    // since naming the book afterwards is exactly what the log is for.
+    let title: Option<String> = sqlx::query_scalar("SELECT title FROM book WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
     // Collect blob paths before the row (and its cascaded book_file rows) vanish,
     // so we can remove them from disk afterwards and not leak storage.
     let cover: Option<Option<String>> =
@@ -1044,6 +1156,17 @@ pub async fn delete(
     for rel in files.into_iter().chain(cover.flatten()) {
         let _ = tokio::fs::remove_file(state.data_dir.join(rel)).await;
     }
+    // The title is captured before the row goes, which is the whole point:
+    // "who deleted that book?" needs to name the book after it is gone.
+    crate::audit::record(
+        &state,
+        Some(&user),
+        "book.delete",
+        "book",
+        &id,
+        title.as_deref(),
+    )
+    .await;
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 

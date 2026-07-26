@@ -33,6 +33,7 @@
       <button class="btn" onclick="loadAll()">Refresh</button>
       <button class="btn" onclick="showCert()">Certificate</button>
       <button class="btn" onclick="showStats()">Server</button>
+      <button class="btn" onclick="showActivity()">Activity</button>
       <button class="btn" onclick="logout()">Log out</button>
     </header>
 
@@ -69,6 +70,12 @@
       <span class="sep"></span>
       <span id="missingfilters"></span>
       <button class="btn sm" onclick="clearFilters()">Clear filters</button>
+      <span class="sep"></span>
+      <!-- Saved views (plan 5 #35): a name for how you like to look at the
+           library, kept in this browser like the density toggle. -->
+      <span class="muted">Views:</span>
+      <span id="views"></span>
+      <button class="btn sm" onclick="saveView()">Save this view</button>
       <!-- Content search (plan 5 #32). Hidden unless this server advertises
            `content_search`: a button that can only 400 is worse than none. -->
       <span class="sep hidden" id="contentsep"></span>

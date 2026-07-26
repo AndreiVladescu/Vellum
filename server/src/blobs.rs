@@ -358,6 +358,16 @@ pub async fn upload_file(
     .fetch_one(&state.db)
     .await?;
 
+    crate::audit::record(
+        &state,
+        Some(&user),
+        "file.upload",
+        "book",
+        &id,
+        Some(&q.filename),
+    )
+    .await;
+
     // The heavy enrichment — page-count parse, first-page cover render (a
     // shell-out that can take seconds), and file-name metadata — runs in a
     // detached task *after* the response, so a big upload's HTTP reply isn't

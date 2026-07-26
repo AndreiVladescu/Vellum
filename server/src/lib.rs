@@ -15,6 +15,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
 mod access;
 mod admin;
+mod audit;
 mod auth;
 mod blobs;
 mod books;
@@ -74,6 +75,10 @@ pub struct AppState {
     /// `Option` is the feature flag: everything that needs mail checks it and
     /// degrades rather than failing.
     pub mailer: Option<mail::Mailer>,
+    /// Whether this server keeps an activity log (`VELLUM_AUDIT=1`, plan
+    /// 5 #35). Off by default: a single-user server should not pay for a table
+    /// it will never read.
+    pub audit: bool,
     /// Whether this server extracts and indexes book *contents* for search
     /// (`VELLUM_INDEX_TEXT=1`, plan 5 #32). Off by default: the index is
     /// roughly the size of the text it holds, and an operator who only wants
@@ -135,6 +140,7 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Integrity sweep and one-command backup (plan 5 #12), both master-only.
         .route("/admin/sweep", post(admin::sweep))
         .route("/admin/reindex", post(text_index::reindex))
+        .route("/admin/audit", get(audit::list))
         // Content search (plan 5 #32). Under /api like everything else, and
         // named `search` rather than `books/search` because it searches inside
         // books rather than over their metadata — `/books?q=` is the other one.
