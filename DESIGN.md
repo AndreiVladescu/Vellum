@@ -346,6 +346,31 @@ Metadata is also filled in **automatically**, without picking an edition:
 
 ## Adding & editing books
 
+**Bulk folder import** (app, plan 5 #15) is the on-ramp for someone arriving with
+an existing folder of downloads: *Import a folder* in the drawer recurses for
+PDFs and EPUBs and then shows a **dry run** — one row per file with the title and
+author parsed from its name, a status (**new** · **already here** · **possible
+duplicate** · **unreadable**), and an edit button. Nothing is written until the
+user presses Import.
+
+- The file-name parser (`app/lib/import/filename_metadata.dart`) is a port of the
+  server's `metadata::parse_filename`, rule for rule, so the same folder imported
+  in the app and through the console produces the same books. It can't call the
+  server's copy: import has to work with no server at all.
+- Duplicate detection runs during the scan, which is why the scan hashes every
+  file: an identical **sha256** is certain and decides on its own; a matching
+  ISBN or title+author only *suggests* — the row is deselected but visible and
+  re-selectable. A false "duplicate" would silently lose a book, so nothing is
+  ever skipped without being shown.
+- Online lookups are a **separate, resumable pass** after the import, one request
+  at a time, and default off above ~50 books. So importing 500 books doesn't
+  depend on 500 network calls, and a cancelled or offline enrichment simply
+  continues next time (it skips books that already have a description).
+- Each file goes through the atomic import path (#14) and each row is
+  independent: one failure is reported and the run continues.
+- A folder can optionally be **watched**: on launch (only — no filesystem watcher,
+  no background service) Vellum offers to review new files found in it.
+
 The console's Add-book dialog is a small **editable metadata form** (title,
 authors, year, pages, publisher, ISBN, description):
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'account/account_page.dart';
 import 'account/user_profile.dart';
 import 'data/library_repository.dart';
+import 'import/folder_import_page.dart';
 import 'loans/loans_page.dart';
 import 'server/connection_store.dart';
 import 'server/server_page.dart';
@@ -60,6 +61,16 @@ class AppDrawer extends StatelessWidget {
     ));
   }
 
+  void _openFolderImport(BuildContext context) {
+    Navigator.of(context).pop(); // close the drawer first
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => FolderImportPage(
+        repository: repository,
+        settings: settings,
+      ),
+    ));
+  }
+
   void _openAccount(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(
@@ -97,6 +108,11 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.swap_horiz),
             title: const Text('Loans'),
             onTap: () => _openLoans(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.folder_open),
+            title: const Text('Import a folder'),
+            onTap: () => _openFolderImport(context),
           ),
           ListenableBuilder(
             listenable: connection,

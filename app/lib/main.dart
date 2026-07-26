@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,10 @@ import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
 import 'data/library_queries.dart';
 import 'data/library_repository.dart';
+import 'import/filename_metadata.dart';
+import 'import/folder_import_page.dart';
+import 'import/folder_import_service.dart';
+import 'import/import_plan.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
 import 'server/connection_store.dart';
@@ -127,6 +132,7 @@ class _LibraryPageState extends State<LibraryPage> {
     super.initState();
     _autoSync();
     _autoPusher.start();
+    _offerWatchedFolder();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
   }
@@ -189,6 +195,63 @@ class _LibraryPageState extends State<LibraryPage> {
       // Offline, or a server without the endpoint — the position simply stays
       // local until next time.
     }
+  }
+
+  /// Offers to import from the watched folder if it holds books this library
+  /// doesn't (plan 5 #15).
+  ///
+  /// Launch-only and *offered*, never automatic: a folder can hold files the
+  /// user deliberately didn't import, and silently adding books to someone's
+  /// library because a download finished would be the wrong kind of helpful. The
+  /// scan itself is the wizard's normal dry run, so the count here is a cheap
+  /// hash-free pre-check — anything else waits for the user to say yes.
+  Future<void> _offerWatchedFolder() async {
+    final folder = widget.settings.watchedImportFolder;
+    if (folder == null) return;
+    final directory = Directory(folder);
+    if (!await directory.exists()) return; // unplugged drive, moved folder
+    final service = FolderImportService(repository);
+    final List<File> found;
+    try {
+      found = await service.findImportableFiles(directory);
+    } catch (_) {
+      return; // unreadable folder — not worth a message
+    }
+    if (found.isEmpty || !mounted) return;
+    // Cheap pre-check so a folder whose books are all imported doesn't nag on
+    // every launch. Compared by *guessed title*, not by path: a stored file is
+    // named after its uuid, so the original file name is no longer on disk to
+    // compare with. Being approximate is fine in this direction — the worst case
+    // is one extra prompt, and the dry run that follows compares by hash.
+    final known = {
+      for (final book in await repository.db.select(repository.db.books).get())
+        normalizeForMatch(book.title),
+    };
+    final unseen = found.where((f) {
+      final guess = parseFilename(filenameStem(f.path)).title;
+      return guess == null || !known.contains(normalizeForMatch(guess));
+    }).length;
+    if (unseen == 0 || !mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text('$unseen new file${unseen == 1 ? '' : 's'} in your '
+            'watched folder.'),
+        action: SnackBarAction(
+          label: 'Review',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => FolderImportPage(
+                repository: repository,
+                settings: widget.settings,
+                initialFolder: folder,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override

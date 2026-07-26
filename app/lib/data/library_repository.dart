@@ -222,6 +222,8 @@ class LibraryRepository {
     bool importGenres = false,
   }) => writes.addFromSearch(result, importGenres: importGenres);
   Future<BookDetails> detailsFor(String bookId) => writes.detailsFor(bookId);
+  Future<void> enrichFromSearch(String bookId, BookSearchResult result) =>
+      writes.enrichFromSearch(bookId, result);
   Future<void> deleteBook(Book book, {bool recordTombstone = true}) =>
       writes.deleteBook(book, recordTombstone: recordTombstone);
 

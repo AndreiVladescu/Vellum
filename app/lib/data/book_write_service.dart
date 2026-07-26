@@ -417,6 +417,88 @@ class BookWriteService {
     return id;
   }
 
+  /// Fills a book's blank fields from an online [result], leaving everything
+  /// already set alone (plan 5 #15's enrichment pass).
+  ///
+  /// "Only blanks" is the whole contract: this runs unattended over books
+  /// imported from file names, possibly long after the user has edited some of
+  /// them by hand, and an enrichment that overwrote a corrected title would be
+  /// worse than no enrichment. Authors are added only when the book has none,
+  /// and the cover only when it has none — matching the server's
+  /// `discover::enrich`.
+  ///
+  /// Records [BookSearchResult] as `sourceMetadata` when the book had none, so
+  /// an enriched book gains "revert to library defaults" like a searched one.
+  Future<void> enrichFromSearch(String bookId, BookSearchResult result) async {
+    final book = await (db.select(
+      db.books,
+    )..where((b) => b.id.equals(bookId))).getSingleOrNull();
+    if (book == null) return;
+
+    // Network work first, outside the transaction.
+    final description = book.description == null || book.description!.isEmpty
+        ? await metadata.descriptionOf(result)
+        : null;
+    Uint8List? coverBytes;
+    if (book.coverPath == null) {
+      coverBytes = await metadata.downloadCover(result);
+    }
+
+    final hadAuthors = (await detailsFor(bookId)).authors.isNotEmpty;
+    await db.transaction(() async {
+      await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+        BooksCompanion(
+          subtitle: book.subtitle == null
+              ? Value(result.subtitle)
+              : const Value.absent(),
+          description:
+              description == null ? const Value.absent() : Value(description),
+          isbn: book.isbn == null ? Value(result.isbn) : const Value.absent(),
+          publisher: book.publisher == null
+              ? Value(result.publisher)
+              : const Value.absent(),
+          publishedYear: book.publishedYear == null
+              ? Value(result.firstPublishYear)
+              : const Value.absent(),
+          pageCount: book.pageCount == null
+              ? Value(result.pageCount)
+              : const Value.absent(),
+          sourceMetadata: book.sourceMetadata == null
+              ? Value(jsonEncode({
+                  'title': result.title,
+                  'subtitle': result.subtitle,
+                  'description': description ?? book.description,
+                  'isbn': result.isbn,
+                  'publisher': result.publisher,
+                  'publishedYear': result.firstPublishYear,
+                  'pageCount': result.pageCount,
+                  'coverUrl': result.largeCoverUrl?.toString(),
+                }))
+              : const Value.absent(),
+          updatedAt: Value(DateTime.now()),
+          needsPush: const Value(true),
+        ),
+      );
+      if (!hadAuthors) {
+        var position = 0;
+        for (final name in result.authors) {
+          final authorId = await _idForName(db.authors, name);
+          await db.into(db.bookAuthors).insert(
+                BookAuthorsCompanion.insert(
+                  bookId: bookId,
+                  authorId: authorId,
+                  position: Value(position++),
+                ),
+                mode: InsertMode.insertOrIgnore,
+              );
+        }
+      }
+    });
+    // Outside the transaction: this writes a file and recomputes the spine's
+    // dominant colour.
+    if (coverBytes != null) await _covers.setCoverBytes(bookId, coverBytes);
+  }
+
   /// Get-or-create for the name-keyed lookup tables (authors, genres).
   Future<String> _idForName(TableInfo table, String name) async {
     final existing = await db

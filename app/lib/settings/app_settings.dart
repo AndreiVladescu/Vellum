@@ -23,6 +23,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _syncReadingPositionKey = 'settings.syncReadingPosition';
   static const _deviceIdKey = 'settings.deviceId';
   static const _deviceLabelKey = 'settings.deviceLabel';
+  static const _watchedFolderKey = 'settings.watchedImportFolder';
 
   final SharedPreferences _prefs;
 
@@ -159,6 +160,24 @@ class AppSettingsStore extends ChangeNotifier {
     }
     if (label.trim().isEmpty) label = Platform.operatingSystem;
     return label;
+  }
+
+  /// A folder the user asked Vellum to keep an eye on for new books (plan 5
+  /// #15), or null. Checked **on launch only** — no filesystem watcher and no
+  /// background service, so a folder on a disconnected drive is a no-op rather
+  /// than a hang, and nothing is imported without the usual dry-run review.
+  String? get watchedImportFolder {
+    final stored = _prefs.getString(_watchedFolderKey);
+    return (stored == null || stored.isEmpty) ? null : stored;
+  }
+
+  Future<void> setWatchedImportFolder(String? path) async {
+    if (path == null || path.trim().isEmpty) {
+      await _prefs.remove(_watchedFolderKey);
+    } else {
+      await _prefs.setString(_watchedFolderKey, path.trim());
+    }
+    notifyListeners();
   }
 
   /// Override the device label (a user who has two machines both called

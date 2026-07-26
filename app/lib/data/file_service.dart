@@ -91,7 +91,15 @@ class FileService {
         db.books,
       )..where((b) => b.id.equals(bookId))).getSingleOrNull();
       if (book != null && book.coverPath == null) {
-        await _covers.setCoverFromEmbedded(bookId);
+        try {
+          await _covers.setCoverFromEmbedded(bookId);
+        } catch (_) {
+          // The file is attached and its row is committed; a cover is cosmetic
+          // (the book falls back to a generated spine). Rendering can fail for
+          // reasons that say nothing about the file's usefulness — a malformed
+          // PDF, a missing renderer — and a bulk import (plan 5 #15) must not
+          // report a perfectly good book as failed because of it.
+        }
       }
     }
   }
