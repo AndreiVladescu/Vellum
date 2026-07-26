@@ -70,9 +70,6 @@ sidecar folder + small db-only archives" over an incremental format if they do.
 **Still open in Phase 5:** #35 (console scale: saved views, activity log), #34
 (OPDS search, facets, OPDS 2.0), #33 (read in the browser).
 
-The app side of #31 is also open: the server advertises `mail`, but nothing in the
-app reads it yet to show a "Forgot password?" link.
-
 **#46 is done but its second half is deliberately partial.** `access.rs` is the
 compile-checked pilot; the rest is mechanical and can proceed module by module
 (`auth.rs`, `groups.rs`, `blobs.rs` are fully static and next in line). Roughly

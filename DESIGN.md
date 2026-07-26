@@ -170,6 +170,13 @@ people. Re-inviting an address supersedes the previous link.
 Both token-bearing paths (`/reset/<token>`, `/join/<token>`) are **redacted** by
 the request logger — see L8 in `docs/SECURITY_AUDIT.md`.
 
+The **app** shows "Forgot your password?" only when the server it is pointed at
+advertises `mail` — probed from the unauthenticated capability endpoint as the
+address is typed, since a reset by definition has no session. Its confirmation is
+deliberately non-committal ("if that address has an account…") and is shown even
+when the request fails: echoing success would turn the sign-in screen into the
+account-existence oracle the server took care not to be.
+
 ## Observability
 
 Every response carries an **`X-Request-Id`** (plan 5 #37) — echoed when the caller

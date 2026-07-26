@@ -270,6 +270,20 @@ class VellumServerClient {
     return Capabilities.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Starts a password reset (plan 5 #31).
+  ///
+  /// Unauthenticated, and the server answers the same whether or not the
+  /// address exists — so the app must not phrase the result as confirmation
+  /// that an account was found.
+  Future<void> forgotPassword(String email) async {
+    final res = await _http.post(
+      _uri('/api/auth/forgot'),
+      headers: const {'content-type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    _body(res);
+  }
+
   /// Searches inside book *contents* (plan 5 #32).
   ///
   /// Only meaningful when the server advertises `content_search`; without the

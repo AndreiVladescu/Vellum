@@ -188,6 +188,87 @@ class _ServerPageState extends State<ServerPage> {
     );
   }
 
+  /// Whether the server at the typed address can send mail.
+  ///
+  /// Probed from the *unauthenticated* capability endpoint as the address is
+  /// typed — there is no session yet, which is the whole point of a reset.
+  bool _mailAvailable = false;
+  String _probedUrl = '';
+
+  Future<void> _probeMail(String rawUrl) async {
+    final url = ServerConnection.normalizeUrl(rawUrl);
+    if (url.isEmpty || url == _probedUrl) return;
+    _probedUrl = url;
+    try {
+      final caps = await widget.connection.anonymousClient(url).capabilities();
+      if (!mounted || ServerConnection.normalizeUrl(_url.text) != url) return;
+      setState(() => _mailAvailable = caps.hasFeature('mail'));
+    } catch (_) {
+      // Unreachable, or a server too old to answer: assume no mail rather than
+      // offering a link that would fail.
+      if (mounted) setState(() => _mailAvailable = false);
+    }
+  }
+
+  /// Asks the server to email a reset link.
+  ///
+  /// The confirmation is deliberately non-committal: the server answers
+  /// identically whether or not the address has an account, and echoing "we
+  /// sent you an email" would turn this screen into an account-existence
+  /// oracle the server took care not to be.
+  Future<void> _forgotPassword() async {
+    final email = TextEditingController(text: _email.text.trim());
+    final send = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset your password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'The server will email a link that lets you choose a new '
+              'password. Open it on this device or any browser.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: email,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Send the link'),
+          ),
+        ],
+      ),
+    );
+    final address = email.text.trim();
+    email.dispose();
+    if (send != true || address.isEmpty || !mounted) return;
+
+    try {
+      await widget.connection
+          .anonymousClient(_url.text)
+          .forgotPassword(address);
+    } catch (_) {
+      // Fall through to the same message: a failure here would otherwise leak
+      // whether the address is known.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('If that address has an account, a link is on its way.'),
+    ));
+  }
+
   Future<void> _authenticate() => _run(() async {
         final url = _url.text;
         final client = widget.connection.anonymousClient(url);
@@ -652,7 +733,10 @@ class _ServerPageState extends State<ServerPage> {
         TextField(
           controller: _url,
           keyboardType: TextInputType.url,
-          onChanged: (_) => setState(() {}),
+          onChanged: (value) {
+            setState(() {});
+            _probeMail(value);
+          },
           decoration: const InputDecoration(
             labelText: 'Server address',
             hintText: 'https://library.example.com',
@@ -726,6 +810,14 @@ class _ServerPageState extends State<ServerPage> {
                   child: CircularProgressIndicator(strokeWidth: 2))
               : Text(_registerMode ? 'Create account' : 'Log in'),
         ),
+        // Offered only when the server says it can send mail (plan 5 #31): a
+        // "Forgot password?" link on a LAN server with no SMTP would be a
+        // button that can only fail.
+        if (!_registerMode && _mailAvailable)
+          TextButton(
+            onPressed: _busy ? null : _forgotPassword,
+            child: const Text('Forgot your password?'),
+          ),
         const SizedBox(height: 8),
         TextButton(
           onPressed: _busy
