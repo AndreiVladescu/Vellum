@@ -47,7 +47,7 @@ pub async fn request_id(request: Request, next: Next) -> Response {
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
     let method = request.method().clone();
-    let path = request.uri().path().to_string();
+    let path = redact_path(request.uri().path());
     let started = std::time::Instant::now();
 
     let span = tracing::info_span!("request", %method, path = %path, request_id = %id);
@@ -87,6 +87,32 @@ pub async fn request_id(request: Request, next: Next) -> Response {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
     }
     response
+}
+
+/// Replaces secret path segments before a path is logged.
+///
+/// Some URLs *are* credentials: a password-reset link and a public share link
+/// both carry a token in the path, and logging them verbatim would put a live
+/// secret in a file that gets tailed, shipped and pasted into issues. (This is
+/// the same class as L1 in `docs/SECURITY_AUDIT.md`, which is about `?token=` in
+/// query strings — the request logger must not reintroduce it in the path.)
+///
+/// The *shape* of the request is kept, because that is what the log is for.
+fn redact_path(path: &str) -> String {
+    // (prefix, how many segments to keep after it)
+    const SECRET_PREFIXES: [&str; 3] = ["/reset/", "/p/", "/api/public/"];
+    for prefix in SECRET_PREFIXES {
+        if let Some(rest) = path.strip_prefix(prefix) {
+            // Keep any trailing sub-path (e.g. `/file`), drop only the token.
+            let tail = rest.split_once('/').map(|(_, tail)| tail).unwrap_or("");
+            return if tail.is_empty() {
+                format!("{prefix}<redacted>")
+            } else {
+                format!("{prefix}<redacted>/{tail}")
+            };
+        }
+    }
+    path.to_string()
 }
 
 /// Keeps an inbound id usable as a log field: printable ASCII only, bounded.
@@ -204,4 +230,33 @@ async fn database_size() -> u64 {
         }
     }
     total
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_path;
+
+    #[test]
+    fn secret_bearing_paths_are_redacted() {
+        // These tokens are credentials for as long as they live; a log line is
+        // not a place to keep one.
+        assert_eq!(redact_path("/reset/abc123"), "/reset/<redacted>");
+        assert_eq!(redact_path("/p/sharetoken"), "/p/<redacted>");
+        assert_eq!(
+            redact_path("/api/public/sharetoken"),
+            "/api/public/<redacted>"
+        );
+        // The shape of the request survives — that is what the log is for.
+        assert_eq!(
+            redact_path("/api/public/sharetoken/file"),
+            "/api/public/<redacted>/file"
+        );
+    }
+
+    #[test]
+    fn ordinary_paths_are_untouched() {
+        assert_eq!(redact_path("/api/books"), "/api/books");
+        assert_eq!(redact_path("/api/books/abc/cover"), "/api/books/abc/cover");
+        assert_eq!(redact_path("/health"), "/health");
+    }
 }

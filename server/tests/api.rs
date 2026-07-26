@@ -1138,6 +1138,260 @@ async fn mail_is_advertised_once_a_mailer_exists() {
     );
 }
 
+// ---- Password reset (plan 5 #31, stage 2) ----------------------------------
+
+/// An app whose `AppState` has a mailer, so the reset path runs end to end.
+/// Sending fails (the host doesn't exist) — which is deliberate: the handler must
+/// answer identically whether or not the mail actually goes out.
+async fn test_app_with_mail() -> (axum::Router, sqlx::SqlitePool) {
+    let id = uuid::Uuid::new_v4();
+    let path = std::env::temp_dir().join(format!("vellum_reset_{id}.db"));
+    let db = connect_db(path.to_str().unwrap()).await.unwrap();
+    let app = router(AppState {
+        db: db.clone(),
+        public_base_url: "https://books.example.com".into(),
+        data_dir: std::env::temp_dir().join(format!("vellum_reset_data_{id}")),
+        http: reqwest::Client::new(),
+        max_upload_bytes: 1024 * 1024,
+        throttle: std::sync::Arc::default(),
+        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            1000,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            1000,
+            std::time::Duration::from_secs(60),
+        )),
+        mailer: Some(vellum_server::test_mailer(
+            "smtp.invalid.example",
+            "vellum@example.com",
+        )),
+        tls_cert: None,
+    });
+    (app, db)
+}
+
+/// The plaintext token can't be read from the response (by design), so tests
+/// mint one the same way the handler does and insert it directly.
+async fn seed_reset_token(db: &sqlx::SqlitePool, user_id: &str, token: &str, sql_expiry: &str) {
+    sqlx::query(&format!(
+        "INSERT INTO password_reset (token_hash, user_id, expires_at) \
+         VALUES (?, ?, {sql_expiry})"
+    ))
+    .bind(vellum_server::sha256_hex_for_tests(token))
+    .bind(user_id)
+    .execute(db)
+    .await
+    .unwrap();
+}
+
+async fn master_id(db: &sqlx::SqlitePool) -> String {
+    sqlx::query_scalar("SELECT id FROM app_user LIMIT 1")
+        .fetch_one(db)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn forgot_answers_identically_for_known_and_unknown_addresses() {
+    // The property that matters: this endpoint must not be an account-existence
+    // oracle. A personal library's account list is a list of people its owner
+    // knows.
+    let (app, _db) = test_app_with_mail().await;
+    register_master(&app).await;
+
+    let (known_status, known_body) = call(
+        &app,
+        "POST",
+        "/api/auth/forgot",
+        None,
+        Some(json!({ "email": "master@lib.test" })),
+    )
+    .await;
+    let (unknown_status, unknown_body) = call(
+        &app,
+        "POST",
+        "/api/auth/forgot",
+        None,
+        Some(json!({ "email": "nobody@lib.test" })),
+    )
+    .await;
+
+    assert_eq!(known_status, unknown_status);
+    assert_eq!(known_body, unknown_body);
+    assert_eq!(known_status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn forgot_is_a_no_op_when_mail_is_off_but_answers_the_same() {
+    let app = test_app().await; // no mailer
+    register_master(&app).await;
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/auth/forgot",
+        None,
+        Some(json!({ "email": "master@lib.test" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["status"].is_string());
+}
+
+#[tokio::test]
+async fn a_reset_token_sets_the_password_once() {
+    let (app, db) = test_app_with_mail().await;
+    register_master(&app).await;
+    let user = master_id(&db).await;
+    seed_reset_token(&db, &user, "tok-good", "datetime('now', '+1 hour')").await;
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/auth/reset",
+        None,
+        Some(json!({ "token": "tok-good", "password": "brand-new-pass" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    // The new password works...
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "email": "master@lib.test", "password": "brand-new-pass" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    // ...the old one doesn't...
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "email": "master@lib.test", "password": "masterpass1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    // ...and the token is spent.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/auth/reset",
+        None,
+        Some(json!({ "token": "tok-good", "password": "another-attempt" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "a reset link works once");
+}
+
+#[tokio::test]
+async fn a_reset_ends_every_existing_session() {
+    // Resetting is what someone does when they fear their account is
+    // compromised; leaving the attacker's session alive would defeat it.
+    let (app, db) = test_app_with_mail().await;
+    let token = register_master(&app).await;
+    let user = master_id(&db).await;
+
+    let (status, _) = call(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK, "session works before the reset");
+
+    seed_reset_token(&db, &user, "tok-session", "datetime('now', '+1 hour')").await;
+    call(
+        &app,
+        "POST",
+        "/api/auth/reset",
+        None,
+        Some(json!({ "token": "tok-session", "password": "brand-new-pass" })),
+    )
+    .await;
+
+    let (status, _) = call(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "old sessions are dropped");
+}
+
+#[tokio::test]
+async fn an_expired_or_unknown_token_is_refused_the_same_way() {
+    let (app, db) = test_app_with_mail().await;
+    register_master(&app).await;
+    let user = master_id(&db).await;
+    seed_reset_token(&db, &user, "tok-stale", "datetime('now', '-1 minute')").await;
+
+    let (expired_status, expired_body) = call(
+        &app,
+        "POST",
+        "/api/auth/reset",
+        None,
+        Some(json!({ "token": "tok-stale", "password": "brand-new-pass" })),
+    )
+    .await;
+    let (unknown_status, unknown_body) = call(
+        &app,
+        "POST",
+        "/api/auth/reset",
+        None,
+        Some(json!({ "token": "never-existed", "password": "brand-new-pass" })),
+    )
+    .await;
+
+    assert_eq!(expired_status, StatusCode::BAD_REQUEST);
+    assert_eq!(expired_status, unknown_status);
+    assert_eq!(
+        expired_body["error"], unknown_body["error"],
+        "distinguishing expired from unknown tells a guesser which attempt was close"
+    );
+}
+
+#[tokio::test]
+async fn only_the_token_hash_is_stored() {
+    // A backup or a snapshot must not contain anything replayable as a reset.
+    let (app, db) = test_app_with_mail().await;
+    register_master(&app).await;
+    let user = master_id(&db).await;
+    seed_reset_token(&db, &user, "tok-secret", "datetime('now', '+1 hour')").await;
+
+    let stored: Vec<String> = sqlx::query_scalar("SELECT token_hash FROM password_reset")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(stored.len(), 1);
+    assert_ne!(stored[0], "tok-secret");
+    assert_eq!(stored[0].len(), 64, "a hex SHA-256");
+}
+
+#[tokio::test]
+async fn a_new_reset_request_invalidates_the_previous_link() {
+    // A forwarded or leaked earlier email must stop working once a new one is
+    // requested.
+    let (app, db) = test_app_with_mail().await;
+    register_master(&app).await;
+    let user = master_id(&db).await;
+    seed_reset_token(&db, &user, "tok-old", "datetime('now', '+1 hour')").await;
+
+    call(
+        &app,
+        "POST",
+        "/api/auth/forgot",
+        None,
+        Some(json!({ "email": "master@lib.test" })),
+    )
+    .await;
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/auth/reset",
+        None,
+        Some(json!({ "token": "tok-old", "password": "brand-new-pass" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
 // ---- Integrity sweep and snapshot (plan 5 #12) -----------------------------
 
 #[tokio::test]

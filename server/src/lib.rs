@@ -125,6 +125,11 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .route("/auth/logout", post(auth::logout))
+        // Password reset by email (plan 5 #31). Both are unauthenticated by
+        // necessity — the caller can't log in — so both are throttled and
+        // deliberately uninformative about which addresses exist.
+        .route("/auth/forgot", post(auth::forgot))
+        .route("/auth/reset", post(auth::reset))
         .route("/auth/me", get(auth::me))
         .route("/users", get(auth::list_users).post(auth::create_user))
         // Online metadata search + add a chosen result.
@@ -212,6 +217,12 @@ pub fn build_mailer() -> anyhow::Result<Option<mail::Mailer>> {
     mail::Mailer::from_env()
 }
 
+/// The token-hashing function, so tests can seed a reset token the same way the
+/// handler stores one (the plaintext is never returned by the API, by design).
+pub fn sha256_hex_for_tests(input: &str) -> String {
+    auth::sha256_hex(input)
+}
+
 /// A mailer for tests, built without touching the process environment.
 pub fn test_mailer(host: &str, from: &str) -> mail::Mailer {
     mail::for_testing(host, from)
@@ -229,6 +240,8 @@ pub fn router(state: AppState) -> Router {
         .route("/assets/logo.svg", get(web::logo))
         .route("/favicon.svg", get(web::favicon))
         .route("/p/{token}", get(web::public_page))
+        // Where the emailed password-reset link lands (plan 5 #31).
+        .route("/reset/{token}", get(web::reset_page))
         // OPDS catalog for third-party e-readers (HTTP Basic auth) — not
         // versioned: readers have this exact URL saved, it never moves.
         .route("/opds", get(opds::feed))

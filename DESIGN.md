@@ -134,6 +134,33 @@ while). It is the primary way to manage the library; the app's Sharing screen
 covers the same
 endpoints for on-device use.
 
+## Email (optional)
+
+Off unless `VELLUM_SMTP_HOST` and `VELLUM_MAIL_FROM` are set (plan 5 #31), because
+a LAN-only server should need no outbound SMTP, no credential, and no egress. When
+it *is* configured, `mail` appears in `GET /api/capabilities` — a conditional
+capability, unlike the rest — so the app can hide "Forgot password?" rather than
+offer a button that can only fail. A misconfiguration stops the server at boot
+instead of surfacing weeks later as a reset that silently doesn't arrive.
+
+**Password reset** is `POST /api/auth/forgot` → emailed
+`${PUBLIC_URL}/reset/<token>` → `POST /api/auth/reset`. Three properties carry
+the security of it:
+
+- `forgot` **always answers the same thing** — "if that email exists, a link was
+  sent" — whether or not the address is real, whether or not the mail send
+  succeeded, and whether or not mail is even configured. Anything else makes it an
+  account-existence oracle. It is throttled per email *and* per IP, checked before
+  the lookup so a rate limit is indistinguishable from a missing account too.
+- Only the token's **SHA-256** is stored (as with sessions), so a backup or a
+  snapshot contains nothing replayable. Tokens last an hour, work once, and a new
+  request invalidates the previous link.
+- Redeeming one **drops every existing session** for that account: resetting is
+  what someone does when they fear they are compromised.
+
+The token rides in the path, and the request logger **redacts** it
+(`/reset/<redacted>`) — see L8 in `docs/SECURITY_AUDIT.md`.
+
 ## Observability
 
 Every response carries an **`X-Request-Id`** (plan 5 #37) — echoed when the caller

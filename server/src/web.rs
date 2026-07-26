@@ -32,6 +32,14 @@ pub async fn console_js() -> impl IntoResponse {
     )
 }
 
+/// The page an emailed reset link opens (plan 5 #31). Served for any
+/// `/reset/{token}`; the page reads the token from its own path rather than
+/// taking it as a query parameter, which keeps it out of proxy logs and
+/// browser-history entries the way `?token=` never could.
+pub async fn reset_page() -> Html<&'static str> {
+    Html(include_str!("../web/reset.html"))
+}
+
 pub async fn public_page() -> Html<&'static str> {
     Html(include_str!("../web/public.html"))
 }

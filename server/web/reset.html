@@ -1,0 +1,70 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reset your Vellum password</title>
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/assets/console.css">
+
+<!--
+  The page the emailed reset link opens (plan 5 #31). Deliberately tiny and
+  self-contained: it takes the token from its own URL, so the token never has to
+  be typed, pasted, or put in a query string where a proxy log would keep it.
+-->
+<main class="modal" style="max-width:420px;margin:12vh auto">
+  <h2 style="margin:0 0 4px">Choose a new password</h2>
+  <p class="muted" id="hint" style="margin:0 0 16px">
+    At least 8 characters. Your other devices will be signed out.
+  </p>
+
+  <form id="form" autocomplete="on">
+    <label for="pw">New password</label>
+    <input id="pw" type="password" autocomplete="new-password" required
+           minlength="8" style="width:100%">
+    <label for="pw2" style="margin-top:10px">Repeat it</label>
+    <input id="pw2" type="password" autocomplete="new-password" required
+           minlength="8" style="width:100%">
+    <p class="err" id="err" style="min-height:1.2em"></p>
+    <button class="btn primary" id="go" type="submit" style="width:100%">
+      Set password
+    </button>
+  </form>
+</main>
+
+<script>
+  // /reset/<token> — the last path segment.
+  const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+  const err = document.getElementById('err');
+  const form = document.getElementById('form');
+
+  if (!token) {
+    err.textContent = 'This link is incomplete. Open the link from your email again.';
+    document.getElementById('go').disabled = true;
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    err.textContent = '';
+    const pw = document.getElementById('pw').value;
+    if (pw !== document.getElementById('pw2').value) {
+      err.textContent = 'Those two passwords are different.';
+      return;
+    }
+    const go = document.getElementById('go');
+    go.disabled = true;
+    try {
+      const res = await fetch('/api/auth/reset', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token, password: pw }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not set the password.');
+      form.innerHTML =
+        '<p>Password updated. You can sign in with it now, ' +
+        'here or in the app.</p><a class="btn primary" href="/">Go to the console</a>';
+      document.getElementById('hint').textContent = '';
+    } catch (e) {
+      err.textContent = e.message;
+      go.disabled = false;
+    }
+  });
+</script>

@@ -573,3 +573,160 @@ mod tests {
         assert!(require_bootstrap_token(Some("anything")).is_ok());
     }
 }
+
+// ---- Password reset (plan 5 #31, stage 2) ----------------------------------
+
+#[derive(Deserialize)]
+pub struct ForgotInput {
+    pub email: String,
+}
+
+/// `POST /api/auth/forgot` — start a password reset.
+///
+/// **Always answers the same thing.** Whether or not the address belongs to an
+/// account, the response is "if that email exists, a link was sent". Anything
+/// else turns this endpoint into an account-existence oracle, which is worse
+/// than the inconvenience of an ambiguous message — and for a personal library
+/// server, the account list is a list of people the owner knows.
+///
+/// Throttled per email *and* per source IP, reusing the login limiter, so the
+/// endpoint can't be used to spray mail at one address or to enumerate many.
+pub async fn forgot(
+    State(state): State<AppState>,
+    client: ClientKey,
+    Json(input): Json<ForgotInput>,
+) -> AppResult<Json<serde_json::Value>> {
+    let email = input.email.trim().to_lowercase();
+    let ip_key = format!("ip:{}", client.0);
+    // Deliberately checked *before* looking anything up, so a throttled caller
+    // can't tell a rate limit from a missing account either.
+    if !state.throttle.allowed(&email) || !state.throttle.allowed(&ip_key) {
+        return Err(AppError::TooManyRequests(
+            "too many reset requests; try again later".into(),
+        ));
+    }
+    state.throttle.record_failure(&email);
+    state.throttle.record_failure(&ip_key);
+
+    let ambiguous = Ok(Json(serde_json::json!({
+        "status": "if that email exists, a link was sent"
+    })));
+
+    // No mailer means the feature is off; the app hides it via capabilities, so
+    // reaching here at all is unusual. Still answer identically.
+    let Some(mailer) = state.mailer.clone() else {
+        return ambiguous;
+    };
+
+    let user: Option<(String, String)> =
+        sqlx::query_as("SELECT id, display_name FROM app_user WHERE email = ?")
+            .bind(&email)
+            .fetch_optional(&state.db)
+            .await?;
+    let Some((user_id, display_name)) = user else {
+        return ambiguous;
+    };
+
+    // One outstanding token per user: minting a new link silently invalidates
+    // the old one, so a forwarded or leaked earlier email stops working.
+    sqlx::query("DELETE FROM password_reset WHERE user_id = ?")
+        .bind(&user_id)
+        .execute(&state.db)
+        .await?;
+
+    let token = new_token();
+    sqlx::query(
+        "INSERT INTO password_reset (token_hash, user_id, expires_at) \
+         VALUES (?, ?, datetime('now', '+1 hour'))",
+    )
+    .bind(sha256_hex(&token))
+    .bind(&user_id)
+    .execute(&state.db)
+    .await?;
+
+    let link = format!(
+        "{}/reset/{token}",
+        state.public_base_url.trim_end_matches('/')
+    );
+    let body = format!(
+        "Hello {display_name},\n\n\
+         Someone asked to reset the password for your Vellum account ({email}).\n\
+         Open this link within the hour to choose a new one:\n\n\
+         {link}\n\n\
+         If it wasn't you, ignore this email — nothing has changed, and the link \n\
+         expires on its own.\n"
+    );
+    // A send failure is logged inside the mailer and must not change the answer:
+    // "we couldn't email you" would leak that the address exists.
+    let _ = mailer
+        .send(&email, "Reset your Vellum password", &body)
+        .await;
+    ambiguous
+}
+
+#[derive(Deserialize)]
+pub struct ResetInput {
+    pub token: String,
+    pub password: String,
+}
+
+/// `POST /api/auth/reset` — redeem a reset token and set a new password.
+///
+/// Single-use and short-lived: the row is marked used inside the same
+/// transaction that writes the new hash, so two racing redemptions can't both
+/// succeed. Every existing session is dropped as well — a reset is what someone
+/// does when they fear their account is compromised, and leaving the attacker's
+/// session alive would defeat the point.
+pub async fn reset(
+    State(state): State<AppState>,
+    Json(input): Json<ResetInput>,
+) -> AppResult<Json<serde_json::Value>> {
+    check_password_length(&input.password)?;
+    let hash = sha256_hex(input.token.trim());
+
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT user_id FROM password_reset \
+         WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')",
+    )
+    .bind(&hash)
+    .fetch_optional(&state.db)
+    .await?;
+    let Some((user_id,)) = row else {
+        // One message for expired, used, and never-existed: distinguishing them
+        // tells a guesser which of their attempts was close.
+        return Err(AppError::BadRequest(
+            "this reset link is invalid or has expired".into(),
+        ));
+    };
+
+    let password_hash = hash_password(&input.password)?;
+    let mut tx = state.db.begin().await?;
+    // Consuming the token is part of the same transaction as the password write,
+    // so a crash can't leave a used token with the old password (or vice versa).
+    let consumed = sqlx::query(
+        "UPDATE password_reset SET used_at = datetime('now') \
+         WHERE token_hash = ? AND used_at IS NULL",
+    )
+    .bind(&hash)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if consumed == 0 {
+        return Err(AppError::BadRequest(
+            "this reset link is invalid or has expired".into(),
+        ));
+    }
+    sqlx::query("UPDATE app_user SET password_hash = ? WHERE id = ?")
+        .bind(&password_hash)
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM session WHERE user_id = ?")
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    tracing::info!(user_id, "password reset completed");
+    Ok(Json(serde_json::json!({ "status": "password updated" })))
+}

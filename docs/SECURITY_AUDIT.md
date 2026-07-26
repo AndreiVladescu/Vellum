@@ -325,6 +325,23 @@ check, in both handlers — the order every other handler already used. The matr
 now pins the behaviour for all seven actor kinds, so a future endpoint that gets
 it wrong fails a test rather than shipping.
 
+### 🟡 L8 — Secret-bearing paths in the request log (fixed 2026-07-26)
+
+Introduced and fixed in the same session. The request logger added for plan 5
+#37 wrote the full request path, and plan 5 #31's reset link is
+`/reset/<token>` — so a live, single-use credential was being written into a
+file that gets tailed, shipped to an operator, and pasted into bug reports.
+Public share links (`/p/<token>`, `/api/public/<token>`) had the same shape.
+
+This is L1's problem (a token in a URL reaching logs) reappearing through a new
+door, which is the argument for treating "does this URL contain a secret?" as a
+property of the route rather than of the query string.
+
+**Fixed** by redacting the token segment before the path is logged
+(`observability::redact_path`), keeping the request's shape — `/reset/<redacted>`
+— because that is what the log is for. Unit-tested, and confirmed against a
+running server.
+
 ## What's done well (🔵 Info)
 
 These are genuine strengths worth preserving:
