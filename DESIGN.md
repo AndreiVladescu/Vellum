@@ -179,6 +179,13 @@ it. The image runs as an unprivileged user, keeps database and blobs in one
 volume, and health-checks `/health` with a real request. A `v*` tag builds
 musl-static Linux binaries plus Windows, macOS and the Android artefacts.
 
+**One-command backup.** `GET /api/admin/snapshot` (master-only) streams a tar of
+a `VACUUM INTO` copy of the database plus the blob directory — consistent without
+touching the live WAL, which is the trap in doing it by hand.
+`POST /api/admin/sweep` reports rows whose blobs are missing and blobs no row
+references, deleting nothing unless asked (plan 5 #12) — the server-side
+counterpart of the app's library health check.
+
 **Back up the `.db` file and the data dir together** — the database stores blob
 *paths*, so the two are only meaningful as a pair. The database runs in **WAL
 mode**, so its `-wal`/`-shm` sidecar files are part of the state: back them up

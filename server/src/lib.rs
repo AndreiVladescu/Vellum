@@ -14,6 +14,7 @@ use axum::routing::{delete, get, post, put};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
 mod access;
+mod admin;
 mod auth;
 mod blobs;
 mod books;
@@ -110,6 +111,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Operator dashboard numbers (plan 5 #37). Master-only — see the
         // handler; counts of other people's shares are not a member's business.
         .route("/admin/stats", get(observability::stats))
+        // Integrity sweep and one-command backup (plan 5 #12), both master-only.
+        .route("/admin/sweep", post(admin::sweep))
+        .route("/admin/snapshot", get(admin::snapshot))
         // The active TLS certificate (public), for the console's import affordance.
         .route("/cert", get(web::server_cert))
         // Accounts & sessions.

@@ -1079,6 +1079,196 @@ async fn deleting_a_book_takes_its_reading_progress_with_it() {
     assert!(left.as_array().unwrap().is_empty(), "{left}");
 }
 
+// ---- Integrity sweep and snapshot (plan 5 #12) -----------------------------
+
+#[tokio::test]
+async fn sweep_and_snapshot_are_master_only() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+
+    let (status, _) = call(&app, "POST", "/api/admin/sweep", Some(&alice), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = call(&app, "GET", "/api/admin/snapshot", Some(&alice), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn a_sweep_reports_an_orphan_without_deleting_it() {
+    // Deleting by default would be a footgun: the first run on a real library is
+    // exactly when the operator wants to look before touching anything.
+    let (app, data_dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    let orphan = data_dir.join("files").join("nobody-refers-to-this.pdf");
+    tokio::fs::create_dir_all(orphan.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::write(&orphan, b"stray bytes").await.unwrap();
+
+    let (status, body) = call(&app, "POST", "/api/admin/sweep", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        body["orphan_blobs"],
+        json!(["files/nobody-refers-to-this.pdf"])
+    );
+    assert_eq!(body["orphan_bytes"], json!(11));
+    assert_eq!(body["deleted"], json!(0));
+    assert!(orphan.exists(), "a plain sweep must not delete anything");
+
+    // Only with the flag.
+    let (_, body) = call(
+        &app,
+        "POST",
+        "/api/admin/sweep?delete_orphans=true",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(body["deleted"], json!(1));
+    assert!(!orphan.exists());
+}
+
+#[tokio::test]
+async fn a_sweep_reports_a_row_whose_blob_is_gone() {
+    let (app, data_dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // A cover row pointing at nothing, the way a half-restored data dir looks.
+    let (status, _) = call(
+        &app,
+        "PUT",
+        &format!("/api/books/{book}"),
+        Some(&master),
+        Some(json!({ "title": "Dune", "cover_path": "covers/vanished.jpg" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, body) = call(&app, "POST", "/api/admin/sweep", Some(&master), None).await;
+    let missing = body["missing_covers"].as_array().unwrap();
+    assert_eq!(missing.len(), 1);
+    assert!(missing[0].as_str().unwrap().contains("covers/vanished.jpg"));
+    // Nothing was deleted from the database — reporting is not repairing.
+    let (_, still_there) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(still_there["title"], json!("Dune"));
+    let _ = data_dir;
+}
+
+#[tokio::test]
+async fn an_in_flight_upload_temp_is_not_reported_as_an_orphan() {
+    let (app, data_dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    let files = data_dir.join("files");
+    tokio::fs::create_dir_all(&files).await.unwrap();
+    tokio::fs::write(files.join(".tmp-abc"), b"half").await.unwrap();
+    tokio::fs::write(files.join("x.pdf.part"), b"half").await.unwrap();
+
+    let (_, body) = call(&app, "POST", "/api/admin/sweep", Some(&master), None).await;
+    assert_eq!(
+        body["orphan_blobs"],
+        json!([]),
+        "flagging in-flight temporaries would train the operator to ignore this"
+    );
+}
+
+#[tokio::test]
+async fn a_snapshot_restores_to_a_database_with_the_same_books() {
+    // The property that matters: the tar is not merely non-empty, it contains a
+    // database that opens and still has the library in it.
+    let (app, _dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    create_book(&app, &master, "Dune").await;
+    create_book(&app, &master, "Neuromancer").await;
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/admin/snapshot")
+                .header("authorization", format!("Bearer {master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get("content-type").unwrap(),
+        "application/x-tar"
+    );
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert!(!bytes.is_empty());
+
+    // Unpack and open the database it contains.
+    let restore = std::env::temp_dir().join(format!("vellum_restore_{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&restore).unwrap();
+    tar::Archive::new(std::io::Cursor::new(&bytes[..]))
+        .unpack(&restore)
+        .expect("the snapshot must be a valid tar");
+    let restored_db = restore.join("vellum.db");
+    assert!(restored_db.exists(), "the snapshot must contain the database");
+
+    let pool = connect_db(restored_db.to_str().unwrap()).await.unwrap();
+    let titles: Vec<String> = sqlx::query_scalar("SELECT title FROM book ORDER BY title")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(titles, vec!["Dune".to_string(), "Neuromancer".to_string()]);
+
+    std::fs::remove_dir_all(&restore).ok();
+}
+
+#[tokio::test]
+async fn a_snapshot_leaves_no_workspace_behind() {
+    let (app, data_dir) = test_app_with_dir().await;
+    let master = register_master(&app).await;
+    create_book(&app, &master, "Dune").await;
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/admin/snapshot")
+                .header("authorization", format!("Bearer {master}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    // Draining the body drops the stream, which is what triggers cleanup.
+    let _ = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    // The cleanup is a detached blocking task; give it a moment.
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    let leftovers: Vec<_> = std::fs::read_dir(&data_dir)
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .filter(|n| n.starts_with(".snapshot-"))
+                .collect()
+        })
+        .unwrap_or_default();
+    assert!(
+        leftovers.is_empty(),
+        "an abandoned snapshot must not leave a copy of the library: {leftovers:?}"
+    );
+}
+
 // ---- Request ids and stats (plan 5 #37) ------------------------------------
 
 /// Like [call], but returns the response headers too.

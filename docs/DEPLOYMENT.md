@@ -147,8 +147,40 @@ server first gets it.
 
 ## Backups
 
-Everything is in the data directory plus the SQLite file (both under
-`/var/lib/vellum` in the image):
+**The supported way is one request** (plan 5 #12). `GET /api/admin/snapshot`
+streams a `.tar` containing a consistent copy of the database plus every cover
+and book file:
+
+```sh
+curl -fL -H "Authorization: Bearer $TOKEN" \
+     -o "vellum-$(date +%F).tar" \
+     https://books.example.com/api/admin/snapshot
+```
+
+As a cron line:
+
+```cron
+17 3 * * * curl -fsSL -H "Authorization: Bearer $VELLUM_TOKEN" \
+  -o /backups/vellum-$(date +\%F).tar https://books.example.com/api/admin/snapshot
+```
+
+It is master-only, and it uses SQLite's `VACUUM INTO` — which produces a
+consistent single-file copy **without touching the live WAL**. That is exactly
+the trap in doing it by hand: copying a `.db` while it is being written restores
+to a database that is subtly wrong rather than obviously broken. The archive is
+assembled on disk before streaming, so the host needs transient free space of
+roughly the library's size.
+
+To check what a running server thinks of its own storage first:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" .../api/admin/sweep -X POST
+```
+
+reports rows whose blobs are missing and blobs no row references, and **deletes
+nothing** unless you add `?delete_orphans=true`.
+
+Stopping the container and archiving the volume also works, and needs no token:
 
 ```sh
 docker compose stop vellum
@@ -156,11 +188,6 @@ docker run --rm -v vellum-data:/data -v "$PWD:/out" debian:stable-slim \
   tar czf /out/vellum-backup.tar.gz -C /data .
 docker compose start vellum
 ```
-
-Stopping first is the simple, always-correct option. If you can't, snapshot the
-database with `sqlite3 vellum.db ".backup ..."` rather than copying the file
-while it is being written — a half-copied WAL restores to a database that is
-subtly wrong rather than obviously broken.
 
 The **app** also exports a complete archive (Preferences → Backup), which is the
 easier route for a single-user library.
