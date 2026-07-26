@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Metadata search + cover downloads (release builds need this explicitly). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- ISBN barcode scanning (plan 5 #16). Requested at first use by
+         mobile_scanner; the feature falls back to typing an ISBN when it is
+         denied, so the camera stays optional. `required="false"` keeps the app
+         installable on a device without one. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <application
         android:label="Vellum"
         android:name="${applicationName}"

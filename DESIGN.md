@@ -346,6 +346,18 @@ Metadata is also filled in **automatically**, without picking an edition:
 
 ## Adding & editing books
 
+**Scanning ISBN barcodes** (app, plan 5 #16) is the fast path for physical books:
+the *Scan* button on the shelf opens a live camera that keeps scanning — a shelf
+is dozens of books, so each accepted barcode adds a book and slides onto a strip
+with an **Undo** rather than interrupting with a dialog. Barcodes are validated
+before any lookup (EAN-13 check digit, a 978/979 Bookland prefix, `979-0` sheet
+music excluded), because a camera pointed at a room finds plenty of non-book
+EAN-13s and a "not found" for each would feel broken. A book already in the
+library is **flagged, not blocked** (owning two copies is legitimate), reusing the
+folder importer's duplicate classifier. No camera, or a denied permission, leaves
+a manual ISBN field driving exactly the same path — which is also how desktop
+uses it.
+
 **Bulk folder import** (app, plan 5 #15) is the on-ramp for someone arriving with
 an existing folder of downloads: *Import a folder* in the drawer recurses for
 PDFs and EPUBs and then shows a **dry run** — one row per file with the title and

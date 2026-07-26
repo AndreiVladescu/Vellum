@@ -85,16 +85,21 @@ class LibraryRepository {
 
   /// Builds a repository over an explicit data directory instead of the
   /// platform app-support dir — for tests that can't reach `path_provider`.
+  ///
+  /// [metadata] replaces the live online-lookup service, so a test can drive the
+  /// search/ISBN paths against a `MockClient` instead of the network.
   @visibleForTesting
   static Future<LibraryRepository> forTesting(
     VellumDatabase db,
-    Directory dataDir,
-  ) => _withDataDir(db, dataDir);
+    Directory dataDir, {
+    MetadataService? metadata,
+  }) => _withDataDir(db, dataDir, metadata: metadata);
 
   static Future<LibraryRepository> _withDataDir(
     VellumDatabase db,
-    Directory dir,
-  ) async {
+    Directory dir, {
+    MetadataService? metadata,
+  }) async {
     final coversDir = Directory(p.join(dir.path, 'covers'));
     await coversDir.create(recursive: true);
     final filesDir = Directory(p.join(dir.path, 'files'));
@@ -119,12 +124,12 @@ class LibraryRepository {
         // Listing failed (e.g. dir vanished) — nothing to sweep.
       }
     }
-    final metadata = MetadataService();
+    final metadataService = metadata ?? MetadataService();
     final covers = CoverService(db, dir);
     final physical = PhysicalService(db);
     return LibraryRepository._(
       db: db,
-      metadata: metadata,
+      metadata: metadataService,
       dataDir: dir,
       layout: LayoutRepository(db, physical),
       queries: LibraryQueries(db),
@@ -132,7 +137,7 @@ class LibraryRepository {
       shelves: ShelfService(db),
       physical: physical,
       files: FileService(db, dir, covers),
-      writes: BookWriteService(db, dir, metadata, covers),
+      writes: BookWriteService(db, dir, metadataService, covers),
       readingPositions: ReadingPositionService(db),
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'account/user_profile.dart';
 import 'add_book/add_book_page.dart';
+import 'add_book/scan_page.dart';
 import 'app_drawer.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
@@ -285,6 +286,12 @@ class _LibraryPageState extends State<LibraryPage> {
     }
   }
 
+  Future<void> _openScan(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ScanPage(repository: repository)),
+    );
+  }
+
   /// Applies the genre facet from a tapped genre chip on a book's detail page.
   /// Sets the dedicated filter (shown as a removable chip near the search)
   /// rather than the search box, so any text search you had stays put.
@@ -343,10 +350,28 @@ class _LibraryPageState extends State<LibraryPage> {
         ],
       ),
       floatingActionButton: _tab == 0
-          ? FloatingActionButton.extended(
-              onPressed: () => _openAddBook(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add book'),
+          // Scan sits above Add book rather than replacing it: scanning is the
+          // fast path for physical books you're holding, not a substitute for
+          // the search/create form. Shown on desktop too — there it's the same
+          // flow driven by a typed ISBN (plan 5 #16).
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'scan',
+                  tooltip: 'Scan an ISBN barcode',
+                  onPressed: () => _openScan(context),
+                  child: const Icon(Icons.barcode_reader),
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'add',
+                  onPressed: () => _openAddBook(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add book'),
+                ),
+              ],
             )
           : FloatingActionButton.extended(
               onPressed: () =>

@@ -157,6 +157,14 @@ class OpenLibraryClient {
     ];
   }
 
+  /// Looks a book up by its ISBN specifically (plan 5 #16).
+  ///
+  /// `isbn:<n>` rather than the bare number as free text: a plain numeric query
+  /// also matches works that merely *mention* the digits, which for a barcode
+  /// scan means confidently attaching the wrong book.
+  Future<List<BookSearchResult>> searchByIsbn(String isbn13) =>
+      search('isbn:$isbn13');
+
   /// The work's description is not in search results; fetch it separately.
   Future<String?> fetchDescription(String workKey) async {
     if (workKey.isEmpty) return null;
@@ -175,6 +183,11 @@ class GoogleBooksClient {
   GoogleBooksClient([http.Client? client]) : _http = client ?? http.Client();
 
   final http.Client _http;
+
+  /// Google Books' own ISBN-qualified search — the fallback for a scan when
+  /// Open Library doesn't have the edition.
+  Future<List<BookSearchResult>> searchByIsbn(String isbn13) =>
+      search('isbn:$isbn13');
 
   Future<List<BookSearchResult>> search(String query) async {
     final uri = Uri.https('www.googleapis.com', '/books/v1/volumes', {
@@ -224,6 +237,31 @@ class MetadataService {
     }
     if (openLibraryResults.isNotEmpty) return openLibraryResults;
     return _googleBooks.search(query);
+  }
+
+  /// The one book behind a scanned barcode, or null if neither source knows it
+  /// (plan 5 #16).
+  ///
+  /// Same Open-Library-then-Google order as [search], but ISBN-qualified on both
+  /// sides and reduced to a single result: a barcode identifies one edition, so
+  /// presenting a list of twenty would just be a worse confirm step. Returns
+  /// null rather than throwing when nothing matches — "not found" is an ordinary
+  /// outcome that the caller answers with the manual form.
+  Future<BookSearchResult?> lookupByIsbn(String isbn13) async {
+    List<BookSearchResult> results = const [];
+    try {
+      results = await _openLibrary.searchByIsbn(isbn13);
+    } catch (_) {
+      // Fall through to Google Books.
+    }
+    if (results.isEmpty) {
+      try {
+        results = await _googleBooks.searchByIsbn(isbn13);
+      } catch (_) {
+        return null;
+      }
+    }
+    return results.firstOrNull;
   }
 
   /// The description for a chosen result: inline when the source supplied one
