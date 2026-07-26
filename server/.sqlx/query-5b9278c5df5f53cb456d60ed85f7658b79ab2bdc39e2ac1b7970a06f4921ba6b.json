@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT book_id FROM physical_copy WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "book_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5b9278c5df5f53cb456d60ed85f7658b79ab2bdc39e2ac1b7970a06f4921ba6b"
+}

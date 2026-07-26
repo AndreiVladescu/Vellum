@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM share s WHERE s.grantee_id = ? AND ( (s.scope = 'group' AND s.scope_id = ?) OR (s.scope = 'all'   AND s.owner_id = ?) ))",
+  "describe": {
+    "columns": [
+      {
+        "name": "EXISTS(SELECT 1 FROM share s WHERE s.grantee_id = ? AND ( (s.scope = 'group' AND s.scope_id = ?) OR (s.scope = 'all'   AND s.owner_id = ?) ))",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "09904723bcad9819bc7d87b142c482327510ee9c0bbb0dfdb037718c5d9cbc61"
+}

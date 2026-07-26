@@ -22,6 +22,19 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      # Compile-checked queries (plan 5 #46) only stay honest if `.sqlx/` matches
+      # the migrations. Rebuilding it here and failing on a diff means a query
+      # edited without re-running `cargo sqlx prepare` is caught in review rather
+      # than becoming a runtime 500.
+      - name: Check .sqlx is current
+        run: |
+          cargo install sqlx-cli --version 0.8.6 --no-default-features \
+            --features sqlite,rustls --locked
+          export DATABASE_URL="sqlite://$PWD/ci-prepare.db?mode=rwc"
+          sqlx database create
+          sqlx migrate run
+          cargo sqlx prepare --check -- --lib
+          rm -f ci-prepare.db*
 
   app:
     runs-on: ubuntu-latest

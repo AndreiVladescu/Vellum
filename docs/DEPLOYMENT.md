@@ -218,3 +218,26 @@ them to a GitHub Release with SHA-256 checksums
 The Linux desktop app is still built from source
 (`flutter build linux`, then `scripts/install-dev.sh`); Flatpak/AppImage/MSIX
 packaging is not done yet.
+
+---
+
+## Working on the server
+
+Some queries are **compile-checked** against the schema (plan 5 #46): they use
+`sqlx::query!`-family macros, verified at build time from the committed
+`server/.sqlx/` data. That means no database is needed to build.
+
+After editing or adding such a query, regenerate the data:
+
+```sh
+cd server
+export DATABASE_URL="sqlite://$PWD/prepare.db?mode=rwc"
+sqlx database create && sqlx migrate run
+cargo sqlx prepare -- --lib
+rm -f prepare.db*
+```
+
+CI fails if `.sqlx/` is out of date. Queries composed with `format!` (the
+visibility predicate, the dynamic-table helpers) can't use the macros — they take
+a string literal — so the migration is deliberately incremental, module by
+module.

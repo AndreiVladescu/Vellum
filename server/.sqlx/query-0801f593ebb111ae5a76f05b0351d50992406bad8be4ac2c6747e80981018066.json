@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT pc.book_id FROM loan l JOIN physical_copy pc ON pc.id = l.copy_id WHERE l.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "book_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0801f593ebb111ae5a76f05b0351d50992406bad8be4ac2c6747e80981018066"
+}
