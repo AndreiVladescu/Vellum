@@ -346,6 +346,19 @@ Metadata is also filled in **automatically**, without picking an edition:
 
 ## Adding & editing books
 
+**Finding and merging duplicates** (app, plan 5 #21b) exists because a library
+grown by bulk import will contain them. *Find duplicates* in the drawer compares
+three ways, and the ordering is the safety property: an identical **file hash** or
+**ISBN** is certain, while a **fuzzy title** match (normalised, token-sorted,
+within a small edit distance, and only when the authors agree) is offered as a
+suggestion. Merging is never automatic — it opens a side-by-side dialog where the
+user picks which book survives and, per disagreeing field, which value to keep.
+The merge itself moves files, physical copies (with their placements and loan
+history), shelf memberships, authors and genres onto the survivor in one
+transaction, keeps the further-along reading position, and **tombstones** the
+loser so the merge propagates instead of the duplicate returning on the next
+pull. What moved is logged and shown, because the operation can't be undone.
+
 **Books opened or shared from another app** (Android, plan 5 #20) arrive through
 `VIEW` / `SEND` / `SEND_MULTIPLE` intent filters. A small `MethodChannel` in
 `MainActivity.kt` does the one thing that has to happen natively: it **copies each

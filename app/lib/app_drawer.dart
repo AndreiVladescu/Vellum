@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'account/account_page.dart';
 import 'account/user_profile.dart';
 import 'data/library_repository.dart';
+import 'dedupe/duplicates_page.dart';
 import 'import/folder_import_page.dart';
 import 'loans/loans_page.dart';
 import 'server/connection_store.dart';
@@ -71,6 +72,13 @@ class AppDrawer extends StatelessWidget {
     ));
   }
 
+  void _openDuplicates(BuildContext context) {
+    Navigator.of(context).pop(); // close the drawer first
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => DuplicatesPage(repository: repository),
+    ));
+  }
+
   void _openAccount(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(
@@ -113,6 +121,11 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.folder_open),
             title: const Text('Import a folder'),
             onTap: () => _openFolderImport(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.content_copy_outlined),
+            title: const Text('Find duplicates'),
+            onTap: () => _openDuplicates(context),
           ),
           ListenableBuilder(
             listenable: connection,
