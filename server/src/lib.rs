@@ -121,6 +121,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Books (visibility-filtered by RBAC).
         .route("/deletions", get(books::deletions))
         .route("/books", get(books::list).post(books::create))
+        // Batch metadata push (plan 5 #7): fewer round trips for a large
+        // first sync. Shares books::upsert's exact per-book logic.
+        .route("/books:batch", post(books::batch_upsert))
         .route(
             "/books/{id}",
             get(books::get)

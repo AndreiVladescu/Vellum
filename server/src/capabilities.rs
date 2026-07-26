@@ -28,13 +28,13 @@ pub struct Capabilities {
 /// - `content_search`: the FTS5 search index (plan 5 #2) is app-local only,
 ///   no server-side equivalent exists.
 /// - `mail`: SMTP/password-reset is planned (docs/BACKLOG.md) but not built.
-/// - `batch_push`: plan 5 #7, not implemented yet — add it there when it is.
 ///
-/// `shelf_sync`, `copy_sync`, and `loan_sync` (plan 5 #4) are the entries
-/// that became true after this handshake shipped, exactly as its original
-/// commit predicted: shelves, physical copies, and now loan history all sync
-/// (`shelves.rs`, `physical_copies.rs`, `loans.rs`) instead of living on one
-/// device only.
+/// `shelf_sync`, `copy_sync`, `loan_sync` (plan 5 #4), and `batch_push`
+/// (plan 5 #7) are the entries that became true after this handshake
+/// shipped, exactly as its original commit predicted: shelves, physical
+/// copies, and loan history all sync (`shelves.rs`, `physical_copies.rs`,
+/// `loans.rs`), and `POST /books:batch` (`books::batch_upsert`) lets a large
+/// first push skip one round trip per book.
 const FEATURES: &[&str] = &[
     "delta_pull",
     "deletions",
@@ -45,6 +45,7 @@ const FEATURES: &[&str] = &[
     "shelf_sync",
     "copy_sync",
     "loan_sync",
+    "batch_push",
 ];
 
 pub async fn get() -> Json<Capabilities> {

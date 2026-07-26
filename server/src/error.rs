@@ -20,6 +20,24 @@ pub enum AppError {
 
 pub type AppResult<T> = Result<T, AppError>;
 
+impl AppError {
+    /// The human-readable message, regardless of variant — for a caller that
+    /// catches the error itself instead of letting it become an HTTP response
+    /// (e.g. a batch endpoint reporting one item's failure without aborting
+    /// the rest; see `books::batch_upsert`).
+    pub fn message(&self) -> String {
+        match self {
+            AppError::Unauthorized(m)
+            | AppError::Forbidden(m)
+            | AppError::NotFound(m)
+            | AppError::BadRequest(m)
+            | AppError::Conflict(m)
+            | AppError::TooManyRequests(m)
+            | AppError::Internal(m) => m.clone(),
+        }
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         // 401s carry a Basic challenge so OPDS e-readers show a login prompt.

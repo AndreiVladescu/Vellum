@@ -453,19 +453,43 @@ pub async fn upsert(
     Path(id): Path<String>,
     Json(input): Json<BookInput>,
 ) -> AppResult<Json<BookDto>> {
+    let outcome = upsert_one(&state, &user, &id, input).await?;
+    Ok(Json(match outcome {
+        UpsertOutcome::Applied(b) | UpsertOutcome::SkippedOlder(b) => b,
+    }))
+}
+
+/// The two ways [upsert_one] can succeed — distinguished so [batch_upsert] can
+/// report per-item status without re-deriving it (`updated` vs. `skipped_older`
+/// in the batch response). The single-item [upsert] handler collapses both
+/// back to a plain [BookDto], since it has no per-item status to report.
+pub(crate) enum UpsertOutcome {
+    Applied(BookDto),
+    SkippedOlder(BookDto),
+}
+
+/// The actual upsert logic, extracted so [upsert] and [batch_upsert] (plan 5
+/// #7) share it exactly rather than risking the two drifting apart on LWW or
+/// the no-op guard.
+async fn upsert_one(
+    state: &AppState,
+    user: &AuthUser,
+    id: &str,
+    input: BookInput,
+) -> AppResult<UpsertOutcome> {
     if input.title.trim().is_empty() {
         return Err(AppError::BadRequest("title is required".into()));
     }
     validate_cover_path(input.cover_path.as_deref())?;
     let existing: Option<(Option<String>, String)> =
         sqlx::query_as("SELECT owner_id, updated_at FROM book WHERE id = ?")
-            .bind(&id)
+            .bind(id)
             .fetch_optional(&state.db)
             .await?;
 
     let is_update = match &existing {
         Some((_owner, stored_updated_at)) => {
-            if !book_access(&state, &user, &id).await?.can_edit() {
+            if !book_access(state, user, id).await?.can_edit() {
                 return Err(AppError::Forbidden(
                     "you have read-only access to this book".into(),
                 ));
@@ -477,7 +501,7 @@ pub async fn upsert(
             if let Some(incoming) = input.updated_at.as_deref()
                 && incoming <= stored_updated_at.as_str()
             {
-                return fetch_book(&state, &id).await;
+                return Ok(UpsertOutcome::SkippedOlder(fetch_book(state, id).await?.0));
             }
             true
         }
@@ -489,7 +513,7 @@ pub async fn upsert(
     // churned by a redundant push — notably the first post-upgrade sweep, which
     // re-pushes every book once. New books (INSERT path) always write.
     if is_update {
-        let current = fetch_book(&state, &id).await?.0;
+        let current = fetch_book(state, id).await?.0;
         let meta_same = current.title == input.title.trim()
             && current.subtitle == input.subtitle
             && current.description == input.description
@@ -508,7 +532,7 @@ pub async fn upsert(
                 .is_none_or(|s| current.spine_style.as_ref() == Some(s));
         let authors_same = match &input.authors {
             None => true,
-            Some(a) => book_author_names(&state, &id).await? == normalize_names(a),
+            Some(a) => book_author_names(state, id).await? == normalize_names(a),
         };
         let genres_same = match &input.genres {
             None => true,
@@ -516,18 +540,18 @@ pub async fn upsert(
                 let mut want = normalize_names(g);
                 want.sort();
                 want.dedup();
-                book_genre_names(&state, &id).await? == want
+                book_genre_names(state, id).await? == want
             }
         };
         // A live tombstone for this id (a crashed delete) must still be cleared,
         // so it isn't a no-op even when the data matches — fall through to write.
         let tombstoned: bool =
             sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE book_id = ?)")
-                .bind(&id)
+                .bind(id)
                 .fetch_one(&state.db)
                 .await?;
         if meta_same && authors_same && genres_same && !tombstoned {
-            return Ok(Json(current));
+            return Ok(UpsertOutcome::Applied(current));
         }
     }
 
@@ -553,7 +577,7 @@ pub async fn upsert(
         .bind(input.page_count)
         .bind(&input.cover_path)
         .bind(&input.spine_style)
-        .bind(&id)
+        .bind(id)
         .execute(&mut *tx)
         .await?;
     } else {
@@ -562,7 +586,7 @@ pub async fn upsert(
                 published_year, page_count, cover_path, spine_style, owner_id) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(&id)
+        .bind(id)
         .bind(input.title.trim())
         .bind(&input.subtitle)
         .bind(&input.description)
@@ -580,7 +604,7 @@ pub async fn upsert(
     // it isn't deleted again on the next pull. Cleared on both branches so a
     // revived-then-updated id can't leave a stale tombstone behind.
     sqlx::query("DELETE FROM deletion WHERE book_id = ?")
-        .bind(&id)
+        .bind(id)
         .execute(&mut *tx)
         .await?;
 
@@ -588,7 +612,7 @@ pub async fn upsert(
     // whatever is there (an old client, or a metadata-only edit).
     if let Some(authors) = &input.authors {
         sqlx::query("DELETE FROM book_author WHERE book_id = ?")
-            .bind(&id)
+            .bind(id)
             .execute(&mut *tx)
             .await?;
         let mut position: i64 = 0;
@@ -602,7 +626,7 @@ pub async fn upsert(
                 "INSERT OR IGNORE INTO book_author (book_id, author_id, position) \
                  VALUES (?, ?, ?)",
             )
-            .bind(&id)
+            .bind(id)
             .bind(&author_id)
             .bind(position)
             .execute(&mut *tx)
@@ -617,7 +641,7 @@ pub async fn upsert(
     }
     if let Some(genres) = &input.genres {
         sqlx::query("DELETE FROM book_genre WHERE book_id = ?")
-            .bind(&id)
+            .bind(id)
             .execute(&mut *tx)
             .await?;
         for name in genres {
@@ -627,7 +651,7 @@ pub async fn upsert(
             }
             let genre_id = id_for_name_tx(&mut tx, "genre", name).await?;
             sqlx::query("INSERT OR IGNORE INTO book_genre (book_id, genre_id) VALUES (?, ?)")
-                .bind(&id)
+                .bind(id)
                 .bind(&genre_id)
                 .execute(&mut *tx)
                 .await?;
@@ -637,7 +661,78 @@ pub async fn upsert(
             .await?;
     }
     tx.commit().await?;
-    fetch_book(&state, &id).await
+    Ok(UpsertOutcome::Applied(fetch_book(state, id).await?.0))
+}
+
+/// One book in a [`BatchUpsertRequest`] — [`BookInput`]'s fields plus the
+/// caller-chosen id [`upsert`] takes as a path parameter (a batch request has
+/// no per-item URL to carry it).
+#[derive(Deserialize)]
+pub struct BatchBookItem {
+    pub id: String,
+    #[serde(flatten)]
+    pub book: BookInput,
+}
+
+#[derive(Deserialize)]
+pub struct BatchUpsertRequest {
+    pub books: Vec<BatchBookItem>,
+}
+
+#[derive(Serialize)]
+pub struct BatchItemResult {
+    pub id: String,
+    /// `"updated"` (created or applied), `"skipped_older"` (a stale push --
+    /// the server's copy is at least as new), or `"error"`.
+    pub status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// The batch sibling of [`upsert`] (plan 5 #7): fewer round trips for a large
+/// first push, one item at a time through the same [`upsert_one`] so LWW and
+/// the no-op guard can't drift between the two paths. Deliberately **not**
+/// wrapped in one transaction -- a single bad row must not roll back every
+/// good one in the same batch, matching the existing per-book `SyncIssue`
+/// model on the app side (each item's outcome is independent and reported,
+/// never all-or-nothing).
+pub async fn batch_upsert(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(input): Json<BatchUpsertRequest>,
+) -> AppResult<Json<serde_json::Value>> {
+    // A generous but real cap: unbounded would let one request hold the
+    // connection pool across an arbitrarily long loop.
+    const MAX_BATCH: usize = 200;
+    if input.books.len() > MAX_BATCH {
+        return Err(AppError::BadRequest(format!(
+            "batch too large: {} items (max {MAX_BATCH})",
+            input.books.len()
+        )));
+    }
+
+    let mut results = Vec::with_capacity(input.books.len());
+    for item in input.books {
+        let outcome = upsert_one(&state, &user, &item.id, item.book).await;
+        results.push(match outcome {
+            Ok(UpsertOutcome::Applied(_)) => BatchItemResult {
+                id: item.id,
+                status: "updated",
+                message: None,
+            },
+            Ok(UpsertOutcome::SkippedOlder(_)) => BatchItemResult {
+                id: item.id,
+                status: "skipped_older",
+                message: None,
+            },
+            Err(e) => BatchItemResult {
+                id: item.id,
+                status: "error",
+                message: Some(e.message()),
+            },
+        });
+    }
+    Ok(Json(serde_json::json!({ "results": results })))
 }
 
 /// Trim each name and drop the blanks — the same normalization the join

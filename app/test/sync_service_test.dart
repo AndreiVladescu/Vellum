@@ -178,6 +178,74 @@ Map<String, dynamic> _serverLoan(
   'updated_at': ?updatedAt,
 };
 
+/// A push-side handler for the batch metadata push (plan 5 #7). Advertises
+/// [features] on `/api/capabilities`, records each batch body in
+/// [batchCollector] and each per-book PUT id in [putCollector] — so a test can
+/// tell the batch path and its per-book fallback apart by which one filled up.
+/// Anything else falls through to [_server] with an empty library.
+///
+/// [batchHttpStatus] simulates a batch endpoint that fails outright,
+/// [statusOverrides] a per-item non-default outcome (`{'status': 'error',
+/// 'message': …}`), and [omitFromResults] a server that answers without
+/// mentioning an id at all.
+Future<http.Response> Function(http.Request) _batchPushServer({
+  List<String> features = const ['batch_push'],
+  List<List<Map<String, dynamic>>>? batchCollector,
+  List<String>? putCollector,
+  List<String>? probeCollector,
+  int batchHttpStatus = 200,
+  Map<String, Map<String, dynamic>> statusOverrides = const {},
+  Set<String> omitFromResults = const {},
+}) {
+  final fallback = _server(books: const []);
+  return (req) async {
+    final path = req.url.path;
+    if (req.method == 'GET' && path == '/api/capabilities') {
+      probeCollector?.add(path);
+      return http.Response(
+        jsonEncode({
+          'server_version': '0.0.0-test',
+          'sync_protocol': 1,
+          'features': features,
+        }),
+        200,
+      );
+    }
+    if (req.method == 'POST' && path == '/api/books:batch') {
+      if (batchHttpStatus != 200) {
+        return http.Response('{"error":"batch unavailable"}', batchHttpStatus);
+      }
+      final items = [
+        for (final b in (jsonDecode(req.body) as Map<String, dynamic>)['books'] as List)
+          b as Map<String, dynamic>,
+      ];
+      batchCollector?.add(items);
+      final results = <Map<String, dynamic>>[];
+      for (final item in items) {
+        final id = item['id'] as String;
+        if (omitFromResults.contains(id)) continue;
+        results.add({'id': id, ...?statusOverrides[id]});
+        if (statusOverrides[id] == null) results.last['status'] = 'updated';
+      }
+      return http.Response(jsonEncode({'results': results}), 200);
+    }
+    if (req.method == 'PUT' &&
+        path.startsWith('/api/books/') &&
+        !path.endsWith('/cover')) {
+      putCollector?.add(path.split('/').last);
+      return http.Response('{}', 200);
+    }
+    return fallback(req);
+  };
+}
+
+/// Inserts [count] dirty books named `b0…b{count-1}`.
+Future<void> _insertDirtyBooks(VellumDatabase db, int count) =>
+    db.batch((b) => b.insertAll(db.books, [
+          for (var i = 0; i < count; i++)
+            BooksCompanion.insert(id: 'b$i', title: 'Book $i'),
+        ]));
+
 Map<String, dynamic> _serverBook(String id, String title, String updatedAt) => {
   'id': id,
   'title': title,
@@ -1054,5 +1122,209 @@ void main() {
     final loan = await (db.select(db.loans)..where((l) => l.id.equals(loanId))).getSingle();
     expect(loan.needsPush, true);
     expect(loan.returnedAt, isNotNull);
+  });
+
+  // ---- Batch metadata push (plan 5 #7) --------------------------------------
+
+  test('push sends metadata in one batch when the server advertises it', () async {
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 3);
+
+    final batches = <List<Map<String, dynamic>>>[];
+    final puts = <String>[];
+    final client = _client(
+      _batchPushServer(batchCollector: batches, putCollector: puts),
+    );
+
+    final report = await SyncService(repo).push(client);
+
+    expect(batches, hasLength(1), reason: 'three books, one round trip');
+    expect(
+      [for (final item in batches.single) item['id']],
+      ['b0', 'b1', 'b2'],
+    );
+    expect(puts, isEmpty, reason: 'the per-book PUT path must not also run');
+    expect(report.pushed, 3);
+    expect(report.issues, isEmpty);
+    for (final b in await repo.db.select(repo.db.books).get()) {
+      expect(b.needsPush, false);
+    }
+  });
+
+  test('the batch carries the same fields a per-book PUT would', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(
+          id: 'b1',
+          title: 'Dune',
+          subtitle: const Value('A novel'),
+          isbn: const Value('9780441013593'),
+          publishedYear: const Value(1965),
+          updatedAt: Value(DateTime.utc(2024, 5, 4, 3, 2, 1)),
+        ));
+    // A second dirty book only so the push is worth batching at all.
+    await db.into(db.books).insert(BooksCompanion.insert(id: 'b2', title: 'Other'));
+    await repo.setAuthors('b1', ['Frank Herbert']);
+    await repo.setGenres('b1', ['Science fiction']);
+
+    final batches = <List<Map<String, dynamic>>>[];
+    final client = _client(_batchPushServer(batchCollector: batches));
+    await SyncService(repo).push(client);
+
+    final sent = batches.single.firstWhere((i) => i['id'] == 'b1');
+    expect(sent['title'], 'Dune');
+    expect(sent['subtitle'], 'A novel');
+    expect(sent['isbn'], '9780441013593');
+    expect(sent['published_year'], 1965);
+    expect(sent['updated_at'], '2024-05-04 03:02:01');
+    expect(sent['authors'], ['Frank Herbert']);
+    // Title-cased by the repository on the way in, not by the push.
+    expect(sent['genres'], ['Science Fiction']);
+  });
+
+  test('push chunks a batch to the server cap of 200', () async {
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 205);
+
+    final batches = <List<Map<String, dynamic>>>[];
+    final puts = <String>[];
+    final client = _client(
+      _batchPushServer(batchCollector: batches, putCollector: puts),
+    );
+
+    final report = await SyncService(repo).push(client);
+
+    expect([for (final b in batches) b.length], [200, 5]);
+    expect(puts, isEmpty);
+    expect(report.pushed, 205);
+  });
+
+  test('a per-item batch error becomes a SyncIssue and stays dirty', () async {
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 2);
+
+    final client = _client(_batchPushServer(statusOverrides: {
+      'b1': {'status': 'error', 'message': 'you have read-only access'},
+    }));
+
+    final report = await SyncService(repo).push(client);
+
+    expect(report.pushed, 1);
+    expect(report.issues, hasLength(1));
+    expect(report.issues.single.bookId, 'b1');
+    expect(report.issues.single.stage, 'push');
+    expect(report.issues.single.message, 'you have read-only access');
+    expect((await repo.watchBook('b0').first)?.needsPush, false);
+    expect(
+      (await repo.watchBook('b1').first)?.needsPush,
+      true,
+      reason: 'a rejected book must stay dirty so the next push retries it',
+    );
+  });
+
+  test('skipped_older counts as pushed — the server is already ahead', () async {
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 2);
+
+    final client = _client(_batchPushServer(statusOverrides: {
+      'b1': {'status': 'skipped_older'},
+    }));
+
+    final report = await SyncService(repo).push(client);
+
+    expect(report.pushed, 2);
+    expect(report.issues, isEmpty);
+    expect((await repo.watchBook('b1').first)?.needsPush, false);
+  });
+
+  test('a book missing from the batch response is treated as a failure', () async {
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 2);
+
+    final client = _client(_batchPushServer(omitFromResults: {'b1'}));
+
+    final report = await SyncService(repo).push(client);
+
+    expect(report.pushed, 1);
+    expect(report.issues.single.bookId, 'b1');
+    expect((await repo.watchBook('b1').first)?.needsPush, true);
+  });
+
+  test('a server without batch_push falls back to per-book PUTs', () async {
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 2);
+
+    final batches = <List<Map<String, dynamic>>>[];
+    final puts = <String>[];
+    final client = _client(_batchPushServer(
+      features: const ['delta_pull'],
+      batchCollector: batches,
+      putCollector: puts,
+    ));
+
+    final report = await SyncService(repo).push(client);
+
+    expect(batches, isEmpty);
+    expect(puts, ['b0', 'b1']);
+    expect(report.pushed, 2);
+    expect(report.issues, isEmpty);
+  });
+
+  test('a batch endpoint that fails outright falls back to per-book PUTs', () async {
+    // The capability says yes but the call fails (a proxy, a rollback, a bug):
+    // the push must still succeed rather than fail every book at once.
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 2);
+
+    final puts = <String>[];
+    final client = _client(_batchPushServer(
+      putCollector: puts,
+      batchHttpStatus: 500,
+    ));
+
+    final report = await SyncService(repo).push(client);
+
+    expect(puts, ['b0', 'b1']);
+    expect(report.pushed, 2);
+    expect(report.issues, isEmpty);
+  });
+
+  test('a single dirty book skips the handshake and the batch entirely', () async {
+    // One book is already one request; probing capabilities to save nothing
+    // would make the common auto-push case slower, not faster.
+    final repo = await _repo(dir);
+    await _insertDirtyBooks(repo.db, 1);
+
+    final probes = <String>[];
+    final batches = <List<Map<String, dynamic>>>[];
+    final puts = <String>[];
+    final client = _client(_batchPushServer(
+      probeCollector: probes,
+      batchCollector: batches,
+      putCollector: puts,
+    ));
+
+    await SyncService(repo).push(client);
+
+    expect(probes, isEmpty);
+    expect(batches, isEmpty);
+    expect(puts, ['b0']);
+  });
+
+  test('the capability handshake is memoized across pushes', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await _insertDirtyBooks(db, 2);
+
+    final probes = <String>[];
+    final client = _client(_batchPushServer(probeCollector: probes));
+    final sync = SyncService(repo);
+
+    await sync.push(client);
+    // Dirty them again, as an edit would, and push the same service again.
+    await db.update(db.books).write(const BooksCompanion(needsPush: Value(true)));
+    await sync.push(client);
+
+    expect(probes, hasLength(1), reason: 'one handshake, not one per push');
   });
 }

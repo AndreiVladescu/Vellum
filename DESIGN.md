@@ -443,6 +443,17 @@ One limitation: a book made newly **visible** by a *share* doesn't change its
 cursor on each login (and disconnect), making the first pull of a session a full
 one.
 
+**Batched push.** Push sends metadata for up to 200 dirty books per
+`POST /api/books:batch` instead of one `PUT /api/books/{id}` each, so the first
+sync of a large library costs a handful of round trips rather than one per book.
+The batch is *not* one transaction: each item reports its own outcome
+(`updated` / `skipped_older` / `error`) through the same per-book `SyncIssue`
+model, so one rejected book can't roll back the rest. It runs only when the
+server advertises `batch_push` in `GET /api/capabilities`; a single-book push,
+an older server, or a failing batch call all fall back to per-book PUTs, which
+the server's unchanged-data guard makes a cheap no-op for anything the batch
+already applied. Covers and files still transfer per book.
+
 1. ✅ **Server blob storage** — upload/download endpoints for cover images and
    book files (filesystem-backed, `VELLUM_DATA_DIR`), access-checked like the
    book they belong to.

@@ -133,6 +133,55 @@ String? formatServerTime(DateTime? dt) {
       '${two(u.hour)}:${two(u.minute)}:${two(u.second)}';
 }
 
+/// One book's push payload for [VellumServerClient.pushBooksBatch] — the same
+/// fields [VellumServerClient.pushBook] takes, plus the id (a batch request
+/// has no per-item URL to carry it).
+class BookPushItem {
+  BookPushItem({
+    required this.id,
+    required this.title,
+    this.subtitle,
+    this.description,
+    this.isbn,
+    this.publisher,
+    this.publishedYear,
+    this.pageCount,
+    this.spineStyle,
+    this.updatedAt,
+    this.authors,
+    this.genres,
+  });
+
+  final String id;
+  final String title;
+  final String? subtitle;
+  final String? description;
+  final String? isbn;
+  final String? publisher;
+  final int? publishedYear;
+  final int? pageCount;
+  final String? spineStyle;
+  final DateTime? updatedAt;
+  final List<String>? authors;
+  final List<String>? genres;
+}
+
+/// One book's outcome from [VellumServerClient.pushBooksBatch] — mirrors the
+/// server's per-item `status` (`'updated'`, `'skipped_older'`, or `'error'`).
+class BatchPushResult {
+  BatchPushResult({required this.status, this.message});
+
+  final String status;
+  final String? message;
+
+  bool get isError => status == 'error';
+
+  factory BatchPushResult.fromJson(Map<String, dynamic> j) => BatchPushResult(
+    status: j['status'] as String? ?? 'error',
+    message: j['message'] as String?,
+  );
+}
+
 /// Thin REST client for a Vellum sync server. Stateless apart from [baseUrl] and
 /// an optional bearer [token]; create a new one when either changes.
 class VellumServerClient {
@@ -262,6 +311,36 @@ class VellumServerClient {
     throw ServerException('Cover download failed (HTTP ${res.statusCode})');
   }
 
+  /// The JSON body [pushBook] and [pushBooksBatch] both send for one book —
+  /// factored out so the two can't drift on field names/shape.
+  Map<String, dynamic> _bookPushJson({
+    required String title,
+    String? subtitle,
+    String? description,
+    String? isbn,
+    String? publisher,
+    int? publishedYear,
+    int? pageCount,
+    String? spineStyle,
+    DateTime? updatedAt,
+    List<String>? authors,
+    List<String>? genres,
+  }) => {
+    'title': title,
+    'subtitle': subtitle,
+    'description': description,
+    'isbn': isbn,
+    'publisher': publisher,
+    'published_year': publishedYear,
+    'page_count': pageCount,
+    'spine_style': spineStyle,
+    'updated_at': ?formatServerTime(updatedAt),
+    // Sent as arrays so the server replaces the joins; omitted (not null)
+    // when the caller has nothing to say, to leave server joins untouched.
+    'authors': ?authors,
+    'genres': ?genres,
+  };
+
   /// Upsert a book at [id] (create or update). Used to push local books up.
   /// [updatedAt] is the local row's sync clock; the server only overwrites an
   /// existing row when this is strictly newer than its stored timestamp
@@ -283,23 +362,62 @@ class VellumServerClient {
     final res = await _http.put(
       _uri('/api/books/$id'),
       headers: _headers,
-      body: jsonEncode({
-        'title': title,
-        'subtitle': subtitle,
-        'description': description,
-        'isbn': isbn,
-        'publisher': publisher,
-        'published_year': publishedYear,
-        'page_count': pageCount,
-        'spine_style': spineStyle,
-        'updated_at': ?formatServerTime(updatedAt),
-        // Sent as arrays so the server replaces the joins; omitted (not null)
-        // when the caller has nothing to say, to leave server joins untouched.
-        'authors': ?authors,
-        'genres': ?genres,
-      }),
+      body: jsonEncode(_bookPushJson(
+        title: title,
+        subtitle: subtitle,
+        description: description,
+        isbn: isbn,
+        publisher: publisher,
+        publishedYear: publishedYear,
+        pageCount: pageCount,
+        spineStyle: spineStyle,
+        updatedAt: updatedAt,
+        authors: authors,
+        genres: genres,
+      )),
     );
     _body(res);
+  }
+
+  /// Batch sibling of [pushBook] (plan 5 #7): several books' metadata in one
+  /// request, each with its own outcome, so a first sync of a large library
+  /// isn't one HTTPS round trip per book. Only call this when the server
+  /// advertises `batch_push` (see [Capabilities.hasFeature]) — an older
+  /// server 404s on this route, and the caller should fall back to
+  /// per-book [pushBook] instead of treating that as this batch's failure.
+  Future<Map<String, BatchPushResult>> pushBooksBatch(
+    List<BookPushItem> items,
+  ) async {
+    final res = await _http.post(
+      _uri('/api/books:batch'),
+      headers: _headers,
+      body: jsonEncode({
+        'books': [
+          for (final it in items)
+            {
+              'id': it.id,
+              ..._bookPushJson(
+                title: it.title,
+                subtitle: it.subtitle,
+                description: it.description,
+                isbn: it.isbn,
+                publisher: it.publisher,
+                publishedYear: it.publishedYear,
+                pageCount: it.pageCount,
+                spineStyle: it.spineStyle,
+                updatedAt: it.updatedAt,
+                authors: it.authors,
+                genres: it.genres,
+              ),
+            },
+        ],
+      }),
+    );
+    final body = _body(res) as Map<String, dynamic>;
+    return {
+      for (final r in body['results'] as List)
+        (r as Map<String, dynamic>)['id'] as String: BatchPushResult.fromJson(r),
+    };
   }
 
   /// Ids the server has tombstoned, so a pull can delete them locally. A

@@ -608,6 +608,142 @@ async fn put_upserts_a_book_at_a_chosen_id() {
 }
 
 #[tokio::test]
+async fn batch_upsert_creates_every_item_and_shares_upsert_s_logic() {
+    // Plan 5 #7: same shape a single PUT accepts, just several at once with
+    // a caller-chosen id per item (a batch request has no per-item URL).
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/books:batch",
+        Some(&master),
+        Some(json!({ "books": [
+            { "id": "b1", "title": "Dune" },
+            { "id": "b2", "title": "Neuromancer", "authors": ["William Gibson"] },
+        ] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let results = body["results"].as_array().unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0], json!({ "id": "b1", "status": "updated" }));
+    assert_eq!(results[1], json!({ "id": "b2", "status": "updated" }));
+
+    let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    assert_eq!(list.as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn batch_upsert_reports_per_item_status_without_aborting_the_batch() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    // Pre-existing row with a "newer" stored updated_at than the stale push
+    // below will send -- exercises skipped_older inside a batch.
+    call(
+        &app,
+        "PUT",
+        "/api/books/existing",
+        Some(&master),
+        Some(json!({ "title": "Original", "updated_at": "2025-06-01 00:00:00" })),
+    )
+    .await;
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/books:batch",
+        Some(&master),
+        Some(json!({ "books": [
+            { "id": "new-book", "title": "Fresh" },
+            { "id": "existing", "title": "Stale push", "updated_at": "2024-01-01 00:00:00" },
+            { "id": "bad", "title": "   " },
+        ] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let results = body["results"].as_array().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0]["status"], json!("updated"));
+    assert_eq!(results[1]["status"], json!("skipped_older"));
+    assert_eq!(results[2]["status"], json!("error"));
+    assert!(results[2]["message"].is_string());
+
+    // The bad/skipped items didn't roll back the good one.
+    let (_, fresh) = call(&app, "GET", "/api/books/new-book", Some(&master), None).await;
+    assert_eq!(fresh["title"], json!("Fresh"));
+    // The stale push left the original title intact.
+    let (_, existing) = call(&app, "GET", "/api/books/existing", Some(&master), None).await;
+    assert_eq!(existing["title"], json!("Original"));
+}
+
+#[tokio::test]
+async fn batch_upsert_reports_forbidden_items_as_errors_not_aborts() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+    let book = create_book(&app, &master, "Master's book").await;
+    // No share granted -- Alice has no access to `book`.
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/books:batch",
+        Some(&master),
+        Some(json!({ "books": [ { "id": "hers", "title": "Alice's own" } ] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/books:batch",
+        Some(&alice),
+        Some(json!({ "books": [
+            { "id": &book, "title": "Hijack attempt" },
+            { "id": "alices-own-2", "title": "Alice's second" },
+        ] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let results = body["results"].as_array().unwrap();
+    assert_eq!(results[0]["status"], json!("error"));
+    assert_eq!(results[1]["status"], json!("updated"));
+
+    // Master's book is untouched.
+    let (_, untouched) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(untouched["title"], json!("Master's book"));
+}
+
+#[tokio::test]
+async fn batch_upsert_rejects_a_batch_over_the_cap() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let books: Vec<serde_json::Value> = (0..201)
+        .map(|i| json!({ "id": format!("b{i}"), "title": format!("Book {i}") }))
+        .collect();
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/books:batch",
+        Some(&master),
+        Some(json!({ "books": books })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn upsert_ignores_a_stale_timestamped_push() {
     let app = test_app().await;
     let master = register_master(&app).await;
@@ -699,15 +835,17 @@ async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
     assert_eq!(body["sync_protocol"], json!(1));
     let features = body["features"].as_array().unwrap();
     assert!(features.contains(&json!("delta_pull")));
-    // shelf_sync and copy_sync shipped in plan 5 #4, after this handshake --
-    // confirms the list tracks what's actually built rather than staying frozen.
+    // shelf_sync, copy_sync, loan_sync (plan 5 #4), and batch_push (plan 5
+    // #7) shipped after this handshake -- confirms the list tracks what's
+    // actually built rather than staying frozen.
     assert!(features.contains(&json!("shelf_sync")));
     assert!(features.contains(&json!("copy_sync")));
     assert!(features.contains(&json!("loan_sync")));
-    // Never advertised: not built (content_search, mail, batch_push) or
-    // deliberately never synced (reading_progress) -- a capability handshake
-    // that claims one of these would be worse than none.
-    for absent in ["reading_progress", "content_search", "mail", "batch_push"] {
+    assert!(features.contains(&json!("batch_push")));
+    // Never advertised: not built (content_search, mail) or deliberately
+    // never synced (reading_progress) -- a capability handshake that claims
+    // one of these would be worse than none.
+    for absent in ["reading_progress", "content_search", "mail"] {
         assert!(
             !features.contains(&json!(absent)),
             "{absent} isn't a real server feature yet"
