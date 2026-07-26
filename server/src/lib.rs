@@ -271,7 +271,22 @@ pub fn router(state: AppState) -> Router {
         .route("/join/{token}", get(web::join_page))
         // OPDS catalog for third-party e-readers (HTTP Basic auth) — not
         // versioned: readers have this exact URL saved, it never moves.
-        .route("/opds", get(opds::feed))
+        // OPDS (plan 5 #34). `/opds` is a *navigation* feed; the acquisition
+        // feeds hang off it and are paged. `/opds/all` is what the old flat
+        // `/opds` was, so an existing client that bookmarked the root still
+        // finds every book one hop away.
+        .route("/opds", get(opds::root))
+        .route("/opds/all", get(opds::all))
+        .route("/opds/recent", get(opds::recent))
+        .route("/opds/authors", get(opds::authors))
+        .route("/opds/authors/{name}", get(opds::by_author))
+        .route("/opds/genres", get(opds::genres))
+        .route("/opds/genres/{name}", get(opds::by_genre))
+        .route("/opds/groups", get(opds::groups))
+        .route("/opds/groups/{id}", get(opds::by_group))
+        .route("/opds/search", get(opds::search))
+        .route("/opds/search.xml", get(opds::search_description))
+        .route("/opds/v2", get(opds::v2_root))
         .nest("/api", api.clone())
         .nest("/api/v1", api)
         .with_state(state)

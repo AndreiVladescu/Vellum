@@ -4085,8 +4085,29 @@ async fn opds_feed_needs_basic_auth_and_lists_books() {
         .await
         .unwrap();
     let xml = String::from_utf8(bytes.to_vec()).unwrap();
-    assert!(xml.contains("<title>Dune</title>"));
+    // Since plan 5 #34 the root is a *navigation* feed -- a flat 1,000-entry
+    // feed is unusable on e-ink -- so the books are one hop away, at /opds/all.
     assert!(xml.contains("opds-spec.org"));
+    assert!(xml.contains("All books"));
+    assert!(xml.contains("/opds/all"));
+
+    let all = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/opds/all")
+                .header("authorization", format!("Basic {basic}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(all.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(all.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let xml = String::from_utf8(bytes.to_vec()).unwrap();
+    assert!(xml.contains("<title>Dune</title>"));
 }
 
 #[tokio::test]

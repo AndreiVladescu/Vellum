@@ -301,6 +301,24 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**OPDS grew a shape** (server, plan 5 #34). `/opds` was a flat acquisition feed,
+which is unusable on e-ink past a few hundred books — the device downloads and
+re-renders the whole thing to scroll. It is now a **navigation** feed (Recently
+added / All / By author / By genre / By tag), every acquisition feed is **paged**
+with `first`/`previous`/`next`/`last` and OpenSearch counts, and there is an
+OpenSearch descriptor at `/opds/search.xml` so clients get a search box at all.
+The old flat feed lives on as `/opds/all`, one hop from where it was, so an
+existing bookmark still finds everything.
+
+Three details. Feeds carry an **ETag** computed per *caller* from the count and
+newest `updated_at` they can see — per-user because a share granted to one
+account must not be served from another's cached feed — so an e-reader polling
+hourly costs one aggregate query. `/opds/search` unions metadata matching with
+**#32's content index** when the server has one, because an e-reader has one
+search box and a reader who remembers a phrase shouldn't have to know which index
+answers. And `/opds/v2` serves the same root as OPDS 2.0 JSON: the same
+aggregation, a different serialisation, for newer clients.
+
 **Content search** (server + app, plan 5 #32) is the one capability that is
 genuinely better connected: indexing gigabytes of PDFs is not something a phone
 should do, which makes this the strongest argument for running a server at all.
