@@ -186,6 +186,20 @@ warns when a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+**Reading insights** (app, plan 5 #19) exist because the app was already writing
+a position on every page turn and throwing all of it away. A `reading_sessions`
+table keeps the shape of it — **one row per sitting**, not per page turn — and
+*Reading insights* in the drawer draws streaks, pages a day, a 12-week heat map,
+books finished per month and the genre split of what you finish, with `CustomPaint`
+rather than a charting dependency.
+
+Two details do the work. **Coalescing:** reopening a book within two minutes
+extends the previous session instead of starting a new one, so a phone call
+doesn't turn one evening into six sessions and make every average measure
+interruptions. **Local-only, permanently:** this is behavioural data, it has no
+sync channel and should never get one, it rides backups because those snapshot the
+database file, and *Clear reading history* really deletes it.
+
 **Reading status, ratings and dates** (app, plan 5 #18) add `status`
 (`unread`/`reading`/`finished`/`abandoned`/`reference`), `rating` (1–5),
 `startedAt`/`finishedAt` and `readCount` to the book row. They are **app-local for

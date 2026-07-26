@@ -26,6 +26,7 @@ export 'book_write_service.dart' show BookDetails;
 export 'physical_service.dart' show LoanEntry;
 export '../reader/annotations/annotation_store.dart'
     show AnnotationKind, AnnotationStore;
+export '../stats/session_recorder.dart' show SessionRecorder;
 export 'reading_position_service.dart'
     show ReadingJumpOffer, ReadingPositionService, readingUnitForFormats;
 export 'reading_status.dart' show ReadingStatus, ReadingStatusService;

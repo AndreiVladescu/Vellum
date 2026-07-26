@@ -326,6 +326,29 @@ class Annotations extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// One stretch of reading (plan 5 #19).
+///
+/// The app already knows every page turn — `saveReadingPosition` writes on each
+/// one — and throws all of it away except the latest position. This table keeps
+/// the shape of it: one row per *session*, not per page turn, so a long evening
+/// costs one write rather than four hundred.
+///
+/// **Local-only, permanently.** This is behavioural data: when you read and for
+/// how long. It rides backups (they snapshot the database file) and can be wiped
+/// from Preferences, but it has no sync channel and should never get one.
+@DataClassName('ReadingSession')
+class ReadingSessions extends Table {
+  TextColumn get id => text()();
+  TextColumn get bookId => text().references(Books, #id)();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get endedAt => dateTime()();
+  IntColumn get startPage => integer().nullable()();
+  IntColumn get endPage => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
   Books,
   Authors,
@@ -343,13 +366,14 @@ class Annotations extends Table {
   LocalDeletions,
   RemoteReadingPositions,
   Annotations,
+  ReadingSessions,
 ])
 class VellumDatabase extends _$VellumDatabase {
   VellumDatabase([QueryExecutor? executor])
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -513,6 +537,13 @@ class VellumDatabase extends _$VellumDatabase {
             await addBookColumn('started_at', books.startedAt);
             await addBookColumn('finished_at', books.finishedAt);
             await addBookColumn('read_count', books.readCount);
+          }
+          if (from < 16) {
+            // Reading sessions (plan 5 #19): local-only behavioural data, so no
+            // server migration — and deliberately never one.
+            if (!(await tableNames()).contains('reading_sessions')) {
+              await m.createTable(readingSessions);
+            }
           }
         },
         beforeOpen: (details) async {

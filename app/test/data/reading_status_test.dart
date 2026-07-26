@@ -10,7 +10,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
-import 'package:vellum/data/reading_status.dart';
 import 'package:vellum/settings/shelf_sort.dart';
 
 Future<LibraryRepository> _repo(Directory dir) async =>

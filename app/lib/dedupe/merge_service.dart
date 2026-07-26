@@ -259,6 +259,15 @@ class MergeService {
       );
       if (movedNotes > 0) log.add('moved $movedNotes annotation(s)');
 
+      final movedSessions = await db.customUpdate(
+        'UPDATE reading_sessions SET book_id = ? WHERE book_id = ?',
+        variables: [Variable(keeperId), Variable(loserId)],
+        updates: {db.readingSessions},
+      );
+      if (movedSessions > 0) {
+        log.add('moved $movedSessions reading session(s)');
+      }
+
       // ---- reading state: keep whichever is further along ----
       // Reading state is app-local and never synced, but losing "you were on
       // page 300" because the merge kept the other row would still be a loss.
@@ -287,6 +296,7 @@ class MergeService {
         'book_files',
         'shelf_books',
         'annotations',
+        'reading_sessions',
       ]) {
         await db.customStatement('DELETE FROM $table WHERE book_id = ?', [loserId]);
       }

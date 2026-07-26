@@ -5,6 +5,7 @@ import 'account/user_profile.dart';
 import 'data/library_repository.dart';
 import 'dedupe/duplicates_page.dart';
 import 'import/folder_import_page.dart';
+import 'stats/insights_page.dart';
 import 'loans/loans_page.dart';
 import 'server/connection_store.dart';
 import 'server/server_page.dart';
@@ -79,6 +80,13 @@ class AppDrawer extends StatelessWidget {
     ));
   }
 
+  void _openInsights(BuildContext context) {
+    Navigator.of(context).pop(); // close the drawer first
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => InsightsPage(repository: repository),
+    ));
+  }
+
   void _openAccount(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(
@@ -126,6 +134,11 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.content_copy_outlined),
             title: const Text('Find duplicates'),
             onTap: () => _openDuplicates(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.insights_outlined),
+            title: const Text('Reading insights'),
+            onTap: () => _openInsights(context),
           ),
           ListenableBuilder(
             listenable: connection,

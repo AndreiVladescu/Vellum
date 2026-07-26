@@ -36,6 +36,11 @@ class _ReaderPageState extends State<ReaderPage> {
 
   AnnotationStore get _annotations => widget.repository.annotations;
 
+  /// Records this sitting (plan 5 #19). Opened on the first page report rather
+  /// than in initState, so the session's start page is a real page number.
+  late final SessionRecorder _session =
+      SessionRecorder(widget.repository.db);
+
   /// The live text selection, kept so the highlight action can ask it for the
   /// selected text and its page ranges. pdfrx hands this over on every selection
   /// change; it is not a snapshot, so it must not be used after a rebuild that
@@ -73,6 +78,9 @@ class _ReaderPageState extends State<ReaderPage> {
 
   @override
   void dispose() {
+    // Closing the session is fire-and-forget: the widget is going away, and a
+    // dropped write costs one session row, not correctness.
+    _session.end(page: _page);
     _searcher.removeListener(_onSearchChanged);
     _searcher.dispose();
     _searchController.dispose();
@@ -144,6 +152,9 @@ class _ReaderPageState extends State<ReaderPage> {
     // Fire-and-forget; tiny row update, safe to do per page turn.
     widget.repository.saveReadingPosition(
         widget.book.id, page, _controller.pageCount);
+    _session.begin(widget.book.id, page: page).then((_) {
+      _session.touch(page: page);
+    });
     _refreshBookmark(page);
   }
 

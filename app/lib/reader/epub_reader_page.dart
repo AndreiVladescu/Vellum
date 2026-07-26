@@ -72,6 +72,12 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
   AnnotationStore get _annotations => widget.repository.annotations;
 
+  /// Records this sitting (plan 5 #19). Pages are chapters here, which is the
+  /// honest unit for an EPUB — the stats say "pages" because that is what the
+  /// reader turns.
+  late final SessionRecorder _session =
+      SessionRecorder(widget.repository.db);
+
   /// Appearance settings (plan 5 #23). Loaded here rather than passed in, so a
   /// reader opened from anywhere gets them without every call site threading
   /// them through.
@@ -105,6 +111,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
       });
       settings.addListener(_onSettingsChanged);
     });
+    _session.begin(widget.book.id, page: (widget.book.lastReadPage ?? 1));
   }
 
   void _onSettingsChanged() {
@@ -118,6 +125,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     _selectionNotifier.removeListener(_onSelectionChanged);
     _selectionNotifier.dispose();
     _settings?.removeListener(_onSettingsChanged);
+    _session.end(page: _chapter + 1);
     _scroll.dispose();
     super.dispose();
   }
@@ -300,6 +308,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
   void _goTo(int index, int count) {
     setState(() => _chapter = index.clamp(0, count - 1));
+    _session.touch(page: _chapter + 1);
     _refreshBookmark();
     if (_scroll.hasClients) _scroll.jumpTo(0);
     // A new chapter starts at the top; save immediately (fraction 0).
