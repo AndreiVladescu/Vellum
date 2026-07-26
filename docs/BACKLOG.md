@@ -89,6 +89,14 @@ on a page containing a photograph (it must not look like a negative); fit
 width/page; in-book search with next/previous; "go to page"; and the hide-controls
 preference plus tap-to-reveal in both readers.
 
+**Deferred from #27**: scheduled OS notifications a day before and on the due
+date. The *decision* logic is built and tested (`LoanDue.needingReminder`, which
+knows not to nag twice in a day but to come back while a book is still out) and
+the loans list badges what needs attention, but nothing schedules a system
+notification — that needs `flutter_local_notifications` plus per-platform channel
+setup, permissions and a timezone database. The in-app path (badge → *Copy a
+reminder*) works everywhere today.
+
 **Deferred from #23**, and why: paged (rather than scrolled) EPUB mode is a layout
 engine of its own; keep-screen-awake, volume-key page turns and the brightness
 slider each need a platform plugin, and were not worth adding three dependencies
