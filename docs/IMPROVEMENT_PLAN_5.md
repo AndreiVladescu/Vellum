@@ -63,7 +63,7 @@ is answerable from `git log`:
 | 35 | Console paging, saved views, activity log* | `70f9d8e` |
 | 33 | Read EPUBs (and share links) in the browser | `17b626c` |
 | 47 | Publish and fetch physical room layouts | `b15a6d9` |
-| 48 | Rendered room view + public room links | `HEAD` |
+| 48 | Rendered room view + public room links | `ef7c8ef` |
 
 **Every item in Phases 1–5 is now done.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list.
