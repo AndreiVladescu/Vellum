@@ -346,6 +346,20 @@ Metadata is also filled in **automatically**, without picking an edition:
 
 ## Adding & editing books
 
+**Above the shelf** sits a compact strip (plan 5 #25): *Continue reading* (up to
+three, most recently read first, with progress) and *Recently added*. It is
+derived from the same `LibraryView` the shelf itself draws, never a second set of
+queries, so it narrows with the active search and genre filter instead of
+contradicting the list underneath, and collapses to nothing when there is nothing
+to show. A book at 98% or more counts as finished and drops off.
+
+**First run** (plan 5 #41) opens a three-card sheet — get your books in (folder /
+scan / one at a time), connect a server (optional, skippable forever), set up a
+room — which is dismissible in every direction and marked seen the moment it
+opens, so swiping it away is never punished by it returning. Every empty state
+(shelf, no-search-match, physical tab, loans) carries one line of what-to-do-next
+copy **and** a primary action.
+
 **Finding and merging duplicates** (app, plan 5 #21b) exists because a library
 grown by bulk import will contain them. *Find duplicates* in the drawer compares
 three ways, and the ordering is the safety property: an identical **file hash** or

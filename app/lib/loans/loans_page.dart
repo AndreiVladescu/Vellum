@@ -43,6 +43,12 @@ class LoansPage extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.shelves),
+                    label: const Text('Go to your shelf'),
+                  ),
                 ],
               ),
             );

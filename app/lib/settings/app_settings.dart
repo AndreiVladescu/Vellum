@@ -24,6 +24,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _deviceIdKey = 'settings.deviceId';
   static const _deviceLabelKey = 'settings.deviceLabel';
   static const _watchedFolderKey = 'settings.watchedImportFolder';
+  static const _seenFirstRunKey = 'settings.hasSeenFirstRun';
 
   final SharedPreferences _prefs;
 
@@ -177,6 +178,16 @@ class AppSettingsStore extends ChangeNotifier {
     } else {
       await _prefs.setString(_watchedFolderKey, path.trim());
     }
+    notifyListeners();
+  }
+
+  /// Whether the first-run introduction has been shown (plan 5 #41). Set as soon
+  /// as it opens, not when it completes: someone who swipes it away has answered,
+  /// and showing it again next launch would be nagging.
+  bool get hasSeenFirstRun => _prefs.getBool(_seenFirstRunKey) ?? false;
+
+  Future<void> setHasSeenFirstRun(bool value) async {
+    await _prefs.setBool(_seenFirstRunKey, value);
     notifyListeners();
   }
 

@@ -17,14 +17,17 @@ import 'import/folder_import_page.dart';
 import 'import/folder_import_service.dart';
 import 'import/import_plan.dart';
 import 'import/incoming_share.dart';
+import 'onboarding/first_run_sheet.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
 import 'server/connection_store.dart';
 import 'server/server_client.dart';
+import 'server/server_page.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
+import 'shelf/library_header.dart';
 import 'shelf/shelf_view.dart';
 
 Future<void> main() async {
@@ -111,6 +114,10 @@ class _LibraryPageState extends State<LibraryPage> {
   // can be shown/cleared as a chip rather than hidden in the search box.
   String? _genreFilter;
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
+  // The continue-reading / recently-added strip (plan 5 #25), hidden for this
+  // session only: its value is reappearing when you come back mid-book, not
+  // being a preference to manage.
+  bool _headerDismissed = false;
   Timer? _searchDebounce;
   final _searchController = TextEditingController();
 
@@ -140,6 +147,7 @@ class _LibraryPageState extends State<LibraryPage> {
     _autoPusher.start();
     _offerWatchedFolder();
     _listenForSharedBooks();
+    _showFirstRun();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
   }
@@ -340,6 +348,56 @@ class _LibraryPageState extends State<LibraryPage> {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ScanPage(repository: repository)),
     );
+  }
+
+  /// The first-run introduction (plan 5 #41), on the first launch only. It
+  /// reports a choice rather than navigating itself, so the routes all stay here
+  /// where the rest of the shelf's navigation lives.
+  Future<void> _showFirstRun() async {
+    // After the frame, so the sheet has a Scaffold to sit in.
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+    final action = await FirstRunSheet.maybeShow(context, widget.settings);
+    if (action == null || !mounted) return;
+    switch (action) {
+      case FirstRunAction.importFolder:
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => FolderImportPage(
+            repository: repository,
+            settings: widget.settings,
+          ),
+        ));
+      case FirstRunAction.scan:
+        if (mounted) await _openScan(context);
+      case FirstRunAction.addOne:
+        if (mounted) await _openAddBook(context);
+      case FirstRunAction.connectServer:
+        if (!mounted) return;
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ServerPage(
+            connection: widget.connection,
+            repository: repository,
+            sync: _sync,
+            settings: widget.settings,
+          ),
+        ));
+      case FirstRunAction.createRoom:
+        if (!mounted) return;
+        setState(() => _tab = 1);
+        await promptCreateLibrary(context, repository, widget.settings);
+    }
+  }
+
+  /// Opens a book's detail page — the same destination a spine tap reaches, so
+  /// the header strip and the shelf can't drift apart.
+  void _openBook(Book book) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BookDetailPage(
+        book: book,
+        repository: repository,
+        onGenreTap: _applyGenreFilter,
+      ),
+    ));
   }
 
   /// Applies the genre facet from a tapped genre chip on a book's detail page.
@@ -561,10 +619,23 @@ class _LibraryPageState extends State<LibraryPage> {
                       genre: _genreFilter,
                       sort: widget.settings.shelfSort,
                     ),
-                    builder: (context, snapshot) => _shelfBody(
-                      snapshot.data ?? LibraryView.empty,
-                      active != null,
-                    ),
+                    builder: (context, snapshot) {
+                      final view = snapshot.data ?? LibraryView.empty;
+                      return Column(
+                        children: [
+                          // Derived from the same view the shelf below draws —
+                          // never a second query (plan 5 #25).
+                          if (!_headerDismissed)
+                            LibraryHeader(
+                              highlights: LibraryHighlights.from(view),
+                              onOpen: _openBook,
+                              onDismiss: () =>
+                                  setState(() => _headerDismissed = true),
+                            ),
+                          Expanded(child: _shelfBody(view, active != null)),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
@@ -585,10 +656,29 @@ class _LibraryPageState extends State<LibraryPage> {
       // exactly like the shelf genuinely being empty gets its own message.
       if (!view.scopeEmpty) {
         return Center(
-          child: Text(
-            _noMatchMessage(),
-            textAlign: TextAlign.center,
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _noMatchMessage(),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
+              // A dead end otherwise: the filters that hid everything aren't
+              // necessarily both visible from here (plan 5 #41).
+              TextButton.icon(
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() {
+                    _query = '';
+                    _genreFilter = null;
+                  });
+                },
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('Clear search and filters'),
+              ),
+            ],
           ),
         );
       }
@@ -611,6 +701,33 @@ class _LibraryPageState extends State<LibraryPage> {
                   : 'Add your first book to see it here.',
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
+            if (!onCustomShelf) ...[
+              const SizedBox(height: 16),
+              // The two ways in that a bare FAB doesn't advertise (plan 5 #41).
+              Wrap(
+                spacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () => _openAddBook(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add a book'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FolderImportPage(
+                          repository: repository,
+                          settings: widget.settings,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text('Import a folder'),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       );

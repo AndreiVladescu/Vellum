@@ -77,6 +77,15 @@ class PhysicalLibrariesTab extends StatelessWidget {
                   'Create a room, add shelves, and arrange your books.',
                   style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 ),
+                const SizedBox(height: 16),
+                // An empty state that only explains leaves the next step to be
+                // hunted for; every one of them now offers it (plan 5 #41).
+                FilledButton.icon(
+                  onPressed: () =>
+                      promptCreateLibrary(context, repository, settings),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create a room'),
+                ),
               ],
             ),
           );
