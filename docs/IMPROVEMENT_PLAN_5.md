@@ -62,7 +62,7 @@ is answerable from `git log`:
 | 34 | OPDS search, navigation feeds, and paging | `3ac84a2` |
 | 35 | Console paging, saved views, activity log* | `70f9d8e` |
 | 33 | Read EPUBs (and share links) in the browser | `17b626c` |
-| 47 | Publish and fetch physical room layouts | `HEAD` |
+| 47 | Publish and fetch physical room layouts | `b15a6d9` |
 
 **Every item in Phases 1–5 is now done.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list.
