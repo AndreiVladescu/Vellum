@@ -66,9 +66,12 @@ is answerable from `git log`:
 | 48 | Rendered room view + public room links | `ef7c8ef` |
 | 49 | Borrow requests on shared physical books | `beab6b7` |
 
-**Every numbered item in all six phases is now done.** Everything §I lists for the
-on-ramp has landed, plus #14 from the interleave list, and §K's five items
-(#47–#51) finished it off.
+**Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
+#14 from the interleave list. What remains is §I's **"interleave anywhere"** set,
+which was never assigned to a phase: #26 (shortcuts), #39 (theming), #42 (a11y
+round two), #9 (content-addressed blobs), #8 (SSE), #29/#30 (physical depth), #38
+(l10n), #40 (Android background), #52 (trash), #53 (send-to-e-reader), and #21a /
+#21c (wishlist, Calibre/CSV/OPDS import). None of them blocks anything.
 
 *#35's **virtualised table body** is deliberately not built. It was proposed as
 the fix for a DOM holding the whole library — but with search, sort and filters
