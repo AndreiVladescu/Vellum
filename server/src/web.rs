@@ -45,6 +45,21 @@ pub async fn join_page() -> Html<&'static str> {
     Html(include_str!("../web/join.html"))
 }
 
+/// The browser reader (plan 5 #33), served for both `/read/{book_id}` (signed
+/// in) and `/r/{token}` (a share link). One page for both, because the only
+/// difference is where it fetches from and whether Download appears — and the
+/// page works that out from its own path.
+pub async fn read_page() -> Html<&'static str> {
+    Html(include_str!("../web/read.html"))
+}
+
+pub async fn read_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("../web/read.js"),
+    )
+}
+
 pub async fn public_page() -> Html<&'static str> {
     Html(include_str!("../web/public.html"))
 }

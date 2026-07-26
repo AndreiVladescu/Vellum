@@ -277,6 +277,7 @@ function render(){
       r += `<td>${chips}<button class="addtag" onclick="quickAdd(this,'${b.id}')">＋ tag</button></td>`;
       if (S.cols.has('added'))  r += `<td class="muted">${esc((b.created_at||'').slice(0,10))}</td>`;
       r += `<td class="actions">
+        <button class="btn sm" onclick="openReader('${b.id}')">Read</button>
         <button class="btn sm" onclick="pickUpload('${b.id}')">Upload</button>
         <button class="btn sm" onclick="openLink('${b.id}')">Link</button>
       </td></tr>`;
@@ -1195,6 +1196,11 @@ function fmtBytes(n){
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
   return (i === 0 ? v : v.toFixed(1)) + ' ' + units[i];
 }
+
+// Reading in the browser (plan 5 #33). A new tab, because reading and managing
+// are different activities and losing your place in the table to skim a chapter
+// is exactly the annoyance this would otherwise create.
+function openReader(id){ window.open('/read/' + encodeURIComponent(id), '_blank', 'noopener'); }
 
 // ---- saved views (plan 5 #35) -------------------------------------------
 //

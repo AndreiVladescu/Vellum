@@ -29,6 +29,7 @@ mod metadata;
 mod observability;
 mod opds;
 mod physical_copies;
+mod reader;
 mod reading;
 mod shares;
 mod shelves;
@@ -192,6 +193,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             get(blobs::list_files)
                 .post(blobs::upload_file.layer(DefaultBodyLimit::max(max_upload))),
         )
+        .route("/books/{id}/read", get(reader::manifest))
+        .route("/books/{id}/read/{index}", get(reader::unit))
+        .route("/books/{id}/read/asset/{*name}", get(reader::asset))
         .route("/files/{file_id}", get(blobs::download_file))
         // Book groups.
         .route("/groups", get(groups::list).post(groups::create))
@@ -236,6 +240,14 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             get(shares::list_links).post(shares::create_link),
         )
         .route("/share-links/{id}", delete(shares::delete_link))
+        // Reading in the browser (plan 5 #33). The public variants never
+        // consume a share link's use — that counts downloads.
+        .route("/public/{token}/read", get(reader::public_manifest))
+        .route("/public/{token}/read/{index}", get(reader::public_unit))
+        .route(
+            "/public/{token}/read/asset/{*name}",
+            get(reader::public_asset),
+        )
         .route("/public/{token}", get(shares::public_book))
         .route("/public/{token}/file", get(shares::public_file))
         // Book detail (metadata + authors + genres + files) for the console.
@@ -272,6 +284,11 @@ pub fn router(state: AppState) -> Router {
         .route("/assets/logo.svg", get(web::logo))
         .route("/favicon.svg", get(web::favicon))
         .route("/p/{token}", get(web::public_page))
+        // The browser reader (plan 5 #33): the same page for a signed-in
+        // reader and for a share link, which it tells apart from its own path.
+        .route("/read/{book_id}", get(web::read_page))
+        .route("/r/{token}", get(web::read_page))
+        .route("/assets/read.js", get(web::read_js))
         // Where the emailed password-reset link lands (plan 5 #31).
         .route("/reset/{token}", get(web::reset_page))
         .route("/join/{token}", get(web::join_page))

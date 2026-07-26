@@ -652,6 +652,144 @@ pub(crate) fn epub_section_texts(path: &Path) -> Option<Vec<String>> {
     Some(sections)
 }
 
+/// One EPUB spine section as **sanitised** HTML, for browser reading
+/// (plan 5 #33): the section's title (from its first heading, else its file
+/// name) and its body markup.
+///
+/// Returns None when the archive can't be read or the index is past the end.
+pub(crate) fn epub_section_html(path: &Path, index: usize) -> Option<(String, String)> {
+    let (opf_dir, hrefs) = epub_spine_hrefs(path)?;
+    let href = hrefs.get(index)?.clone();
+    let full = join_posix(&opf_dir, &href);
+
+    let file = std::fs::File::open(path).ok()?;
+    let mut zip = zip::ZipArchive::new(file).ok()?;
+    let xhtml = {
+        use std::io::Read;
+        const MAX_ENTRY_BYTES: u64 = 32 * 1024 * 1024;
+        let f = zip.by_name(&full).ok()?;
+        let mut buf = Vec::new();
+        f.take(MAX_ENTRY_BYTES).read_to_end(&mut buf).ok()?;
+        String::from_utf8_lossy(&buf).into_owned()
+    };
+
+    let base_dir = full
+        .rsplit_once('/')
+        .map(|(d, _)| d)
+        .unwrap_or("")
+        .to_string();
+    let body = body_of(&xhtml);
+    let title = first_heading(&body).unwrap_or_else(|| {
+        href.rsplit('/')
+            .next()
+            .unwrap_or(&href)
+            .trim_end_matches(".xhtml")
+            .trim_end_matches(".html")
+            .to_string()
+    });
+    Some((title, sanitize_html(&body, &base_dir)))
+}
+
+/// Spine hrefs in reading order, with the OPF's directory (hrefs are relative
+/// to it). Shared by [`epub_section_html`] and [`epub_section_texts`].
+fn epub_spine_hrefs(path: &Path) -> Option<(String, Vec<String>)> {
+    use std::io::Read;
+    const MAX_ENTRY_BYTES: u64 = 32 * 1024 * 1024;
+    let file = std::fs::File::open(path).ok()?;
+    let mut zip = zip::ZipArchive::new(file).ok()?;
+
+    let mut read = |name: &str| -> Option<String> {
+        let f = zip.by_name(name).ok()?;
+        let mut buf = Vec::new();
+        f.take(MAX_ENTRY_BYTES).read_to_end(&mut buf).ok()?;
+        String::from_utf8(buf).ok()
+    };
+    let container = read("META-INF/container.xml")?;
+    let opf_path = tag_attr(find_tag(&container, "rootfile")?, "full-path")?.to_string();
+    let opf = read(&opf_path)?;
+    let opf_dir = opf_path
+        .rsplit_once('/')
+        .map(|(d, _)| d)
+        .unwrap_or("")
+        .to_string();
+
+    let manifest: Vec<(String, String)> = item_tags(&opf)
+        .filter_map(|tag| {
+            Some((
+                tag_attr(tag, "id")?.to_string(),
+                tag_attr(tag, "href")?.to_string(),
+            ))
+        })
+        .collect();
+    let hrefs = itemref_ids(&opf)
+        .into_iter()
+        .filter_map(|idref| {
+            manifest
+                .iter()
+                .find(|(id, _)| id == idref)
+                .map(|(_, href)| href.clone())
+        })
+        .collect();
+    Some((opf_dir, hrefs))
+}
+
+/// How many spine sections an EPUB has, for the reader's chapter list.
+pub(crate) fn epub_spine_len(path: &Path) -> usize {
+    epub_spine_hrefs(path).map(|(_, h)| h.len()).unwrap_or(0)
+}
+
+/// A zip entry's bytes, for serving an EPUB's own images to the reader.
+///
+/// Reads **by name from the archive**, never through the filesystem, so a
+/// crafted entry name like `../../etc/passwd` addresses nothing outside the
+/// book — there is no path to traverse.
+pub(crate) fn epub_entry_bytes(path: &Path, name: &str) -> Option<Vec<u8>> {
+    use std::io::Read;
+    const MAX_ENTRY_BYTES: u64 = 32 * 1024 * 1024;
+    let file = std::fs::File::open(path).ok()?;
+    let mut zip = zip::ZipArchive::new(file).ok()?;
+    let f = zip.by_name(name).ok()?;
+    let mut buf = Vec::new();
+    f.take(MAX_ENTRY_BYTES).read_to_end(&mut buf).ok()?;
+    Some(buf)
+}
+
+/// Everything between `<body …>` and `</body>`, or the whole document when
+/// there is no body element.
+fn body_of(xhtml: &str) -> String {
+    let lower = xhtml.to_ascii_lowercase();
+    let Some(open) = lower.find("<body") else {
+        return xhtml.to_string();
+    };
+    let Some(after) = xhtml[open..].find('>').map(|e| open + e + 1) else {
+        return xhtml.to_string();
+    };
+    let end = lower[after..]
+        .find("</body>")
+        .map(|e| after + e)
+        .unwrap_or(xhtml.len());
+    xhtml[after..end].to_string()
+}
+
+fn first_heading(body: &str) -> Option<String> {
+    for level in 1..=3 {
+        let open = format!("<h{level}");
+        let close = format!("</h{level}>");
+        let lower = body.to_ascii_lowercase();
+        if let Some(at) = lower.find(&open)
+            && let Some(gt) = body[at..].find('>').map(|e| at + e + 1)
+            && let Some(end) = lower[gt..].find(&close).map(|e| gt + e)
+        {
+            let text = strip_markup(&body[gt..end]);
+            let trimmed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
 /// The `idref` of every `<itemref>`, in document order — the EPUB spine.
 fn itemref_ids(opf: &str) -> Vec<&str> {
     let mut ids = Vec::new();
@@ -663,6 +801,215 @@ fn itemref_ids(opf: &str) -> Vec<&str> {
         }
     }
     ids
+}
+
+/// EPUB markup to something safe to inject into the reader page (plan 5 #33).
+///
+/// **An allowlist, not a blocklist.** Book files are attacker-supplied in the
+/// share-link case — anyone with a link is reading markup somebody else
+/// uploaded — and a blocklist of dangerous tags is a list you get wrong once.
+/// So only known-harmless elements survive, with a known-harmless set of
+/// attributes each; everything else has its *tags* removed while its text is
+/// kept, which is what a reader wants anyway.
+///
+/// Three specific holes this closes: `on*` handlers (dropped with every
+/// unlisted attribute), `javascript:` and `data:` URLs (only relative links,
+/// `http(s)` and in-document `#fragment`s pass), and `<script>`/`<style>`
+/// bodies (removed entirely, contents included). The CSP forbids inline script
+/// on top of this — but a page that depends on its CSP alone is one header away
+/// from being wrong.
+///
+/// Image `src`s are rewritten to `asset/<zip path>` so the reader can serve them
+/// out of the book's own archive; anything not resolvable inside the book turns
+/// into no image rather than an outbound request.
+fn sanitize_html(body: &str, base_dir: &str) -> String {
+    const ALLOWED: &[&str] = &[
+        "p",
+        "br",
+        "hr",
+        "div",
+        "span",
+        "section",
+        "article",
+        "blockquote",
+        "pre",
+        "code",
+        "em",
+        "strong",
+        "i",
+        "b",
+        "u",
+        "s",
+        "small",
+        "sup",
+        "sub",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "ul",
+        "ol",
+        "li",
+        "dl",
+        "dt",
+        "dd",
+        "table",
+        "thead",
+        "tbody",
+        "tr",
+        "td",
+        "th",
+        "figure",
+        "figcaption",
+        "a",
+        "img",
+        "cite",
+        "q",
+        "abbr",
+        "ruby",
+        "rt",
+        "rp",
+    ];
+    const DROP_WITH_CONTENT: &[(&str, &str)] = &[
+        ("<script", "</script>"),
+        ("<style", "</style>"),
+        ("<iframe", "</iframe>"),
+        ("<object", "</object>"),
+        ("<embed", "</embed>"),
+        ("<svg", "</svg>"),
+    ];
+
+    let lower = body.to_ascii_lowercase();
+    let mut out = String::with_capacity(body.len());
+    let mut i = 0;
+    while i < body.len() {
+        let Some(rel) = body[i..].find('<') else {
+            out.push_str(&body[i..]);
+            break;
+        };
+        out.push_str(&body[i..i + rel]);
+        let at = i + rel;
+
+        if let Some((_, close)) = DROP_WITH_CONTENT
+            .iter()
+            .find(|(open, _)| lower[at..].starts_with(open))
+        {
+            i = lower[at..]
+                .find(close)
+                .map(|e| at + e + close.len())
+                .unwrap_or(body.len());
+            continue;
+        }
+
+        let Some(end) = body[at..].find('>').map(|e| at + e + 1) else {
+            break; // an unterminated `<` at the end: drop the rest
+        };
+        let tag = &body[at..end];
+        let closing = tag.starts_with("</");
+        let name: String = tag
+            .trim_start_matches('<')
+            .trim_start_matches('/')
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .collect::<String>()
+            .to_ascii_lowercase();
+
+        if ALLOWED.contains(&name.as_str()) {
+            if closing {
+                out.push_str(&format!("</{name}>"));
+            } else {
+                out.push_str(&rebuild_tag(&name, tag, base_dir));
+            }
+        } else {
+            // Unknown element: keep its text, lose its tag — and a space, so
+            // "end.<x/>Next" doesn't become one word.
+            out.push(' ');
+        }
+        i = end;
+    }
+    out
+}
+
+/// Rebuilds one opening tag with only the attributes that are safe to keep.
+fn rebuild_tag(name: &str, tag: &str, base_dir: &str) -> String {
+    let self_closing = tag.trim_end().trim_end_matches('>').ends_with('/');
+    let mut rebuilt = format!("<{name}");
+    match name {
+        "a" => {
+            if let Some(href) = tag_attr(tag, "href").and_then(safe_link) {
+                rebuilt.push_str(&format!(" href=\"{}\"", attr_escape(&href)));
+                // Never let a book's link take over the reader's tab.
+                rebuilt.push_str(" target=\"_blank\" rel=\"noopener noreferrer\"");
+            }
+        }
+        "img" => {
+            match tag_attr(tag, "src").and_then(|src| book_asset(src, base_dir)) {
+                Some(src) => rebuilt.push_str(&format!(" src=\"{}\"", attr_escape(&src))),
+                // No resolvable image beats an image element pointing nowhere.
+                None => return String::new(),
+            }
+            if let Some(alt) = tag_attr(tag, "alt") {
+                rebuilt.push_str(&format!(" alt=\"{}\"", attr_escape(alt)));
+            }
+        }
+        _ => {}
+    }
+    rebuilt.push_str(if self_closing { "/>" } else { ">" });
+    rebuilt
+}
+
+/// Relative, `http(s)` and in-document links only. Everything else — most of
+/// all `javascript:` — becomes no link at all.
+fn safe_link(href: &str) -> Option<String> {
+    let trimmed = href.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("http://") || lower.starts_with("https://") || trimmed.starts_with('#') {
+        return Some(trimmed.to_string());
+    }
+    // Anything else — a `javascript:`/`data:` URL, or a relative link to
+    // another file inside the book — loses its href. The anchor's *text* is
+    // still shown, so a cross-chapter footnote reads as words rather than
+    // vanishing or becoming a broken link.
+    None
+}
+
+/// An EPUB-internal image path, resolved against the section's directory and
+/// handed back as the reader's own asset URL.
+fn book_asset(src: &str, base_dir: &str) -> Option<String> {
+    let trimmed = src.trim();
+    if trimmed.is_empty() || trimmed.contains(':') {
+        return None; // absolute or data: — not something inside this book
+    }
+    let resolved = join_posix(base_dir, trimmed);
+    if resolved.is_empty() {
+        return None;
+    }
+    Some(format!("asset/{}", url_escape(&resolved)))
+}
+
+fn url_escape(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for byte in raw.as_bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                out.push(*byte as char)
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+fn attr_escape(raw: &str) -> String {
+    raw.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// XHTML to searchable text: drop `<script>`/`<style>` bodies, then every tag,
@@ -895,6 +1242,18 @@ async fn run_render(mut cmd: std::process::Command) -> bool {
 
 /// Try each known PDF CLI in turn until one writes a non-empty JPEG.
 async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
+    render_page(input, out_jpg, 1).await
+}
+
+/// Render page `page` (1-based) of a PDF to a JPEG, trying each known CLI in
+/// turn until one writes a non-empty file.
+///
+/// Generalised from the cover renderer for browser reading (plan 5 #33) — the
+/// same sandbox, the same tools, one more argument. A second renderer would
+/// mean a second set of resource limits to keep in step with L6.
+pub(crate) async fn render_page(input: &Path, out_jpg: &Path, page: u32) -> bool {
+    let page = page.max(1);
+    let n = page.to_string();
     // poppler: pdftoppm / pdftocairo write "<prefix>.jpg" with -singlefile.
     let prefix = out_jpg.with_extension("");
     for tool in ["pdftoppm", "pdftocairo"] {
@@ -903,9 +1262,9 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
         cmd.args([
             "-jpeg",
             "-f",
-            "1",
+            &n,
             "-l",
-            "1",
+            &n,
             "-singlefile",
             "-scale-to",
             "1400",
@@ -922,7 +1281,7 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
     cmd.args(["draw", "-F", "jpeg", "-w", "1400", "-o"])
         .arg(out_jpg)
         .arg(input)
-        .arg("1");
+        .arg(&n);
     if run_render(cmd).await && nonempty(out_jpg).await {
         return true;
     }
@@ -936,13 +1295,18 @@ async fn render_first_page(input: &Path, out_jpg: &Path) -> bool {
         "-dBATCH",
         "-dNOPAUSE",
         "-sDEVICE=jpeg",
-        "-dFirstPage=1",
-        "-dLastPage=1",
+        &format!("-dFirstPage={n}"),
+        &format!("-dLastPage={n}"),
         "-r150",
     ])
     .arg(format!("-sOutputFile={}", out_jpg.display()))
     .arg(input);
     run_render(cmd).await && nonempty(out_jpg).await
+}
+
+/// Whether a path exists and has bytes — used by the reader's page cache.
+pub(crate) async fn nonempty_file(p: &Path) -> bool {
+    nonempty(p).await
 }
 
 async fn nonempty(p: &Path) -> bool {
@@ -1026,6 +1390,19 @@ async fn require_edit(state: &AppState, user: &AuthUser, book_id: &str) -> AppRe
 /// root, no Windows prefix. A defence-in-depth backstop so that even a poisoned
 /// `cover_path` row can't turn a blob read into an arbitrary-file read. See
 /// docs/SECURITY_AUDIT.md (H1).
+/// The MIME type of a sniffed image, or None when the bytes are not an image
+/// we recognise. The reader serves EPUB-internal assets through this so a book
+/// can never get arbitrary bytes served under a type a browser will execute.
+pub(crate) fn image_mime(bytes: &[u8]) -> Option<&'static str> {
+    match sniff(bytes) {
+        Sniffed::Jpeg => Some("image/jpeg"),
+        Sniffed::Png => Some("image/png"),
+        Sniffed::Gif => Some("image/gif"),
+        Sniffed::WebP => Some("image/webp"),
+        _ => None,
+    }
+}
+
 pub(crate) fn is_safe_rel(rel: &str) -> bool {
     let p = Path::new(rel);
     !rel.is_empty() && !p.is_absolute() && p.components().all(|c| matches!(c, Component::Normal(_)))

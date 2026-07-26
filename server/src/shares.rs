@@ -386,6 +386,20 @@ pub async fn public_book(
     }))
 }
 
+/// The book a share-link token points at, **without consuming a use**.
+///
+/// Reading in the browser (plan 5 #33) goes through here: `max_uses` counts
+/// *downloads*, and burning a one-time link on a page turn would destroy it the
+/// moment someone opened the book.
+pub(crate) async fn book_id_for_link(state: &AppState, token: &str) -> AppResult<Option<String>> {
+    Ok(sqlx::query_scalar(&format!(
+        "SELECT book_id FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
+    ))
+    .bind(sha256_hex(token))
+    .fetch_optional(&state.db)
+    .await?)
+}
+
 /// Anonymous one-shot download of the shared book's file. Atomically consumes a
 /// use, so a one-time link can only be downloaded once even under concurrency.
 pub async fn public_file(

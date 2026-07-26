@@ -301,6 +301,36 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**Reading in the browser** (server + console, plan 5 #33) makes a machine
+without Vellum installed useful, and turns a share link from "here's a 40 MB
+download" into "here's the chapter". One page serves both cases —
+`/read/<book id>` signed in, `/r/<token>` for a link — and it works out which
+from its own path.
+
+**EPUB is rendered server-side into sanitised HTML.** The sanitiser is an
+**allowlist, not a blocklist**: with a share link, markup somebody else uploaded
+renders in your browser, and a blocklist is a list you get wrong once. Only known
+elements survive, each with a known attribute set, so `on*` handlers,
+`javascript:`/`data:` URLs and `<script>`/`<iframe>` bodies are gone before the
+page ever sees them — the CSP forbids inline script as well, but a page that
+depends on its CSP alone is one header away from being wrong. External `<img>`s
+are dropped so opening a book can't phone home; the book's own images are served
+out of its zip **only if they sniff as images**, and external links get
+`noopener`.
+
+**PDF is served as page images** through the existing sandboxed renderer,
+generalised from "first page" to any page and cached under `pages/<file id>/`.
+That was the plan's recommendation over vendoring ~1 MB of pdf.js, and it means
+the reader needs no book-format code in the browser at all.
+
+**Reading never consumes a share link.** `max_uses` counts *downloads* — the
+one-time link exists so a file can be handed over once — so burning a use on a
+page turn would destroy the link the moment someone opened the book. The public
+landing page therefore offers "Read it here" *before* "Download", and a public
+reader is told plainly that the file isn't theirs to take. Position is kept in
+`localStorage` per browser and never touches #5's cross-device channel: a skim in
+a browser must not overwrite where you actually are on your own devices.
+
 **The console stopped loading the library** (console + server, plan 5 #35).
 Search, sort and the tag/missing filters are now **query params the server
 answers** — `?q=&sort=&dir=&tag=&missing=` on the paged `/api/books` — rather

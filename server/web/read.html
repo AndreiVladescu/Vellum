@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading — Vellum</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  /* Deliberately self-contained rather than reusing console.css: this page is
+     reached by share-link readers who have never seen the console, and a
+     reading page wants a reading typeface, not a management one. */
+  :root {
+    color-scheme: light dark;
+    --bg:#eee9dd; --fg:#2e2822; --muted:#7d7263; --accent:#6e573f;
+    --card:#f8f4e9; --line:#d5ccba;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141210; --fg:#dcd5c6; --muted:#8f8674; --accent:#94795a;
+            --card:#1b1814; --line:#353026; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans); }
+
+  header {
+    position:sticky; top:0; z-index:5; display:flex; gap:12px; align-items:center;
+    padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line);
+  }
+  header h1 { font-family:var(--serif); font-size:1.05rem; margin:0; font-weight:600; }
+  .spacer { flex:1; }
+  .muted { color:var(--muted); }
+  button, select {
+    font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:8px;
+    background:transparent; color:inherit; cursor:pointer;
+  }
+  button:hover { border-color:var(--accent); }
+  button[disabled] { opacity:.45; cursor:default; }
+
+  main {
+    max-width:44rem; margin:0 auto; padding:28px 20px 80px;
+    font-family:var(--serif); font-size:1.12rem; line-height:1.7;
+  }
+  main img { max-width:100%; height:auto; }
+  main h1, main h2, main h3 { line-height:1.25; }
+  main blockquote { margin:1.2em 0; padding-left:1em; border-left:3px solid var(--line); color:var(--muted); }
+  main pre { overflow-x:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.9rem; }
+  /* A PDF page is one image per "unit"; centre it and let it fill the column. */
+  .page { display:block; margin:0 auto; max-width:100%; border:1px solid var(--line); }
+
+  footer {
+    position:fixed; bottom:0; left:0; right:0; display:flex; gap:12px;
+    justify-content:center; align-items:center; padding:10px;
+    background:var(--card); border-top:1px solid var(--line);
+  }
+  .err { color:#b3261e; padding:24px; text-align:center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="title">Loading…</h1>
+  <span class="muted" id="where"></span>
+  <span class="spacer"></span>
+  <select id="jump" class="hidden" aria-label="Jump to"></select>
+  <a id="download" class="hidden" href="#"><button>Download</button></a>
+</header>
+
+<main id="content"></main>
+
+<footer>
+  <button id="prev">← Previous</button>
+  <span class="muted" id="progress"></span>
+  <button id="next">Next →</button>
+</footer>
+
+<script src="/assets/read.js"></script>
+</body>
+</html>

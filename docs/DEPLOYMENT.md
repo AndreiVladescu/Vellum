@@ -150,6 +150,21 @@ A scanned PDF with no text layer records `no_text` and is simply not searchable.
 There is **no OCR** and there will not be — a tesseract dependency contradicts
 the single-binary story the rest of this server is built around.
 
+### Reading in the browser
+
+Always on, no configuration. `/read/<book id>` reads a book from the console (an
+EPUB as sanitised HTML, a PDF as rendered page images); `/r/<share token>` does
+the same for anyone with a public link, **read-only** — a public reader may read
+the book but not take the file.
+
+Page images are cached under `<data>/pages/`, so the directory grows with how
+much of your PDFs people actually read. It is pure cache: delete it whenever you
+like and pages re-render on demand.
+
+Reading a share link does **not** consume its `max_uses`. That counts downloads —
+a one-time link exists so a file can be handed over once, and spending it on a
+page turn would destroy the link the moment someone opened the book.
+
 ### Activity log (optional)
 
 Off unless switched on. When enabled, every mutation (book create/update/delete,

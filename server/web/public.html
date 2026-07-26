@@ -89,6 +89,11 @@
       if (authors) html += '<p class="authors">' + esc(authors) + '</p>';
       if (b.description) html += '<p class="desc">' + esc(b.description) + '</p>';
       if (b.download_available) {
+        // Reading comes first, and is offered even for a one-time link:
+        // reading never consumes a use (plan 5 #33), so "read it here" is the
+        // safe option and "download" is the one that spends the link.
+        html += '<a class="btn" href="/r/' + encodeURIComponent(token) +
+          '">Read it here</a> ';
         html += '<a class="btn" href="/api/public/' + encodeURIComponent(token) +
           '/file">Download</a>';
         if (b.one_time) html += '<p class="note">This is a one-time download — ' +
