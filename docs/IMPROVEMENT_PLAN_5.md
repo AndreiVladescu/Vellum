@@ -42,14 +42,28 @@ is answerable from `git log`:
 | 21b | Find and merge duplicate books | `25cad1e` |
 | 25 | Continue-reading and recently-added strip | `466ff63` |
 | 41 | First-run onboarding and better empty states | `f10820a` |
+| 22 | Bookmarks, highlights, and notes | `6072552` |
+| 23 | Reader typography, themes, search, scroll restore | `e3f919d` |
+| 18 | Reading status, ratings, and finish dates | `f100d9b` |
+| 19 | Reading sessions and an insights page | `beb1195` |
+| 17 | Series and volume tracking | `b7bc567` |
+| 50 | Derive a copy's location from its placement | `7f3d44d` |
+| 11 | Library health check with guided repairs | `695b326` |
 
-**Phases 1–3 are done.** Everything §I lists for the on-ramp has landed, plus #14
-from the interleave list. Not started: **Phase 4** (#22 annotations → #23 reader
-comfort → #18 status/rating → #19 insights → #17 series → #27 loans with due
-dates → #28 find a copy → #50 → #51 → #11 doctor → #13 backup hardening),
-**Phase 5** (server as a product), and **Phase 6** (§K, whose two prerequisites
-— #4's Option A and #6 — are both in place, so it is unblocked whenever it comes
-up). Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
+**Phases 1–3 are done, and 7 of Phase 4's 11 items.** Everything §I lists for the on-ramp has landed, plus #14
+from the interleave list. **Still open in Phase 4** — each needs a new dependency or is substantial in its
+own right, which is why they were left rather than rushed:
+
+| # | Item | What it needs |
+|---|---|---|
+| 27 | Loans: due dates, overdue badges, reminders | a server migration (loan syncs since #4), `flutter_local_notifications` |
+| 28 | Find a copy, tidy a shelf, print labels | pan/zoom-to-placement, a print path (`pdf` package or system print) |
+| 51 | Condition photos on copies | `image_picker`, one app-local table |
+| 13 | Backup manifest + verify, rotation, encryption | `cryptography` for the optional passphrase half |
+
+**Phase 5** (server as a product) and **Phase 6** (§K, whose two prerequisites —
+#4's Option A and #6 — are both in place, so it is unblocked whenever it comes
+up) are untouched. Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
 round two, #9 content-addressed blobs, #8 SSE, #29/#30, #38 l10n, #40 Android
 background, #52 trash, #53 send-to-e-reader. #21a (wishlist) and #21c (Calibre /
 CSV / OPDS import) are also still open — 21b was taken on its own because §I
@@ -73,6 +87,17 @@ Two notes for whoever picks this up:
   only native work is copying a `content://` stream before its permission
   expires. Its device-only checks are listed under "Manual device checks" in
   `docs/BACKLOG.md`.
+- **#17 is the only Phase-4 item that syncs**, and it needed two things the plan
+  didn't spell out: `shares.rs` was keeping a hand-copied duplicate of the book
+  select list (now `books::BOOK_COLUMNS`, `pub(crate)`), and applying a *pulled*
+  series must not bump `updatedAt` — `setSeries(markDirty: false)`. #44's model
+  tests caught the second one, which is exactly what they exist for.
+- **#22's EPUB locators are honest approximations**: offsets index the app's own
+  `EpubChapter.plainText`, so the locator is versioned and re-finding a highlight
+  is quote-first. PDF locators are objective (pdfrx's own extracted text).
+- **#23 left three things out deliberately** (paged EPUB mode, keep-awake,
+  volume-key turns) — each needs a platform plugin or a layout engine; they are
+  listed in `docs/BACKLOG.md` with the manual visual checks.
 - #21b's merge is the one destructive operation in the app. It moves everything
   in a single transaction, tombstones the loser so the merge propagates, and logs
   what moved; `test/dedupe/merge_service_test.dart` is the contract.
