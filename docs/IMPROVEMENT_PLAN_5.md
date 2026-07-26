@@ -37,13 +37,23 @@ is answerable from `git log`:
 | 44 | Model-based sync state machine tests | `0cc9f69` |
 | 14 | Atomic file import (interleaved) | `b1f9315` |
 | 15 | Bulk folder import with a dry-run plan | `f2ea4d8` |
+| 16 | Scan ISBN barcodes to add books | `36761ea` |
+| 20 | Open-with / share-target import | `b826164` |
+| 21b | Find and merge duplicate books | `25cad1e` |
+| 25 | Continue-reading and recently-added strip | `466ff63` |
+| 41 | First-run onboarding and better empty states | `f10820a` |
 
-**Phase 3 in progress.** #15 — the "if only one thing gets done" item — and its
-prerequisite #14 have landed. Still open in Phase 3: #16 (barcode/ISBN scanning)
-→ #20 (share-target import) → #21b (duplicate merge) → #25 (continue reading) →
-#41 (onboarding). Phases 4–6 are untouched; #4's Option A and #6 (the two
-prerequisites §I calls out for §K) are both in place, so Phase 6 is unblocked
-whenever it comes up.
+**Phases 1–3 are done.** Everything §I lists for the on-ramp has landed, plus #14
+from the interleave list. Not started: **Phase 4** (#22 annotations → #23 reader
+comfort → #18 status/rating → #19 insights → #17 series → #27 loans with due
+dates → #28 find a copy → #50 → #51 → #11 doctor → #13 backup hardening),
+**Phase 5** (server as a product), and **Phase 6** (§K, whose two prerequisites
+— #4's Option A and #6 — are both in place, so it is unblocked whenever it comes
+up). Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
+round two, #9 content-addressed blobs, #8 SSE, #29/#30, #38 l10n, #40 Android
+background, #52 trash, #53 send-to-e-reader. #21a (wishlist) and #21c (Calibre /
+CSV / OPDS import) are also still open — 21b was taken on its own because §I
+sequences it into Phase 3 while the other two aren't.
 
 Two notes for whoever picks this up:
 
@@ -55,7 +65,17 @@ Two notes for whoever picks this up:
   a single-book push deliberately skips both the handshake and the batch.
 - #15's duplicate detection needs the scan to hash every file, which is why the
   dry run is the slow step and the import that follows is only as slow as the
-  copying. #21b (duplicate merge) can reuse `import_plan.dart`'s classifier.
+  copying. #21b and #16 both reuse `import_plan.dart`'s classifier, as planned.
+- #16 added the `mobile_scanner` dependency; the camera is optional
+  (`uses-feature required="false"`) and a typed ISBN drives the same path, which
+  is also how desktop uses the feature.
+- #20 is a hand-written `MethodChannel` rather than a share-intent package: the
+  only native work is copying a `content://` stream before its permission
+  expires. Its device-only checks are listed under "Manual device checks" in
+  `docs/BACKLOG.md`.
+- #21b's merge is the one destructive operation in the app. It moves everything
+  in a single transaction, tombstones the loser so the merge propagates, and logs
+  what moved; `test/dedupe/merge_service_test.dart` is the contract.
 
 **Status of plan 4:** §A 1–3, §B 4–6, §C 7–10, §D 11–13, §E 16–17 and §F 18 all
 landed. Still open and **carried into this plan unchanged**:
