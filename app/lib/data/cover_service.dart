@@ -28,7 +28,23 @@ class CoverService {
   /// preference.
   Future<void> setCoverBytes(String bookId, Uint8List bytes) async {
     final rel = p.join('covers', '$bookId.jpg');
-    await File(p.join(_dataDir.path, rel)).writeAsBytes(bytes);
+    final dest = File(p.join(_dataDir.path, rel));
+    // Write via `.part` + rename (plan 5 #14), so an interrupted write can't
+    // replace a good cover with a truncated one — unlike a file, a cover has a
+    // fixed path per book, so a partial write overwrites what was already there.
+    // Stale `.part` files are swept at startup.
+    final part = File('${dest.path}.part');
+    try {
+      await part.writeAsBytes(bytes, flush: true);
+      await part.rename(dest.path);
+    } catch (_) {
+      try {
+        if (await part.exists()) await part.delete();
+      } catch (_) {
+        // Best-effort; the startup sweeper will get it.
+      }
+      rethrow;
+    }
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
       BooksCompanion(
         coverPath: Value(rel),

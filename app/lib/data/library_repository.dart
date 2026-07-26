@@ -95,24 +95,29 @@ class LibraryRepository {
     VellumDatabase db,
     Directory dir,
   ) async {
-    await Directory(p.join(dir.path, 'covers')).create(recursive: true);
+    final coversDir = Directory(p.join(dir.path, 'covers'));
+    await coversDir.create(recursive: true);
     final filesDir = Directory(p.join(dir.path, 'files'));
     await filesDir.create(recursive: true);
-    // Sweep leftover `*.part` files from downloads a previous run couldn't
-    // finish — any that survive are by definition incomplete, so deleting them
-    // just frees space and lets the next pull re-download cleanly.
-    try {
-      await for (final entry in filesDir.list()) {
-        if (entry is File && entry.path.endsWith('.part')) {
-          try {
-            await entry.delete();
-          } catch (_) {
-            // Best-effort; a locked/racing file is harmless to leave.
+    // Sweep leftover `*.part` files from a transfer or import a previous run
+    // couldn't finish — any that survive are by definition incomplete, so
+    // deleting them just frees space and lets the next pull/import redo the
+    // work cleanly. Both directories: downloads and local imports (plan 5 #14)
+    // use the same temp-then-rename shape.
+    for (final target in [filesDir, coversDir]) {
+      try {
+        await for (final entry in target.list()) {
+          if (entry is File && entry.path.endsWith('.part')) {
+            try {
+              await entry.delete();
+            } catch (_) {
+              // Best-effort; a locked/racing file is harmless to leave.
+            }
           }
         }
+      } catch (_) {
+        // Listing failed (e.g. dir vanished) — nothing to sweep.
       }
-    } catch (_) {
-      // Listing failed (e.g. dir vanished) — nothing to sweep.
     }
     final metadata = MetadataService();
     final covers = CoverService(db, dir);
