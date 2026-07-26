@@ -49,8 +49,11 @@ is answerable from `git log`:
 | 17 | Series and volume tracking | `b7bc567` |
 | 50 | Derive a copy's location from its placement | `7f3d44d` |
 | 11 | Library health check with guided repairs | `695b326` |
+| 36 | Docker, compose with TLS, systemd, releases | `1869fae` |
+| 37 | Request ids, tracing spans, stats dashboard | `ab00074` |
+| 12 | Integrity sweep, stats, snapshot endpoints | `9a4540f` |
 
-**Phases 1–3 are done, and 7 of Phase 4's 11 items.** Everything §I lists for the on-ramp has landed, plus #14
+**Phases 1–3 are done, 7 of Phase 4's 11 items, and 3 of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list. **Still open in Phase 4** — each needs a new dependency or is substantial in its
 own right, which is why they were left rather than rushed:
 
@@ -61,9 +64,14 @@ own right, which is why they were left rather than rushed:
 | 51 | Condition photos on copies | `image_picker`, one app-local table |
 | 13 | Backup manifest + verify, rotation, encryption | `cryptography` for the optional passphrase half |
 
-**Phase 5** (server as a product) and **Phase 6** (§K, whose two prerequisites —
-#4's Option A and #6 — are both in place, so it is unblocked whenever it comes
-up) are untouched. Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
+**Still open in Phase 5:** #31 (SMTP → password reset & invites — needs a mailer
+dependency and an SMTP config surface), #32 (server-side content search — an FTS5
+index over extracted PDF/EPUB text), #35 (console scale: saved views, activity
+log), #34 (OPDS search, facets, OPDS 2.0), #46 (RBAC matrix tests + `sqlx`
+offline/compile-time checks), #33 (read in the browser).
+
+**Phase 6** (§K, whose two prerequisites — #4's Option A and #6 — are both in
+place, so it is unblocked whenever it comes up) is untouched. Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
 round two, #9 content-addressed blobs, #8 SSE, #29/#30, #38 l10n, #40 Android
 background, #52 trash, #53 send-to-e-reader. #21a (wishlist) and #21c (Calibre /
 CSV / OPDS import) are also still open — 21b was taken on its own because §I
@@ -98,6 +106,14 @@ Two notes for whoever picks this up:
 - **#23 left three things out deliberately** (paged EPUB mode, keep-awake,
   volume-key turns) — each needs a platform plugin or a layout engine; they are
   listed in `docs/BACKLOG.md` with the manual visual checks.
+- **#37's span must be attached with `.instrument()`**, not `span.enter()`: a
+  guard is dropped at the first `.await`, so entering it loses the request id on
+  every handler that touches the database — i.e. exactly the slow ones. This was
+  observed against a live server before being fixed, and is the sort of thing that
+  looks fine in a unit test.
+- **#12's snapshot uses `VACUUM INTO`** and cleans its workspace from a `Drop`
+  guard tied to the response stream, so a client that disconnects halfway doesn't
+  leave a second copy of the library on disk.
 - #21b's merge is the one destructive operation in the app. It moves everything
   in a single transaction, tombstones the loser so the merge propagates, and logs
   what moved; `test/dedupe/merge_service_test.dart` is the contract.

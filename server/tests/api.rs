@@ -1168,8 +1168,12 @@ async fn an_in_flight_upload_temp_is_not_reported_as_an_orphan() {
     let master = register_master(&app).await;
     let files = data_dir.join("files");
     tokio::fs::create_dir_all(&files).await.unwrap();
-    tokio::fs::write(files.join(".tmp-abc"), b"half").await.unwrap();
-    tokio::fs::write(files.join("x.pdf.part"), b"half").await.unwrap();
+    tokio::fs::write(files.join(".tmp-abc"), b"half")
+        .await
+        .unwrap();
+    tokio::fs::write(files.join("x.pdf.part"), b"half")
+        .await
+        .unwrap();
 
     let (_, body) = call(&app, "POST", "/api/admin/sweep", Some(&master), None).await;
     assert_eq!(
@@ -1217,7 +1221,10 @@ async fn a_snapshot_restores_to_a_database_with_the_same_books() {
         .unpack(&restore)
         .expect("the snapshot must be a valid tar");
     let restored_db = restore.join("vellum.db");
-    assert!(restored_db.exists(), "the snapshot must contain the database");
+    assert!(
+        restored_db.exists(),
+        "the snapshot must contain the database"
+    );
 
     let pool = connect_db(restored_db.to_str().unwrap()).await.unwrap();
     let titles: Vec<String> = sqlx::query_scalar("SELECT title FROM book ORDER BY title")
