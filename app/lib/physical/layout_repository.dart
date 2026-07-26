@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/database.dart';
 import '../data/physical_service.dart';
+import 'locate.dart';
 
 /// A placement joined with the book it shows, for rendering an environment.
 typedef PlacedBook = ({BookPlacement placement, Book book});
@@ -204,6 +205,76 @@ class LayoutRepository {
     }
     final label = best?.label?.trim();
     return (label == null || label.isEmpty) ? null : label;
+  }
+
+  /// Every place a copy of [bookId] physically stands (plan 5 #28).
+  ///
+  /// Across *all* environments, because "which library is it in?" is the
+  /// question once you have more than one room — and a book with two copies in
+  /// two rooms is the case that makes picking the first row silently wrong.
+  /// Ordered by room, then by position along the shelf, so the list reads the
+  /// way the shelf does.
+  Future<List<BookSighting>> sightingsOf(String bookId) async {
+    final rows = await (db.select(db.bookPlacements).join([
+      innerJoin(
+        db.physicalCopies,
+        db.physicalCopies.id.equalsExp(db.bookPlacements.copyId),
+      ),
+      innerJoin(
+        db.physicalEnvironments,
+        db.physicalEnvironments.id.equalsExp(db.bookPlacements.environmentId),
+      ),
+    ])
+          ..where(db.physicalCopies.bookId.equals(bookId)))
+        .get();
+    if (rows.isEmpty) return const [];
+
+    // Shelves are fetched once per environment rather than per placement: a
+    // wall of books in one room would otherwise be one query each.
+    final shelvesByEnv = <String, List<PhysicalShelf>>{};
+    final sightings = <BookSighting>[];
+    for (final row in rows) {
+      final placement = row.readTable(db.bookPlacements);
+      final environment = row.readTable(db.physicalEnvironments);
+      final shelves = shelvesByEnv[environment.id] ??= await (db.select(
+        db.physicalShelves,
+      )..where((s) => s.environmentId.equals(environment.id)))
+          .get();
+      sightings.add(BookSighting(
+        placementId: placement.id,
+        copyId: placement.copyId,
+        environmentId: environment.id,
+        environmentName: environment.name,
+        x: placement.x,
+        y: placement.y,
+        shelfLabel: nearestShelfLabel(placement: placement, shelves: shelves),
+      ));
+    }
+    sightings.sort((a, b) {
+      final byRoom = a.environmentName.compareTo(b.environmentName);
+      if (byRoom != 0) return byRoom;
+      final byHeight = b.y.compareTo(a.y); // top shelf first, as you'd look
+      if (byHeight != 0) return byHeight;
+      return a.x.compareTo(b.x);
+    });
+    return sightings;
+  }
+
+  /// The environment a shelf belongs to, for opening a scanned shelf label.
+  /// Null when the shelf no longer exists (a label outlived its shelf).
+  Future<PhysicalEnvironment?> environmentOfShelf(String shelfId) async {
+    final rows = await (db.select(db.physicalShelves).join([
+      innerJoin(
+        db.physicalEnvironments,
+        db.physicalEnvironments.id.equalsExp(db.physicalShelves.environmentId),
+      ),
+    ])
+          ..where(db.physicalShelves.id.equals(shelfId))
+          ..limit(1))
+        .get();
+    return rows.isEmpty
+        ? null
+        : rows.first.readTable(db.physicalEnvironments);
   }
 
   /// Placements joined with their books, for rendering.

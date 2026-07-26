@@ -4,6 +4,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
 import 'environment_editor_page.dart';
+import 'shelf_scan_page.dart';
 
 /// The Physical tab body: lists physical environments ("libraries") and lets
 /// you rename / delete them. Creation is driven by the host page's FAB via
@@ -92,10 +93,28 @@ class PhysicalLibrariesTab extends StatelessWidget {
         }
         return ListView.separated(
           padding: const EdgeInsets.only(top: 8, bottom: 88),
-          itemCount: envs.length,
+          // One extra row at the top: scanning a printed shelf label
+          // (plan 5 #28) belongs where the rooms are listed, since what it does
+          // is open one of them.
+          itemCount: envs.length + 1,
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, i) {
-            final env = envs[i];
+            if (i == 0) {
+              return ListTile(
+                leading: const Icon(Icons.qr_code_scanner),
+                title: const Text('Scan a shelf label'),
+                subtitle: const Text('Opens the room that shelf is in'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ShelfScanPage(
+                      repository: repository,
+                      settings: settings,
+                    ),
+                  ),
+                ),
+              );
+            }
+            final env = envs[i - 1];
             return ListTile(
               leading: const Icon(Icons.grid_view_rounded),
               title: Text(env.name),

@@ -294,6 +294,30 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**Finding a book, tidying a shelf, printing labels** (app, plan 5 #28) turns the
+physical view from a map into a map with a "you are here". *Find my copy* on a
+book resolves book → copy → placement → environment, opens that room, points the
+camera at the book and pulses it once; with several copies placed it **asks
+which**, naming the room and shelf, because a title in two rooms is exactly when
+guessing is wrong. A search field in the room **dims** what doesn't match rather
+than hiding it — a room with holes stops being a picture of your shelves.
+
+*Tidy this shelf* re-packs the books resting on a shelf by author, title or
+series, flush from its left end. The ordering falls through to title and then
+placement id so a tidy is deterministic (a shelf that reshuffles itself on every
+press looks broken), missing values sort **last**, and books wider than the shelf
+overflow rather than being dropped — the existing gravity pass cleans up after.
+
+Labels print as **HTML, not PDF**: the browser's print dialog already knows about
+paper sizes, margins and previews, and a PDF generator would mean a layout engine
+of our own. Each label carries the room, the shelf, a book count, and a QR of
+`vellum://shelf/<id>`. That link is read by **Vellum's own scanner**, not an OS
+URL handler — registering a scheme means manifest work on four platforms and lets
+any web page poke it, while the app already has a camera page from #16 and you
+were going to open the app anyway. The link is printed as text too, so the
+desktop (no camera) can paste it. *Save a picture of this room* captures exactly
+the framing on screen, because framing is what the pan and zoom are for.
+
 **Condition photos** (app, plan 5 #51) settle the other half of a loan: what the
 book looked like when it left. An app-local `copy_photos` table stores a caption,
 a timestamp and a *path* — the bytes live under `photos/` in the data dir and ride

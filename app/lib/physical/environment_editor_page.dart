@@ -1,16 +1,25 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../book_detail/book_detail_page.dart';
 import '../data/database.dart';
+import '../data/external_open.dart';
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
 import 'book_picker.dart';
+import 'labels.dart';
+import 'locate.dart';
 import 'physical_metrics.dart';
 import 'placement_toolbar.dart';
 import 'room_painter.dart';
@@ -31,6 +40,7 @@ class EnvironmentEditorPage extends StatefulWidget {
     required this.settings,
     required this.environmentId,
     required this.environmentName,
+    this.focusPlacementId,
   });
 
   final LibraryRepository repository;
@@ -38,11 +48,16 @@ class EnvironmentEditorPage extends StatefulWidget {
   final String environmentId;
   final String environmentName;
 
+  /// A placement to pan to and pulse once the room is on screen — how *Find my
+  /// copy* (plan 5 #28) arrives here.
+  final String? focusPlacementId;
+
   @override
   State<EnvironmentEditorPage> createState() => _EnvironmentEditorPageState();
 }
 
-class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
+class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
+    with SingleTickerProviderStateMixin {
   // Camera: pixels-per-metre and the screen offset of world (0, 0). World Y is
   // up, so screen Y is flipped in the transforms below.
   double _scale = 300;
@@ -80,8 +95,45 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   final ValueNotifier<Offset> _dragPosVN = ValueNotifier(Offset.zero);
   final ValueNotifier<Offset> _shelfDeltaVN = ValueNotifier(Offset.zero);
 
+  // ---- find, search and snapshot (plan 5 #28) -----------------------------
+
+  /// The in-room filter. Non-matching books are *dimmed*, never hidden: a room
+  /// with holes in it stops being a picture of your shelves.
+  final _search = TextEditingController();
+  String _query = '';
+  bool _searchOpen = false;
+
+  /// Authors, for the filter — the field would be useless if typing a surname
+  /// matched nothing. Watched rather than fetched so a rename shows up.
+  Map<String, List<String>> _authorsByBook = const {};
+  StreamSubscription<Map<String, List<String>>>? _authorsSub;
+
+  /// The placement being pulsed after a *Find my copy*, and the animation that
+  /// draws the ring. One-shot: it runs three times and stops, because a marker
+  /// that pulses forever becomes part of the furniture.
+  String? _pulseId;
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+  bool _didFocus = false;
+
+  /// Wraps the canvas so it can be captured as a PNG.
+  final GlobalKey _canvasKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _authorsSub = repo.watchAuthorsByBook().listen((byBook) {
+      if (mounted) setState(() => _authorsByBook = byBook);
+    });
+  }
+
   @override
   void dispose() {
+    _authorsSub?.cancel();
+    _search.dispose();
+    _pulse.dispose();
     _dragPosVN.dispose();
     _shelfDeltaVN.dispose();
     super.dispose();
@@ -540,7 +592,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   void _openBook(PlacedBook pb) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => BookDetailPage(book: pb.book, repository: repo),
+        builder: (_) => BookDetailPage(
+          book: pb.book,
+          repository: repo,
+          settings: widget.settings,
+        ),
       ),
     );
   }
@@ -609,15 +665,20 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
       position: _menuPosition(global),
       items: const [
         PopupMenuItem(value: 'edit', child: Text('Edit shelf…')),
+        PopupMenuItem(value: 'tidy', child: Text('Tidy this shelf…')),
         PopupMenuItem(value: 'delete', child: Text('Delete shelf')),
       ],
     );
     if (choice == null || !mounted) return;
-    if (choice == 'delete') {
-      await repo.layout.deleteShelf(s.id);
-      await _applyGravity();
-    } else {
-      await _editShelf(s);
+    switch (choice) {
+      case 'delete':
+        await repo.layout.deleteShelf(s.id);
+        await _applyGravity();
+      case 'tidy':
+        final sort = await _askTidySort();
+        if (sort != null && mounted) await _tidyShelf(s, sort);
+      default:
+        await _editShelf(s);
     }
   }
 
@@ -660,14 +721,212 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     await _applyGravity();
   }
 
+  // ---- find, tidy, labels, snapshot (plan 5 #28) ---------------------------
+
+  /// Centres the camera on [placement] and pulses it.
+  ///
+  /// Zooms *in* to at least 500 px/m but never zooms out: arriving from "find
+  /// my copy" at a wall-sized view would technically show the book and tell you
+  /// nothing. The camera is placed so the book sits slightly above centre,
+  /// which is where the eye looks first.
+  void _focusOn(BookPlacement placement, {double? width, double? height}) {
+    final size = context.size ?? const Size(400, 600);
+    final scale = math.max(_scale, 500.0).clamp(_minScale, _maxScale);
+    final centreWorld = Offset(
+      placement.x + (width ?? 0.03) / 2,
+      placement.y + (height ?? PhysicalMetrics.defaultHeight) / 2,
+    );
+    setState(() {
+      _scale = scale;
+      _origin = Offset(
+        size.width / 2 - centreWorld.dx * scale,
+        size.height * 0.55 + centreWorld.dy * scale,
+      );
+      _pulseId = placement.id;
+    });
+    _pulse
+      ..reset()
+      ..repeat(reverse: true, count: 6);
+  }
+
+  /// Runs the pending *Find my copy* once the canvas has a size and the
+  /// placement has actually arrived from the stream.
+  void _maybeFocusInitial() {
+    if (_didFocus || widget.focusPlacementId == null || _origin == null) return;
+    for (final pb in _placed) {
+      if (pb.placement.id == widget.focusPlacementId) {
+        _didFocus = true;
+        final f = _footOf(pb);
+        // After this frame: we are inside a build, and focusing calls setState.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _focusOn(pb.placement, width: f.w, height: f.h);
+        });
+        return;
+      }
+    }
+  }
+
+  bool _matchesQuery(PlacedBook pb) => bookMatches(
+        pb.book,
+        _query,
+        authors: _authorsByBook[pb.book.id] ?? const [],
+      );
+
+  /// Re-packs the books resting on [s] in [sort] order, flush from its left end.
+  Future<void> _tidyShelf(PhysicalShelf s, TidySort sort) async {
+    final riders = _ridersOf(s);
+    if (riders.isEmpty) {
+      _say('Nothing is resting on that shelf.');
+      return;
+    }
+    // Series *names* live in their own table; the book row only holds the id.
+    final seriesById = {
+      for (final row in await repo.db.select(repo.db.series).get())
+        row.id: row.name,
+    };
+    if (!mounted) return;
+
+    final books = [
+      for (final pb in riders)
+        TidyBook(
+          placementId: pb.placement.id,
+          width: _footOf(pb).w,
+          title: pb.book.title,
+          author: (_authorsByBook[pb.book.id] ?? const []).firstOrNull,
+          seriesName: seriesById[pb.book.seriesId],
+          seriesIndex: pb.book.seriesIndex,
+        ),
+    ];
+    final moves = tidyPositions(
+      tidyOrder(books, sort),
+      shelfLeft: math.min(s.x1, s.x2),
+      shelfRight: math.max(s.x1, s.x2),
+      currentX: {for (final pb in riders) pb.placement.id: pb.placement.x},
+    );
+    if (moves.isEmpty) {
+      _say('That shelf is already tidy.');
+      return;
+    }
+    for (final move in moves) {
+      await repo.layout.updatePlacement(move.placementId, x: move.x);
+    }
+    // Books that were stacked on top of the ones just moved are now floating.
+    await _applyGravity();
+    if (mounted) _say('Tidied ${moves.length} of ${riders.length} books.');
+  }
+
+  Future<TidySort?> _askTidySort() => showDialog<TidySort>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Tidy this shelf'),
+          children: [
+            for (final sort in TidySort.values)
+              SimpleDialogOption(
+                onPressed: () => Navigator.of(dialogContext).pop(sort),
+                child: Text(sort.label),
+              ),
+          ],
+        ),
+      );
+
+  /// Generates the printable label sheet and hands it to the system.
+  Future<void> _printLabels() async {
+    if (_shelves.isEmpty) {
+      _say('This room has no shelves to label yet.');
+      return;
+    }
+    final labels = [
+      for (final s in _shelves)
+        ShelfLabel(
+          shelfId: s.id,
+          environmentName: widget.environmentName,
+          shelfName: s.label,
+          bookCount: _ridersOf(s).length,
+        ),
+    ]..sort((a, b) => a.displayName.compareTo(b.displayName));
+
+    final file = File(p.join(
+      (await getTemporaryDirectory()).path,
+      'vellum-labels-${DateTime.now().millisecondsSinceEpoch}.html',
+    ));
+    await file.writeAsString(buildLabelSheetHtml(
+      labels: labels,
+      title: '${widget.environmentName} — shelf labels',
+    ));
+    final opened = await openExternally(file, mimeType: 'text/html');
+    if (!mounted) return;
+    _say(opened
+        ? 'Labels opened — print them with Ctrl+P.'
+        : 'Saved the labels to ${file.path}');
+  }
+
+  /// Saves the room as a PNG.
+  ///
+  /// Captures exactly what is on screen, deliberately: framing the picture is
+  /// what the pan and zoom you already have are for, and re-deriving a "whole
+  /// room" bounding box would produce a different image from the one you set up.
+  Future<void> _saveSnapshot() async {
+    final boundary =
+        _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) {
+      _say('Nothing to capture yet.');
+      return;
+    }
+    // 2× so the picture survives being looked at on a phone or printed small.
+    final image = await boundary.toImage(pixelRatio: 2);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (bytes == null) {
+      if (mounted) _say("Couldn't render the picture.");
+      return;
+    }
+    final safeName = widget.environmentName
+        .replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-')
+        .toLowerCase();
+    final file = File(p.join(
+      (await getTemporaryDirectory()).path,
+      'vellum-$safeName-${DateTime.now().millisecondsSinceEpoch}.png',
+    ));
+    await file.writeAsBytes(bytes.buffer.asUint8List());
+    final opened = await openExternally(file, mimeType: 'image/png');
+    if (!mounted) return;
+    _say(opened ? 'Picture saved and opened.' : 'Saved to ${file.path}');
+  }
+
+  void _say(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   // ---- build --------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.environmentName),
+        title: _searchOpen
+            ? TextField(
+                controller: _search,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Find a book in this room',
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) => setState(() => _query = value),
+              )
+            : Text(widget.environmentName),
         actions: [
+          IconButton(
+            tooltip: _searchOpen ? 'Close search' : 'Search this room',
+            onPressed: () => setState(() {
+              _searchOpen = !_searchOpen;
+              if (!_searchOpen) {
+                _search.clear();
+                _query = '';
+              }
+            }),
+            icon: Icon(_searchOpen ? Icons.close : Icons.search),
+          ),
           IconButton(
             tooltip: 'Add shelf',
             onPressed: _addShelf,
@@ -683,10 +942,29 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
             onPressed: () => _zoomAt(_viewCentre(), 0.8),
             icon: const Icon(Icons.zoom_out),
           ),
-          IconButton(
-            tooltip: 'Help',
-            onPressed: _showHelp,
-            icon: const Icon(Icons.help_outline),
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            onSelected: (choice) async {
+              switch (choice) {
+                case 'labels':
+                  await _printLabels();
+                case 'snapshot':
+                  await _saveSnapshot();
+                case 'help':
+                  _showHelp();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'labels',
+                child: Text('Print shelf labels…'),
+              ),
+              PopupMenuItem(
+                value: 'snapshot',
+                child: Text('Save a picture of this room'),
+              ),
+              PopupMenuItem(value: 'help', child: Text('Help')),
+            ],
           ),
         ],
       ),
@@ -705,7 +983,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
                 return LayoutBuilder(
                   builder: (context, constraints) {
                     _origin ??= Offset(40, constraints.maxHeight - 90);
-                    return _buildCanvas(constraints);
+                    _maybeFocusInitial();
+                    // The boundary is what `_saveSnapshot` captures, so it wraps
+                    // the room and nothing else — no app bar, no snackbar.
+                    return RepaintBoundary(
+                      key: _canvasKey,
+                      child: _buildCanvas(constraints),
+                    );
                   },
                 );
               },
@@ -740,7 +1024,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
           'on top of another book.\n'
           '• Tap a book to select it (rotate / resize / remove).\n'
           '• Right-click or long-press a book or shelf to edit it.\n'
-          '• Drag a shelf to move it — the books on it ride along.',
+          '• Drag a shelf to move it — the books on it ride along.\n'
+          '• Right-click a shelf to tidy it by author, title or series.\n'
+          '• The search icon dims everything that doesn’t match.\n'
+          '• “Print shelf labels” makes a sheet you can cut up and stick on; '
+          'scanning one opens this room.',
         ),
         actions: [
           FilledButton(
@@ -961,6 +1249,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
   Widget _bookVisual(PlacedBook pb, {required bool dragging}) {
     final selected = _selectedId == pb.placement.id;
     final flat = pb.placement.rotation == 90;
+    // Dimmed, not hidden, when a search is running and this book doesn't match:
+    // the room stays a room, and the matches stand out because everything else
+    // recedes.
+    final dimmed = _query.trim().isNotEmpty && !_matchesQuery(pb);
     Widget spine = SpineFace(
       book: pb.book,
       coverFile: repo.coverFileOf(pb.book),
@@ -969,11 +1261,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
     if (flat) spine = RotatedBox(quarterTurns: 3, child: spine);
     return IgnorePointer(
       child: Opacity(
-        opacity: dragging ? 0.85 : 1,
+        opacity: dimmed ? 0.22 : (dragging ? 0.85 : 1),
         child: Stack(
           fit: StackFit.expand,
           children: [
             spine,
+            if (_pulseId == pb.placement.id) _pulseRing(),
             if (selected)
               DecoratedBox(
                 decoration: BoxDecoration(
@@ -984,6 +1277,27 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage> {
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The "here it is" marker: a ring that breathes a few times and stops.
+  Widget _pulseRing() {
+    final colour = Theme.of(context).colorScheme.tertiary;
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) => DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: colour, width: 2 + _pulse.value * 3),
+          borderRadius: BorderRadius.circular(3),
+          boxShadow: [
+            BoxShadow(
+              color: colour.withValues(alpha: 0.55 * (1 - _pulse.value)),
+              blurRadius: 14 * _pulse.value + 4,
+              spreadRadius: 3 * _pulse.value,
+            ),
           ],
         ),
       ),

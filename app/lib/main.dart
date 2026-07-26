@@ -397,6 +397,7 @@ class _LibraryPageState extends State<LibraryPage> {
       builder: (_) => BookDetailPage(
         book: book,
         repository: repository,
+        settings: widget.settings,
         onGenreTap: _applyGenreFilter,
       ),
     ));
@@ -773,6 +774,7 @@ class _LibraryPageState extends State<LibraryPage> {
       detailBuilder: (book) => BookDetailPage(
         book: book,
         repository: repository,
+        settings: widget.settings,
         onGenreTap: _applyGenreFilter,
       ),
     );

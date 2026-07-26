@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../data/book_file_validation.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../physical/find_copy.dart';
+import '../settings/app_settings.dart';
 import 'cover_thumb.dart';
 import 'edit_book_sheet.dart';
 import 'formats_section.dart';
@@ -22,12 +24,17 @@ class BookDetailPage extends StatelessWidget {
     super.key,
     required this.book,
     required this.repository,
+    this.settings,
     this.onGenreTap,
   });
 
   /// Snapshot used before the first stream event arrives.
   final Book book;
   final LibraryRepository repository;
+
+  /// Needed only to open the room editor for *Find my copy* (plan 5 #28); the
+  /// action is hidden when a caller has no settings store to hand.
+  final AppSettingsStore? settings;
 
   /// Tapping a genre chip closes this page and filters the shelf by that genre.
   final void Function(String genre)? onGenreTap;
@@ -47,6 +54,7 @@ class BookDetailPage extends StatelessWidget {
         return _BookDetailBody(
           book: current,
           repository: repository,
+          settings: settings,
           onGenreTap: onGenreTap,
         );
       },
@@ -58,11 +66,13 @@ class _BookDetailBody extends StatefulWidget {
   const _BookDetailBody({
     required this.book,
     required this.repository,
+    this.settings,
     this.onGenreTap,
   });
 
   final Book book;
   final LibraryRepository repository;
+  final AppSettingsStore? settings;
   final void Function(String genre)? onGenreTap;
 
   @override
@@ -289,6 +299,17 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       appBar: AppBar(
         title: Text(book.title),
         actions: [
+          if (widget.settings != null)
+            IconButton(
+              icon: const Icon(Icons.travel_explore_outlined),
+              tooltip: 'Find my copy',
+              onPressed: () => findMyCopy(
+                context,
+                repository,
+                widget.settings!,
+                book,
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.handshake_outlined),
             tooltip: 'Lend or return',
