@@ -53,8 +53,9 @@ is answerable from `git log`:
 | 37 | Request ids, tracing spans, stats dashboard | `ab00074` |
 | 12 | Integrity sweep, stats, snapshot endpoints | `9a4540f` |
 | 46 | RBAC matrix + compile-checked queries | `74d3864`, `b903cb5` |
+| 31 | Opt-in SMTP mailer; password reset (stages 1–2 of 3) | `d031ffd`, `eda0843` |
 
-**Phases 1–3 are done, 7 of Phase 4's 11 items, and 4 of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
+**Phases 1–3 are done, 7 of Phase 4's 11 items, and 4½ of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list. **Still open in Phase 4** — each needs a new dependency or is substantial in its
 own right, which is why they were left rather than rushed:
 
@@ -65,10 +66,14 @@ own right, which is why they were left rather than rushed:
 | 51 | Condition photos on copies | `image_picker`, one app-local table |
 | 13 | Backup manifest + verify, rotation, encryption | `cryptography` for the optional passphrase half |
 
-**Still open in Phase 5:** #31 (SMTP → password reset & invites — needs a mailer
-dependency and an SMTP config surface), #32 (server-side content search — an FTS5
-index over extracted PDF/EPUB text), #35 (console scale: saved views, activity
-log), #34 (OPDS search, facets, OPDS 2.0), #33 (read in the browser).
+**Still open in Phase 5:** #31 **stage 3 only** (emailed member invites — the
+mailer and the token pattern it reuses are both in place, so this is the smallest
+remaining piece of Phase 5), #32 (server-side content search — an FTS5 index over
+extracted PDF/EPUB text), #35 (console scale: saved views, activity log), #34
+(OPDS search, facets, OPDS 2.0), #33 (read in the browser).
+
+The app side of #31 is also open: the server advertises `mail`, but nothing in the
+app reads it yet to show a "Forgot password?" link.
 
 **#46 is done but its second half is deliberately partial.** `access.rs` is the
 compile-checked pilot; the rest is mechanical and can proceed module by module
@@ -123,6 +128,10 @@ Two notes for whoever picks this up:
   oracle over the whole library, and `PUT` told them they had "read-only access"
   they didn't have. Fixed in `books.rs` and recorded as L7 in
   `docs/SECURITY_AUDIT.md`. This is the argument for the matrix in one sentence.
+- **#31 introduced and then fixed a log leak** (L8 in `docs/SECURITY_AUDIT.md`):
+  #37's request logger wrote full paths, and a reset link *is* a credential, so
+  `/reset/<token>` was landing in the log. Secret-bearing paths are now redacted.
+  Worth remembering when adding any future route whose path contains a token.
 - **#12's snapshot uses `VACUUM INTO`** and cleans its workspace from a `Drop`
   guard tied to the response stream, so a client that disconnects halfway doesn't
   leave a second copy of the library on disk.
