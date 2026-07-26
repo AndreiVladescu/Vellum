@@ -51,6 +51,7 @@ Book _book(String id, String title) => Book(
       createdAt: DateTime(2024),
       updatedAt: DateTime(2024),
       needsPush: false,
+      needsProgressPush: false,
     );
 
 /// Seeds a clean (already-pushed) book so the launch auto-push schedules no
@@ -204,6 +205,7 @@ void main() {
   testWidgets('server page offers Sync now when connected', (tester) async {
     late LibraryRepository repo;
     late ServerConnection connection;
+    late AppSettingsStore settings;
     await tester.runAsync(() async {
       repo = await _repo(dir);
       SharedPreferences.setMockInitialValues({
@@ -212,6 +214,7 @@ void main() {
         'server.email': 'reader@example.com',
       });
       connection = await ServerConnection.load();
+      settings = await AppSettingsStore.load();
     });
     expect(connection.isConnected, true);
 
@@ -220,6 +223,7 @@ void main() {
         connection: connection,
         repository: repo,
         sync: SyncService(repo),
+        settings: settings,
       ),
     ));
     await _settle(tester);

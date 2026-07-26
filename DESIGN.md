@@ -194,6 +194,30 @@ migration, `0002`, added the three reading-state columns to the *server* table
 by mistake; migration `0006` drops them again, since reading state must stay on
 the device. Reader notes and `source_metadata` were never on the server.)
 
+**Optional cross-device reading position.** The rule above stands — the `book`
+row still carries no reading state either way — but a reader who owns the same
+book on phone and desktop wants "resume where I left off" to follow them, so
+there is now a *separate* channel for exactly that (plan 5 #5). Its shape is
+what keeps it from re-opening the settled question:
+
+- Its own server table, `reading_progress` (migration `0011`), keyed
+  `(book_id, user_id, device_id)`. Per-device rows mean **no conflict
+  resolution at all**: a device only ever writes its own row and reads the
+  others, so LWW never enters the picture. `user_id` comes from the token, so
+  one user's reading is invisible to everyone else on a shared library.
+- **Opt-in, default off** (Preferences → *Sync reading position*), because it
+  publishes reading behaviour rather than catalogue data. Switching it on
+  queues the positions already on the device; switching it off deletes this
+  device's rows from the server and clears the local cache.
+- The app **offers**, never adopts: opening a book whose other device is
+  further ahead asks "you were on page 214 on desktop — go there?". A silent
+  merge would be worse than the prompt. The offer only appears when the units
+  match (PDF pages vs EPUB chapters), since converting between them would land
+  the reader somewhere plausible and wrong.
+- Other devices' rows are cached in the app-local `remote_reading_positions`
+  table so the prompt works offline. `readerNotes` and `sourceMetadata` get no
+  channel, opt-in or otherwise.
+
 The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
 pins the column list of every synced table (`book`, `author`, `book_author`,
 `genre`, `book_genre`, `book_file`, `shelf`, `shelf_book`, `physical_copy`,

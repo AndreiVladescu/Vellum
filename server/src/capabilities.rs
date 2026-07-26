@@ -23,8 +23,6 @@ pub struct Capabilities {
 /// Built from routes that actually exist in `lib.rs`, not from the plan's
 /// example list — a capability handshake that claims a feature no route
 /// backs is worse than not having one. Notably absent, and why:
-/// - `reading_progress`: never sent to the server by design (reading state
-///   is app-local-only; see migration 0006 and CLAUDE.md).
 /// - `content_search`: the FTS5 search index (plan 5 #2) is app-local only,
 ///   no server-side equivalent exists.
 /// - `mail`: SMTP/password-reset is planned (docs/BACKLOG.md) but not built.
@@ -35,6 +33,12 @@ pub struct Capabilities {
 /// copies, and loan history all sync (`shelves.rs`, `physical_copies.rs`,
 /// `loans.rs`), and `POST /books:batch` (`books::batch_upsert`) lets a large
 /// first push skip one round trip per book.
+///
+/// `reading_progress` (plan 5 #5) is the subtle one: it advertises the
+/// *separate, opt-in, per-device* channel in `reading.rs`, and emphatically
+/// **not** reading state on the book row — that stays app-local-only, off the
+/// LWW clock, and absent from `book`'s columns and payload (migration 0006,
+/// CLAUDE.md, and the `book_upsert_ignores_reading_state` test that pins it).
 const FEATURES: &[&str] = &[
     "delta_pull",
     "deletions",
@@ -46,6 +50,7 @@ const FEATURES: &[&str] = &[
     "copy_sync",
     "loan_sync",
     "batch_push",
+    "reading_progress",
 ];
 
 pub async fn get() -> Json<Capabilities> {

@@ -25,6 +25,7 @@ mod loans;
 mod metadata;
 mod opds;
 mod physical_copies;
+mod reading;
 mod shares;
 mod shelves;
 mod throttle;
@@ -168,6 +169,14 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Loan history (plan 5 #4, last of the trio) — same shape again.
         .route("/loans", get(loans::list))
         .route("/loans/{id}", put(loans::upsert).delete(loans::delete))
+        // Optional cross-device reading position (plan 5 #5). Per-(book, user,
+        // device) rows, so there is nothing to merge; DELETE un-publishes one
+        // device's rows when the user turns the setting back off.
+        .route(
+            "/reading-progress",
+            get(reading::list).delete(reading::forget_device),
+        )
+        .route("/reading-progress/{book_id}", put(reading::upsert))
         // User-to-user shares.
         .route("/shares", get(shares::list).post(shares::create))
         .route("/shares/{id}", delete(shares::delete))

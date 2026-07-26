@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
+import '../settings/app_settings.dart';
 import 'cert_trust.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
@@ -18,10 +19,16 @@ class ServerPage extends StatefulWidget {
     required this.connection,
     required this.repository,
     required this.sync,
+    required this.settings,
   });
 
   final ServerConnection connection;
   final LibraryRepository repository;
+
+  /// Read for the "Sync reading position" opt-in and this device's identity
+  /// (plan 5 #5) — the manual Sync action honours the same preference the
+  /// launch sync does.
+  final AppSettingsStore settings;
 
   /// The app-wide sync service (shared with the launch auto-sync, so its
   /// re-entrancy guard spans both).
@@ -209,6 +216,21 @@ class _ServerPageState extends State<ServerPage> {
           onCursor: widget.connection.setSyncCursor,
           onProgress: _onProgress,
         );
+        // Its own pass, after the guard is free, and only when opted in.
+        // Failures here don't spoil an otherwise successful sync report.
+        if (widget.settings.syncReadingPosition) {
+          try {
+            await _sync.syncReadingProgress(
+              client,
+              deviceId: widget.settings.deviceId,
+              deviceLabel: widget.settings.deviceLabel,
+              cursor: widget.connection.readingCursor,
+              onCursor: widget.connection.setReadingCursor,
+            );
+          } catch (_) {
+            // Offline, or a server without the endpoint.
+          }
+        }
         if (!mounted) return;
         final n = report.issues.length;
         final changed = report.pulled + report.pushed;

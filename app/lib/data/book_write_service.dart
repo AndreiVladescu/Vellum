@@ -290,6 +290,10 @@ class BookWriteService {
         readingProgress: Value(pageCount == 0 ? 0 : page / pageCount),
         lastReadPage: Value(page),
         lastReadAt: Value(DateTime.now()),
+        // Queue the new position for the optional cross-device channel (plan 5
+        // #5). App-local like the columns above until the user opts in — the
+        // flag only decides *what* would be published, never that it is.
+        needsProgressPush: const Value(true),
       ),
     );
   }
@@ -314,6 +318,10 @@ class BookWriteService {
         readingProgress: Value(progress),
         lastReadPage: Value(chapterIndex + 1),
         lastReadAt: Value(DateTime.now()),
+        // Queue the new position for the optional cross-device channel (plan 5
+        // #5). App-local like the columns above until the user opts in — the
+        // flag only decides *what* would be published, never that it is.
+        needsProgressPush: const Value(true),
       ),
     );
   }

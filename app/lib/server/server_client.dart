@@ -692,6 +692,67 @@ class VellumServerClient {
     _body(res);
   }
 
+  // ---- reading position (plan 5 #5) ----------------------------------------
+
+  /// This account's reading positions across all its devices, as the delta-pull
+  /// envelope `{ server_now, entries }` — same cursor convention as
+  /// [listShelves]. The server only ever returns the caller's own rows.
+  Future<({String? serverNow, List<ServerReadingPosition> entries})>
+      listReadingPositions({String? cursor}) async {
+    final uri = _uri(
+      '/api/reading-progress',
+    ).replace(queryParameters: {'cursor': cursor ?? ''});
+    final res = await _http.get(uri, headers: _headers);
+    final map = _body(res) as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      entries: [
+        for (final e in map['entries'] as List)
+          ServerReadingPosition.fromJson(e as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  /// Publish this device's position in [bookId]. Not an LWW push: the row is
+  /// keyed by device, so this only ever overwrites what *this* device last
+  /// said. [unit] must be `'page'` or `'chapter'` — what [page] counts.
+  Future<void> pushReadingPosition(
+    String bookId, {
+    required String deviceId,
+    String? deviceLabel,
+    double? progress,
+    int? page,
+    String? unit,
+    double? scroll,
+    DateTime? updatedAt,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/reading-progress/$bookId'),
+      headers: _headers,
+      body: jsonEncode({
+        'device_id': deviceId,
+        'device_label': deviceLabel,
+        'progress': progress,
+        'page': page,
+        'unit': unit,
+        'scroll': scroll,
+        'updated_at': ?formatServerTime(updatedAt),
+      }),
+    );
+    _body(res);
+  }
+
+  /// Un-publish every position this device ever sent, for this account only.
+  /// What the "Sync reading position" switch calls on its way off, so turning
+  /// the feature off removes what turning it on published.
+  Future<void> forgetReadingPositions(String deviceId) async {
+    final uri = _uri(
+      '/api/reading-progress',
+    ).replace(queryParameters: {'device_id': deviceId});
+    final res = await _http.delete(uri, headers: _headers);
+    _body(res);
+  }
+
   // ---- groups -------------------------------------------------------------
 
   Future<List<ServerGroup>> listGroups() async {
@@ -822,6 +883,46 @@ class ServerShelf {
     bookIds: [for (final id in (j['book_ids'] as List? ?? const [])) id as String],
     updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
   );
+}
+
+/// One device's reading position in one book (plan 5 #5). Always this
+/// account's own — the server never returns another user's row, so there is no
+/// user field to carry.
+class ServerReadingPosition {
+  ServerReadingPosition({
+    required this.bookId,
+    required this.deviceId,
+    this.deviceLabel,
+    this.progress,
+    this.page,
+    this.unit,
+    this.scroll,
+    this.updatedAt,
+  });
+
+  final String bookId;
+  final String deviceId;
+  final String? deviceLabel;
+  final double? progress;
+  final int? page;
+
+  /// What [page] counts: `'page'` (PDF) or `'chapter'` (EPUB). Travels with the
+  /// row because another device may have read a different format.
+  final String? unit;
+  final double? scroll;
+  final DateTime? updatedAt;
+
+  factory ServerReadingPosition.fromJson(Map<String, dynamic> j) =>
+      ServerReadingPosition(
+        bookId: j['book_id'] as String,
+        deviceId: j['device_id'] as String,
+        deviceLabel: j['device_label'] as String?,
+        progress: (j['progress'] as num?)?.toDouble(),
+        page: (j['page'] as num?)?.toInt(),
+        unit: j['unit'] as String?,
+        scroll: (j['scroll'] as num?)?.toDouble(),
+        updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
+      );
 }
 
 /// A physical copy from the server (plan 5 #4). No owner of its own — access

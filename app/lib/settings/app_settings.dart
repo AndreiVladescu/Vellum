@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import 'book_face.dart';
 import 'shelf_sort.dart';
@@ -17,6 +20,9 @@ class AppSettingsStore extends ChangeNotifier {
   static const _shelfSortKey = 'settings.shelfSort';
   static const _autoPushKey = 'settings.autoPush';
   static const _importGenresKey = 'settings.importOpenLibraryGenres';
+  static const _syncReadingPositionKey = 'settings.syncReadingPosition';
+  static const _deviceIdKey = 'settings.deviceId';
+  static const _deviceLabelKey = 'settings.deviceLabel';
 
   final SharedPreferences _prefs;
 
@@ -106,6 +112,64 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setImportOpenLibraryGenres(bool value) async {
     await _prefs.setBool(_importGenresKey, value);
+    notifyListeners();
+  }
+
+  /// Whether this device publishes its reading position to the server so other
+  /// devices can offer to resume there (plan 5 #5).
+  ///
+  /// **Off by default, and stays a real opt-in.** Everything else the app syncs
+  /// is catalogue data; where you are in a book is behaviour, and publishing it
+  /// changes what the server knows about you. Nothing is written to the server
+  /// until this is on, and turning it off un-publishes what it published (see
+  /// `PreferencesPage`).
+  bool get syncReadingPosition =>
+      _prefs.getBool(_syncReadingPositionKey) ?? false;
+
+  Future<void> setSyncReadingPosition(bool value) async {
+    await _prefs.setBool(_syncReadingPositionKey, value);
+    notifyListeners();
+  }
+
+  /// Stable, opaque id for this install — the key the reading-position channel
+  /// files this device's rows under. Generated once and kept in preferences; a
+  /// reinstall becoming a "new device" is fine and better than fingerprinting
+  /// the hardware.
+  String get deviceId {
+    final existing = _prefs.getString(_deviceIdKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final generated = const Uuid().v4();
+    // Fire-and-forget: the in-memory value is returned now and the write lands
+    // shortly. A crash before it does just mints another id next launch.
+    _prefs.setString(_deviceIdKey, generated);
+    return generated;
+  }
+
+  /// Human name for this device, used in "you were on page 214 on **desktop**".
+  /// The hostname is the most recognisable thing available without a plugin;
+  /// falls back to the platform name if it's unhelpfully empty.
+  String get deviceLabel {
+    final stored = _prefs.getString(_deviceLabelKey);
+    if (stored != null && stored.trim().isNotEmpty) return stored.trim();
+    String label;
+    try {
+      label = Platform.localHostname;
+    } catch (_) {
+      label = '';
+    }
+    if (label.trim().isEmpty) label = Platform.operatingSystem;
+    return label;
+  }
+
+  /// Override the device label (a user who has two machines both called
+  /// "localhost" needs this to mean anything).
+  Future<void> setDeviceLabel(String? value) async {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      await _prefs.remove(_deviceLabelKey);
+    } else {
+      await _prefs.setString(_deviceLabelKey, trimmed);
+    }
     notifyListeners();
   }
 }

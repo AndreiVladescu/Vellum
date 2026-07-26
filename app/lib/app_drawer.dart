@@ -33,6 +33,7 @@ class AppDrawer extends StatelessWidget {
         connection: connection,
         repository: repository,
         sync: sync,
+        settings: settings,
       ),
     ));
   }

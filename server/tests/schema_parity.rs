@@ -8,6 +8,12 @@
 //! the physical-layout tables, local_deletions) are intentionally NOT part of
 //! the server schema, so they don't appear here. `book.owner_id` is the mirror
 //! image: a server-only column, present here but not in the app.
+//!
+//! `reading_progress` (migration 0011, plan 5 #5) is excluded on purpose, not by
+//! oversight: it is a per-(book, user, device) channel with no column-for-column
+//! app counterpart — the app mirrors *other* devices' rows into its own
+//! `remote_reading_positions` table and keeps its own position on the book row.
+//! Both sides are free to carry columns the other doesn't.
 
 use sqlx::Row;
 use vellum_server::connect_db;

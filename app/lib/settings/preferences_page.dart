@@ -116,6 +116,11 @@ class PreferencesPage extends StatelessWidget {
               value: settings.autoPush,
               onChanged: settings.setAutoPush,
             ),
+            _ReadingPositionSwitch(
+              settings: settings,
+              repository: repository,
+              connection: connection,
+            ),
             const Divider(height: 24),
             _SectionHeader('Backup'),
             _BackupSection(
@@ -126,6 +131,85 @@ class PreferencesPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The opt-in for publishing this device's reading position (plan 5 #5).
+///
+/// A switch with side effects in both directions, which is why it isn't a plain
+/// [SwitchListTile] on the settings object:
+/// - **On** marks every already-read book for publishing, so the first sync
+///   after opting in carries the positions you already have rather than only
+///   books you open from now on.
+/// - **Off** deletes this device's rows on the server (best-effort — offline
+///   must not block the toggle) and clears the local cache, so the opt-in is
+///   reversible rather than a one-way door.
+class _ReadingPositionSwitch extends StatefulWidget {
+  const _ReadingPositionSwitch({
+    required this.settings,
+    required this.repository,
+    required this.connection,
+  });
+
+  final AppSettingsStore settings;
+  final LibraryRepository repository;
+  final ServerConnection connection;
+
+  @override
+  State<_ReadingPositionSwitch> createState() => _ReadingPositionSwitchState();
+}
+
+class _ReadingPositionSwitchState extends State<_ReadingPositionSwitch> {
+  bool _busy = false;
+
+  Future<void> _toggle(bool value) async {
+    setState(() => _busy = true);
+    final positions = widget.repository.readingPositions;
+    var serverUnreachable = false;
+    try {
+      if (value) {
+        await positions.markReadBooksForProgressPush();
+      } else {
+        final client = widget.connection.client;
+        if (client != null) {
+          try {
+            await client.forgetReadingPositions(widget.settings.deviceId);
+          } catch (_) {
+            // Offline, or the server predates the endpoint. The switch still
+            // goes off locally; the rows stay until a later opt-out succeeds.
+            serverUnreachable = true;
+          }
+        }
+        await positions.forgetLocally();
+      }
+      await widget.settings.setSyncReadingPosition(value);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted || !serverUnreachable) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Turned off here, but the server couldn't be reached to remove "
+          'the positions it already has. Turn it off again while connected.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.auto_stories_outlined),
+      title: const Text('Sync reading position'),
+      subtitle: Text(
+        'Let your other devices offer to resume where you left off. Off by '
+        'default: unlike your catalogue, this tells the server what you read '
+        'and how far. This device appears as “${widget.settings.deviceLabel}”.',
+      ),
+      value: widget.settings.syncReadingPosition,
+      onChanged: _busy ? null : _toggle,
     );
   }
 }

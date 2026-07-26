@@ -12,6 +12,7 @@ import 'file_service.dart';
 import 'library_queries.dart';
 import 'metadata.dart';
 import 'physical_service.dart';
+import 'reading_position_service.dart';
 import 'shelf_service.dart';
 
 // Physical-layout CRUD lives in LayoutRepository (reached via `.layout`);
@@ -21,6 +22,8 @@ import 'shelf_service.dart';
 export '../physical/layout_repository.dart' show LayoutRepository, PlacedBook;
 export 'book_write_service.dart' show BookDetails;
 export 'physical_service.dart' show LoanEntry;
+export 'reading_position_service.dart'
+    show ReadingJumpOffer, ReadingPositionService, readingUnitForFormats;
 
 /// All library operations the UI needs. A thin facade over the local
 /// database and filesystem store: each concern (queries, book lifecycle,
@@ -39,6 +42,7 @@ class LibraryRepository {
     required this.physical,
     required this.files,
     required this.writes,
+    required this.readingPositions,
   });
 
   final VellumDatabase db;
@@ -68,6 +72,11 @@ class LibraryRepository {
   /// Book lifecycle: create/update/delete, authors, genres, reading position,
   /// revert-to-default, online-search import. Reached as `repository.writes`.
   final BookWriteService writes;
+
+  /// The optional cross-device reading position (plan 5 #5): other devices'
+  /// cached positions, the publish-dirty flag, and the jump offer. Reached as
+  /// `repository.readingPositions`.
+  final ReadingPositionService readingPositions;
 
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
@@ -119,6 +128,7 @@ class LibraryRepository {
       physical: physical,
       files: FileService(db, dir, covers),
       writes: BookWriteService(db, dir, metadata, covers),
+      readingPositions: ReadingPositionService(db),
     );
   }
 

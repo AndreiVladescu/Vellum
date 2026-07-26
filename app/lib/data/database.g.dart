@@ -217,6 +217,21 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _needsProgressPushMeta = const VerificationMeta(
+    'needsProgressPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsProgressPush = GeneratedColumn<bool>(
+    'needs_progress_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_progress_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -238,6 +253,7 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     updatedAt,
     needsPush,
     coverEtag,
+    needsProgressPush,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -387,6 +403,15 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         coverEtag.isAcceptableOrUnknown(data['cover_etag']!, _coverEtagMeta),
       );
     }
+    if (data.containsKey('needs_progress_push')) {
+      context.handle(
+        _needsProgressPushMeta,
+        needsProgressPush.isAcceptableOrUnknown(
+          data['needs_progress_push']!,
+          _needsProgressPushMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -472,6 +497,10 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.string,
         data['${effectivePrefix}cover_etag'],
       ),
+      needsProgressPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_progress_push'],
+      )!,
     );
   }
 
@@ -501,6 +530,7 @@ class Book extends DataClass implements Insertable<Book> {
   final DateTime updatedAt;
   final bool needsPush;
   final String? coverEtag;
+  final bool needsProgressPush;
   const Book({
     required this.id,
     required this.title,
@@ -521,6 +551,7 @@ class Book extends DataClass implements Insertable<Book> {
     required this.updatedAt,
     required this.needsPush,
     this.coverEtag,
+    required this.needsProgressPush,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -572,6 +603,7 @@ class Book extends DataClass implements Insertable<Book> {
     if (!nullToAbsent || coverEtag != null) {
       map['cover_etag'] = Variable<String>(coverEtag);
     }
+    map['needs_progress_push'] = Variable<bool>(needsProgressPush);
     return map;
   }
 
@@ -622,6 +654,7 @@ class Book extends DataClass implements Insertable<Book> {
       coverEtag: coverEtag == null && nullToAbsent
           ? const Value.absent()
           : Value(coverEtag),
+      needsProgressPush: Value(needsProgressPush),
     );
   }
 
@@ -650,6 +683,7 @@ class Book extends DataClass implements Insertable<Book> {
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       needsPush: serializer.fromJson<bool>(json['needsPush']),
       coverEtag: serializer.fromJson<String?>(json['coverEtag']),
+      needsProgressPush: serializer.fromJson<bool>(json['needsProgressPush']),
     );
   }
   @override
@@ -675,6 +709,7 @@ class Book extends DataClass implements Insertable<Book> {
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'needsPush': serializer.toJson<bool>(needsPush),
       'coverEtag': serializer.toJson<String?>(coverEtag),
+      'needsProgressPush': serializer.toJson<bool>(needsProgressPush),
     };
   }
 
@@ -698,6 +733,7 @@ class Book extends DataClass implements Insertable<Book> {
     DateTime? updatedAt,
     bool? needsPush,
     Value<String?> coverEtag = const Value.absent(),
+    bool? needsProgressPush,
   }) => Book(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -724,6 +760,7 @@ class Book extends DataClass implements Insertable<Book> {
     updatedAt: updatedAt ?? this.updatedAt,
     needsPush: needsPush ?? this.needsPush,
     coverEtag: coverEtag.present ? coverEtag.value : this.coverEtag,
+    needsProgressPush: needsProgressPush ?? this.needsProgressPush,
   );
   Book copyWithCompanion(BooksCompanion data) {
     return Book(
@@ -762,6 +799,9 @@ class Book extends DataClass implements Insertable<Book> {
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
       coverEtag: data.coverEtag.present ? data.coverEtag.value : this.coverEtag,
+      needsProgressPush: data.needsProgressPush.present
+          ? data.needsProgressPush.value
+          : this.needsProgressPush,
     );
   }
 
@@ -786,7 +826,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('needsPush: $needsPush, ')
-          ..write('coverEtag: $coverEtag')
+          ..write('coverEtag: $coverEtag, ')
+          ..write('needsProgressPush: $needsProgressPush')
           ..write(')'))
         .toString();
   }
@@ -812,6 +853,7 @@ class Book extends DataClass implements Insertable<Book> {
     updatedAt,
     needsPush,
     coverEtag,
+    needsProgressPush,
   );
   @override
   bool operator ==(Object other) =>
@@ -835,7 +877,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.needsPush == this.needsPush &&
-          other.coverEtag == this.coverEtag);
+          other.coverEtag == this.coverEtag &&
+          other.needsProgressPush == this.needsProgressPush);
 }
 
 class BooksCompanion extends UpdateCompanion<Book> {
@@ -858,6 +901,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<DateTime> updatedAt;
   final Value<bool> needsPush;
   final Value<String?> coverEtag;
+  final Value<bool> needsProgressPush;
   final Value<int> rowid;
   const BooksCompanion({
     this.id = const Value.absent(),
@@ -879,6 +923,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.updatedAt = const Value.absent(),
     this.needsPush = const Value.absent(),
     this.coverEtag = const Value.absent(),
+    this.needsProgressPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BooksCompanion.insert({
@@ -901,6 +946,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.updatedAt = const Value.absent(),
     this.needsPush = const Value.absent(),
     this.coverEtag = const Value.absent(),
+    this.needsProgressPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -924,6 +970,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<DateTime>? updatedAt,
     Expression<bool>? needsPush,
     Expression<String>? coverEtag,
+    Expression<bool>? needsProgressPush,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -946,6 +993,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (needsPush != null) 'needs_push': needsPush,
       if (coverEtag != null) 'cover_etag': coverEtag,
+      if (needsProgressPush != null) 'needs_progress_push': needsProgressPush,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -970,6 +1018,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<DateTime>? updatedAt,
     Value<bool>? needsPush,
     Value<String?>? coverEtag,
+    Value<bool>? needsProgressPush,
     Value<int>? rowid,
   }) {
     return BooksCompanion(
@@ -992,6 +1041,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
       updatedAt: updatedAt ?? this.updatedAt,
       needsPush: needsPush ?? this.needsPush,
       coverEtag: coverEtag ?? this.coverEtag,
+      needsProgressPush: needsProgressPush ?? this.needsProgressPush,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1056,6 +1106,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (coverEtag.present) {
       map['cover_etag'] = Variable<String>(coverEtag.value);
     }
+    if (needsProgressPush.present) {
+      map['needs_progress_push'] = Variable<bool>(needsProgressPush.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1084,6 +1137,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('updatedAt: $updatedAt, ')
           ..write('needsPush: $needsPush, ')
           ..write('coverEtag: $coverEtag, ')
+          ..write('needsProgressPush: $needsProgressPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5649,6 +5703,532 @@ class LocalDeletionsCompanion extends UpdateCompanion<LocalDeletion> {
   }
 }
 
+class $RemoteReadingPositionsTable extends RemoteReadingPositions
+    with TableInfo<$RemoteReadingPositionsTable, RemoteReadingPosition> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RemoteReadingPositionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _bookIdMeta = const VerificationMeta('bookId');
+  @override
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceLabelMeta = const VerificationMeta(
+    'deviceLabel',
+  );
+  @override
+  late final GeneratedColumn<String> deviceLabel = GeneratedColumn<String>(
+    'device_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _progressMeta = const VerificationMeta(
+    'progress',
+  );
+  @override
+  late final GeneratedColumn<double> progress = GeneratedColumn<double>(
+    'progress',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pageMeta = const VerificationMeta('page');
+  @override
+  late final GeneratedColumn<int> page = GeneratedColumn<int>(
+    'page',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _scrollMeta = const VerificationMeta('scroll');
+  @override
+  late final GeneratedColumn<double> scroll = GeneratedColumn<double>(
+    'scroll',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    bookId,
+    deviceId,
+    deviceLabel,
+    progress,
+    page,
+    unit,
+    scroll,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'remote_reading_positions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RemoteReadingPosition> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('book_id')) {
+      context.handle(
+        _bookIdMeta,
+        bookId.isAcceptableOrUnknown(data['book_id']!, _bookIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookIdMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('device_label')) {
+      context.handle(
+        _deviceLabelMeta,
+        deviceLabel.isAcceptableOrUnknown(
+          data['device_label']!,
+          _deviceLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('progress')) {
+      context.handle(
+        _progressMeta,
+        progress.isAcceptableOrUnknown(data['progress']!, _progressMeta),
+      );
+    }
+    if (data.containsKey('page')) {
+      context.handle(
+        _pageMeta,
+        page.isAcceptableOrUnknown(data['page']!, _pageMeta),
+      );
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('scroll')) {
+      context.handle(
+        _scrollMeta,
+        scroll.isAcceptableOrUnknown(data['scroll']!, _scrollMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {bookId, deviceId};
+  @override
+  RemoteReadingPosition map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RemoteReadingPosition(
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      deviceLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_label'],
+      ),
+      progress: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}progress'],
+      ),
+      page: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page'],
+      ),
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      ),
+      scroll: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}scroll'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RemoteReadingPositionsTable createAlias(String alias) {
+    return $RemoteReadingPositionsTable(attachedDatabase, alias);
+  }
+}
+
+class RemoteReadingPosition extends DataClass
+    implements Insertable<RemoteReadingPosition> {
+  final String bookId;
+  final String deviceId;
+
+  /// Human label for the prompt ("desktop", "Pixel 8"); may be absent if the
+  /// writing device didn't send one.
+  final String? deviceLabel;
+  final double? progress;
+  final int? page;
+
+  /// What [page] counts: 'page' (PDF) or 'chapter' (EPUB). A remote device may
+  /// have read a different format of the same book, so the unit travels with
+  /// the row instead of being inferred locally.
+  final String? unit;
+  final double? scroll;
+  final DateTime updatedAt;
+  const RemoteReadingPosition({
+    required this.bookId,
+    required this.deviceId,
+    this.deviceLabel,
+    this.progress,
+    this.page,
+    this.unit,
+    this.scroll,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_id'] = Variable<String>(bookId);
+    map['device_id'] = Variable<String>(deviceId);
+    if (!nullToAbsent || deviceLabel != null) {
+      map['device_label'] = Variable<String>(deviceLabel);
+    }
+    if (!nullToAbsent || progress != null) {
+      map['progress'] = Variable<double>(progress);
+    }
+    if (!nullToAbsent || page != null) {
+      map['page'] = Variable<int>(page);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    if (!nullToAbsent || scroll != null) {
+      map['scroll'] = Variable<double>(scroll);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  RemoteReadingPositionsCompanion toCompanion(bool nullToAbsent) {
+    return RemoteReadingPositionsCompanion(
+      bookId: Value(bookId),
+      deviceId: Value(deviceId),
+      deviceLabel: deviceLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceLabel),
+      progress: progress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(progress),
+      page: page == null && nullToAbsent ? const Value.absent() : Value(page),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      scroll: scroll == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scroll),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RemoteReadingPosition.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RemoteReadingPosition(
+      bookId: serializer.fromJson<String>(json['bookId']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      deviceLabel: serializer.fromJson<String?>(json['deviceLabel']),
+      progress: serializer.fromJson<double?>(json['progress']),
+      page: serializer.fromJson<int?>(json['page']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      scroll: serializer.fromJson<double?>(json['scroll']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bookId': serializer.toJson<String>(bookId),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'deviceLabel': serializer.toJson<String?>(deviceLabel),
+      'progress': serializer.toJson<double?>(progress),
+      'page': serializer.toJson<int?>(page),
+      'unit': serializer.toJson<String?>(unit),
+      'scroll': serializer.toJson<double?>(scroll),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  RemoteReadingPosition copyWith({
+    String? bookId,
+    String? deviceId,
+    Value<String?> deviceLabel = const Value.absent(),
+    Value<double?> progress = const Value.absent(),
+    Value<int?> page = const Value.absent(),
+    Value<String?> unit = const Value.absent(),
+    Value<double?> scroll = const Value.absent(),
+    DateTime? updatedAt,
+  }) => RemoteReadingPosition(
+    bookId: bookId ?? this.bookId,
+    deviceId: deviceId ?? this.deviceId,
+    deviceLabel: deviceLabel.present ? deviceLabel.value : this.deviceLabel,
+    progress: progress.present ? progress.value : this.progress,
+    page: page.present ? page.value : this.page,
+    unit: unit.present ? unit.value : this.unit,
+    scroll: scroll.present ? scroll.value : this.scroll,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RemoteReadingPosition copyWithCompanion(
+    RemoteReadingPositionsCompanion data,
+  ) {
+    return RemoteReadingPosition(
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      deviceLabel: data.deviceLabel.present
+          ? data.deviceLabel.value
+          : this.deviceLabel,
+      progress: data.progress.present ? data.progress.value : this.progress,
+      page: data.page.present ? data.page.value : this.page,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      scroll: data.scroll.present ? data.scroll.value : this.scroll,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RemoteReadingPosition(')
+          ..write('bookId: $bookId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('progress: $progress, ')
+          ..write('page: $page, ')
+          ..write('unit: $unit, ')
+          ..write('scroll: $scroll, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    bookId,
+    deviceId,
+    deviceLabel,
+    progress,
+    page,
+    unit,
+    scroll,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RemoteReadingPosition &&
+          other.bookId == this.bookId &&
+          other.deviceId == this.deviceId &&
+          other.deviceLabel == this.deviceLabel &&
+          other.progress == this.progress &&
+          other.page == this.page &&
+          other.unit == this.unit &&
+          other.scroll == this.scroll &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RemoteReadingPositionsCompanion
+    extends UpdateCompanion<RemoteReadingPosition> {
+  final Value<String> bookId;
+  final Value<String> deviceId;
+  final Value<String?> deviceLabel;
+  final Value<double?> progress;
+  final Value<int?> page;
+  final Value<String?> unit;
+  final Value<double?> scroll;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const RemoteReadingPositionsCompanion({
+    this.bookId = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.deviceLabel = const Value.absent(),
+    this.progress = const Value.absent(),
+    this.page = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.scroll = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RemoteReadingPositionsCompanion.insert({
+    required String bookId,
+    required String deviceId,
+    this.deviceLabel = const Value.absent(),
+    this.progress = const Value.absent(),
+    this.page = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.scroll = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : bookId = Value(bookId),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt);
+  static Insertable<RemoteReadingPosition> custom({
+    Expression<String>? bookId,
+    Expression<String>? deviceId,
+    Expression<String>? deviceLabel,
+    Expression<double>? progress,
+    Expression<int>? page,
+    Expression<String>? unit,
+    Expression<double>? scroll,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookId != null) 'book_id': bookId,
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceLabel != null) 'device_label': deviceLabel,
+      if (progress != null) 'progress': progress,
+      if (page != null) 'page': page,
+      if (unit != null) 'unit': unit,
+      if (scroll != null) 'scroll': scroll,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RemoteReadingPositionsCompanion copyWith({
+    Value<String>? bookId,
+    Value<String>? deviceId,
+    Value<String?>? deviceLabel,
+    Value<double?>? progress,
+    Value<int?>? page,
+    Value<String?>? unit,
+    Value<double?>? scroll,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RemoteReadingPositionsCompanion(
+      bookId: bookId ?? this.bookId,
+      deviceId: deviceId ?? this.deviceId,
+      deviceLabel: deviceLabel ?? this.deviceLabel,
+      progress: progress ?? this.progress,
+      page: page ?? this.page,
+      unit: unit ?? this.unit,
+      scroll: scroll ?? this.scroll,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (deviceLabel.present) {
+      map['device_label'] = Variable<String>(deviceLabel.value);
+    }
+    if (progress.present) {
+      map['progress'] = Variable<double>(progress.value);
+    }
+    if (page.present) {
+      map['page'] = Variable<int>(page.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (scroll.present) {
+      map['scroll'] = Variable<double>(scroll.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RemoteReadingPositionsCompanion(')
+          ..write('bookId: $bookId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('progress: $progress, ')
+          ..write('page: $page, ')
+          ..write('unit: $unit, ')
+          ..write('scroll: $scroll, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$VellumDatabase extends GeneratedDatabase {
   _$VellumDatabase(QueryExecutor e) : super(e);
   $VellumDatabaseManager get managers => $VellumDatabaseManager(this);
@@ -5669,6 +6249,8 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
   );
   late final $BookPlacementsTable bookPlacements = $BookPlacementsTable(this);
   late final $LocalDeletionsTable localDeletions = $LocalDeletionsTable(this);
+  late final $RemoteReadingPositionsTable remoteReadingPositions =
+      $RemoteReadingPositionsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5688,6 +6270,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     physicalShelves,
     bookPlacements,
     localDeletions,
+    remoteReadingPositions,
   ];
 }
 
@@ -5712,6 +6295,7 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<bool> needsPush,
       Value<String?> coverEtag,
+      Value<bool> needsProgressPush,
       Value<int> rowid,
     });
 typedef $$BooksTableUpdateCompanionBuilder =
@@ -5735,6 +6319,7 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<DateTime> updatedAt,
       Value<bool> needsPush,
       Value<String?> coverEtag,
+      Value<bool> needsProgressPush,
       Value<int> rowid,
     });
 
@@ -5935,6 +6520,11 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<String> get coverEtag => $composableBuilder(
     column: $table.coverEtag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsProgressPush => $composableBuilder(
+    column: $table.needsProgressPush,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6167,6 +6757,11 @@ class $$BooksTableOrderingComposer
     column: $table.coverEtag,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get needsProgressPush => $composableBuilder(
+    column: $table.needsProgressPush,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BooksTableAnnotationComposer
@@ -6250,6 +6845,11 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<String> get coverEtag =>
       $composableBuilder(column: $table.coverEtag, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsProgressPush => $composableBuilder(
+    column: $table.needsProgressPush,
+    builder: (column) => column,
+  );
 
   Expression<T> bookAuthorsRefs<T extends Object>(
     Expression<T> Function($$BookAuthorsTableAnnotationComposer a) f,
@@ -6430,6 +7030,7 @@ class $$BooksTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
                 Value<String?> coverEtag = const Value.absent(),
+                Value<bool> needsProgressPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion(
                 id: id,
@@ -6451,6 +7052,7 @@ class $$BooksTableTableManager
                 updatedAt: updatedAt,
                 needsPush: needsPush,
                 coverEtag: coverEtag,
+                needsProgressPush: needsProgressPush,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6474,6 +7076,7 @@ class $$BooksTableTableManager
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
                 Value<String?> coverEtag = const Value.absent(),
+                Value<bool> needsProgressPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion.insert(
                 id: id,
@@ -6495,6 +7098,7 @@ class $$BooksTableTableManager
                 updatedAt: updatedAt,
                 needsPush: needsPush,
                 coverEtag: coverEtag,
+                needsProgressPush: needsProgressPush,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -11224,6 +11828,284 @@ typedef $$LocalDeletionsTableProcessedTableManager =
       LocalDeletion,
       PrefetchHooks Function()
     >;
+typedef $$RemoteReadingPositionsTableCreateCompanionBuilder =
+    RemoteReadingPositionsCompanion Function({
+      required String bookId,
+      required String deviceId,
+      Value<String?> deviceLabel,
+      Value<double?> progress,
+      Value<int?> page,
+      Value<String?> unit,
+      Value<double?> scroll,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RemoteReadingPositionsTableUpdateCompanionBuilder =
+    RemoteReadingPositionsCompanion Function({
+      Value<String> bookId,
+      Value<String> deviceId,
+      Value<String?> deviceLabel,
+      Value<double?> progress,
+      Value<int?> page,
+      Value<String?> unit,
+      Value<double?> scroll,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$RemoteReadingPositionsTableFilterComposer
+    extends Composer<_$VellumDatabase, $RemoteReadingPositionsTable> {
+  $$RemoteReadingPositionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get progress => $composableBuilder(
+    column: $table.progress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get scroll => $composableBuilder(
+    column: $table.scroll,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RemoteReadingPositionsTableOrderingComposer
+    extends Composer<_$VellumDatabase, $RemoteReadingPositionsTable> {
+  $$RemoteReadingPositionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get progress => $composableBuilder(
+    column: $table.progress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get page => $composableBuilder(
+    column: $table.page,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get scroll => $composableBuilder(
+    column: $table.scroll,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RemoteReadingPositionsTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $RemoteReadingPositionsTable> {
+  $$RemoteReadingPositionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get bookId =>
+      $composableBuilder(column: $table.bookId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get progress =>
+      $composableBuilder(column: $table.progress, builder: (column) => column);
+
+  GeneratedColumn<int> get page =>
+      $composableBuilder(column: $table.page, builder: (column) => column);
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<double> get scroll =>
+      $composableBuilder(column: $table.scroll, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RemoteReadingPositionsTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $RemoteReadingPositionsTable,
+          RemoteReadingPosition,
+          $$RemoteReadingPositionsTableFilterComposer,
+          $$RemoteReadingPositionsTableOrderingComposer,
+          $$RemoteReadingPositionsTableAnnotationComposer,
+          $$RemoteReadingPositionsTableCreateCompanionBuilder,
+          $$RemoteReadingPositionsTableUpdateCompanionBuilder,
+          (
+            RemoteReadingPosition,
+            BaseReferences<
+              _$VellumDatabase,
+              $RemoteReadingPositionsTable,
+              RemoteReadingPosition
+            >,
+          ),
+          RemoteReadingPosition,
+          PrefetchHooks Function()
+        > {
+  $$RemoteReadingPositionsTableTableManager(
+    _$VellumDatabase db,
+    $RemoteReadingPositionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RemoteReadingPositionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$RemoteReadingPositionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$RemoteReadingPositionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> bookId = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<String?> deviceLabel = const Value.absent(),
+                Value<double?> progress = const Value.absent(),
+                Value<int?> page = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<double?> scroll = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RemoteReadingPositionsCompanion(
+                bookId: bookId,
+                deviceId: deviceId,
+                deviceLabel: deviceLabel,
+                progress: progress,
+                page: page,
+                unit: unit,
+                scroll: scroll,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String bookId,
+                required String deviceId,
+                Value<String?> deviceLabel = const Value.absent(),
+                Value<double?> progress = const Value.absent(),
+                Value<int?> page = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<double?> scroll = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => RemoteReadingPositionsCompanion.insert(
+                bookId: bookId,
+                deviceId: deviceId,
+                deviceLabel: deviceLabel,
+                progress: progress,
+                page: page,
+                unit: unit,
+                scroll: scroll,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RemoteReadingPositionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $RemoteReadingPositionsTable,
+      RemoteReadingPosition,
+      $$RemoteReadingPositionsTableFilterComposer,
+      $$RemoteReadingPositionsTableOrderingComposer,
+      $$RemoteReadingPositionsTableAnnotationComposer,
+      $$RemoteReadingPositionsTableCreateCompanionBuilder,
+      $$RemoteReadingPositionsTableUpdateCompanionBuilder,
+      (
+        RemoteReadingPosition,
+        BaseReferences<
+          _$VellumDatabase,
+          $RemoteReadingPositionsTable,
+          RemoteReadingPosition
+        >,
+      ),
+      RemoteReadingPosition,
+      PrefetchHooks Function()
+    >;
 
 class $VellumDatabaseManager {
   final _$VellumDatabase _db;
@@ -11256,4 +12138,9 @@ class $VellumDatabaseManager {
       $$BookPlacementsTableTableManager(_db, _db.bookPlacements);
   $$LocalDeletionsTableTableManager get localDeletions =>
       $$LocalDeletionsTableTableManager(_db, _db.localDeletions);
+  $$RemoteReadingPositionsTableTableManager get remoteReadingPositions =>
+      $$RemoteReadingPositionsTableTableManager(
+        _db,
+        _db.remoteReadingPositions,
+      );
 }

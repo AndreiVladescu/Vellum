@@ -743,6 +743,390 @@ async fn batch_upsert_rejects_a_batch_over_the_cap() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+// ---- Cross-device reading position (plan 5 #5) ------------------------------
+
+/// PUT one device's position in `book`, asserting it was accepted.
+async fn put_progress(
+    app: &axum::Router,
+    token: &str,
+    book: &str,
+    device: &str,
+    body: Value,
+) -> Value {
+    let mut payload = json!({ "device_id": device });
+    payload
+        .as_object_mut()
+        .unwrap()
+        .extend(body.as_object().unwrap().clone());
+    let (status, out) = call(
+        app,
+        "PUT",
+        &format!("/api/reading-progress/{book}"),
+        Some(token),
+        Some(payload),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{out}");
+    out
+}
+
+#[tokio::test]
+async fn reading_progress_is_per_device_so_two_devices_never_conflict() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "desktop-1",
+        json!({ "device_label": "desktop", "progress": 0.5, "page": 214, "unit": "page" }),
+    )
+    .await;
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "phone-1",
+        json!({ "device_label": "phone", "progress": 0.1, "page": 40, "unit": "page" }),
+    )
+    .await;
+
+    // The phone's write left the desktop's row alone: both survive, each owned
+    // by its writer. That is the whole point of the (book, user, device) key.
+    let (status, body) = call(&app, "GET", "/api/reading-progress", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let rows = body.as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    let desktop = rows
+        .iter()
+        .find(|r| r["device_id"] == json!("desktop-1"))
+        .unwrap();
+    assert_eq!(desktop["page"], json!(214));
+    assert_eq!(desktop["device_label"], json!("desktop"));
+    assert_eq!(desktop["unit"], json!("page"));
+    let phone = rows
+        .iter()
+        .find(|r| r["device_id"] == json!("phone-1"))
+        .unwrap();
+    assert_eq!(phone["page"], json!(40));
+
+    // Re-writing the same device replaces its own row rather than adding one.
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "phone-1",
+        json!({ "progress": 0.2, "page": 80, "unit": "page" }),
+    )
+    .await;
+    let (_, body) = call(&app, "GET", "/api/reading-progress", Some(&master), None).await;
+    assert_eq!(body.as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn reading_progress_is_never_visible_to_another_user() {
+    // The stronger of the two isolation properties: a shared library means two
+    // *users* hold positions in the same book, and one user's reading is not
+    // the other's business (nor is it something they could overwrite).
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({ "scope": "book", "scope_id": book, "grantee_email": "alice@lib.test" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "master-desktop",
+        json!({ "progress": 0.9, "page": 400, "unit": "page" }),
+    )
+    .await;
+    // Alice may record her own position in a book shared with her read-only:
+    // it's her data, so view access is the right bar.
+    put_progress(
+        &app,
+        &alice,
+        &book,
+        "alice-phone",
+        json!({ "progress": 0.1, "page": 20, "unit": "page" }),
+    )
+    .await;
+
+    let (_, hers) = call(&app, "GET", "/api/reading-progress", Some(&alice), None).await;
+    let rows = hers.as_array().unwrap();
+    assert_eq!(rows.len(), 1, "Alice must not see the master's position");
+    assert_eq!(rows[0]["device_id"], json!("alice-phone"));
+
+    let (_, his) = call(&app, "GET", "/api/reading-progress", Some(&master), None).await;
+    let rows = his.as_array().unwrap();
+    assert_eq!(rows.len(), 1, "and the master must not see hers");
+    assert_eq!(rows[0]["page"], json!(400));
+}
+
+#[tokio::test]
+async fn reading_progress_needs_view_access_and_hides_unshared_books() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    // No share: 404 rather than 403, so the endpoint doesn't confirm which
+    // book ids exist.
+    let (status, _) = call(
+        &app,
+        "PUT",
+        &format!("/api/reading-progress/{book}"),
+        Some(&alice),
+        Some(json!({ "device_id": "alice-phone", "progress": 0.1 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/reading-progress/no-such-book",
+        Some(&master),
+        Some(json!({ "device_id": "d", "progress": 0.1 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn reading_progress_stops_being_returned_when_a_book_is_unshared() {
+    // The book join in `my_progress` isn't redundant with the user filter:
+    // access can be revoked after a position was recorded.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    let (_, share) = call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({ "scope": "book", "scope_id": book, "grantee_email": "alice@lib.test" })),
+    )
+    .await;
+    put_progress(
+        &app,
+        &alice,
+        &book,
+        "alice-phone",
+        json!({ "progress": 0.3, "page": 60, "unit": "page" }),
+    )
+    .await;
+
+    let share_id = share["id"].as_str().unwrap();
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/shares/{share_id}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, hers) = call(&app, "GET", "/api/reading-progress", Some(&alice), None).await;
+    assert!(
+        hers.as_array().unwrap().is_empty(),
+        "an unshared book's position must stop coming back: {hers}"
+    );
+}
+
+#[tokio::test]
+async fn reading_progress_delta_pull_uses_the_server_cursor() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "old-device",
+        json!({ "progress": 0.2, "page": 40, "unit": "page", "updated_at": "2020-01-01 00:00:00" }),
+    )
+    .await;
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "new-device",
+        json!({ "progress": 0.8, "page": 300, "unit": "page", "updated_at": "2026-01-01 00:00:00" }),
+    )
+    .await;
+
+    // An empty cursor selects the envelope (with server_now) and everything.
+    let (status, all) = call(
+        &app,
+        "GET",
+        "/api/reading-progress?cursor=",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(all["server_now"].is_string());
+    assert_eq!(all["entries"].as_array().unwrap().len(), 2);
+
+    let (_, delta) = call(
+        &app,
+        "GET",
+        "/api/reading-progress?cursor=2025-01-01%2000:00:00",
+        Some(&master),
+        None,
+    )
+    .await;
+    let entries = delta["entries"].as_array().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0]["device_id"], json!("new-device"));
+}
+
+#[tokio::test]
+async fn reading_progress_rejects_a_bad_unit_or_missing_device() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    for bad in [
+        json!({ "device_id": "d", "unit": "paragraph" }),
+        json!({ "device_id": "   ", "progress": 0.5 }),
+    ] {
+        let (status, _) = call(
+            &app,
+            "PUT",
+            &format!("/api/reading-progress/{book}"),
+            Some(&master),
+            Some(bad),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+}
+
+#[tokio::test]
+async fn forgetting_a_device_unpublishes_only_that_device() {
+    // What makes the opt-in honest: turning the setting off removes what
+    // turning it on published -- this device's rows, and nothing else's.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    put_progress(&app, &master, &book, "phone-1", json!({ "progress": 0.1 })).await;
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "desktop-1",
+        json!({ "progress": 0.6 }),
+    )
+    .await;
+
+    let (status, body) = call(
+        &app,
+        "DELETE",
+        "/api/reading-progress?device_id=phone-1",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["deleted"], json!(1));
+
+    let (_, left) = call(&app, "GET", "/api/reading-progress", Some(&master), None).await;
+    let rows = left.as_array().unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["device_id"], json!("desktop-1"));
+
+    let (status, _) = call(&app, "DELETE", "/api/reading-progress", Some(&master), None).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "a blanket wipe isn't what a per-device opt-out means"
+    );
+}
+
+#[tokio::test]
+async fn deleting_a_book_takes_its_reading_progress_with_it() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    put_progress(&app, &master, &book, "phone-1", json!({ "progress": 0.4 })).await;
+
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/books/{book}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, left) = call(&app, "GET", "/api/reading-progress", Some(&master), None).await;
+    assert!(left.as_array().unwrap().is_empty(), "{left}");
+}
+
+#[tokio::test]
+async fn book_upsert_ignores_reading_state() {
+    // Plan 2 §A1's decision, pinned directly now that `reading_progress` is an
+    // advertised capability (plan 5 #5) and can no longer stand in for it: the
+    // *book row* still carries no reading state, in either direction. #5's
+    // channel is a separate table, keyed per device, and must never leak here.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({
+            "title": "Dune",
+            "reading_progress": 0.5,
+            "last_read_page": 214,
+            "last_read_at": "2026-01-01 00:00:00",
+            "reader_notes": "private",
+            "source_metadata": "{}"
+        })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "unknown fields are ignored, not 400"
+    );
+    for local_only in [
+        "reading_progress",
+        "last_read_page",
+        "last_read_at",
+        "reader_notes",
+        "source_metadata",
+    ] {
+        assert!(
+            body.get(local_only).is_none(),
+            "{local_only} must not appear on a book DTO"
+        );
+    }
+
+    let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    let first = &list.as_array().unwrap()[0];
+    assert!(first.get("reading_progress").is_none());
+    assert!(first.get("reader_notes").is_none());
+}
+
 #[tokio::test]
 async fn upsert_ignores_a_stale_timestamped_push() {
     let app = test_app().await;
@@ -842,10 +1226,14 @@ async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
     assert!(features.contains(&json!("copy_sync")));
     assert!(features.contains(&json!("loan_sync")));
     assert!(features.contains(&json!("batch_push")));
-    // Never advertised: not built (content_search, mail) or deliberately
-    // never synced (reading_progress) -- a capability handshake that claims
-    // one of these would be worse than none.
-    for absent in ["reading_progress", "content_search", "mail"] {
+    // reading_progress advertises #5's separate opt-in per-device channel --
+    // *not* reading state on the book row, which stays app-local-only. That
+    // invariant used to be implied by this feature's absence; it is now pinned
+    // directly by `book_upsert_ignores_reading_state`.
+    assert!(features.contains(&json!("reading_progress")));
+    // Never advertised: not built -- a capability handshake that claims one of
+    // these would be worse than none.
+    for absent in ["content_search", "mail"] {
         assert!(
             !features.contains(&json!(absent)),
             "{absent} isn't a real server feature yet"

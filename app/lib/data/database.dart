@@ -37,6 +37,14 @@ class Books extends Table {
   // conditional cover pulls (see IMPROVEMENT_PLAN_2 §D24).
   BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
   TextColumn get coverEtag => text().nullable()();
+  // Whether this book's *reading position* still needs publishing to the
+  // optional cross-device channel (plan 5 #5). Separate from `needsPush` on
+  // purpose: reading state is not part of the book upsert and must never ride
+  // along with it. Defaults **false**, unlike `needsPush` — the channel is
+  // opt-in, so "never switched on" has to mean "nothing was ever published".
+  // Enabling the setting marks the already-read books dirty explicitly.
+  BoolColumn get needsProgressPush =>
+      boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -240,6 +248,34 @@ class LocalDeletions extends Table {
   Set<Column> get primaryKey => {bookId};
 }
 
+/// Other devices' reading positions for a book, mirrored from the server's
+/// `reading_progress` table (plan 5 #5) so "you were on page 214 on desktop —
+/// jump there?" works offline and without a round trip when opening a book.
+///
+/// App-local by construction and NOT a counterpart of the server table: this
+/// device's own position stays on the book row, and only *remote* rows land
+/// here. Nothing in here is authoritative — it is a cache of what the server
+/// last said, cleared when the feature is switched off.
+@DataClassName('RemoteReadingPosition')
+class RemoteReadingPositions extends Table {
+  TextColumn get bookId => text()();
+  TextColumn get deviceId => text()();
+  /// Human label for the prompt ("desktop", "Pixel 8"); may be absent if the
+  /// writing device didn't send one.
+  TextColumn get deviceLabel => text().nullable()();
+  RealColumn get progress => real().nullable()();
+  IntColumn get page => integer().nullable()();
+  /// What [page] counts: 'page' (PDF) or 'chapter' (EPUB). A remote device may
+  /// have read a different format of the same book, so the unit travels with
+  /// the row instead of being inferred locally.
+  TextColumn get unit => text().nullable()();
+  RealColumn get scroll => real().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {bookId, deviceId};
+}
+
 @DriftDatabase(tables: [
   Books,
   Authors,
@@ -255,13 +291,14 @@ class LocalDeletions extends Table {
   PhysicalShelves,
   BookPlacements,
   LocalDeletions,
+  RemoteReadingPositions,
 ])
 class VellumDatabase extends _$VellumDatabase {
   VellumDatabase([QueryExecutor? executor])
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -394,6 +431,19 @@ class VellumDatabase extends _$VellumDatabase {
               if (!loanCols.contains('needs_push')) {
                 await m.addColumn(loans, loans.needsPush);
               }
+            }
+          }
+          if (from < 13) {
+            // Optional cross-device reading position (plan 5 #5). Both parts
+            // are app-local: `needs_progress_push` defaults *false* (unlike
+            // every needsPush before it) because the channel is opt-in, and
+            // `remote_reading_positions` only ever caches other devices' rows.
+            await addBookColumn(
+              'needs_progress_push',
+              books.needsProgressPush,
+            );
+            if (!(await tableNames()).contains('remote_reading_positions')) {
+              await m.createTable(remoteReadingPositions);
             }
           }
         },

@@ -90,6 +90,13 @@ class ServerConnection extends ChangeNotifier {
 
   String _cursorKey(String url) => 'sync.cursor.$url';
 
+  /// The reading-position channel's own cursor (plan 5 #5). Separate from
+  /// [syncCursor] because that pass runs on its own after a sync: sharing one
+  /// cursor would let either pass advance it past rows the other hasn't seen.
+  /// Sits under the same `sync.cursor.` prefix so [clearAllSyncCursors] wipes
+  /// it too.
+  String _readingCursorKey(String url) => 'sync.cursor.reading.$url';
+
   /// The last server clock a delta pull reached for the current connection, or
   /// null to force a full pull. Keyed by base URL so distinct servers don't
   /// share a cursor.
@@ -101,6 +108,19 @@ class ServerConnection extends ChangeNotifier {
   Future<void> setSyncCursor(String value) async {
     final url = baseUrl;
     if (url.isNotEmpty) await _prefs.setString(_cursorKey(url), value);
+  }
+
+  /// Cursor for the reading-position pass, or null to force a full pull of it.
+  String? get readingCursor {
+    final url = baseUrl;
+    return url.isEmpty ? null : _prefs.getString(_readingCursorKey(url));
+  }
+
+  Future<void> setReadingCursor(String value) async {
+    final url = baseUrl;
+    if (url.isNotEmpty) {
+      await _prefs.setString(_readingCursorKey(url), value);
+    }
   }
 
   /// Drops every delta-pull cursor (all servers), forcing a full pull next time.
@@ -184,6 +204,7 @@ class ServerConnection extends ChangeNotifier {
     // a book was newly *shared* with this account (sharing doesn't bump a book's
     // updated_at), so clearing it here guarantees newly-visible books arrive.
     await _prefs.remove(_cursorKey(normalized));
+    await _prefs.remove(_readingCursorKey(normalized));
     _capabilities = null;
     _token = auth.token;
     try {
@@ -220,7 +241,10 @@ class ServerConnection extends ChangeNotifier {
     await _prefs.remove(_emailKey);
     await _prefs.remove(_masterKey);
     await _prefs.remove(_insecureAckKey);
-    if (baseUrl.isNotEmpty) await _prefs.remove(_cursorKey(baseUrl));
+    if (baseUrl.isNotEmpty) {
+      await _prefs.remove(_cursorKey(baseUrl));
+      await _prefs.remove(_readingCursorKey(baseUrl));
+    }
     notifyListeners();
   }
 
@@ -235,7 +259,10 @@ class ServerConnection extends ChangeNotifier {
       // ignore: the prefs removal below clears any fallback copy.
     }
     await _prefs.remove(_tokenKey);
-    if (baseUrl.isNotEmpty) await _prefs.remove(_cursorKey(baseUrl));
+    if (baseUrl.isNotEmpty) {
+      await _prefs.remove(_cursorKey(baseUrl));
+      await _prefs.remove(_readingCursorKey(baseUrl));
+    }
     notifyListeners();
   }
 

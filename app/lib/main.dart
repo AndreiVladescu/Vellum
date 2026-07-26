@@ -144,6 +144,10 @@ class _LibraryPageState extends State<LibraryPage> {
         cursor: conn.syncCursor,
         onCursor: conn.setSyncCursor,
       );
+      // Reading position rides its own pass, after the sync guard is free and
+      // only when the user opted in (plan 5 #5). Its own try/catch: a failure
+      // here must not make a successful library sync look failed.
+      await _syncReadingPosition(client);
       if (!mounted) return;
       final changed = report.pulled +
           report.pushed +
@@ -164,6 +168,26 @@ class _LibraryPageState extends State<LibraryPage> {
       if (e.isUnauthorized) await conn.clearExpiredSession();
     } catch (_) {
       // Offline or unreachable — stay quiet, the local library works as is.
+    }
+  }
+
+  /// Publishes this device's reading position and caches the other devices'
+  /// (plan 5 #5). No-op unless the user turned the option on; silent on failure
+  /// like the rest of the launch sync, since nothing local depends on it.
+  Future<void> _syncReadingPosition(VellumServerClient client) async {
+    if (!widget.settings.syncReadingPosition) return;
+    final conn = widget.connection;
+    try {
+      await _sync.syncReadingProgress(
+        client,
+        deviceId: widget.settings.deviceId,
+        deviceLabel: widget.settings.deviceLabel,
+        cursor: conn.readingCursor,
+        onCursor: conn.setReadingCursor,
+      );
+    } catch (_) {
+      // Offline, or a server without the endpoint — the position simply stays
+      // local until next time.
     }
   }
 

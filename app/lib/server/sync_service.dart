@@ -1067,6 +1067,106 @@ class SyncService {
     return (pushed: pushed, deletedRemotely: deletedRemotely);
   }
 
+  /// Two-way sync of the *optional* cross-device reading position (plan 5 #5).
+  ///
+  /// Deliberately its own pass, not part of [pull]/[push]: reading state is not
+  /// part of the book upsert and must not become part of it by accident, and the
+  /// whole channel only runs when the user has opted in — the caller checks the
+  /// preference and simply doesn't call this otherwise. Call it *after*
+  /// [sync]/[push] returns, never inside: the re-entrancy guard is shared.
+  ///
+  /// [deviceId] identifies this install; rows keyed by it are this device's own,
+  /// so pushing can only ever overwrite our own row and pulling deliberately
+  /// skips it. Returns how many positions were published and how many remote
+  /// rows were cached.
+  Future<({int published, int cached})> syncReadingProgress(
+    VellumServerClient client, {
+    required String deviceId,
+    String? deviceLabel,
+    String? cursor,
+    void Function(String serverNow)? onCursor,
+  }) async {
+    if (_running) {
+      throw StateError('a sync is already in progress');
+    }
+    _running = true;
+    try {
+      return await _syncReadingProgress(
+        client,
+        deviceId: deviceId,
+        deviceLabel: deviceLabel,
+        cursor: cursor,
+        onCursor: onCursor,
+      );
+    } finally {
+      _running = false;
+    }
+  }
+
+  Future<({int published, int cached})> _syncReadingProgress(
+    VellumServerClient client, {
+    required String deviceId,
+    String? deviceLabel,
+    String? cursor,
+    void Function(String serverNow)? onCursor,
+  }) async {
+    final db = _db;
+    final positions = repository.readingPositions;
+    final isFullPull = cursor == null || cursor.isEmpty;
+
+    // Pull first, so a position this device is about to publish wins on screen.
+    final listed = await client.listReadingPositions(cursor: cursor);
+    // A full pull replaces the cache outright. A delta pull can't: the server
+    // has no tombstones for this table (a device that un-publishes just stops
+    // being listed), so dropping stale rows is what the periodic full pull —
+    // after each login, like books — is for.
+    if (isFullPull) {
+      await db.delete(db.remoteReadingPositions).go();
+    }
+    await positions.cacheRemotePositions(
+      [
+        for (final e in listed.entries)
+          RemoteReadingPositionsCompanion.insert(
+            bookId: e.bookId,
+            deviceId: e.deviceId,
+            deviceLabel: Value(e.deviceLabel),
+            progress: Value(e.progress),
+            page: Value(e.page),
+            unit: Value(e.unit),
+            scroll: Value(e.scroll),
+            updatedAt: e.updatedAt ?? DateTime.now(),
+          ),
+      ],
+      ownDeviceId: deviceId,
+    );
+    final serverNow = listed.serverNow;
+    if (serverNow != null && onCursor != null) onCursor(serverNow);
+
+    // Push this device's dirty positions. Each book's unit comes from the file
+    // it opens in, so a device reading the EPUB doesn't claim PDF pages.
+    var published = 0;
+    for (final book in await positions.booksNeedingProgressPush()) {
+      final formats = [
+        for (final f in await (db.select(db.bookFiles)
+              ..where((f) => f.bookId.equals(book.id)))
+            .get())
+          f.format,
+      ];
+      await client.pushReadingPosition(
+        book.id,
+        deviceId: deviceId,
+        deviceLabel: deviceLabel,
+        progress: book.readingProgress,
+        page: book.lastReadPage,
+        unit: readingUnitForFormats(formats),
+        updatedAt: book.lastReadAt,
+      );
+      await positions.clearProgressDirty(book.id);
+      published++;
+    }
+    return (published: published, cached: listed.entries.length);
+  }
+
   /// Whether [client]'s server advertises the batch push endpoint (plan 5 #7).
   /// Memoized per base URL, including the negative: a server old enough to
   /// predate the handshake answers 404, and re-paying that probe on every push
