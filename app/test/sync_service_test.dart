@@ -193,6 +193,7 @@ Future<http.Response> Function(http.Request) _batchPushServer({
   List<List<Map<String, dynamic>>>? batchCollector,
   List<String>? putCollector,
   List<String>? probeCollector,
+  int capabilitiesHttpStatus = 200,
   int batchHttpStatus = 200,
   Map<String, Map<String, dynamic>> statusOverrides = const {},
   Set<String> omitFromResults = const {},
@@ -202,6 +203,9 @@ Future<http.Response> Function(http.Request) _batchPushServer({
     final path = req.url.path;
     if (req.method == 'GET' && path == '/api/capabilities') {
       probeCollector?.add(path);
+      if (capabilitiesHttpStatus != 200) {
+        return http.Response('{"error":"no such route"}', capabilitiesHttpStatus);
+      }
       return http.Response(
         jsonEncode({
           'server_version': '0.0.0-test',
@@ -1326,5 +1330,29 @@ void main() {
     await sync.push(client);
 
     expect(probes, hasLength(1), reason: 'one handshake, not one per push');
+  });
+
+  test('a server predating the handshake is probed once, not once per push', () async {
+    // The negative has to be memoized too, or every auto-push re-pays a 404
+    // against an older server — the very cost the memoization removes.
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await _insertDirtyBooks(db, 2);
+
+    final probes = <String>[];
+    final puts = <String>[];
+    final client = _client(_batchPushServer(
+      probeCollector: probes,
+      putCollector: puts,
+      capabilitiesHttpStatus: 404,
+    ));
+    final sync = SyncService(repo);
+
+    await sync.push(client);
+    await db.update(db.books).write(const BooksCompanion(needsPush: Value(true)));
+    await sync.push(client);
+
+    expect(probes, hasLength(1));
+    expect(puts, ['b0', 'b1', 'b0', 'b1'], reason: 'both pushes used per-book PUTs');
   });
 }

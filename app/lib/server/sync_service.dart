@@ -1068,12 +1068,21 @@ class SyncService {
   }
 
   /// Whether [client]'s server advertises the batch push endpoint (plan 5 #7).
-  /// Memoized per base URL; throws whatever [VellumServerClient.capabilities]
-  /// throws (a server predating the handshake 404s), which the caller treats as
-  /// "no batch support" rather than a push failure.
+  /// Memoized per base URL, including the negative: a server old enough to
+  /// predate the handshake answers 404, and re-paying that probe on every push
+  /// is exactly the cost the memoization exists to avoid.
+  ///
+  /// A *transient* failure (offline mid-push) is deliberately not cached — it
+  /// propagates, the caller falls back for this push only, and the next one
+  /// probes again rather than staying downgraded for the session.
   Future<bool> _supportsBatchPush(VellumServerClient client) async {
     if (_capsBaseUrl != client.baseUrl) {
-      _caps = await client.capabilities();
+      try {
+        _caps = await client.capabilities();
+      } on ServerException {
+        // The server answered, just not with capabilities — a real negative.
+        _caps = null;
+      }
       _capsBaseUrl = client.baseUrl;
     }
     return _caps?.hasFeature('batch_push') ?? false;
