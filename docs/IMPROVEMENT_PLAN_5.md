@@ -57,17 +57,17 @@ is answerable from `git log`:
 | 27 | Loan due dates, overdue badges, reminders* | `93574d5` |
 | 51 | Condition photos on copies | `0ebe05c` |
 | 28 | Find a copy, tidy a shelf, print labels | `c751607` |
-| 13 | Backup manifest + verify, rotation, encryption* | `HEAD` |
+| 13 | Backup manifest + verify, rotation, encryption* | `4697d31` |
+| 32 | Server-side full-text search of book contents | `HEAD` |
 
-**Phase 4 is complete, and 5 of Phase 5's 9 items are done.** Everything §I lists for the on-ramp has landed, plus #14
+**Phase 4 is complete, and 6 of Phase 5's 9 items are done.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list.
 
 *#13's **incremental** half (step 4) is deliberately not built: the plan itself
 says to defer it until full backups measurably hurt, and to prefer "blobs in a
 sidecar folder + small db-only archives" over an incremental format if they do.
 
-**Still open in Phase 5:** #32 (server-side content search — an FTS5 index over
-extracted PDF/EPUB text), #35 (console scale: saved views, activity log), #34
+**Still open in Phase 5:** #35 (console scale: saved views, activity log), #34
 (OPDS search, facets, OPDS 2.0), #33 (read in the browser).
 
 The app side of #31 is also open: the server advertises `mail`, but nothing in the

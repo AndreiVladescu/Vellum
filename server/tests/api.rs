@@ -33,6 +33,11 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
             std::time::Duration::from_secs(60),
         )),
         mailer: None,
+        // Off, like a default server: content indexing is opt-in
+        // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
+        // it on.
+        index_text: false,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
     (app, data_dir)
@@ -68,6 +73,11 @@ async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
             std::time::Duration::from_secs(60),
         )),
         mailer: None,
+        // Off, like a default server: content indexing is opt-in
+        // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
+        // it on.
+        index_text: false,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
     (app, db)
@@ -234,6 +244,11 @@ async fn session_expiry_slides_forward_on_use() {
             std::time::Duration::from_secs(60),
         )),
         mailer: None,
+        // Off, like a default server: content indexing is opt-in
+        // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
+        // it on.
+        index_text: false,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
     let token = register_master(&app).await;
@@ -1126,6 +1141,11 @@ async fn mail_is_advertised_once_a_mailer_exists() {
             std::time::Duration::from_secs(60),
         )),
         mailer: Some(mailer),
+        // Off, like a default server: content indexing is opt-in
+        // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
+        // it on.
+        index_text: false,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
 
@@ -1164,6 +1184,11 @@ async fn test_app_with_mail() -> (axum::Router, sqlx::SqlitePool) {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        // Off, like a default server: content indexing is opt-in
+        // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
+        // it on.
+        index_text: false,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         mailer: Some(vellum_server::test_mailer(
             "smtp.invalid.example",
             "vellum@example.com",
@@ -2319,13 +2344,14 @@ async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
     // invariant used to be implied by this feature's absence; it is now pinned
     // directly by `book_upsert_ignores_reading_state`.
     assert!(features.contains(&json!("reading_progress")));
-    // Absent here: content_search isn't built, and `mail` depends on this
-    // server's configuration rather than being a constant (this app has no
-    // mailer -- see mail_is_advertised_once_a_mailer_exists for the other side).
+    // Absent here: `content_search` (plan 5 #32) and `mail` both depend on this
+    // server's configuration rather than being constants -- this app has no
+    // mailer and no content index. See mail_is_advertised_once_a_mailer_exists
+    // and tests/text_index.rs for the other side of each.
     for absent in ["content_search", "mail"] {
         assert!(
             !features.contains(&json!(absent)),
-            "{absent} isn't a real server feature yet"
+            "{absent} is configuration-dependent and this server has it off"
         );
     }
 }
@@ -3577,6 +3603,11 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
             std::time::Duration::from_secs(60),
         )),
         mailer: None,
+        // Off, like a default server: content indexing is opt-in
+        // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
+        // it on.
+        index_text: false,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
     let master = register_master(&app).await;

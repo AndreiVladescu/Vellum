@@ -56,4 +56,7 @@ libc = "0.2"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+# Building a real (tiny) PDF fixture for the content-index tests, rather than
+# committing a binary blob nobody can read the provenance of.
+lopdf = "0.43.0"
 zip = { version = "2", default-features = false, features = ["deflate"] }

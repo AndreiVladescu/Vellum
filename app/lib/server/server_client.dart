@@ -270,6 +270,23 @@ class VellumServerClient {
     return Capabilities.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Searches inside book *contents* (plan 5 #32).
+  ///
+  /// Only meaningful when the server advertises `content_search`; without the
+  /// index it answers 400, which surfaces as a [ServerException] the caller
+  /// turns into "this server doesn't do that" rather than an error.
+  Future<List<ContentHit>> searchContents(String query, {int limit = 30}) async {
+    final uri = _uri('/api/search').replace(
+      queryParameters: {'q': query, 'limit': '$limit'},
+    );
+    final res = await _http.get(uri, headers: _headers);
+    final body = _body(res);
+    final hits = (body is Map ? body['hits'] as List? : null) ?? const [];
+    return [
+      for (final h in hits) ContentHit.fromJson(h as Map<String, dynamic>),
+    ];
+  }
+
   /// Invalidates the current session server-side. Best-effort: the caller still
   /// clears local credentials even if this fails (e.g. offline).
   Future<void> logout() async {
@@ -1085,6 +1102,39 @@ class ServerFile {
 /// [Capabilities.syncProtocol] to show "this server is newer than the app"
 /// instead of failing sync opaquely partway through.
 const kKnownSyncProtocol = 1;
+
+/// One hit from `GET /api/search` (plan 5 #32): where in which book, and the
+/// surrounding text with the match marked.
+class ContentHit {
+  const ContentHit({
+    required this.bookId,
+    required this.title,
+    required this.fileId,
+    required this.page,
+    required this.snippet,
+  });
+
+  final String bookId;
+  final String title;
+  final String fileId;
+
+  /// The PDF page, or — for an EPUB, which has no pages — the 1-based spine
+  /// section. The app labels it accordingly rather than claiming a page number
+  /// a reflowable book doesn't have.
+  final int page;
+
+  /// Text around the match, with the matched words wrapped in `[` and `]` by
+  /// FTS5's `snippet()`.
+  final String snippet;
+
+  factory ContentHit.fromJson(Map<String, dynamic> j) => ContentHit(
+        bookId: j['book_id'] as String,
+        title: (j['title'] as String?) ?? 'Untitled',
+        fileId: (j['file_id'] as String?) ?? '',
+        page: (j['page'] as num?)?.toInt() ?? 1,
+        snippet: (j['snippet'] as String?) ?? '',
+      );
+}
 
 /// The server's `GET /api/capabilities` response: version info plus which
 /// optional sync features it actually supports. Fetched once per connect and

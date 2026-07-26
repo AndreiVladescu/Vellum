@@ -125,6 +125,31 @@ authority if this table drifts.
 | `VELLUM_BOOTSTRAP_TOKEN` | — | Secret the **first** (master) registration must present |
 | `RUST_LOG` | `info` | Log filter, e.g. `vellum_server=debug` |
 
+### Content search (optional)
+
+Off unless switched on. When enabled, the server extracts the text of every
+uploaded PDF and EPUB into an FTS5 index and serves `GET /api/search`; the app
+grows an "In book contents" tab and the console a "Search inside books" button,
+both revealed by `GET /api/capabilities`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VELLUM_INDEX_TEXT` | off | `1`/`true` indexes book contents for search |
+
+What it costs, plainly: **the index is roughly the size of the text it holds** —
+a few megabytes per thousand-page technical book, far less for novels — on top
+of the blobs themselves. It can be dropped and rebuilt at any time
+(`POST /api/admin/reindex`, master only); nothing in it is a source of truth.
+Extraction runs in a background worker, one file at a time, so it never competes
+with serving requests, and a server restarted mid-run resumes where it stopped.
+
+Switching it on is **retroactive**: the backlog is queued at the next startup,
+so an existing library is indexed rather than only future uploads.
+
+A scanned PDF with no text layer records `no_text` and is simply not searchable.
+There is **no OCR** and there will not be — a tesseract dependency contradicts
+the single-binary story the rest of this server is built around.
+
 ### Email (optional)
 
 Off unless configured — a LAN server needs no mailer, and the app hides the

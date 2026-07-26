@@ -50,6 +50,8 @@ async fn test_app() -> (axum::Router, std::path::PathBuf) {
             std::time::Duration::from_secs(60),
         )),
         mailer: None,
+        index_text: true,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
     });
     (app, data_dir)

@@ -31,11 +31,19 @@ mod physical_copies;
 mod reading;
 mod shares;
 mod shelves;
+mod text_index;
 mod throttle;
 pub mod tls;
 mod web;
 
 pub use throttle::RateLimiter;
+
+/// Re-exported for `main.rs`: the content-search backlog queue and worker
+/// (plan 5 #32).
+pub use text_index::{
+    drain as drain_text_index, enqueue_missing as enqueue_missing_text,
+    run_worker as run_text_worker,
+};
 
 /// Shared handler state: the database pool, the base URL used to build public
 /// share links (`VELLUM_PUBLIC_URL`), and the directory holding cover/file
@@ -66,6 +74,14 @@ pub struct AppState {
     /// `Option` is the feature flag: everything that needs mail checks it and
     /// degrades rather than failing.
     pub mailer: Option<mail::Mailer>,
+    /// Whether this server extracts and indexes book *contents* for search
+    /// (`VELLUM_INDEX_TEXT=1`, plan 5 #32). Off by default: the index is
+    /// roughly the size of the text it holds, and an operator who only wants
+    /// sync should not silently start paying for a search engine.
+    pub index_text: bool,
+    /// Wakes the text-index worker when something is queued, so an upload is
+    /// searchable in moments rather than on the next slow poll.
+    pub text_notify: std::sync::Arc<tokio::sync::Notify>,
     /// When TLS is on, the served certificate's path + SHA-256 fingerprint, so
     /// the web console can offer it for import into the app. `None` over plain
     /// HTTP (nothing to import).
@@ -118,6 +134,12 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/admin/stats", get(observability::stats))
         // Integrity sweep and one-command backup (plan 5 #12), both master-only.
         .route("/admin/sweep", post(admin::sweep))
+        .route("/admin/reindex", post(text_index::reindex))
+        // Content search (plan 5 #32). Under /api like everything else, and
+        // named `search` rather than `books/search` because it searches inside
+        // books rather than over their metadata — `/books?q=` is the other one.
+        .route("/search", get(text_index::search))
+        .route("/search/status", get(text_index::status))
         .route("/admin/snapshot", get(admin::snapshot))
         // The active TLS certificate (public), for the console's import affordance.
         .route("/cert", get(web::server_cert))

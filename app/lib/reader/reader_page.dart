@@ -19,11 +19,18 @@ class ReaderPage extends StatefulWidget {
     required this.book,
     required this.file,
     required this.repository,
+    this.initialPage,
   });
 
   final Book book;
   final File file;
   final LibraryRepository repository;
+
+  /// Open here instead of where you left off — how a content-search hit jumps
+  /// straight to the page it matched on (plan 5 #32). The saved position is
+  /// left alone until the reader records a new one, so a look at page 300
+  /// doesn't quietly throw away your bookmark at page 12.
+  final int? initialPage;
 
   @override
   State<ReaderPage> createState() => _ReaderPageState();
@@ -419,7 +426,7 @@ class _ReaderPageState extends State<ReaderPage> {
           child: PdfViewer.file(
         widget.file.path,
         controller: _controller,
-        initialPageNumber: widget.book.lastReadPage ?? 1,
+        initialPageNumber: widget.initialPage ?? widget.book.lastReadPage ?? 1,
         params: PdfViewerParams(
           backgroundColor: readerTheme.background,
           onPageChanged: _onPageChanged,

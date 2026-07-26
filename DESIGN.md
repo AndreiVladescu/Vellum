@@ -294,6 +294,32 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**Content search** (server + app, plan 5 #32) is the one capability that is
+genuinely better connected: indexing gigabytes of PDFs is not something a phone
+should do, which makes this the strongest argument for running a server at all.
+An opt-in `VELLUM_INDEX_TEXT=1` turns on a `book_text` + `book_text_fts` pair,
+`GET /api/search` returns highlighted snippets with a book id and a page, and the
+app's shelf search grows an **"In book contents"** tab — revealed by the
+capability handshake, never by probing — whose hits open the reader *at that
+page* without disturbing the saved position. Local search stays the default, so
+offline the feature degrades to nothing rather than to an error.
+
+Four decisions carry it. **The queue is the table**: a `book_text` row with
+`status='pending'` *is* the work item, so a server killed mid-extraction resumes
+exactly where it stopped and `reindex` is one UPDATE. **One sandbox, not two**:
+PDF text tries pure-Rust `lopdf` first and falls back to `pdftotext`/`mutool`
+through the *same* hardened shell-out as the cover renderer (L6) — a second,
+weaker path would undo that hardening for exactly the files most likely to be
+hostile. **Hits are RBAC-filtered by the same predicate as `/api/books`**, since
+leaking the contents of a book someone cannot see exists is the worst failure
+this feature could have. And **user text never reaches `MATCH` raw**: every run
+of word characters becomes one quoted term, ANDed, with a prefix `*` on the last
+— otherwise `foo AND` is a syntax error and `OR`/`NEAR` mean things nobody typed.
+
+An EPUB's `page` is its **spine position**, not a page number: a reflowable book
+has no pages, and claiming one would be a lie the reader can't act on. A scanned
+PDF records `no_text`, which is a real outcome — there is no OCR, deliberately.
+
 **Backups that can be trusted** (app, plan 5 #13). An archive now carries a
 `manifest.json` with the drift schema version, counts, and a **SHA-256 per
 entry**, and *Verify a backup* re-hashes everything without restoring — the only

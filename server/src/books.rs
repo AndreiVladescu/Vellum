@@ -1010,6 +1010,14 @@ pub async fn delete(
         .fetch_all(&mut *tx)
         .await?;
 
+    // The content index (plan 5 #32) is a virtual table with no foreign keys,
+    // and SQLite only fires triggers for FK cascades when recursive triggers
+    // are on — so its rows are cleared here, inside the same transaction.
+    sqlx::query("DELETE FROM book_text_fts WHERE book_id = ?")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await?;
+
     // Record a tombstone so a client that pulls after this delete removes the
     // book locally instead of treating its absence as "nothing to do".
     sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id) VALUES (?, ?)")

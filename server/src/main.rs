@@ -126,6 +126,21 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
+    // Content indexing is opt-in per server (plan 5 #32): the index costs
+    // roughly the size of the text it holds, and it can be dropped and rebuilt
+    // from the blobs at any time.
+    let index_text = std::env::var("VELLUM_INDEX_TEXT")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    tracing::info!(
+        "content search: {}",
+        if index_text {
+            "on (VELLUM_INDEX_TEXT)"
+        } else {
+            "off (set VELLUM_INDEX_TEXT=1 to index book contents)"
+        }
+    );
+
     let state = AppState {
         db,
         public_base_url,
@@ -144,11 +159,26 @@ async fn main() -> anyhow::Result<()> {
             std::time::Duration::from_secs(60),
         )),
         mailer,
+        index_text,
+        text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert,
     };
 
     // Sweep temp files left by uploads a previous run couldn't finish.
     sweep_tmp_files(&state.data_dir.join("files")).await;
+
+    // The content-search worker (plan 5 #32). Queueing what has no index row
+    // yet is what makes switching the feature on retroactive: a server that ran
+    // for a year without it catches up here rather than only indexing uploads
+    // from now on.
+    if state.index_text {
+        match vellum_server::enqueue_missing_text(&state).await {
+            Ok(queued) if queued > 0 => tracing::info!("content search: queued {queued} file(s)"),
+            Ok(_) => {}
+            Err(e) => tracing::warn!("content search: could not queue backlog: {e:?}"),
+        }
+        tokio::spawn(vellum_server::run_text_worker(state.clone()));
+    }
 
     let port: u16 = std::env::var("VELLUM_PORT")
         .ok()

@@ -28,6 +28,7 @@ import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
+import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
 import 'shelf/shelf_view.dart';
 
@@ -115,6 +116,12 @@ class LibraryPage extends StatefulWidget {
 
 class _LibraryPageState extends State<LibraryPage> {
   String _query = '';
+
+  /// Whether the search is looking inside book contents (plan 5 #32) rather
+  /// than at titles and authors. Only reachable when the server advertises
+  /// `content_search`; reset whenever the query is cleared, so a disconnect
+  /// can't strand the shelf on a tab that can't answer.
+  bool _searchInsideBooks = false;
   // The active genre facet, or null for "all genres". Kept separate from the
   // text query so a genre filter and a text search can be on at once, and so it
   // can be shown/cleared as a chip rather than hidden in the search box.
@@ -334,7 +341,14 @@ class _LibraryPageState extends State<LibraryPage> {
   void _onQueryChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 150), () {
-      if (mounted) setState(() => _query = value);
+      if (mounted) {
+        setState(() {
+          _query = value;
+          // Clearing the box leaves the content tab behind, so the shelf is
+          // never stranded on a tab with nothing to show.
+          if (value.trim().isEmpty) _searchInsideBooks = false;
+        });
+      }
     });
   }
 
@@ -410,6 +424,13 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   /// Applies the genre facet from a tapped genre chip on a book's detail page.
+  /// Whether this server can search inside book contents (plan 5 #32). Reads
+  /// the capability handshake rather than probing: a tab that 400s on every
+  /// keystroke is worse than no tab.
+  bool get _contentSearchAvailable =>
+      widget.connection.isConnected &&
+      (widget.connection.capabilities?.hasFeature('content_search') ?? false);
+
   /// Sets the dedicated filter (shown as a removable chip near the search)
   /// rather than the search box, so any text search you had stays put.
   void _applyGenreFilter(String genre) {
@@ -650,6 +671,36 @@ class _LibraryPageState extends State<LibraryPage> {
               children: [
                 if (_genreFilter != null) _activeGenreBar(),
                 _shelfChips(shelves, active),
+                if (_contentSearchAvailable && _query.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                    child: SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          label: Text('Titles'),
+                          icon: Icon(Icons.menu_book_outlined),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          label: Text('In book contents'),
+                          icon: Icon(Icons.find_in_page_outlined),
+                        ),
+                      ],
+                      selected: {_searchInsideBooks},
+                      onSelectionChanged: (selection) =>
+                          setState(() => _searchInsideBooks = selection.first),
+                    ),
+                  ),
+                if (_searchInsideBooks && _query.trim().isNotEmpty)
+                  Expanded(
+                    child: ContentSearchResults(
+                      query: _query,
+                      connection: widget.connection,
+                      repository: repository,
+                    ),
+                  )
+                else
                 Expanded(
                   child: StreamBuilder<LibraryView>(
                     stream: repository.queries.watchLibrary(

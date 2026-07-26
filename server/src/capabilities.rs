@@ -25,14 +25,14 @@ pub struct Capabilities {
 
 /// Built from routes that actually exist in `lib.rs`, not from the plan's
 /// example list — a capability handshake that claims a feature no route
-/// backs is worse than not having one. Notably absent, and why:
-/// - `content_search`: the FTS5 search index (plan 5 #2) is app-local only,
-///   no server-side equivalent exists.
+/// backs is worse than not having one.
 ///
-/// `mail` is the one entry that is **not** a constant: it depends on whether
-/// this particular server has SMTP configured (plan 5 #31). Advertising it lets
-/// the app hide "Forgot password?" instead of offering a button that can only
-/// fail — which is the whole reason a capability handshake exists.
+/// `mail` and `content_search` are the entries that are **not** constants: they
+/// depend on whether this particular server has SMTP configured (plan 5 #31) and
+/// whether it indexes book contents (`VELLUM_INDEX_TEXT`, plan 5 #32). That is
+/// the whole reason a capability handshake exists — the app hides "Forgot
+/// password?" and the "In book contents" search tab instead of offering buttons
+/// that can only fail.
 ///
 /// `shelf_sync`, `copy_sync`, `loan_sync` (plan 5 #4), and `batch_push`
 /// (plan 5 #7) are the entries that became true after this handshake
@@ -64,6 +64,9 @@ pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {
     let mut features = FEATURES.to_vec();
     if crate::mail::is_enabled(&state.mailer) {
         features.push("mail");
+    }
+    if state.index_text {
+        features.push("content_search");
     }
     Json(Capabilities {
         server_version: env!("CARGO_PKG_VERSION"),

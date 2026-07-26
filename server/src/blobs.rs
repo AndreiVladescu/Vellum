@@ -366,6 +366,7 @@ pub async fn upload_file(
     // nothing user-visible is lost if this fails.
     let bg = state.clone();
     let bg_id = id.clone();
+    let bg_file_id = file_id.clone();
     let bg_full = full.clone();
     let bg_filename = q.filename.clone();
     let is_pdf = ext == "pdf";
@@ -406,6 +407,10 @@ pub async fn upload_file(
         // Fill still-missing author / title / publisher / year from the file-name
         // convention (so a later online lookup can search a clean title).
         let _ = crate::discover::apply_filename_metadata(&bg, &bg_id, &bg_filename).await;
+        // Queue the contents for indexing (plan 5 #32). A no-op unless the
+        // server opted in, and never on the request path: extracting a 900-page
+        // PDF must not hold an upload open.
+        crate::text_index::enqueue(&bg, &bg_file_id, &bg_id).await;
     });
 
     Ok(Json(file))
@@ -579,6 +584,167 @@ fn epub_cover_bytes(path: &Path) -> Option<Vec<u8>> {
     let href = cover_href?;
     let full = join_posix(opf_dir, &href);
     entry(&mut zip, &full)
+}
+
+/// Every spine section of an EPUB as plain text, in reading order (plan 5 #32).
+///
+/// Reuses the same zip + tiny-XML reading as [`epub_cover_bytes`] — an EPUB is
+/// a zip of XHTML, so its text costs nothing but a strip of the tags. Sections
+/// that fail to read are skipped rather than aborting the file: one broken
+/// chapter should not make a whole book unsearchable.
+///
+/// Returns None only when the archive itself can't be read as an EPUB.
+pub(crate) fn epub_section_texts(path: &Path) -> Option<Vec<String>> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut zip = zip::ZipArchive::new(file).ok()?;
+
+    fn entry(zip: &mut zip::ZipArchive<std::fs::File>, name: &str) -> Option<Vec<u8>> {
+        use std::io::Read;
+        // Same zip-bomb cap as the cover read (M1): a tiny compressed entry
+        // must not be able to inflate into gigabytes of memory.
+        const MAX_ENTRY_BYTES: u64 = 32 * 1024 * 1024;
+        let f = zip.by_name(name).ok()?;
+        let mut buf = Vec::new();
+        f.take(MAX_ENTRY_BYTES).read_to_end(&mut buf).ok()?;
+        Some(buf)
+    }
+
+    let container = String::from_utf8(entry(&mut zip, "META-INF/container.xml")?).ok()?;
+    let opf_path = tag_attr(find_tag(&container, "rootfile")?, "full-path")?.to_string();
+    let opf = String::from_utf8(entry(&mut zip, &opf_path)?).ok()?;
+    let opf_dir = opf_path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+
+    // id -> href for every manifest item, then walk the spine's itemrefs, which
+    // is what defines reading order.
+    let manifest: Vec<(String, String)> = item_tags(&opf)
+        .filter_map(|tag| {
+            Some((
+                tag_attr(tag, "id")?.to_string(),
+                tag_attr(tag, "href")?.to_string(),
+            ))
+        })
+        .collect();
+
+    let mut sections = Vec::new();
+    for idref in itemref_ids(&opf) {
+        let Some((_, href)) = manifest.iter().find(|(id, _)| id == idref) else {
+            continue;
+        };
+        let full = join_posix(opf_dir, href);
+        let Some(bytes) = entry(&mut zip, &full) else {
+            continue;
+        };
+        let Ok(xhtml) = String::from_utf8(bytes) else {
+            continue;
+        };
+        sections.push(strip_markup(&xhtml));
+    }
+    Some(sections)
+}
+
+/// The `idref` of every `<itemref>`, in document order — the EPUB spine.
+fn itemref_ids(opf: &str) -> Vec<&str> {
+    let mut ids = Vec::new();
+    for (i, _) in opf.match_indices("<itemref") {
+        let rest = &opf[i..];
+        let Some(end) = rest.find('>') else { continue };
+        if let Some(id) = tag_attr(&rest[..end], "idref") {
+            ids.push(id);
+        }
+    }
+    ids
+}
+
+/// XHTML to searchable text: drop `<script>`/`<style>` bodies, then every tag,
+/// then decode the handful of entities that actually appear in prose.
+///
+/// A real HTML parser would be more correct and is not worth a dependency here:
+/// the output is only ever fed to an FTS tokenizer, which throws away
+/// punctuation anyway. What matters is that no tag *name* ends up as a search
+/// term — "div" must not match every book.
+fn strip_markup(xhtml: &str) -> String {
+    const SKIP: [(&str, &str); 2] = [("<script", "</script>"), ("<style", "</style>")];
+    let lower = xhtml.to_ascii_lowercase();
+    let mut text = String::with_capacity(xhtml.len() / 2);
+    let mut i = 0;
+    while i < xhtml.len() {
+        let Some(open) = xhtml[i..].find('<') else {
+            text.push_str(&xhtml[i..]);
+            break;
+        };
+        text.push_str(&xhtml[i..i + open]);
+        let tag_at = i + open;
+
+        // Skip the *contents* of script/style, not merely their tags —
+        // otherwise a variable name inside a <script> becomes a search term
+        // that matches a book nobody can see it in.
+        if let Some((_, close)) = SKIP
+            .iter()
+            .find(|(open_tag, _)| lower[tag_at..].starts_with(open_tag))
+        {
+            i = lower[tag_at..]
+                .find(close)
+                .map(|e| tag_at + e + close.len())
+                .unwrap_or(xhtml.len());
+            continue;
+        }
+
+        // Any other tag is dropped and replaced by a space: without that,
+        // "end.<p>Next" would index as the single word "end.Next".
+        text.push(' ');
+        i = xhtml[tag_at..]
+            .find('>')
+            .map(|e| tag_at + e + 1)
+            .unwrap_or(xhtml.len());
+    }
+    decode_entities(&text)
+}
+
+fn decode_entities(raw: &str) -> String {
+    raw.replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+}
+
+/// PDF text via the sandboxed CLI tools (plan 5 #32).
+///
+/// The **same** sandbox as the cover renderer, on purpose: wall timeout,
+/// `setrlimit` caps, `kill_on_drop`, and the shared semaphore. Adding a second,
+/// weaker shell-out path for text would undo L6 for exactly the files most
+/// likely to be hostile.
+///
+/// Returns the text (possibly empty, which means "reached the tool, the PDF has
+/// no text layer") or None when no tool could be run at all.
+pub(crate) async fn pdf_text_via_cli(state: &AppState, input: &Path) -> Option<String> {
+    let out = state
+        .data_dir
+        .join(format!(".text-{}.txt", uuid::Uuid::new_v4()));
+    let _permit = state.render_semaphore.acquire().await.ok()?;
+
+    // poppler's pdftotext keeps page breaks as form feeds by default, which is
+    // how the page numbers survive.
+    let mut cmd = std::process::Command::new("pdftotext");
+    cmd.arg("-q").arg(input).arg(&out);
+    let mut ran = run_render(cmd).await;
+    if !ran {
+        let _ = tokio::fs::remove_file(&out).await;
+        let mut cmd = std::process::Command::new("mutool");
+        cmd.args(["draw", "-F", "txt", "-o"]).arg(&out).arg(input);
+        ran = run_render(cmd).await;
+    }
+    drop(_permit);
+
+    let text = tokio::fs::read_to_string(&out).await.ok();
+    let _ = tokio::fs::remove_file(&out).await;
+    if ran {
+        text.or(Some(String::new()))
+    } else {
+        None
+    }
 }
 
 /// The substring `<name ...>` for the first element called `name`, or None. The
