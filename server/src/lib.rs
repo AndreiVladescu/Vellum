@@ -198,6 +198,10 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // User-to-user shares.
         .route("/shares", get(shares::list).post(shares::create))
         .route("/shares/{id}", delete(shares::delete))
+        // Emailed member invites (plan 5 #31, stage 3). Minting is master-only;
+        // redeeming is necessarily unauthenticated — the invitee has no account.
+        .route("/invites", post(shares::create_invite))
+        .route("/invites/redeem", post(shares::redeem_invite))
         // Public per-book links (no account required to read).
         .route(
             "/share-links",
@@ -242,6 +246,7 @@ pub fn router(state: AppState) -> Router {
         .route("/p/{token}", get(web::public_page))
         // Where the emailed password-reset link lands (plan 5 #31).
         .route("/reset/{token}", get(web::reset_page))
+        .route("/join/{token}", get(web::join_page))
         // OPDS catalog for third-party e-readers (HTTP Basic auth) — not
         // versioned: readers have this exact URL saved, it never moves.
         .route("/opds", get(opds::feed))

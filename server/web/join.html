@@ -1,0 +1,78 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join a Vellum library</title>
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/assets/console.css">
+
+<!--
+  Where an emailed invite lands (plan 5 #31, stage 3). Like the reset page, it
+  takes the token from its own path so it never has to be typed or pasted.
+  The email address is *not* a field here on purpose: it comes from the invite,
+  so a forwarded link can't be used to open an account under another address.
+-->
+<main class="modal" style="max-width:420px;margin:12vh auto">
+  <h2 style="margin:0 0 4px">Join this library</h2>
+  <p class="muted" id="hint" style="margin:0 0 16px">
+    Choose a name and a password. Your account uses the address the invitation
+    was sent to.
+  </p>
+
+  <form id="form" autocomplete="on">
+    <label for="name">Your name</label>
+    <input id="name" type="text" autocomplete="name" required style="width:100%">
+    <label for="pw" style="margin-top:10px">Password</label>
+    <input id="pw" type="password" autocomplete="new-password" required
+           minlength="8" style="width:100%">
+    <label for="pw2" style="margin-top:10px">Repeat it</label>
+    <input id="pw2" type="password" autocomplete="new-password" required
+           minlength="8" style="width:100%">
+    <p class="err" id="err" style="min-height:1.2em"></p>
+    <button class="btn primary" id="go" type="submit" style="width:100%">
+      Create my account
+    </button>
+  </form>
+</main>
+
+<script>
+  const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+  const err = document.getElementById('err');
+  const form = document.getElementById('form');
+
+  if (!token) {
+    err.textContent = 'This link is incomplete. Open the link from your email again.';
+    document.getElementById('go').disabled = true;
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    err.textContent = '';
+    const pw = document.getElementById('pw').value;
+    if (pw !== document.getElementById('pw2').value) {
+      err.textContent = 'Those two passwords are different.';
+      return;
+    }
+    const go = document.getElementById('go');
+    go.disabled = true;
+    try {
+      const res = await fetch('/api/invites/redeem', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          display_name: document.getElementById('name').value.trim(),
+          password: pw,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not create the account.');
+      form.innerHTML =
+        '<p>Welcome. Sign in as <strong>' + (body.email || '') +
+        '</strong> here or in the app.</p>' +
+        '<a class="btn primary" href="/">Go to the console</a>';
+      document.getElementById('hint').textContent = '';
+    } catch (e) {
+      err.textContent = e.message;
+      go.disabled = false;
+    }
+  });
+</script>

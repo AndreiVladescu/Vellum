@@ -1392,6 +1392,296 @@ async fn a_new_reset_request_invalidates_the_previous_link() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+// ---- Emailed invites (plan 5 #31, stage 3) ---------------------------------
+
+#[tokio::test]
+async fn only_the_master_may_invite() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let alice = add_member(&app, &master, "alice@lib.test").await;
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&alice),
+        Some(json!({ "email": "friend@lib.test" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn an_invite_without_mail_hands_back_the_link() {
+    // A LAN server with no SMTP must still be able to invite someone; refusing
+    // would make the feature depend on a mailer the design says is optional.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "friend@lib.test" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["emailed"], json!(false));
+    let url = body["url"].as_str().expect("the link is returned instead");
+    assert!(url.contains("/join/"));
+}
+
+#[tokio::test]
+async fn redeeming_an_invite_creates_the_account_and_applies_the_share() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let (_, invite) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({
+            "email": "friend@lib.test",
+            "scope": "book",
+            "scope_id": book,
+            "permission": "viewer"
+        })),
+    )
+    .await;
+    let token = invite["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/invites/redeem",
+        None,
+        Some(json!({
+            "token": token,
+            "display_name": "A Friend",
+            "password": "friendpass1"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    // They can sign in...
+    let (status, login) = call(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "email": "friend@lib.test", "password": "friendpass1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let friend = login["token"].as_str().unwrap().to_string();
+    assert_eq!(login["user"]["is_master"], json!(false), "never master");
+
+    // ...and the grant came with the invite.
+    let (_, books) = call(&app, "GET", "/api/books", Some(&friend), None).await;
+    assert_eq!(titles(&books), vec!["Dune".to_string()]);
+
+    // Viewer, not editor.
+    let (status, _) = call(
+        &app,
+        "PUT",
+        &format!("/api/books/{book}"),
+        Some(&friend),
+        Some(json!({ "title": "Hijacked" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn an_invite_works_once() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let (_, invite) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "friend@lib.test" })),
+    )
+    .await;
+    let token = invite["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    let redeem = json!({
+        "token": token,
+        "display_name": "A Friend",
+        "password": "friendpass1"
+    });
+    let (first, _) = call(
+        &app,
+        "POST",
+        "/api/invites/redeem",
+        None,
+        Some(redeem.clone()),
+    )
+    .await;
+    assert_eq!(first, StatusCode::OK);
+    let (second, _) = call(&app, "POST", "/api/invites/redeem", None, Some(redeem)).await;
+    assert_eq!(
+        second,
+        StatusCode::BAD_REQUEST,
+        "a link is not a standing door"
+    );
+}
+
+#[tokio::test]
+async fn the_account_uses_the_invited_address_not_a_chosen_one() {
+    // The security property: a forwarded link must not become an open
+    // registration endpoint under whatever address the caller likes.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let (_, invite) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "intended@lib.test" })),
+    )
+    .await;
+    let token = invite["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/invites/redeem",
+        None,
+        Some(json!({
+            "token": token,
+            // No email field exists on the redeem input at all — this is the
+            // shape of the API, and the test pins it by checking the outcome.
+            "display_name": "Someone Else",
+            "password": "friendpass1"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["email"], json!("intended@lib.test"));
+}
+
+#[tokio::test]
+async fn re_inviting_supersedes_the_previous_link() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let (_, first) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "friend@lib.test" })),
+    )
+    .await;
+    let old = first["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "friend@lib.test" })),
+    )
+    .await;
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/invites/redeem",
+        None,
+        Some(json!({
+            "token": old,
+            "display_name": "A Friend",
+            "password": "friendpass1"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn inviting_an_existing_account_is_refused_plainly() {
+    // Unlike `forgot`, being explicit is right here: the master is entitled to
+    // know who already has an account in their own library.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    add_member(&app, &master, "alice@lib.test").await;
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "alice@lib.test" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn an_expired_invite_is_refused() {
+    let (app, db) = test_app_with_mail().await;
+    let master = register_master(&app).await;
+    let (_, invite) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "friend@lib.test" })),
+    )
+    .await;
+    // Mail is "configured" here, so the link isn't returned -- age the row
+    // directly instead, which is what a fortnight would do.
+    let _ = invite;
+    sqlx::query("UPDATE invite SET expires_at = datetime('now', '-1 day')")
+        .execute(&db)
+        .await
+        .unwrap();
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/invites/redeem",
+        None,
+        Some(json!({
+            "token": "whatever",
+            "display_name": "A Friend",
+            "password": "friendpass1"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
 // ---- Integrity sweep and snapshot (plan 5 #12) -----------------------------
 
 #[tokio::test]

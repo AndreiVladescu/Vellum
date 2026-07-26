@@ -53,7 +53,7 @@ is answerable from `git log`:
 | 37 | Request ids, tracing spans, stats dashboard | `ab00074` |
 | 12 | Integrity sweep, stats, snapshot endpoints | `9a4540f` |
 | 46 | RBAC matrix + compile-checked queries | `74d3864`, `b903cb5` |
-| 31 | Opt-in SMTP mailer; password reset (stages 1–2 of 3) | `d031ffd`, `eda0843` |
+| 31 | SMTP mailer, password reset, emailed invites | `d031ffd`, `eda0843`, `2f0ac0c` |
 | 27 | Loan due dates, overdue badges, reminders* | `93574d5` |
 
 **Phases 1–3 are done, 7 of Phase 4's 11 items, and 4½ of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14

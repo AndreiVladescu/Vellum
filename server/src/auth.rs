@@ -290,6 +290,12 @@ fn verify_password(password: &str, hash: &str) -> bool {
 }
 
 /// A fresh opaque session token (returned to the client once).
+/// The invite-token minter (plan 5 #31 stage 3), same generator as sessions and
+/// resets — one source of randomness, so all three have the same strength.
+pub fn new_token_for_invite() -> String {
+    new_token()
+}
+
 fn new_token() -> String {
     let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
@@ -729,4 +735,20 @@ pub async fn reset(
 
     tracing::info!(user_id, "password reset completed");
     Ok(Json(serde_json::json!({ "status": "password updated" })))
+}
+
+/// Creates the account behind a redeemed invite (plan 5 #31, stage 3).
+///
+/// Deliberately not reachable through the public registration path: the address
+/// comes from the *invite*, not from the request, so a forwarded link can't be
+/// used to open an account under someone else's email. Never master.
+pub async fn create_invited_user(
+    state: &AppState,
+    email: &str,
+    display_name: &str,
+    password: &str,
+) -> AppResult<String> {
+    check_password_length(password)?;
+    let user = insert_user(&state.db, email, display_name, password, false).await?;
+    Ok(user.id)
 }

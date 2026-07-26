@@ -158,8 +158,17 @@ the security of it:
 - Redeeming one **drops every existing session** for that account: resetting is
   what someone does when they fear they are compromised.
 
-The token rides in the path, and the request logger **redacts** it
-(`/reset/<redacted>`) — see L8 in `docs/SECURITY_AUDIT.md`.
+**Invites** close the loop: registration shuts after the first account, so
+`POST /api/invites` (master-only) mints a 14-day single-use token and emails a
+join link, optionally carrying a share to apply on redemption. Two choices worth
+noting — the account is created under the **invited address**, never one the
+redeemer supplies, so a forwarded link can't become an open registration
+endpoint; and when mail is off the link is **returned to the master** instead of
+the invite being refused, because a LAN server without SMTP still needs to add
+people. Re-inviting an address supersedes the previous link.
+
+Both token-bearing paths (`/reset/<token>`, `/join/<token>`) are **redacted** by
+the request logger — see L8 in `docs/SECURITY_AUDIT.md`.
 
 ## Observability
 

@@ -40,6 +40,11 @@ pub async fn reset_page() -> Html<&'static str> {
     Html(include_str!("../web/reset.html"))
 }
 
+/// Where an emailed invite link lands (plan 5 #31, stage 3).
+pub async fn join_page() -> Html<&'static str> {
+    Html(include_str!("../web/join.html"))
+}
+
 pub async fn public_page() -> Html<&'static str> {
     Html(include_str!("../web/public.html"))
 }

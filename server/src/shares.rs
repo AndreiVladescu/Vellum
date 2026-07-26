@@ -515,3 +515,226 @@ async fn require_owns_book(state: &AppState, user: &AuthUser, book_id: &str) -> 
         ))
     }
 }
+
+// ---- Emailed invites (plan 5 #31, stage 3) ---------------------------------
+
+#[derive(Deserialize)]
+pub struct InviteInput {
+    pub email: String,
+    /// Optional grant to apply when the invite is redeemed, same shape as a
+    /// share: `all`, `group` or `book`. Omit for "just give them an account".
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub scope_id: Option<String>,
+    #[serde(default)]
+    pub permission: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct InviteCreated {
+    pub email: String,
+    pub expires_at: String,
+    /// True when the link was emailed. False means mail is off and the operator
+    /// has to pass `url` along themselves — better than refusing to invite at
+    /// all on a LAN server.
+    pub emailed: bool,
+    /// Only returned when it could *not* be emailed; otherwise the link exists
+    /// solely in the recipient's inbox.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// `POST /api/invites` — master-only: mint an invite and email a join link.
+///
+/// Registration is closed after the first account, so this is how a second
+/// person gets in without the master typing a password on their behalf and
+/// sending it over a chat app.
+pub async fn create_invite(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(input): Json<InviteInput>,
+) -> AppResult<Json<InviteCreated>> {
+    if !user.is_master {
+        return Err(AppError::Forbidden("only the master may invite".into()));
+    }
+    let email = input.email.trim().to_lowercase();
+    if !email.contains('@') {
+        return Err(AppError::BadRequest("a valid email is required".into()));
+    }
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM app_user WHERE email = ?)")
+        .bind(&email)
+        .fetch_one(&state.db)
+        .await?;
+    if exists {
+        // Unlike `forgot`, saying so is right here: the master is entitled to
+        // know who already has an account in their own library.
+        return Err(AppError::Conflict(
+            "that email already has an account".into(),
+        ));
+    }
+
+    let permission = normalize_permission(input.permission.as_deref())?;
+    if let Some(scope) = input.scope.as_deref() {
+        if !matches!(scope, "all" | "group" | "book") {
+            return Err(AppError::BadRequest(
+                "scope must be all, group, or book".into(),
+            ));
+        }
+        if scope != "all" && input.scope_id.is_none() {
+            return Err(AppError::BadRequest(
+                "scope_id is required for a group or book invite".into(),
+            ));
+        }
+    }
+
+    // One outstanding invite per address, so re-inviting supersedes rather than
+    // leaving two live links.
+    sqlx::query("DELETE FROM invite WHERE email = ?")
+        .bind(&email)
+        .execute(&state.db)
+        .await?;
+
+    let token = crate::auth::new_token_for_invite();
+    sqlx::query(
+        "INSERT INTO invite (token_hash, email, invited_by, scope, scope_id, \
+            permission, expires_at) \
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))",
+    )
+    .bind(crate::auth::sha256_hex(&token))
+    .bind(&email)
+    .bind(&user.id)
+    .bind(&input.scope)
+    .bind(&input.scope_id)
+    .bind(permission)
+    .execute(&state.db)
+    .await?;
+
+    let url = format!(
+        "{}/join/{token}",
+        state.public_base_url.trim_end_matches('/')
+    );
+    let expires_at: String = sqlx::query_scalar("SELECT expires_at FROM invite WHERE email = ?")
+        .bind(&email)
+        .fetch_one(&state.db)
+        .await?;
+
+    let emailed = match state.mailer.clone() {
+        Some(mailer) => {
+            let body = format!(
+                "{} has invited you to their Vellum library.\n\n\
+                 Open this link within two weeks to choose a password and join:\n\n\
+                 {url}\n\n\
+                 If you weren't expecting this, ignore it — the link expires on \n\
+                 its own and nothing was created for you.\n",
+                user.display_name
+            );
+            mailer
+                .send(&email, "You've been invited to a Vellum library", &body)
+                .await
+                .is_ok()
+        }
+        None => false,
+    };
+
+    Ok(Json(InviteCreated {
+        email,
+        expires_at,
+        emailed,
+        // Handing the link back when mail is off is the difference between a
+        // usable LAN server and a feature that only works with SMTP.
+        url: (!emailed).then_some(url),
+    }))
+}
+
+/// One outstanding invite, as the redeem path reads it.
+#[derive(sqlx::FromRow)]
+struct PendingInvite {
+    email: String,
+    scope: Option<String>,
+    scope_id: Option<String>,
+    permission: String,
+    invited_by: String,
+}
+
+#[derive(Deserialize)]
+pub struct RedeemInput {
+    pub token: String,
+    pub display_name: String,
+    pub password: String,
+}
+
+/// `POST /api/invites/redeem` — create the account and apply the grant.
+///
+/// Unauthenticated by necessity: the invitee has no account yet. The token is
+/// the whole credential, so it is single-use, short-lived, and the account it
+/// creates uses the invited address rather than one the caller chooses — a
+/// forwarded link must not become an open registration endpoint.
+pub async fn redeem_invite(
+    State(state): State<AppState>,
+    Json(input): Json<RedeemInput>,
+) -> AppResult<Json<serde_json::Value>> {
+    let hash = crate::auth::sha256_hex(input.token.trim());
+    let row: Option<PendingInvite> = sqlx::query_as(
+        "SELECT email, scope, scope_id, permission, invited_by FROM invite \
+         WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')",
+    )
+    .bind(&hash)
+    .fetch_optional(&state.db)
+    .await?;
+    let Some(PendingInvite {
+        email,
+        scope,
+        scope_id,
+        permission,
+        invited_by,
+    }) = row
+    else {
+        return Err(AppError::BadRequest(
+            "this invitation is invalid or has expired".into(),
+        ));
+    };
+
+    let user_id = crate::auth::create_invited_user(
+        &state,
+        &email,
+        input.display_name.trim(),
+        &input.password,
+    )
+    .await?;
+
+    let mut tx = state.db.begin().await?;
+    let consumed = sqlx::query(
+        "UPDATE invite SET used_at = datetime('now') \
+         WHERE token_hash = ? AND used_at IS NULL",
+    )
+    .bind(&hash)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if consumed == 0 {
+        return Err(AppError::BadRequest(
+            "this invitation is invalid or has expired".into(),
+        ));
+    }
+    if let Some(scope) = scope {
+        sqlx::query(
+            "INSERT INTO share (id, owner_id, grantee_id, scope, scope_id, permission) \
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&invited_by)
+        .bind(&user_id)
+        .bind(&scope)
+        .bind(&scope_id)
+        .bind(&permission)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+
+    tracing::info!(user_id, "invite redeemed");
+    Ok(Json(
+        serde_json::json!({ "status": "account created", "email": email }),
+    ))
+}
