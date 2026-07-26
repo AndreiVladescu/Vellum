@@ -18,6 +18,10 @@ class Books extends Table {
   IntColumn get pageCount => integer().nullable()();
   TextColumn get coverPath => text().nullable()();
   TextColumn get spineStyle => text().nullable()(); // JSON: generated spine params
+  // Series membership (plan 5 #17), synced. `seriesIndex` is REAL so a novella
+  // can be 1.5 — an integer would force it to lie about where it sits.
+  TextColumn get seriesId => text().nullable().references(Series, #id)();
+  RealColumn get seriesIndex => real().nullable()();
   // Reading state (null progress = never opened).
   RealColumn get readingProgress => real().nullable()(); // 0..1
   IntColumn get lastReadPage => integer().nullable()();
@@ -62,6 +66,17 @@ class Books extends Table {
   DateTimeColumn get finishedAt => dateTime().nullable()();
   /// How many times this book has been finished, for re-reads.
   IntColumn get readCount => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// A named book series (plan 5 #17). Mirrors `server/migrations/0012_series.sql`
+/// — this one **is** synced, unlike the app-local tables further down: series
+/// membership is catalogue metadata the metadata sources supply.
+class Series extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text().unique()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -351,6 +366,7 @@ class ReadingSessions extends Table {
 
 @DriftDatabase(tables: [
   Books,
+  Series,
   Authors,
   BookAuthors,
   Genres,
@@ -373,7 +389,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -544,6 +560,15 @@ class VellumDatabase extends _$VellumDatabase {
             if (!(await tableNames()).contains('reading_sessions')) {
               await m.createTable(readingSessions);
             }
+          }
+          if (from < 17) {
+            // Series (plan 5 #17) — synced, so this has a matching server
+            // migration (0012) and an entry in schema_parity.rs.
+            if (!(await tableNames()).contains('series')) {
+              await m.createTable(series);
+            }
+            await addBookColumn('series_id', books.seriesId);
+            await addBookColumn('series_index', books.seriesIndex);
           }
         },
         beforeOpen: (details) async {

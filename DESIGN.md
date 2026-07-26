@@ -186,6 +186,22 @@ warns when a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+**Series and volume tracking** (both, plan 5 #17) is the one Phase-4 addition that
+**syncs**: a series is catalogue metadata the online sources supply, and a library
+of trilogies sorted by title puts *The Two Towers* nowhere near *The Fellowship of
+the Ring*. A `series` table plus `book.series_id` / `book.series_index` exist on
+both sides (`server/migrations/0012`, drift v17, `schema_parity.rs`). Two choices
+worth knowing: membership crosses the wire **by name**, so two devices that each
+invented an id for "Dune" still converge (the rule authors and genres already
+follow), and `series_index` is **REAL** so a novella can be 1.5 instead of lying
+about where it sits.
+
+`ShelfSort.series` orders by series name, then volume, then title, with
+series-less books last. The detail page shows the book's place in its series and,
+more usefully, the **gaps** — whole numbers missing between the volumes you own.
+Only whole numbers are ever claimed missing: a fractional 2.5 is usually a novella
+nobody intended to own, and inventing gaps would make the feature cry wolf.
+
 **Reading insights** (app, plan 5 #19) exist because the app was already writing
 a position on every page turn and throwing all of it away. A `reading_sessions`
 table keeps the shape of it — **one row per sitting**, not per page turn — and

@@ -395,6 +395,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               const SizedBox(height: 24),
               PhysicalCopiesSection(book: book, repository: repository),
               const SizedBox(height: 24),
+              _SeriesStrip(book: book, repository: repository),
               _StatusAndRating(book: book, repository: repository),
               ReaderNotesSection(book: book, repository: repository),
               // The reading record for this book (plan 5 #22). No onJump here:
@@ -575,6 +576,152 @@ class _StatusAndRating extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+
+/// Where this book sits in its series, and what's missing (plan 5 #17).
+///
+/// The gap list is the most useful thing the feature can say: not "book 2 of 5"
+/// but "you're missing 2". Tapping *Set series…* edits the membership; the field
+/// autocompletes over series the library already knows, so a typo doesn't create
+/// a second "Dune".
+class _SeriesStrip extends StatelessWidget {
+  const _SeriesStrip({required this.book, required this.repository});
+
+  final Book book;
+  final LibraryRepository repository;
+
+  Future<void> _edit(BuildContext context) async {
+    final names = await repository.seriesService.watchNames().first;
+    final current = await repository.seriesService.nameOf(book.id) ?? '';
+    if (!context.mounted) return;
+    final nameController = TextEditingController(text: current);
+    final indexController = TextEditingController(
+      text: book.seriesIndex == null
+          ? ''
+          // Trim a trailing .0 so "2" doesn't come back as "2.0".
+          : (book.seriesIndex! % 1 == 0
+              ? book.seriesIndex!.toInt().toString()
+              : book.seriesIndex!.toString()),
+    );
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Series'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Autocomplete<String>(
+              initialValue: TextEditingValue(text: current),
+              optionsBuilder: (value) {
+                final q = value.text.trim().toLowerCase();
+                if (q.isEmpty) return names;
+                return names
+                    .where((n) => n.toLowerCase().contains(q))
+                    .toList();
+              },
+              onSelected: (value) => nameController.text = value,
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
+                controller.addListener(
+                    () => nameController.text = controller.text);
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Series name',
+                    helperText: 'Leave blank for no series',
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: indexController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Volume',
+                helperText: 'Decimals are fine — a novella can be 1.5',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true) return;
+    await repository.seriesService.setSeries(
+      book.id,
+      nameController.text,
+      double.tryParse(indexController.text.trim()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FutureBuilder<SeriesPlace?>(
+      future: repository.seriesService.placeOf(book),
+      builder: (context, snapshot) {
+        final place = snapshot.data;
+        if (place == null) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _edit(context),
+              icon: const Icon(Icons.format_list_numbered, size: 18),
+              label: const Text('Set series…'),
+            ),
+          );
+        }
+        final index = place.index;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      index == null
+                          ? place.name
+                          : '${place.name} · '
+                              'book ${index % 1 == 0 ? index.toInt() : index}'
+                              ' of ${place.owned.length} you own',
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    tooltip: 'Edit series',
+                    onPressed: () => _edit(context),
+                  ),
+                ],
+              ),
+              if (place.hasGaps)
+                Text(
+                  'Missing: ${place.gaps.join(', ')}',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.tertiary),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

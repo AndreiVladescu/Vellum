@@ -86,6 +86,25 @@ List<Book> sortBooks({
         final c = (ay ?? 0).compareTo(by ?? 0);
         return c != 0 ? c : byTitle(a, b);
       });
+    case ShelfSort.series:
+      // This helper sorts a plain list of books and has no series *names* — the
+      // shelf's real sort happens in SQL (`LibraryQueries`), which joins them.
+      // Ordering by index within a series id keeps the two consistent for the
+      // callers that still use this path (search results, tests).
+      sorted.sort((a, b) {
+        final asId = a.seriesId;
+        final bsId = b.seriesId;
+        // Series-less books sort last.
+        if ((asId == null) != (bsId == null)) return asId == null ? 1 : -1;
+        if (asId != null && bsId != null && asId != bsId) {
+          return asId.compareTo(bsId);
+        }
+        final ai = a.seriesIndex;
+        final bi = b.seriesIndex;
+        if ((ai == null) != (bi == null)) return ai == null ? 1 : -1;
+        final c = (ai ?? 0).compareTo(bi ?? 0);
+        return c != 0 ? c : byTitle(a, b);
+      });
   }
   return sorted;
 }

@@ -345,11 +345,10 @@ pub async fn public_book(
     let (book_id, max_uses) =
         row.ok_or_else(|| AppError::NotFound("link is invalid or expired".into()))?;
 
-    let book = sqlx::query_as::<_, BookDto>(
-        "SELECT id, title, subtitle, description, isbn, publisher, published_year, \
-            page_count, cover_path, spine_style, owner_id, created_at, updated_at \
-         FROM book WHERE id = ?",
-    )
+    let book = sqlx::query_as::<_, BookDto>(&format!(
+        "SELECT {} FROM book b WHERE b.id = ?",
+        crate::books::BOOK_COLUMNS
+    ))
     .bind(&book_id)
     .fetch_optional(&state.db)
     .await?

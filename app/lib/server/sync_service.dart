@@ -253,6 +253,16 @@ class SyncService {
       }
     });
 
+    // Series membership for the adopted rows (plan 5 #17). Resolved by name, so
+    // two devices converge on one series row; null means the server says the
+    // book is in none, while a server that predates the feature sends nothing at
+    // all and `series` stays null — indistinguishable, and harmless: the next
+    // push re-asserts whatever this device knows.
+    for (final b in applied) {
+      await repository.seriesService
+          .setSeries(b.id, b.series, b.seriesIndex, markDirty: false);
+    }
+
     // Replace authors/genres for the rows we adopted. Null means the server
     // didn't send them (old server) — leave the local joins untouched.
     // setAuthors/setGenres mark the row dirty; the needsPush clear below undoes
@@ -838,6 +848,10 @@ class SyncService {
             updatedAt: b.updatedAt,
             authors: details.authors,
             genres: details.genres,
+            // '' rather than null clears the membership server-side; null would
+            // mean "nothing to say" and leave a stale series in place.
+            series: await repository.seriesService.nameOf(b.id) ?? '',
+            seriesIndex: b.seriesIndex,
           );
         }
         final cover = repository.coverFileOf(b);
@@ -1211,6 +1225,8 @@ class SyncService {
         items.add(BookPushItem(
           id: b.id,
           title: b.title,
+          series: await repository.seriesService.nameOf(b.id) ?? '',
+          seriesIndex: b.seriesIndex,
           subtitle: b.subtitle,
           description: b.description,
           isbn: b.isbn,

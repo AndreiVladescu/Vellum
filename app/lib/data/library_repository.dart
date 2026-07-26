@@ -15,6 +15,7 @@ import 'physical_service.dart';
 import '../reader/annotations/annotation_store.dart';
 import 'reading_position_service.dart';
 import 'reading_status.dart';
+import 'series_service.dart';
 import 'shelf_service.dart';
 
 // Physical-layout CRUD lives in LayoutRepository (reached via `.layout`);
@@ -30,6 +31,7 @@ export '../stats/session_recorder.dart' show SessionRecorder;
 export 'reading_position_service.dart'
     show ReadingJumpOffer, ReadingPositionService, readingUnitForFormats;
 export 'reading_status.dart' show ReadingStatus, ReadingStatusService;
+export 'series_service.dart' show SeriesPlace, SeriesService;
 
 /// All library operations the UI needs. A thin facade over the local
 /// database and filesystem store: each concern (queries, book lifecycle,
@@ -51,6 +53,7 @@ class LibraryRepository {
     required this.readingPositions,
     required this.annotations,
     required this.readingStatus,
+    required this.seriesService,
   });
 
   final VellumDatabase db;
@@ -93,6 +96,10 @@ class LibraryRepository {
   /// Reading status, ratings and finish dates (plan 5 #18). Reached as
   /// `repository.readingStatus`.
   final ReadingStatusService readingStatus;
+
+  /// Series membership and gap detection (plan 5 #17). Reached as
+  /// `repository.seriesService`.
+  final SeriesService seriesService;
 
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
@@ -157,6 +164,7 @@ class LibraryRepository {
       readingPositions: ReadingPositionService(db),
       annotations: AnnotationStore(db),
       readingStatus: ReadingStatusService(db),
+      seriesService: SeriesService(db),
     );
   }
 

@@ -3,6 +3,209 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
+class $SeriesTable extends Series with TableInfo<$SeriesTable, Sery> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SeriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'series';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Sery> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Sery map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Sery(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
+  }
+
+  @override
+  $SeriesTable createAlias(String alias) {
+    return $SeriesTable(attachedDatabase, alias);
+  }
+}
+
+class Sery extends DataClass implements Insertable<Sery> {
+  final String id;
+  final String name;
+  const Sery({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  SeriesCompanion toCompanion(bool nullToAbsent) {
+    return SeriesCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory Sery.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Sery(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  Sery copyWith({String? id, String? name}) =>
+      Sery(id: id ?? this.id, name: name ?? this.name);
+  Sery copyWithCompanion(SeriesCompanion data) {
+    return Sery(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Sery(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Sery && other.id == this.id && other.name == this.name);
+}
+
+class SeriesCompanion extends UpdateCompanion<Sery> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> rowid;
+  const SeriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SeriesCompanion.insert({
+    required String id,
+    required String name,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<Sery> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SeriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return SeriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -110,6 +313,31 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     aliasedName,
     true,
     type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _seriesIdMeta = const VerificationMeta(
+    'seriesId',
+  );
+  @override
+  late final GeneratedColumn<String> seriesId = GeneratedColumn<String>(
+    'series_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES series (id)',
+    ),
+  );
+  static const VerificationMeta _seriesIndexMeta = const VerificationMeta(
+    'seriesIndex',
+  );
+  @override
+  late final GeneratedColumn<double> seriesIndex = GeneratedColumn<double>(
+    'series_index',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _readingProgressMeta = const VerificationMeta(
@@ -297,6 +525,8 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     pageCount,
     coverPath,
     spineStyle,
+    seriesId,
+    seriesIndex,
     readingProgress,
     lastReadPage,
     lastReadAt,
@@ -390,6 +620,21 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
       context.handle(
         _spineStyleMeta,
         spineStyle.isAcceptableOrUnknown(data['spine_style']!, _spineStyleMeta),
+      );
+    }
+    if (data.containsKey('series_id')) {
+      context.handle(
+        _seriesIdMeta,
+        seriesId.isAcceptableOrUnknown(data['series_id']!, _seriesIdMeta),
+      );
+    }
+    if (data.containsKey('series_index')) {
+      context.handle(
+        _seriesIndexMeta,
+        seriesIndex.isAcceptableOrUnknown(
+          data['series_index']!,
+          _seriesIndexMeta,
+        ),
       );
     }
     if (data.containsKey('reading_progress')) {
@@ -549,6 +794,14 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.string,
         data['${effectivePrefix}spine_style'],
       ),
+      seriesId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}series_id'],
+      ),
+      seriesIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}series_index'],
+      ),
       readingProgress: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}reading_progress'],
@@ -629,6 +882,8 @@ class Book extends DataClass implements Insertable<Book> {
   final int? pageCount;
   final String? coverPath;
   final String? spineStyle;
+  final String? seriesId;
+  final double? seriesIndex;
   final double? readingProgress;
   final int? lastReadPage;
   final DateTime? lastReadAt;
@@ -659,6 +914,8 @@ class Book extends DataClass implements Insertable<Book> {
     this.pageCount,
     this.coverPath,
     this.spineStyle,
+    this.seriesId,
+    this.seriesIndex,
     this.readingProgress,
     this.lastReadPage,
     this.lastReadAt,
@@ -703,6 +960,12 @@ class Book extends DataClass implements Insertable<Book> {
     }
     if (!nullToAbsent || spineStyle != null) {
       map['spine_style'] = Variable<String>(spineStyle);
+    }
+    if (!nullToAbsent || seriesId != null) {
+      map['series_id'] = Variable<String>(seriesId);
+    }
+    if (!nullToAbsent || seriesIndex != null) {
+      map['series_index'] = Variable<double>(seriesIndex);
     }
     if (!nullToAbsent || readingProgress != null) {
       map['reading_progress'] = Variable<double>(readingProgress);
@@ -766,6 +1029,12 @@ class Book extends DataClass implements Insertable<Book> {
       spineStyle: spineStyle == null && nullToAbsent
           ? const Value.absent()
           : Value(spineStyle),
+      seriesId: seriesId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seriesId),
+      seriesIndex: seriesIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seriesIndex),
       readingProgress: readingProgress == null && nullToAbsent
           ? const Value.absent()
           : Value(readingProgress),
@@ -818,6 +1087,8 @@ class Book extends DataClass implements Insertable<Book> {
       pageCount: serializer.fromJson<int?>(json['pageCount']),
       coverPath: serializer.fromJson<String?>(json['coverPath']),
       spineStyle: serializer.fromJson<String?>(json['spineStyle']),
+      seriesId: serializer.fromJson<String?>(json['seriesId']),
+      seriesIndex: serializer.fromJson<double?>(json['seriesIndex']),
       readingProgress: serializer.fromJson<double?>(json['readingProgress']),
       lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
       lastReadAt: serializer.fromJson<DateTime?>(json['lastReadAt']),
@@ -849,6 +1120,8 @@ class Book extends DataClass implements Insertable<Book> {
       'pageCount': serializer.toJson<int?>(pageCount),
       'coverPath': serializer.toJson<String?>(coverPath),
       'spineStyle': serializer.toJson<String?>(spineStyle),
+      'seriesId': serializer.toJson<String?>(seriesId),
+      'seriesIndex': serializer.toJson<double?>(seriesIndex),
       'readingProgress': serializer.toJson<double?>(readingProgress),
       'lastReadPage': serializer.toJson<int?>(lastReadPage),
       'lastReadAt': serializer.toJson<DateTime?>(lastReadAt),
@@ -878,6 +1151,8 @@ class Book extends DataClass implements Insertable<Book> {
     Value<int?> pageCount = const Value.absent(),
     Value<String?> coverPath = const Value.absent(),
     Value<String?> spineStyle = const Value.absent(),
+    Value<String?> seriesId = const Value.absent(),
+    Value<double?> seriesIndex = const Value.absent(),
     Value<double?> readingProgress = const Value.absent(),
     Value<int?> lastReadPage = const Value.absent(),
     Value<DateTime?> lastReadAt = const Value.absent(),
@@ -906,6 +1181,8 @@ class Book extends DataClass implements Insertable<Book> {
     pageCount: pageCount.present ? pageCount.value : this.pageCount,
     coverPath: coverPath.present ? coverPath.value : this.coverPath,
     spineStyle: spineStyle.present ? spineStyle.value : this.spineStyle,
+    seriesId: seriesId.present ? seriesId.value : this.seriesId,
+    seriesIndex: seriesIndex.present ? seriesIndex.value : this.seriesIndex,
     readingProgress: readingProgress.present
         ? readingProgress.value
         : this.readingProgress,
@@ -944,6 +1221,10 @@ class Book extends DataClass implements Insertable<Book> {
       spineStyle: data.spineStyle.present
           ? data.spineStyle.value
           : this.spineStyle,
+      seriesId: data.seriesId.present ? data.seriesId.value : this.seriesId,
+      seriesIndex: data.seriesIndex.present
+          ? data.seriesIndex.value
+          : this.seriesIndex,
       readingProgress: data.readingProgress.present
           ? data.readingProgress.value
           : this.readingProgress,
@@ -989,6 +1270,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('pageCount: $pageCount, ')
           ..write('coverPath: $coverPath, ')
           ..write('spineStyle: $spineStyle, ')
+          ..write('seriesId: $seriesId, ')
+          ..write('seriesIndex: $seriesIndex, ')
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
@@ -1020,6 +1303,8 @@ class Book extends DataClass implements Insertable<Book> {
     pageCount,
     coverPath,
     spineStyle,
+    seriesId,
+    seriesIndex,
     readingProgress,
     lastReadPage,
     lastReadAt,
@@ -1050,6 +1335,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.pageCount == this.pageCount &&
           other.coverPath == this.coverPath &&
           other.spineStyle == this.spineStyle &&
+          other.seriesId == this.seriesId &&
+          other.seriesIndex == this.seriesIndex &&
           other.readingProgress == this.readingProgress &&
           other.lastReadPage == this.lastReadPage &&
           other.lastReadAt == this.lastReadAt &&
@@ -1078,6 +1365,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<int?> pageCount;
   final Value<String?> coverPath;
   final Value<String?> spineStyle;
+  final Value<String?> seriesId;
+  final Value<double?> seriesIndex;
   final Value<double?> readingProgress;
   final Value<int?> lastReadPage;
   final Value<DateTime?> lastReadAt;
@@ -1105,6 +1394,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.pageCount = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.spineStyle = const Value.absent(),
+    this.seriesId = const Value.absent(),
+    this.seriesIndex = const Value.absent(),
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
@@ -1133,6 +1424,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.pageCount = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.spineStyle = const Value.absent(),
+    this.seriesId = const Value.absent(),
+    this.seriesIndex = const Value.absent(),
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
@@ -1162,6 +1455,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<int>? pageCount,
     Expression<String>? coverPath,
     Expression<String>? spineStyle,
+    Expression<String>? seriesId,
+    Expression<double>? seriesIndex,
     Expression<double>? readingProgress,
     Expression<int>? lastReadPage,
     Expression<DateTime>? lastReadAt,
@@ -1190,6 +1485,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (pageCount != null) 'page_count': pageCount,
       if (coverPath != null) 'cover_path': coverPath,
       if (spineStyle != null) 'spine_style': spineStyle,
+      if (seriesId != null) 'series_id': seriesId,
+      if (seriesIndex != null) 'series_index': seriesIndex,
       if (readingProgress != null) 'reading_progress': readingProgress,
       if (lastReadPage != null) 'last_read_page': lastReadPage,
       if (lastReadAt != null) 'last_read_at': lastReadAt,
@@ -1220,6 +1517,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<int?>? pageCount,
     Value<String?>? coverPath,
     Value<String?>? spineStyle,
+    Value<String?>? seriesId,
+    Value<double?>? seriesIndex,
     Value<double?>? readingProgress,
     Value<int?>? lastReadPage,
     Value<DateTime?>? lastReadAt,
@@ -1248,6 +1547,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       pageCount: pageCount ?? this.pageCount,
       coverPath: coverPath ?? this.coverPath,
       spineStyle: spineStyle ?? this.spineStyle,
+      seriesId: seriesId ?? this.seriesId,
+      seriesIndex: seriesIndex ?? this.seriesIndex,
       readingProgress: readingProgress ?? this.readingProgress,
       lastReadPage: lastReadPage ?? this.lastReadPage,
       lastReadAt: lastReadAt ?? this.lastReadAt,
@@ -1299,6 +1600,12 @@ class BooksCompanion extends UpdateCompanion<Book> {
     }
     if (spineStyle.present) {
       map['spine_style'] = Variable<String>(spineStyle.value);
+    }
+    if (seriesId.present) {
+      map['series_id'] = Variable<String>(seriesId.value);
+    }
+    if (seriesIndex.present) {
+      map['series_index'] = Variable<double>(seriesIndex.value);
     }
     if (readingProgress.present) {
       map['reading_progress'] = Variable<double>(readingProgress.value);
@@ -1364,6 +1671,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('pageCount: $pageCount, ')
           ..write('coverPath: $coverPath, ')
           ..write('spineStyle: $spineStyle, ')
+          ..write('seriesId: $seriesId, ')
+          ..write('seriesIndex: $seriesIndex, ')
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
@@ -7500,6 +7809,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
 abstract class _$VellumDatabase extends GeneratedDatabase {
   _$VellumDatabase(QueryExecutor e) : super(e);
   $VellumDatabaseManager get managers => $VellumDatabaseManager(this);
+  late final $SeriesTable series = $SeriesTable(this);
   late final $BooksTable books = $BooksTable(this);
   late final $AuthorsTable authors = $AuthorsTable(this);
   late final $BookAuthorsTable bookAuthors = $BookAuthorsTable(this);
@@ -7528,6 +7838,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    series,
     books,
     authors,
     bookAuthors,
@@ -7548,6 +7859,234 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
   ];
 }
 
+typedef $$SeriesTableCreateCompanionBuilder =
+    SeriesCompanion Function({
+      required String id,
+      required String name,
+      Value<int> rowid,
+    });
+typedef $$SeriesTableUpdateCompanionBuilder =
+    SeriesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> rowid,
+    });
+
+final class $$SeriesTableReferences
+    extends BaseReferences<_$VellumDatabase, $SeriesTable, Sery> {
+  $$SeriesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$BooksTable, List<Book>> _booksRefsTable(
+    _$VellumDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.books,
+    aliasName: 'series__id__books__series_id',
+  );
+
+  $$BooksTableProcessedTableManager get booksRefs {
+    final manager = $$BooksTableTableManager(
+      $_db,
+      $_db.books,
+    ).filter((f) => f.seriesId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_booksRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$SeriesTableFilterComposer
+    extends Composer<_$VellumDatabase, $SeriesTable> {
+  $$SeriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> booksRefs(
+    Expression<bool> Function($$BooksTableFilterComposer f) f,
+  ) {
+    final $$BooksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.seriesId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableFilterComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$SeriesTableOrderingComposer
+    extends Composer<_$VellumDatabase, $SeriesTable> {
+  $$SeriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SeriesTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $SeriesTable> {
+  $$SeriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  Expression<T> booksRefs<T extends Object>(
+    Expression<T> Function($$BooksTableAnnotationComposer a) f,
+  ) {
+    final $$BooksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.seriesId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$SeriesTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $SeriesTable,
+          Sery,
+          $$SeriesTableFilterComposer,
+          $$SeriesTableOrderingComposer,
+          $$SeriesTableAnnotationComposer,
+          $$SeriesTableCreateCompanionBuilder,
+          $$SeriesTableUpdateCompanionBuilder,
+          (Sery, $$SeriesTableReferences),
+          Sery,
+          PrefetchHooks Function({bool booksRefs})
+        > {
+  $$SeriesTableTableManager(_$VellumDatabase db, $SeriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SeriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SeriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SeriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SeriesCompanion(id: id, name: name, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<int> rowid = const Value.absent(),
+              }) => SeriesCompanion.insert(id: id, name: name, rowid: rowid),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) =>
+                    (e.readTable(table), $$SeriesTableReferences(db, table, e)),
+              )
+              .toList(),
+          prefetchHooksCallback: ({booksRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (booksRefs) db.books],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (booksRefs)
+                    await $_getPrefetchedData<Sery, $SeriesTable, Book>(
+                      currentTable: table,
+                      referencedTable: $$SeriesTableReferences._booksRefsTable(
+                        db,
+                      ),
+                      managerFromTypedResult: (p0) =>
+                          $$SeriesTableReferences(db, table, p0).booksRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.seriesId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SeriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $SeriesTable,
+      Sery,
+      $$SeriesTableFilterComposer,
+      $$SeriesTableOrderingComposer,
+      $$SeriesTableAnnotationComposer,
+      $$SeriesTableCreateCompanionBuilder,
+      $$SeriesTableUpdateCompanionBuilder,
+      (Sery, $$SeriesTableReferences),
+      Sery,
+      PrefetchHooks Function({bool booksRefs})
+    >;
 typedef $$BooksTableCreateCompanionBuilder =
     BooksCompanion Function({
       required String id,
@@ -7560,6 +8099,8 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<int?> pageCount,
       Value<String?> coverPath,
       Value<String?> spineStyle,
+      Value<String?> seriesId,
+      Value<double?> seriesIndex,
       Value<double?> readingProgress,
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
@@ -7589,6 +8130,8 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<int?> pageCount,
       Value<String?> coverPath,
       Value<String?> spineStyle,
+      Value<String?> seriesId,
+      Value<double?> seriesIndex,
       Value<double?> readingProgress,
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
@@ -7610,6 +8153,23 @@ typedef $$BooksTableUpdateCompanionBuilder =
 final class $$BooksTableReferences
     extends BaseReferences<_$VellumDatabase, $BooksTable, Book> {
   $$BooksTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $SeriesTable _seriesIdTable(_$VellumDatabase db) =>
+      db.series.createAlias('books__series_id__series__id');
+
+  $$SeriesTableProcessedTableManager? get seriesId {
+    final $_column = $_itemColumn<String>('series_id');
+    if ($_column == null) return null;
+    final manager = $$SeriesTableTableManager(
+      $_db,
+      $_db.series,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_seriesIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$BookAuthorsTable, List<BookAuthor>>
   _bookAuthorsRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
@@ -7801,6 +8361,11 @@ class $$BooksTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get seriesIndex => $composableBuilder(
+    column: $table.seriesIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get readingProgress => $composableBuilder(
     column: $table.readingProgress,
     builder: (column) => ColumnFilters(column),
@@ -7875,6 +8440,29 @@ class $$BooksTableFilterComposer
     column: $table.readCount,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$SeriesTableFilterComposer get seriesId {
+    final $$SeriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.seriesId,
+      referencedTable: $db.series,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SeriesTableFilterComposer(
+            $db: $db,
+            $table: $db.series,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<bool> bookAuthorsRefs(
     Expression<bool> Function($$BookAuthorsTableFilterComposer f) f,
@@ -8111,6 +8699,11 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get seriesIndex => $composableBuilder(
+    column: $table.seriesIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get readingProgress => $composableBuilder(
     column: $table.readingProgress,
     builder: (column) => ColumnOrderings(column),
@@ -8185,6 +8778,29 @@ class $$BooksTableOrderingComposer
     column: $table.readCount,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$SeriesTableOrderingComposer get seriesId {
+    final $$SeriesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.seriesId,
+      referencedTable: $db.series,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SeriesTableOrderingComposer(
+            $db: $db,
+            $table: $db.series,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$BooksTableAnnotationComposer
@@ -8229,6 +8845,11 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<String> get spineStyle => $composableBuilder(
     column: $table.spineStyle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get seriesIndex => $composableBuilder(
+    column: $table.seriesIndex,
     builder: (column) => column,
   );
 
@@ -8290,6 +8911,29 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<int> get readCount =>
       $composableBuilder(column: $table.readCount, builder: (column) => column);
+
+  $$SeriesTableAnnotationComposer get seriesId {
+    final $$SeriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.seriesId,
+      referencedTable: $db.series,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SeriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.series,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<T> bookAuthorsRefs<T extends Object>(
     Expression<T> Function($$BookAuthorsTableAnnotationComposer a) f,
@@ -8481,6 +9125,7 @@ class $$BooksTableTableManager
           (Book, $$BooksTableReferences),
           Book,
           PrefetchHooks Function({
+            bool seriesId,
             bool bookAuthorsRefs,
             bool bookGenresRefs,
             bool bookFilesRefs,
@@ -8513,6 +9158,8 @@ class $$BooksTableTableManager
                 Value<int?> pageCount = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
                 Value<String?> spineStyle = const Value.absent(),
+                Value<String?> seriesId = const Value.absent(),
+                Value<double?> seriesIndex = const Value.absent(),
                 Value<double?> readingProgress = const Value.absent(),
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
@@ -8540,6 +9187,8 @@ class $$BooksTableTableManager
                 pageCount: pageCount,
                 coverPath: coverPath,
                 spineStyle: spineStyle,
+                seriesId: seriesId,
+                seriesIndex: seriesIndex,
                 readingProgress: readingProgress,
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
@@ -8569,6 +9218,8 @@ class $$BooksTableTableManager
                 Value<int?> pageCount = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
                 Value<String?> spineStyle = const Value.absent(),
+                Value<String?> seriesId = const Value.absent(),
+                Value<double?> seriesIndex = const Value.absent(),
                 Value<double?> readingProgress = const Value.absent(),
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
@@ -8596,6 +9247,8 @@ class $$BooksTableTableManager
                 pageCount: pageCount,
                 coverPath: coverPath,
                 spineStyle: spineStyle,
+                seriesId: seriesId,
+                seriesIndex: seriesIndex,
                 readingProgress: readingProgress,
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
@@ -8621,6 +9274,7 @@ class $$BooksTableTableManager
               .toList(),
           prefetchHooksCallback:
               ({
+                seriesId = false,
                 bookAuthorsRefs = false,
                 bookGenresRefs = false,
                 bookFilesRefs = false,
@@ -8640,7 +9294,38 @@ class $$BooksTableTableManager
                     if (annotationsRefs) db.annotations,
                     if (readingSessionsRefs) db.readingSessions,
                   ],
-                  addJoins: null,
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (seriesId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.seriesId,
+                                    referencedTable: $$BooksTableReferences
+                                        ._seriesIdTable(db),
+                                    referencedColumn: $$BooksTableReferences
+                                        ._seriesIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (bookAuthorsRefs)
@@ -8799,6 +9484,7 @@ typedef $$BooksTableProcessedTableManager =
       (Book, $$BooksTableReferences),
       Book,
       PrefetchHooks Function({
+        bool seriesId,
         bool bookAuthorsRefs,
         bool bookGenresRefs,
         bool bookFilesRefs,
@@ -14433,6 +15119,8 @@ typedef $$ReadingSessionsTableProcessedTableManager =
 class $VellumDatabaseManager {
   final _$VellumDatabase _db;
   $VellumDatabaseManager(this._db);
+  $$SeriesTableTableManager get series =>
+      $$SeriesTableTableManager(_db, _db.series);
   $$BooksTableTableManager get books =>
       $$BooksTableTableManager(_db, _db.books);
   $$AuthorsTableTableManager get authors =>

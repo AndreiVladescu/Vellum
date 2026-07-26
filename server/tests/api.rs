@@ -1079,6 +1079,178 @@ async fn deleting_a_book_takes_its_reading_progress_with_it() {
     assert!(left.as_array().unwrap().is_empty(), "{left}");
 }
 
+// ---- Series and volume tracking (plan 5 #17) -------------------------------
+
+#[tokio::test]
+async fn series_membership_is_resolved_by_name_and_shared_between_books() {
+    // By name, not by id: two devices that each invented an id for "Dune" must
+    // still end up in one series rather than two identically-named ones.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    for (id, index) in [("b1", 1.0), ("b2", 2.0)] {
+        let (status, body) = call(
+            &app,
+            "PUT",
+            &format!("/api/books/{id}"),
+            Some(&master),
+            Some(json!({
+                "title": format!("Volume {index}"),
+                "series": "Dune",
+                "series_index": index
+            })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["series"], json!("Dune"));
+        assert_eq!(body["series_index"], json!(index));
+    }
+
+    // One series row, two books in it.
+    let (_, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    let books = list.as_array().unwrap();
+    assert_eq!(books.len(), 2);
+    for book in books {
+        assert_eq!(book["series"], json!("Dune"));
+    }
+}
+
+#[tokio::test]
+async fn a_fractional_series_index_survives() {
+    // The reason the column is REAL: novellas and interquels are 1.5.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/books/novella",
+        Some(&master),
+        Some(json!({ "title": "An Interquel", "series": "Dune", "series_index": 1.5 })),
+    )
+    .await;
+    assert_eq!(body["series_index"], json!(1.5));
+}
+
+#[tokio::test]
+async fn an_empty_series_name_clears_membership() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "series": "Dune", "series_index": 1 })),
+    )
+    .await;
+
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "series": "" })),
+    )
+    .await;
+    assert_eq!(body["series"], json!(null));
+}
+
+#[tokio::test]
+async fn a_push_that_omits_series_leaves_it_alone() {
+    // `None` means "an older client with nothing to say" — the same convention
+    // as the author and genre joins. Losing a series to a metadata-only edit
+    // from an old build would be silent data loss.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "series": "Dune", "series_index": 1 })),
+    )
+    .await;
+
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune (revised)" })),
+    )
+    .await;
+    assert_eq!(body["title"], json!("Dune (revised)"));
+    assert_eq!(body["series"], json!("Dune"));
+    assert_eq!(body["series_index"], json!(1.0));
+}
+
+#[tokio::test]
+async fn a_series_only_edit_is_not_treated_as_a_no_op() {
+    // The unchanged-data guard has to know about the series, or moving a book
+    // from #2 to #2.5 would be silently dropped.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "series": "Dune", "series_index": 2 })),
+    )
+    .await;
+
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "series": "Dune", "series_index": 2.5 })),
+    )
+    .await;
+    assert_eq!(body["series_index"], json!(2.5));
+
+    // ...and renaming the series is likewise applied.
+    let (_, renamed) = call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "series": "Dune Chronicles", "series_index": 2.5 })),
+    )
+    .await;
+    assert_eq!(renamed["series"], json!("Dune Chronicles"));
+}
+
+#[tokio::test]
+async fn a_public_link_still_serves_a_book_with_a_series() {
+    // Regression guard: `shares.rs` used to keep its own copy of the book select
+    // list, which went stale the moment this feature added two columns.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    call(
+        &app,
+        "PUT",
+        "/api/books/b1",
+        Some(&master),
+        Some(json!({ "title": "Dune", "series": "Dune", "series_index": 1 })),
+    )
+    .await;
+    let (status, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": "b1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{link}");
+    let token = link["url"].as_str().unwrap().rsplit('/').next().unwrap();
+
+    let (status, body) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["title"], json!("Dune"));
+}
+
 #[tokio::test]
 async fn book_upsert_ignores_reading_state() {
     // Plan 2 §A1's decision, pinned directly now that `reading_progress` is an

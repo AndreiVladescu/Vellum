@@ -57,6 +57,8 @@ class ServerBook {
     this.updatedAt,
     this.authors,
     this.genres,
+    this.series,
+    this.seriesIndex,
     this.files = const [],
   });
 
@@ -88,6 +90,10 @@ class ServerBook {
   /// should overwrite a local row. Null if the server sent no/blank timestamp.
   final DateTime? updatedAt;
 
+  /// Series name and volume number (plan 5 #17), null when the book is in none.
+  final String? series;
+  final double? seriesIndex;
+
   bool get hasCover => coverPath != null && coverPath!.isNotEmpty;
 
   /// Server timestamps are `datetime('now')` UTC strings ("YYYY-MM-DD HH:MM:SS").
@@ -107,6 +113,8 @@ class ServerBook {
     spineStyle: j['spine_style'] as String?,
     coverPath: j['cover_path'] as String?,
     updatedAt: _parseServerTime(j['updated_at'] as String?),
+    series: j['series'] as String?,
+    seriesIndex: (j['series_index'] as num?)?.toDouble(),
     authors: _stringList(j['authors']),
     genres: _stringList(j['genres']),
     files: j['files'] is List
@@ -150,6 +158,8 @@ class BookPushItem {
     this.updatedAt,
     this.authors,
     this.genres,
+    this.series,
+    this.seriesIndex,
   });
 
   final String id;
@@ -164,6 +174,8 @@ class BookPushItem {
   final DateTime? updatedAt;
   final List<String>? authors;
   final List<String>? genres;
+  final String? series;
+  final double? seriesIndex;
 }
 
 /// One book's outcome from [VellumServerClient.pushBooksBatch] — mirrors the
@@ -325,6 +337,8 @@ class VellumServerClient {
     DateTime? updatedAt,
     List<String>? authors,
     List<String>? genres,
+    String? series,
+    double? seriesIndex,
   }) => {
     'title': title,
     'subtitle': subtitle,
@@ -339,6 +353,10 @@ class VellumServerClient {
     // when the caller has nothing to say, to leave server joins untouched.
     'authors': ?authors,
     'genres': ?genres,
+    // Series by *name* (plan 5 #17), same convention: omitted means "nothing to
+    // say"; an empty string clears the membership.
+    'series': ?series,
+    'series_index': ?seriesIndex,
   };
 
   /// Upsert a book at [id] (create or update). Used to push local books up.
@@ -358,6 +376,8 @@ class VellumServerClient {
     DateTime? updatedAt,
     List<String>? authors,
     List<String>? genres,
+    String? series,
+    double? seriesIndex,
   }) async {
     final res = await _http.put(
       _uri('/api/books/$id'),
@@ -374,6 +394,8 @@ class VellumServerClient {
         updatedAt: updatedAt,
         authors: authors,
         genres: genres,
+        series: series,
+        seriesIndex: seriesIndex,
       )),
     );
     _body(res);
@@ -408,6 +430,8 @@ class VellumServerClient {
                 updatedAt: it.updatedAt,
                 authors: it.authors,
                 genres: it.genres,
+                series: it.series,
+                seriesIndex: it.seriesIndex,
               ),
             },
         ],

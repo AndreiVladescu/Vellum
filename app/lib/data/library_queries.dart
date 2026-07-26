@@ -297,8 +297,17 @@ class LibraryQueries {
         'JOIN authors a ON a.id = ba.author_id '
         'WHERE ba.book_id = books.id ORDER BY ba.position LIMIT 1)';
 
+    // Same trick for the series name (plan 5 #17): aliased in the select list so
+    // ORDER BY can reference it without repeating the subquery.
+    const seriesSortExpr =
+        '(SELECT LOWER(s.name) FROM series s WHERE s.id = books.series_id)';
+
     final orderBy = switch (sort) {
       ShelfSort.title => 'LOWER(books.title)',
+      // Series-less books sort last: a shelf sorted by series shouldn't open on
+      // everything that has none.
+      ShelfSort.series => 'sort_series IS NULL, sort_series, '
+          'books.series_index IS NULL, books.series_index, LOWER(books.title)',
       ShelfSort.author =>
         'sort_author IS NULL, sort_author, LOWER(books.title)',
       ShelfSort.year =>
@@ -308,6 +317,7 @@ class LibraryQueries {
 
     final sql =
         'SELECT books.*, $authorSortExpr AS sort_author, '
+        '$seriesSortExpr AS sort_series, '
         'EXISTS(SELECT 1 FROM book_files bf WHERE bf.book_id = books.id) '
         'AS has_file '
         'FROM books '
@@ -329,6 +339,9 @@ class LibraryQueries {
             db.genres,
             db.shelfBooks,
             db.bookFiles,
+            // The series sort reads `series` via a subquery, so a rename has to
+            // invalidate this stream too (plan 5 #17).
+            db.series,
           },
         )
         .watch()

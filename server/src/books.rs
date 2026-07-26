@@ -22,10 +22,24 @@ pub struct BookDto {
     pub owner_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// Series name, resolved from `series_id` (plan 5 #17). The *name* rather
+    /// than the id crosses the wire, so two devices that each invented an id for
+    /// "Dune" still converge — the same reason authors and genres are pushed by
+    /// name.
+    pub series: Option<String>,
+    /// REAL so novellas can be 1.5.
+    pub series_index: Option<f64>,
 }
 
-const BOOK_COLUMNS: &str = "id, title, subtitle, description, isbn, publisher, \
-    published_year, page_count, cover_path, spine_style, owner_id, created_at, updated_at";
+/// The book DTO's select list, aliased on `book b`.
+///
+/// `pub(crate)` because `shares.rs` needs the same list: it had a hand-copied
+/// duplicate, which silently went stale the moment #17 added two columns (the
+/// public-link tests caught it). One definition, one place to update.
+pub(crate) const BOOK_COLUMNS: &str = "b.id, b.title, b.subtitle, b.description, b.isbn, b.publisher, \
+    b.published_year, b.page_count, b.cover_path, b.spine_style, b.owner_id, b.created_at, \
+    b.updated_at, (SELECT s.name FROM series s WHERE s.id = b.series_id) AS series, \
+    b.series_index";
 
 #[derive(Deserialize)]
 pub struct BookInput {
@@ -50,6 +64,12 @@ pub struct BookInput {
     /// leaves existing joins untouched.
     #[serde(default)]
     pub authors: Option<Vec<String>>,
+    /// Series name (plan 5 #17). `Some("")` clears the membership; `None`
+    /// (older clients) leaves it untouched, the same convention as the joins.
+    #[serde(default)]
+    pub series: Option<String>,
+    #[serde(default)]
+    pub series_index: Option<f64>,
     /// Genre names. Same replace-or-leave semantics as [`authors`].
     #[serde(default)]
     pub genres: Option<Vec<String>>,
@@ -534,6 +554,14 @@ async fn upsert_one(
             None => true,
             Some(a) => book_author_names(state, id).await? == normalize_names(a),
         };
+        let series_same = match &input.series {
+            None => true,
+            Some(name) => {
+                let wanted = name.trim();
+                let current_name = current.series.as_deref().unwrap_or("");
+                current_name == wanted && current.series_index == input.series_index
+            }
+        };
         let genres_same = match &input.genres {
             None => true,
             Some(g) => {
@@ -550,7 +578,7 @@ async fn upsert_one(
                 .bind(id)
                 .fetch_one(&state.db)
                 .await?;
-        if meta_same && authors_same && genres_same && !tombstoned {
+        if meta_same && authors_same && genres_same && series_same && !tombstoned {
             return Ok(UpsertOutcome::Applied(current));
         }
     }
@@ -639,6 +667,33 @@ async fn upsert_one(
             .execute(&mut *tx)
             .await?;
     }
+    // Series (plan 5 #17): resolved by name inside the transaction, like the
+    // author and genre joins. An empty name clears the membership — that is how a
+    // client says "this book isn't in a series after all", distinct from `None`
+    // (an older client with nothing to say).
+    if let Some(name) = &input.series {
+        let trimmed = name.trim();
+        let series_id = if trimmed.is_empty() {
+            None
+        } else {
+            Some(id_for_name_tx(&mut tx, "series", trimmed).await?)
+        };
+        sqlx::query("UPDATE book SET series_id = ?, series_index = ? WHERE id = ?")
+            .bind(&series_id)
+            .bind(input.series_index)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    } else if input.series_index.is_some() {
+        // An index without a name: just the number moved (a client fixing "2" to
+        // "2.5" on a book whose series is already right).
+        sqlx::query("UPDATE book SET series_index = ? WHERE id = ?")
+            .bind(input.series_index)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
     if let Some(genres) = &input.genres {
         sqlx::query("DELETE FROM book_genre WHERE book_id = ?")
             .bind(id)
@@ -1027,7 +1082,7 @@ pub async fn deletions(
 
 pub(crate) async fn fetch_book(state: &AppState, id: &str) -> AppResult<Json<BookDto>> {
     let book =
-        sqlx::query_as::<_, BookDto>(&format!("SELECT {BOOK_COLUMNS} FROM book WHERE id = ?"))
+        sqlx::query_as::<_, BookDto>(&format!("SELECT {BOOK_COLUMNS} FROM book b WHERE b.id = ?"))
             .bind(id)
             .fetch_optional(&state.db)
             .await?

@@ -55,9 +55,14 @@ async fn synced_tables_have_the_expected_columns() {
                 // added to the server by migration 0002, then dropped again by
                 // 0006 — it's app-local-only by design and never synced.
                 "owner_id", // server-only (migration 0003); not in the app schema
+                // Series membership (migration 0012, plan 5 #17) — synced, so
+                // both sides carry these.
+                "series_id",
+                "series_index",
             ],
         ),
         ("author", &["id", "name"]),
+        ("series", &["id", "name"]),
         ("book_author", &["book_id", "author_id", "position"]),
         ("genre", &["id", "name"]),
         ("book_genre", &["book_id", "genre_id"]),
