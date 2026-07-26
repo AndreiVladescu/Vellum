@@ -181,11 +181,40 @@ class PhysicalCopyTile extends StatelessWidget {
               leading: Icon(
                 active != null ? Icons.person_outline : Icons.place_outlined,
               ),
-              title: Text(copy.location ?? 'Somewhere…'),
-              subtitle: Text(
-                [if (copy.notes != null) copy.notes!, status].join('\n'),
+              // Where the copy *is* comes from its placement when it has one
+              // (plan 5 #50); the free-text field is only a note, and showing it
+              // as the location goes stale the first time the shelf is
+              // rearranged.
+              title: StreamBuilder<CopyLocation?>(
+                stream: repository.layout.watchLocationOf(copy.id),
+                builder: (context, snapshot) {
+                  final placed = snapshot.data;
+                  if (placed != null) {
+                    return Row(
+                      children: [
+                        Flexible(child: Text(placed.display)),
+                        const SizedBox(width: 6),
+                        Icon(Icons.push_pin_outlined,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.outline),
+                      ],
+                    );
+                  }
+                  return Text(copy.location ?? 'Somewhere…');
+                },
               ),
-              isThreeLine: copy.notes != null,
+              subtitle: Text(
+                [
+                  // Labelled as a note, so it doesn't read as the location once
+                  // a placement supersedes it.
+                  if (copy.location != null &&
+                      copy.location!.trim().isNotEmpty)
+                    'Note: ${copy.location}',
+                  if (copy.notes != null) copy.notes!,
+                  status,
+                ].join('\n'),
+              ),
+              isThreeLine: true,
               trailing: active != null
                   ? TextButton(
                       onPressed: () => repository.returnLoan(active.id),

@@ -186,6 +186,16 @@ warns when a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+**A copy's location is derived, not stored** (app, plan 5 #50).
+`physical_copy.location` is free text typed once when the copy was added, while a
+*placement* records where the book was last dragged to; they diverge the first time
+a shelf is rearranged, and the detail page used to show the stale string
+confidently. Now a placed copy displays its **room plus the shelf it stands on**,
+computed from the placement (nearest labelled shelf below it that it horizontally
+overlaps), and the free text is relabelled as a *note* for unplaced copies. The
+derived string is never written back into the column — derived data stays derived,
+the same rule spine colours follow.
+
 **Series and volume tracking** (both, plan 5 #17) is the one Phase-4 addition that
 **syncs**: a series is catalogue metadata the online sources supply, and a library
 of trilogies sorted by title puts *The Two Towers* nowhere near *The Fellowship of

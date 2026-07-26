@@ -17,6 +17,25 @@ typedef PlacedBook = ({BookPlacement placement, Book book});
 /// so (plan 5 #4) it syncs like any other copy; deletion goes through
 /// [PhysicalService.deletePhysicalCopy] so that stays true when a placement
 /// is removed.
+/// A copy's real location, derived from its placement (plan 5 #50).
+class CopyLocation {
+  const CopyLocation({
+    required this.environmentId,
+    required this.environmentName,
+    this.shelfLabel,
+  });
+
+  final String environmentId;
+  final String environmentName;
+
+  /// The label of the shelf it stands on, when that shelf has one.
+  final String? shelfLabel;
+
+  /// "Living room · Shelf 2", or just the room when the shelf is unlabelled.
+  String get display =>
+      shelfLabel == null ? environmentName : '$environmentName · $shelfLabel';
+}
+
 class LayoutRepository {
   LayoutRepository(this.db, this._physical);
 
@@ -122,6 +141,69 @@ class LayoutRepository {
 
   Future<void> deleteShelf(String id) async {
     await (db.delete(db.physicalShelves)..where((s) => s.id.equals(id))).go();
+  }
+
+  /// Where a copy actually sits, derived from its placement (plan 5 #50).
+  ///
+  /// `physical_copy.location` is free text typed once when the copy was added,
+  /// while a *placement* records where the book was last dragged to. They drift
+  /// apart the first time the shelf is rearranged, and the detail page used to
+  /// show the stale string. So the placement wins when there is one — and the
+  /// derived string is **never written back** into the column: derived data stays
+  /// derived, the same rule spine colours follow.
+  ///
+  /// Returns null when the copy has no placement, in which case the free-text
+  /// note is all there is.
+  Stream<CopyLocation?> watchLocationOf(String copyId) {
+    final query = db.select(db.bookPlacements).join([
+      innerJoin(
+        db.physicalEnvironments,
+        db.physicalEnvironments.id.equalsExp(db.bookPlacements.environmentId),
+      ),
+    ])
+      ..where(db.bookPlacements.copyId.equals(copyId))
+      ..limit(1);
+    return query.watch().asyncMap((rows) async {
+      if (rows.isEmpty) return null;
+      final placement = rows.first.readTable(db.bookPlacements);
+      final environment = rows.first.readTable(db.physicalEnvironments);
+      final shelves = await (db.select(db.physicalShelves)
+            ..where((s) => s.environmentId.equals(placement.environmentId)))
+          .get();
+      return CopyLocation(
+        environmentId: environment.id,
+        environmentName: environment.name,
+        shelfLabel: nearestShelfLabel(placement: placement, shelves: shelves),
+      );
+    });
+  }
+
+  /// The label of the shelf a placement is standing on, or null.
+  ///
+  /// "Standing on" means the nearest shelf *below or at* the book's baseline and
+  /// horizontally overlapping it — a book floating above a shelf it doesn't
+  /// overlap belongs to no shelf, and guessing would put it on the wrong one.
+  static String? nearestShelfLabel({
+    required BookPlacement placement,
+    required List<PhysicalShelf> shelves,
+  }) {
+    PhysicalShelf? best;
+    var bestDistance = double.infinity;
+    for (final shelf in shelves) {
+      final left = shelf.x1 < shelf.x2 ? shelf.x1 : shelf.x2;
+      final right = shelf.x1 < shelf.x2 ? shelf.x2 : shelf.x1;
+      if (placement.x < left || placement.x > right) continue;
+      // Shelf tops are y; a book sits with its base at (or just above) one.
+      final surface = (shelf.y1 + shelf.y2) / 2;
+      final distance = surface - placement.y;
+      if (distance < -0.02) continue; // the shelf is above the book
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = shelf;
+      }
+    }
+    final label = best?.label?.trim();
+    return (label == null || label.isEmpty) ? null : label;
   }
 
   /// Placements joined with their books, for rendering.

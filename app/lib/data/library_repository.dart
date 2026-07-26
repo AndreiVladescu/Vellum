@@ -22,7 +22,8 @@ import 'shelf_service.dart';
 // re-export the pieces callers still import from here so their imports are
 // unchanged. Likewise the typedefs and Uint8List moved with their owning
 // services.
-export '../physical/layout_repository.dart' show LayoutRepository, PlacedBook;
+export '../physical/layout_repository.dart'
+    show CopyLocation, LayoutRepository, PlacedBook;
 export 'book_write_service.dart' show BookDetails;
 export 'physical_service.dart' show LoanEntry;
 export '../reader/annotations/annotation_store.dart'
