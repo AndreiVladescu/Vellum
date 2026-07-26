@@ -468,6 +468,7 @@ class _LibraryPageState extends State<LibraryPage> {
           PhysicalLibrariesTab(
             repository: repository,
             settings: widget.settings,
+            connection: widget.connection,
           ),
         ],
       ),

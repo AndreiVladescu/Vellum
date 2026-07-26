@@ -5197,8 +5197,41 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _serverRevisionMeta = const VerificationMeta(
+    'serverRevision',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, sortOrder, createdAt];
+  late final GeneratedColumn<int> serverRevision = GeneratedColumn<int>(
+    'server_revision',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _needsPublishMeta = const VerificationMeta(
+    'needsPublish',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPublish = GeneratedColumn<bool>(
+    'needs_publish',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_publish" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    sortOrder,
+    createdAt,
+    serverRevision,
+    needsPublish,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -5236,6 +5269,24 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('server_revision')) {
+      context.handle(
+        _serverRevisionMeta,
+        serverRevision.isAcceptableOrUnknown(
+          data['server_revision']!,
+          _serverRevisionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('needs_publish')) {
+      context.handle(
+        _needsPublishMeta,
+        needsPublish.isAcceptableOrUnknown(
+          data['needs_publish']!,
+          _needsPublishMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -5261,6 +5312,14 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      serverRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_revision'],
+      ),
+      needsPublish: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_publish'],
+      )!,
     );
   }
 
@@ -5276,11 +5335,15 @@ class PhysicalEnvironment extends DataClass
   final String name;
   final int sortOrder;
   final DateTime createdAt;
+  final int? serverRevision;
+  final bool needsPublish;
   const PhysicalEnvironment({
     required this.id,
     required this.name,
     required this.sortOrder,
     required this.createdAt,
+    this.serverRevision,
+    required this.needsPublish,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5289,6 +5352,10 @@ class PhysicalEnvironment extends DataClass
     map['name'] = Variable<String>(name);
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || serverRevision != null) {
+      map['server_revision'] = Variable<int>(serverRevision);
+    }
+    map['needs_publish'] = Variable<bool>(needsPublish);
     return map;
   }
 
@@ -5298,6 +5365,10 @@ class PhysicalEnvironment extends DataClass
       name: Value(name),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
+      serverRevision: serverRevision == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverRevision),
+      needsPublish: Value(needsPublish),
     );
   }
 
@@ -5311,6 +5382,8 @@ class PhysicalEnvironment extends DataClass
       name: serializer.fromJson<String>(json['name']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      serverRevision: serializer.fromJson<int?>(json['serverRevision']),
+      needsPublish: serializer.fromJson<bool>(json['needsPublish']),
     );
   }
   @override
@@ -5321,6 +5394,8 @@ class PhysicalEnvironment extends DataClass
       'name': serializer.toJson<String>(name),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'serverRevision': serializer.toJson<int?>(serverRevision),
+      'needsPublish': serializer.toJson<bool>(needsPublish),
     };
   }
 
@@ -5329,11 +5404,17 @@ class PhysicalEnvironment extends DataClass
     String? name,
     int? sortOrder,
     DateTime? createdAt,
+    Value<int?> serverRevision = const Value.absent(),
+    bool? needsPublish,
   }) => PhysicalEnvironment(
     id: id ?? this.id,
     name: name ?? this.name,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
+    serverRevision: serverRevision.present
+        ? serverRevision.value
+        : this.serverRevision,
+    needsPublish: needsPublish ?? this.needsPublish,
   );
   PhysicalEnvironment copyWithCompanion(PhysicalEnvironmentsCompanion data) {
     return PhysicalEnvironment(
@@ -5341,6 +5422,12 @@ class PhysicalEnvironment extends DataClass
       name: data.name.present ? data.name.value : this.name,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      serverRevision: data.serverRevision.present
+          ? data.serverRevision.value
+          : this.serverRevision,
+      needsPublish: data.needsPublish.present
+          ? data.needsPublish.value
+          : this.needsPublish,
     );
   }
 
@@ -5350,13 +5437,16 @@ class PhysicalEnvironment extends DataClass
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('serverRevision: $serverRevision, ')
+          ..write('needsPublish: $needsPublish')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, sortOrder, createdAt);
+  int get hashCode =>
+      Object.hash(id, name, sortOrder, createdAt, serverRevision, needsPublish);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5364,7 +5454,9 @@ class PhysicalEnvironment extends DataClass
           other.id == this.id &&
           other.name == this.name &&
           other.sortOrder == this.sortOrder &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.serverRevision == this.serverRevision &&
+          other.needsPublish == this.needsPublish);
 }
 
 class PhysicalEnvironmentsCompanion
@@ -5373,12 +5465,16 @@ class PhysicalEnvironmentsCompanion
   final Value<String> name;
   final Value<int> sortOrder;
   final Value<DateTime> createdAt;
+  final Value<int?> serverRevision;
+  final Value<bool> needsPublish;
   final Value<int> rowid;
   const PhysicalEnvironmentsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.serverRevision = const Value.absent(),
+    this.needsPublish = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PhysicalEnvironmentsCompanion.insert({
@@ -5386,6 +5482,8 @@ class PhysicalEnvironmentsCompanion
     required String name,
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.serverRevision = const Value.absent(),
+    this.needsPublish = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -5394,6 +5492,8 @@ class PhysicalEnvironmentsCompanion
     Expression<String>? name,
     Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
+    Expression<int>? serverRevision,
+    Expression<bool>? needsPublish,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5401,6 +5501,8 @@ class PhysicalEnvironmentsCompanion
       if (name != null) 'name': name,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
+      if (serverRevision != null) 'server_revision': serverRevision,
+      if (needsPublish != null) 'needs_publish': needsPublish,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5410,6 +5512,8 @@ class PhysicalEnvironmentsCompanion
     Value<String>? name,
     Value<int>? sortOrder,
     Value<DateTime>? createdAt,
+    Value<int?>? serverRevision,
+    Value<bool>? needsPublish,
     Value<int>? rowid,
   }) {
     return PhysicalEnvironmentsCompanion(
@@ -5417,6 +5521,8 @@ class PhysicalEnvironmentsCompanion
       name: name ?? this.name,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
+      serverRevision: serverRevision ?? this.serverRevision,
+      needsPublish: needsPublish ?? this.needsPublish,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5436,6 +5542,12 @@ class PhysicalEnvironmentsCompanion
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (serverRevision.present) {
+      map['server_revision'] = Variable<int>(serverRevision.value);
+    }
+    if (needsPublish.present) {
+      map['needs_publish'] = Variable<bool>(needsPublish.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5449,6 +5561,8 @@ class PhysicalEnvironmentsCompanion
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
+          ..write('serverRevision: $serverRevision, ')
+          ..write('needsPublish: $needsPublish, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -13664,6 +13778,8 @@ typedef $$PhysicalEnvironmentsTableCreateCompanionBuilder =
       required String name,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
+      Value<int?> serverRevision,
+      Value<bool> needsPublish,
       Value<int> rowid,
     });
 typedef $$PhysicalEnvironmentsTableUpdateCompanionBuilder =
@@ -13672,6 +13788,8 @@ typedef $$PhysicalEnvironmentsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
+      Value<int?> serverRevision,
+      Value<bool> needsPublish,
       Value<int> rowid,
     });
 
@@ -13759,6 +13877,16 @@ class $$PhysicalEnvironmentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get serverRevision => $composableBuilder(
+    column: $table.serverRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPublish => $composableBuilder(
+    column: $table.needsPublish,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> physicalShelvesRefs(
     Expression<bool> Function($$PhysicalShelvesTableFilterComposer f) f,
   ) {
@@ -13838,6 +13966,16 @@ class $$PhysicalEnvironmentsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get serverRevision => $composableBuilder(
+    column: $table.serverRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsPublish => $composableBuilder(
+    column: $table.needsPublish,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PhysicalEnvironmentsTableAnnotationComposer
@@ -13860,6 +13998,16 @@ class $$PhysicalEnvironmentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get serverRevision => $composableBuilder(
+    column: $table.serverRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get needsPublish => $composableBuilder(
+    column: $table.needsPublish,
+    builder: (column) => column,
+  );
 
   Expression<T> physicalShelvesRefs<T extends Object>(
     Expression<T> Function($$PhysicalShelvesTableAnnotationComposer a) f,
@@ -13955,12 +14103,16 @@ class $$PhysicalEnvironmentsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int?> serverRevision = const Value.absent(),
+                Value<bool> needsPublish = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalEnvironmentsCompanion(
                 id: id,
                 name: name,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
+                serverRevision: serverRevision,
+                needsPublish: needsPublish,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -13969,12 +14121,16 @@ class $$PhysicalEnvironmentsTableTableManager
                 required String name,
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int?> serverRevision = const Value.absent(),
+                Value<bool> needsPublish = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalEnvironmentsCompanion.insert(
                 id: id,
                 name: name,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
+                serverRevision: serverRevision,
+                needsPublish: needsPublish,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

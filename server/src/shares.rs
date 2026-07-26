@@ -78,6 +78,26 @@ pub async fn create(
                 .ok_or_else(|| AppError::BadRequest("scope_id (book) is required".into()))?;
             require_owns_book(&state, &user, bid).await?;
         }
+        // A published room (plan 5 #47). Viewer only — `editor` would mean two
+        // people dragging the same shelf, and the document model has no answer
+        // for that beyond the 409 the publisher already sees.
+        "layout" => {
+            let lid = input
+                .scope_id
+                .as_deref()
+                .ok_or_else(|| AppError::BadRequest("scope_id (layout) is required".into()))?;
+            let owner = crate::layouts::owner_of(&state, lid)
+                .await?
+                .ok_or_else(|| AppError::NotFound("layout not found".into()))?;
+            if !user.is_master && owner != user.id {
+                return Err(AppError::Forbidden("you do not own this room".into()));
+            }
+            if permission != "viewer" {
+                return Err(AppError::BadRequest(
+                    "a room can only be shared for viewing".into(),
+                ));
+            }
+        }
         other => {
             return Err(AppError::BadRequest(format!("unknown scope '{other}'")));
         }
@@ -155,6 +175,7 @@ const SHARE_SELECT: &str = "SELECT s.id, s.scope, s.scope_id, s.permission, s.cr
             WHEN 'all'   THEN 'Entire library' \
             WHEN 'group' THEN (SELECT name FROM book_group WHERE id = s.scope_id) \
             WHEN 'book'  THEN (SELECT title FROM book WHERE id = s.scope_id) \
+            WHEN 'layout' THEN (SELECT name FROM layout WHERE id = s.scope_id) \
         END AS scope_label \
     FROM share s \
     JOIN app_user ou ON ou.id = s.owner_id \

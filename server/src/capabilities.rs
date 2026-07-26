@@ -58,6 +58,7 @@ const FEATURES: &[&str] = &[
     "loan_sync",
     "batch_push",
     "reading_progress",
+    "layouts",
 ];
 
 pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {

@@ -255,6 +255,21 @@ class PhysicalEnvironments extends Table {
   TextColumn get name => text()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  // Publishing bookkeeping (plan 5 #47). **App-local by construction**: the
+  // server stores a `layout` *document*, not a mirror of this table, so these
+  // two columns have no server counterpart and must never gain one.
+  //
+  // `serverRevision` is the revision this device last published or fetched —
+  // sent back as `base_revision` so a publish that raced another device is
+  // refused with a 409 rather than silently overwriting their arrangement.
+  // Null means "never published".
+  IntColumn get serverRevision => integer().nullable()();
+  // Set whenever the room is edited locally; cleared on a successful publish or
+  // fetch. Defaults **false**, unlike the sync tables' `needsPush`: publishing
+  // is a deliberate act, and a room that was never published should not start
+  // life asking to be.
+  BoolColumn get needsPublish =>
+      boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -427,7 +442,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -629,6 +644,24 @@ class VellumDatabase extends _$VellumDatabase {
             // — and deliberately never one, see the table's doc comment.
             if (!(await tableNames()).contains('copy_photos')) {
               await m.createTable(copyPhotos);
+            }
+          }
+          if (from < 20) {
+            // Layout publishing bookkeeping (plan 5 #47). App-local: the server
+            // stores a document, not a mirror of these tables, so there is no
+            // matching server migration.
+            final envCols = await columnsOf('physical_environments');
+            if (!envCols.contains('server_revision')) {
+              await m.addColumn(
+                physicalEnvironments,
+                physicalEnvironments.serverRevision,
+              );
+            }
+            if (!envCols.contains('needs_publish')) {
+              await m.addColumn(
+                physicalEnvironments,
+                physicalEnvironments.needsPublish,
+              );
             }
           }
         },

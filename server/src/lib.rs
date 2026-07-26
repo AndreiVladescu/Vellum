@@ -23,6 +23,7 @@ mod capabilities;
 mod discover;
 mod error;
 mod groups;
+mod layouts;
 mod loans;
 mod mail;
 mod metadata;
@@ -228,6 +229,15 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         )
         .route("/reading-progress/{book_id}", put(reading::upsert))
         // User-to-user shares.
+        // Published room layouts (plan 5 #47). A document store: whole-document
+        // publish with a revision, 409 on a stale base.
+        .route("/layouts", get(layouts::list))
+        .route(
+            "/layouts/{id}",
+            get(layouts::get)
+                .put(layouts::publish)
+                .delete(layouts::delete),
+        )
         .route("/shares", get(shares::list).post(shares::create))
         .route("/shares/{id}", delete(shares::delete))
         // Emailed member invites (plan 5 #31, stage 3). Minting is master-only;

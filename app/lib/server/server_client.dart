@@ -270,6 +270,50 @@ class VellumServerClient {
     return Capabilities.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Rooms this account can see: its own, plus any shared with it (plan 5 #47).
+  Future<List<ServerLayout>> listLayouts() async {
+    final res = await _http.get(_uri('/api/layouts'), headers: _headers);
+    final body = _body(res) as List? ?? const [];
+    return [
+      for (final l in body) ServerLayout.fromJson(l as Map<String, dynamic>),
+    ];
+  }
+
+  /// One room, document included.
+  Future<ServerLayout> fetchLayout(String id) async {
+    final res = await _http.get(_uri('/api/layouts/$id'), headers: _headers);
+    return ServerLayout.fromJson(_body(res) as Map<String, dynamic>);
+  }
+
+  /// Publishes a room whole.
+  ///
+  /// [baseRevision] is the revision this device last saw; the server answers
+  /// **409** if someone else published since, which surfaces as a
+  /// [ServerException] with `statusCode == 409` for the caller to turn into a
+  /// question rather than an overwrite.
+  Future<ServerLayout> publishLayout({
+    required String id,
+    required String name,
+    required int baseRevision,
+    required Map<String, dynamic> doc,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/layouts/$id'),
+      headers: {..._headers, 'content-type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'base_revision': baseRevision,
+        'doc': doc,
+      }),
+    );
+    return ServerLayout.fromJson(_body(res) as Map<String, dynamic>);
+  }
+
+  Future<void> deleteLayout(String id) async {
+    final res = await _http.delete(_uri('/api/layouts/$id'), headers: _headers);
+    _body(res);
+  }
+
   /// Starts a password reset (plan 5 #31).
   ///
   /// Unauthenticated, and the server answers the same whether or not the
@@ -1116,6 +1160,40 @@ class ServerFile {
 /// [Capabilities.syncProtocol] to show "this server is newer than the app"
 /// instead of failing sync opaquely partway through.
 const kKnownSyncProtocol = 1;
+
+/// A published room (plan 5 #47), with its document when fetched singly.
+class ServerLayout {
+  const ServerLayout({
+    required this.id,
+    required this.name,
+    required this.revision,
+    required this.publishedAt,
+    required this.mine,
+    this.doc,
+  });
+
+  final String id;
+  final String name;
+  final int revision;
+  final String publishedAt;
+
+  /// Whether this account owns it — a shared room can be fetched but not
+  /// published over.
+  final bool mine;
+
+  /// The `layout_doc` JSON. Null in a list response, which carries only the
+  /// summary.
+  final Map<String, dynamic>? doc;
+
+  factory ServerLayout.fromJson(Map<String, dynamic> j) => ServerLayout(
+        id: j['id'] as String,
+        name: (j['name'] as String?) ?? 'Room',
+        revision: (j['revision'] as num?)?.toInt() ?? 0,
+        publishedAt: (j['published_at'] as String?) ?? '',
+        mine: j['mine'] == true,
+        doc: j['doc'] is Map ? (j['doc'] as Map).cast<String, dynamic>() : null,
+      );
+}
 
 /// One hit from `GET /api/search` (plan 5 #32): where in which book, and the
 /// surrounding text with the match marked.

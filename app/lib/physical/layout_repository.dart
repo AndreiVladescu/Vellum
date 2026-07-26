@@ -67,6 +67,48 @@ class LayoutRepository {
     return id;
   }
 
+  /// Marks a room as changed since its last publish (plan 5 #47).
+  ///
+  /// Set **here**, inside every mutator, rather than at the fifteen call sites
+  /// in the editor — a flag that has to be remembered is a flag that gets
+  /// forgotten, and this one decides whether the Publish badge is honest.
+  ///
+  /// The by-placement and by-shelf variants resolve the room in the same
+  /// statement, so marking a room dirty never costs a second round trip during
+  /// a gravity pass that touches every book on a shelf.
+  Future<void> markDirty(String environmentId) =>
+      (db.update(db.physicalEnvironments)
+            ..where((e) => e.id.equals(environmentId)))
+          .write(const PhysicalEnvironmentsCompanion(
+        needsPublish: Value(true),
+      ));
+
+  /// Records a successful publish/fetch: this device is now level with the
+  /// server at [revision].
+  Future<void> markPublished(String environmentId, int revision) =>
+      (db.update(db.physicalEnvironments)
+            ..where((e) => e.id.equals(environmentId)))
+          .write(PhysicalEnvironmentsCompanion(
+        serverRevision: Value(revision),
+        needsPublish: const Value(false),
+      ));
+
+  Future<void> _dirtyByPlacement(String placementId) => db.customStatement(
+        'UPDATE physical_environments SET needs_publish = 1 WHERE id = '
+        '(SELECT environment_id FROM book_placements WHERE id = ?)',
+        [placementId],
+      );
+
+  Future<void> _dirtyByShelf(String shelfId) => db.customStatement(
+        'UPDATE physical_environments SET needs_publish = 1 WHERE id = '
+        '(SELECT environment_id FROM physical_shelves WHERE id = ?)',
+        [shelfId],
+      );
+
+  Future<PhysicalEnvironment?> environment(String id) =>
+      (db.select(db.physicalEnvironments)..where((e) => e.id.equals(id)))
+          .getSingleOrNull();
+
   Future<void> renameEnvironment(String id, String name) async {
     await (db.update(db.physicalEnvironments)..where((e) => e.id.equals(id)))
         .write(PhysicalEnvironmentsCompanion(name: Value(name.trim())));
@@ -119,6 +161,7 @@ class LayoutRepository {
             label: Value(label),
           ),
         );
+    await markDirty(environmentId);
   }
 
   Future<void> updateShelf(
@@ -138,9 +181,12 @@ class LayoutRepository {
         label: label ?? const Value.absent(),
       ),
     );
+    await _dirtyByShelf(id);
   }
 
   Future<void> deleteShelf(String id) async {
+    // Dirty *before* the delete, while the shelf still names its room.
+    await _dirtyByShelf(id);
     await (db.delete(db.physicalShelves)..where((s) => s.id.equals(id))).go();
   }
 
@@ -329,6 +375,7 @@ class LayoutRepository {
             ),
           );
     });
+    await markDirty(environmentId);
   }
 
   /// Partial update of a placement; omitted arguments are left unchanged.
@@ -352,10 +399,12 @@ class LayoutRepository {
         format: format ?? const Value.absent(),
       ),
     );
+    await _dirtyByPlacement(id);
   }
 
   /// Removes a placement and the copy it created.
   Future<void> removePlacement(BookPlacement placement) async {
+    await markDirty(placement.environmentId);
     await db.transaction(() async {
       await (db.delete(db.bookPlacements)
             ..where((p) => p.id.equals(placement.id)))

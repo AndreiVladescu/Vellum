@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
 import 'environment_editor_page.dart';
+import 'publish_room.dart';
 import 'shelf_scan_page.dart';
 
 /// The Physical tab body: lists physical environments ("libraries") and lets
@@ -14,10 +16,16 @@ class PhysicalLibrariesTab extends StatelessWidget {
     super.key,
     required this.repository,
     required this.settings,
+    this.connection,
   });
 
   final LibraryRepository repository;
   final AppSettingsStore settings;
+
+  /// Needed only for publishing rooms (plan 5 #47); the actions are hidden
+  /// without a connection, or against a server that doesn't advertise
+  /// `layouts` — a Publish button that can only fail is worse than none.
+  final ServerConnection? connection;
 
   Future<void> _rename(BuildContext context, PhysicalEnvironment env) async {
     final name = await _promptName(
@@ -51,6 +59,82 @@ class PhysicalLibrariesTab extends StatelessWidget {
       ),
     );
     if (ok == true) await repository.layout.deleteEnvironment(env.id);
+  }
+
+  /// The publisher, or null when this server can't take rooms.
+  RoomPublisher? get _publisher {
+    final c = connection;
+    if (c == null) return null;
+    final publisher = RoomPublisher(repository: repository, connection: c);
+    return publisher.available ? publisher : null;
+  }
+
+  Future<void> _publish(BuildContext context, PhysicalEnvironment env) async {
+    final publisher = _publisher;
+    if (publisher == null) return;
+
+    // Asked, not assumed: publishing a room shares its *shape*; whether the
+    // books in it become visible is a separate decision, and one people should
+    // make deliberately.
+    var shareBooks = false;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setLocal) => AlertDialog(
+          title: Text('Publish “${env.name}”?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your other devices — and anyone you share the room with — '
+                'will see this arrangement. The room itself carries only '
+                'shelf and book positions, never titles or covers.',
+              ),
+              CheckboxListTile(
+                value: shareBooks,
+                onChanged: (v) => setLocal(() => shareBooks = v ?? false),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                title: const Text('Also collect its books under a tag'),
+                subtitle: Text(
+                  'Makes a “Room: ${env.name}” tag you can share, so viewers '
+                  'see titles instead of blank spines',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Publish'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (go != true || !context.mounted) return;
+
+    final message = await publisher.publish(context, env, shareBooks: shareBooks);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _fetch(BuildContext context, PhysicalEnvironment env) async {
+    final publisher = _publisher;
+    if (publisher == null) return;
+    final message = await publisher.fetch(env.id, name: env.name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   @override
@@ -120,13 +204,35 @@ class PhysicalLibrariesTab extends StatelessWidget {
               title: Text(env.name),
               onTap: () =>
                   openEnvironment(context, repository, settings, env.id, env.name),
+              // The dirty badge (plan 5 #47): a room edited since its last
+              // publish says so, rather than leaving you to remember.
+              subtitle: _publisher == null
+                  ? null
+                  : Text(env.serverRevision == null
+                      ? 'Not published'
+                      : env.needsPublish
+                          ? 'Changed since publishing'
+                          : 'Published · revision ${env.serverRevision}'),
               trailing: PopupMenuButton<String>(
-                onSelected: (v) => v == 'rename'
-                    ? _rename(context, env)
-                    : _delete(context, env),
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'rename', child: Text('Rename')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                onSelected: (v) => switch (v) {
+                  'rename' => _rename(context, env),
+                  'delete' => _delete(context, env),
+                  'publish' => _publish(context, env),
+                  _ => _fetch(context, env),
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                  if (_publisher != null) ...[
+                    const PopupMenuItem(
+                      value: 'publish',
+                      child: Text('Publish to server'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'fetch',
+                      child: Text('Update from server'),
+                    ),
+                  ],
+                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
               ),
             );

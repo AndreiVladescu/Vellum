@@ -301,6 +301,37 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**Published rooms** (both, plan 5 #47) let a layout leave the device it was
+built on. It is the one thing Vellum syncs as a **document rather than rows**,
+and deliberately so: a room is a *composition*, and two devices that each moved
+half the books have no meaningful row-level merge — last-write-wins would
+interleave two arrangements into a third nobody made. So a publish is whole, with
+a revision counter; a publish whose `base_revision` is stale gets a **409** and
+the app asks the human (take theirs, or replace with mine). That is the same
+reasoning that rejected field-level merge for books.
+
+The document (`docs/LAYOUT_DOC.md`) carries **geometry only** — no titles,
+authors or covers. That is what makes a shared room safe by construction rather
+than by remembering to filter: a viewer resolves each `book_id` through normal
+RBAC, and a book they may not see renders as an anonymous spine because there was
+never anything else in the document to leak. The one denormalisation is
+`width_m`/`height_m`, resolved at publish time, since a viewer who cannot read a
+page count still has to draw the spine at the right thickness.
+
+Sharing a room shares its *shape*. Making its books visible is a separate,
+deliberate act: publish offers to collect them under a `Room: <name>` tag, and
+that tag is shared through the ordinary group/share UI — book visibility rides
+the RBAC that already exists instead of a second path to the same data. The share
+scope `layout` is **viewer-only**; `editor` would mean two people dragging the
+same shelf, which the document model has no answer for beyond the 409.
+
+Applying a fetched room is **upsert-by-id then delete-what-is-missing**, so a
+fetch is idempotent and a book someone took off the shelf actually disappears.
+It never invents book rows — a placement whose book hasn't synced yet is skipped
+and *counted*, so the app can say "3 books aren't on this device yet" instead of
+looking like data loss — and a copy minted for a not-yet-synced `copy_id` is not
+marked dirty, or the fetch would push the server's own data straight back.
+
 **Reading in the browser** (server + console, plan 5 #33) makes a machine
 without Vellum installed useful, and turns a share link from "here's a 40 MB
 download" into "here's the chapter". One page serves both cases —
