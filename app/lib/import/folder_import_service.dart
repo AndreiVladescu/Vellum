@@ -143,8 +143,26 @@ class FolderImportService {
     Directory root, {
     ImportProgress? onProgress,
     Future<bool> Function()? isCancelled,
+  }) async =>
+      scanFiles(
+        await findImportableFiles(root),
+        onProgress: onProgress,
+        isCancelled: isCancelled,
+      );
+
+  /// The same dry run over an explicit list of files rather than a folder — what
+  /// a multi-file share hands over (plan 5 #20), which has paths but no folder.
+  /// Unsupported formats are dropped here too: a share sheet will offer Vellum
+  /// anything once the user has picked it.
+  Future<List<ImportCandidate>> scanFiles(
+    List<File> requested, {
+    ImportProgress? onProgress,
+    Future<bool> Function()? isCancelled,
   }) async {
-    final files = await findImportableFiles(root);
+    final files = [
+      for (final f in requested)
+        if (supportedFormats.contains(_formatOf(f.path))) f,
+    ];
     final library = await libraryFingerprint();
     final candidates = <ImportCandidate>[];
     for (var i = 0; i < files.length; i++) {

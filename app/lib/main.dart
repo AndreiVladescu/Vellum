@@ -16,6 +16,7 @@ import 'import/filename_metadata.dart';
 import 'import/folder_import_page.dart';
 import 'import/folder_import_service.dart';
 import 'import/import_plan.dart';
+import 'import/incoming_share.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
 import 'server/connection_store.dart';
@@ -126,6 +127,10 @@ class _LibraryPageState extends State<LibraryPage> {
     enabled: () => widget.settings.autoPush,
   );
 
+  /// Books opened or shared into Vellum from another app (plan 5 #20).
+  late final IncomingShare _incoming = IncomingShare();
+  StreamSubscription<List<String>>? _incomingSub;
+
   LibraryRepository get repository => widget.repository;
 
   @override
@@ -134,6 +139,7 @@ class _LibraryPageState extends State<LibraryPage> {
     _autoSync();
     _autoPusher.start();
     _offerWatchedFolder();
+    _listenForSharedBooks();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
   }
@@ -255,11 +261,55 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
+  /// Handles books arriving from another app's "open with" / share sheet.
+  ///
+  /// Both arrival shapes are handled here, because they are equally normal: the
+  /// share may *be* what launched the app (the paths are waiting), or it may
+  /// arrive while Vellum is already open (the stream). One file goes to the
+  /// add-book form pre-filled, several to the import plan (#15) — the same
+  /// review either way, since the alternative is silently adding books someone
+  /// only meant to look at.
+  void _listenForSharedBooks() {
+    _incomingSub = _incoming.files.listen(_openSharedFiles);
+    _incoming.takeInitialFiles().then((paths) {
+      if (paths.isNotEmpty) _openSharedFiles(paths);
+    });
+  }
+
+  Future<void> _openSharedFiles(List<String> paths) async {
+    if (!mounted || paths.isEmpty) return;
+    final navigator = Navigator.of(context);
+    if (paths.length == 1) {
+      final added = await navigator.push<String>(MaterialPageRoute(
+        builder: (_) => AddBookPage(
+          repository: repository,
+          settings: widget.settings,
+          initialFilePath: paths.single,
+        ),
+      ));
+      if (added != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('“$added” added to your shelf')),
+        );
+      }
+      return;
+    }
+    await navigator.push(MaterialPageRoute(
+      builder: (_) => FolderImportPage(
+        repository: repository,
+        settings: widget.settings,
+        initialFiles: paths,
+      ),
+    ));
+  }
+
   @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
     _autoPusher.dispose();
+    _incomingSub?.cancel();
+    _incoming.dispose();
     super.dispose();
   }
 

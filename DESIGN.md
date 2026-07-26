@@ -346,6 +346,15 @@ Metadata is also filled in **automatically**, without picking an edition:
 
 ## Adding & editing books
 
+**Books opened or shared from another app** (Android, plan 5 #20) arrive through
+`VIEW` / `SEND` / `SEND_MULTIPLE` intent filters. A small `MethodChannel` in
+`MainActivity.kt` does the one thing that has to happen natively: it **copies each
+`content://` stream into the app's cache before handing Dart a path**, because
+such a URI is only readable while the granting intent lives. One file opens the
+add-book form pre-filled; several go to the import wizard's review list. Both
+cold start (the share launched the app) and warm resume (it was already running)
+are handled.
+
 **Scanning ISBN barcodes** (app, plan 5 #16) is the fast path for physical books:
 the *Scan* button on the shelf opens a live camera that keeps scanning — a shelf
 is dozens of books, so each accepted barcode adds a book and slides onto a strip

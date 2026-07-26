@@ -14,10 +14,17 @@ class AddBookPage extends StatefulWidget {
     super.key,
     required this.repository,
     required this.settings,
+    this.initialFilePath,
   });
 
   final LibraryRepository repository;
   final AppSettingsStore settings;
+
+  /// A file to attach as soon as the page opens, from an "open with" or share
+  /// (plan 5 #20). Goes through the same [_AddBookPageState._acceptFile] as a
+  /// picked or dropped file, so a shared book is validated by content like any
+  /// other and seeds the title from its name.
+  final String? initialFilePath;
 
   @override
   State<AddBookPage> createState() => _AddBookPageState();
@@ -43,6 +50,17 @@ class _AddBookPageState extends State<AddBookPage> {
   static const _customKey = '__custom__';
 
   bool get _busy => _addingWorkKey != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final shared = widget.initialFilePath;
+    if (shared != null) {
+      final name = shared.split(RegExp(r'[/\\]')).last;
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _acceptFile(shared, name));
+    }
+  }
 
   @override
   void dispose() {

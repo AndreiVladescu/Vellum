@@ -22,6 +22,7 @@ class FolderImportPage extends StatefulWidget {
     required this.repository,
     required this.settings,
     this.initialFolder,
+    this.initialFiles,
   });
 
   final LibraryRepository repository;
@@ -30,6 +31,10 @@ class FolderImportPage extends StatefulWidget {
   /// Skip the picker and scan this folder immediately — used by the watched
   /// folder's launch prompt.
   final String? initialFolder;
+
+  /// Skip the picker and review these exact files — a multi-file share (plan 5
+  /// #20), which arrives as paths with no folder to watch.
+  final List<String>? initialFiles;
 
   @override
   State<FolderImportPage> createState() => _FolderImportPageState();
@@ -54,10 +59,34 @@ class _FolderImportPageState extends State<FolderImportPage> {
   @override
   void initState() {
     super.initState();
+    final files = widget.initialFiles;
     final initial = widget.initialFolder;
-    if (initial != null) {
+    if (files != null && files.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scanFiles(files));
+    } else if (initial != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scan(initial));
     }
+  }
+
+  /// The shared-files variant of [_scan]: same dry run, no folder behind it (so
+  /// no "watch this folder" offer on the summary).
+  Future<void> _scanFiles(List<String> paths) async {
+    setState(() {
+      _phase = _Phase.scanning;
+      _cancelRequested = false;
+      _progress = (done: 0, total: paths.length, label: '');
+    });
+    final plan = await _service.scanFiles(
+      [for (final path in paths) File(path)],
+      onProgress: (done, total, label) {
+        if (mounted) {
+          setState(() => _progress = (done: done, total: total, label: label));
+        }
+      },
+      isCancelled: () async => _cancelRequested,
+    );
+    if (!mounted) return;
+    _applyPlan(plan);
   }
 
   Future<void> _pickFolder() async {
@@ -83,6 +112,10 @@ class _FolderImportPageState extends State<FolderImportPage> {
       isCancelled: () async => _cancelRequested,
     );
     if (!mounted) return;
+    _applyPlan(plan);
+  }
+
+  void _applyPlan(List<ImportCandidate> plan) {
     setState(() {
       _plan = plan;
       _selected
@@ -142,11 +175,15 @@ class _FolderImportPageState extends State<FolderImportPage> {
     setState(() => _phase = _Phase.done);
   }
 
+  /// True when this page is reviewing shared files rather than a folder, which
+  /// changes only the wording — the flow underneath is identical.
+  bool get _isShare => widget.initialFiles != null;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Import a folder'),
+        title: Text(_isShare ? 'Import shared books' : 'Import a folder'),
         actions: [
           if (_phase == _Phase.scanning || _phase == _Phase.importing)
             TextButton(
@@ -160,7 +197,9 @@ class _FolderImportPageState extends State<FolderImportPage> {
       body: switch (_phase) {
         _Phase.pick => _PickStep(onPick: _pickFolder),
         _Phase.scanning => _BusyStep(
-            title: 'Looking through ${_folder ?? 'the folder'}…',
+            title: _isShare
+                ? 'Checking the shared files…'
+                : 'Looking through ${_folder ?? 'the folder'}…',
             progress: _progress,
           ),
         _Phase.review => _reviewStep(context),
@@ -185,7 +224,9 @@ class _FolderImportPageState extends State<FolderImportPage> {
       return _EmptyMessage(
         icon: Icons.folder_off_outlined,
         title: 'No PDFs or EPUBs here',
-        detail: 'Vellum looked in ${_folder!} and every folder inside it.',
+        detail: _folder == null
+            ? 'None of the shared files is a PDF or EPUB.'
+            : 'Vellum looked in $_folder and every folder inside it.',
       );
     }
     final counts = summarize(_plan);

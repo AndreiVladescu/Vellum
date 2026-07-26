@@ -58,6 +58,31 @@ default) and a generated spine in that dominant colour.
 
 ---
 
+## Manual device checks (CI can't do these)
+
+**Open-with / share-target import** (plan 5 #20). The Dart side is unit-tested
+through a fake channel (`app/test/import/incoming_share_test.dart`) and the
+Kotlin side compiles in `flutter build apk`, but the intent plumbing itself needs
+a real device:
+
+1. **Open with, cold start.** Force-stop Vellum. In Files, long-press a PDF →
+   *Open with* → Vellum. Expect the add-book form with the file already attached
+   and the title seeded from the file name.
+2. **Share, warm resume.** Open Vellum, switch to Gmail, share an EPUB
+   attachment to Vellum. Expect the same form without a restart.
+3. **Multi-file share.** Select two or more PDFs in Files → Share → Vellum.
+   Expect the import wizard's review list, not the single-book form.
+4. **A share you then cancel.** Back out of the form; nothing should be added,
+   and `cacheDir/incoming` may keep the copy (harmless — Android reclaims it).
+5. **A generic mime type.** Share a PDF from an app that sends
+   `application/octet-stream`; the path pattern in the manifest should still
+   offer Vellum.
+
+**Barcode scanning** (plan 5 #16): scan a real book, then deny the camera
+permission and confirm the manual ISBN field still adds books.
+
+---
+
 ## Open / possible follow-ups
 
 - **Books riding shelves.** Moving a shelf still leaves its books behind; they
