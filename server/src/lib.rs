@@ -232,6 +232,7 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Published room layouts (plan 5 #47). A document store: whole-document
         // publish with a revision, 409 on a stale base.
         .route("/layouts", get(layouts::list))
+        .route("/layouts/{id}/books", get(layouts::books))
         .route(
             "/layouts/{id}",
             get(layouts::get)
@@ -252,6 +253,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/share-links/{id}", delete(shares::delete_link))
         // Reading in the browser (plan 5 #33). The public variants never
         // consume a share link's use — that counts downloads.
+        // A published room, for anyone with the link (plan 5 #48). Never
+        // consumes a use: there is nothing to download.
+        .route("/public/{token}/room", get(shares::public_room))
         .route("/public/{token}/read", get(reader::public_manifest))
         .route("/public/{token}/read/{index}", get(reader::public_unit))
         .route(
@@ -296,6 +300,12 @@ pub fn router(state: AppState) -> Router {
         .route("/p/{token}", get(web::public_page))
         // The browser reader (plan 5 #33): the same page for a signed-in
         // reader and for a share link, which it tells apart from its own path.
+        // The room viewer (plan 5 #48): /room/<id> signed in, /pr/<token> for a
+        // public link. One page, told apart by its own path — the same shape
+        // the browser reader uses.
+        .route("/room/{layout_id}", get(web::room_page))
+        .route("/pr/{token}", get(web::room_page))
+        .route("/assets/room.js", get(web::room_js))
         .route("/read/{book_id}", get(web::read_page))
         .route("/r/{token}", get(web::read_page))
         .route("/assets/read.js", get(web::read_js))

@@ -280,6 +280,99 @@ pub async fn delete(
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 
+/// What a viewer is allowed to know about the books in a room (plan 5 #48).
+///
+/// One row per *visible* book. A placement whose book the caller can't see
+/// simply has no entry, and the viewer draws an anonymous spine — which is safe
+/// because the document itself never carried a title to hide.
+#[derive(Serialize)]
+pub struct RoomBook {
+    pub book_id: String,
+    pub title: String,
+    pub authors: Vec<String>,
+    pub has_cover: bool,
+}
+
+/// `GET /api/layouts/{id}/books` — the metadata half of the room view.
+///
+/// Deliberately a **second** request rather than fields inside the document:
+/// the document is the same bytes for everybody, and what differs per viewer is
+/// resolved here through the ordinary access predicate. That split is what makes
+/// redaction structural.
+pub async fn books(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<Vec<RoomBook>>> {
+    let doc: Option<String> = sqlx::query_scalar(&format!(
+        "SELECT l.doc FROM layout l WHERE l.id = ? AND {}",
+        visible_predicate()
+    ))
+    .bind(&id)
+    .bind(&user.id)
+    .bind(user.is_master)
+    .bind(&user.id)
+    .fetch_optional(&state.db)
+    .await?;
+    let doc = doc.ok_or_else(|| AppError::NotFound("layout not found".into()))?;
+    let ids = book_ids_in(&doc);
+    resolve_books(&state, &user, &ids).await.map(Json)
+}
+
+/// The `book_id`s a document mentions, de-duplicated.
+pub(crate) fn book_ids_in(doc: &str) -> Vec<String> {
+    let parsed: serde_json::Value = match serde_json::from_str(doc) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    for placement in parsed["placements"].as_array().unwrap_or(&Vec::new()) {
+        if let Some(id) = placement["book_id"].as_str() {
+            seen.insert(id.to_string());
+        }
+    }
+    seen.into_iter().collect()
+}
+
+/// Titles and authors for exactly the books in `ids` that `user` may see.
+pub(crate) async fn resolve_books(
+    state: &AppState,
+    user: &AuthUser,
+    ids: &[String],
+) -> AppResult<Vec<RoomBook>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let placeholders = std::iter::repeat_n("?", ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT b.id, b.title, b.cover_path FROM book b          WHERE b.id IN ({placeholders}) AND {}",
+        crate::books::access_predicate()
+    );
+    let mut query = sqlx::query_as::<_, (String, String, Option<String>)>(&sql);
+    for id in ids {
+        query = query.bind(id.clone());
+    }
+    let rows = query
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .fetch_all(&state.db)
+        .await?;
+
+    let authors = crate::books::author_map(state).await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, title, cover)| RoomBook {
+            authors: authors.get(&id).cloned().unwrap_or_default(),
+            has_cover: cover.is_some(),
+            book_id: id,
+            title,
+        })
+        .collect())
+}
+
 /// The owner of a layout, for the share-scope check in `shares::create`.
 pub async fn owner_of(state: &AppState, layout_id: &str) -> AppResult<Option<String>> {
     Ok(

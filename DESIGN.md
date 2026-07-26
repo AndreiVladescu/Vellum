@@ -332,6 +332,28 @@ and *counted*, so the app can say "3 books aren't on this device yet" instead of
 looking like data loss — and a copy minted for a not-yet-synced `copy_id` is not
 marked dirty, or the fetch would push the server's own data straight back.
 
+**Rooms you can look at in a browser** (server/console, plan 5 #48) render a
+published layout as inline SVG — shelf lines and one rectangle per book, pan and
+zoom, hover for a title. No rendering dependency: a room is rectangles, and the
+CSP forbids a CDN anyway.
+
+The redaction is the point, and it is **structural**. The document is the same
+bytes for every viewer and carries no titles; who may see which title is resolved
+by a *separate* request (`/api/layouts/{id}/books`) filtered by the same access
+predicate as `/api/books`. A spine with no entry there is drawn blank, and the
+page says how many are blank and why. There is no filtering step anyone can
+forget, because there was never anything to filter.
+
+Public room links reuse `share_link` — `kind` now says `book` or `layout`, with a
+CHECK that exactly one target is set — so expiry and revocation are the machinery
+that already exists rather than a second kind of link with its own lifetime rules
+to get wrong. Two deliberate choices: a room link **never consumes a use** (there
+is nothing to download), and naming the books is an explicit **per-link**
+`show_books` flag, off by default. The plan proposed inferring it from the owner
+having tagged the room's books, but tagging books to share with a named member
+must not silently publish their titles to anyone holding a URL; when the flag is
+on, the titles shown are still exactly the room's `Room: <name>` tag.
+
 **Reading in the browser** (server + console, plan 5 #33) makes a machine
 without Vellum installed useful, and turns a share link from "here's a 40 MB
 download" into "here's the chapter". One page serves both cases —

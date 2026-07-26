@@ -188,7 +188,12 @@ const SHARE_SELECT: &str = "SELECT s.id, s.scope, s.scope_id, s.permission, s.cr
 #[derive(Serialize, sqlx::FromRow)]
 pub struct LinkDto {
     pub id: String,
-    pub book_id: String,
+    /// 'book' or 'layout' (plan 5 #48).
+    pub kind: String,
+    pub book_id: Option<String>,
+    pub layout_id: Option<String>,
+    /// What the link points at, whichever kind it is — so the console can list
+    /// and revoke a room link without knowing the difference.
     pub book_title: String,
     pub permission: String,
     pub created_at: String,
@@ -200,7 +205,14 @@ pub struct LinkDto {
 
 #[derive(Deserialize)]
 pub struct LinkInput {
-    pub book_id: String,
+    /// 'book' (default) or 'layout' — a public link can point at a published
+    /// room since plan 5 #48. Exactly one of `book_id`/`layout_id` applies.
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub book_id: Option<String>,
+    #[serde(default)]
+    pub layout_id: Option<String>,
     pub permission: Option<String>,
     /// Days until the link expires; omit for a link that never expires.
     pub expires_in_days: Option<i64>,
@@ -211,12 +223,19 @@ pub struct LinkInput {
     pub max_uses: Option<i64>,
     /// Convenience for `max_uses = 1` (a one-time download).
     pub one_time: Option<bool>,
+    /// Room links only: let anonymous viewers see the titles of the books in
+    /// the room's `Room: <name>` tag. Off by default — see the column comment
+    /// in migration 0019.
+    #[serde(default)]
+    pub show_books: Option<bool>,
 }
 
 #[derive(Serialize)]
 pub struct LinkCreated {
     pub id: String,
-    pub book_id: String,
+    /// Set for a book link; null for a room link (plan 5 #48).
+    pub book_id: Option<String>,
+    pub layout_id: Option<String>,
     /// The full public URL. Shown once — only its hash is stored.
     pub url: String,
     pub expires_at: Option<String>,
@@ -226,10 +245,16 @@ pub async fn list_links(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<Vec<LinkDto>>> {
+    // LEFT JOINs, not inner: a room link has no book, and an inner join would
+    // quietly drop it from the list — leaving a live link nobody can revoke.
     let links = sqlx::query_as::<_, LinkDto>(
-        "SELECT l.id, l.book_id, b.title AS book_title, l.permission, l.created_at, \
+        "SELECT l.id, l.kind, l.book_id, l.layout_id, \
+            COALESCE(b.title, r.name, '(deleted)') AS book_title, \
+            l.permission, l.created_at, \
             l.expires_at, l.max_uses, l.use_count, l.revoked \
-         FROM share_link l JOIN book b ON b.id = l.book_id \
+         FROM share_link l \
+         LEFT JOIN book b ON b.id = l.book_id \
+         LEFT JOIN layout r ON r.id = l.layout_id \
          WHERE ? = 1 OR l.owner_id = ? \
          ORDER BY l.created_at DESC",
     )
@@ -245,7 +270,33 @@ pub async fn create_link(
     user: AuthUser,
     Json(input): Json<LinkInput>,
 ) -> AppResult<Json<LinkCreated>> {
-    require_owns_book(&state, &user, &input.book_id).await?;
+    let kind = input.kind.as_deref().unwrap_or("book");
+    // Resolve the target first: a link to something you don't own, or to
+    // nothing at all, must fail before a token is ever minted.
+    let (book_id, layout_id) = match kind {
+        "book" => {
+            let bid = input
+                .book_id
+                .clone()
+                .ok_or_else(|| AppError::BadRequest("book_id is required".into()))?;
+            require_owns_book(&state, &user, &bid).await?;
+            (Some(bid), None)
+        }
+        "layout" => {
+            let lid = input
+                .layout_id
+                .clone()
+                .ok_or_else(|| AppError::BadRequest("layout_id is required".into()))?;
+            let owner = crate::layouts::owner_of(&state, &lid)
+                .await?
+                .ok_or_else(|| AppError::NotFound("layout not found".into()))?;
+            if !user.is_master && owner != user.id {
+                return Err(AppError::Forbidden("you do not own this room".into()));
+            }
+            (None, Some(lid))
+        }
+        other => return Err(AppError::BadRequest(format!("unknown link kind '{other}'"))),
+    };
     let permission = normalize_permission(input.permission.as_deref())?;
 
     if input.expires_in_days.is_some_and(|d| d <= 0) {
@@ -296,24 +347,35 @@ pub async fn create_link(
 
     sqlx::query(
         "INSERT INTO share_link \
-            (id, owner_id, book_id, token_hash, permission, expires_at, max_uses) \
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (id, owner_id, kind, book_id, layout_id, token_hash, permission, \
+             expires_at, max_uses, show_books) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&user.id)
-    .bind(&input.book_id)
+    .bind(kind)
+    .bind(&book_id)
+    .bind(&layout_id)
     .bind(sha256_hex(&token))
     .bind(&permission)
     .bind(&expires_at)
     .bind(max_uses)
+    .bind(kind == "layout" && input.show_books.unwrap_or(false))
     .execute(&state.db)
     .await?;
 
     Ok(Json(LinkCreated {
         id,
-        book_id: input.book_id,
-        // A friendly landing page rather than the raw API endpoint.
-        url: format!("{}/p/{}", state.public_base_url, token),
+        book_id,
+        layout_id,
+        // A friendly landing page rather than the raw API endpoint. A room link
+        // lands on /r-room/ so the page knows what it is showing without a
+        // round trip that might 404.
+        url: if kind == "layout" {
+            format!("{}/pr/{}", state.public_base_url, token)
+        } else {
+            format!("{}/p/{}", state.public_base_url, token)
+        },
         expires_at,
     }))
 }
@@ -407,6 +469,113 @@ pub async fn public_book(
     }))
 }
 
+/// The published room a share-link token points at (plan 5 #48), and whether
+/// its books were shared alongside it.
+///
+/// A room link never consumes a use — there is nothing to download, and
+/// `max_uses` counts downloads.
+pub(crate) async fn layout_for_link(
+    state: &AppState,
+    token: &str,
+) -> AppResult<Option<(String, bool)>> {
+    Ok(sqlx::query_as(&format!(
+        "SELECT l.layout_id, l.show_books FROM share_link l \
+         WHERE l.token_hash = ? AND l.kind = 'layout' AND {LINK_VALID}"
+    ))
+    .bind(sha256_hex(token))
+    .fetch_optional(&state.db)
+    .await?)
+}
+
+/// `GET /api/public/{token}/room` — the room document for an anonymous viewer.
+pub async fn public_room(
+    State(state): State<AppState>,
+    client: crate::auth::ClientKey,
+    Path(token): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    if !state.public_limiter.check(&client.0) {
+        return Err(AppError::TooManyRequests("too many requests".into()));
+    }
+    let (layout_id, show_books) = layout_for_link(&state, &token)
+        .await?
+        .ok_or_else(|| AppError::NotFound("link is invalid or expired".into()))?;
+
+    let row: Option<(String, i64, String)> =
+        sqlx::query_as("SELECT name, revision, doc FROM layout WHERE id = ?")
+            .bind(&layout_id)
+            .fetch_optional(&state.db)
+            .await?;
+    let (name, revision, doc) = row.ok_or_else(|| AppError::NotFound("room not found".into()))?;
+
+    // The books an anonymous viewer may name: none unless this *link* was
+    // created with `show_books`, and even then only those the owner collected
+    // under the room's `Room: <name>` tag. Anonymous spines are the default —
+    // which is the whole reason the document carries no titles.
+    let named = if show_books {
+        public_room_books(&state, &layout_id, &name).await?
+    } else {
+        Vec::new()
+    };
+
+    Ok(Json(serde_json::json!({
+        "name": name,
+        "revision": revision,
+        "doc": serde_json::from_str::<serde_json::Value>(&doc)
+            .unwrap_or(serde_json::Value::Null),
+        "books": named,
+    })))
+}
+
+/// Titles for the books of a public room, scoped to the room's own tag.
+///
+/// Only ever called for a link created with `show_books`. Scoping to the
+/// `Room: <name>` group (rather than to every book in the document) means the
+/// owner controls exactly which books are named by what they put in the tag —
+/// the same collection they'd share with a named member, and no second path to
+/// the library.
+async fn public_room_books(
+    state: &AppState,
+    layout_id: &str,
+    room_name: &str,
+) -> AppResult<Vec<serde_json::Value>> {
+    let owner: Option<String> = sqlx::query_scalar("SELECT owner_id FROM layout WHERE id = ?")
+        .bind(layout_id)
+        .fetch_optional(&state.db)
+        .await?;
+    let Some(owner) = owner else {
+        return Ok(Vec::new());
+    };
+    let group: Option<String> =
+        sqlx::query_scalar("SELECT id FROM book_group WHERE owner_id = ? AND name = ?")
+            .bind(&owner)
+            .bind(format!("Room: {room_name}"))
+            .fetch_optional(&state.db)
+            .await?;
+    let Some(group) = group else {
+        return Ok(Vec::new());
+    };
+
+    let rows: Vec<(String, String, Option<String>)> = sqlx::query_as(
+        "SELECT b.id, b.title, b.cover_path FROM book b \
+         JOIN book_group_item gi ON gi.book_id = b.id \
+         WHERE gi.group_id = ?",
+    )
+    .bind(&group)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, title, cover)| {
+            serde_json::json!({
+                "book_id": id,
+                "title": title,
+                "has_cover": cover.is_some(),
+            })
+        })
+        .collect())
+}
+
 /// The book a share-link token points at, **without consuming a use**.
 ///
 /// Reading in the browser (plan 5 #33) goes through here: `max_uses` counts
@@ -414,7 +583,8 @@ pub async fn public_book(
 /// moment someone opened the book.
 pub(crate) async fn book_id_for_link(state: &AppState, token: &str) -> AppResult<Option<String>> {
     Ok(sqlx::query_scalar(&format!(
-        "SELECT book_id FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
+        "SELECT book_id FROM share_link WHERE token_hash = ? AND kind = 'book' \
+         AND {LINK_VALID}"
     ))
     .bind(sha256_hex(token))
     .fetch_optional(&state.db)

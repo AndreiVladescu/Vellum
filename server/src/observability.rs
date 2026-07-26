@@ -100,7 +100,7 @@ pub async fn request_id(request: Request, next: Next) -> Response {
 /// The *shape* of the request is kept, because that is what the log is for.
 fn redact_path(path: &str) -> String {
     // (prefix, how many segments to keep after it)
-    const SECRET_PREFIXES: [&str; 5] = ["/reset/", "/join/", "/p/", "/r/", "/api/public/"];
+    const SECRET_PREFIXES: [&str; 6] = ["/reset/", "/join/", "/p/", "/pr/", "/r/", "/api/public/"];
     for prefix in SECRET_PREFIXES {
         if let Some(rest) = path.strip_prefix(prefix) {
             // Keep any trailing sub-path (e.g. `/file`), drop only the token.
@@ -244,6 +244,7 @@ mod tests {
         assert_eq!(redact_path("/join/invite123"), "/join/<redacted>");
         // The browser reader's share-link route carries the same token as /p/.
         assert_eq!(redact_path("/r/sharetoken"), "/r/<redacted>");
+        assert_eq!(redact_path("/pr/roomtoken"), "/pr/<redacted>");
         assert_eq!(redact_path("/p/sharetoken"), "/p/<redacted>");
         assert_eq!(
             redact_path("/api/public/sharetoken"),

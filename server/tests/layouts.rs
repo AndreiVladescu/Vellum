@@ -449,3 +449,456 @@ async fn layouts_are_advertised_as_a_capability() {
             .any(|f| f == "layouts")
     );
 }
+
+// ---- the room view and public room links (plan 5 #48) --------------------
+
+/// A book owned by `token`, returned as its id.
+async fn book(app: &axum::Router, token: &str, title: &str) -> String {
+    let (status, created) = call(
+        app,
+        "POST",
+        "/api/books",
+        Some(token),
+        Some(serde_json::json!({ "title": title })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    created["id"].as_str().unwrap().to_string()
+}
+
+fn doc_with(books: &[&str]) -> serde_json::Value {
+    serde_json::json!({
+        "doc": "vellum.layout",
+        "version": 1,
+        "environment": { "id": "room-1", "name": "Living room" },
+        "shelves": [{ "id": "s1", "x1": 0.0, "y1": 1.0, "x2": 2.0, "y2": 1.0 }],
+        "placements": books.iter().enumerate().map(|(i, b)| serde_json::json!({
+            "id": format!("p{i}"),
+            "copy_id": format!("c{i}"),
+            "book_id": b,
+            "x": 0.1 * i as f64,
+            "y": 1.0,
+            "rotation": 0,
+            "width_m": 0.02,
+            "height_m": 0.2,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+#[tokio::test]
+async fn the_room_view_names_only_the_books_the_viewer_may_see() {
+    // The redaction property, end to end: geometry for every placement,
+    // metadata for exactly the visible books.
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    let other = member(&app, &owner, "other@lib.test").await;
+    let shared = book(&app, &owner, "Shared book").await;
+    let private = book(&app, &owner, "Private book").await;
+
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({
+            "name": "Living room",
+            "base_revision": 0,
+            "doc": doc_with(&[&shared, &private]),
+        })),
+    )
+    .await;
+    for (scope, scope_id) in [("layout", "room-1"), ("book", shared.as_str())] {
+        let (status, _) = call(
+            &app,
+            "POST",
+            "/api/shares",
+            Some(&owner),
+            Some(serde_json::json!({
+                "grantee_email": "other@lib.test",
+                "scope": scope,
+                "scope_id": scope_id,
+                "permission": "viewer",
+            })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    // The owner sees both.
+    let (status, mine) = call(&app, "GET", "/api/layouts/room-1/books", Some(&owner), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(mine.as_array().unwrap().len(), 2);
+
+    // The viewer sees the room's full geometry...
+    let (_, room) = call(&app, "GET", "/api/layouts/room-1", Some(&other), None).await;
+    assert_eq!(room["doc"]["placements"].as_array().unwrap().len(), 2);
+    // ...but only the one book they were given.
+    let (_, theirs) = call(&app, "GET", "/api/layouts/room-1/books", Some(&other), None).await;
+    let names: Vec<&str> = theirs
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Shared book"]);
+    // And the document itself never carried the other title at all.
+    assert!(!room.to_string().contains("Private book"));
+}
+
+#[tokio::test]
+async fn a_stranger_cannot_read_a_rooms_book_list() {
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    let other = member(&app, &owner, "other@lib.test").await;
+    let b = book(&app, &owner, "Secret").await;
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({
+            "name": "R", "base_revision": 0, "doc": doc_with(&[&b]),
+        })),
+    )
+    .await;
+
+    let (status, _) = call(&app, "GET", "/api/layouts/room-1/books", Some(&other), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_public_room_link_shows_shapes_and_by_default_no_titles() {
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    let b = book(&app, &owner, "On the shelf").await;
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({
+            "name": "Living room", "base_revision": 0, "doc": doc_with(&[&b]),
+        })),
+    )
+    .await;
+
+    let (status, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&owner),
+        Some(serde_json::json!({ "kind": "layout", "layout_id": "room-1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(link["book_id"].is_null());
+    assert_eq!(link["layout_id"], "room-1");
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    let (status, room) = call(
+        &app,
+        "GET",
+        &format!("/api/public/{token}/room"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(room["name"], "Living room");
+    assert_eq!(room["doc"]["placements"].as_array().unwrap().len(), 1);
+    // Off by default: tagging books to share with a person must not publish
+    // their titles to anyone holding a URL.
+    assert!(room["books"].as_array().unwrap().is_empty());
+    assert!(!room.to_string().contains("On the shelf"));
+}
+
+#[tokio::test]
+async fn a_public_room_link_can_name_the_books_in_the_rooms_tag() {
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    let tagged = book(&app, &owner, "Named book").await;
+    let untagged = book(&app, &owner, "Unnamed book").await;
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({
+            "name": "Living room",
+            "base_revision": 0,
+            "doc": doc_with(&[&tagged, &untagged]),
+        })),
+    )
+    .await;
+
+    // The `Room: <name>` tag the app's publish flow creates.
+    let (_, group) = call(
+        &app,
+        "POST",
+        "/api/groups",
+        Some(&owner),
+        Some(serde_json::json!({ "name": "Room: Living room" })),
+    )
+    .await;
+    let group_id = group["id"].as_str().unwrap();
+    call(
+        &app,
+        "POST",
+        &format!("/api/groups/{group_id}/books"),
+        Some(&owner),
+        Some(serde_json::json!({ "book_id": tagged })),
+    )
+    .await;
+
+    let (_, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&owner),
+        Some(serde_json::json!({
+            "kind": "layout", "layout_id": "room-1", "show_books": true,
+        })),
+    )
+    .await;
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    let (_, room) = call(
+        &app,
+        "GET",
+        &format!("/api/public/{token}/room"),
+        None,
+        None,
+    )
+    .await;
+    let titles: Vec<&str> = room["books"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["title"].as_str().unwrap())
+        .collect();
+    // Exactly the tag's contents — the other book stays a blank spine even
+    // though it is in the same room.
+    assert_eq!(titles, ["Named book"]);
+    assert!(!room.to_string().contains("Unnamed book"));
+}
+
+#[tokio::test]
+async fn a_revoked_or_expired_room_link_shows_nothing() {
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    let b = book(&app, &owner, "Book").await;
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({
+            "name": "R", "base_revision": 0, "doc": doc_with(&[&b]),
+        })),
+    )
+    .await;
+    let (_, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&owner),
+        Some(serde_json::json!({ "kind": "layout", "layout_id": "room-1" })),
+    )
+    .await;
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+    let id = link["id"].as_str().unwrap();
+
+    let (status, _) = call(
+        &app,
+        "GET",
+        &format!("/api/public/{token}/room"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/share-links/{id}"),
+        Some(&owner),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call(
+        &app,
+        "GET",
+        &format!("/api/public/{token}/room"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_book_link_is_not_a_room_link_and_the_reverse() {
+    // The kinds must not be interchangeable: a book token must not open a room
+    // endpoint, or the `show_books` decision could be bypassed entirely.
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    let b = book(&app, &owner, "Book").await;
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({
+            "name": "R", "base_revision": 0, "doc": doc_with(&[&b]),
+        })),
+    )
+    .await;
+
+    let (_, book_link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&owner),
+        Some(serde_json::json!({ "book_id": b })),
+    )
+    .await;
+    let book_token = book_link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap();
+    let (status, _) = call(
+        &app,
+        "GET",
+        &format!("/api/public/{book_token}/room"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (_, room_link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&owner),
+        Some(serde_json::json!({ "kind": "layout", "layout_id": "room-1" })),
+    )
+    .await;
+    let room_token = room_link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap();
+    let (status, _) = call(
+        &app,
+        "GET",
+        &format!("/api/public/{room_token}"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_room_link_needs_a_room_you_own() {
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    let other = member(&app, &owner, "other@lib.test").await;
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({ "name": "R", "base_revision": 0, "doc": doc("R", 1) })),
+    )
+    .await;
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&other),
+        Some(serde_json::json!({ "kind": "layout", "layout_id": "room-1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // And a link to nothing is refused before a token is minted.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&owner),
+        Some(serde_json::json!({ "kind": "layout" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn room_links_appear_in_the_link_list_so_they_can_be_revoked() {
+    // An inner join on `book` would drop them, leaving a live link nobody can
+    // find — which is how a "temporary" share becomes permanent.
+    let app = app().await;
+    let owner = register(&app, "owner@lib.test").await;
+    call(
+        &app,
+        "PUT",
+        "/api/layouts/room-1",
+        Some(&owner),
+        Some(serde_json::json!({ "name": "Living room", "base_revision": 0, "doc": doc("R", 1) })),
+    )
+    .await;
+    call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&owner),
+        Some(serde_json::json!({ "kind": "layout", "layout_id": "room-1" })),
+    )
+    .await;
+
+    let (status, links) = call(&app, "GET", "/api/share-links", Some(&owner), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let row = links.as_array().unwrap().first().expect("the room link");
+    assert_eq!(row["kind"], "layout");
+    assert_eq!(row["book_title"], "Living room");
+}
+
+#[tokio::test]
+async fn the_room_page_is_served_for_both_shapes() {
+    let app = app().await;
+    for uri in ["/room/whatever", "/pr/sometoken", "/assets/room.js"] {
+        let res = app
+            .clone()
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK, "{uri}");
+    }
+}

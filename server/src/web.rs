@@ -60,6 +60,18 @@ pub async fn read_js() -> impl IntoResponse {
     )
 }
 
+/// The room viewer (plan 5 #48), for `/room/{id}` and `/pr/{token}` alike.
+pub async fn room_page() -> Html<&'static str> {
+    Html(include_str!("../web/room.html"))
+}
+
+pub async fn room_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("../web/room.js"),
+    )
+}
+
 pub async fn public_page() -> Html<&'static str> {
     Html(include_str!("../web/public.html"))
 }

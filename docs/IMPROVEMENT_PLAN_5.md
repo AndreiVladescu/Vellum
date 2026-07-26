@@ -63,6 +63,7 @@ is answerable from `git log`:
 | 35 | Console paging, saved views, activity log* | `70f9d8e` |
 | 33 | Read EPUBs (and share links) in the browser | `17b626c` |
 | 47 | Publish and fetch physical room layouts | `b15a6d9` |
+| 48 | Rendered room view + public room links | `HEAD` |
 
 **Every item in Phases 1–5 is now done.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list.
@@ -84,8 +85,8 @@ compile-checked pilot; the rest is mechanical and can proceed module by module
 dynamic-table get-or-create helpers — and can never use the macros, since those
 take a string literal.
 
-**Phase 6** (§K) is under way: #50 and #51 shipped earlier, #47 has now landed,
-leaving #48 (console room view + public room links) and #49 (borrow requests).
+**Phase 6** (§K) is nearly done: #50, #51, #47 and #48 have landed, leaving only
+#49 (borrow requests).
 Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
 round two, #9 content-addressed blobs, #8 SSE, #29/#30, #38 l10n, #40 Android
 background, #52 trash, #53 send-to-e-reader. #21a (wishlist) and #21c (Calibre /
