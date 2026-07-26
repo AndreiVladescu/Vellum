@@ -186,6 +186,21 @@ warns when a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+**Reader comfort** (app, plan 5 #23) is one persisted `ReaderSettings` shared by
+both readers, because theme, measure and distraction-free mode mean the same thing
+in either. The format-specific halves differ for a reason: an EPUB is reflowable,
+so it gets typeface, size, line spacing and line length; a PDF is a rendered page,
+so its only levers are fit (width/page) and **night mode**, applied as a colour
+matrix that inverts luminance while pulling toward a warm near-black — a naive
+`1 - x` invert turns photographs into negatives. The PDF reader also gains in-book
+text search with match navigation and a go-to-page field. These controls set the
+*book's* type; the surrounding UI keeps following the system text scale.
+
+EPUB position is stored as one **global fraction** across the book plus the 1-based
+chapter, and reopening splits it back into "chapter N, this far down" — closing
+plan 4 §E15's in-chapter scroll restore. The chapter index is authoritative if the
+two ever disagree.
+
 **Annotations** (app, plan 5 #22) are bookmarks, highlights and notes, all in one
 app-local `annotations` table discriminated by `kind` — they differ only in which
 fields they carry. Personal marginalia, so they stay on the device like

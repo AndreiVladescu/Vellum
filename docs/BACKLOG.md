@@ -81,6 +81,19 @@ a real device:
 **Barcode scanning** (plan 5 #16): scan a real book, then deny the camera
 permission and confirm the manual ISBN field still adds books.
 
+**Reader appearance** (plan 5 #23): the settings themselves are unit-tested, but
+their visual effect is not — driving `HtmlWidget` and the EPUB parse isolate under
+`testWidgets` hangs rather than failing. Check by hand: each of the four page
+colours; text size/line-spacing/measure sliders reflowing an EPUB; PDF night mode
+on a page containing a photograph (it must not look like a negative); fit
+width/page; in-book search with next/previous; "go to page"; and the hide-controls
+preference plus tap-to-reveal in both readers.
+
+**Deferred from #23**, and why: paged (rather than scrolled) EPUB mode is a layout
+engine of its own; keep-screen-awake, volume-key page turns and the brightness
+slider each need a platform plugin, and were not worth adding three dependencies
+in the same pass. None of them block the rest of the item.
+
 ---
 
 ## Open / possible follow-ups
@@ -91,9 +104,11 @@ permission and confirm the manual ISBN field still adds books.
   shelf *edit*.)
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.
-- **EPUB reader polish.** The reader is chapter-at-a-time with resume-by-
-  chapter; in-chapter scroll position isn't saved, and heavy CSS-driven
-  layouts render approximately (`flutter_widget_from_html_core`).
+- **EPUB reader polish.** Partly resolved by plan 5 #23: in-chapter scroll
+  position **is** saved and restored (the arithmetic is pinned in
+  `test/reader/epub_reader_page_test.dart`), and typography/themes now apply.
+  Still open: paged (as opposed to scrolled) mode, and heavy CSS-driven layouts
+  rendering approximately (`flutter_widget_from_html_core`).
 - **Dominant colour in the physical view.** The physical editor always draws
   cover-slice spines; honouring the spine-artwork preference there too would
   keep the two views identical.

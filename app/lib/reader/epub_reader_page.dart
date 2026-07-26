@@ -9,6 +9,38 @@ import '../data/library_repository.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'epub_book.dart';
+import 'reader_settings.dart';
+import 'reader_settings_sheet.dart';
+
+/// Where in a book a saved position points: a chapter and how far down it.
+///
+/// The saved form is one *global* fraction across the whole book plus the 1-based
+/// chapter in `lastReadPage`. Converting between the two is the whole of plan 4
+/// §E15 (in-chapter scroll restore) and easy to get subtly wrong, so it lives
+/// here as two pure functions rather than inline in a post-frame callback.
+({int chapter, double fraction}) epubPositionFrom({
+  required double? progress,
+  required int? lastReadPage,
+  required int chapterCount,
+}) {
+  if (chapterCount <= 0) return (chapter: 0, fraction: 0);
+  final chapter = ((lastReadPage ?? 1) - 1).clamp(0, chapterCount - 1);
+  final global = (progress ?? 0) * chapterCount;
+  // The chapter index is authoritative (it was saved explicitly); the fraction
+  // is whatever is left over inside it.
+  final within = (global - chapter).clamp(0.0, 1.0);
+  return (chapter: chapter, fraction: within.toDouble());
+}
+
+/// The inverse: the global fraction to store for a position inside a chapter.
+double epubGlobalProgress({
+  required int chapter,
+  required int chapterCount,
+  required double fraction,
+}) {
+  if (chapterCount <= 0) return 0;
+  return ((chapter + fraction.clamp(0, 1)) / chapterCount).clamp(0, 1).toDouble();
+}
 
 /// The integrated EPUB reader: one chapter at a time, with previous/next
 /// controls and a chapter list. The current chapter is persisted like a PDF
@@ -40,6 +72,15 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
   AnnotationStore get _annotations => widget.repository.annotations;
 
+  /// Appearance settings (plan 5 #23). Loaded here rather than passed in, so a
+  /// reader opened from anywhere gets them without every call site threading
+  /// them through.
+  ReaderSettings? _settings;
+
+  /// Whether the chrome is currently hidden; seeded from the preference so a tap
+  /// can reveal it temporarily without changing the setting.
+  bool _chromeHidden = false;
+
   /// Reports the live text selection inside the chapter (plan 5 #22). The range
   /// it gives is in characters of the *rendered* chapter text, which is what
   /// makes an EPUB locator an approximation — see [_highlightSelection].
@@ -56,6 +97,18 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     super.initState();
     _scroll.addListener(_onScroll);
     _selectionNotifier.addListener(_onSelectionChanged);
+    ReaderSettings.load().then((settings) {
+      if (!mounted) return;
+      setState(() {
+        _settings = settings;
+        _chromeHidden = settings.immersive;
+      });
+      settings.addListener(_onSettingsChanged);
+    });
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -64,6 +117,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     _scroll.removeListener(_onScroll);
     _selectionNotifier.removeListener(_onSelectionChanged);
     _selectionNotifier.dispose();
+    _settings?.removeListener(_onSettingsChanged);
     _scroll.dispose();
     super.dispose();
   }
@@ -262,10 +316,15 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   void _restoreScroll(int count) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
-      final global = (widget.book.readingProgress ?? 0) * count;
-      final within = (global - _chapter).clamp(0.0, 1.0);
+      final target = epubPositionFrom(
+        progress: widget.book.readingProgress,
+        lastReadPage: widget.book.lastReadPage,
+        chapterCount: count,
+      );
       final max = _scroll.position.maxScrollExtent;
-      if (within > 0 && max > 0) _scroll.jumpTo(within * max);
+      if (target.fraction > 0 && max > 0) {
+        _scroll.jumpTo(target.fraction * max);
+      }
     });
   }
 
@@ -314,14 +373,27 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
         if (!_restored) {
           // Saved position is 1-based (like PDF pages); clamp for safety.
           _restored = true;
-          _chapter = ((widget.book.lastReadPage ?? 1) - 1).clamp(0, count - 1);
+          _chapter = epubPositionFrom(
+            progress: widget.book.readingProgress,
+            lastReadPage: widget.book.lastReadPage,
+            chapterCount: count,
+          ).chapter;
           // Restore the in-chapter scroll once this chapter has laid out.
           _restoreScroll(count);
           _refreshBookmark();
         }
         final chapter = epub.chapters[_chapter];
+        final settings = _settings;
+        final readerTheme = settings?.theme ?? ReaderTheme.light;
         return Scaffold(
-          appBar: AppBar(
+          backgroundColor: readerTheme.background,
+          // Immersive mode drops the bar entirely rather than fading it: a
+          // translucent bar over prose is still something to read around.
+          appBar: _chromeHidden
+              ? null
+              : AppBar(
+            backgroundColor: readerTheme.background,
+            foregroundColor: readerTheme.foreground,
             title: Text(widget.book.title),
             actions: [
               Center(
@@ -361,21 +433,51 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                 icon: const Icon(Icons.toc),
                 onPressed: () => _pickChapter(epub),
               ),
+              if (settings != null)
+                IconButton(
+                  tooltip: 'Reading options',
+                  icon: const Icon(Icons.text_fields),
+                  onPressed: () => ReaderSettingsSheet.show(
+                    context,
+                    settings: settings,
+                    typography: true,
+                  ),
+                ),
             ],
           ),
-          body: SingleChildScrollView(
-            controller: _scroll,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Center(
-              child: ConstrainedBox(
-                // A comfortable measure on wide desktop windows.
-                constraints: const BoxConstraints(maxWidth: 720),
-                // Selectable so passages can be highlighted; the listener is
-                // what turns a selection into character offsets (plan 5 #22).
-                child: SelectionArea(
-                  child: SelectionListener(
-                    selectionNotifier: _selectionNotifier,
-                    child: HtmlWidget(chapter.html),
+          body: GestureDetector(
+            // A tap toggles the chrome when the reader asked for a
+            // distraction-free page; otherwise it does nothing, so a stray tap
+            // can't hide the controls someone is using.
+            onTap: settings?.immersive == true
+                ? () => setState(() => _chromeHidden = !_chromeHidden)
+                : null,
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: SafeArea(
+                child: Center(
+                  child: ConstrainedBox(
+                    // The measure: a full-width line on a wide monitor is
+                    // unreadable however good the type is (plan 5 #23).
+                    constraints: BoxConstraints(
+                      maxWidth: settings?.measure ?? 720,
+                    ),
+                    // Selectable so passages can be highlighted; the listener is
+                    // what turns a selection into character offsets (plan 5 #22).
+                    child: SelectionArea(
+                      child: SelectionListener(
+                        selectionNotifier: _selectionNotifier,
+                        child: HtmlWidget(
+                          chapter.html,
+                          // The reader's own typography, applied to the book's
+                          // text only — the surrounding UI keeps following the
+                          // system text scale.
+                          textStyle: settings?.bodyTextStyle() ??
+                              TextStyle(color: readerTheme.foreground),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -384,7 +486,10 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
           // SafeArea(top:false) keeps the chapter controls above the Android
           // gesture/nav bar under edge-to-edge; the bar grows by that inset
           // rather than clipping, so no fixed height here.
-          bottomNavigationBar: BottomAppBar(
+          bottomNavigationBar: _chromeHidden
+              ? null
+              : BottomAppBar(
+            color: readerTheme.background,
             padding: EdgeInsets.zero,
             child: SafeArea(
               top: false,

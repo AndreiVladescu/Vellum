@@ -7,6 +7,8 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
+import 'reader_settings.dart';
+import 'reader_settings_sheet.dart';
 
 /// The integrated PDF reader. Persists the current page as the user reads,
 /// which drives the "Resume reading" state on the book's detail page, and lets
@@ -44,6 +46,94 @@ class _ReaderPageState extends State<ReaderPage> {
   /// Whether the current page already has a bookmark, so the action can toggle
   /// rather than stack duplicates. Refreshed on every page change.
   String? _bookmarkOnPage;
+
+  /// Appearance settings (plan 5 #23).
+  ReaderSettings? _settings;
+  bool _chromeHidden = false;
+
+  /// In-book text search. pdfrx does the work; this owns the query field's
+  /// state and the match cursor.
+  late final PdfTextSearcher _searcher = PdfTextSearcher(_controller)
+    ..addListener(_onSearchChanged);
+  final _searchController = TextEditingController();
+  bool _searching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ReaderSettings.load().then((settings) {
+      if (!mounted) return;
+      setState(() {
+        _settings = settings;
+        _chromeHidden = settings.immersive;
+      });
+      settings.addListener(_onSettingsChanged);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searcher.removeListener(_onSearchChanged);
+    _searcher.dispose();
+    _searchController.dispose();
+    _settings?.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    if (!mounted) return;
+    setState(() {});
+    _applyFit();
+  }
+
+  void _onSearchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Re-anchors the current page for the chosen fit. `topCenter` leaves a tall
+  /// page free to scroll (fit width); `all` frames the whole page.
+  void _applyFit() {
+    final page = _page;
+    if (page == null || !_controller.isReady) return;
+    _controller.goToPage(
+      pageNumber: page,
+      anchor: _settings?.pdfFit == PdfFit.page
+          ? PdfPageAnchor.all
+          : PdfPageAnchor.topCenter,
+    );
+  }
+
+  Future<void> _promptPageJump() async {
+    final controller = TextEditingController();
+    final target = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Go to page (1–${_pageCount ?? 1})'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          onSubmitted: (value) =>
+              Navigator.pop(dialogContext, int.tryParse(value)),
+          decoration: const InputDecoration(hintText: 'Page number'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, int.tryParse(controller.text)),
+            child: const Text('Go'),
+          ),
+        ],
+      ),
+    );
+    final count = _pageCount;
+    if (target == null || count == null || !_controller.isReady) return;
+    _controller.goToPage(pageNumber: target.clamp(1, count));
+  }
 
   void _onPageChanged(int? page) {
     if (page == null || !_controller.isReady) return;
@@ -196,10 +286,58 @@ class _ReaderPageState extends State<ReaderPage> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = _settings;
+    final readerTheme = settings?.theme ?? ReaderTheme.light;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.book.title),
+      backgroundColor: readerTheme.background,
+      appBar: _chromeHidden
+          ? null
+          : AppBar(
+        backgroundColor: readerTheme.background,
+        foregroundColor: readerTheme.foreground,
+        title: _searching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search in this book',
+                  border: InputBorder.none,
+                ),
+                onSubmitted: (query) {
+                  if (query.trim().isEmpty) return;
+                  _searcher.startTextSearch(query.trim());
+                },
+              )
+            : Text(widget.book.title),
         actions: [
+          if (_searching) ...[
+            if (_searcher.hasMatches)
+              Center(
+                child: Text(
+                  '${(_searcher.currentIndex ?? 0) + 1}/${_searcher.matches.length}',
+                ),
+              ),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_up),
+              tooltip: 'Previous match',
+              onPressed: _searcher.hasMatches ? _searcher.goToPrevMatch : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_down),
+              tooltip: 'Next match',
+              onPressed: _searcher.hasMatches ? _searcher.goToNextMatch : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Close search',
+              onPressed: () {
+                _searcher.resetTextSearch();
+                _searchController.clear();
+                setState(() => _searching = false);
+              },
+            ),
+          ],
+          if (!_searching) ...[
           if (_page != null && _pageCount != null)
             Center(
               child: Padding(
@@ -235,14 +373,48 @@ class _ReaderPageState extends State<ReaderPage> {
             tooltip: 'Annotations',
             onPressed: _openPanel,
           ),
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Search in this book',
+            onPressed: () => setState(() => _searching = true),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            onSelected: (choice) {
+              switch (choice) {
+                case 'jump':
+                  _promptPageJump();
+                case 'options':
+                  final s = _settings;
+                  if (s != null) {
+                    ReaderSettingsSheet.show(context, settings: s, pdf: true);
+                  }
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'jump', child: Text('Go to page…')),
+              PopupMenuItem(value: 'options', child: Text('Reading options…')),
+            ],
+          ),
+          ],
         ],
       ),
-      body: PdfViewer.file(
+      body: GestureDetector(
+        onTap: settings?.immersive == true
+            ? () => setState(() => _chromeHidden = !_chromeHidden)
+            : null,
+        child: _nightModeWrap(
+          enabled: settings?.pdfNightMode ?? false,
+          child: PdfViewer.file(
         widget.file.path,
         controller: _controller,
         initialPageNumber: widget.book.lastReadPage ?? 1,
         params: PdfViewerParams(
+          backgroundColor: readerTheme.background,
           onPageChanged: _onPageChanged,
+          onViewerReady: (_, _) => _applyFit(),
+          // Draws the search highlights pdfrx maintains for the active query.
+          pagePaintCallbacks: [_searcher.pageTextMatchPaintCallback],
           textSelectionParams: PdfTextSelectionParams(
             onTextSelectionChange: (selection) {
               _selection = selection;
@@ -255,6 +427,21 @@ class _ReaderPageState extends State<ReaderPage> {
           ),
         ),
       ),
+        ),
+      ),
     );
   }
+
+  /// Applies the night-mode filter to a rendered page.
+  ///
+  /// A `ColorFiltered` wrap rather than a per-page paint: the pages are rasters,
+  /// so the only way to darken them is to filter the pixels, and doing it once
+  /// around the viewer keeps every page (and the gaps between them) consistent.
+  Widget _nightModeWrap({required bool enabled, required Widget child}) =>
+      enabled
+          ? ColorFiltered(
+              colorFilter: const ColorFilter.matrix(nightModeMatrix),
+              child: child,
+            )
+          : child;
 }
