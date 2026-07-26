@@ -3,12 +3,10 @@
 // the first rearrangement the detail page confidently showed the wrong shelf.
 import 'dart:io';
 
-import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
-import 'package:vellum/physical/layout_repository.dart';
 
 Future<LibraryRepository> _repo(Directory dir) async =>
     LibraryRepository.forTesting(VellumDatabase(NativeDatabase.memory()), dir);

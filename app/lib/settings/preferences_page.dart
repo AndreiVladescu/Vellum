@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../data/backup_service.dart';
+import '../data/library_doctor.dart';
 import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../server/sync_service.dart';
@@ -122,6 +123,9 @@ class PreferencesPage extends StatelessWidget {
               connection: connection,
             ),
             const Divider(height: 24),
+            _SectionHeader('Library health'),
+            _HealthSection(repository: repository, connection: connection),
+            const Divider(height: 24),
             _SectionHeader('Backup'),
             _BackupSection(
               repository: repository,
@@ -131,6 +135,148 @@ class PreferencesPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The library health check (plan 5 #11).
+///
+/// Read-only until asked: the scan reports, and each category is repaired only on
+/// an explicit tap — with a confirmation for the destructive ones, since deleting
+/// blobs and collapsing duplicate rows cannot be undone.
+class _HealthSection extends StatefulWidget {
+  const _HealthSection({required this.repository, required this.connection});
+
+  final LibraryRepository repository;
+  final ServerConnection connection;
+
+  @override
+  State<_HealthSection> createState() => _HealthSectionState();
+}
+
+class _HealthSectionState extends State<_HealthSection> {
+  DoctorReport? _report;
+  bool _busy = false;
+  bool _cancelRequested = false;
+
+  Future<void> _scan() async {
+    setState(() {
+      _busy = true;
+      _cancelRequested = false;
+    });
+    final report = await LibraryDoctor(widget.repository).scan(
+      hasServer: widget.connection.baseUrl.isNotEmpty,
+      isCancelled: () async => _cancelRequested,
+    );
+    if (!mounted) return;
+    setState(() {
+      _report = report;
+      _busy = false;
+    });
+  }
+
+  Future<void> _repair(DefectKind kind, List<Defect> defects) async {
+    if (kind.isDestructive) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(kind.label),
+          content: Text('${kind.repairLabel} for ${defects.length} item'
+              '${defects.length == 1 ? '' : 's'}. This can’t be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    setState(() => _busy = true);
+    final fixed = await LibraryDoctor(widget.repository).repairAll(defects);
+    if (!mounted) return;
+    await _scan();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Repaired $fixed item${fixed == 1 ? '' : 's'}')),
+    );
+  }
+
+  String _bytes(int value) {
+    if (value < 1024) return '$value B';
+    if (value < 1024 * 1024) return '${(value / 1024).round()} KB';
+    if (value < 1024 * 1024 * 1024) {
+      return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(value / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final report = _report;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Checks that every book still has its file and cover, and that no '
+            'stray data is left behind. Nothing is changed until you ask.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: _busy ? null : _scan,
+                icon: const Icon(Icons.health_and_safety_outlined),
+                label: Text(_busy ? 'Checking…' : 'Check library'),
+              ),
+              if (_busy)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: TextButton(
+                    onPressed: () => setState(() => _cancelRequested = true),
+                    child: const Text('Stop'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (report != null && report.isHealthy)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline, size: 18),
+                SizedBox(width: 8),
+                Text('Everything checks out.'),
+              ],
+            ),
+          ),
+        if (report != null && !report.isHealthy)
+          for (final entry in report.counts.entries)
+            ListTile(
+              dense: true,
+              title: Text(entry.key.label),
+              subtitle: Text(entry.key == DefectKind.orphanBlob
+                  ? '${entry.value} · ${_bytes(report.reclaimableBytes)} to reclaim'
+                  : '${entry.value} found · ${entry.key.repairLabel}'),
+              trailing: TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _repair(entry.key, report.of(entry.key)),
+                child: const Text('Repair'),
+              ),
+            ),
+      ],
     );
   }
 }

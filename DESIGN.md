@@ -186,6 +186,18 @@ warns when a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+**Library health** (app, plan 5 #11) is Preferences → *Check library*: the database
+and the file tree can diverge — a file deleted by hand, a partial restore, bytes
+left by a failed import — and nothing detected any of it, while the shelf hid the
+loss by drawing a generated spine. The scan reports six categories (missing file,
+missing cover, orphan blob with the bytes it would reclaim, placement with no copy,
+the same content attached twice to one book, and delete markers too old to matter
+when there is no server) and is **read-only**: every repair is a separate, explicit
+action, the destructive ones confirm first, and the scan is cancellable because it
+stats every blob. Two deliberate non-findings: `.part` leftovers are swept at
+startup and are not reported, and the same content on *two* books is legitimate
+(an omnibus) rather than a duplicate.
+
 **A copy's location is derived, not stored** (app, plan 5 #50).
 `physical_copy.location` is free text typed once when the copy was added, while a
 *placement* records where the book was last dragged to; they diverge the first time
