@@ -295,8 +295,29 @@ class LibraryRepository {
   Stream<List<Loan>> watchLoansOf(String copyId) =>
       physical.watchLoansOf(copyId);
   Stream<List<LoanEntry>> watchAllLoans() => physical.watchAllLoans();
-  Future<void> lendCopy(String copyId, String borrower) =>
-      physical.lendCopy(copyId, borrower);
+  Future<void> lendCopy(
+    String copyId,
+    String borrower, {
+    DateTime? dueAt,
+    String? contact,
+    String? notes,
+  }) =>
+      physical.lendCopy(
+        copyId,
+        borrower,
+        dueAt: dueAt,
+        contact: contact,
+        notes: notes,
+      );
+  Future<void> updateLoan(
+    String loanId, {
+    required DateTime? dueAt,
+    String? contact,
+    String? notes,
+  }) =>
+      physical.updateLoan(loanId, dueAt: dueAt, contact: contact, notes: notes);
+  Future<void> markReminderSent(String loanId) =>
+      physical.markReminderSent(loanId);
   Future<void> returnLoan(String loanId) => physical.returnLoan(loanId);
   Future<void> deletePhysicalCopy(String id, {bool recordTombstone = true}) =>
       physical.deletePhysicalCopy(id, recordTombstone: recordTombstone);

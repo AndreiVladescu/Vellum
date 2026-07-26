@@ -693,6 +693,10 @@ class VellumServerClient {
     required DateTime loanedAt,
     DateTime? returnedAt,
     DateTime? updatedAt,
+    DateTime? dueAt,
+    String? borrowerContact,
+    String? notes,
+    DateTime? reminderSentAt,
   }) async {
     final res = await _http.put(
       _uri('/api/loans/$id'),
@@ -703,6 +707,13 @@ class VellumServerClient {
         'loaned_at': formatServerTime(loanedAt),
         'returned_at': ?formatServerTime(returnedAt),
         'updated_at': ?formatServerTime(updatedAt),
+        // Due dates, contacts and notes (plan 5 #27). Sent as explicit nulls,
+        // not omitted: clearing a due date is a real edit, and omitting the
+        // field would leave a stale date on the server forever.
+        'due_at': formatServerTime(dueAt),
+        'borrower_contact': borrowerContact,
+        'notes': notes,
+        'reminder_sent_at': formatServerTime(reminderSentAt),
       }),
     );
     _body(res);
@@ -988,6 +999,10 @@ class ServerLoan {
     required this.loanedAt,
     this.returnedAt,
     this.updatedAt,
+    this.dueAt,
+    this.borrowerContact,
+    this.notes,
+    this.reminderSentAt,
   });
 
   final String id;
@@ -997,12 +1012,22 @@ class ServerLoan {
   final DateTime? returnedAt;
   final DateTime? updatedAt;
 
+  /// Due date, contact and notes (plan 5 #27).
+  final DateTime? dueAt;
+  final String? borrowerContact;
+  final String? notes;
+  final DateTime? reminderSentAt;
+
   factory ServerLoan.fromJson(Map<String, dynamic> j) => ServerLoan(
     id: j['id'] as String,
     copyId: j['copy_id'] as String,
     borrower: j['borrower'] as String? ?? '',
     loanedAt: ServerBook._parseServerTime(j['loaned_at'] as String?) ?? DateTime.now(),
     returnedAt: ServerBook._parseServerTime(j['returned_at'] as String?),
+    dueAt: ServerBook._parseServerTime(j['due_at'] as String?),
+    borrowerContact: j['borrower_contact'] as String?,
+    notes: j['notes'] as String?,
+    reminderSentAt: ServerBook._parseServerTime(j['reminder_sent_at'] as String?),
     updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
   );
 }

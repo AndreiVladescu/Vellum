@@ -173,6 +173,18 @@ class Loans extends Table {
   // so this must be bumped explicitly -- column defaults don't re-run),
   // cleared once a push succeeds.
   BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
+  // Due dates, contacts and notes (plan 5 #27). Synced, because `loan` has been
+  // a synced table since plan 5 #4 — mirrors server migration 0014.
+  //
+  // `dueAt` is nullable and that is a real state, not missing data: "borrow it
+  // as long as you like" is a normal arrangement, and forcing a date would make
+  // the app describe an agreement nobody made.
+  DateTimeColumn get dueAt => dateTime().nullable()();
+  /// Free text — a phone number, an email, "Ana from book club".
+  TextColumn get borrowerContact => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  /// When a due reminder was last raised, so it isn't raised twice.
+  DateTimeColumn get reminderSentAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -389,7 +401,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -569,6 +581,22 @@ class VellumDatabase extends _$VellumDatabase {
             }
             await addBookColumn('series_id', books.seriesId);
             await addBookColumn('series_index', books.seriesIndex);
+          }
+          if (from < 18) {
+            // Loan due dates (plan 5 #27) — synced, matching server 0014.
+            final loanCols = await columnsOf('loans');
+            if (!loanCols.contains('due_at')) {
+              await m.addColumn(loans, loans.dueAt);
+            }
+            if (!loanCols.contains('borrower_contact')) {
+              await m.addColumn(loans, loans.borrowerContact);
+            }
+            if (!loanCols.contains('notes')) {
+              await m.addColumn(loans, loans.notes);
+            }
+            if (!loanCols.contains('reminder_sent_at')) {
+              await m.addColumn(loans, loans.reminderSentAt);
+            }
           }
         },
         beforeOpen: (details) async {

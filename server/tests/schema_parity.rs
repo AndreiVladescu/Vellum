@@ -110,6 +110,12 @@ async fn synced_tables_have_the_expected_columns() {
                 "loaned_at",
                 "returned_at",
                 "updated_at",
+                // Due dates, contacts and notes (migration 0014, plan 5 #27) --
+                // synced, because `loan` has been a synced table since 0010.
+                "due_at",
+                "borrower_contact",
+                "notes",
+                "reminder_sent_at",
             ],
         ),
     ];

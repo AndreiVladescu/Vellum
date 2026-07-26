@@ -269,6 +269,22 @@ stats every blob. Two deliberate non-findings: `.part` leftovers are swept at
 startup and are not reported, and the same content on *two* books is legitimate
 (an omnibus) rather than a duplicate.
 
+**Loans chase people** (both, plan 5 #27). `loan` gains `due_at`,
+`borrower_contact`, `notes` and `reminder_sent_at` — synced columns, because
+`loan` has been a synced table since #4, which is exactly why that decision had to
+come first. Lending offers **presets** (2 weeks / 1 month / pick a date / **no
+date**) rather than a bare date picker: most lending is "a couple of weeks", and
+"no date" has to be as easy as the rest or people invent a deadline they don't
+mean. A null `due_at` is therefore a real arrangement, not missing data.
+
+Everything about overdue-ness compares **local calendar days, not instants**: a
+book due today must not read as overdue at 00:01 because the stored moment was
+midnight UTC. The loans list sorts most-urgent-first (overdue, then by date, with
+undated loans last) and badges the ones that need attention; *Copy a reminder*
+puts a ready message on the clipboard rather than half-integrating a share sheet
+that would fail on desktop. A reminder given today isn't repeated today, but one
+given last week comes back for a book that is still out.
+
 **A copy's location is derived, not stored** (app, plan 5 #50).
 `physical_copy.location` is free text typed once when the copy was added, while a
 *placement* records where the book was last dragged to; they diverge the first time

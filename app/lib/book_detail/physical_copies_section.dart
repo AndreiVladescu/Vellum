@@ -6,36 +6,137 @@ import '../data/library_repository.dart';
 /// Prompts for a borrower's name. Returns the trimmed name, or null if the user
 /// cancelled or left it blank. Shared by the inline copy tile and the lend sheet
 /// so both flows collect a borrower the same way.
-Future<String?> promptBorrower(BuildContext context) async {
+/// What a lend dialog collected (plan 5 #27).
+class LendDetails {
+  const LendDetails({required this.borrower, this.dueAt, this.contact});
+
+  final String borrower;
+
+  /// Null means no agreed return date — a real arrangement, not a blank field.
+  final DateTime? dueAt;
+  final String? contact;
+}
+
+/// Asks who is taking the book, when it's due back, and how to reach them.
+///
+/// The due date is offered as **presets plus "no date"** rather than a date
+/// picker alone: most lending is "a couple of weeks", nobody wants to operate a
+/// calendar for that, and "no date" has to be as easy as the others or people
+/// will invent a date they don't mean.
+Future<LendDetails?> promptBorrower(BuildContext context) async {
   final borrower = TextEditingController();
-  final name = await showDialog<String>(
+  final contact = TextEditingController();
+  DateTime? due;
+  int? selectedPreset;
+
+  final result = await showDialog<LendDetails>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Lend this copy'),
-      content: TextField(
-        controller: borrower,
-        autofocus: true,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
-        decoration: const InputDecoration(
-          labelText: 'Borrower',
-          hintText: "Who's taking it?",
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(dialogContext).pop(borrower.text.trim()),
-          child: const Text('Lend'),
-        ),
-      ],
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setState) {
+        void pick(int? days) {
+          setState(() {
+            selectedPreset = days;
+            due = days == null
+                ? null
+                : DateTime.now().add(Duration(days: days));
+          });
+        }
+
+        return AlertDialog(
+          title: const Text('Lend this copy'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: borrower,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Borrower',
+                    hintText: "Who's taking it?",
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: contact,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact (optional)',
+                    hintText: 'Phone, email, or how you know them',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Due back'),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final (label, days) in [
+                      ('2 weeks', 14),
+                      ('1 month', 30),
+                    ])
+                      ChoiceChip(
+                        label: Text(label),
+                        selected: selectedPreset == days,
+                        onSelected: (_) => pick(days),
+                      ),
+                    ChoiceChip(
+                      label: const Text('No date'),
+                      selected: selectedPreset == null && due == null,
+                      onSelected: (_) => pick(null),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.event, size: 16),
+                      label: Text(due != null && selectedPreset == -1
+                          ? '${due!.year}-${due!.month.toString().padLeft(2, '0')}'
+                              '-${due!.day.toString().padLeft(2, '0')}'
+                          : 'Pick a date'),
+                      onPressed: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: due ?? now.add(const Duration(days: 14)),
+                          firstDate: now,
+                          lastDate: now.add(const Duration(days: 365 * 5)),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            due = picked;
+                            selectedPreset = -1;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = borrower.text.trim();
+                if (name.isEmpty) return;
+                Navigator.of(dialogContext).pop(LendDetails(
+                  borrower: name,
+                  dueAt: due,
+                  contact: contact.text.trim(),
+                ));
+              },
+              child: const Text('Lend'),
+            ),
+          ],
+        );
+      },
     ),
   );
   borrower.dispose();
-  return (name == null || name.isEmpty) ? null : name;
+  contact.dispose();
+  return result;
 }
 
 /// The "Physical copies" list: locations, lend/return, and loan history.
@@ -155,9 +256,14 @@ class PhysicalCopyTile extends StatelessWidget {
       '${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _lend(BuildContext context) async {
-    final name = await promptBorrower(context);
-    if (name != null) {
-      await repository.lendCopy(copy.id, name);
+    final details = await promptBorrower(context);
+    if (details != null) {
+      await repository.lendCopy(
+        copy.id,
+        details.borrower,
+        dueAt: details.dueAt,
+        contact: details.contact,
+      );
     }
   }
 

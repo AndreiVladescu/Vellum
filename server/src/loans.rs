@@ -23,9 +23,22 @@ pub struct LoanDto {
     pub loaned_at: String,
     pub returned_at: Option<String>,
     pub updated_at: String,
+    /// When the book is due back, or null for "no agreed date" — which is a
+    /// normal arrangement, not missing data (plan 5 #27).
+    pub due_at: Option<String>,
+    pub borrower_contact: Option<String>,
+    pub notes: Option<String>,
+    pub reminder_sent_at: Option<String>,
 }
 
-const LOAN_COLUMNS: &str = "id, copy_id, borrower, loaned_at, returned_at, updated_at";
+const LOAN_COLUMNS: &str = "id, copy_id, borrower, loaned_at, returned_at, updated_at, \
+     due_at, borrower_contact, notes, reminder_sent_at";
+
+/// The same list qualified with `l.`, for the list query — which joins
+/// `physical_copy`, and that table has a `notes` column too, so an unqualified
+/// list is ambiguous SQL (caught immediately by the loan tests).
+const LOAN_COLUMNS_ALIASED: &str = "l.id, l.copy_id, l.borrower, l.loaned_at, l.returned_at, \
+     l.updated_at, l.due_at, l.borrower_contact, l.notes, l.reminder_sent_at";
 
 #[derive(Deserialize)]
 pub struct LoanInput {
@@ -43,6 +56,17 @@ pub struct LoanInput {
     /// The pushing client's sync clock, same LWW convention as `CopyInput`.
     #[serde(default)]
     pub updated_at: Option<String>,
+    /// Due date, contact and notes (plan 5 #27). Unlike `copy_id`/`loaned_at`
+    /// these are editable for the life of the loan — a return date gets pushed
+    /// back, a phone number gets filled in later.
+    #[serde(default)]
+    pub due_at: Option<String>,
+    #[serde(default)]
+    pub borrower_contact: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub reminder_sent_at: Option<String>,
 }
 
 /// Loans of copies the caller can see, joined through `access_predicate()` on
@@ -59,7 +83,7 @@ async fn visible_loans(
         ""
     };
     let sql = format!(
-        "SELECT l.id, l.copy_id, l.borrower, l.loaned_at, l.returned_at, l.updated_at \
+        "SELECT {LOAN_COLUMNS_ALIASED} \
          FROM loan l \
          JOIN physical_copy pc ON pc.id = l.copy_id \
          JOIN book b ON b.id = pc.book_id \
@@ -169,8 +193,15 @@ pub async fn upsert(
                 .bind(&id)
                 .fetch_one(&state.db)
                 .await?;
+        // The guard has to know about every editable field, or a push that only
+        // moves the due date would be silently dropped (the same trap #17's
+        // series edit hit).
         if current.borrower == input.borrower.trim()
             && current.returned_at == input.returned_at
+            && current.due_at == input.due_at
+            && current.borrower_contact == input.borrower_contact
+            && current.notes == input.notes
+            && current.reminder_sent_at == input.reminder_sent_at
             && !tombstoned
         {
             return Ok(Json(current));
@@ -180,24 +211,35 @@ pub async fn upsert(
     let mut tx = state.db.begin().await?;
     if is_update {
         sqlx::query(
-            "UPDATE loan SET borrower = ?, returned_at = ?, updated_at = datetime('now') \
+            "UPDATE loan SET borrower = ?, returned_at = ?, due_at = ?, \
+                borrower_contact = ?, notes = ?, reminder_sent_at = ?, \
+                updated_at = datetime('now') \
              WHERE id = ?",
         )
         .bind(input.borrower.trim())
         .bind(&input.returned_at)
+        .bind(&input.due_at)
+        .bind(&input.borrower_contact)
+        .bind(&input.notes)
+        .bind(&input.reminder_sent_at)
         .bind(&id)
         .execute(&mut *tx)
         .await?;
     } else {
         sqlx::query(
-            "INSERT INTO loan (id, copy_id, borrower, loaned_at, returned_at) \
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO loan (id, copy_id, borrower, loaned_at, returned_at, \
+                due_at, borrower_contact, notes, reminder_sent_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(&input.copy_id)
         .bind(input.borrower.trim())
         .bind(&input.loaned_at)
         .bind(&input.returned_at)
+        .bind(&input.due_at)
+        .bind(&input.borrower_contact)
+        .bind(&input.notes)
+        .bind(&input.reminder_sent_at)
         .execute(&mut *tx)
         .await?;
     }

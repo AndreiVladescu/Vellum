@@ -20,10 +20,15 @@ class LendSheet extends StatelessWidget {
   /// book that isn't tracked on paper yet. No-ops if the borrower prompt is
   /// cancelled, so it never leaves an empty copy behind.
   Future<void> _addCopyAndLend(BuildContext context) async {
-    final name = await promptBorrower(context);
-    if (name == null) return;
+    final details = await promptBorrower(context);
+    if (details == null) return;
     final copyId = await repository.addPhysicalCopy(book.id);
-    await repository.lendCopy(copyId, name);
+    await repository.lendCopy(
+      copyId,
+      details.borrower,
+      dueAt: details.dueAt,
+      contact: details.contact,
+    );
   }
 
   @override

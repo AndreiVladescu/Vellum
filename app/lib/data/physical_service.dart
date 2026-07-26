@@ -95,16 +95,56 @@ class PhysicalService {
   /// Lends a copy to [borrower]. Callers only offer this when the copy has no
   /// active loan, so no additional check is needed here. `needsPush` defaults
   /// true (an insert), so the next push sends it.
-  Future<void> lendCopy(String copyId, String borrower) async {
-    await db
-        .into(db.loans)
-        .insert(
+  Future<void> lendCopy(
+    String copyId,
+    String borrower, {
+    DateTime? dueAt,
+    String? contact,
+    String? notes,
+  }) async {
+    await db.into(db.loans).insert(
           LoansCompanion.insert(
             id: _uuid.v4(),
             copyId: copyId,
             borrower: borrower,
+            dueAt: Value(dueAt),
+            borrowerContact: Value(_blankToNull(contact)),
+            notes: Value(_blankToNull(notes)),
           ),
         );
+  }
+
+  /// Edits an existing loan's agreement — the due date moves, a phone number
+  /// turns up later. Bumps the sync clock explicitly, like [returnLoan].
+  Future<void> updateLoan(
+    String loanId, {
+    required DateTime? dueAt,
+    String? contact,
+    String? notes,
+  }) =>
+      (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
+        LoansCompanion(
+          dueAt: Value(dueAt),
+          borrowerContact: Value(_blankToNull(contact)),
+          notes: Value(_blankToNull(notes)),
+          updatedAt: Value(DateTime.now()),
+          needsPush: const Value(true),
+        ),
+      );
+
+  /// Records that a due reminder has been shown, so it isn't shown again.
+  Future<void> markReminderSent(String loanId) =>
+      (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
+        LoansCompanion(
+          reminderSentAt: Value(DateTime.now()),
+          updatedAt: Value(DateTime.now()),
+          needsPush: const Value(true),
+        ),
+      );
+
+  static String? _blankToNull(String? value) {
+    final trimmed = value?.trim();
+    return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
   }
 
   /// Marks a loan returned as of now, keeping it in the history. `needsPush`

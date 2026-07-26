@@ -721,6 +721,10 @@ class SyncService {
                 borrower: l.borrower,
                 loanedAt: Value(l.loanedAt),
                 returnedAt: Value(l.returnedAt),
+                dueAt: Value(l.dueAt),
+                borrowerContact: Value(l.borrowerContact),
+                notes: Value(l.notes),
+                reminderSentAt: Value(l.reminderSentAt),
                 updatedAt:
                     server == null ? const Value.absent() : Value(server),
               ),
@@ -1064,6 +1068,10 @@ class SyncService {
           borrower: l.borrower,
           loanedAt: l.loanedAt,
           returnedAt: l.returnedAt,
+          dueAt: l.dueAt,
+          borrowerContact: l.borrowerContact,
+          notes: l.notes,
+          reminderSentAt: l.reminderSentAt,
           updatedAt: l.updatedAt,
         );
         await (db.update(db.loans)..where((x) => x.id.equals(l.id)))
