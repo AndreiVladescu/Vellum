@@ -55,16 +55,15 @@ is answerable from `git log`:
 | 46 | RBAC matrix + compile-checked queries | `74d3864`, `b903cb5` |
 | 31 | SMTP mailer, password reset, emailed invites | `d031ffd`, `eda0843`, `cf349dc` |
 | 27 | Loan due dates, overdue badges, reminders* | `93574d5` |
+| 51 | Condition photos on copies | `HEAD` |
 
-**Phases 1–3 are done, 8 of Phase 4's 11 items, and 5 of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
+**Phases 1–3 are done, 9 of Phase 4's 11 items, and 5 of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list. **Still open in Phase 4** — each needs a new dependency or is substantial in its
 own right, which is why they were left rather than rushed:
 
 | # | Item | What it needs |
 |---|---|---|
-| 27 | Loans: due dates, overdue badges, reminders | a server migration (loan syncs since #4), `flutter_local_notifications` |
 | 28 | Find a copy, tidy a shelf, print labels | pan/zoom-to-placement, a print path (`pdf` package or system print) |
-| 51 | Condition photos on copies | `image_picker`, one app-local table |
 | 13 | Backup manifest + verify, rotation, encryption | `cryptography` for the optional passphrase half |
 
 **Still open in Phase 5:** #32 (server-side content search — an FTS5 index over

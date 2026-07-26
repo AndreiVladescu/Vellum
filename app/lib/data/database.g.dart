@@ -4169,6 +4169,362 @@ class LoansCompanion extends UpdateCompanion<Loan> {
   }
 }
 
+class $CopyPhotosTable extends CopyPhotos
+    with TableInfo<$CopyPhotosTable, CopyPhoto> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CopyPhotosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _copyIdMeta = const VerificationMeta('copyId');
+  @override
+  late final GeneratedColumn<String> copyId = GeneratedColumn<String>(
+    'copy_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES physical_copies (id)',
+    ),
+  );
+  static const VerificationMeta _pathMeta = const VerificationMeta('path');
+  @override
+  late final GeneratedColumn<String> path = GeneratedColumn<String>(
+    'path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _takenAtMeta = const VerificationMeta(
+    'takenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> takenAt = GeneratedColumn<DateTime>(
+    'taken_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _captionMeta = const VerificationMeta(
+    'caption',
+  );
+  @override
+  late final GeneratedColumn<String> caption = GeneratedColumn<String>(
+    'caption',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, copyId, path, takenAt, caption];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'copy_photos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CopyPhoto> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('copy_id')) {
+      context.handle(
+        _copyIdMeta,
+        copyId.isAcceptableOrUnknown(data['copy_id']!, _copyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_copyIdMeta);
+    }
+    if (data.containsKey('path')) {
+      context.handle(
+        _pathMeta,
+        path.isAcceptableOrUnknown(data['path']!, _pathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pathMeta);
+    }
+    if (data.containsKey('taken_at')) {
+      context.handle(
+        _takenAtMeta,
+        takenAt.isAcceptableOrUnknown(data['taken_at']!, _takenAtMeta),
+      );
+    }
+    if (data.containsKey('caption')) {
+      context.handle(
+        _captionMeta,
+        caption.isAcceptableOrUnknown(data['caption']!, _captionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CopyPhoto map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CopyPhoto(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      copyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}copy_id'],
+      )!,
+      path: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}path'],
+      )!,
+      takenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}taken_at'],
+      )!,
+      caption: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}caption'],
+      ),
+    );
+  }
+
+  @override
+  $CopyPhotosTable createAlias(String alias) {
+    return $CopyPhotosTable(attachedDatabase, alias);
+  }
+}
+
+class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
+  final String id;
+  final String copyId;
+
+  /// Relative to the data dir, like `BookFiles.path` — `photos/<id>.jpg`.
+  final String path;
+  final DateTime takenAt;
+  final String? caption;
+  const CopyPhoto({
+    required this.id,
+    required this.copyId,
+    required this.path,
+    required this.takenAt,
+    this.caption,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['copy_id'] = Variable<String>(copyId);
+    map['path'] = Variable<String>(path);
+    map['taken_at'] = Variable<DateTime>(takenAt);
+    if (!nullToAbsent || caption != null) {
+      map['caption'] = Variable<String>(caption);
+    }
+    return map;
+  }
+
+  CopyPhotosCompanion toCompanion(bool nullToAbsent) {
+    return CopyPhotosCompanion(
+      id: Value(id),
+      copyId: Value(copyId),
+      path: Value(path),
+      takenAt: Value(takenAt),
+      caption: caption == null && nullToAbsent
+          ? const Value.absent()
+          : Value(caption),
+    );
+  }
+
+  factory CopyPhoto.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CopyPhoto(
+      id: serializer.fromJson<String>(json['id']),
+      copyId: serializer.fromJson<String>(json['copyId']),
+      path: serializer.fromJson<String>(json['path']),
+      takenAt: serializer.fromJson<DateTime>(json['takenAt']),
+      caption: serializer.fromJson<String?>(json['caption']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'copyId': serializer.toJson<String>(copyId),
+      'path': serializer.toJson<String>(path),
+      'takenAt': serializer.toJson<DateTime>(takenAt),
+      'caption': serializer.toJson<String?>(caption),
+    };
+  }
+
+  CopyPhoto copyWith({
+    String? id,
+    String? copyId,
+    String? path,
+    DateTime? takenAt,
+    Value<String?> caption = const Value.absent(),
+  }) => CopyPhoto(
+    id: id ?? this.id,
+    copyId: copyId ?? this.copyId,
+    path: path ?? this.path,
+    takenAt: takenAt ?? this.takenAt,
+    caption: caption.present ? caption.value : this.caption,
+  );
+  CopyPhoto copyWithCompanion(CopyPhotosCompanion data) {
+    return CopyPhoto(
+      id: data.id.present ? data.id.value : this.id,
+      copyId: data.copyId.present ? data.copyId.value : this.copyId,
+      path: data.path.present ? data.path.value : this.path,
+      takenAt: data.takenAt.present ? data.takenAt.value : this.takenAt,
+      caption: data.caption.present ? data.caption.value : this.caption,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CopyPhoto(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('path: $path, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('caption: $caption')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, copyId, path, takenAt, caption);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CopyPhoto &&
+          other.id == this.id &&
+          other.copyId == this.copyId &&
+          other.path == this.path &&
+          other.takenAt == this.takenAt &&
+          other.caption == this.caption);
+}
+
+class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
+  final Value<String> id;
+  final Value<String> copyId;
+  final Value<String> path;
+  final Value<DateTime> takenAt;
+  final Value<String?> caption;
+  final Value<int> rowid;
+  const CopyPhotosCompanion({
+    this.id = const Value.absent(),
+    this.copyId = const Value.absent(),
+    this.path = const Value.absent(),
+    this.takenAt = const Value.absent(),
+    this.caption = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CopyPhotosCompanion.insert({
+    required String id,
+    required String copyId,
+    required String path,
+    this.takenAt = const Value.absent(),
+    this.caption = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       copyId = Value(copyId),
+       path = Value(path);
+  static Insertable<CopyPhoto> custom({
+    Expression<String>? id,
+    Expression<String>? copyId,
+    Expression<String>? path,
+    Expression<DateTime>? takenAt,
+    Expression<String>? caption,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (copyId != null) 'copy_id': copyId,
+      if (path != null) 'path': path,
+      if (takenAt != null) 'taken_at': takenAt,
+      if (caption != null) 'caption': caption,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CopyPhotosCompanion copyWith({
+    Value<String>? id,
+    Value<String>? copyId,
+    Value<String>? path,
+    Value<DateTime>? takenAt,
+    Value<String?>? caption,
+    Value<int>? rowid,
+  }) {
+    return CopyPhotosCompanion(
+      id: id ?? this.id,
+      copyId: copyId ?? this.copyId,
+      path: path ?? this.path,
+      takenAt: takenAt ?? this.takenAt,
+      caption: caption ?? this.caption,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (copyId.present) {
+      map['copy_id'] = Variable<String>(copyId.value);
+    }
+    if (path.present) {
+      map['path'] = Variable<String>(path.value);
+    }
+    if (takenAt.present) {
+      map['taken_at'] = Variable<DateTime>(takenAt.value);
+    }
+    if (caption.present) {
+      map['caption'] = Variable<String>(caption.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CopyPhotosCompanion(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('path: $path, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('caption: $caption, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -8029,6 +8385,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
   late final $BookFilesTable bookFiles = $BookFilesTable(this);
   late final $PhysicalCopiesTable physicalCopies = $PhysicalCopiesTable(this);
   late final $LoansTable loans = $LoansTable(this);
+  late final $CopyPhotosTable copyPhotos = $CopyPhotosTable(this);
   late final $ShelvesTable shelves = $ShelvesTable(this);
   late final $ShelfBooksTable shelfBooks = $ShelfBooksTable(this);
   late final $PhysicalEnvironmentsTable physicalEnvironments =
@@ -8058,6 +8415,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     bookFiles,
     physicalCopies,
     loans,
+    copyPhotos,
     shelves,
     shelfBooks,
     physicalEnvironments,
@@ -11300,6 +11658,24 @@ final class $$PhysicalCopiesTableReferences
     );
   }
 
+  static MultiTypedResultKey<$CopyPhotosTable, List<CopyPhoto>>
+  _copyPhotosRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
+    db.copyPhotos,
+    aliasName: 'physical_copies__id__copy_photos__copy_id',
+  );
+
+  $$CopyPhotosTableProcessedTableManager get copyPhotosRefs {
+    final manager = $$CopyPhotosTableTableManager(
+      $_db,
+      $_db.copyPhotos,
+    ).filter((f) => f.copyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_copyPhotosRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$BookPlacementsTable, List<BookPlacement>>
   _bookPlacementsRefsTable(_$VellumDatabase db) =>
       MultiTypedResultKey.fromTable(
@@ -11398,6 +11774,31 @@ class $$PhysicalCopiesTableFilterComposer
           }) => $$LoansTableFilterComposer(
             $db: $db,
             $table: $db.loans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> copyPhotosRefs(
+    Expression<bool> Function($$CopyPhotosTableFilterComposer f) f,
+  ) {
+    final $$CopyPhotosTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.copyPhotos,
+      getReferencedColumn: (t) => t.copyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CopyPhotosTableFilterComposer(
+            $db: $db,
+            $table: $db.copyPhotos,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -11571,6 +11972,31 @@ class $$PhysicalCopiesTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> copyPhotosRefs<T extends Object>(
+    Expression<T> Function($$CopyPhotosTableAnnotationComposer a) f,
+  ) {
+    final $$CopyPhotosTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.copyPhotos,
+      getReferencedColumn: (t) => t.copyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CopyPhotosTableAnnotationComposer(
+            $db: $db,
+            $table: $db.copyPhotos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> bookPlacementsRefs<T extends Object>(
     Expression<T> Function($$BookPlacementsTableAnnotationComposer a) f,
   ) {
@@ -11613,6 +12039,7 @@ class $$PhysicalCopiesTableTableManager
           PrefetchHooks Function({
             bool bookId,
             bool loansRefs,
+            bool copyPhotosRefs,
             bool bookPlacementsRefs,
           })
         > {
@@ -11681,12 +12108,14 @@ class $$PhysicalCopiesTableTableManager
               ({
                 bookId = false,
                 loansRefs = false,
+                copyPhotosRefs = false,
                 bookPlacementsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (loansRefs) db.loans,
+                    if (copyPhotosRefs) db.copyPhotos,
                     if (bookPlacementsRefs) db.bookPlacements,
                   ],
                   addJoins:
@@ -11746,6 +12175,27 @@ class $$PhysicalCopiesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (copyPhotosRefs)
+                        await $_getPrefetchedData<
+                          PhysicalCopy,
+                          $PhysicalCopiesTable,
+                          CopyPhoto
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PhysicalCopiesTableReferences
+                              ._copyPhotosRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PhysicalCopiesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).copyPhotosRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.copyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (bookPlacementsRefs)
                         await $_getPrefetchedData<
                           PhysicalCopy,
@@ -11790,6 +12240,7 @@ typedef $$PhysicalCopiesTableProcessedTableManager =
       PrefetchHooks Function({
         bool bookId,
         bool loansRefs,
+        bool copyPhotosRefs,
         bool bookPlacementsRefs,
       })
     >;
@@ -12226,6 +12677,324 @@ typedef $$LoansTableProcessedTableManager =
       $$LoansTableUpdateCompanionBuilder,
       (Loan, $$LoansTableReferences),
       Loan,
+      PrefetchHooks Function({bool copyId})
+    >;
+typedef $$CopyPhotosTableCreateCompanionBuilder =
+    CopyPhotosCompanion Function({
+      required String id,
+      required String copyId,
+      required String path,
+      Value<DateTime> takenAt,
+      Value<String?> caption,
+      Value<int> rowid,
+    });
+typedef $$CopyPhotosTableUpdateCompanionBuilder =
+    CopyPhotosCompanion Function({
+      Value<String> id,
+      Value<String> copyId,
+      Value<String> path,
+      Value<DateTime> takenAt,
+      Value<String?> caption,
+      Value<int> rowid,
+    });
+
+final class $$CopyPhotosTableReferences
+    extends BaseReferences<_$VellumDatabase, $CopyPhotosTable, CopyPhoto> {
+  $$CopyPhotosTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PhysicalCopiesTable _copyIdTable(_$VellumDatabase db) => db
+      .physicalCopies
+      .createAlias('copy_photos__copy_id__physical_copies__id');
+
+  $$PhysicalCopiesTableProcessedTableManager get copyId {
+    final $_column = $_itemColumn<String>('copy_id')!;
+
+    final manager = $$PhysicalCopiesTableTableManager(
+      $_db,
+      $_db.physicalCopies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_copyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CopyPhotosTableFilterComposer
+    extends Composer<_$VellumDatabase, $CopyPhotosTable> {
+  $$CopyPhotosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get takenAt => $composableBuilder(
+    column: $table.takenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get caption => $composableBuilder(
+    column: $table.caption,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PhysicalCopiesTableFilterComposer get copyId {
+    final $$PhysicalCopiesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.copyId,
+      referencedTable: $db.physicalCopies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalCopiesTableFilterComposer(
+            $db: $db,
+            $table: $db.physicalCopies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CopyPhotosTableOrderingComposer
+    extends Composer<_$VellumDatabase, $CopyPhotosTable> {
+  $$CopyPhotosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get takenAt => $composableBuilder(
+    column: $table.takenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get caption => $composableBuilder(
+    column: $table.caption,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PhysicalCopiesTableOrderingComposer get copyId {
+    final $$PhysicalCopiesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.copyId,
+      referencedTable: $db.physicalCopies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalCopiesTableOrderingComposer(
+            $db: $db,
+            $table: $db.physicalCopies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CopyPhotosTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $CopyPhotosTable> {
+  $$CopyPhotosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get path =>
+      $composableBuilder(column: $table.path, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get takenAt =>
+      $composableBuilder(column: $table.takenAt, builder: (column) => column);
+
+  GeneratedColumn<String> get caption =>
+      $composableBuilder(column: $table.caption, builder: (column) => column);
+
+  $$PhysicalCopiesTableAnnotationComposer get copyId {
+    final $$PhysicalCopiesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.copyId,
+      referencedTable: $db.physicalCopies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalCopiesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.physicalCopies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CopyPhotosTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $CopyPhotosTable,
+          CopyPhoto,
+          $$CopyPhotosTableFilterComposer,
+          $$CopyPhotosTableOrderingComposer,
+          $$CopyPhotosTableAnnotationComposer,
+          $$CopyPhotosTableCreateCompanionBuilder,
+          $$CopyPhotosTableUpdateCompanionBuilder,
+          (CopyPhoto, $$CopyPhotosTableReferences),
+          CopyPhoto,
+          PrefetchHooks Function({bool copyId})
+        > {
+  $$CopyPhotosTableTableManager(_$VellumDatabase db, $CopyPhotosTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CopyPhotosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CopyPhotosTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CopyPhotosTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> copyId = const Value.absent(),
+                Value<String> path = const Value.absent(),
+                Value<DateTime> takenAt = const Value.absent(),
+                Value<String?> caption = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CopyPhotosCompanion(
+                id: id,
+                copyId: copyId,
+                path: path,
+                takenAt: takenAt,
+                caption: caption,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String copyId,
+                required String path,
+                Value<DateTime> takenAt = const Value.absent(),
+                Value<String?> caption = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CopyPhotosCompanion.insert(
+                id: id,
+                copyId: copyId,
+                path: path,
+                takenAt: takenAt,
+                caption: caption,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CopyPhotosTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({copyId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (copyId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.copyId,
+                                referencedTable: $$CopyPhotosTableReferences
+                                    ._copyIdTable(db),
+                                referencedColumn: $$CopyPhotosTableReferences
+                                    ._copyIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CopyPhotosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $CopyPhotosTable,
+      CopyPhoto,
+      $$CopyPhotosTableFilterComposer,
+      $$CopyPhotosTableOrderingComposer,
+      $$CopyPhotosTableAnnotationComposer,
+      $$CopyPhotosTableCreateCompanionBuilder,
+      $$CopyPhotosTableUpdateCompanionBuilder,
+      (CopyPhoto, $$CopyPhotosTableReferences),
+      CopyPhoto,
       PrefetchHooks Function({bool copyId})
     >;
 typedef $$ShelvesTableCreateCompanionBuilder =
@@ -15428,6 +16197,8 @@ class $VellumDatabaseManager {
       $$PhysicalCopiesTableTableManager(_db, _db.physicalCopies);
   $$LoansTableTableManager get loans =>
       $$LoansTableTableManager(_db, _db.loans);
+  $$CopyPhotosTableTableManager get copyPhotos =>
+      $$CopyPhotosTableTableManager(_db, _db.copyPhotos);
   $$ShelvesTableTableManager get shelves =>
       $$ShelvesTableTableManager(_db, _db.shelves);
   $$ShelfBooksTableTableManager get shelfBooks =>

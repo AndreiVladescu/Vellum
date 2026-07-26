@@ -190,6 +190,31 @@ class Loans extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Photographs of a physical copy's condition (plan 5 #51).
+///
+/// The point is the loan argument: `physicalCopy.condition` is one word, and
+/// "there was already a tear on page 40" is not something a word settles. A
+/// photo taken as a copy goes out — and another when it comes back — is.
+///
+/// **App-local, deliberately and permanently.** Copies and loans sync
+/// (plan 5 #4), but photo *blobs* are exactly the sync weight that channel
+/// shouldn't quietly acquire: one condition photo outweighs the entire
+/// catalogue payload for a mid-sized library. Only [path] is stored here; the
+/// bytes live under `photos/` in the data dir and ride backups.
+@DataClassName('CopyPhoto')
+class CopyPhotos extends Table {
+  TextColumn get id => text()();
+  TextColumn get copyId => text().references(PhysicalCopies, #id)();
+
+  /// Relative to the data dir, like `BookFiles.path` — `photos/<id>.jpg`.
+  TextColumn get path => text()();
+  DateTimeColumn get takenAt => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get caption => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Manual collections/panes, independent of genres, with explicit ordering.
 @DataClassName('Shelf')
 class Shelves extends Table {
@@ -386,6 +411,7 @@ class ReadingSessions extends Table {
   BookFiles,
   PhysicalCopies,
   Loans,
+  CopyPhotos,
   Shelves,
   ShelfBooks,
   PhysicalEnvironments,
@@ -401,7 +427,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -596,6 +622,13 @@ class VellumDatabase extends _$VellumDatabase {
             }
             if (!loanCols.contains('reminder_sent_at')) {
               await m.addColumn(loans, loans.reminderSentAt);
+            }
+          }
+          if (from < 19) {
+            // Condition photos (plan 5 #51): app-local, so no server migration
+            // — and deliberately never one, see the table's doc comment.
+            if (!(await tableNames()).contains('copy_photos')) {
+              await m.createTable(copyPhotos);
             }
           }
         },

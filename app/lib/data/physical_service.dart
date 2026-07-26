@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import 'copy_photo_service.dart';
 import 'database.dart';
 
 /// A loan joined with the book it's for, for the cross-library Loans overview.
@@ -11,9 +12,15 @@ typedef LoanEntry = ({Loan loan, Book book});
 /// `updatedAt`, no owner of their own (access derives from the parent book
 /// server-side, and for a loan, from its copy's book).
 class PhysicalService {
-  PhysicalService(this.db);
+  PhysicalService(this.db, [this._photos]);
 
   final VellumDatabase db;
+
+  /// Condition photos (plan 5 #51), so deleting a copy can take its photos with
+  /// it. Optional because photos need a data directory and a database-only
+  /// `PhysicalService` (tests, tooling) has nothing to delete blobs from — the
+  /// rows are still cleared either way, which is what the foreign key needs.
+  final CopyPhotoService? _photos;
 
   static const _uuid = Uuid();
 
@@ -44,11 +51,15 @@ class PhysicalService {
 
   /// Deletes a physical copy along with its loan history and any layout
   /// placement referencing it. Both `Loans.copyId` and `BookPlacements.copyId`
-  /// reference this row with no cascade, so either left behind would make the
+  /// reference this row with no cascade — as does `CopyPhotos.copyId` since
+  /// plan 5 #51 — so any left behind would make the
   /// final delete throw a foreign-key error — notably on a pull-driven delete,
   /// which must not fail. [recordTombstone] is false for that pull-driven case
   /// (the server already knows), same convention as deleteShelf/deleteBook.
   Future<void> deletePhysicalCopy(String id, {bool recordTombstone = true}) async {
+    // Read the photo rows first: the transaction below deletes them, and a blob
+    // sweep that ran afterwards would find nothing and leak every file.
+    final photos = await _photos?.photosOf(id) ?? const <CopyPhoto>[];
     await db.transaction(() async {
       if (recordTombstone) {
         await db.into(db.localDeletions).insertOnConflictUpdate(
@@ -60,8 +71,12 @@ class PhysicalService {
       }
       await (db.delete(db.bookPlacements)..where((p) => p.copyId.equals(id))).go();
       await (db.delete(db.loans)..where((l) => l.copyId.equals(id))).go();
+      await (db.delete(db.copyPhotos)..where((ph) => ph.copyId.equals(id))).go();
       await (db.delete(db.physicalCopies)..where((c) => c.id.equals(id))).go();
     });
+    // Blobs after the commit, never inside it: a failed unlink must not roll
+    // back a delete the database has already agreed to.
+    await _photos?.deleteBlobs(photos);
   }
 
   /// Loan history for a physical copy, most recent first. The active loan (if

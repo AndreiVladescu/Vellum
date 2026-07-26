@@ -11,6 +11,7 @@ import 'database.dart';
 import 'file_service.dart';
 import 'library_queries.dart';
 import 'metadata.dart';
+import 'copy_photo_service.dart';
 import 'physical_service.dart';
 import '../reader/annotations/annotation_store.dart';
 import 'reading_position_service.dart';
@@ -25,6 +26,7 @@ import 'shelf_service.dart';
 export '../physical/layout_repository.dart'
     show CopyLocation, LayoutRepository, PlacedBook;
 export 'book_write_service.dart' show BookDetails;
+export 'copy_photo_service.dart' show CopyPhotoService;
 export 'physical_service.dart' show LoanEntry;
 export '../reader/annotations/annotation_store.dart'
     show AnnotationKind, AnnotationStore;
@@ -49,6 +51,7 @@ class LibraryRepository {
     required this.covers,
     required this.shelves,
     required this.physical,
+    required this.copyPhotos,
     required this.files,
     required this.writes,
     required this.readingPositions,
@@ -77,6 +80,10 @@ class LibraryRepository {
 
   /// Physical copies and loan history. Reached as `repository.physical`.
   final PhysicalService physical;
+
+  /// Condition photos for physical copies (plan 5 #51). Reached as
+  /// `repository.copyPhotos`.
+  final CopyPhotoService copyPhotos;
 
   /// Attached digital files. Reached as `repository.files`.
   final FileService files;
@@ -150,7 +157,8 @@ class LibraryRepository {
     }
     final metadataService = metadata ?? MetadataService();
     final covers = CoverService(db, dir);
-    final physical = PhysicalService(db);
+    final copyPhotos = CopyPhotoService(db, dir);
+    final physical = PhysicalService(db, copyPhotos);
     return LibraryRepository._(
       db: db,
       metadata: metadataService,
@@ -160,6 +168,7 @@ class LibraryRepository {
       covers: covers,
       shelves: ShelfService(db),
       physical: physical,
+      copyPhotos: copyPhotos,
       files: FileService(db, dir, covers),
       writes: BookWriteService(db, dir, metadataService, covers),
       readingPositions: ReadingPositionService(db),

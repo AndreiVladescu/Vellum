@@ -58,6 +58,38 @@ void main() {
     await reopened.db.close();
   });
 
+  test('condition photos ride the backup off the device', () async {
+    // Photos never sync (plan 5 #51), so a backup is the only copy of them that
+    // ever leaves this machine — if the archive skipped `photos/`, the one
+    // record of what a book looked like when it was lent would be un-restorable.
+    final source = await _repo(dir, 'source.sqlite');
+    final bookId = await source.createCustomBook(title: 'Lent out');
+    final copyId = await source.addPhysicalCopy(bookId);
+    final picked = File(p.join(dir.path, 'shot.jpg'))
+      ..writeAsBytesSync([9, 8, 7]);
+    await source.copyPhotos.addPhoto(copyId, picked.path, caption: 'torn');
+
+    final zip = File(p.join(dir.path, 'backup.zip'));
+    await BackupService(source).exportTo(zip);
+    await source.db.close();
+
+    final destDir = Directory(p.join(dir.path, 'dest'))..createSync();
+    final destDbFile = File(p.join(destDir.path, 'vellum.sqlite'));
+    final dest = await _repo(destDir, 'vellum.sqlite');
+    expect(await BackupService(dest, databaseFile: destDbFile).restoreFrom(zip),
+        isTrue);
+
+    final reopened = await LibraryRepository.forTesting(
+      VellumDatabase(NativeDatabase(destDbFile)),
+      destDir,
+    );
+    final restored = await reopened.copyPhotos.photosOf(copyId);
+    expect(restored.single.caption, 'torn');
+    expect(reopened.copyPhotos.fileOf(restored.single).readAsBytesSync(),
+        [9, 8, 7]);
+    await reopened.db.close();
+  });
+
   test('already-compressed blobs are stored, not recompressed, and exact',
       () async {
     final repo = await _repo(dir, 'lib.sqlite');

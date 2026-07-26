@@ -2,19 +2,30 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import 'copy_photos.dart';
 
 /// Prompts for a borrower's name. Returns the trimmed name, or null if the user
 /// cancelled or left it blank. Shared by the inline copy tile and the lend sheet
 /// so both flows collect a borrower the same way.
 /// What a lend dialog collected (plan 5 #27).
 class LendDetails {
-  const LendDetails({required this.borrower, this.dueAt, this.contact});
+  const LendDetails({
+    required this.borrower,
+    this.dueAt,
+    this.contact,
+    this.photograph = false,
+  });
 
   final String borrower;
 
   /// Null means no agreed return date — a real arrangement, not a blank field.
   final DateTime? dueAt;
   final String? contact;
+
+  /// Whether to photograph the copy's condition as it goes out (plan 5 #51).
+  /// Opt-in per loan, not a setting: it matters for the borrowed-by-a-stranger
+  /// case and is noise for lending to a flatmate.
+  final bool photograph;
 }
 
 /// Asks who is taking the book, when it's due back, and how to reach them.
@@ -28,6 +39,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
   final contact = TextEditingController();
   DateTime? due;
   int? selectedPreset;
+  bool photograph = false;
 
   final result = await showDialog<LendDetails>(
     context: context,
@@ -109,6 +121,18 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                // Condition photo (plan 5 #51). Offered here because *before*
+                // the book leaves is the only moment the shot is worth
+                // anything — afterwards it proves nothing.
+                CheckboxListTile(
+                  value: photograph,
+                  onChanged: (v) => setState(() => photograph = v ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  title: const Text('Photograph its condition first'),
+                ),
               ],
             ),
           ),
@@ -125,6 +149,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                   borrower: name,
                   dueAt: due,
                   contact: contact.text.trim(),
+                  photograph: photograph,
                 ));
               },
               child: const Text('Lend'),
@@ -257,14 +282,36 @@ class PhysicalCopyTile extends StatelessWidget {
 
   Future<void> _lend(BuildContext context) async {
     final details = await promptBorrower(context);
-    if (details != null) {
-      await repository.lendCopy(
-        copy.id,
-        details.borrower,
-        dueAt: details.dueAt,
-        contact: details.contact,
-      );
+    if (details == null) return;
+    await repository.lendCopy(
+      copy.id,
+      details.borrower,
+      dueAt: details.dueAt,
+      contact: details.contact,
+    );
+    // The photo is attached after the loan exists, and its caption names the
+    // borrower — that is what makes a shot from June mean anything in October.
+    if (details.photograph && context.mounted) {
+      await addCopyPhoto(context, repository, copy.id,
+          caption: 'Lent to ${details.borrower}');
     }
+  }
+
+  /// Returning is the other half of the argument the photos exist to settle, so
+  /// the offer is made again — as a snackbar action rather than another
+  /// dialog, because most returns are uneventful and shouldn't cost a tap.
+  Future<void> _return(BuildContext context, Loan active) async {
+    await repository.returnLoan(active.id);
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(SnackBar(
+      content: Text('Returned by ${active.borrower}'),
+      action: SnackBarAction(
+        label: 'Photograph it',
+        onPressed: () => addCopyPhoto(context, repository, copy.id,
+            caption: 'Returned by ${active.borrower}'),
+      ),
+    ));
   }
 
   @override
@@ -323,7 +370,7 @@ class PhysicalCopyTile extends StatelessWidget {
               isThreeLine: true,
               trailing: active != null
                   ? TextButton(
-                      onPressed: () => repository.returnLoan(active.id),
+                      onPressed: () => _return(context, active),
                       child: const Text('Return'),
                     )
                   : TextButton(
@@ -331,6 +378,7 @@ class PhysicalCopyTile extends StatelessWidget {
                       child: const Text('Lend'),
                     ),
             ),
+            CopyPhotoStrip(copyId: copy.id, repository: repository),
             if (past.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(left: 8, bottom: 8),

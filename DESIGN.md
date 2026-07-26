@@ -294,6 +294,21 @@ puts a ready message on the clipboard rather than half-integrating a share sheet
 that would fail on desktop. A reminder given today isn't repeated today, but one
 given last week comes back for a book that is still out.
 
+**Condition photos** (app, plan 5 #51) settle the other half of a loan: what the
+book looked like when it left. An app-local `copy_photos` table stores a caption,
+a timestamp and a *path* — the bytes live under `photos/` in the data dir and ride
+backups, which are the only copy of them that ever leaves the device. Lending
+offers "photograph its condition first" as an opt-in tick per loan (it matters for
+a stranger, it is noise for a flatmate), and marking a return offers the shot again
+from the snackbar, where it costs nothing to ignore.
+
+Photos are **app-local permanently**, not "for now" like #18's judgements: copies
+and loans sync, but photo blobs are the exact weight that channel must not
+silently acquire — one photo outweighs the whole catalogue payload of a mid-sized
+library. Deleting a copy therefore reads its photo rows *before* the transaction
+that clears them and unlinks the blobs after it commits; a sweep that ran
+afterwards would find no rows and leak every file.
+
 **A copy's location is derived, not stored** (app, plan 5 #50).
 `physical_copy.location` is free text typed once when the copy was added, while a
 *placement* records where the book was last dragged to; they diverge the first time

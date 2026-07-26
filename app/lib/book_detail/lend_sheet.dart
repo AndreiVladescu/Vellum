@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import 'copy_photos.dart';
 import 'physical_copies_section.dart';
 
 /// A bottom-sheet "mini menu" for lending, reachable straight from the book's
@@ -29,6 +30,10 @@ class LendSheet extends StatelessWidget {
       dueAt: details.dueAt,
       contact: details.contact,
     );
+    if (details.photograph && context.mounted) {
+      await addCopyPhoto(context, repository, copyId,
+          caption: 'Lent to ${details.borrower}');
+    }
   }
 
   @override

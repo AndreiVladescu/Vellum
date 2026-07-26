@@ -52,7 +52,9 @@ class BackupService {
           'created': DateTime.now().toUtc().toIso8601String(),
         }),
       ));
-      for (final sub in ['covers', 'files']) {
+      // 'photos' since plan 5 #51 — condition photos are app-local, so a
+      // backup is the only copy of them that leaves the device.
+      for (final sub in ['covers', 'files', 'photos']) {
         final dir = Directory(p.join(dataDir.path, sub));
         if (!await dir.exists()) continue;
         await for (final entry in dir.list()) {
@@ -118,7 +120,7 @@ class BackupService {
 
       // Replace the blob directories with the archive's (absent in the
       // archive = empty in the restored library).
-      for (final sub in ['covers', 'files']) {
+      for (final sub in ['covers', 'files', 'photos']) {
         final live = Directory(p.join(dataDir.path, sub));
         if (await live.exists()) await live.delete(recursive: true);
         final staged = Directory(p.join(staging.path, sub));
