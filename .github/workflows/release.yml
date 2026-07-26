@@ -1,0 +1,124 @@
+# Release artefacts (plan 5 #36).
+#
+# The single-static-binary advantage is only real if people can download one, so
+# a tag builds the server for the platforms self-hosters actually use, plus the
+# Android app, and attaches everything to a GitHub Release with checksums.
+#
+# Triggered by a `v*` tag; `workflow_dispatch` is kept so a release can be
+# rehearsed without tagging.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  server:
+    name: server (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # musl for Linux: a static binary that runs on any distribution,
+          # which is the whole promise of "single binary".
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - name: Install cross-compiler
+        if: matrix.cross
+        run: |
+          cargo install cross --locked
+      - name: Build
+        working-directory: server
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --locked --target ${{ matrix.target }}
+          else
+            cargo build --release --locked --target ${{ matrix.target }}
+          fi
+        shell: bash
+      - name: Package
+        working-directory: server
+        shell: bash
+        run: |
+          name="vellum-server-${{ matrix.target }}"
+          mkdir -p "dist/$name"
+          if [ -f "target/${{ matrix.target }}/release/vellum-server.exe" ]; then
+            cp "target/${{ matrix.target }}/release/vellum-server.exe" "dist/$name/"
+          else
+            cp "target/${{ matrix.target }}/release/vellum-server" "dist/$name/"
+          fi
+          cp ../docs/DEPLOYMENT.md "dist/$name/" || true
+          cp ../packaging/vellum-server.service "dist/$name/" || true
+          (cd dist && tar czf "$name.tar.gz" "$name")
+          (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.target }}
+          path: server/dist/*.tar.gz*
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Build app bundle and per-ABI APKs
+        working-directory: app
+        # Unsigned unless key.properties is present (see android/README): a
+        # release build without signing config still produces installable
+        # artefacts, it just isn't Play-uploadable.
+        run: |
+          flutter pub get
+          flutter build appbundle --release
+          flutter build apk --release --split-per-abi
+      - name: Checksums
+        working-directory: app
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/bundle/release/*.aab dist/ || true
+          cp build/app/outputs/flutter-apk/*.apk dist/ || true
+          (cd dist && sha256sum * > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: app/dist/*
+
+  publish:
+    needs: [server, android]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

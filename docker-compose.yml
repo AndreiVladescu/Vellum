@@ -1,0 +1,52 @@
+# Vellum sync server behind Caddy, which obtains and renews TLS automatically
+# (plan 5 #36). This is the deployment DESIGN.md recommends, made
+# copy-pasteable: Vellum speaks plain HTTP on an internal network and never sees
+# a certificate, while Caddy terminates TLS on 443.
+#
+#   1. Point a DNS A/AAAA record at this host.
+#   2. Set DOMAIN and ACME_EMAIL below (or in a .env file next to this one).
+#   3. docker compose up -d
+#
+# For a LAN-only server with no domain, skip Caddy and use the server's own
+# VELLUM_TLS instead — see docs/DEPLOYMENT.md.
+
+services:
+  vellum:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vellum-server:latest
+    restart: unless-stopped
+    environment:
+      # Public links embed this, so it must be the address users actually reach.
+      VELLUM_PUBLIC_URL: "https://${DOMAIN:?set DOMAIN in .env}"
+      VELLUM_MAX_UPLOAD_MB: "2048"
+      RUST_LOG: "info"
+      # No VELLUM_TLS here on purpose: Caddy terminates TLS, and running two
+      # certificate stories at once is how you end up debugging both.
+    volumes:
+      - vellum-data:/var/lib/vellum
+    # Not published to the host: only Caddy needs to reach it.
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - vellum
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: "${DOMAIN:?set DOMAIN in .env}"
+      ACME_EMAIL: "${ACME_EMAIL:-}"
+    volumes:
+      - ./packaging/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  vellum-data:
+  caddy-data:
+  caddy-config:

@@ -136,18 +136,33 @@ endpoints for on-device use.
 
 ## Deployment
 
-The server speaks **plain HTTP** and terminates no TLS of its own. Run it behind
-a TLS reverse proxy (Caddy, nginx, Traefik) so credentials, book files, and
-`?token=` URLs travel encrypted. Set **`VELLUM_PUBLIC_URL`** to the public
-`https://` origin so minted public share links point at the proxy, not at
-`localhost`. Other knobs: `VELLUM_PORT` (bind port, default 3000, on `0.0.0.0`),
-`VELLUM_DB` (SQLite file), `VELLUM_DATA_DIR` (blob store), `VELLUM_MAX_UPLOAD_MB`
-(default 2048). Back up the `.db` file and the data dir together — the database
-stores blob *paths*, so the two are only meaningful as a pair. The database runs
-in **WAL mode**, so its `-wal`/`-shm` sidecar files are part of the state: back
-them up alongside the `.db`, or run `PRAGMA wal_checkpoint(TRUNCATE)` before
-copying the `.db` on its own. The app defaults new server URLs to `https://` and
-warns when a URL is unencrypted.
+> The operator-facing guide — Docker, compose with automatic TLS, systemd, the
+> full environment-variable table, backups and upgrades — is
+> [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (plan 5 #36). This section is the
+> design rationale behind it.
+
+**Two TLS stories, and you pick one.** Behind a reverse proxy (Caddy, nginx,
+Traefik) the server speaks plain HTTP and the proxy terminates TLS — the right
+answer when you have a domain, and what `docker-compose.yml` sets up. On a LAN
+with no domain, `VELLUM_TLS=1` makes the server generate and *reuse* a
+self-signed certificate (stable across restarts, so the fingerprint the app
+pinned stays valid) which the app imports. Running both at once means debugging
+both. Either way, set **`VELLUM_PUBLIC_URL`** to the address users actually
+reach, because minted share links embed it.
+
+**Shipping.** A multi-stage `Dockerfile` builds the binary and ships it on
+`debian-slim` — deliberately not `scratch`, since the PDF cover/text fallback
+shells out to `pdftoppm`/`pdftotext` and an empty userland would silently lose
+it. The image runs as an unprivileged user, keeps database and blobs in one
+volume, and health-checks `/health` with a real request. A `v*` tag builds
+musl-static Linux binaries plus Windows, macOS and the Android artefacts.
+
+**Back up the `.db` file and the data dir together** — the database stores blob
+*paths*, so the two are only meaningful as a pair. The database runs in **WAL
+mode**, so its `-wal`/`-shm` sidecar files are part of the state: back them up
+alongside the `.db`, or run `PRAGMA wal_checkpoint(TRUNCATE)` before copying the
+`.db` on its own. The app defaults new server URLs to `https://` and warns when
+a URL is unencrypted.
 
 ## Data model
 

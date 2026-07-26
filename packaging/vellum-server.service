@@ -1,0 +1,58 @@
+# systemd unit for a bare-metal install (plan 5 #36).
+#
+#   sudo useradd --system --home /var/lib/vellum --create-home vellum
+#   sudo install -m755 vellum-server /usr/local/bin/
+#   sudo install -m644 packaging/vellum-server.service /etc/systemd/system/
+#   sudo systemctl enable --now vellum-server
+#
+# Configuration is environment-only; drop overrides in
+# /etc/systemd/system/vellum-server.service.d/override.conf rather than editing
+# this file, so an upgrade doesn't clobber them.
+
+[Unit]
+Description=Vellum sync server
+Documentation=https://github.com/avladescu/Vellum
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=vellum
+Group=vellum
+ExecStart=/usr/local/bin/vellum-server
+Restart=on-failure
+RestartSec=5s
+
+Environment=VELLUM_DB=/var/lib/vellum/vellum.db
+Environment=VELLUM_DATA_DIR=/var/lib/vellum/data
+Environment=VELLUM_PORT=3000
+Environment=RUST_LOG=info
+# Set this to the address users actually reach, or public links will point at
+# localhost:
+# Environment=VELLUM_PUBLIC_URL=https://books.example.com
+
+# The library is one directory; nothing else needs to be writable.
+StateDirectory=vellum
+ReadWritePaths=/var/lib/vellum
+
+# Hardening. The server is a single binary that talks to SQLite and the network;
+# it has no business anywhere else on the filesystem.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

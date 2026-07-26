@@ -3,8 +3,60 @@ use std::path::PathBuf;
 
 use vellum_server::{AppState, TlsCertInfo, connect_db, router, tls};
 
+/// Everything the server reads from the environment, in one place — the source
+/// the `--help` text and `docs/DEPLOYMENT.md` are both written from.
+const USAGE: &str = "\
+vellum-server — the optional sync backend for Vellum
+
+USAGE:
+    vellum-server            Start the server (configured entirely by environment)
+    vellum-server --version  Print the version and exit
+    vellum-server --help     Print this help and exit
+
+ENVIRONMENT:
+    VELLUM_PORT              Port to listen on (default 3000)
+    VELLUM_DB                SQLite file (default ./vellum.db); migrations run at startup
+    VELLUM_DATA_DIR          Covers and book files (default ./data)
+    VELLUM_PUBLIC_URL        Base URL used in public share links
+                             (default http://localhost:3000)
+    VELLUM_MAX_UPLOAD_MB     Per-file upload cap in MB (default 2048)
+    VELLUM_TLS               1/true to serve HTTPS with a self-signed certificate
+    VELLUM_TLS_CERT          PEM certificate path (default <data dir>/cert.pem)
+    VELLUM_TLS_KEY           PEM key path (default <data dir>/key.pem)
+    VELLUM_TLS_SANS          Extra comma-separated SANs for the generated cert
+    VELLUM_BOOTSTRAP_TOKEN   Secret the first (master) registration must present
+    RUST_LOG                 Log filter, e.g. info, vellum_server=debug
+
+The first account registered becomes the master; afterwards the master
+provisions members. See docs/DEPLOYMENT.md for Docker, compose and systemd.
+";
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Argument handling before anything else: a container health check or a
+    // packaging script asking `--version` must not open the database first.
+    // Hand-rolled rather than pulling in an argument parser — there are exactly
+    // two flags, and configuration is environment-only by design.
+    // Only the first argument is examined, and each case ends the process: there
+    // are no combinable flags to accumulate, because configuration is
+    // environment-only by design.
+    if let Some(arg) = std::env::args().nth(1) {
+        match arg.as_str() {
+            "--version" | "-V" => {
+                println!("vellum-server {}", env!("CARGO_PKG_VERSION"));
+            }
+            "--help" | "-h" => {
+                print!("{USAGE}");
+            }
+            other => {
+                eprintln!("vellum-server: unrecognised argument `{other}`\n");
+                print!("{USAGE}");
+                std::process::exit(2);
+            }
+        }
+        return Ok(());
+    }
+
     tracing_subscriber::fmt::init();
 
     let db_path = std::env::var("VELLUM_DB").unwrap_or_else(|_| "vellum.db".into());

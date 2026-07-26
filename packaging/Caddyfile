@@ -1,0 +1,20 @@
+# Caddy in front of Vellum (plan 5 #36). Automatic HTTPS: Caddy obtains and
+# renews a Let's Encrypt certificate for {$DOMAIN} on first start.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	# Book files can be gigabytes; the default request body limit would reject
+	# them long before Vellum's own VELLUM_MAX_UPLOAD_MB got a say.
+	request_body {
+		max_size 2GB
+	}
+
+	# Vellum reads the peer address for its per-IP rate limits, so the real
+	# client address has to survive the proxy hop.
+	reverse_proxy vellum:3000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

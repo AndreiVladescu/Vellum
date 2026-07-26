@@ -85,6 +85,10 @@ cd server
 VELLUM_TLS=1 VELLUM_TLS_SANS=192.168.1.50 cargo run
 ```
 
+For anything beyond trying it out — Docker, a compose file with automatic TLS, a
+systemd unit, the full environment-variable table, backups and upgrades — see
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 On startup it logs whether it **generated** or is **reusing** the certificate,
 its path, and the SHA-256 fingerprint. In the app, connect to
 `https://<LAN-IP>:3000`, tap **Import** on the certificate row, paste

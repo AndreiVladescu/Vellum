@@ -113,3 +113,35 @@ jobs:
       #  - RUSTSEC-2026-0192 (ttf-parser unmaintained): pulled by lopdf for PDF
       #    parsing; a maintenance warning, not a vulnerability, unfixable here.
       - run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0192
+
+  # The Docker image is part of the product (plan 5 #36), so a change that breaks
+  # it should fail here rather than at someone's `docker compose up`. The image
+  # is built and then actually *run*: a build that produces a container which
+  # can't serve /health has not been verified by building it.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: vellum-server:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Run it and probe /health
+        run: |
+          docker run -d --name vellum-ci -p 3000:3000 vellum-server:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health; then ok=1; break; fi
+            sleep 1
+          done
+          test -n "$ok" || { docker logs vellum-ci; exit 1; }
+          # The PDF fallback is the whole reason this image isn't `scratch`.
+          docker exec vellum-ci pdftoppm -v
+          docker exec vellum-ci vellum-server --version
+      - name: Stop
+        if: always()
+        run: docker rm -f vellum-ci || true

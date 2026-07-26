@@ -1,0 +1,13 @@
+# Keep the build context small and reproducible: the image builds the server
+# from source, so nothing else belongs in it — and shipping a developer's
+# `server/target` or a local database into the context would make builds slow
+# and non-deterministic.
+.git
+app/
+design/
+docs/
+scripts/
+server/target/
+server/data/
+server/vellum.db*
+**/*.md
