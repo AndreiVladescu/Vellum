@@ -232,6 +232,59 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('unread'),
+  );
+  static const VerificationMeta _ratingMeta = const VerificationMeta('rating');
+  @override
+  late final GeneratedColumn<int> rating = GeneratedColumn<int>(
+    'rating',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startedAt = GeneratedColumn<DateTime>(
+    'started_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _finishedAtMeta = const VerificationMeta(
+    'finishedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> finishedAt = GeneratedColumn<DateTime>(
+    'finished_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _readCountMeta = const VerificationMeta(
+    'readCount',
+  );
+  @override
+  late final GeneratedColumn<int> readCount = GeneratedColumn<int>(
+    'read_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -254,6 +307,11 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     needsPush,
     coverEtag,
     needsProgressPush,
+    status,
+    rating,
+    startedAt,
+    finishedAt,
+    readCount,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -412,6 +470,36 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         ),
       );
     }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('rating')) {
+      context.handle(
+        _ratingMeta,
+        rating.isAcceptableOrUnknown(data['rating']!, _ratingMeta),
+      );
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    }
+    if (data.containsKey('finished_at')) {
+      context.handle(
+        _finishedAtMeta,
+        finishedAt.isAcceptableOrUnknown(data['finished_at']!, _finishedAtMeta),
+      );
+    }
+    if (data.containsKey('read_count')) {
+      context.handle(
+        _readCountMeta,
+        readCount.isAcceptableOrUnknown(data['read_count']!, _readCountMeta),
+      );
+    }
     return context;
   }
 
@@ -501,6 +589,26 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.bool,
         data['${effectivePrefix}needs_progress_push'],
       )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      rating: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rating'],
+      ),
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}started_at'],
+      ),
+      finishedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}finished_at'],
+      ),
+      readCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}read_count'],
+      )!,
     );
   }
 
@@ -531,6 +639,15 @@ class Book extends DataClass implements Insertable<Book> {
   final bool needsPush;
   final String? coverEtag;
   final bool needsProgressPush;
+  final String status;
+
+  /// 1–5, or null for unrated.
+  final int? rating;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+
+  /// How many times this book has been finished, for re-reads.
+  final int readCount;
   const Book({
     required this.id,
     required this.title,
@@ -552,6 +669,11 @@ class Book extends DataClass implements Insertable<Book> {
     required this.needsPush,
     this.coverEtag,
     required this.needsProgressPush,
+    required this.status,
+    this.rating,
+    this.startedAt,
+    this.finishedAt,
+    required this.readCount,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -604,6 +726,17 @@ class Book extends DataClass implements Insertable<Book> {
       map['cover_etag'] = Variable<String>(coverEtag);
     }
     map['needs_progress_push'] = Variable<bool>(needsProgressPush);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || rating != null) {
+      map['rating'] = Variable<int>(rating);
+    }
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<DateTime>(startedAt);
+    }
+    if (!nullToAbsent || finishedAt != null) {
+      map['finished_at'] = Variable<DateTime>(finishedAt);
+    }
+    map['read_count'] = Variable<int>(readCount);
     return map;
   }
 
@@ -655,6 +788,17 @@ class Book extends DataClass implements Insertable<Book> {
           ? const Value.absent()
           : Value(coverEtag),
       needsProgressPush: Value(needsProgressPush),
+      status: Value(status),
+      rating: rating == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rating),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      finishedAt: finishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishedAt),
+      readCount: Value(readCount),
     );
   }
 
@@ -684,6 +828,11 @@ class Book extends DataClass implements Insertable<Book> {
       needsPush: serializer.fromJson<bool>(json['needsPush']),
       coverEtag: serializer.fromJson<String?>(json['coverEtag']),
       needsProgressPush: serializer.fromJson<bool>(json['needsProgressPush']),
+      status: serializer.fromJson<String>(json['status']),
+      rating: serializer.fromJson<int?>(json['rating']),
+      startedAt: serializer.fromJson<DateTime?>(json['startedAt']),
+      finishedAt: serializer.fromJson<DateTime?>(json['finishedAt']),
+      readCount: serializer.fromJson<int>(json['readCount']),
     );
   }
   @override
@@ -710,6 +859,11 @@ class Book extends DataClass implements Insertable<Book> {
       'needsPush': serializer.toJson<bool>(needsPush),
       'coverEtag': serializer.toJson<String?>(coverEtag),
       'needsProgressPush': serializer.toJson<bool>(needsProgressPush),
+      'status': serializer.toJson<String>(status),
+      'rating': serializer.toJson<int?>(rating),
+      'startedAt': serializer.toJson<DateTime?>(startedAt),
+      'finishedAt': serializer.toJson<DateTime?>(finishedAt),
+      'readCount': serializer.toJson<int>(readCount),
     };
   }
 
@@ -734,6 +888,11 @@ class Book extends DataClass implements Insertable<Book> {
     bool? needsPush,
     Value<String?> coverEtag = const Value.absent(),
     bool? needsProgressPush,
+    String? status,
+    Value<int?> rating = const Value.absent(),
+    Value<DateTime?> startedAt = const Value.absent(),
+    Value<DateTime?> finishedAt = const Value.absent(),
+    int? readCount,
   }) => Book(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -761,6 +920,11 @@ class Book extends DataClass implements Insertable<Book> {
     needsPush: needsPush ?? this.needsPush,
     coverEtag: coverEtag.present ? coverEtag.value : this.coverEtag,
     needsProgressPush: needsProgressPush ?? this.needsProgressPush,
+    status: status ?? this.status,
+    rating: rating.present ? rating.value : this.rating,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+    readCount: readCount ?? this.readCount,
   );
   Book copyWithCompanion(BooksCompanion data) {
     return Book(
@@ -802,6 +966,13 @@ class Book extends DataClass implements Insertable<Book> {
       needsProgressPush: data.needsProgressPush.present
           ? data.needsProgressPush.value
           : this.needsProgressPush,
+      status: data.status.present ? data.status.value : this.status,
+      rating: data.rating.present ? data.rating.value : this.rating,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      finishedAt: data.finishedAt.present
+          ? data.finishedAt.value
+          : this.finishedAt,
+      readCount: data.readCount.present ? data.readCount.value : this.readCount,
     );
   }
 
@@ -827,13 +998,18 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('updatedAt: $updatedAt, ')
           ..write('needsPush: $needsPush, ')
           ..write('coverEtag: $coverEtag, ')
-          ..write('needsProgressPush: $needsProgressPush')
+          ..write('needsProgressPush: $needsProgressPush, ')
+          ..write('status: $status, ')
+          ..write('rating: $rating, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('readCount: $readCount')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     title,
     subtitle,
@@ -854,7 +1030,12 @@ class Book extends DataClass implements Insertable<Book> {
     needsPush,
     coverEtag,
     needsProgressPush,
-  );
+    status,
+    rating,
+    startedAt,
+    finishedAt,
+    readCount,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -878,7 +1059,12 @@ class Book extends DataClass implements Insertable<Book> {
           other.updatedAt == this.updatedAt &&
           other.needsPush == this.needsPush &&
           other.coverEtag == this.coverEtag &&
-          other.needsProgressPush == this.needsProgressPush);
+          other.needsProgressPush == this.needsProgressPush &&
+          other.status == this.status &&
+          other.rating == this.rating &&
+          other.startedAt == this.startedAt &&
+          other.finishedAt == this.finishedAt &&
+          other.readCount == this.readCount);
 }
 
 class BooksCompanion extends UpdateCompanion<Book> {
@@ -902,6 +1088,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<bool> needsPush;
   final Value<String?> coverEtag;
   final Value<bool> needsProgressPush;
+  final Value<String> status;
+  final Value<int?> rating;
+  final Value<DateTime?> startedAt;
+  final Value<DateTime?> finishedAt;
+  final Value<int> readCount;
   final Value<int> rowid;
   const BooksCompanion({
     this.id = const Value.absent(),
@@ -924,6 +1115,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.needsPush = const Value.absent(),
     this.coverEtag = const Value.absent(),
     this.needsProgressPush = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.readCount = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BooksCompanion.insert({
@@ -947,6 +1143,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.needsPush = const Value.absent(),
     this.coverEtag = const Value.absent(),
     this.needsProgressPush = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.readCount = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -971,6 +1172,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<bool>? needsPush,
     Expression<String>? coverEtag,
     Expression<bool>? needsProgressPush,
+    Expression<String>? status,
+    Expression<int>? rating,
+    Expression<DateTime>? startedAt,
+    Expression<DateTime>? finishedAt,
+    Expression<int>? readCount,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -994,6 +1200,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (needsPush != null) 'needs_push': needsPush,
       if (coverEtag != null) 'cover_etag': coverEtag,
       if (needsProgressPush != null) 'needs_progress_push': needsProgressPush,
+      if (status != null) 'status': status,
+      if (rating != null) 'rating': rating,
+      if (startedAt != null) 'started_at': startedAt,
+      if (finishedAt != null) 'finished_at': finishedAt,
+      if (readCount != null) 'read_count': readCount,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1019,6 +1230,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<bool>? needsPush,
     Value<String?>? coverEtag,
     Value<bool>? needsProgressPush,
+    Value<String>? status,
+    Value<int?>? rating,
+    Value<DateTime?>? startedAt,
+    Value<DateTime?>? finishedAt,
+    Value<int>? readCount,
     Value<int>? rowid,
   }) {
     return BooksCompanion(
@@ -1042,6 +1258,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
       needsPush: needsPush ?? this.needsPush,
       coverEtag: coverEtag ?? this.coverEtag,
       needsProgressPush: needsProgressPush ?? this.needsProgressPush,
+      status: status ?? this.status,
+      rating: rating ?? this.rating,
+      startedAt: startedAt ?? this.startedAt,
+      finishedAt: finishedAt ?? this.finishedAt,
+      readCount: readCount ?? this.readCount,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1109,6 +1330,21 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (needsProgressPush.present) {
       map['needs_progress_push'] = Variable<bool>(needsProgressPush.value);
     }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (rating.present) {
+      map['rating'] = Variable<int>(rating.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<DateTime>(startedAt.value);
+    }
+    if (finishedAt.present) {
+      map['finished_at'] = Variable<DateTime>(finishedAt.value);
+    }
+    if (readCount.present) {
+      map['read_count'] = Variable<int>(readCount.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1138,6 +1374,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('needsPush: $needsPush, ')
           ..write('coverEtag: $coverEtag, ')
           ..write('needsProgressPush: $needsProgressPush, ')
+          ..write('status: $status, ')
+          ..write('rating: $rating, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('readCount: $readCount, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6912,6 +7153,11 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<bool> needsPush,
       Value<String?> coverEtag,
       Value<bool> needsProgressPush,
+      Value<String> status,
+      Value<int?> rating,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> finishedAt,
+      Value<int> readCount,
       Value<int> rowid,
     });
 typedef $$BooksTableUpdateCompanionBuilder =
@@ -6936,6 +7182,11 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<bool> needsPush,
       Value<String?> coverEtag,
       Value<bool> needsProgressPush,
+      Value<String> status,
+      Value<int?> rating,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> finishedAt,
+      Value<int> readCount,
       Value<int> rowid,
     });
 
@@ -7159,6 +7410,31 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<bool> get needsProgressPush => $composableBuilder(
     column: $table.needsProgressPush,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rating => $composableBuilder(
+    column: $table.rating,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get readCount => $composableBuilder(
+    column: $table.readCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7421,6 +7697,31 @@ class $$BooksTableOrderingComposer
     column: $table.needsProgressPush,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rating => $composableBuilder(
+    column: $table.rating,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get readCount => $composableBuilder(
+    column: $table.readCount,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BooksTableAnnotationComposer
@@ -7509,6 +7810,23 @@ class $$BooksTableAnnotationComposer
     column: $table.needsProgressPush,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get rating =>
+      $composableBuilder(column: $table.rating, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get readCount =>
+      $composableBuilder(column: $table.readCount, builder: (column) => column);
 
   Expression<T> bookAuthorsRefs<T extends Object>(
     Expression<T> Function($$BookAuthorsTableAnnotationComposer a) f,
@@ -7716,6 +8034,11 @@ class $$BooksTableTableManager
                 Value<bool> needsPush = const Value.absent(),
                 Value<String?> coverEtag = const Value.absent(),
                 Value<bool> needsProgressPush = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int?> rating = const Value.absent(),
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> finishedAt = const Value.absent(),
+                Value<int> readCount = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion(
                 id: id,
@@ -7738,6 +8061,11 @@ class $$BooksTableTableManager
                 needsPush: needsPush,
                 coverEtag: coverEtag,
                 needsProgressPush: needsProgressPush,
+                status: status,
+                rating: rating,
+                startedAt: startedAt,
+                finishedAt: finishedAt,
+                readCount: readCount,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7762,6 +8090,11 @@ class $$BooksTableTableManager
                 Value<bool> needsPush = const Value.absent(),
                 Value<String?> coverEtag = const Value.absent(),
                 Value<bool> needsProgressPush = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int?> rating = const Value.absent(),
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> finishedAt = const Value.absent(),
+                Value<int> readCount = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion.insert(
                 id: id,
@@ -7784,6 +8117,11 @@ class $$BooksTableTableManager
                 needsPush: needsPush,
                 coverEtag: coverEtag,
                 needsProgressPush: needsProgressPush,
+                status: status,
+                rating: rating,
+                startedAt: startedAt,
+                finishedAt: finishedAt,
+                readCount: readCount,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

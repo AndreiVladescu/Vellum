@@ -186,6 +186,22 @@ warns when a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+**Reading status, ratings and dates** (app, plan 5 #18) add `status`
+(`unread`/`reading`/`finished`/`abandoned`/`reference`), `rating` (1–5),
+`startedAt`/`finishedAt` and `readCount` to the book row. They are **app-local for
+now** and written to be promotable — all additive, nullable-or-defaulted — because
+they are *judgements* rather than reading mechanics and users will eventually want
+them on every device; promoting them is one server migration plus a parity update,
+with no data conversion.
+
+The rule is that **the app never decides for you**. Exactly one transition is
+automatic: opening an unread book makes it `reading` (unambiguous and reversible).
+Reaching the end *offers* "Mark as finished" instead of assuming it — someone who
+skims the last chapter has not finished the book. Finishing stamps `finishedAt` and
+counts a re-read; moving back out of `finished` clears the date so the two can't
+disagree. Status is a facet next to the genre filter (both are predicates on the
+same single shelf query), and neither status nor rating touches the sync clock.
+
 **Reader comfort** (app, plan 5 #23) is one persisted `ReaderSettings` shared by
 both readers, because theme, measure and distraction-free mode mean the same thing
 in either. The format-specific halves differ for a reason: an EPUB is reflowable,

@@ -81,7 +81,13 @@ class ReadButton extends StatelessWidget {
               ? null
               : () async {
                   final navigator = Navigator.of(context);
+                  // The jump prompt needs the context, so it goes first; the
+                  // status write is fire-and-forget either way.
                   await _maybeOfferJump(context, unit);
+                  // The one automatic status transition (plan 5 #18):
+                  // unread -> reading. Unambiguous and reversible; everything
+                  // else is the reader's own call.
+                  await repository.readingStatus.noteOpened(book.id);
                   // An accepted jump wrote to the book row, so re-read it:
                   // `book` is the snapshot this widget was built with.
                   final current =

@@ -266,6 +266,8 @@ void main() {
           updatedAt: DateTime(2024),
           needsPush: false,
           needsProgressPush: false,
+          status: 'unread',
+          readCount: 0,
         );
 
     Annotation annotation({

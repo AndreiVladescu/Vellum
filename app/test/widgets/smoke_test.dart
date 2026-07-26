@@ -52,6 +52,8 @@ Book _book(String id, String title) => Book(
       updatedAt: DateTime(2024),
       needsPush: false,
       needsProgressPush: false,
+      status: 'unread',
+      readCount: 0,
     );
 
 /// Seeds a clean (already-pushed) book so the launch auto-push schedules no

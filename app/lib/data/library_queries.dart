@@ -184,10 +184,16 @@ class LibraryQueries {
     String? shelfId,
     String query = '',
     String? genre,
+    String? status,
     ShelfSort sort = ShelfSort.title,
   }) {
     return _combine6(
-      _watchFilteredSortedBooks(shelfId: shelfId, query: query, genre: genre, sort: sort),
+      _watchFilteredSortedBooks(
+          shelfId: shelfId,
+          query: query,
+          genre: genre,
+          status: status,
+          sort: sort),
       _authorsByBook.stream,
       _genresByBook.stream,
       _shelvesOrdered.stream,
@@ -236,6 +242,7 @@ class LibraryQueries {
     String? shelfId,
     String query = '',
     String? genre,
+    String? status,
     ShelfSort sort = ShelfSort.title,
   }) {
     final where = <String>[];
@@ -246,6 +253,12 @@ class LibraryQueries {
         'books.id IN (SELECT book_id FROM shelf_books WHERE shelf_id = ?)',
       );
       vars.add(Variable.withString(shelfId));
+    }
+    if (status != null && status.isNotEmpty) {
+      // Reading status facet (plan 5 #18) — another predicate on the existing
+      // query rather than a second one, so the shelf still costs one stream.
+      where.add('books.status = ?');
+      vars.add(Variable.withString(status));
     }
     if (genre != null && genre.isNotEmpty) {
       where.add(

@@ -395,6 +395,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               const SizedBox(height: 24),
               PhysicalCopiesSection(book: book, repository: repository),
               const SizedBox(height: 24),
+              _StatusAndRating(book: book, repository: repository),
               ReaderNotesSection(book: book, repository: repository),
               // The reading record for this book (plan 5 #22). No onJump here:
               // the detail page has nowhere to jump to, so entries are a record
@@ -484,6 +485,95 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+/// Reading status and rating (plan 5 #18).
+///
+/// Both are the reader's own judgement, so both are one tap and neither is ever
+/// set behind their back: the only automatic transition in the app is
+/// unread → reading when a book is opened, and "finished" is *offered* near the
+/// end rather than assumed (see [ReadingStatusService]).
+class _StatusAndRating extends StatelessWidget {
+  const _StatusAndRating({required this.book, required this.repository});
+
+  final Book book;
+  final LibraryRepository repository;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = ReadingStatus.parse(book.status);
+    final offerFinish = ReadingStatusService.shouldOfferFinished(book);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              PopupMenuButton<ReadingStatus>(
+                tooltip: 'Reading status',
+                onSelected: (choice) =>
+                    repository.readingStatus.setStatus(book.id, choice),
+                itemBuilder: (context) => [
+                  for (final option in ReadingStatus.values)
+                    PopupMenuItem(
+                      value: option,
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(option.label),
+                        subtitle: Text(option.description),
+                        trailing: option == status ? const Icon(Icons.check) : null,
+                      ),
+                    ),
+                ],
+                child: Chip(
+                  avatar: const Icon(Icons.bookmark_border, size: 18),
+                  label: Text(status.label),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Five taps, not a slider: a rating is a choice among five, and a
+              // slider invites precision the scale doesn't have.
+              for (var star = 1; star <= 5; star++)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: '$star star${star == 1 ? '' : 's'}',
+                  icon: Icon(
+                    (book.rating ?? 0) >= star ? Icons.star : Icons.star_border,
+                    size: 20,
+                  ),
+                  // Tapping the current rating clears it — otherwise a
+                  // mis-tapped rating can never be taken back.
+                  onPressed: () => repository.readingStatus.setRating(
+                    book.id,
+                    book.rating == star ? null : star,
+                  ),
+                ),
+            ],
+          ),
+          if (book.finishedAt != null)
+            Text(
+              'Finished ${book.finishedAt!.toLocal().toString().split(' ').first}'
+              '${book.readCount > 1 ? ' · read ${book.readCount} times' : ''}',
+              style: theme.textTheme.bodySmall,
+            ),
+          if (offerFinish)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: FilledButton.tonalIcon(
+                onPressed: () => repository.readingStatus
+                    .setStatus(book.id, ReadingStatus.finished),
+                icon: const Icon(Icons.check),
+                label: const Text('Mark as finished'),
+              ),
+            ),
+        ],
       ),
     );
   }

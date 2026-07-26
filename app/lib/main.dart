@@ -113,6 +113,8 @@ class _LibraryPageState extends State<LibraryPage> {
   // text query so a genre filter and a text search can be on at once, and so it
   // can be shown/cleared as a chip rather than hidden in the search box.
   String? _genreFilter;
+  // The reading-status facet (plan 5 #18), or null for "any status".
+  ReadingStatus? _statusFilter;
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
   // The continue-reading / recently-added strip (plan 5 #25), hidden for this
   // session only: its value is reappearing when you come back mid-book, not
@@ -428,7 +430,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   border: InputBorder.none,
                 ),
               ),
-              actions: [_genreMenu(), _sortMenu()],
+              actions: [_statusMenu(), _genreMenu(), _sortMenu()],
             )
           : AppBar(title: const Text('Physical libraries')),
       body: IndexedStack(
@@ -507,6 +509,36 @@ class _LibraryPageState extends State<LibraryPage> {
   /// Genre filter: lists every genre in the library so you can filter the shelf
   /// to one (or clear it) without opening a book. The icon is tinted while a
   /// filter is active; the active genre also shows as a removable chip below.
+  /// Reading-status facet: the "what am I reading / what have I finished"
+  /// question, which the genre facet can't answer. Sits next to it and stacks
+  /// with it — both are predicates on the same single query.
+  Widget _statusMenu() {
+    final theme = Theme.of(context);
+    final active = _statusFilter != null;
+    return PopupMenuButton<String>(
+      icon: Icon(
+        active ? Icons.bookmark : Icons.bookmark_border,
+        color: active ? theme.colorScheme.primary : null,
+      ),
+      tooltip: 'Filter by reading status',
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'all',
+          onTap: () => setState(() => _statusFilter = null),
+          child: Text(active ? 'Any status' : 'Any status ✓'),
+        ),
+        for (final status in ReadingStatus.values)
+          PopupMenuItem(
+            value: status.name,
+            onTap: () => setState(() => _statusFilter = status),
+            child: Text(
+              '${status.label}${_statusFilter == status ? ' ✓' : ''}',
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _genreMenu() {
     // Only offer genres that actually belong to books currently in the library,
     // so the menu never lists a genre that would match nothing. watchAllBooks
@@ -617,6 +649,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       shelfId: active,
                       query: _query,
                       genre: _genreFilter,
+                      status: _statusFilter?.name,
                       sort: widget.settings.shelfSort,
                     ),
                     builder: (context, snapshot) {

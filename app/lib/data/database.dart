@@ -45,6 +45,23 @@ class Books extends Table {
   // Enabling the setting marks the already-read books dirty explicitly.
   BoolColumn get needsProgressPush =>
       boolean().withDefault(const Constant(false))();
+  // ---- Reading status and judgements (plan 5 #18) -------------------------
+  // App-local **for now**, and written to be promotable: these are additive
+  // nullable/defaulted columns, so moving them onto the synced payload later is
+  // one server migration plus a parity update, with no data conversion. They are
+  // *judgements* (what you thought, what you mean to read) rather than reading
+  // mechanics, so users will eventually expect them on every device — see the
+  // locality note in plan 5 #18.
+  //
+  // 'unread' | 'reading' | 'finished' | 'abandoned' | 'reference'.
+  TextColumn get status =>
+      text().withDefault(const Constant('unread'))();
+  /// 1–5, or null for unrated.
+  IntColumn get rating => integer().nullable()();
+  DateTimeColumn get startedAt => dateTime().nullable()();
+  DateTimeColumn get finishedAt => dateTime().nullable()();
+  /// How many times this book has been finished, for re-reads.
+  IntColumn get readCount => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -332,7 +349,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -485,6 +502,17 @@ class VellumDatabase extends _$VellumDatabase {
             if (!(await tableNames()).contains('annotations')) {
               await m.createTable(annotations);
             }
+          }
+          if (from < 15) {
+            // Reading status, rating and dates (plan 5 #18). App-local for now
+            // (see the column comments), so no server migration; every column
+            // is nullable or defaulted, so existing rows need no backfill
+            // beyond the status default.
+            await addBookColumn('status', books.status);
+            await addBookColumn('rating', books.rating);
+            await addBookColumn('started_at', books.startedAt);
+            await addBookColumn('finished_at', books.finishedAt);
+            await addBookColumn('read_count', books.readCount);
           }
         },
         beforeOpen: (details) async {

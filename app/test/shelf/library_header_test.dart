@@ -26,6 +26,8 @@ Book _book(
       updatedAt: DateTime(2024),
       needsPush: false,
       needsProgressPush: false,
+      status: 'unread',
+      readCount: 0,
     );
 
 LibraryView _view(List<Book> books) => LibraryView(
