@@ -64,10 +64,11 @@ is answerable from `git log`:
 | 33 | Read EPUBs (and share links) in the browser | `17b626c` |
 | 47 | Publish and fetch physical room layouts | `b15a6d9` |
 | 48 | Rendered room view + public room links | `ef7c8ef` |
-| 49 | Borrow requests on shared physical books | `HEAD` |
+| 49 | Borrow requests on shared physical books | `beab6b7` |
 
-**Every item in Phases 1–5 is now done.** Everything §I lists for the on-ramp has landed, plus #14
-from the interleave list.
+**Every numbered item in all six phases is now done.** Everything §I lists for the
+on-ramp has landed, plus #14 from the interleave list, and §K's five items
+(#47–#51) finished it off.
 
 *#35's **virtualised table body** is deliberately not built. It was proposed as
 the fix for a DOM holding the whole library — but with search, sort and filters
