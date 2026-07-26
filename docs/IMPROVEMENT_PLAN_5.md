@@ -52,8 +52,9 @@ is answerable from `git log`:
 | 36 | Docker, compose with TLS, systemd, releases | `1869fae` |
 | 37 | Request ids, tracing spans, stats dashboard | `ab00074` |
 | 12 | Integrity sweep, stats, snapshot endpoints | `9a4540f` |
+| 46 | RBAC matrix + compile-checked queries | `74d3864`, `b903cb5` |
 
-**Phases 1–3 are done, 7 of Phase 4's 11 items, and 3 of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
+**Phases 1–3 are done, 7 of Phase 4's 11 items, and 4 of Phase 5's 9.** Everything §I lists for the on-ramp has landed, plus #14
 from the interleave list. **Still open in Phase 4** — each needs a new dependency or is substantial in its
 own right, which is why they were left rather than rushed:
 
@@ -67,8 +68,14 @@ own right, which is why they were left rather than rushed:
 **Still open in Phase 5:** #31 (SMTP → password reset & invites — needs a mailer
 dependency and an SMTP config surface), #32 (server-side content search — an FTS5
 index over extracted PDF/EPUB text), #35 (console scale: saved views, activity
-log), #34 (OPDS search, facets, OPDS 2.0), #46 (RBAC matrix tests + `sqlx`
-offline/compile-time checks), #33 (read in the browser).
+log), #34 (OPDS search, facets, OPDS 2.0), #33 (read in the browser).
+
+**#46 is done but its second half is deliberately partial.** `access.rs` is the
+compile-checked pilot; the rest is mechanical and can proceed module by module
+(`auth.rs`, `groups.rs`, `blobs.rs` are fully static and next in line). Roughly
+17% of query sites are composed with `format!` — the visibility predicate, the
+dynamic-table get-or-create helpers — and can never use the macros, since those
+take a string literal.
 
 **Phase 6** (§K, whose two prerequisites — #4's Option A and #6 — are both in
 place, so it is unblocked whenever it comes up) is untouched. Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
@@ -111,6 +118,11 @@ Two notes for whoever picks this up:
   every handler that touches the database — i.e. exactly the slow ones. This was
   observed against a live server before being fixed, and is the sort of thing that
   looks fine in a unit test.
+- **#46's matrix found a real hole on its first run**: `PUT` and `DELETE` on a
+  book answered 403 (not 404) to a caller with no access, which is an existence
+  oracle over the whole library, and `PUT` told them they had "read-only access"
+  they didn't have. Fixed in `books.rs` and recorded as L7 in
+  `docs/SECURITY_AUDIT.md`. This is the argument for the matrix in one sentence.
 - **#12's snapshot uses `VACUUM INTO`** and cleans its workspace from a `Drop`
   guard tied to the response stream, so a client that disconnects halfway doesn't
   leave a second copy of the library on disk.
