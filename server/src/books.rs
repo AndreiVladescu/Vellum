@@ -509,7 +509,15 @@ async fn upsert_one(
 
     let is_update = match &existing {
         Some((_owner, stored_updated_at)) => {
-            if !book_access(state, user, id).await?.can_edit() {
+            // Visibility first, then permission — the same order every other
+            // handler uses. Answering 403 to someone who can't see the book at
+            // all would confirm the id exists (and tell them they have
+            // "read-only access" they do not have); `tests/rbac.rs` pins this.
+            let access = book_access(state, user, id).await?;
+            if !access.can_view() {
+                return Err(AppError::NotFound("book not found".into()));
+            }
+            if !access.can_edit() {
                 return Err(AppError::Forbidden(
                     "you have read-only access to this book".into(),
                 ));
@@ -973,6 +981,12 @@ pub async fn delete(
     let Some(owner_id) = owner else {
         return Err(AppError::NotFound("book not found".into()));
     };
+    // Same two-step as `upsert`: a caller who can't see the book is told it
+    // doesn't exist, so DELETE can't be used to probe which ids are real. Only
+    // someone who *can* see it learns that deleting needs ownership.
+    if !book_access(&state, &user, &id).await?.can_view() {
+        return Err(AppError::NotFound("book not found".into()));
+    }
     if !user.is_master && owner_id.as_deref() != Some(user.id.as_str()) {
         return Err(AppError::Forbidden(
             "only the owner may delete this book".into(),

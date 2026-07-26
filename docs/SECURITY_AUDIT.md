@@ -307,6 +307,24 @@ subprocesses have no network and a scratch-only filesystem.
 
 ---
 
+### 🟡 L7 — Book-existence oracle on `PUT`/`DELETE` (fixed 2026-07-26)
+
+**Found by the RBAC matrix** (`server/tests/rbac.rs`, plan 5 #46) the first time
+it ran — which is the argument for that test in one sentence.
+
+`GET`, `PATCH`, the cover and file endpoints all answered **404** to a caller
+with no access, deliberately, so an unauthorised user can't discover which book
+ids exist. `PUT /api/books/{id}` and `DELETE /api/books/{id}` did not: both
+checked *permission* without first checking *visibility*, so an unrelated
+account received **403** for a real id and 404 for a fake one — a working
+existence oracle over the whole library. `PUT`'s message made it worse by
+claiming the caller had "read-only access to this book", which they did not.
+
+**Fixed** by checking `can_view()` first and returning 404, then the permission
+check, in both handlers — the order every other handler already used. The matrix
+now pins the behaviour for all seven actor kinds, so a future endpoint that gets
+it wrong fails a test rather than shipping.
+
 ## What's done well (🔵 Info)
 
 These are genuine strengths worth preserving:
