@@ -35,12 +35,15 @@ is answerable from `git log`:
 | 5 | Optional cross-device reading position | `1cd874f` |
 | 7 | Batch book upsert on push | `b49b825`, `d915fa9` |
 | 44 | Model-based sync state machine tests | `0cc9f69` |
+| 14 | Atomic file import (interleaved) | `b1f9315` |
+| 15 | Bulk folder import with a dry-run plan | `f2ea4d8` |
 
-**Next up: Phase 3 — the on-ramp.** #15 (folder import) → #16 (barcode) → #20
-(share target) → #21b (duplicate merge) → #25 (continue reading) → #41
-(onboarding). Nothing in Phases 3–6 has been started; #4's Option A and #6 (the
-two prerequisites §I calls out for §K) are both in place, so Phase 6 is
-unblocked whenever it comes up.
+**Phase 3 in progress.** #15 — the "if only one thing gets done" item — and its
+prerequisite #14 have landed. Still open in Phase 3: #16 (barcode/ISBN scanning)
+→ #20 (share-target import) → #21b (duplicate merge) → #25 (continue reading) →
+#41 (onboarding). Phases 4–6 are untouched; #4's Option A and #6 (the two
+prerequisites §I calls out for §K) are both in place, so Phase 6 is unblocked
+whenever it comes up.
 
 Two notes for whoever picks this up:
 
@@ -50,6 +53,9 @@ Two notes for whoever picks this up:
   appears when the units match.
 - #7's server cap is 200 per batch, mirrored in `SyncService._batchPushChunk`;
   a single-book push deliberately skips both the handshake and the batch.
+- #15's duplicate detection needs the scan to hash every file, which is why the
+  dry run is the slow step and the import that follows is only as slow as the
+  copying. #21b (duplicate merge) can reuse `import_plan.dart`'s classifier.
 
 **Status of plan 4:** §A 1–3, §B 4–6, §C 7–10, §D 11–13, §E 16–17 and §F 18 all
 landed. Still open and **carried into this plan unchanged**:
