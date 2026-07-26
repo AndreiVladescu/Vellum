@@ -125,6 +125,24 @@ authority if this table drifts.
 | `VELLUM_BOOTSTRAP_TOKEN` | — | Secret the **first** (master) registration must present |
 | `RUST_LOG` | `info` | Log filter, e.g. `vellum_server=debug` |
 
+### Email (optional)
+
+Off unless configured — a LAN server needs no mailer, and the app hides the
+features that would need one (it learns this from `GET /api/capabilities`).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VELLUM_SMTP_HOST` | — | SMTP server; setting it turns mail on |
+| `VELLUM_SMTP_PORT` | `587` | Submission port, STARTTLS |
+| `VELLUM_SMTP_USER` | — | Username, if the relay wants one |
+| `VELLUM_SMTP_PASS` | — | Password |
+| `VELLUM_MAIL_FROM` | — | Sender address; **required** once the host is set |
+
+For Gmail: `smtp.gmail.com`, port 587, and an **App Password** — which needs
+2-step verification on the account, and is not your normal password. A
+misconfiguration (bad port, missing `VELLUM_MAIL_FROM`) stops the server at
+startup rather than surfacing later as a password reset that silently fails.
+
 **`VELLUM_PUBLIC_URL` matters.** Public share links embed it; if it says
 `localhost`, that is what the links will say.
 

@@ -4,7 +4,10 @@
 //! can end up talking to a rebuilt server; this is how it finds out.
 
 use axum::Json;
+use axum::extract::State;
 use serde::Serialize;
+
+use crate::AppState;
 
 /// The sync protocol's *shape* version — bump only for a breaking response
 /// change (a field renamed or removed, a new one that's required), not for a
@@ -25,7 +28,11 @@ pub struct Capabilities {
 /// backs is worse than not having one. Notably absent, and why:
 /// - `content_search`: the FTS5 search index (plan 5 #2) is app-local only,
 ///   no server-side equivalent exists.
-/// - `mail`: SMTP/password-reset is planned (docs/BACKLOG.md) but not built.
+///
+/// `mail` is the one entry that is **not** a constant: it depends on whether
+/// this particular server has SMTP configured (plan 5 #31). Advertising it lets
+/// the app hide "Forgot password?" instead of offering a button that can only
+/// fail — which is the whole reason a capability handshake exists.
 ///
 /// `shelf_sync`, `copy_sync`, `loan_sync` (plan 5 #4), and `batch_push`
 /// (plan 5 #7) are the entries that became true after this handshake
@@ -53,10 +60,14 @@ const FEATURES: &[&str] = &[
     "reading_progress",
 ];
 
-pub async fn get() -> Json<Capabilities> {
+pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {
+    let mut features = FEATURES.to_vec();
+    if crate::mail::is_enabled(&state.mailer) {
+        features.push("mail");
+    }
     Json(Capabilities {
         server_version: env!("CARGO_PKG_VERSION"),
         sync_protocol: SYNC_PROTOCOL,
-        features: FEATURES.to_vec(),
+        features,
     })
 }

@@ -23,6 +23,7 @@ mod discover;
 mod error;
 mod groups;
 mod loans;
+mod mail;
 mod metadata;
 mod observability;
 mod opds;
@@ -61,6 +62,10 @@ pub struct AppState {
     /// Per-user limiter for outbound metadata search (shared Open Library /
     /// Google Books quota).
     pub search_limiter: std::sync::Arc<throttle::RateLimiter>,
+    /// Outbound email, present only when SMTP is configured (plan 5 #31). The
+    /// `Option` is the feature flag: everything that needs mail checks it and
+    /// degrades rather than failing.
+    pub mailer: Option<mail::Mailer>,
     /// When TLS is on, the served certificate's path + SHA-256 fingerprint, so
     /// the web console can offer it for import into the app. `None` over plain
     /// HTTP (nothing to import).
@@ -198,6 +203,18 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/public/{token}/file", get(shares::public_file))
         // Book detail (metadata + authors + genres + files) for the console.
         .route("/books/{id}/detail", get(books::detail))
+}
+
+/// Reads the mail configuration from the environment (plan 5 #31). Re-exported
+/// so `main.rs` can fail fast on a misconfiguration without depending on the
+/// module layout.
+pub fn build_mailer() -> anyhow::Result<Option<mail::Mailer>> {
+    mail::Mailer::from_env()
+}
+
+/// A mailer for tests, built without touching the process environment.
+pub fn test_mailer(host: &str, from: &str) -> mail::Mailer {
+    mail::for_testing(host, from)
 }
 
 /// Build the full application router.

@@ -25,6 +25,13 @@ ENVIRONMENT:
     VELLUM_TLS_KEY           PEM key path (default <data dir>/key.pem)
     VELLUM_TLS_SANS          Extra comma-separated SANs for the generated cert
     VELLUM_BOOTSTRAP_TOKEN   Secret the first (master) registration must present
+
+MAIL (all optional; without VELLUM_SMTP_HOST mail features stay off):
+    VELLUM_SMTP_HOST         SMTP server for password resets and invites
+    VELLUM_SMTP_PORT         Submission port (default 587, STARTTLS)
+    VELLUM_SMTP_USER         Username, if the relay requires one
+    VELLUM_SMTP_PASS         Password (for Gmail, an App Password, not the account one)
+    VELLUM_MAIL_FROM         Sender address; required when SMTP_HOST is set
     RUST_LOG                 Log filter, e.g. info, vellum_server=debug
 
 The first account registered becomes the master; afterwards the master
@@ -109,6 +116,16 @@ async fn main() -> anyhow::Result<()> {
         fingerprint: cert.fingerprint.clone(),
     });
 
+    // Mail is opt-in; a misconfiguration stops the server here rather than
+    // surfacing as a failed password reset weeks later.
+    let mailer = vellum_server::build_mailer()?;
+    if mailer.is_none() {
+        tracing::info!(
+            "mail: disabled (set VELLUM_SMTP_HOST and VELLUM_MAIL_FROM to enable \
+             password reset and invites)"
+        );
+    }
+
     let state = AppState {
         db,
         public_base_url,
@@ -126,6 +143,7 @@ async fn main() -> anyhow::Result<()> {
             30,
             std::time::Duration::from_secs(60),
         )),
+        mailer,
         tls_cert,
     };
 

@@ -49,6 +49,7 @@ async fn test_app() -> (axum::Router, std::path::PathBuf) {
             10_000,
             std::time::Duration::from_secs(60),
         )),
+        mailer: None,
         tls_cert: None,
     });
     (app, data_dir)

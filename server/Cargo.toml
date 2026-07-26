@@ -40,6 +40,14 @@ axum-server = { version = "0.8", default-features = false, features = ["tls-rust
 rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 tar = "0.4"
+lettre = { version = "0.11.22", default-features = false, features = [
+    "tokio1-rustls",
+    "smtp-transport",
+    "builder",
+    "ring",
+    "hostname",
+    "webpki-roots",
+] }
 
 # Used only to apply setrlimit resource caps to the PDF-render subprocesses on
 # Unix (see blobs.rs). Unused on other platforms.

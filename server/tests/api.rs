@@ -32,6 +32,7 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
             30,
             std::time::Duration::from_secs(60),
         )),
+        mailer: None,
         tls_cert: None,
     });
     (app, data_dir)
@@ -66,6 +67,7 @@ async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
             30,
             std::time::Duration::from_secs(60),
         )),
+        mailer: None,
         tls_cert: None,
     });
     (app, db)
@@ -231,6 +233,7 @@ async fn session_expiry_slides_forward_on_use() {
             30,
             std::time::Duration::from_secs(60),
         )),
+        mailer: None,
         tls_cert: None,
     });
     let token = register_master(&app).await;
@@ -1079,6 +1082,62 @@ async fn deleting_a_book_takes_its_reading_progress_with_it() {
     assert!(left.as_array().unwrap().is_empty(), "{left}");
 }
 
+// ---- Opt-in mail (plan 5 #31, stage 1) -------------------------------------
+
+#[tokio::test]
+async fn mail_is_not_advertised_when_it_is_not_configured() {
+    // The default, and the one that matters most: a LAN server with no SMTP must
+    // not tell the app it can send a password reset.
+    let app = test_app().await;
+    let (status, body) = call(&app, "GET", "/api/capabilities", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let features = body["features"].as_array().unwrap();
+    assert!(
+        !features.contains(&json!("mail")),
+        "a server with no mailer must not claim it can email"
+    );
+}
+
+#[tokio::test]
+async fn mail_is_advertised_once_a_mailer_exists() {
+    // The capability is what lets the app hide "Forgot password?" rather than
+    // offering a button that can only fail.
+    let id = uuid::Uuid::new_v4();
+    let path = std::env::temp_dir().join(format!("vellum_mail_{id}.db"));
+    let db = connect_db(path.to_str().unwrap()).await.unwrap();
+    // Built directly rather than from the environment: env vars are process-wide
+    // and would race the other tests in this binary.
+    let mailer = vellum_server::test_mailer("mail.example.com", "vellum@example.com");
+    let app = router(AppState {
+        db,
+        public_base_url: "http://test.local".into(),
+        data_dir: std::env::temp_dir().join(format!("vellum_mail_data_{id}")),
+        http: reqwest::Client::new(),
+        max_upload_bytes: 1024 * 1024,
+        throttle: std::sync::Arc::default(),
+        render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        basic_cache: std::sync::Arc::default(),
+        public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            60,
+            std::time::Duration::from_secs(60),
+        )),
+        search_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
+        mailer: Some(mailer),
+        tls_cert: None,
+    });
+
+    let (_, body) = call(&app, "GET", "/api/capabilities", None, None).await;
+    assert!(
+        body["features"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("mail"))
+    );
+}
+
 // ---- Integrity sweep and snapshot (plan 5 #12) -----------------------------
 
 #[tokio::test]
@@ -1716,8 +1775,9 @@ async fn capabilities_is_unauthenticated_and_has_the_expected_shape() {
     // invariant used to be implied by this feature's absence; it is now pinned
     // directly by `book_upsert_ignores_reading_state`.
     assert!(features.contains(&json!("reading_progress")));
-    // Never advertised: not built -- a capability handshake that claims one of
-    // these would be worse than none.
+    // Absent here: content_search isn't built, and `mail` depends on this
+    // server's configuration rather than being a constant (this app has no
+    // mailer -- see mail_is_advertised_once_a_mailer_exists for the other side).
     for absent in ["content_search", "mail"] {
         assert!(
             !features.contains(&json!(absent)),
@@ -2972,6 +3032,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
             30,
             std::time::Duration::from_secs(60),
         )),
+        mailer: None,
         tls_cert: None,
     });
     let master = register_master(&app).await;
