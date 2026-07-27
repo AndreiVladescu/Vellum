@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget metadata (plan 5 #40).
+
+  `updatePeriodMillis` is 0 on purpose: the system's minimum is 30 minutes and
+  it wakes the device to honour it. The app pushes an update when the reading
+  position actually changes, which is both fresher and cheaper — the whole
+  design here is battery-conscious.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="80dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/continue_reading_widget"
+    android:previewLayout="@layout/continue_reading_widget"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen" />

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher shortcut labels (plan 5 #40).
+
+  These live in Android resources rather than the app's ARB because the
+  launcher reads them before Flutter starts — `gen_l10n` has no say in what a
+  long-press menu says. Translating them means `values-<locale>/strings.xml`,
+  which is the Android-side counterpart of #38's scaffolding.
+
+  Short labels are capped at ~10 characters by the launcher; anything longer is
+  truncated with no ellipsis, so they are written short rather than trimmed.
+-->
+<resources>
+    <string name="shortcut_scan_short">Scan</string>
+    <string name="shortcut_scan_long">Scan a book</string>
+
+    <string name="shortcut_continue_short">Continue</string>
+    <string name="shortcut_continue_long">Continue reading</string>
+
+    <string name="shortcut_add_short">Add</string>
+    <string name="shortcut_add_long">Add a book</string>
+
+    <!-- The continue-reading widget (plan 5 #40). -->
+    <string name="widget_name">Continue reading</string>
+    <string name="widget_cover_description">Book cover</string>
+    <string name="widget_empty_title">Nothing on the go</string>
+    <string name="widget_empty_subtitle">Open Vellum to start a book</string>
+</resources>

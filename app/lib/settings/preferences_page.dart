@@ -12,6 +12,7 @@ import '../data/backup_schedule.dart';
 import '../data/backup_service.dart';
 import '../data/library_doctor.dart';
 import '../data/library_repository.dart';
+import '../server/background_sync.dart';
 import '../server/connection_store.dart';
 import '../server/sync_service.dart';
 import 'app_settings.dart';
@@ -129,6 +130,7 @@ class PreferencesPage extends StatelessWidget {
               repository: repository,
               connection: connection,
             ),
+            _BackgroundSyncTile(settings: settings),
             const Divider(height: 24),
             _SectionHeader('Trash'),
             _TrashTile(repository: repository),
@@ -772,6 +774,92 @@ class _BackupSectionState extends State<_BackupSection> {
 /// Android there is no folder to write to without a picker and no moment to run
 /// in, so promising a schedule there would be promising something that doesn't
 /// happen.
+/// Background sync on Android (plan 5 #40).
+///
+/// Off by default, Wi-Fi and charging only, and shown as unavailable elsewhere
+/// rather than hidden — a setting that silently does nothing on your platform is
+/// worse than one that says so.
+class _BackgroundSyncTile extends StatelessWidget {
+  const _BackgroundSyncTile({required this.settings});
+
+  final AppSettingsStore settings;
+
+  bool get _supported => defaultTargetPlatform == TargetPlatform.android;
+
+  @override
+  Widget build(BuildContext context) {
+    final interval =
+        BackgroundSyncInterval.parse(settings.backgroundSyncInterval);
+    final last = settings.lastBackgroundSyncAt;
+    return ExpansionTile(
+      leading: const Icon(Icons.schedule_send_outlined),
+      title: const Text('Background sync'),
+      subtitle: Text(
+        !_supported
+            ? 'Android only'
+            : interval == BackgroundSyncInterval.off
+                ? 'Off'
+                : '${interval.label}'
+                    '${last == null ? '' : ' · last ${last.toLocal()}'}',
+      ),
+      children: [
+        if (!_supported)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              'A desktop app is already running when you use it. This is for '
+              'a phone, where the library would otherwise be stale every time '
+              'you pick it up.',
+            ),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Runs only on Wi-Fi while charging, so it can never spend your '
+              'mobile data or your last few per cent. Syncing by hand ignores '
+              'both conditions.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Text('How often'),
+                const Spacer(),
+                DropdownButton<BackgroundSyncInterval>(
+                  value: interval,
+                  onChanged: (value) async {
+                    if (value == null) return;
+                    await settings.setBackgroundSyncInterval(value.key);
+                    // Applied immediately rather than at the next launch: a
+                    // setting that takes effect "sometime later" is one people
+                    // stop trusting.
+                    await applySchedule(policyFrom(
+                      settings,
+                      hasServer: true,
+                      isAndroid: true,
+                    ));
+                  },
+                  items: [
+                    for (final option in BackgroundSyncInterval.values)
+                      DropdownMenuItem(
+                        value: option,
+                        child: Text(option.label),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
 class _ScheduledBackupTile extends StatefulWidget {
   const _ScheduledBackupTile({required this.settings});
 

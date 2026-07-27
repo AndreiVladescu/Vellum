@@ -23,7 +23,9 @@ import 'import/incoming_share.dart';
 import 'onboarding/first_run_sheet.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
+import 'server/background_sync.dart';
 import 'server/connection_store.dart';
+import 'server/continue_widget.dart';
 import 'server/live_sync.dart';
 import 'server/server_client.dart';
 import 'server/server_page.dart';
@@ -52,6 +54,14 @@ Future<void> main() async {
   final profile = await UserProfileStore.load();
   final settings = await AppSettingsStore.load();
   final connection = await ServerConnection.load();
+  // The background-sync schedule (plan 5 #40). Re-applied on every launch so a
+  // changed interval takes effect without leaving the old registration behind;
+  // a no-op off Android and when the setting is off.
+  unawaited(applySchedule(policyFrom(
+    settings,
+    hasServer: connection.isConnected,
+  )));
+
   // Unattended backup (plan 5 #13). Deliberately *not* awaited: a backup of a
   // large library takes a while, and blocking the first frame on it would make
   // the app look broken once a day. It also never throws — see `runIfDue`.
@@ -194,6 +204,7 @@ class _LibraryPageState extends State<LibraryPage> {
   /// Books opened or shared into Vellum from another app (plan 5 #20).
   late final IncomingShare _incoming = IncomingShare();
   StreamSubscription<List<String>>? _incomingSub;
+  StreamSubscription<LauncherShortcut>? _shortcutSub;
 
   LibraryRepository get repository => widget.repository;
 
@@ -208,6 +219,21 @@ class _LibraryPageState extends State<LibraryPage> {
     _showFirstRun();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
+    // Refresh the home-screen widget (plan 5 #40) — a no-op off Android, and
+    // silent everywhere. Pushed at launch and after a sync, which is when the
+    // answer can actually have changed.
+    unawaited(updateContinueWidget(widget.repository));
+  }
+
+  /// Records that a sync happened, so the background schedule's "is it due?"
+  /// has something to measure from — including when the user synced by hand.
+  Future<void> _noteBackgroundSyncRan() async {
+    final policy = policyFrom(
+      widget.settings,
+      hasServer: widget.connection.isConnected,
+    );
+    if (policy.interval == BackgroundSyncInterval.off) return;
+    await widget.settings.setLastBackgroundSyncAt(DateTime.now());
   }
 
   /// A delta pull provoked by a live hint (plan 5 #8).
@@ -237,6 +263,11 @@ class _LibraryPageState extends State<LibraryPage> {
     final conn = widget.connection;
     final client = conn.client;
     if (client == null) return;
+    // Background sync (plan 5 #40) shares this path rather than duplicating it:
+    // "sync when the app comes up and enough time has passed" is the same work
+    // as the launch sync, and a second implementation would be a second set of
+    // cursor bugs. WorkManager only decides *when*; the policy decides whether.
+    unawaited(_noteBackgroundSyncRan());
     try {
       final report = await _sync.sync(
         client,
@@ -247,6 +278,7 @@ class _LibraryPageState extends State<LibraryPage> {
       // only when the user opted in (plan 5 #5). Its own try/catch: a failure
       // here must not make a successful library sync look failed.
       await _syncReadingPosition(client);
+      unawaited(updateContinueWidget(repository));
       if (!mounted) return;
       final changed = report.pulled +
           report.pushed +
@@ -362,6 +394,38 @@ class _LibraryPageState extends State<LibraryPage> {
     _incoming.takeInitialFiles().then((paths) {
       if (paths.isNotEmpty) _openSharedFiles(paths);
     });
+    // Launcher shortcuts (plan 5 #40), on the same channel: both answer "what
+    // did the user tap to get here?".
+    _shortcutSub = _incoming.shortcuts.listen(_runShortcut);
+    _incoming.takeInitialShortcut().then((shortcut) {
+      if (shortcut != null) _runShortcut(shortcut);
+    });
+  }
+
+  /// A launcher shortcut lands on the same destination the in-app action does,
+  /// rather than a parallel entry point with its own state to get wrong.
+  void _runShortcut(LauncherShortcut shortcut) {
+    if (!mounted) return;
+    switch (shortcut) {
+      case LauncherShortcut.scan:
+        _openScan(context);
+      case LauncherShortcut.add:
+        _openAddBook(context);
+      case LauncherShortcut.continueReading:
+        // Whatever the shelf's own "continue reading" strip would open. Nothing
+        // to continue is not an error — it opens the shelf, which is where you
+        // would have started anyway.
+        _openMostRecentlyRead();
+    }
+  }
+
+  Future<void> _openMostRecentlyRead() async {
+    final view = await repository.queries
+        .watchLibrary(shelfId: null, query: '', sort: widget.settings.shelfSort)
+        .first;
+    final continuing = LibraryHighlights.from(view).continueReading;
+    if (!mounted || continuing.isEmpty) return;
+    _openBook(continuing.first);
   }
 
   Future<void> _openSharedFiles(List<String> paths) async {
@@ -399,6 +463,7 @@ class _LibraryPageState extends State<LibraryPage> {
     _autoPusher.dispose();
     _live.dispose();
     _incomingSub?.cancel();
+    _shortcutSub?.cancel();
     _incoming.dispose();
     super.dispose();
   }

@@ -77,12 +77,16 @@ is answerable from `git log`:
 | 8 | Live sync hints over SSE | `2471cb5` |
 | 38 | Localization scaffolding (en)* | `26da8ae` |
 | 29 | Room backdrop, furniture, and measurements | `9295076` |
+| 40 | Android background sync, shortcuts, widget* | `HEAD` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
-#14, #52, #26, #21a, #9, #8, #38 and #29 from the "interleave anywhere" list.
-**#40** (Android background sync, quick actions, a widget) is the only item in
-the entire plan still open — it needs a device to develop against, which is why
-it is last. **Every item #21 and #29/#30 cover is now done.**
+every item on the "interleave anywhere" list. **Improvement plan 5 is complete:
+all 53 numbered items are done.**
+
+*#40's device-dependent behaviour is listed under "Manual device checks" in
+`docs/BACKLOG.md`. The scheduling policy is unit-tested and everything compiles
+into a release APK, but a build cannot prove the OS honours a shortcut, draws a
+widget, or respects a job constraint — those four checks need a phone.
 
 *#38 ships the **scaffolding plus two migrated areas** (the shelf in `main.dart`
 and the add-book flow), which is what the plan asked for — it says explicitly to
@@ -110,7 +114,7 @@ take a string literal.
 
 **Phase 6** (§K) is complete: #47, #48, #49, #50 and #51 have all landed — so
 **every numbered item in this plan's six phases is done**.
-Still open from the interleave list: only #40 (Android background). #21 is complete: 21b was taken on its own because §I sequences it
+Nothing is open from the interleave list. #21 is complete: 21b was taken on its own because §I sequences it
 into Phase 3, and 21a and 21c landed separately afterwards.
 
 Two notes for whoever picks this up:

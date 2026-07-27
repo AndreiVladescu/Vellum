@@ -812,6 +812,35 @@ opens, so swiping it away is never punished by it returning. Every empty state
 (shelf, no-search-match, physical tab, loans) carries one line of what-to-do-next
 copy **and** a primary action.
 
+**Android background sync, shortcuts and a widget** (app, plan 5 #40) close the
+gap on a phone, where the library used to be stale every time you picked it up.
+
+**The policy is the feature.** How often, under what conditions, and when to give
+up are pure Dart in `BackgroundSyncPolicy` and unit-tested; WorkManager only
+decides *when* to ask. **Wi-Fi and charging are constraints, not preferences** —
+syncing can mean downloading book files, and doing that on someone's mobile data
+or last 8% is how an app gets uninstalled; syncing by hand ignores both. It is
+**off by default**, because a local-first app already works without it, so the
+only thing background sync can do to someone who didn't ask for it is drain their
+phone. Backoff doubles from 30 minutes and **caps at six hours**, so a phone that
+was offline for a week doesn't come back owing four days of waiting, and a clock
+that moved backwards reads as "due" rather than stalling the schedule forever.
+
+The headless callback is marked `vm:entry-point` — without it the release build
+schedules a task whose Dart entry has been tree-shaken away, and the failure is
+invisible until someone's phone quietly stops syncing. It opens its own database
+and **always closes it**, since a background isolate holding the lock is what the
+foreground app would trip over.
+
+**Launcher shortcuts** (Scan / Continue / Add) route through the same
+`MethodChannel` as #20's share intents — both answer "what did the user tap to
+get here?" — and land on the same destinations the in-app actions use rather than
+becoming parallel entry points. The **widget** reads a snapshot the app pushed
+and never touches the database: a launcher process opening the app's SQLite file
+would be a second writer to a store the app assumes it owns alone, and a locked
+database is a much worse failure than a widget showing yesterday's book. Stale is
+the intended failure mode.
+
 **Room realism** (app, plan 5 #29) turns the physical view from a diagram into
 something recognisable as *your* room. Three parts, all app-local.
 

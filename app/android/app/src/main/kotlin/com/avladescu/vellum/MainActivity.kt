@@ -29,6 +29,16 @@ class MainActivity : FlutterActivity() {
     /** Files from the intent that launched a cold start, awaiting Dart's first ask. */
     private var pending: List<String> = emptyList()
 
+    /**
+     * Which launcher shortcut opened us, if any (plan 5 #40).
+     *
+     * Carried on the same channel as the shared files rather than a second one:
+     * both answer "what did the user tap to get here?", and one channel is one
+     * lifecycle to reason about. Consumed once — a hot restart must not
+     * re-trigger the shortcut.
+     */
+    private var pendingShortcut: String? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
@@ -41,16 +51,30 @@ class MainActivity : FlutterActivity() {
                     pending = emptyList()
                     result.success(files)
                 }
+                // The launcher shortcut that opened this run, or null.
+                "takeShortcut" -> {
+                    val shortcut = pendingShortcut
+                    pendingShortcut = null
+                    result.success(shortcut)
+                }
                 else -> result.notImplemented()
             }
         }
         pending = copyFrom(intent)
+        pendingShortcut = intent?.getStringExtra("vellum_shortcut")
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Warm resume: the app is already running (launchMode is singleTop), so
         // Dart is listening and can be told directly.
+        // A shortcut tapped while the app is already running.
+        intent.getStringExtra("vellum_shortcut")?.let { shortcut ->
+            val sink = channel
+            if (sink == null) pendingShortcut = shortcut
+            else sink.invokeMethod("onShortcut", shortcut)
+        }
+
         val files = copyFrom(intent)
         if (files.isEmpty()) return
         val sink = channel

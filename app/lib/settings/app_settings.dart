@@ -30,6 +30,9 @@ class AppSettingsStore extends ChangeNotifier {
   static const _backupFolderKey = 'settings.backupFolder';
   static const _backupKeepKey = 'settings.backupKeep';
   static const _lastBackupAtKey = 'settings.lastBackupAt';
+  // Background sync on Android (plan 5 #40).
+  static const _backgroundSyncKey = 'settings.backgroundSync';
+  static const _lastBackgroundSyncKey = 'settings.lastBackgroundSync';
   // Appearance (plan 5 #39).
   static const _themeModeKey = 'settings.themeMode';
   static const _seedKey = 'settings.seedColor';
@@ -286,6 +289,30 @@ class AppSettingsStore extends ChangeNotifier {
   // and the UI says so; encryption stays a manual, you-are-present action.
 
   /// 'off' | 'daily' | 'weekly'.
+  // ---- Background sync (plan 5 #40) ---------------------------------------
+  //
+  // 'off' | 'everySixHours' | 'daily'. **Off by default**: a local-first app
+  // already works without it, so the only thing background sync can do to
+  // someone who didn't ask for it is drain their phone.
+
+  String get backgroundSyncInterval =>
+      _prefs.getString(_backgroundSyncKey) ?? 'off';
+
+  Future<void> setBackgroundSyncInterval(String value) async {
+    await _prefs.setString(_backgroundSyncKey, value);
+    notifyListeners();
+  }
+
+  DateTime? get lastBackgroundSyncAt {
+    final stored = _prefs.getString(_lastBackgroundSyncKey);
+    return stored == null ? null : DateTime.tryParse(stored);
+  }
+
+  Future<void> setLastBackgroundSyncAt(DateTime value) async {
+    await _prefs.setString(_lastBackgroundSyncKey, value.toIso8601String());
+    notifyListeners();
+  }
+
   String get backupFrequency =>
       _prefs.getString(_backupFrequencyKey) ?? 'off';
 

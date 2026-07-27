@@ -60,6 +60,28 @@ default) and a generated spine in that dominant colour.
 
 ## Manual device checks (CI can't do these)
 
+**Background sync, shortcuts and the widget** (plan 5 #40). The scheduling
+*policy* is unit-tested (`app/test/server/background_sync_test.dart`) and the
+Kotlin, the manifest, the shortcut XML and the widget layout all compile in
+`flutter build apk`. What a build cannot prove is that the OS honours any of it:
+
+1. **Shortcuts.** Long-press the launcher icon. Expect *Scan*, *Continue*,
+   *Add*. Tap each from a cold start and from a warm resume — the cold path goes
+   through `takeShortcut`, the warm one through `onShortcut`, and they are
+   different code.
+2. **The widget.** Add *Continue reading* to the home screen. Expect the book
+   you last opened, its cover and progress; tapping it should open that book.
+   Then finish the book and confirm the widget falls back to the empty state
+   rather than keeping it.
+3. **Background sync.** Set it to *Every 6 hours* in Preferences, then use
+   `adb shell cmd jobscheduler run -f com.avladescu.vellum <id>` to force the
+   job. Expect a sync with no UI and no notification. The headless isolate opens
+   its own database — watch for a lock conflict if the app is in the foreground
+   at the same time, which is the one failure this design could still have.
+4. **Constraints.** Off Wi-Fi, or unplugged, the job must not run at all. This
+   is the whole point of the defaults and the only way to check them.
+
+
 **Open-with / share-target import** (plan 5 #20). The Dart side is unit-tested
 through a fake channel (`app/test/import/incoming_share_test.dart`) and the
 Kotlin side compiles in `flutter build apk`, but the intent plumbing itself needs

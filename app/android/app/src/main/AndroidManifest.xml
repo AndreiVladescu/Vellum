@@ -37,6 +37,13 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Launcher long-press shortcuts (plan 5 #40). Static: scanning,
+                 adding and continuing are always meaningful, and a dynamic
+                 shortcut would need a Kotlin service keeping in step with a
+                 library it can't read. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
             <!-- Open-with / share-target import (plan 5 #20): the natural way to
                  get a book into Vellum from Files, Gmail, or a chat app.
                  VIEW handles "Open with", SEND(_MULTIPLE) handles "Share".
@@ -65,6 +72,22 @@
                 <data android:mimeType="application/epub+zip"/>
             </intent-filter>
         </activity>
+
+        <!-- The continue-reading widget (plan 5 #40). It reads a snapshot the
+             app pushed through home_widget and never touches the database —
+             a second writer to the app's SQLite file would be far worse than a
+             stale widget. -->
+        <receiver
+            android:name=".ContinueReadingWidget"
+            android:label="@string/widget_name"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/continue_reading_widget_info" />
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

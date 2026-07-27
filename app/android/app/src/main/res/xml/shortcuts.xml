@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher long-press shortcuts (plan 5 #40).
+
+  Three, because Android shows at most four and the fourth would be a filler.
+  Each one routes into MainActivity with an extra the Flutter side reads on
+  cold start, so a shortcut is a *destination*, not a second entry point with
+  its own lifecycle to get wrong.
+
+  Static rather than dynamic: these three are always meaningful — scanning,
+  adding and continuing are what the app is for — and a dynamic shortcut would
+  need a Kotlin service to keep in step with a library it can't read.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="scan"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_scan_short"
+        android:shortcutLongLabel="@string/shortcut_scan_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.avladescu.vellum"
+            android:targetClass="com.avladescu.vellum.MainActivity">
+            <extra
+                android:name="vellum_shortcut"
+                android:value="scan" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="continue"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_continue_short"
+        android:shortcutLongLabel="@string/shortcut_continue_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.avladescu.vellum"
+            android:targetClass="com.avladescu.vellum.MainActivity">
+            <extra
+                android:name="vellum_shortcut"
+                android:value="continue" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="add"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_short"
+        android:shortcutLongLabel="@string/shortcut_add_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.avladescu.vellum"
+            android:targetClass="com.avladescu.vellum.MainActivity">
+            <extra
+                android:name="vellum_shortcut"
+                android:value="add" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>

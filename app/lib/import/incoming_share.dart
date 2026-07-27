@@ -16,10 +16,34 @@ import 'package:flutter/services.dart';
 ///
 /// A no-op on platforms with no such host (desktop): [takeInitialFiles] returns
 /// empty and [files] never emits, so callers need no platform checks.
+/// What a launcher long-press asked for (plan 5 #40).
+///
+/// A closed set parsed from the string the Android side sends: an unknown value
+/// opens the app normally rather than throwing, because a shortcut from an
+/// older install of the app is a real thing that happens.
+enum LauncherShortcut {
+  scan,
+  continueReading,
+  add;
+
+  static LauncherShortcut? parse(String? raw) => switch (raw) {
+        'scan' => LauncherShortcut.scan,
+        'continue' => LauncherShortcut.continueReading,
+        'add' => LauncherShortcut.add,
+        _ => null,
+      };
+}
+
 class IncomingShare {
   IncomingShare({MethodChannel? channel})
       : _channel = channel ?? const MethodChannel(channelName) {
     _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onShortcut') {
+        final raw = call.arguments?.toString();
+        final shortcut = LauncherShortcut.parse(raw);
+        if (shortcut != null) _shortcuts.add(shortcut);
+        return null;
+      }
       if (call.method == 'onFiles') {
         final paths = [
           for (final path in (call.arguments as List? ?? const []))
@@ -39,6 +63,24 @@ class IncomingShare {
   /// Files shared while the app was already running.
   Stream<List<String>> get files => _controller.stream;
 
+  final _shortcuts = StreamController<LauncherShortcut>.broadcast();
+
+  /// Launcher shortcuts tapped while the app was already running (plan 5 #40).
+  Stream<LauncherShortcut> get shortcuts => _shortcuts.stream;
+
+  /// The shortcut that launched this run, if any. Consumed once, like
+  /// [takeInitialFiles] — a hot restart must not re-trigger it.
+  Future<LauncherShortcut?> takeInitialShortcut() async {
+    try {
+      final raw = await _channel.invokeMethod<String>('takeShortcut');
+      return LauncherShortcut.parse(raw);
+    } on MissingPluginException {
+      return null; // desktop, or a host build without the handler
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// The files that launched this run, if any. Consumed once — the host clears
   /// them, so a hot restart doesn't re-import the same share.
   Future<List<String>> takeInitialFiles() async {
@@ -57,6 +99,7 @@ class IncomingShare {
   }
 
   Future<void> dispose() async {
+    await _shortcuts.close();
     _channel.setMethodCallHandler(null);
     await _controller.close();
   }
