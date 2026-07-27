@@ -10,6 +10,7 @@ import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
+import 'edge_turn.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
 
@@ -51,12 +52,16 @@ class _ReaderPageState extends State<ReaderPage> {
   late final SessionRecorder _session =
       SessionRecorder(widget.repository.db);
 
-  /// The live text selection, kept so the highlight action can ask it for the
-  /// selected text and its page ranges. pdfrx hands this over on every selection
-  /// change; it is not a snapshot, so it must not be used after a rebuild that
-  /// clears the selection.
-  PdfTextSelection? _selection;
-  bool _hasSelection = false;
+  /// The selected passages, resolved *while the selection is live*.
+  ///
+  /// pdfrx hands `onTextSelectionChange` the viewer's own selection object
+  /// rather than a snapshot, and debounces the callback. Holding that object and
+  /// asking it for its ranges later — on the button press, after a dialog took
+  /// focus — is why highlighting sometimes silently did nothing: the check said
+  /// there was a selection and the `await` came back empty.
+  List<PdfPageTextRange> _selectedRanges = const [];
+
+  bool get _hasSelection => _selectedRanges.isNotEmpty;
 
   /// Whether the current page already has a bookmark, so the action can toggle
   /// rather than stack duplicates. Refreshed on every page change.
@@ -189,6 +194,45 @@ class _ReaderPageState extends State<ReaderPage> {
     _refreshBookmark(page);
   }
 
+  /// The marker currently in hand. A setting, not a question asked per
+  /// highlight — see [HighlightColorButton].
+  HighlightColor get _highlightColour =>
+      HighlightColor.fromArgb(_settings?.highlightColor);
+
+  /// One screenful, or one page, depending on the mode.
+  ///
+  /// In [PdfPageMode.paged] the edges do what they do in a book: the next page.
+  /// In [PdfPageMode.scroll] the document is continuous, so they move a
+  /// screenful — a little short of one, so the line you were reading is still on
+  /// screen — and roll onto the following page by themselves.
+  Future<void> _step(int direction) async {
+    if (!_controller.isReady) return;
+    if ((_settings?.pdfMode ?? PdfPageMode.scroll) == PdfPageMode.paged) {
+      final page = _page;
+      final count = _pageCount;
+      if (page == null || count == null) return;
+      final target = page + direction;
+      if (target < 1 || target > count) return;
+      await _controller.goToPage(
+        pageNumber: target,
+        anchor: _settings?.pdfFit == PdfFit.page
+            ? PdfPageAnchor.all
+            : PdfPageAnchor.topCenter,
+      );
+      return;
+    }
+    final view = _controller.visibleRect;
+    final document = _controller.documentSize;
+    final step = view.height * 0.86 * direction;
+    await _controller.goToPosition(
+      documentOffset: Offset(
+        view.left,
+        (view.top + step).clamp(0.0, (document.height - view.height).clamp(0.0, double.infinity)),
+      ),
+      duration: const Duration(milliseconds: 220),
+    );
+  }
+
   Future<void> _refreshBookmark(int page) async {
     final existing = await _annotations.bookmarkAtPage(widget.book.id, page);
     if (!mounted) return;
@@ -226,17 +270,14 @@ class _ReaderPageState extends State<ReaderPage> {
   /// because that is what the ranges describe and a single annotation would have
   /// to lie about where it is.
   Future<void> _highlightSelection({bool withNote = false}) async {
-    final selection = _selection;
-    if (selection == null || !selection.hasSelectedText) return;
-    final ranges = await selection.getSelectedTextRanges();
-    if (ranges.isEmpty || !mounted) return;
+    final ranges = _selectedRanges;
+    if (ranges.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+      return;
+    }
 
-    // The colour is asked for first: it is part of *making* the highlight, and
-    // a marker you pick after the fact isn't how anyone uses one.
-    final colour = withNote
-        ? HighlightColor.fallback
-        : await pickHighlightColor(context);
-    if (colour == null || !mounted) return; // dismissed the sheet
+    final colour = _highlightColour;
 
     String? note;
     if (withNote) {
@@ -402,16 +443,35 @@ class _ReaderPageState extends State<ReaderPage> {
           // the bar isn't a row of buttons that silently do nothing.
           if (_hasSelection) ...[
             IconButton(
-              icon: const Icon(Icons.format_color_text),
-              tooltip: 'Highlight selection',
+              icon:
+                  Icon(Icons.format_color_text, color: _highlightColour.color),
+              tooltip: 'Highlight in ${_highlightColour.label}',
               onPressed: _highlightSelection,
             ),
+            if (settings != null)
+              HighlightColorButton(
+                selected: _highlightColour,
+                onChanged: (colour) => settings.setHighlightColor(colour.argb),
+              ),
             IconButton(
               icon: const Icon(Icons.sticky_note_2_outlined),
               tooltip: 'Note on selection',
               onPressed: () => _highlightSelection(withNote: true),
             ),
           ],
+          if (settings != null)
+            IconButton(
+              icon: Icon(settings.pdfMode == PdfPageMode.paged
+                  ? Icons.auto_stories_outlined
+                  : Icons.swap_vert),
+              tooltip: '${settings.pdfMode.label} — switch to '
+                  '${settings.pdfMode == PdfPageMode.paged ? PdfPageMode.scroll.label : PdfPageMode.paged.label}',
+              onPressed: () => settings.setPdfMode(
+                settings.pdfMode == PdfPageMode.paged
+                    ? PdfPageMode.scroll
+                    : PdfPageMode.paged,
+              ),
+            ),
           IconButton(
             icon: Icon(_bookmarkOnPage == null
                 ? Icons.bookmark_outline
@@ -457,19 +517,40 @@ class _ReaderPageState extends State<ReaderPage> {
           ],
         ],
       ),
-      body: GestureDetector(
-        onTap: settings?.immersive == true
-            ? () => setState(() => _chromeHidden = !_chromeHidden)
-            : null,
-        child: _nightModeWrap(
-          enabled: settings?.pdfNightMode ?? false,
-          child: PdfViewer.file(
+      body: LayoutBuilder(builder: (context, constraints) {
+        // A PDF has no measure to hang the strips off, so they take a tenth of
+        // the width — which for a page fitted to the window is its own margin.
+        final strip =
+            ReaderEdgeTurn.stripWidth(constraints.maxWidth, constraints.maxWidth * 0.8);
+        return Stack(children: [
+          GestureDetector(
+            onTap: settings?.immersive == true
+                ? () => setState(() => _chromeHidden = !_chromeHidden)
+                : null,
+            child: _nightModeWrap(
+              enabled: settings?.pdfNightMode ?? false,
+              child: PdfViewer.file(
         widget.file.path,
         controller: _controller,
         initialPageNumber: widget.initialPage ?? widget.book.lastReadPage ?? 1,
         params: PdfViewerParams(
           backgroundColor: readerTheme.background,
           onPageChanged: _onPageChanged,
+          // Twice pdfrx's default. Its 0.2 is a crawl on a desktop mouse: a
+          // notch of the wheel should move you a visible distance down the page.
+          scrollByMouseWheel: 0.4,
+          // The scrollbar belongs to scrolling. In paged mode there is nothing
+          // for it to represent — you are on a page, not somewhere in a river.
+          viewerOverlayBuilder:
+              (settings?.pdfMode ?? PdfPageMode.scroll) == PdfPageMode.scroll
+                  ? (context, size, handleLinkTap) => [
+                        PdfViewerScrollThumb(
+                          controller: _controller,
+                          orientation: ScrollbarOrientation.right,
+                          thumbSize: const Size(28, 44),
+                        ),
+                      ]
+                  : null,
           onViewerReady: (_, _) {
             _applyFit();
             // Now the controller has a document, so the searcher can exist.
@@ -488,19 +569,46 @@ class _ReaderPageState extends State<ReaderPage> {
             if (_searcher != null) _searcher!.pageTextMatchPaintCallback,
           ],
           textSelectionParams: PdfTextSelectionParams(
-            onTextSelectionChange: (selection) {
-              _selection = selection;
+            onTextSelectionChange: (selection) async {
+              // Resolved here, while the selection is live, and kept as a
+              // snapshot — see [_selectedRanges].
+              final ranges = selection.hasSelectedText
+                  ? (await selection.getSelectedTextRanges())
+                      .where((r) => r.text.trim().isNotEmpty)
+                      .toList()
+                  : const <PdfPageTextRange>[];
+              if (!mounted) return;
               // Only rebuild when the *presence* of a selection changes: this
               // fires continuously while dragging.
-              if (selection.hasSelectedText != _hasSelection && mounted) {
-                setState(() => _hasSelection = selection.hasSelectedText);
-              }
+              final had = _hasSelection;
+              _selectedRanges = ranges;
+              if (ranges.isNotEmpty != had) setState(() {});
             },
           ),
         ),
       ),
-        ),
-      ),
+            ),
+          ),
+          // The same edge controls as the EPUB reader, so the two readers turn
+          // the same way. What a turn *means* follows the mode — see [_step].
+          ReaderEdgeTurn(
+            width: strip,
+            alignment: Alignment.centerLeft,
+            icon: Icons.chevron_left,
+            tooltip: 'Back a page',
+            colour: readerTheme.foreground,
+            onTap: () => _step(-1),
+          ),
+          ReaderEdgeTurn(
+            width: strip,
+            alignment: Alignment.centerRight,
+            icon: Icons.chevron_right,
+            tooltip: 'Forward a page',
+            colour: readerTheme.foreground,
+            onTap: () => _step(1),
+          ),
+        ]);
+      }),
     );
   }
 

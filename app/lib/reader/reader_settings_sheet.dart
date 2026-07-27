@@ -111,6 +111,22 @@ class ReaderSettingsSheet extends StatelessWidget {
                 ],
                 if (showPdfOptions) ...[
                   const SizedBox(height: 16),
+                  _Label('Moving through the book'),
+                  SegmentedButton<PdfPageMode>(
+                    segments: [
+                      for (final mode in PdfPageMode.values)
+                        ButtonSegment(value: mode, label: Text(mode.label)),
+                    ],
+                    selected: {settings.pdfMode},
+                    onSelectionChanged: (s) => settings.setPdfMode(s.first),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      settings.pdfMode.description,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                   _Label('Page fit'),
                   SegmentedButton<PdfFit>(
                     segments: [

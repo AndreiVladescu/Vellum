@@ -46,6 +46,23 @@ enum PdfFit {
   final String label;
 }
 
+/// How the PDF viewer moves through the document.
+///
+/// The two are genuinely different reading postures, not a cosmetic toggle:
+/// [paged] is a book you turn, [scroll] is a document you run through looking
+/// for something. Trying to serve both at once is what makes most PDF readers
+/// feel wrong — a continuous scroll that snaps to pages fights your drag, and a
+/// paged view you can nudge half a page leaves you reading across a seam.
+enum PdfPageMode {
+  paged('Pages', 'One page at a time'),
+  scroll('Scrolling', 'Continuous, with a scrollbar');
+
+  const PdfPageMode(this.label, this.description);
+
+  final String label;
+  final String description;
+}
+
 /// Reader preferences, persisted and shared by both readers (plan 5 #23).
 ///
 /// Deliberately one store rather than per-format ones: theme, margins and
@@ -72,6 +89,8 @@ class ReaderSettings extends ChangeNotifier {
   static const _pdfFitKey = 'reader.pdfFit';
   static const _nightModeKey = 'reader.pdfNightMode';
   static const _immersiveKey = 'reader.immersive';
+  static const _pdfModeKey = 'reader.pdfMode';
+  static const _highlightColorKey = 'reader.highlightColor';
 
   ReaderTheme get theme {
     final stored = _prefs.getString(_themeKey);
@@ -152,6 +171,30 @@ class ReaderSettings extends ChangeNotifier {
 
   Future<void> setPdfNightMode(bool value) async {
     await _prefs.setBool(_nightModeKey, value);
+    notifyListeners();
+  }
+
+  PdfPageMode get pdfMode {
+    final stored = _prefs.getString(_pdfModeKey);
+    return PdfPageMode.values.where((m) => m.name == stored).firstOrNull ??
+        PdfPageMode.scroll;
+  }
+
+  Future<void> setPdfMode(PdfPageMode value) async {
+    await _prefs.setString(_pdfModeKey, value.name);
+    notifyListeners();
+  }
+
+  /// The highlighter currently in hand, as a full-opacity ARGB int.
+  ///
+  /// A *setting*, not a per-highlight question: a marker is an object you pick
+  /// up once and then use, and asking for the colour on every highlight turns a
+  /// one-tap gesture into a two-step dialogue. Stored raw rather than as an enum
+  /// name so the palette can change without stranding the preference.
+  int? get highlightColor => _prefs.getInt(_highlightColorKey);
+
+  Future<void> setHighlightColor(int argb) async {
+    await _prefs.setInt(_highlightColorKey, argb);
     notifyListeners();
   }
 

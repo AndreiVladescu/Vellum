@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
+import '../data/external_open.dart';
 import '../data/library_repository.dart';
 import '../reader/epub_reader_page.dart';
 import '../reader/reader_page.dart';
@@ -76,7 +77,31 @@ class ReadButton extends StatelessWidget {
             : 'Resume reading · '
                   '${(book.readingProgress! * 100).round()}% '
                   '($unit ${book.lastReadPage})';
-        return FilledButton.icon(
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _read(context, files: files, pdf: pdf, epub: epub, unit: unit,
+                label: label),
+            if (files.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              _OpenExternally(files: files, repository: repository),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _read(
+    BuildContext context, {
+    required List<BookFile> files,
+    required BookFile? pdf,
+    required BookFile? epub,
+    required String unit,
+    required String label,
+  }) {
+    final started = book.readingProgress != null;
+    return FilledButton.icon(
           onPressed: pdf == null && epub == null
               ? null
               : () async {
@@ -111,7 +136,72 @@ class ReadButton extends StatelessWidget {
           icon: Icon(started ? Icons.play_arrow : Icons.menu_book),
           label: Text(files.isEmpty ? 'Read (no digital copy yet)' : label),
         );
-      },
-    );
   }
+}
+
+/// Hands the book to whatever the system opens PDFs and EPUBs with.
+///
+/// Sits next to Read because it is the same intention taking a different route:
+/// Vellum's reader keeps your position, highlights and notes, and someone who
+/// wants Okular or Calibre for this one book should not have to go hunting
+/// through the file list for the path. Where a book has both formats it asks
+/// which — the answer is not always "the PDF", and guessing wastes a launch.
+class _OpenExternally extends StatelessWidget {
+  const _OpenExternally({required this.files, required this.repository});
+
+  final List<BookFile> files;
+  final LibraryRepository repository;
+
+  static const _mimeTypes = {
+    'pdf': 'application/pdf',
+    'epub': 'application/epub+zip',
+  };
+
+  Future<void> _open(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final file = files.length == 1 ? files.first : await _pick(context);
+    if (file == null) return;
+
+    final onDisk = repository.fileOf(file);
+    if (!onDisk.existsSync()) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('That file is missing from the library.')),
+      );
+      return;
+    }
+    final opened = await openExternally(
+      onDisk,
+      mimeType: _mimeTypes[file.format],
+    );
+    if (!opened) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Nothing on this system is set up to open a ${file.format}.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<BookFile?> _pick(BuildContext context) => showDialog<BookFile>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Open which file?'),
+          children: [
+            for (final file in files)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(dialogContext, file),
+                child: Text(file.format.toUpperCase()),
+              ),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => IconButton.filledTonal(
+        icon: const Icon(Icons.open_in_new),
+        tooltip: 'Open in another app',
+        onPressed: () => _open(context),
+      );
 }

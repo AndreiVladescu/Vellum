@@ -16,11 +16,11 @@ import 'highlight_palette.dart';
 /// painting over them. That has to happen in page coordinates, on the same
 /// canvas as the page, which is exactly what `pagePaintCallbacks` is for.
 ///
-/// The page text is loaded lazily and cached: `loadText()` is async and the
-/// paint callback is not, so a page whose text hasn't arrived yet paints
-/// nothing this frame and asks for a repaint when it has. That is why a
-/// highlight can appear a moment after the page does — the alternative is
-/// blocking the frame on a text extraction.
+/// The page text is loaded lazily and cached: loading is async and the paint
+/// callback is not, so a page whose text hasn't arrived yet paints nothing this
+/// frame and asks for a repaint when it has. That is why a highlight can appear
+/// a moment after the page does — the alternative is blocking the frame on a
+/// text extraction.
 class PdfHighlightPainter {
   PdfHighlightPainter({required this.onNeedsRepaint});
 
@@ -33,7 +33,13 @@ class PdfHighlightPainter {
 
   /// Page text, once loaded. A page with no text maps to null so it is asked
   /// for exactly once rather than on every frame.
-  final Map<int, PdfPageRawText?> _text = {};
+  ///
+  /// **Structured, not raw.** `loadText()` returns the raw extraction;
+  /// `loadStructuredText()` returns the reflowed one, with lines and words
+  /// composed — and the ranges `getSelectedTextRanges()` hands back index into
+  /// *that*. Painting raw rects at structured offsets is why a highlight used to
+  /// cover part of the phrase and then drift off it.
+  final Map<int, PdfPageText?> _text = {};
   final Set<int> _loading = {};
 
   bool _disposed = false;
@@ -78,52 +84,26 @@ class PdfHighlightPainter {
         // Multiply keeps the glyphs readable through the ink instead of
         // washing them out, which is what a real highlighter does.
         ..blendMode = BlendMode.multiply;
-      for (final rect in _rectsFor(text, mark, page, pageRect)) {
-        canvas.drawRect(rect, paint);
+      final bands = highlightBands(
+        text.fullText,
+        text.charRects,
+        mark.start,
+        mark.end,
+      );
+      for (final band in bands) {
+        canvas.drawRect(
+          band.toRectInDocument(page: page, pageRect: pageRect),
+          paint,
+        );
       }
     }
-  }
-
-  /// The character rectangles a mark covers, merged per line.
-  ///
-  /// Merged because one rect per character produces hundreds of overlapping
-  /// draws whose seams show as vertical banding at low alpha — a highlight
-  /// should look like one stroke, not like each letter was coloured separately.
-  Iterable<Rect> _rectsFor(
-    PdfPageRawText text,
-    _Mark mark,
-    PdfPage page,
-    Rect pageRect,
-  ) sync* {
-    final rects = text.charRects;
-    final start = mark.start.clamp(0, rects.length);
-    final end = mark.end.clamp(start, rects.length);
-    Rect? run;
-    for (var i = start; i < end; i++) {
-      final r = rects[i].toRectInDocument(page: page, pageRect: pageRect);
-      if (r.isEmpty) continue;
-      if (run == null) {
-        run = r;
-        continue;
-      }
-      // Same line, near enough to be contiguous: extend the run. The vertical
-      // test is what stops a wrapped selection joining into one huge block.
-      final sameLine = (r.top - run.top).abs() < run.height * 0.6;
-      if (sameLine && r.left <= run.right + run.height * 0.6) {
-        run = run.expandToInclude(r);
-      } else {
-        yield run;
-        run = r;
-      }
-    }
-    if (run != null) yield run;
   }
 
   void _ensureText(PdfPage page) {
     final number = page.pageNumber;
     if (_text.containsKey(number) || _loading.contains(number)) return;
     _loading.add(number);
-    page.loadText().then((text) {
+    page.loadStructuredText().then((text) {
       _loading.remove(number);
       if (_disposed) return;
       _text[number] = text;
@@ -134,6 +114,53 @@ class PdfHighlightPainter {
       // highlights — there was nothing to select on it in the first place.
     });
   }
+}
+
+/// One rectangle per line of the range `[start, end)` — the shape a marker
+/// actually leaves.
+///
+/// **Why a band per line and not a rect per character.** A highlighter stains
+/// the paper, not the letters: the spaces between words, and the gaps above and
+/// below the glyphs, are covered too. Drawing each character's own box leaves
+/// the highlight riddled with unpainted slivers wherever there is a space, a
+/// thin letter or a comma — which is exactly what it looked like. So the
+/// characters of each line are unioned into one band.
+///
+/// Lines come from the newlines in the extracted text rather than from
+/// comparing rectangle positions: pdfrx already decided where the lines are when
+/// it composed this text, and re-deriving that from geometry gets justified text
+/// and mixed type sizes wrong.
+///
+/// Degenerate rectangles are ignored. A newline's box is zero-width at the left
+/// margin and an unmapped glyph's is all zeros at the page origin; either one,
+/// unioned in, drags the band across the whole page.
+List<PdfRect> highlightBands(
+  String fullText,
+  List<PdfRect> charRects,
+  int start,
+  int end,
+) {
+  final lo = start.clamp(0, charRects.length);
+  final hi = end.clamp(lo, charRects.length);
+  final bands = <PdfRect>[];
+
+  PdfRect? band;
+  void close() {
+    if (band != null) bands.add(band!);
+    band = null;
+  }
+
+  for (var i = lo; i < hi; i++) {
+    if (i < fullText.length && fullText.codeUnitAt(i) == 0x0a) {
+      close();
+      continue;
+    }
+    final r = charRects[i];
+    if (r.width <= 0 || r.height <= 0) continue; // no glyph box to speak of
+    band = band == null ? r : band!.merge(r);
+  }
+  close();
+  return bands;
 }
 
 class _Mark {

@@ -10,6 +10,7 @@ import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/epub_highlight_html.dart';
 import 'annotations/highlight_palette.dart';
+import 'edge_turn.dart';
 import 'epub_book.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
@@ -154,6 +155,11 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     if ((next != null) != had && mounted) setState(() {});
   }
 
+  /// The marker currently in hand. A setting, not a question asked per
+  /// highlight — see [HighlightColorButton].
+  HighlightColor get _highlightColour =>
+      HighlightColor.fromArgb(_settings?.highlightColor);
+
   Future<void> _refreshBookmark() async {
     final existing =
         await _annotations.bookmarkAtChapter(widget.book.id, _chapter);
@@ -198,12 +204,13 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     final start = range.start.clamp(0, plain.length);
     final end = range.end.clamp(start, plain.length);
     final quote = plain.substring(start, end).trim();
-    if (quote.isEmpty) return;
+    if (quote.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+      return;
+    }
 
-    final colour = withNote
-        ? HighlightColor.fallback
-        : await pickHighlightColor(context);
-    if (colour == null || !mounted) return; // dismissed the sheet
+    final colour = _highlightColour;
 
     String? note;
     if (withNote) {
@@ -479,10 +486,17 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               ),
               if (_selectionRange != null) ...[
                 IconButton(
-                  tooltip: 'Highlight selection',
-                  icon: const Icon(Icons.format_color_text),
+                  tooltip: 'Highlight in ${_highlightColour.label}',
+                  icon: Icon(Icons.format_color_text,
+                      color: _highlightColour.color),
                   onPressed: () => _highlightSelection(epub),
                 ),
+                if (settings != null)
+                  HighlightColorButton(
+                    selected: _highlightColour,
+                    onChanged: (colour) =>
+                        settings.setHighlightColor(colour.argb),
+                  ),
                 IconButton(
                   tooltip: 'Note on selection',
                   icon: const Icon(Icons.sticky_note_2_outlined),
@@ -521,14 +535,10 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
             ],
           ),
           body: LayoutBuilder(builder: (context, constraints) {
-            // The tap strips live in the *margin* beside the text column
-            // wherever there is one, so they don't sit on top of words you
-            // might want to select. On a narrow window there is no margin, and
-            // a minimum strip wins anyway: turning the page is the thing you do
-            // a thousand times more often than selecting a passage.
-            final measure = settings?.measure ?? 720;
-            final margin = ((constraints.maxWidth - measure) / 2).clamp(0, 96);
-            final strip = margin < 44.0 ? 44.0 : margin.toDouble();
+            final strip = ReaderEdgeTurn.stripWidth(
+              constraints.maxWidth,
+              settings?.measure ?? 720,
+            );
             return Stack(children: [
               GestureDetector(
             // A tap toggles the chrome when the reader asked for a
@@ -575,7 +585,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               // The edge tap zones. The chevron sits at the vertical middle of
               // the page — where your thumb already is — and the whole strip is
               // the target, not just the glyph.
-              _EdgeTurn(
+              ReaderEdgeTurn(
                 width: strip,
                 alignment: Alignment.centerLeft,
                 icon: Icons.chevron_left,
@@ -583,7 +593,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                 colour: readerTheme.foreground,
                 onTap: () => _pageBack(count),
               ),
-              _EdgeTurn(
+              ReaderEdgeTurn(
                 width: strip,
                 alignment: Alignment.centerRight,
                 icon: Icons.chevron_right,
@@ -593,9 +603,13 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               ),
             ]);
           }),
-          // SafeArea(top:false) keeps the chapter controls above the Android
-          // gesture/nav bar under edge-to-edge; the bar grows by that inset
-          // rather than clipping, so no fixed height here.
+          // Just the chapter's name now: the corner chevrons that used to sit
+          // either side of it did what the page edges do, and two controls for
+          // one action is one too many. Jumping to a *particular* chapter is
+          // still the Chapters button, which is the thing they were worse at.
+          //
+          // SafeArea(top:false) keeps it above the Android gesture/nav bar under
+          // edge-to-edge; the bar grows by that inset rather than clipping.
           bottomNavigationBar: _chromeHidden
               ? null
               : BottomAppBar(
@@ -604,100 +618,23 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
             child: SafeArea(
               top: false,
               child: SizedBox(
-                height: 56,
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Previous chapter',
-                      onPressed:
-                          _chapter > 0 ? () => _goTo(_chapter - 1, count) : null,
-                      icon: const Icon(Icons.chevron_left),
+                height: 48,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      chapter.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Expanded(
-                      child: Text(
-                        chapter.title,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Next chapter',
-                      onPressed: _chapter < count - 1
-                          ? () => _goTo(_chapter + 1, count)
-                          : null,
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
         );
       },
-    );
-  }
-}
-
-/// A page-turn strip down one edge of the reader (the whole strip is the
-/// target), with a chevron at the vertical middle as its affordance.
-///
-/// Deliberately faint: it is a hint that the edge does something, not a control
-/// competing with the prose. It brightens on hover so a mouse user can find it,
-/// which a touch user never needs.
-class _EdgeTurn extends StatefulWidget {
-  const _EdgeTurn({
-    required this.width,
-    required this.alignment,
-    required this.icon,
-    required this.tooltip,
-    required this.colour,
-    required this.onTap,
-  });
-
-  final double width;
-  final Alignment alignment;
-  final IconData icon;
-  final String tooltip;
-  final Color colour;
-  final VoidCallback onTap;
-
-  @override
-  State<_EdgeTurn> createState() => _EdgeTurnState();
-}
-
-class _EdgeTurnState extends State<_EdgeTurn> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: widget.alignment,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          // Opaque: a tap here turns the page and does not also fall through to
-          // the chrome toggle underneath.
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap,
-          child: Tooltip(
-            message: widget.tooltip,
-            child: SizedBox(
-              width: widget.width,
-              height: double.infinity,
-              child: Center(
-                child: AnimatedOpacity(
-                  opacity: _hovered ? 0.7 : 0.22,
-                  duration: const Duration(milliseconds: 120),
-                  child: Icon(widget.icon, size: 32, color: widget.colour),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

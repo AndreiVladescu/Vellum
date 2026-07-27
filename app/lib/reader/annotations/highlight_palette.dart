@@ -49,75 +49,77 @@ enum HighlightColor {
   static Color inkFor(int? argb) => fromArgb(argb).inkColor;
 }
 
-/// Asks which colour to highlight in.
+/// The marker currently in hand: shows its colour, and switches it.
 ///
-/// A row of four swatches, not a menu: the choice is the gesture, and putting
-/// it behind a dropdown would make highlighting slower than it was before there
-/// were colours at all.
-Future<HighlightColor?> pickHighlightColor(
-  BuildContext context, {
-  String title = 'Highlight',
-}) =>
-    showModalBottomSheet<HighlightColor>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(sheetContext).textTheme.titleMedium),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  for (final choice in HighlightColor.values)
-                    _Swatch(
-                      choice: choice,
-                      onTap: () => Navigator.of(sheetContext).pop(choice),
-                    ),
+/// **Why this is not a prompt.** Asking which colour on every highlight makes
+/// the common case — highlight this, in the colour I have been using all
+/// afternoon — cost two decisions instead of none. A physical highlighter is
+/// picked up once and then simply used, and the only thing you need on screen
+/// is which one you are holding. So this sits beside the highlight button, is
+/// the swatch itself, and changing it is a deliberate second act.
+class HighlightColorButton extends StatelessWidget {
+  const HighlightColorButton({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final HighlightColor selected;
+  final ValueChanged<HighlightColor> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<HighlightColor>(
+      tooltip: 'Highlighter colour — ${selected.label}',
+      onSelected: onChanged,
+      // A row of swatches rather than a list of names: the thing being chosen
+      // is a colour, so the colour is the label.
+      itemBuilder: (context) => [
+        for (final choice in HighlightColor.values)
+          PopupMenuItem(
+            value: choice,
+            child: Row(
+              children: [
+                _Swatch(choice: choice, size: 22),
+                const SizedBox(width: 12),
+                Text(choice.label),
+                if (choice == selected) ...[
+                  const Spacer(),
+                  const Icon(Icons.check, size: 18),
                 ],
-              ),
-            ],
+              ],
+            ),
           ),
+      ],
+      child: Tooltip(
+        message: 'Highlighter colour — ${selected.label}',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: _Swatch(choice: selected, size: 20),
         ),
       ),
     );
+  }
+}
 
 class _Swatch extends StatelessWidget {
-  const _Swatch({required this.choice, required this.onTap});
+  const _Swatch({required this.choice, required this.size});
 
   final HighlightColor choice;
-  final VoidCallback onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      button: true,
-      label: '${choice.label} highlight',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(32),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: choice.color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(choice.label, style: Theme.of(context).textTheme.labelSmall),
-            ],
+      label: '${choice.label} highlighter',
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: choice.color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
       ),
