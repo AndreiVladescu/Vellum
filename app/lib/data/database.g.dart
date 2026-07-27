@@ -5284,6 +5284,64 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _backdropPathMeta = const VerificationMeta(
+    'backdropPath',
+  );
+  @override
+  late final GeneratedColumn<String> backdropPath = GeneratedColumn<String>(
+    'backdrop_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _backdropOpacityMeta = const VerificationMeta(
+    'backdropOpacity',
+  );
+  @override
+  late final GeneratedColumn<double> backdropOpacity = GeneratedColumn<double>(
+    'backdrop_opacity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.5),
+  );
+  static const VerificationMeta _backdropScaleMeta = const VerificationMeta(
+    'backdropScale',
+  );
+  @override
+  late final GeneratedColumn<double> backdropScale = GeneratedColumn<double>(
+    'backdrop_scale',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _backdropOffsetXMeta = const VerificationMeta(
+    'backdropOffsetX',
+  );
+  @override
+  late final GeneratedColumn<double> backdropOffsetX = GeneratedColumn<double>(
+    'backdrop_offset_x',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _backdropOffsetYMeta = const VerificationMeta(
+    'backdropOffsetY',
+  );
+  @override
+  late final GeneratedColumn<double> backdropOffsetY = GeneratedColumn<double>(
+    'backdrop_offset_y',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5292,6 +5350,11 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
     createdAt,
     serverRevision,
     needsPublish,
+    backdropPath,
+    backdropOpacity,
+    backdropScale,
+    backdropOffsetX,
+    backdropOffsetY,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5348,6 +5411,51 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
         ),
       );
     }
+    if (data.containsKey('backdrop_path')) {
+      context.handle(
+        _backdropPathMeta,
+        backdropPath.isAcceptableOrUnknown(
+          data['backdrop_path']!,
+          _backdropPathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('backdrop_opacity')) {
+      context.handle(
+        _backdropOpacityMeta,
+        backdropOpacity.isAcceptableOrUnknown(
+          data['backdrop_opacity']!,
+          _backdropOpacityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('backdrop_scale')) {
+      context.handle(
+        _backdropScaleMeta,
+        backdropScale.isAcceptableOrUnknown(
+          data['backdrop_scale']!,
+          _backdropScaleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('backdrop_offset_x')) {
+      context.handle(
+        _backdropOffsetXMeta,
+        backdropOffsetX.isAcceptableOrUnknown(
+          data['backdrop_offset_x']!,
+          _backdropOffsetXMeta,
+        ),
+      );
+    }
+    if (data.containsKey('backdrop_offset_y')) {
+      context.handle(
+        _backdropOffsetYMeta,
+        backdropOffsetY.isAcceptableOrUnknown(
+          data['backdrop_offset_y']!,
+          _backdropOffsetYMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -5381,6 +5489,26 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
         DriftSqlType.bool,
         data['${effectivePrefix}needs_publish'],
       )!,
+      backdropPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}backdrop_path'],
+      ),
+      backdropOpacity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}backdrop_opacity'],
+      )!,
+      backdropScale: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}backdrop_scale'],
+      ),
+      backdropOffsetX: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}backdrop_offset_x'],
+      )!,
+      backdropOffsetY: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}backdrop_offset_y'],
+      )!,
     );
   }
 
@@ -5398,6 +5526,16 @@ class PhysicalEnvironment extends DataClass
   final DateTime createdAt;
   final int? serverRevision;
   final bool needsPublish;
+  final String? backdropPath;
+  final double backdropOpacity;
+
+  /// Metres per backdrop pixel, from the two-point calibration. Null means the
+  /// photo has never been calibrated, so it is drawn but not trusted for scale.
+  final double? backdropScale;
+
+  /// Where the photo's top-left sits in world metres.
+  final double backdropOffsetX;
+  final double backdropOffsetY;
   const PhysicalEnvironment({
     required this.id,
     required this.name,
@@ -5405,6 +5543,11 @@ class PhysicalEnvironment extends DataClass
     required this.createdAt,
     this.serverRevision,
     required this.needsPublish,
+    this.backdropPath,
+    required this.backdropOpacity,
+    this.backdropScale,
+    required this.backdropOffsetX,
+    required this.backdropOffsetY,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5417,6 +5560,15 @@ class PhysicalEnvironment extends DataClass
       map['server_revision'] = Variable<int>(serverRevision);
     }
     map['needs_publish'] = Variable<bool>(needsPublish);
+    if (!nullToAbsent || backdropPath != null) {
+      map['backdrop_path'] = Variable<String>(backdropPath);
+    }
+    map['backdrop_opacity'] = Variable<double>(backdropOpacity);
+    if (!nullToAbsent || backdropScale != null) {
+      map['backdrop_scale'] = Variable<double>(backdropScale);
+    }
+    map['backdrop_offset_x'] = Variable<double>(backdropOffsetX);
+    map['backdrop_offset_y'] = Variable<double>(backdropOffsetY);
     return map;
   }
 
@@ -5430,6 +5582,15 @@ class PhysicalEnvironment extends DataClass
           ? const Value.absent()
           : Value(serverRevision),
       needsPublish: Value(needsPublish),
+      backdropPath: backdropPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(backdropPath),
+      backdropOpacity: Value(backdropOpacity),
+      backdropScale: backdropScale == null && nullToAbsent
+          ? const Value.absent()
+          : Value(backdropScale),
+      backdropOffsetX: Value(backdropOffsetX),
+      backdropOffsetY: Value(backdropOffsetY),
     );
   }
 
@@ -5445,6 +5606,11 @@ class PhysicalEnvironment extends DataClass
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       serverRevision: serializer.fromJson<int?>(json['serverRevision']),
       needsPublish: serializer.fromJson<bool>(json['needsPublish']),
+      backdropPath: serializer.fromJson<String?>(json['backdropPath']),
+      backdropOpacity: serializer.fromJson<double>(json['backdropOpacity']),
+      backdropScale: serializer.fromJson<double?>(json['backdropScale']),
+      backdropOffsetX: serializer.fromJson<double>(json['backdropOffsetX']),
+      backdropOffsetY: serializer.fromJson<double>(json['backdropOffsetY']),
     );
   }
   @override
@@ -5457,6 +5623,11 @@ class PhysicalEnvironment extends DataClass
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'serverRevision': serializer.toJson<int?>(serverRevision),
       'needsPublish': serializer.toJson<bool>(needsPublish),
+      'backdropPath': serializer.toJson<String?>(backdropPath),
+      'backdropOpacity': serializer.toJson<double>(backdropOpacity),
+      'backdropScale': serializer.toJson<double?>(backdropScale),
+      'backdropOffsetX': serializer.toJson<double>(backdropOffsetX),
+      'backdropOffsetY': serializer.toJson<double>(backdropOffsetY),
     };
   }
 
@@ -5467,6 +5638,11 @@ class PhysicalEnvironment extends DataClass
     DateTime? createdAt,
     Value<int?> serverRevision = const Value.absent(),
     bool? needsPublish,
+    Value<String?> backdropPath = const Value.absent(),
+    double? backdropOpacity,
+    Value<double?> backdropScale = const Value.absent(),
+    double? backdropOffsetX,
+    double? backdropOffsetY,
   }) => PhysicalEnvironment(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -5476,6 +5652,13 @@ class PhysicalEnvironment extends DataClass
         ? serverRevision.value
         : this.serverRevision,
     needsPublish: needsPublish ?? this.needsPublish,
+    backdropPath: backdropPath.present ? backdropPath.value : this.backdropPath,
+    backdropOpacity: backdropOpacity ?? this.backdropOpacity,
+    backdropScale: backdropScale.present
+        ? backdropScale.value
+        : this.backdropScale,
+    backdropOffsetX: backdropOffsetX ?? this.backdropOffsetX,
+    backdropOffsetY: backdropOffsetY ?? this.backdropOffsetY,
   );
   PhysicalEnvironment copyWithCompanion(PhysicalEnvironmentsCompanion data) {
     return PhysicalEnvironment(
@@ -5489,6 +5672,21 @@ class PhysicalEnvironment extends DataClass
       needsPublish: data.needsPublish.present
           ? data.needsPublish.value
           : this.needsPublish,
+      backdropPath: data.backdropPath.present
+          ? data.backdropPath.value
+          : this.backdropPath,
+      backdropOpacity: data.backdropOpacity.present
+          ? data.backdropOpacity.value
+          : this.backdropOpacity,
+      backdropScale: data.backdropScale.present
+          ? data.backdropScale.value
+          : this.backdropScale,
+      backdropOffsetX: data.backdropOffsetX.present
+          ? data.backdropOffsetX.value
+          : this.backdropOffsetX,
+      backdropOffsetY: data.backdropOffsetY.present
+          ? data.backdropOffsetY.value
+          : this.backdropOffsetY,
     );
   }
 
@@ -5500,14 +5698,30 @@ class PhysicalEnvironment extends DataClass
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('serverRevision: $serverRevision, ')
-          ..write('needsPublish: $needsPublish')
+          ..write('needsPublish: $needsPublish, ')
+          ..write('backdropPath: $backdropPath, ')
+          ..write('backdropOpacity: $backdropOpacity, ')
+          ..write('backdropScale: $backdropScale, ')
+          ..write('backdropOffsetX: $backdropOffsetX, ')
+          ..write('backdropOffsetY: $backdropOffsetY')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, sortOrder, createdAt, serverRevision, needsPublish);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    sortOrder,
+    createdAt,
+    serverRevision,
+    needsPublish,
+    backdropPath,
+    backdropOpacity,
+    backdropScale,
+    backdropOffsetX,
+    backdropOffsetY,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5517,7 +5731,12 @@ class PhysicalEnvironment extends DataClass
           other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt &&
           other.serverRevision == this.serverRevision &&
-          other.needsPublish == this.needsPublish);
+          other.needsPublish == this.needsPublish &&
+          other.backdropPath == this.backdropPath &&
+          other.backdropOpacity == this.backdropOpacity &&
+          other.backdropScale == this.backdropScale &&
+          other.backdropOffsetX == this.backdropOffsetX &&
+          other.backdropOffsetY == this.backdropOffsetY);
 }
 
 class PhysicalEnvironmentsCompanion
@@ -5528,6 +5747,11 @@ class PhysicalEnvironmentsCompanion
   final Value<DateTime> createdAt;
   final Value<int?> serverRevision;
   final Value<bool> needsPublish;
+  final Value<String?> backdropPath;
+  final Value<double> backdropOpacity;
+  final Value<double?> backdropScale;
+  final Value<double> backdropOffsetX;
+  final Value<double> backdropOffsetY;
   final Value<int> rowid;
   const PhysicalEnvironmentsCompanion({
     this.id = const Value.absent(),
@@ -5536,6 +5760,11 @@ class PhysicalEnvironmentsCompanion
     this.createdAt = const Value.absent(),
     this.serverRevision = const Value.absent(),
     this.needsPublish = const Value.absent(),
+    this.backdropPath = const Value.absent(),
+    this.backdropOpacity = const Value.absent(),
+    this.backdropScale = const Value.absent(),
+    this.backdropOffsetX = const Value.absent(),
+    this.backdropOffsetY = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PhysicalEnvironmentsCompanion.insert({
@@ -5545,6 +5774,11 @@ class PhysicalEnvironmentsCompanion
     this.createdAt = const Value.absent(),
     this.serverRevision = const Value.absent(),
     this.needsPublish = const Value.absent(),
+    this.backdropPath = const Value.absent(),
+    this.backdropOpacity = const Value.absent(),
+    this.backdropScale = const Value.absent(),
+    this.backdropOffsetX = const Value.absent(),
+    this.backdropOffsetY = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -5555,6 +5789,11 @@ class PhysicalEnvironmentsCompanion
     Expression<DateTime>? createdAt,
     Expression<int>? serverRevision,
     Expression<bool>? needsPublish,
+    Expression<String>? backdropPath,
+    Expression<double>? backdropOpacity,
+    Expression<double>? backdropScale,
+    Expression<double>? backdropOffsetX,
+    Expression<double>? backdropOffsetY,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5564,6 +5803,11 @@ class PhysicalEnvironmentsCompanion
       if (createdAt != null) 'created_at': createdAt,
       if (serverRevision != null) 'server_revision': serverRevision,
       if (needsPublish != null) 'needs_publish': needsPublish,
+      if (backdropPath != null) 'backdrop_path': backdropPath,
+      if (backdropOpacity != null) 'backdrop_opacity': backdropOpacity,
+      if (backdropScale != null) 'backdrop_scale': backdropScale,
+      if (backdropOffsetX != null) 'backdrop_offset_x': backdropOffsetX,
+      if (backdropOffsetY != null) 'backdrop_offset_y': backdropOffsetY,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5575,6 +5819,11 @@ class PhysicalEnvironmentsCompanion
     Value<DateTime>? createdAt,
     Value<int?>? serverRevision,
     Value<bool>? needsPublish,
+    Value<String?>? backdropPath,
+    Value<double>? backdropOpacity,
+    Value<double?>? backdropScale,
+    Value<double>? backdropOffsetX,
+    Value<double>? backdropOffsetY,
     Value<int>? rowid,
   }) {
     return PhysicalEnvironmentsCompanion(
@@ -5584,6 +5833,11 @@ class PhysicalEnvironmentsCompanion
       createdAt: createdAt ?? this.createdAt,
       serverRevision: serverRevision ?? this.serverRevision,
       needsPublish: needsPublish ?? this.needsPublish,
+      backdropPath: backdropPath ?? this.backdropPath,
+      backdropOpacity: backdropOpacity ?? this.backdropOpacity,
+      backdropScale: backdropScale ?? this.backdropScale,
+      backdropOffsetX: backdropOffsetX ?? this.backdropOffsetX,
+      backdropOffsetY: backdropOffsetY ?? this.backdropOffsetY,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5609,6 +5863,21 @@ class PhysicalEnvironmentsCompanion
     if (needsPublish.present) {
       map['needs_publish'] = Variable<bool>(needsPublish.value);
     }
+    if (backdropPath.present) {
+      map['backdrop_path'] = Variable<String>(backdropPath.value);
+    }
+    if (backdropOpacity.present) {
+      map['backdrop_opacity'] = Variable<double>(backdropOpacity.value);
+    }
+    if (backdropScale.present) {
+      map['backdrop_scale'] = Variable<double>(backdropScale.value);
+    }
+    if (backdropOffsetX.present) {
+      map['backdrop_offset_x'] = Variable<double>(backdropOffsetX.value);
+    }
+    if (backdropOffsetY.present) {
+      map['backdrop_offset_y'] = Variable<double>(backdropOffsetY.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5624,6 +5893,11 @@ class PhysicalEnvironmentsCompanion
           ..write('createdAt: $createdAt, ')
           ..write('serverRevision: $serverRevision, ')
           ..write('needsPublish: $needsPublish, ')
+          ..write('backdropPath: $backdropPath, ')
+          ..write('backdropOpacity: $backdropOpacity, ')
+          ..write('backdropScale: $backdropScale, ')
+          ..write('backdropOffsetX: $backdropOffsetX, ')
+          ..write('backdropOffsetY: $backdropOffsetY, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5704,6 +5978,16 @@ class $PhysicalShelvesTable extends PhysicalShelves
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('shelf'),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -5725,6 +6009,7 @@ class $PhysicalShelvesTable extends PhysicalShelves
     x2,
     y2,
     label,
+    kind,
     createdAt,
   ];
   @override
@@ -5781,6 +6066,12 @@ class $PhysicalShelvesTable extends PhysicalShelves
         label.isAcceptableOrUnknown(data['label']!, _labelMeta),
       );
     }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -5824,6 +6115,10 @@ class $PhysicalShelvesTable extends PhysicalShelves
         DriftSqlType.string,
         data['${effectivePrefix}label'],
       ),
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -5845,6 +6140,15 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
   final double x2;
   final double y2;
   final String? label;
+
+  /// What this segment *is* (plan 5 #29): 'shelf' (books rest on it),
+  /// 'panel' (a bookcase side — structure, nothing rests on it), 'divider'
+  /// (a vertical separator), or 'label' (a text marker).
+  ///
+  /// A `kind` column rather than a second table, because a side panel is
+  /// geometrically a shelf that books don't sit on — the only difference is
+  /// whether `settle` may land something on it, which is one predicate.
+  final String kind;
   final DateTime createdAt;
   const PhysicalShelf({
     required this.id,
@@ -5854,6 +6158,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     required this.x2,
     required this.y2,
     this.label,
+    required this.kind,
     required this.createdAt,
   });
   @override
@@ -5868,6 +6173,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     if (!nullToAbsent || label != null) {
       map['label'] = Variable<String>(label);
     }
+    map['kind'] = Variable<String>(kind);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -5883,6 +6189,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       label: label == null && nullToAbsent
           ? const Value.absent()
           : Value(label),
+      kind: Value(kind),
       createdAt: Value(createdAt),
     );
   }
@@ -5900,6 +6207,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       x2: serializer.fromJson<double>(json['x2']),
       y2: serializer.fromJson<double>(json['y2']),
       label: serializer.fromJson<String?>(json['label']),
+      kind: serializer.fromJson<String>(json['kind']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -5914,6 +6222,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       'x2': serializer.toJson<double>(x2),
       'y2': serializer.toJson<double>(y2),
       'label': serializer.toJson<String?>(label),
+      'kind': serializer.toJson<String>(kind),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -5926,6 +6235,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     double? x2,
     double? y2,
     Value<String?> label = const Value.absent(),
+    String? kind,
     DateTime? createdAt,
   }) => PhysicalShelf(
     id: id ?? this.id,
@@ -5935,6 +6245,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     x2: x2 ?? this.x2,
     y2: y2 ?? this.y2,
     label: label.present ? label.value : this.label,
+    kind: kind ?? this.kind,
     createdAt: createdAt ?? this.createdAt,
   );
   PhysicalShelf copyWithCompanion(PhysicalShelvesCompanion data) {
@@ -5948,6 +6259,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       x2: data.x2.present ? data.x2.value : this.x2,
       y2: data.y2.present ? data.y2.value : this.y2,
       label: data.label.present ? data.label.value : this.label,
+      kind: data.kind.present ? data.kind.value : this.kind,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -5962,6 +6274,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
           ..write('x2: $x2, ')
           ..write('y2: $y2, ')
           ..write('label: $label, ')
+          ..write('kind: $kind, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -5969,7 +6282,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
 
   @override
   int get hashCode =>
-      Object.hash(id, environmentId, x1, y1, x2, y2, label, createdAt);
+      Object.hash(id, environmentId, x1, y1, x2, y2, label, kind, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5981,6 +6294,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
           other.x2 == this.x2 &&
           other.y2 == this.y2 &&
           other.label == this.label &&
+          other.kind == this.kind &&
           other.createdAt == this.createdAt);
 }
 
@@ -5992,6 +6306,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
   final Value<double> x2;
   final Value<double> y2;
   final Value<String?> label;
+  final Value<String> kind;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const PhysicalShelvesCompanion({
@@ -6002,6 +6317,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     this.x2 = const Value.absent(),
     this.y2 = const Value.absent(),
     this.label = const Value.absent(),
+    this.kind = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6013,6 +6329,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     required double x2,
     required double y2,
     this.label = const Value.absent(),
+    this.kind = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -6029,6 +6346,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     Expression<double>? x2,
     Expression<double>? y2,
     Expression<String>? label,
+    Expression<String>? kind,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -6040,6 +6358,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
       if (x2 != null) 'x2': x2,
       if (y2 != null) 'y2': y2,
       if (label != null) 'label': label,
+      if (kind != null) 'kind': kind,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6053,6 +6372,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     Value<double>? x2,
     Value<double>? y2,
     Value<String?>? label,
+    Value<String>? kind,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -6064,6 +6384,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
       x2: x2 ?? this.x2,
       y2: y2 ?? this.y2,
       label: label ?? this.label,
+      kind: kind ?? this.kind,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6093,6 +6414,9 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     if (label.present) {
       map['label'] = Variable<String>(label.value);
     }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -6112,6 +6436,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
           ..write('x2: $x2, ')
           ..write('y2: $y2, ')
           ..write('label: $label, ')
+          ..write('kind: $kind, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -13860,6 +14185,11 @@ typedef $$PhysicalEnvironmentsTableCreateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<int?> serverRevision,
       Value<bool> needsPublish,
+      Value<String?> backdropPath,
+      Value<double> backdropOpacity,
+      Value<double?> backdropScale,
+      Value<double> backdropOffsetX,
+      Value<double> backdropOffsetY,
       Value<int> rowid,
     });
 typedef $$PhysicalEnvironmentsTableUpdateCompanionBuilder =
@@ -13870,6 +14200,11 @@ typedef $$PhysicalEnvironmentsTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<int?> serverRevision,
       Value<bool> needsPublish,
+      Value<String?> backdropPath,
+      Value<double> backdropOpacity,
+      Value<double?> backdropScale,
+      Value<double> backdropOffsetX,
+      Value<double> backdropOffsetY,
       Value<int> rowid,
     });
 
@@ -13967,6 +14302,31 @@ class $$PhysicalEnvironmentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get backdropPath => $composableBuilder(
+    column: $table.backdropPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get backdropOpacity => $composableBuilder(
+    column: $table.backdropOpacity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get backdropScale => $composableBuilder(
+    column: $table.backdropScale,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get backdropOffsetX => $composableBuilder(
+    column: $table.backdropOffsetX,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get backdropOffsetY => $composableBuilder(
+    column: $table.backdropOffsetY,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> physicalShelvesRefs(
     Expression<bool> Function($$PhysicalShelvesTableFilterComposer f) f,
   ) {
@@ -14056,6 +14416,31 @@ class $$PhysicalEnvironmentsTableOrderingComposer
     column: $table.needsPublish,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get backdropPath => $composableBuilder(
+    column: $table.backdropPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get backdropOpacity => $composableBuilder(
+    column: $table.backdropOpacity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get backdropScale => $composableBuilder(
+    column: $table.backdropScale,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get backdropOffsetX => $composableBuilder(
+    column: $table.backdropOffsetX,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get backdropOffsetY => $composableBuilder(
+    column: $table.backdropOffsetY,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PhysicalEnvironmentsTableAnnotationComposer
@@ -14086,6 +14471,31 @@ class $$PhysicalEnvironmentsTableAnnotationComposer
 
   GeneratedColumn<bool> get needsPublish => $composableBuilder(
     column: $table.needsPublish,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get backdropPath => $composableBuilder(
+    column: $table.backdropPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get backdropOpacity => $composableBuilder(
+    column: $table.backdropOpacity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get backdropScale => $composableBuilder(
+    column: $table.backdropScale,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get backdropOffsetX => $composableBuilder(
+    column: $table.backdropOffsetX,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get backdropOffsetY => $composableBuilder(
+    column: $table.backdropOffsetY,
     builder: (column) => column,
   );
 
@@ -14185,6 +14595,11 @@ class $$PhysicalEnvironmentsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int?> serverRevision = const Value.absent(),
                 Value<bool> needsPublish = const Value.absent(),
+                Value<String?> backdropPath = const Value.absent(),
+                Value<double> backdropOpacity = const Value.absent(),
+                Value<double?> backdropScale = const Value.absent(),
+                Value<double> backdropOffsetX = const Value.absent(),
+                Value<double> backdropOffsetY = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalEnvironmentsCompanion(
                 id: id,
@@ -14193,6 +14608,11 @@ class $$PhysicalEnvironmentsTableTableManager
                 createdAt: createdAt,
                 serverRevision: serverRevision,
                 needsPublish: needsPublish,
+                backdropPath: backdropPath,
+                backdropOpacity: backdropOpacity,
+                backdropScale: backdropScale,
+                backdropOffsetX: backdropOffsetX,
+                backdropOffsetY: backdropOffsetY,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -14203,6 +14623,11 @@ class $$PhysicalEnvironmentsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int?> serverRevision = const Value.absent(),
                 Value<bool> needsPublish = const Value.absent(),
+                Value<String?> backdropPath = const Value.absent(),
+                Value<double> backdropOpacity = const Value.absent(),
+                Value<double?> backdropScale = const Value.absent(),
+                Value<double> backdropOffsetX = const Value.absent(),
+                Value<double> backdropOffsetY = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalEnvironmentsCompanion.insert(
                 id: id,
@@ -14211,6 +14636,11 @@ class $$PhysicalEnvironmentsTableTableManager
                 createdAt: createdAt,
                 serverRevision: serverRevision,
                 needsPublish: needsPublish,
+                backdropPath: backdropPath,
+                backdropOpacity: backdropOpacity,
+                backdropScale: backdropScale,
+                backdropOffsetX: backdropOffsetX,
+                backdropOffsetY: backdropOffsetY,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -14308,6 +14738,7 @@ typedef $$PhysicalShelvesTableCreateCompanionBuilder =
       required double x2,
       required double y2,
       Value<String?> label,
+      Value<String> kind,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -14320,6 +14751,7 @@ typedef $$PhysicalShelvesTableUpdateCompanionBuilder =
       Value<double> x2,
       Value<double> y2,
       Value<String?> label,
+      Value<String> kind,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -14392,6 +14824,11 @@ class $$PhysicalShelvesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -14460,6 +14897,11 @@ class $$PhysicalShelvesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -14516,6 +14958,9 @@ class $$PhysicalShelvesTableAnnotationComposer
 
   GeneratedColumn<String> get label =>
       $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -14582,6 +15027,7 @@ class $$PhysicalShelvesTableTableManager
                 Value<double> x2 = const Value.absent(),
                 Value<double> y2 = const Value.absent(),
                 Value<String?> label = const Value.absent(),
+                Value<String> kind = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalShelvesCompanion(
@@ -14592,6 +15038,7 @@ class $$PhysicalShelvesTableTableManager
                 x2: x2,
                 y2: y2,
                 label: label,
+                kind: kind,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -14604,6 +15051,7 @@ class $$PhysicalShelvesTableTableManager
                 required double x2,
                 required double y2,
                 Value<String?> label = const Value.absent(),
+                Value<String> kind = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalShelvesCompanion.insert(
@@ -14614,6 +15062,7 @@ class $$PhysicalShelvesTableTableManager
                 x2: x2,
                 y2: y2,
                 label: label,
+                kind: kind,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

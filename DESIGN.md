@@ -812,6 +812,38 @@ opens, so swiping it away is never punished by it returning. Every empty state
 (shelf, no-search-match, physical tab, loans) carries one line of what-to-do-next
 copy **and** a primary action.
 
+**Room realism** (app, plan 5 #29) turns the physical view from a diagram into
+something recognisable as *your* room. Three parts, all app-local.
+
+A **backdrop photo** per room, with an opacity slider and a **two-point
+calibration**: you mark a length you can measure — a door, a shelf, the whole
+wall — and say what it really is, which gives metres per pixel. Two points
+rather than one number because nobody knows their phone's focal length. A
+degenerate calibration (zero pixels, zero metres) is **rejected rather than
+clamped**: a wrong scale doesn't throw, it just draws the room at the wrong size
+while looking authoritative. An uncalibrated photo is still drawn, at a
+centimetre per pixel, so it can be seen while being lined up. Replacing the photo
+clears the calibration, because the scale belonged to the old image's pixels.
+
+**Furniture is a `kind` on `physical_shelves`**, not a second table: a bookcase
+side panel is geometrically a shelf that books don't rest on, and the only real
+difference is one predicate — `holdsBooks`, which both `settle` and the gravity
+pass consult, so a book can never come to rest on a divider. An unknown kind
+read from a newer version's row falls back to `shelf`, because treating it as
+furniture would drop the books resting on it to the floor.
+
+A **measure tool** (drag for a distance, shown in cm under a metre and metres
+above) and a **fill estimate** per shelf — "42 cm of 90 cm used · 48 cm free" —
+computed from the *same* `PhysicalMetrics` curve the drawing uses, so the number
+and the picture can't disagree. A flat book counts its height along the shelf,
+not its spine; an overfull shelf says so rather than sitting quietly at a full
+bar; and "does this fit?" allows a millimetre of slack, because shelves are
+measured by hand.
+
+The backdrop is **never published**: #47's layout document is geometry only, and
+a photo of someone's home is exactly what must not ride a share link. It rides
+backups instead, like condition photos.
+
 **Localization scaffolding** (app, plan 5 #38) is `flutter_localizations` +
 `gen_l10n`, an `l10n.yaml`, and `lib/l10n/app_en.arb`. **English is the only
 locale, and the scaffolding is the deliverable** — the point is that every string

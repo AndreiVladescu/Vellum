@@ -22,6 +22,8 @@ import 'labels.dart';
 import 'locate.dart';
 import 'physical_metrics.dart';
 import 'placement_toolbar.dart';
+import 'room_backdrop.dart';
+import 'room_measure.dart';
 import 'room_painter.dart';
 import 'room_semantics.dart';
 import 'settle.dart';
@@ -123,16 +125,65 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// Wraps the canvas so it can be captured as a PNG.
   final GlobalKey _canvasKey = GlobalKey();
 
+  // ---- room realism (plan 5 #29) ------------------------------------------
+
+  /// The decoded backdrop photo, and the row it came from. Decoded once and
+  /// held rather than re-read per frame: a wall photo is megabytes, and the
+  /// painter runs on every pan.
+  ui.Image? _backdrop;
+  PhysicalEnvironment? _environment;
+
+  /// The measure tool. Non-null `_measureFrom` means the tool is armed; the
+  /// two points are world metres.
+  bool _measuring = false;
+  Offset? _measureFrom;
+  Offset? _measureTo;
+
   @override
   void initState() {
     super.initState();
     _authorsSub = repo.watchAuthorsByBook().listen((byBook) {
       if (mounted) setState(() => _authorsByBook = byBook);
     });
+    _loadEnvironment();
+  }
+
+  /// Reads the room row and decodes its backdrop, if any.
+  Future<void> _loadEnvironment() async {
+    final environment = await repo.layout.environment(widget.environmentId);
+    if (!mounted) return;
+    setState(() => _environment = environment);
+    await _loadBackdrop(environment?.backdropPath);
+  }
+
+  Future<void> _loadBackdrop(String? relativePath) async {
+    if (relativePath == null) {
+      // Dispose the old one: an image held after its row is gone is a leak the
+      // size of a photo.
+      _backdrop?.dispose();
+      if (mounted) setState(() => _backdrop = null);
+      return;
+    }
+    try {
+      final file = File(p.join(repo.dataDir.path, relativePath));
+      final bytes = await file.readAsBytes();
+      final decoded = await decodeImageFromList(bytes);
+      if (!mounted) {
+        decoded.dispose();
+        return;
+      }
+      _backdrop?.dispose();
+      setState(() => _backdrop = decoded);
+    } catch (_) {
+      // A missing or unreadable photo draws nothing rather than failing the
+      // room — the geometry is the part that matters.
+      if (mounted) setState(() => _backdrop = null);
+    }
   }
 
   @override
   void dispose() {
+    _backdrop?.dispose();
     _authorsSub?.cancel();
     _search.dispose();
     _pulse.dispose();
@@ -226,6 +277,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   void _onScaleStart(ScaleStartDetails d) {
     _moved = false;
     final focal = d.localFocalPoint;
+    // The measure tool takes over the canvas while it is armed (plan 5 #29):
+    // one drag, one distance. A modeless gesture would have to compete with
+    // pan, zoom, drag-a-book and drag-a-shelf, and lose.
+    if (_measuring) {
+      setState(() {
+        _measureFrom = _screenToWorld(focal);
+        _measureTo = _measureFrom;
+      });
+      return;
+    }
     // Topmost book under the finger, if any.
     _dragId = null;
     _dragShelfId = null;
@@ -259,6 +320,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
     final focal = d.localFocalPoint;
+    if (_measuring && _measureFrom != null) {
+      setState(() => _measureTo = _screenToWorld(focal));
+      return;
+    }
     final draggingItem = _dragId != null || _dragShelfId != null;
     if (d.scale != 1.0 || d.pointerCount >= 2 || !draggingItem) {
       // Pan + zoom the camera, anchoring the world point grabbed at start.
@@ -301,6 +366,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }
 
   void _onScaleEnd(ScaleEndDetails d) {
+    if (_measuring) {
+      // The measurement stays on screen until the next drag or until the tool
+      // is switched off — reading a number that vanished on lift-off is the
+      // classic way to make a measure tool useless.
+      return;
+    }
     final dragId = _dragId;
     final dragShelfId = _dragShelfId;
     final riders = [
@@ -381,9 +452,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     required double w,
     required double h,
   }) {
+    // Only surfaces books actually rest on (plan 5 #29): a side panel or a
+    // divider is geometry, not a shelf, and landing a book on one would put it
+    // in mid-air as far as anyone looking at the room is concerned.
     final shelves = [
       for (final s in _shelves)
-        SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2),
+        if (ShelfKind.parse(s.kind).holdsBooks)
+          SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2),
     ];
     final others = _placed
         .where((p) => p.placement.id != draggedId)
@@ -426,6 +501,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       final bottom = pb.placement.y;
       double surface = 0; // floor
       for (final s in shelves) {
+        // Same rule as `_settle`: furniture holds nothing up.
+        if (!ShelfKind.parse(s.kind).holdsBooks) continue;
         final left = math.min(s.x1, s.x2);
         final right = math.max(s.x1, s.x2);
         final top = math.max(s.y1, s.y2);
@@ -477,6 +554,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       x2: result.right,
       y2: result.y,
       label: result.label,
+      kind: result.kind,
     );
   }
 
@@ -693,6 +771,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         initialLeft: math.min(s.x1, s.x2),
         initialRight: math.max(s.x1, s.x2),
         initialLabel: s.label,
+        initialKind: ShelfKind.parse(s.kind),
+        // "42 cm of 90 cm used" — the number you actually want while deciding
+        // whether to move this shelf (plan 5 #29).
+        fill: fillOf(shelf: s, placed: _placed),
       ),
     );
     if (result == null) return;
@@ -710,6 +792,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       x2: result.right,
       y2: result.y,
       label: Value(result.label),
+      kind: result.kind,
     );
     if (dx.abs() > 1e-9 || dy.abs() > 1e-9) {
       for (final pb in riders) {
@@ -773,6 +856,66 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         _query,
         authors: _authorsByBook[pb.book.id] ?? const [],
       );
+
+  /// Picks a photo of the wall and stores it beside the room's other blobs.
+  ///
+  /// Copied into the data dir rather than referenced: a photo picked from the
+  /// camera roll can be deleted tomorrow, and the same reasoning as #51's
+  /// condition photos applies — a backdrop that evaporates is worse than none.
+  Future<void> _chooseBackdrop() async {
+    final picked = await addRoomBackdrop(context, repo, widget.environmentId);
+    if (picked == null || !mounted) return;
+    await _loadEnvironment();
+    if (mounted) {
+      _say('Photo added. Calibrate it so the room is drawn to scale.');
+    }
+  }
+
+  /// The two-point calibration: mark a length you know, say what it really is.
+  ///
+  /// Asked in pixels-on-the-photo terms rather than by dragging on the canvas,
+  /// because the canvas is already carrying pan, zoom, drag-a-book and
+  /// drag-a-shelf gestures — a fifth would need a mode nobody would find.
+  Future<void> _calibrateBackdrop() async {
+    final image = _backdrop;
+    if (image == null) return;
+    final result = await showDialog<BackdropCalibration>(
+      context: context,
+      builder: (_) => BackdropCalibrationDialog(
+        imageWidth: image.width,
+        imageHeight: image.height,
+      ),
+    );
+    final metresPerPixel = result?.metresPerPixel;
+    if (metresPerPixel == null) {
+      if (result != null && mounted) {
+        // Rejected rather than clamped: a wrong scale looks authoritative.
+        _say("That doesn't give a usable scale — check both numbers.");
+      }
+      return;
+    }
+    await repo.layout.updateBackdrop(
+      widget.environmentId,
+      scale: Value(metresPerPixel),
+    );
+    await _loadEnvironment();
+    if (mounted) {
+      _say('Calibrated: the photo is now drawn to scale.');
+    }
+  }
+
+  Future<void> _showBackdropSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => BackdropSettingsSheet(
+        repository: repo,
+        environmentId: widget.environmentId,
+        opacity: _environment?.backdropOpacity ?? 0.5,
+        onChanged: _loadEnvironment,
+      ),
+    );
+    await _loadEnvironment();
+  }
 
   /// Re-packs the books resting on [s] in [sort] order, flush from its left end.
   Future<void> _tidyShelf(PhysicalShelf s, TidySort sort) async {
@@ -1012,24 +1155,56 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   await _saveSnapshot();
                 case 'stocktake':
                   await _startStocktake();
+                case 'backdrop':
+                  await _chooseBackdrop();
+                case 'calibrate':
+                  await _calibrateBackdrop();
+                case 'backdrop-opacity':
+                  await _showBackdropSettings();
+                case 'measure':
+                  setState(() {
+                    _measuring = !_measuring;
+                    _measureFrom = null;
+                    _measureTo = null;
+                  });
                 case 'help':
                   _showHelp();
               }
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
+                value: 'measure',
+                child: Text(_measuring ? 'Stop measuring' : 'Measure…'),
+              ),
+              PopupMenuItem(
+                value: 'backdrop',
+                child: Text(_environment?.backdropPath == null
+                    ? 'Add a room photo…'
+                    : 'Change the room photo…'),
+              ),
+              if (_environment?.backdropPath != null) ...[
+                const PopupMenuItem(
+                  value: 'calibrate',
+                  child: Text('Calibrate the photo…'),
+                ),
+                const PopupMenuItem(
+                  value: 'backdrop-opacity',
+                  child: Text('Photo strength…'),
+                ),
+              ],
+              const PopupMenuItem(
                 value: 'labels',
                 child: Text('Print shelf labels…'),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'snapshot',
                 child: Text('Save a picture of this room'),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'stocktake',
                 child: Text('Stocktake this room…'),
               ),
-              PopupMenuItem(value: 'help', child: Text('Help')),
+              const PopupMenuItem(value: 'help', child: Text('Help')),
             ],
           ),
         ],
@@ -1107,6 +1282,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           '• Tap a book to select it (rotate / resize / remove).\n'
           '• Right-click or long-press a book or shelf to edit it.\n'
           '• Drag a shelf to move it — the books on it ride along.\n'
+          '• A shelf can be furniture instead: a side panel, divider or label '
+          'draws but holds nothing.\n'
+          '• “Measure” turns the canvas into a ruler; “Add a room photo” lets '
+          'you trace your actual wall once you calibrate it.\n'
           '• Right-click a shelf to tidy it by author, title or series.\n'
           '• The search icon dims everything that doesn’t match.\n'
           '• “Print shelf labels” makes a sheet you can cut up and stick on; '
@@ -1170,6 +1349,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   label: theme.colorScheme.onSurfaceVariant,
                   draggingShelfId: _dragShelfId,
                   shelfDelta: _shelfDeltaVN,
+                  backdrop: _backdrop,
+                  backdropOpacity: _environment?.backdropOpacity ?? 0.5,
+                  backdropScale: _environment?.backdropScale,
+                  backdropOffset: Offset(
+                    _environment?.backdropOffsetX ?? 0,
+                    _environment?.backdropOffsetY ?? 0,
+                  ),
+                  measureFrom: _measureFrom,
+                  measureTo: _measureTo,
+                  measureColor: theme.colorScheme.tertiary,
                 ),
                 size: Size.infinite,
               ),

@@ -154,7 +154,10 @@ class BackupService {
       await encoder.addFile(snapshot, 'vellum.sqlite');
       // 'photos' since plan 5 #51 — condition photos are app-local, so a
       // backup is the only copy of them that leaves the device.
-      for (final sub in ['covers', 'files', 'photos']) {
+      // 'backdrops' since plan 5 #29 — a room photo is app-local (it never
+      // rides the published layout document), so a backup is the only copy of
+      // it that leaves the device.
+      for (final sub in ['covers', 'files', 'photos', 'backdrops']) {
         final dir = Directory(p.join(dataDir.path, sub));
         if (!await dir.exists()) continue;
         await for (final entry in dir.list()) {
@@ -404,7 +407,7 @@ class BackupService {
 
       // Replace the blob directories with the archive's (absent in the
       // archive = empty in the restored library).
-      for (final sub in ['covers', 'files', 'photos']) {
+      for (final sub in ['covers', 'files', 'photos', 'backdrops']) {
         final live = Directory(p.join(dataDir.path, sub));
         if (await live.exists()) await live.delete(recursive: true);
         final staged = Directory(p.join(staging.path, sub));

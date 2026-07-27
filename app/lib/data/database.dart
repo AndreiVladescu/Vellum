@@ -283,6 +283,22 @@ class PhysicalEnvironments extends Table {
   // life asking to be.
   BoolColumn get needsPublish =>
       boolean().withDefault(const Constant(false))();
+  // ---- Room realism (plan 5 #29) ------------------------------------------
+  // A photo of the actual wall, traced over at true scale. **App-local**: the
+  // published layout document (#47) is geometry only and must stay that way —
+  // a backdrop is a photo of someone's home, which is exactly the sort of
+  // thing that must not ride a share link.
+  //
+  // Relative to the data dir, like every other blob path.
+  TextColumn get backdropPath => text().nullable()();
+  RealColumn get backdropOpacity =>
+      real().withDefault(const Constant(0.5))();
+  /// Metres per backdrop pixel, from the two-point calibration. Null means the
+  /// photo has never been calibrated, so it is drawn but not trusted for scale.
+  RealColumn get backdropScale => real().nullable()();
+  /// Where the photo's top-left sits in world metres.
+  RealColumn get backdropOffsetX => real().withDefault(const Constant(0))();
+  RealColumn get backdropOffsetY => real().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -300,6 +316,14 @@ class PhysicalShelves extends Table {
   RealColumn get x2 => real()();
   RealColumn get y2 => real()();
   TextColumn get label => text().nullable()();
+  /// What this segment *is* (plan 5 #29): 'shelf' (books rest on it),
+  /// 'panel' (a bookcase side — structure, nothing rests on it), 'divider'
+  /// (a vertical separator), or 'label' (a text marker).
+  ///
+  /// A `kind` column rather than a second table, because a side panel is
+  /// geometrically a shelf that books don't sit on — the only difference is
+  /// whether `settle` may land something on it, which is one predicate.
+  TextColumn get kind => text().withDefault(const Constant('shelf'))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -455,7 +479,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -682,6 +706,27 @@ class VellumDatabase extends _$VellumDatabase {
             // everywhere else, so there is no server migration — and never
             // one, see the column's doc comment.
             await addBookColumn('deleted_at', books.deletedAt);
+          }
+          if (from < 22) {
+            // Room realism (plan 5 #29): a backdrop photo per room and a kind
+            // per shelf segment. App-local — the published layout document
+            // (#47) carries geometry only, and a photo of someone's wall must
+            // never ride a share link.
+            final envCols = await columnsOf('physical_environments');
+            for (final (name, column) in [
+              ('backdrop_path', physicalEnvironments.backdropPath),
+              ('backdrop_opacity', physicalEnvironments.backdropOpacity),
+              ('backdrop_scale', physicalEnvironments.backdropScale),
+              ('backdrop_offset_x', physicalEnvironments.backdropOffsetX),
+              ('backdrop_offset_y', physicalEnvironments.backdropOffsetY),
+            ]) {
+              if (!envCols.contains(name)) {
+                await m.addColumn(physicalEnvironments, column);
+              }
+            }
+            if (!(await columnsOf('physical_shelves')).contains('kind')) {
+              await m.addColumn(physicalShelves, physicalShelves.kind);
+            }
           }
         },
         beforeOpen: (details) async {

@@ -37,6 +37,7 @@ PhysicalShelf shelf(String id, {required double y, double x1 = 0, double x2 = 3}
       y1: y,
       x2: x2,
       y2: y,
+      kind: 'shelf',
       createdAt: DateTime(2026),
     );
 

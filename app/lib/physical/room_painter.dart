@@ -1,12 +1,16 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
+import 'room_measure.dart';
 
-/// Paints the room behind the placed books: a faint metre grid, the floor
-/// line, and every shelf as a plank (with its optional label).
+/// Paints the room behind the placed books: an optional backdrop photo, a faint
+/// metre grid, the floor line, and every segment drawn according to its kind
+/// (plan 5 #29) — a plank for a shelf, a thin upright for a panel or divider,
+/// bare text for a label.
 class RoomPainter extends CustomPainter {
   RoomPainter({
     required this.shelves,
@@ -17,9 +21,35 @@ class RoomPainter extends CustomPainter {
     required this.label,
     this.draggingShelfId,
     required this.shelfDelta,
+    this.backdrop,
+    this.backdropOpacity = 0.5,
+    this.backdropScale,
+    this.backdropOffset = Offset.zero,
+    this.measureFrom,
+    this.measureTo,
+    this.measureColor,
   }) : super(repaint: shelfDelta);
 
   final List<PhysicalShelf> shelves;
+
+  /// The room photo, already decoded. Null when the room has none.
+  final ui.Image? backdrop;
+  final double backdropOpacity;
+
+  /// Metres per backdrop pixel, from the two-point calibration. Null means the
+  /// photo has never been calibrated — it is still drawn, at one pixel per
+  /// centimetre, so it can be *seen* while being lined up rather than being
+  /// invisible until the maths is done.
+  final double? backdropScale;
+
+  /// Where the photo's top-left sits, in world metres.
+  final Offset backdropOffset;
+
+  /// The measure tool's endpoints in world metres, while a measurement is in
+  /// progress (plan 5 #29).
+  final Offset? measureFrom;
+  final Offset? measureTo;
+  final Color? measureColor;
   final Offset origin;
   final double scale;
   final Color line;
@@ -35,6 +65,10 @@ class RoomPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // The photo goes first, under everything: it is a tracing aid, and anything
+    // drawn beneath the grid and the shelves would be hidden by them.
+    _paintBackdrop(canvas);
+
     // Faint metre grid.
     final grid = Paint()
       ..color = line.withValues(alpha: 0.25)
@@ -58,8 +92,9 @@ class RoomPainter extends CustomPainter {
       ..strokeWidth = 2;
     canvas.drawLine(Offset(0, origin.dy), Offset(size.width, origin.dy), floor);
 
-    // Shelves as planks (the one being dragged is shifted live).
+    // Segments, drawn by kind (the one being dragged is shifted live).
     final plankPaint = Paint()..color = plank.withValues(alpha: 0.85);
+    final structurePaint = Paint()..color = plank.withValues(alpha: 0.45);
     for (final s in shelves) {
       final d = s.id == draggingShelfId ? shelfDelta.value : Offset.zero;
       final p1 = _w2s(Offset(s.x1 + d.dx, s.y1 + d.dy));
@@ -67,19 +102,94 @@ class RoomPainter extends CustomPainter {
       final left = math.min(p1.dx, p2.dx);
       final right = math.max(p1.dx, p2.dx);
       final top = math.min(p1.dy, p2.dy);
-      canvas.drawRect(Rect.fromLTWH(left, top, right - left, 5), plankPaint);
+      final bottom = math.max(p1.dy, p2.dy);
+      final kind = ShelfKind.parse(s.kind);
+
+      switch (kind) {
+        case ShelfKind.shelf:
+          canvas.drawRect(
+              Rect.fromLTWH(left, top, right - left, 5), plankPaint);
+        case ShelfKind.panel:
+        case ShelfKind.divider:
+          // Structure reads as an upright: a bookcase side is defined by the
+          // *span* between its endpoints, which for these is usually vertical.
+          canvas.drawRect(
+            Rect.fromLTRB(left, top, math.max(right, left + 3),
+                math.max(bottom, top + 3)),
+            structurePaint,
+          );
+        case ShelfKind.marker:
+          break; // text only — see below
+      }
+
       final name = s.label;
       if (name != null && name.isNotEmpty) {
         final tp = TextPainter(
           text: TextSpan(
             text: name,
-            style: TextStyle(color: label, fontSize: 11),
+            style: TextStyle(
+              color: label,
+              fontSize: kind == ShelfKind.marker ? 13 : 11,
+              fontWeight:
+                  kind == ShelfKind.marker ? FontWeight.w600 : FontWeight.normal,
+            ),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
-        tp.paint(canvas, Offset(left + 2, top + 7));
+        tp.paint(canvas, Offset(left + 2, top + (kind == ShelfKind.marker ? -4 : 7)));
       }
     }
+
+    _paintMeasure(canvas);
+  }
+
+  void _paintBackdrop(Canvas canvas) {
+    final image = backdrop;
+    if (image == null || backdropOpacity <= 0) return;
+    // Uncalibrated: a centimetre per pixel, which is roughly a phone photo of a
+    // wall and puts the image on screen at a workable size to line up.
+    final metresPerPixel = backdropScale ?? 0.01;
+    final topLeft = _w2s(backdropOffset);
+    final width = image.width * metresPerPixel * scale;
+    final height = image.height * metresPerPixel * scale;
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(topLeft.dx, topLeft.dy, width, height),
+      Paint()..color = Color.fromRGBO(255, 255, 255, backdropOpacity.clamp(0, 1)),
+    );
+  }
+
+  void _paintMeasure(Canvas canvas) {
+    final from = measureFrom;
+    final to = measureTo;
+    if (from == null || to == null) return;
+    final colour = measureColor ?? plank;
+    final a = _w2s(from);
+    final b = _w2s(to);
+    final paint = Paint()
+      ..color = colour
+      ..strokeWidth = 2;
+    canvas.drawLine(a, b, paint);
+    // End caps, so a short measurement is still visibly a measurement.
+    for (final point in [a, b]) {
+      canvas.drawCircle(point, 4, paint);
+    }
+
+    final metres = (to - from).distance;
+    final tp = TextPainter(
+      text: TextSpan(
+        text: formatDistance(metres),
+        style: TextStyle(
+          color: colour,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final mid = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
+    tp.paint(canvas, mid + const Offset(8, -18));
   }
 
   @override
@@ -87,7 +197,13 @@ class RoomPainter extends CustomPainter {
       old.shelves != shelves ||
       old.origin != origin ||
       old.scale != scale ||
-      old.draggingShelfId != draggingShelfId;
+      old.draggingShelfId != draggingShelfId ||
+      old.backdrop != backdrop ||
+      old.backdropOpacity != backdropOpacity ||
+      old.backdropScale != backdropScale ||
+      old.backdropOffset != backdropOffset ||
+      old.measureFrom != measureFrom ||
+      old.measureTo != measureTo;
   // shelfDelta drives repaints via `repaint:` (a Listenable), so it's not
   // compared here.
 }

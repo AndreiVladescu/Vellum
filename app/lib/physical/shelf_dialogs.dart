@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'room_measure.dart';
+
 import '../data/database.dart';
 import 'physical_metrics.dart';
 
 /// What the shelf dialog returns: endpoints, height, and an optional label.
 class ShelfSpec {
-  ShelfSpec(this.left, this.right, this.y, this.label);
+  ShelfSpec(this.left, this.right, this.y, this.label, this.kind);
   final double left;
   final double right;
   final double y;
   final String? label;
+
+  /// What this segment is (plan 5 #29): a shelf books rest on, or furniture
+  /// that only draws.
+  final ShelfKind kind;
 }
 
 /// Add/edit dialog for a shelf: left/right X, height Y (metres), and a label.
@@ -21,12 +27,20 @@ class ShelfDialog extends StatefulWidget {
     this.initialLeft,
     this.initialRight,
     this.initialLabel,
+    this.initialKind = ShelfKind.shelf,
+    this.fill,
   });
   final double defaultY;
   final String title;
   final double? initialLeft;
   final double? initialRight;
   final String? initialLabel;
+  final ShelfKind initialKind;
+
+  /// How full the shelf currently is (plan 5 #29). Shown when editing an
+  /// existing one — it is the number you actually want while deciding whether
+  /// to move a shelf or buy another bookcase.
+  final ShelfFill? fill;
 
   @override
   State<ShelfDialog> createState() => _ShelfDialogState();
@@ -39,6 +53,7 @@ class _ShelfDialogState extends State<ShelfDialog> {
       TextEditingController(text: (widget.initialRight ?? 1.0).toString());
   late final _height = TextEditingController(text: widget.defaultY.toString());
   late final _label = TextEditingController(text: widget.initialLabel ?? '');
+  late ShelfKind _kind = widget.initialKind;
 
   @override
   void dispose() {
@@ -73,6 +88,35 @@ class _ShelfDialogState extends State<ShelfDialog> {
               'A shelf is a flat line between two points (metres).',
               style: TextStyle(fontSize: 12),
             ),
+            const SizedBox(height: 8),
+            // Furniture reuses this dialog because it *is* the same geometry —
+            // the only difference is whether books rest on it (plan 5 #29).
+            DropdownButtonFormField<ShelfKind>(
+              initialValue: _kind,
+              isDense: true,
+              decoration: const InputDecoration(
+                labelText: 'Kind',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                for (final kind in ShelfKind.values)
+                  DropdownMenuItem(
+                    value: kind,
+                    child: Text(kind.displayName),
+                  ),
+              ],
+              onChanged: (value) =>
+                  setState(() => _kind = value ?? ShelfKind.shelf),
+            ),
+            if (!_kind.holdsBooks)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'Books never rest on this — it only draws.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
             Row(
               children: [
                 Expanded(child: field('Left X (m)', _left)),
@@ -92,6 +136,10 @@ class _ShelfDialogState extends State<ShelfDialog> {
                 ),
               ),
             ),
+            if (widget.fill != null) ...[
+              const SizedBox(height: 14),
+              _FillBar(fill: widget.fill!),
+            ],
           ],
         ),
       ),
@@ -113,10 +161,40 @@ class _ShelfDialogState extends State<ShelfDialog> {
                 right,
                 y,
                 _label.text.trim().isEmpty ? null : _label.text.trim(),
+                _kind,
               ),
             );
           },
           child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+/// How full a shelf is, as a bar and a sentence (plan 5 #29).
+class _FillBar extends StatelessWidget {
+  const _FillBar({required this.fill});
+
+  final ShelfFill fill;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LinearProgressIndicator(
+          value: fill.fraction,
+          // Overfull is a real state — books pushed past the end — and it wants
+          // to look wrong rather than sit quietly at a full bar.
+          color: fill.isOverfull ? theme.colorScheme.error : null,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '${fill.describe()} · ${fill.bookCount} book'
+          '${fill.bookCount == 1 ? '' : 's'}',
+          style: theme.textTheme.bodySmall,
         ),
       ],
     );

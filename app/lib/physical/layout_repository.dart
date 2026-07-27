@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../data/database.dart';
 import '../data/physical_service.dart';
 import 'locate.dart';
+import 'room_measure.dart';
 
 /// A placement joined with the book it shows, for rendering an environment.
 typedef PlacedBook = ({BookPlacement placement, Book book});
@@ -105,6 +106,34 @@ class LayoutRepository {
         [shelfId],
       );
 
+  /// The room's backdrop photo and how it is placed (plan 5 #29). Any argument
+  /// left null is untouched; pass `Value(null)` for [backdropPath] to remove
+  /// the photo.
+  Future<void> updateBackdrop(
+    String environmentId, {
+    Value<String?>? backdropPath,
+    double? opacity,
+    Value<double?>? scale,
+    double? offsetX,
+    double? offsetY,
+  }) async {
+    await (db.update(db.physicalEnvironments)
+          ..where((e) => e.id.equals(environmentId)))
+        .write(PhysicalEnvironmentsCompanion(
+      backdropPath: backdropPath ?? const Value.absent(),
+      backdropOpacity:
+          opacity == null ? const Value.absent() : Value(opacity.clamp(0, 1)),
+      backdropScale: scale ?? const Value.absent(),
+      backdropOffsetX:
+          offsetX == null ? const Value.absent() : Value(offsetX),
+      backdropOffsetY:
+          offsetY == null ? const Value.absent() : Value(offsetY),
+    ));
+    // Deliberately *not* markDirty: the backdrop is app-local and never
+    // published (#47's document is geometry only), so it must not make a room
+    // look like it has unpublished changes.
+  }
+
   Future<PhysicalEnvironment?> environment(String id) =>
       (db.select(db.physicalEnvironments)..where((e) => e.id.equals(id)))
           .getSingleOrNull();
@@ -147,6 +176,7 @@ class LayoutRepository {
     required double x2,
     required double y2,
     String? label,
+    ShelfKind kind = ShelfKind.shelf,
   }) async {
     await db
         .into(db.physicalShelves)
@@ -159,6 +189,7 @@ class LayoutRepository {
             x2: x2,
             y2: y2,
             label: Value(label),
+            kind: Value(kind.key),
           ),
         );
     await markDirty(environmentId);
@@ -171,6 +202,7 @@ class LayoutRepository {
     double? x2,
     double? y2,
     Value<String?>? label,
+    ShelfKind? kind,
   }) async {
     await (db.update(db.physicalShelves)..where((s) => s.id.equals(id))).write(
       PhysicalShelvesCompanion(
@@ -179,6 +211,7 @@ class LayoutRepository {
         x2: x2 == null ? const Value.absent() : Value(x2),
         y2: y2 == null ? const Value.absent() : Value(y2),
         label: label ?? const Value.absent(),
+        kind: kind == null ? const Value.absent() : Value(kind.key),
       ),
     );
     await _dirtyByShelf(id);
