@@ -18,6 +18,7 @@ import 'physical_copies_section.dart';
 import 'read_button.dart';
 import '../reader/annotations/annotations_panel.dart';
 import 'reader_notes_section.dart';
+import 'send_to_device_sheet.dart';
 
 /// Full-page book view: metadata, digital formats, physical copies, and the
 /// Read / Resume reading action.
@@ -329,6 +330,23 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                 widget.connection!,
                 book.id,
                 book.title,
+              ),
+            ),
+          // Only when the server has a mailer (plan 5 #53) — the file and the
+          // outbound email both live there.
+          if (SendToDeviceSheet.availableOn(widget.connection))
+            IconButton(
+              icon: const Icon(Icons.send_outlined),
+              tooltip: 'Send to a device',
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                showDragHandle: true,
+                builder: (_) => SendToDeviceSheet(
+                  book: book,
+                  repository: repository,
+                  connection: widget.connection!,
+                ),
               ),
             ),
           if (widget.settings != null)

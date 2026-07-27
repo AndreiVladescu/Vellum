@@ -36,6 +36,14 @@ class ServerConnection extends ChangeNotifier {
   Capabilities? _capabilities;
   Capabilities? get capabilities => _capabilities;
 
+  /// Seeds the cached handshake without a round trip, so a test can exercise
+  /// a capability gate (plan 5 #6, #53) against a server it never contacts.
+  @visibleForTesting
+  void applyCapabilities(Capabilities value) {
+    _capabilities = value;
+    notifyListeners();
+  }
+
   /// True when the session token is (or was loaded) in plaintext preferences
   /// because the OS secure store was unavailable — a keyring-less headless Linux
   /// box, typically. Drives the honesty notice on the server page (L2).

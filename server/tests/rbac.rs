@@ -49,6 +49,10 @@ async fn test_app() -> (axum::Router, std::path::PathBuf) {
             10_000,
             std::time::Duration::from_secs(60),
         )),
+        send_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            10_000,
+            std::time::Duration::from_secs(60),
+        )),
         mailer: None,
         index_text: true,
         audit: true,

@@ -15,6 +15,12 @@ pub enum AppError {
     BadRequest(String),
     Conflict(String),
     TooManyRequests(String),
+    /// An upstream this server depends on refused the request — today only the
+    /// SMTP relay (plan 5 #53). Distinct from `Internal` because the message is
+    /// *actionable by the user* ("that address is not approved", "the file is
+    /// too large for the recipient") and so, unlike an internal error, it is
+    /// passed through rather than swallowed.
+    BadGateway(String),
     Internal(String),
 }
 
@@ -33,6 +39,7 @@ impl AppError {
             | AppError::BadRequest(m)
             | AppError::Conflict(m)
             | AppError::TooManyRequests(m)
+            | AppError::BadGateway(m)
             | AppError::Internal(m) => m.clone(),
         }
     }
@@ -56,6 +63,7 @@ impl IntoResponse for AppError {
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m),
             AppError::TooManyRequests(m) => (StatusCode::TOO_MANY_REQUESTS, m),
+            AppError::BadGateway(m) => (StatusCode::BAD_GATEWAY, m),
             AppError::Internal(m) => {
                 tracing::error!("internal error: {m}");
                 (

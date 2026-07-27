@@ -172,6 +172,10 @@ async fn main() -> anyhow::Result<()> {
             30,
             std::time::Duration::from_secs(60),
         )),
+        send_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
+            30,
+            std::time::Duration::from_secs(60),
+        )),
         mailer,
         index_text,
         audit,

@@ -3,7 +3,7 @@
 //! hashes. Every endpoint is access-checked against the book the blob belongs
 //! to, exactly like the book metadata.
 
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use axum::Json;
 use axum::body::Bytes;
@@ -1406,6 +1406,19 @@ pub(crate) fn image_mime(bytes: &[u8]) -> Option<&'static str> {
 pub(crate) fn is_safe_rel(rel: &str) -> bool {
     let p = Path::new(rel);
     !rel.is_empty() && !p.is_absolute() && p.components().all(|c| matches!(c, Component::Normal(_)))
+}
+
+/// Resolves a stored relative blob path to an absolute one, refusing anything
+/// that would escape the data dir.
+///
+/// The same defence-in-depth `serve_blob` applies, exposed for callers that
+/// read a blob's *bytes* rather than streaming it as a response — today the
+/// email attachment path (plan 5 #53).
+pub(crate) fn blob_file_path(state: &AppState, rel: &str) -> AppResult<PathBuf> {
+    if !is_safe_rel(rel) {
+        return Err(AppError::NotFound("blob missing on disk".into()));
+    }
+    Ok(state.data_dir.join(rel))
 }
 
 async fn write_blob(state: &AppState, rel: &str, body: &[u8]) -> AppResult<()> {

@@ -592,6 +592,53 @@ class VellumServerClient {
     ];
   }
 
+  // ---- send to a device (plan 5 #53) --------------------------------------
+
+  /// The caller's saved destination addresses.
+  Future<List<SendTarget>> sendTargets() async {
+    final res = await _http.get(_uri('/api/send-targets'), headers: _headers);
+    return [
+      for (final t in _body(res) as List)
+        SendTarget.fromJson(t as Map<String, dynamic>),
+    ];
+  }
+
+  /// Replaces the whole saved list.
+  Future<List<SendTarget>> setSendTargets(List<SendTarget> targets) async {
+    final res = await _http.put(
+      _uri('/api/send-targets'),
+      headers: {..._headers, 'content-type': 'application/json'},
+      body: jsonEncode([for (final t in targets) t.toJson()]),
+    );
+    return [
+      for (final t in _body(res) as List)
+        SendTarget.fromJson(t as Map<String, dynamic>),
+    ];
+  }
+
+  /// Emails one of a book's files to an e-reader. [to] is a literal address;
+  /// [label] picks one of the saved targets instead.
+  Future<String> sendBookToDevice(
+    String bookId, {
+    required String fileId,
+    String? to,
+    String? label,
+  }) async {
+    final res = await _http.post(
+      _uri('/api/books/$bookId/send'),
+      headers: {..._headers, 'content-type': 'application/json'},
+      body: jsonEncode({
+        'file_id': fileId,
+        // Null-aware values: an absent field lets the server fall back to the
+        // other way of naming the destination.
+        'to': ?to,
+        'label': ?label,
+      }),
+    );
+    final body = _body(res) as Map<String, dynamic>;
+    return body['sent_to'] as String? ?? '';
+  }
+
   /// Delete a book on the server (used to propagate a local delete up).
   Future<void> deleteBook(String id) async {
     final res = await _http.delete(_uri('/api/books/$id'), headers: _headers);
@@ -1351,6 +1398,21 @@ class Capabilities {
       for (final f in (j['features'] as List? ?? const [])) f.toString(),
     ],
   );
+}
+
+/// A saved send-to-device address (plan 5 #53) — "My Kindle".
+class SendTarget {
+  const SendTarget({required this.label, required this.address});
+
+  factory SendTarget.fromJson(Map<String, dynamic> json) => SendTarget(
+        label: json['label'] as String? ?? '',
+        address: json['address'] as String? ?? '',
+      );
+
+  final String label;
+  final String address;
+
+  Map<String, dynamic> toJson() => {'label': label, 'address': address};
 }
 
 /// A public per-book link.

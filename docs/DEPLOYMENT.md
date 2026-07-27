@@ -198,6 +198,34 @@ For Gmail: `smtp.gmail.com`, port 587, and an **App Password** — which needs
 misconfiguration (bad port, missing `VELLUM_MAIL_FROM`) stops the server at
 startup rather than surfacing later as a password reset that silently fails.
 
+#### Sending books to an e-reader
+
+With mail configured, the server also advertises `send_to_device` and the app's
+book toolbar gains **Send to a device** (plan 5 #53). One step is easy to miss
+and is not something Vellum can do for you:
+
+> **The recipient service must approve your sender address.** Amazon only
+> accepts a document from an address on the account's *Approved Personal
+> Document E-mail List* — add whatever `VELLUM_MAIL_FROM` is, at
+> *Manage Your Content and Devices → Preferences → Personal Document Settings*.
+> Kobo and PocketBook have the same idea under different names. Until that is
+> done, every send is refused **by the recipient**, not by Vellum, and the app
+> shows the relay's refusal.
+
+Two other limits worth knowing:
+
+- **25 MB per book.** Enforced by Vellum before anything is sent, because
+  base64 inflates an attachment by about a third and most services stop at
+  50 MB. A larger book is refused with its size rather than accepted and lost.
+- **The file's extension decides the conversion.** Send-to-Kindle reads the
+  suffix, so books are attached as `Title.epub` / `Title.pdf`. EPUB is offered
+  first where a book has both — Kindle has accepted EPUB since 2022, and a PDF
+  arrives unconverted and is usually unreadable on a small screen.
+
+Sends are rate-limited per user, like metadata lookups: outbound mail is a
+shared, quota'd resource, and a loop over a whole library looks like abuse from
+the relay's side.
+
 **`VELLUM_PUBLIC_URL` matters.** Public share links embed it; if it says
 `localhost`, that is what the links will say.
 

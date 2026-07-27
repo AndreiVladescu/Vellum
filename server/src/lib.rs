@@ -33,6 +33,7 @@ mod opds;
 mod physical_copies;
 mod reader;
 mod reading;
+mod send;
 mod shares;
 mod shelves;
 mod text_index;
@@ -74,6 +75,10 @@ pub struct AppState {
     /// Per-user limiter for outbound metadata search (shared Open Library /
     /// Google Books quota).
     pub search_limiter: std::sync::Arc<throttle::RateLimiter>,
+    /// Per-user limiter for send-to-device email (plan 5 #53): outbound mail is
+    /// a shared, quota'd resource, and a loop over a library would look like
+    /// abuse from the relay's side.
+    pub send_limiter: std::sync::Arc<throttle::RateLimiter>,
     /// Outbound email, present only when SMTP is configured (plan 5 #31). The
     /// `Option` is the feature flag: everything that needs mail checks it and
     /// degrades rather than failing.
@@ -199,6 +204,13 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/books/{id}/read/{index}", get(reader::unit))
         .route("/books/{id}/read/asset/{*name}", get(reader::asset))
         .route("/files/{file_id}", get(blobs::download_file))
+        // Send a book to an e-reader by email (plan 5 #53). Gated on the `mail`
+        // capability, rate-limited per user, and RBAC'd exactly like a read.
+        .route("/books/{id}/send", post(send::send_book))
+        .route(
+            "/send-targets",
+            get(send::list_targets).put(send::put_targets),
+        )
         // Book groups.
         .route("/groups", get(groups::list).post(groups::create))
         .route("/groups/{id}", get(groups::get).delete(groups::delete))
@@ -286,6 +298,10 @@ pub fn sha256_hex_for_tests(input: &str) -> String {
 }
 
 /// A mailer for tests, built without touching the process environment.
+/// The email attachment cap and the attachment-name rule, re-exported so the
+/// integration tests can assert against the real values rather than copies.
+pub use send::{MAX_ATTACHMENT_BYTES, attachment_name};
+
 pub fn test_mailer(host: &str, from: &str) -> mail::Mailer {
     mail::for_testing(host, from)
 }

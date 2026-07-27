@@ -66,6 +66,11 @@ pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {
     let mut features = FEATURES.to_vec();
     if crate::mail::is_enabled(&state.mailer) {
         features.push("mail");
+        // Send-to-device (plan 5 #53) exists only where mail does, but it is a
+        // separate feature: a server may gain mail for password resets long
+        // before a client learns to offer "send to my Kindle", and the client
+        // should gate on the thing it actually calls.
+        features.push("send_to_device");
     }
     if state.index_text {
         features.push("content_search");

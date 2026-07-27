@@ -1,0 +1,11 @@
+-- Saved send-to-device addresses per user (plan 5 #53).
+--
+-- A JSON array of {"label": "My Kindle", "address": "…@kindle.com"} rather than
+-- a table: it is a short, unordered, whole-value list that is always read and
+-- written together, never joined against, and never queried by address. A table
+-- would buy indexing and referential integrity that nothing here wants.
+--
+-- **Server-only, like every other `app_user` column.** Accounts do not exist in
+-- the app's schema at all, so this needs no drift counterpart and no entry in
+-- `schema_parity.rs` — that test lists only the tables that actually sync.
+ALTER TABLE app_user ADD COLUMN send_targets TEXT NOT NULL DEFAULT '[]';

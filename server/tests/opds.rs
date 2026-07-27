@@ -31,6 +31,10 @@ async fn app(index_text: bool) -> axum::Router {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        send_limiter: std::sync::Arc::new(RateLimiter::new(
+            1000,
+            std::time::Duration::from_secs(60),
+        )),
         mailer: None,
         index_text,
         audit: true,

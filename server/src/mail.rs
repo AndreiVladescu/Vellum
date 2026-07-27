@@ -11,6 +11,7 @@
 //! — never the username or password.
 
 use lettre::message::header::ContentType;
+use lettre::message::{Attachment, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 
@@ -101,6 +102,60 @@ impl Mailer {
             // The error may name the host and the failure, never the body.
             tracing::error!("mail send failed: {e}");
             AppError::Internal("could not send the email".into())
+        })?;
+        Ok(())
+    }
+
+    /// Sends a message carrying one file (plan 5 #53).
+    ///
+    /// Kept separate from [`send`] rather than folded into it with an optional
+    /// argument: an attachment turns the message into a multipart one, and the
+    /// two call sites want different failure stories — a reset link that can't
+    /// be delivered is an internal error, a 40 MB book that a recipient refuses
+    /// is the user's problem to see and act on.
+    pub async fn send_with_attachment(
+        &self,
+        to: &str,
+        subject: &str,
+        body: &str,
+        filename: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> AppResult<()> {
+        let attachment = Attachment::new(filename.to_string()).body(
+            bytes,
+            content_type
+                .parse()
+                .map_err(|e| AppError::Internal(format!("mail content type: {e}")))?,
+        );
+        let message = Message::builder()
+            .from(
+                self.from
+                    .parse()
+                    .map_err(|e| AppError::Internal(format!("mail from: {e}")))?,
+            )
+            .to(to
+                .parse()
+                .map_err(|_| AppError::BadRequest("not a valid email address".into()))?)
+            .subject(subject)
+            .multipart(
+                MultiPart::mixed()
+                    .singlepart(SinglePart::plain(body.to_string()))
+                    .singlepart(attachment),
+            )
+            .map_err(|e| AppError::Internal(format!("mail body: {e}")))?;
+
+        self.transport.send(message).await.map_err(|e| {
+            tracing::error!("mail send (attachment) failed: {e}");
+            // Deliberately more specific than `send`'s message: the most common
+            // failure here is the recipient service rejecting the sender or the
+            // size, and "could not send the email" would leave the user with
+            // nothing to act on.
+            AppError::BadGateway(
+                "the mail server refused the message — check the size limit and \
+                 that the sender address is approved by the recipient service"
+                    .into(),
+            )
         })?;
         Ok(())
     }
