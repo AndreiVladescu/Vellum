@@ -7,7 +7,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
-use vellum_server::{AppState, RateLimiter, connect_db, drain_text_index, router};
+use vellum_server::{AppState, EventBus, RateLimiter, connect_db, drain_text_index, router};
 
 /// A state and a router over the same state, so a test can both make requests
 /// and drive the indexer.
@@ -37,6 +37,7 @@ async fn indexed_app(index_text: bool) -> (axum::Router, AppState) {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        events: EventBus::new(),
         mailer: None,
         index_text,
         audit: true,

@@ -8,7 +8,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
-use vellum_server::{AppState, RateLimiter, connect_db, router};
+use vellum_server::{AppState, EventBus, RateLimiter, connect_db, router};
 
 struct Harness {
     app: axum::Router,
@@ -45,6 +45,7 @@ async fn app() -> Harness {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        events: EventBus::new(),
         mailer: None,
         index_text: false,
         audit: false,
@@ -372,6 +373,7 @@ fn test_state(h: &Harness) -> AppState {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        events: EventBus::new(),
         mailer: None,
         index_text: false,
         audit: false,

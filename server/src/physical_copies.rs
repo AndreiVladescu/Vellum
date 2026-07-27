@@ -201,6 +201,7 @@ pub async fn upsert(
         .await?;
     tx.commit().await?;
 
+    crate::events::publish(&state, "copy", &id, "upsert");
     fetch_copy(&state, &id).await
 }
 
@@ -240,6 +241,7 @@ pub async fn delete(
         .await?;
     tx.commit().await?;
 
+    crate::events::publish(&state, "copy", &id, "delete");
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 

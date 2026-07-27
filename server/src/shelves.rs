@@ -253,6 +253,7 @@ pub async fn upsert(
     }
     tx.commit().await?;
 
+    crate::events::publish(&state, "shelf", &id, "upsert");
     fetch_shelf(&state, &id).await
 }
 
@@ -309,6 +310,7 @@ pub async fn delete(
         .await?;
     tx.commit().await?;
 
+    crate::events::publish(&state, "shelf", &id, "delete");
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 

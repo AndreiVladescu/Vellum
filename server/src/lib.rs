@@ -23,6 +23,7 @@ mod borrow;
 mod capabilities;
 mod discover;
 mod error;
+mod events;
 mod groups;
 mod layouts;
 mod loans;
@@ -42,6 +43,9 @@ pub mod tls;
 mod web;
 
 pub use throttle::RateLimiter;
+
+/// Re-exported so `main.rs` and the tests can build an `AppState`.
+pub use events::EventBus;
 
 /// Re-exported for `main.rs`: the content-search backlog queue and worker
 /// (plan 5 #32).
@@ -83,6 +87,10 @@ pub struct AppState {
     /// a shared, quota'd resource, and a loop over a library would look like
     /// abuse from the relay's side.
     pub send_limiter: std::sync::Arc<throttle::RateLimiter>,
+    /// Fan-out for live sync hints (plan 5 #8). Hints only — an event says
+    /// *something changed*, and the client answers with the delta pull it
+    /// would have run anyway, so this adds no second conflict model.
+    pub events: events::EventBus,
     /// Outbound email, present only when SMTP is configured (plan 5 #31). The
     /// `Option` is the feature flag: everything that needs mail checks it and
     /// degrades rather than failing.
@@ -145,6 +153,9 @@ pub async fn connect_db(path: &str) -> anyhow::Result<SqlitePool> {
 fn api_routes(max_upload: usize) -> Router<AppState> {
     Router::new()
         .route("/capabilities", get(capabilities::get))
+        // Live sync hints (plan 5 #8). Authenticated, and filtered per
+        // subscriber — see `events::visible_to`.
+        .route("/events", get(events::stream))
         .route("/memberships", get(web::memberships))
         // Operator dashboard numbers (plan 5 #37). Master-only — see the
         // handler; counts of other people's shares are not a member's business.

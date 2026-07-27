@@ -53,6 +53,7 @@ async fn test_app() -> (axum::Router, std::path::PathBuf) {
             10_000,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         mailer: None,
         index_text: true,
         audit: true,

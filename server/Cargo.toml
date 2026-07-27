@@ -48,6 +48,7 @@ lettre = { version = "0.11.22", default-features = false, features = [
     "hostname",
     "webpki-roots",
 ] }
+async-stream = "0.3.6"
 
 # Used only to apply setrlimit resource caps to the PDF-render subprocesses on
 # Unix (see blobs.rs). Unused on other platforms.

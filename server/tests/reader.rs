@@ -7,7 +7,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
-use vellum_server::{AppState, RateLimiter, connect_db, router};
+use vellum_server::{AppState, EventBus, RateLimiter, connect_db, router};
 
 async fn app() -> (axum::Router, sqlx::SqlitePool) {
     let id = uuid::Uuid::new_v4();
@@ -34,6 +34,7 @@ async fn app() -> (axum::Router, sqlx::SqlitePool) {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        events: EventBus::new(),
         mailer: None,
         index_text: false,
         audit: false,

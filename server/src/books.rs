@@ -565,6 +565,7 @@ pub async fn create(
         Some(input.title.trim()),
     )
     .await;
+    crate::events::publish(&state, "book", &id, "upsert");
     fetch_book(&state, &id).await
 }
 
@@ -692,6 +693,7 @@ async fn upsert_one(
                 .fetch_one(&state.db)
                 .await?;
         if meta_same && authors_same && genres_same && series_same && !tombstoned {
+            crate::events::publish(state, "book", id, "upsert");
             return Ok(UpsertOutcome::Applied(current));
         }
     }
@@ -829,6 +831,11 @@ async fn upsert_one(
             .await?;
     }
     tx.commit().await?;
+    // Published from here rather than from the handlers, so the single-book
+    // PUT and #7's batch both emit exactly once — and only on `Applied`: a
+    // `SkippedOlder` changed nothing, and a hint about it would just make every
+    // client pull for no reason.
+    crate::events::publish(state, "book", id, "upsert");
     Ok(UpsertOutcome::Applied(fetch_book(state, id).await?.0))
 }
 
@@ -1069,6 +1076,7 @@ pub async fn update(
     .bind(&id)
     .execute(&state.db)
     .await?;
+    crate::events::publish(&state, "book", &id, "upsert");
     fetch_book(&state, &id).await
 }
 
@@ -1171,6 +1179,7 @@ pub async fn delete(
         title.as_deref(),
     )
     .await;
+    crate::events::publish(&state, "book", &id, "delete");
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 

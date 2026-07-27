@@ -60,6 +60,10 @@ const FEATURES: &[&str] = &[
     "reading_progress",
     "layouts",
     "borrow_requests",
+    // Live sync hints over SSE (plan 5 #8). Always on: the endpoint costs
+    // nothing when nobody subscribes, and a client that can't use it simply
+    // syncs at launch as before.
+    "live_events",
 ];
 
 pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {

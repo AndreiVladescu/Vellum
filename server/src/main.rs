@@ -176,6 +176,7 @@ async fn main() -> anyhow::Result<()> {
             30,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         mailer,
         index_text,
         audit,

@@ -8,7 +8,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use base64::Engine;
 use tower::ServiceExt;
-use vellum_server::{AppState, RateLimiter, connect_db, router};
+use vellum_server::{AppState, EventBus, RateLimiter, connect_db, router};
 
 async fn app(index_text: bool) -> axum::Router {
     let id = uuid::Uuid::new_v4();
@@ -35,6 +35,7 @@ async fn app(index_text: bool) -> axum::Router {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        events: EventBus::new(),
         mailer: None,
         index_text,
         audit: true,

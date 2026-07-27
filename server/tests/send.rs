@@ -10,7 +10,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
-use vellum_server::{AppState, RateLimiter, connect_db, router, test_mailer};
+use vellum_server::{AppState, EventBus, RateLimiter, connect_db, router, test_mailer};
 
 struct Harness {
     app: axum::Router,
@@ -47,6 +47,7 @@ async fn app(with_mail: bool, send_quota: usize) -> Harness {
             send_quota,
             std::time::Duration::from_secs(60),
         )),
+        events: EventBus::new(),
         // A host that cannot resolve: nothing leaves the machine, and the
         // handler still runs to completion.
         mailer: with_mail.then(|| test_mailer("smtp.invalid.example", "vellum@example.com")),

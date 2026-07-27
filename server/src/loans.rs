@@ -249,6 +249,7 @@ pub async fn upsert(
         .await?;
     tx.commit().await?;
 
+    crate::events::publish(&state, "loan", &id, "upsert");
     fetch_loan(&state, &id).await
 }
 
@@ -291,6 +292,7 @@ pub async fn delete(
         .await?;
     tx.commit().await?;
 
+    crate::events::publish(&state, "loan", &id, "delete");
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
 

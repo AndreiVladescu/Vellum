@@ -592,6 +592,24 @@ class VellumServerClient {
     ];
   }
 
+  /// Opens the live change-hint stream (plan 5 #8), decoded to lines.
+  ///
+  /// Takes the [http.Client] rather than using the shared one: an SSE response
+  /// is held open indefinitely, and closing it is how the caller cancels — a
+  /// shared client would have to stay alive for every other request too.
+  Future<Stream<String>> openEventStream(http.Client httpClient) async {
+    final request = http.Request('GET', _uri('/api/events'))
+      ..headers.addAll({..._headers, 'accept': 'text/event-stream'});
+    final response = await httpClient.send(request);
+    if (response.statusCode != 200) {
+      throw ServerException(
+        'event stream unavailable (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    }
+    return response.stream.transform(utf8.decoder).transform(const LineSplitter());
+  }
+
   // ---- send to a device (plan 5 #53) --------------------------------------
 
   /// The caller's saved destination addresses.

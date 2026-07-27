@@ -36,6 +36,7 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
             30,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         mailer: None,
         // Off, like a default server: content indexing is opt-in
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
@@ -81,6 +82,7 @@ async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
             30,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         mailer: None,
         // Off, like a default server: content indexing is opt-in
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
@@ -257,6 +259,7 @@ async fn session_expiry_slides_forward_on_use() {
             30,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         mailer: None,
         // Off, like a default server: content indexing is opt-in
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
@@ -1159,6 +1162,7 @@ async fn mail_is_advertised_once_a_mailer_exists() {
             30,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         mailer: Some(mailer),
         // Off, like a default server: content indexing is opt-in
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
@@ -1208,6 +1212,7 @@ async fn test_app_with_mail() -> (axum::Router, sqlx::SqlitePool) {
             1000,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         // Off, like a default server: content indexing is opt-in
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with
         // it on.
@@ -3631,6 +3636,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
             30,
             std::time::Duration::from_secs(60),
         )),
+        events: vellum_server::EventBus::new(),
         mailer: None,
         // Off, like a default server: content indexing is opt-in
         // (VELLUM_INDEX_TEXT). `tests/text_index.rs` builds its own state with

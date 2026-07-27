@@ -23,6 +23,7 @@ import 'onboarding/first_run_sheet.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
 import 'server/connection_store.dart';
+import 'server/live_sync.dart';
 import 'server/server_client.dart';
 import 'server/server_page.dart';
 import 'server/sync_service.dart';
@@ -173,6 +174,17 @@ class _LibraryPageState extends State<LibraryPage> {
     enabled: () => widget.settings.autoPush,
   );
 
+  /// Live change hints from the server (plan 5 #8). Only ever *triggers* the
+  /// existing delta pull, so there is no second conflict model — and it stays
+  /// silent when the server is old, unreachable, or simply not there.
+  late final LiveSyncTrigger _live = LiveSyncTrigger(
+    client: () => widget.connection.client,
+    isConnected: () =>
+        widget.connection.isConnected &&
+        (widget.connection.capabilities?.hasFeature('live_events') ?? false),
+    onHint: _pullFromHint,
+  );
+
   /// Books opened or shared into Vellum from another app (plan 5 #20).
   late final IncomingShare _incoming = IncomingShare();
   StreamSubscription<List<String>>? _incomingSub;
@@ -184,11 +196,32 @@ class _LibraryPageState extends State<LibraryPage> {
     super.initState();
     _autoSync();
     _autoPusher.start();
+    _live.start();
     _offerWatchedFolder();
     _listenForSharedBooks();
     _showFirstRun();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
+  }
+
+  /// A delta pull provoked by a live hint (plan 5 #8).
+  ///
+  /// Quiet on purpose — no snackbar. The user didn't ask for this sync, and a
+  /// toast every time someone edits a book in the console would be noise; the
+  /// shelf's streams update on their own once the rows land.
+  Future<void> _pullFromHint() async {
+    final client = widget.connection.client;
+    if (client == null || _sync.isRunning) return;
+    try {
+      await _sync.pull(
+        client,
+        cursor: widget.connection.syncCursor,
+        onCursor: widget.connection.setSyncCursor,
+      );
+    } catch (_) {
+      // Offline or racing another sync — the next launch or manual sync covers
+      // it, exactly as before this feature existed.
+    }
   }
 
   /// Best-effort sync on launch when a server is connected. Quiet by design:
@@ -356,6 +389,7 @@ class _LibraryPageState extends State<LibraryPage> {
     _searchController.dispose();
     _searchFocus.dispose();
     _autoPusher.dispose();
+    _live.dispose();
     _incomingSub?.cancel();
     _incoming.dispose();
     super.dispose();
