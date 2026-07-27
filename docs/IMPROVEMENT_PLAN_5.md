@@ -68,13 +68,15 @@ is answerable from `git log`:
 | 52 | Trash with a 30-day grace before permanent delete | `97ee45b` |
 | 26 | Keyboard shortcuts and a command palette | `40d3062` |
 | 21a | Wishlist for books you don't own yet | `b7b2c98` |
+| 39 | Appearance: theme, seed colour, shelf material | `d412537` |
+| 42 | A11y round two: keyboard, room summary, announcements | `c28b6da` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
 #14, #52, #26 and #21a from the "interleave anywhere" list. What remains is the
-rest of that list, which was never assigned to a phase: #39 (theming), #42 (a11y
-round two), #9 (content-addressed blobs), #8 (SSE), #29/#30 (physical depth),
-#38 (l10n), #40 (Android background), #53 (send-to-e-reader) and #21c
-(Calibre/CSV/OPDS import). None of them blocks anything.
+rest of that list, which was never assigned to a phase: #9 (content-addressed
+blobs), #8 (SSE), #29/#30 (physical depth), #38 (l10n), #40 (Android
+background), #53 (send-to-e-reader) and #21c (Calibre/CSV/OPDS import). None of
+them blocks anything.
 
 *#35's **virtualised table body** is deliberately not built. It was proposed as
 the fix for a DOM holding the whole library — but with search, sort and filters
@@ -95,10 +97,10 @@ take a string literal.
 
 **Phase 6** (§K) is complete: #47, #48, #49, #50 and #51 have all landed — so
 **every numbered item in this plan's six phases is done**.
-Still open from the interleave list: #39 theming, #42 a11y round two, #9
-content-addressed blobs, #8 SSE, #29/#30, #38 l10n, #40 Android background, #53
-send-to-e-reader, and #21c (Calibre / CSV / OPDS import) — 21b was taken on its
-own because §I sequences it into Phase 3, and 21a has since landed separately.
+Still open from the interleave list: #9 content-addressed blobs, #8 SSE,
+#29/#30, #38 l10n, #40 Android background, #53 send-to-e-reader, and #21c
+(Calibre / CSV / OPDS import) — 21b was taken on its own because §I sequences it
+into Phase 3, and 21a has since landed separately.
 
 Two notes for whoever picks this up:
 
@@ -168,6 +170,27 @@ Two notes for whoever picks this up:
   services themselves, so promotion happens wherever ownership actually
   changes. `SeriesPlace` gained `wanted`/`openGaps` so gap detection can offer a
   volume once and then stop.
+
+- **#39 does not restyle the spines, on purpose.** Spine colours are persisted
+  per book in `spine_style`, so they cannot follow a live preference without
+  rewriting every row — and a shelf where every book is a tint of the seed looks
+  like a colour swatch rather than a library. The theme drives the *shelf*
+  (boards, via `ShelfMaterial`) and the chrome; the one genuine leak, a
+  leather-brown title ink, is now the neutral `spineInk`. The size nudges are
+  applied at render, so the packer and the spine must use the same factor or the
+  rows lay out for a width the books no longer have.
+- **#39's bundled display faces were not built.** Everything else in the item
+  landed; real display faces mean shipping font assets plus their licences,
+  which is a call for the repo owner rather than a detail of this change.
+- **#42's real finding was that the shelf had no keyboard path at all.** Spines,
+  covers and the cover thumbnail were bare `GestureDetector`s — announced as
+  buttons, reachable only by pointer. That is the rule now written down first in
+  `docs/ACCESSIBILITY.md`. The room canvas keeps *no* direct traversal
+  deliberately: a spatial drag-and-drop arrangement has no useful tab order, so
+  it reports as one summarising node and *Room contents* is the navigable
+  equivalent. `SemanticsService.announce` is deprecated in current Flutter;
+  `sendAnnouncement` needs the `View` and should be guarded with
+  `MediaQuery.supportsAnnounceOf`.
 
 **Status of plan 4:** §A 1–3, §B 4–6, §C 7–10, §D 11–13, §E 16–17 and §F 18 all
 landed. Still open and **carried into this plan unchanged**:
