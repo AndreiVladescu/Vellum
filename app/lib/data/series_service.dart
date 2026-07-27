@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import 'database.dart';
+import 'wishlist_service.dart';
 
 /// A book's place in its series, plus what's missing around it (plan 5 #17).
 class SeriesPlace {
@@ -9,6 +10,7 @@ class SeriesPlace {
     required this.name,
     required this.index,
     required this.owned,
+    required this.wanted,
     required this.gaps,
   });
 
@@ -17,8 +19,13 @@ class SeriesPlace {
   /// This book's own number, if it has one.
   final double? index;
 
-  /// Every volume number owned in this series, ascending.
+  /// Every volume number owned in this series, ascending. Wishlist entries are
+  /// not in here — they're what [wanted] is for.
   final List<double> owned;
+
+  /// Volume numbers already on the wishlist (plan 5 #21a), so the gap list
+  /// doesn't keep offering a book you've already said you want.
+  final List<double> wanted;
 
   /// Whole numbers between the lowest and highest owned volume that are missing.
   ///
@@ -29,6 +36,11 @@ class SeriesPlace {
   final List<int> gaps;
 
   bool get hasGaps => gaps.isNotEmpty;
+
+  /// The gaps you haven't already wished for — what the detail page offers to
+  /// add to the wishlist.
+  List<int> get openGaps =>
+      [for (final g in gaps) if (!wanted.contains(g.toDouble())) g];
 }
 
 /// Series membership and gap detection (plan 5 #17).
@@ -110,17 +122,29 @@ class SeriesService {
     final row = await (db.select(db.series)..where((s) => s.id.equals(seriesId)))
         .getSingleOrNull();
     if (row == null) return null;
+    // Trashed siblings are gone as far as the shelf is concerned (plan 5 #52),
+    // so counting them would report volumes you can't reach.
     final siblings = await (db.select(db.books)
-          ..where((b) => b.seriesId.equals(seriesId)))
+          ..where((b) => b.seriesId.equals(seriesId) & b.deletedAt.isNull()))
         .get();
+    // Wishlist entries sit in the same series but are explicitly *not* owned
+    // (plan 5 #21a) — keeping them separate is what lets the gap list say
+    // "missing 2" and "already on your wishlist" as different things.
     final owned = [
       for (final b in siblings)
-        if (b.seriesIndex != null) b.seriesIndex!,
+        if (b.seriesIndex != null && !WishlistService.isWanted(b))
+          b.seriesIndex!,
+    ]..sort();
+    final wanted = [
+      for (final b in siblings)
+        if (b.seriesIndex != null && WishlistService.isWanted(b))
+          b.seriesIndex!,
     ]..sort();
     return SeriesPlace(
       name: row.name,
       index: book.seriesIndex,
       owned: owned,
+      wanted: wanted,
       gaps: gapsIn(owned),
     );
   }

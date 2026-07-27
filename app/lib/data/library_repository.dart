@@ -19,6 +19,7 @@ import 'reading_status.dart';
 import 'series_service.dart';
 import 'shelf_service.dart';
 import 'trash_service.dart';
+import 'wishlist_service.dart';
 
 // Physical-layout CRUD lives in LayoutRepository (reached via `.layout`);
 // re-export the pieces callers still import from here so their imports are
@@ -37,6 +38,7 @@ export 'reading_position_service.dart'
 export 'reading_status.dart' show ReadingStatus, ReadingStatusService;
 export 'series_service.dart' show SeriesPlace, SeriesService;
 export 'trash_service.dart' show TrashService;
+export 'wishlist_service.dart' show WishlistService;
 
 /// All library operations the UI needs. A thin facade over the local
 /// database and filesystem store: each concern (queries, book lifecycle,
@@ -61,6 +63,7 @@ class LibraryRepository {
     required this.readingStatus,
     required this.seriesService,
     required this.trash,
+    required this.wishlist,
   });
 
   final VellumDatabase db;
@@ -116,6 +119,10 @@ class LibraryRepository {
   /// `repository.trash`.
   final TrashService trash;
 
+  /// Books you want but don't own yet (plan 5 #21a). Reached as
+  /// `repository.wishlist`.
+  final WishlistService wishlist;
+
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
     return _withDataDir(db, dir);
@@ -167,6 +174,7 @@ class LibraryRepository {
     final copyPhotos = CopyPhotoService(db, dir);
     final physical = PhysicalService(db, copyPhotos);
     final writes = BookWriteService(db, dir, metadataService, covers);
+    final seriesService = SeriesService(db);
     return LibraryRepository._(
       db: db,
       metadata: metadataService,
@@ -182,8 +190,9 @@ class LibraryRepository {
       readingPositions: ReadingPositionService(db),
       annotations: AnnotationStore(db),
       readingStatus: ReadingStatusService(db),
-      seriesService: SeriesService(db),
+      seriesService: seriesService,
       trash: TrashService(db, writes),
+      wishlist: WishlistService(db, writes, seriesService),
     );
   }
 
@@ -306,19 +315,34 @@ class LibraryRepository {
   Stream<List<BookFile>> watchFilesOf(String bookId) =>
       files.watchFilesOf(bookId);
   File fileOf(BookFile file) => files.fileOf(file);
-  Future<void> attachFile(String bookId, String sourcePath) =>
-      files.attachFile(bookId, sourcePath);
+  /// Attaches a digital file — and, if the book was on the wishlist, takes it
+  /// off (plan 5 #21a): having the file *is* owning it, so asking the user to
+  /// also say so would only produce a wishlist full of books they have.
+  Future<void> attachFile(String bookId, String sourcePath) async {
+    await files.attachFile(bookId, sourcePath);
+    await wishlist.noteAcquired(bookId);
+  }
   Future<int?> pageCountFromFile(String bookId) =>
       files.pageCountFromFile(bookId);
 
   // ---- Physical copies & loans --------------------------------------------
   Stream<List<PhysicalCopy>> watchCopiesOf(String bookId) =>
       physical.watchCopiesOf(bookId);
+  /// Records a physical copy — and graduates a wishlist entry for the same
+  /// reason [attachFile] does.
   Future<String> addPhysicalCopy(
     String bookId, {
     String? location,
     String? notes,
-  }) => physical.addPhysicalCopy(bookId, location: location, notes: notes);
+  }) async {
+    final id = await physical.addPhysicalCopy(
+      bookId,
+      location: location,
+      notes: notes,
+    );
+    await wishlist.noteAcquired(bookId);
+    return id;
+  }
   Stream<List<Loan>> watchLoansOf(String copyId) =>
       physical.watchLoansOf(copyId);
   Stream<List<LoanEntry>> watchAllLoans() => physical.watchAllLoans();

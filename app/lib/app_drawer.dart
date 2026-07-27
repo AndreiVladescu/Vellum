@@ -12,6 +12,7 @@ import 'server/server_page.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/preferences_page.dart';
+import 'wishlist/wishlist_page.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({
@@ -81,6 +82,17 @@ class AppDrawer extends StatelessWidget {
     ));
   }
 
+  void _openWishlist(BuildContext context) {
+    Navigator.of(context).pop(); // close the drawer first
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => WishlistPage(
+        repository: repository,
+        settings: settings,
+        connection: connection,
+      ),
+    ));
+  }
+
   void _openInsights(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(MaterialPageRoute(
@@ -130,6 +142,18 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.folder_open),
             title: const Text('Import a folder'),
             onTap: () => _openFolderImport(context),
+          ),
+          StreamBuilder<int>(
+            stream: repository.wishlist.watchCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return ListTile(
+                leading: const Icon(Icons.bookmark_border),
+                title: const Text('Wishlist'),
+                trailing: count == 0 ? null : Text('$count'),
+                onTap: () => _openWishlist(context),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.content_copy_outlined),

@@ -771,11 +771,13 @@ class VellumDatabase extends _$VellumDatabase {
     }
   }
 
-  /// All *live* books, alphabetically — reactive: the shelf UI rebuilds on
-  /// changes. Trashed books (plan 5 #52) are excluded here rather than at each
-  /// call site, so nothing that asks for "the library" has to remember to.
+  /// Every book you own, alphabetically — reactive: the shelf UI rebuilds on
+  /// changes. Trashed books (plan 5 #52) and wishlist entries (plan 5 #21a) are
+  /// both excluded here rather than at each call site, so nothing that asks for
+  /// "the library" has to remember that neither is in it.
   Stream<List<Book>> watchAllBooks() => (select(books)
-        ..where((b) => b.deletedAt.isNull())
+        ..where((b) =>
+            b.deletedAt.isNull() & b.status.equals('wishlist').not())
         ..orderBy([(b) => OrderingTerm.asc(b.title)]))
       .watch();
 

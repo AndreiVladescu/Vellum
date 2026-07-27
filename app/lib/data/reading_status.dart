@@ -12,12 +12,29 @@ enum ReadingStatus {
   reading('Reading', 'In progress'),
   finished('Finished', 'Read to the end'),
   abandoned('Abandoned', 'Started, then put down'),
-  reference('Reference', 'Dipped into, never "finished"');
+  reference('Reference', 'Dipped into, never "finished"'),
+
+  /// Not a reading state at all: a book you *want* and don't own (plan 5 #21a).
+  ///
+  /// It rides this column rather than getting one of its own because a wishlist
+  /// entry is a book in every other respect — title, author, cover, series
+  /// number — and giving it a separate table would mean duplicating all of that
+  /// and then migrating a row across when you finally buy it. The one rule that
+  /// follows: a wishlist book is **not in the library**, so it stays out of the
+  /// shelf, the palette, and the copy pickers until it's owned.
+  wishlist('Wishlist', 'Wanted, not owned yet');
 
   const ReadingStatus(this.label, this.description);
 
   final String label;
   final String description;
+
+  /// The states a book you actually own can be in — what the shelf's status
+  /// facet and the detail page offer. [wishlist] is deliberately not among
+  /// them: it has its own view, and offering it as a "reading status" would
+  /// invite marking an owned book as wanted.
+  static List<ReadingStatus> get ownedStates =>
+      [for (final s in values) if (s != wishlist) s];
 
   static ReadingStatus parse(String? raw) =>
       ReadingStatus.values.where((s) => s.name == raw).firstOrNull ??

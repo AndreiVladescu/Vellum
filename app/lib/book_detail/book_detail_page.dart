@@ -577,7 +577,9 @@ class _StatusAndRating extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final status = ReadingStatus.parse(book.status);
-    final offerFinish = ReadingStatusService.shouldOfferFinished(book);
+    final wanted = WishlistService.isWanted(book);
+    final offerFinish =
+        !wanted && ReadingStatusService.shouldOfferFinished(book);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -590,7 +592,10 @@ class _StatusAndRating extends StatelessWidget {
                 onSelected: (choice) =>
                     repository.readingStatus.setStatus(book.id, choice),
                 itemBuilder: (context) => [
-                  for (final option in ReadingStatus.values)
+                  // Owned states only; "wanted" is offered separately below,
+                  // because it is about ownership rather than reading
+                  // (plan 5 #21a).
+                  for (final option in ReadingStatus.ownedStates)
                     PopupMenuItem(
                       value: option,
                       child: ListTile(
@@ -643,6 +648,30 @@ class _StatusAndRating extends StatelessWidget {
                 label: const Text('Mark as finished'),
               ),
             ),
+          // A wanted book says so plainly, and offers the one transition that
+          // matters (plan 5 #21a). Attaching a file or adding a copy does this
+          // by itself — this is for the physical book you bought and haven't
+          // catalogued yet.
+          if (wanted)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'On your wishlist — you don’t own this yet.',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.tertiary),
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () => repository.wishlist.markOwned(book.id),
+                    icon: const Icon(Icons.library_add_check_outlined),
+                    label: const Text('I own this now'),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -656,11 +685,28 @@ class _StatusAndRating extends StatelessWidget {
 /// but "you're missing 2". Tapping *Set series…* edits the membership; the field
 /// autocompletes over series the library already knows, so a typo doesn't create
 /// a second "Dune".
-class _SeriesStrip extends StatelessWidget {
+class _SeriesStrip extends StatefulWidget {
   const _SeriesStrip({required this.book, required this.repository});
 
   final Book book;
   final LibraryRepository repository;
+
+  @override
+  State<_SeriesStrip> createState() => _SeriesStripState();
+}
+
+class _SeriesStripState extends State<_SeriesStrip> {
+  /// Held in state, not recomputed in `build`: the gap list changes when a
+  /// *sibling* is wished for or bought, which never touches this book's row —
+  /// so nothing else would tell the strip to look again.
+  late Future<SeriesPlace?> _place = _load();
+
+  Book get book => widget.book;
+  LibraryRepository get repository => widget.repository;
+
+  Future<SeriesPlace?> _load() => repository.seriesService.placeOf(book);
+
+  void _reload() => setState(() => _place = _load());
 
   Future<void> _edit(BuildContext context) async {
     final names = await repository.seriesService.watchNames().first;
@@ -735,13 +781,34 @@ class _SeriesStrip extends StatelessWidget {
       nameController.text,
       double.tryParse(indexController.text.trim()),
     );
+    if (mounted) _reload();
+  }
+
+  /// Puts a missing volume on the wishlist, carrying this book's author across
+  /// — a series is usually one author's, and typing it again is busywork.
+  Future<void> _wishVolume(
+    BuildContext context,
+    SeriesPlace place,
+    int volume,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final details = await repository.detailsFor(book.id);
+    await repository.wishlist.addSeriesGap(
+      seriesName: place.name,
+      volume: volume,
+      author: details.authors.firstOrNull,
+    );
+    messenger.showSnackBar(SnackBar(
+      content: Text('${place.name} vol. $volume added to your wishlist'),
+    ));
+    if (mounted) _reload();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return FutureBuilder<SeriesPlace?>(
-      future: repository.seriesService.placeOf(book),
+      future: _place,
       builder: (context, snapshot) {
         final place = snapshot.data;
         if (place == null) {
@@ -781,12 +848,30 @@ class _SeriesStrip extends StatelessWidget {
                   ),
                 ],
               ),
-              if (place.hasGaps)
+              if (place.hasGaps) ...[
                 Text(
                   'Missing: ${place.gaps.join(', ')}',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.tertiary),
                 ),
+                // The gap list's natural next question — "so get it" — answered
+                // where it's asked (plan 5 #17 feeding #21a). Volumes already
+                // wished for drop out of `openGaps`, so tapping one doesn't
+                // leave a chip that would add a duplicate.
+                if (place.openGaps.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final volume in place.openGaps)
+                        ActionChip(
+                          avatar: const Icon(Icons.bookmark_add_outlined,
+                              size: 16),
+                          label: Text('Want $volume'),
+                          onPressed: () => _wishVolume(context, place, volume),
+                        ),
+                    ],
+                  ),
+              ],
             ],
           ),
         );
