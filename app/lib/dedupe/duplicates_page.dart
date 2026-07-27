@@ -33,7 +33,13 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
 
   Future<List<DuplicatePair>> _find() async {
     final db = widget.repository.db;
-    final books = await db.select(db.books).get();
+    // Live books only. A merge *hard-deletes* the loser and tombstones it, so
+    // offering a trashed book would let someone merge a live book into an
+    // invisible one — everything moves onto a row the sweep permanently deletes
+    // 30 days later, and the merge is the app's one operation with no undo.
+    final books = await (db.select(db.books)
+          ..where((b) => b.deletedAt.isNull()))
+        .get();
     final files = await db.select(db.bookFiles).get();
     final authorsByBook =
         await widget.repository.queries.watchAuthorsByBook().first;

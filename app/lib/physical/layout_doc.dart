@@ -60,6 +60,12 @@ Map<String, dynamic> buildLayoutDoc({
             'x2': s.x2,
             'y2': s.y2,
             if (s.label != null && s.label!.trim().isNotEmpty) 'label': s.label,
+            // What the segment *is* (plan 5 #29). Written even for a plain
+            // shelf: a viewer that drew a side panel as a shelf would let books
+            // rest on it, and the omission is invisible on the publishing
+            // device — where the row already exists — so only the *other*
+            // device would ever see it go wrong.
+            'kind': s.kind,
           },
       ],
       'placements': [
@@ -114,11 +120,16 @@ class ParsedShelf {
     required this.x2,
     required this.y2,
     this.label,
+    this.kind = 'shelf',
   });
 
   final String id;
   final double x1, y1, x2, y2;
   final String? label;
+
+  /// Absent in documents written before plan 5 #29, which read as a plain
+  /// shelf — the behaviour those documents were published with.
+  final String kind;
 }
 
 class ParsedPlacement {
@@ -177,6 +188,7 @@ ParsedLayout parseLayoutDoc(Map<String, dynamic> doc) {
             x2: _num(raw['x2']),
             y2: _num(raw['y2']),
             label: raw['label']?.toString(),
+            kind: raw['kind']?.toString() ?? 'shelf',
           ),
     ],
     placements: [
@@ -242,6 +254,7 @@ Future<int> applyLayoutDoc(
               x2: shelf.x2,
               y2: shelf.y2,
               label: Value(shelf.label),
+              kind: Value(shelf.kind),
             ),
           );
     }
@@ -264,15 +277,23 @@ Future<int> applyLayoutDoc(
       }
       // The copy may not have arrived through sync yet; mint a placeholder so
       // the room renders, and let the pull fill in its fields later.
-      await db.into(db.physicalCopies).insertOnConflictUpdate(
+      //
+      // `DoNothing` on conflict, not an update: a copy that is already here is
+      // the sync channel's business, not this document's. An upsert would clear
+      // the `needsPush` of a copy placed locally and not yet pushed, so that
+      // copy would never reach the server — and the published room would point
+      // at a `copy_id` no other device can resolve.
+      //
+      // The insert itself sets `needsPush: false` because a *new* placeholder
+      // did come from the server; pushing it straight back is the trap #17's
+      // series pull hit.
+      await db.into(db.physicalCopies).insert(
             PhysicalCopiesCompanion.insert(
               id: placement.copyId,
               bookId: placement.bookId,
-              // Not dirty: this row came *from* the server, and marking it for
-              // push would send it straight back — the same trap #17's series
-              // pull hit.
               needsPush: const Value(false),
             ),
+            onConflict: DoNothing(),
           );
       await db.into(db.bookPlacements).insertOnConflictUpdate(
             BookPlacementsCompanion.insert(

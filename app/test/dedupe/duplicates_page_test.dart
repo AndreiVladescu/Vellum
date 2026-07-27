@@ -56,6 +56,24 @@ void main() {
     return repo;
   }
 
+  testWidgets('a trashed book is never offered as a duplicate', (tester) async {
+    // The data-loss path this closes: a merge *hard-deletes* the loser and
+    // tombstones it. Offering a trashed book as the keeper means merging a live
+    // book into an invisible one — everything moves onto a row the sweep
+    // permanently deletes 30 days later, and the merge is the app's one
+    // operation with no undo.
+    final repo = await seedPair(tester);
+    await tester.runAsync(() async {
+      await repo.trash.trash('second');
+    });
+
+    await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));
+    await settle(tester);
+
+    expect(find.textContaining('Similar title and author'), findsNothing);
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+  });
+
   testWidgets('a pair is listed with why it matched', (tester) async {
     final repo = await seedPair(tester);
     await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));

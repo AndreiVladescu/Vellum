@@ -99,7 +99,16 @@ function render(){
   for (const s of S.doc.shelves || []){
     // World Y is up; SVG Y is down, so the whole scene is flipped once here
     // rather than at every coordinate.
-    parts.push(`<line class="plank" x1="${s.x1}" y1="${-s.y1}" x2="${s.x2}" y2="${-s.y2}"/>`);
+    //
+    // Furniture (plan 5 #29) draws fainter than a shelf, and a bare label draws
+    // no line at all — a side panel rendered as a plank reads as a shelf you
+    // could put books on, which is the opposite of what it is. An older
+    // document with no `kind` is all shelves, which is what it was published as.
+    const kind = s.kind || 'shelf';
+    if (kind !== 'label'){
+      const cls = kind === 'shelf' ? 'plank' : 'plank structure';
+      parts.push(`<line class="${cls}" x1="${s.x1}" y1="${-s.y1}" x2="${s.x2}" y2="${-s.y2}"/>`);
+    }
     if (s.label){
       parts.push(`<text class="shelf-label" x="${Math.min(s.x1, s.x2)}" ` +
         `y="${-Math.max(s.y1, s.y2) - 0.03}" font-size="0.06">${esc(s.label)}</text>`);

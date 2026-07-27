@@ -39,6 +39,8 @@
   #stage.dragging { cursor:grabbing; }
   svg { display:block; width:100%; height:100%; }
   .plank { stroke:var(--plank); stroke-width:0.012; stroke-linecap:round; }
+  /* Furniture: same geometry, visibly not a surface. */
+  .plank.structure { opacity:.5; stroke-width:0.008; }
   .spine { stroke:rgba(0,0,0,.28); stroke-width:0.002; }
   .spine.anon { opacity:.55; }
   .shelf-label { font-family:var(--sans); fill:var(--muted); }

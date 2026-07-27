@@ -78,6 +78,16 @@
     "placeholders": { "title": { "type": "String" } }
   },
 
+  "syncResultWithIssues": "Synced — pulled {pulled}, pushed {pushed}, {issues}.",
+  "@syncResultWithIssues": {
+    "description": "The launch sync's result when it also had issues. `issues` is syncIssues, so the plural stays ICU instead of being glued on with a ternary.",
+    "placeholders": {
+      "pulled": { "type": "int" },
+      "pushed": { "type": "int" },
+      "issues": { "type": "String" }
+    }
+  },
+
   "syncResult": "Synced — pulled {pulled}, pushed {pushed}.",
   "@syncResult": {
     "description": "Result of a manual sync with no issues.",

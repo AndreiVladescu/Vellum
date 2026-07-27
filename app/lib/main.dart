@@ -285,12 +285,20 @@ class _LibraryPageState extends State<LibraryPage> {
           report.deletedLocally +
           report.deletedRemotely;
       if (changed == 0 && !report.hasIssues) return;
-      final n = report.issues.length;
+      final l10n = L10n.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Synced — pulled ${report.pulled}, pushed ${report.pushed}'
-            '${report.hasIssues ? ', $n issue${n == 1 ? '' : 's'}' : ''}.',
+            // ICU both ways (plan 5 #38): gluing a hand-built plural onto a
+            // localized sentence with a ternary is the same bug in a better
+            // disguise, and it is the exact pattern this item exists to remove.
+            report.hasIssues
+                ? l10n.syncResultWithIssues(
+                    report.pulled,
+                    report.pushed,
+                    l10n.syncIssues(report.issues.length),
+                  )
+                : l10n.syncResult(report.pulled, report.pushed),
           ),
         ),
       );
@@ -907,7 +915,11 @@ class _LibraryPageState extends State<LibraryPage> {
         PopupMenuItem(
           value: 'all',
           onTap: () => setState(() => _statusFilter = null),
-          child: Text(active ? 'Any status' : 'Any status ✓'),
+          child: Text(
+            active
+                ? L10n.of(context).anyStatus
+                : '${L10n.of(context).anyStatus} ✓',
+          ),
         ),
         // Owned states only: "wishlist" isn't a reading status and has its own
         // view (plan 5 #21a).

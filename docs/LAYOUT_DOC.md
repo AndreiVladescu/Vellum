@@ -48,7 +48,8 @@ allowed to read.
       "id": "8a2c…",
       "x1": 0.10, "y1": 1.20,  // metres, world coordinates, Y up
       "x2": 1.90, "y2": 1.20,
-      "label": "Shelf 2"       // optional
+      "label": "Shelf 2",      // optional
+      "kind": "shelf"          // shelf | panel | divider | label (#29)
     }
   ],
   "placements": [
@@ -76,6 +77,12 @@ allowed to read.
 - **Unknown fields are ignored** by readers, and a reader that meets a
   `version` greater than it knows must refuse rather than guess — a partially
   understood room is a wrong room.
+- **`kind`** says whether a segment is a shelf books rest on or furniture that
+  only draws (plan 5 #29). It is written for every segment, including plain
+  shelves: a document that omitted it would be read as all-shelves, and books
+  would settle on a side panel. Absent in documents published before #29, where
+  `shelf` is the behaviour they were written with — so this is an additive
+  field, not a version bump.
 - **The server does not interpret the doc.** It stores the JSON, checks it
   parses and is under the size cap, and hands it back. Any validation beyond
   that would be a second implementation of the format to keep in step.

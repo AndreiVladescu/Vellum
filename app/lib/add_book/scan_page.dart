@@ -180,7 +180,11 @@ class _ScanPageState extends State<ScanPage> {
     List<String> authors,
   ) async {
     final db = widget.repository.db;
-    final books = await db.select(db.books).get();
+    // Live books only — scanning a book you trashed should add it back, not
+    // flag it as a duplicate of something you can't see.
+    final books = await (db.select(db.books)
+          ..where((b) => b.deletedAt.isNull()))
+        .get();
     final authorsByBook =
         await widget.repository.queries.watchAuthorsByBook().first;
     final library = [

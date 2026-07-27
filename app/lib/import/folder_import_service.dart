@@ -115,7 +115,12 @@ class FolderImportService {
   /// A fingerprint of the current library, for duplicate detection.
   Future<List<LibraryFingerprint>> libraryFingerprint() async {
     final db = repository.db;
-    final books = await db.select(db.books).get();
+    // Live books only: a book you trashed must not make its own file look like
+    // a duplicate, or re-importing it is silently skipped and the only way back
+    // is the trash screen.
+    final books = await (db.select(db.books)
+          ..where((b) => b.deletedAt.isNull()))
+        .get();
     final files = await db.select(db.bookFiles).get();
     final hashes = <String, Set<String>>{};
     for (final f in files) {

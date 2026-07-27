@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/physical/layout_doc.dart';
+import 'package:vellum/physical/room_measure.dart';
 
 void main() {
   late Directory dir;
@@ -178,6 +179,39 @@ void main() {
     expect((await repo.layout.watchPlacedBooks(envId).first).length, 1);
   });
 
+  test('furniture survives a publish and fetch as furniture', () async {
+    // Without the kind in the document, a side panel comes back as a shelf on
+    // the other device — and books settle on it, which is exactly what
+    // `holdsBooks` exists to prevent.
+    final envId = await repo.layout.createEnvironment('Study');
+    await repo.layout.addShelf(envId,
+        x1: 0, y1: 0, x2: 0, y2: 2.0, label: 'Left side',
+        kind: ShelfKind.panel);
+    await repo.layout
+        .addShelf(envId, x1: 0, y1: 1.0, x2: 0.9, y2: 1.0, kind: ShelfKind.shelf);
+
+    // Applied on a *blank* device: on the publishing device the rows already
+    // exist and the upsert leaves `kind` alone, which hides the bug entirely.
+    final parsed = parseLayoutDoc(await docFor(envId));
+    final otherDir = Directory.systemTemp.createTempSync('vellum_layout_kind');
+    final other = await LibraryRepository.forTesting(
+      VellumDatabase(NativeDatabase.memory()),
+      otherDir,
+    );
+    addTearDown(() async {
+      await other.db.close();
+      otherDir.deleteSync(recursive: true);
+    });
+    await applyLayoutDoc(other.db, parsed, revision: 1);
+
+    final shelves = await other.layout.watchShelves(envId).first;
+    final kinds = {
+      for (final s in shelves) s.label ?? 'unlabelled': ShelfKind.parse(s.kind),
+    };
+    expect(kinds['Left side'], ShelfKind.panel);
+    expect(kinds['unlabelled'], ShelfKind.shelf);
+  });
+
   test('a shelf removed from the published room goes too', () async {
     final envId = await seedRoom(books: 0);
     final full = parseLayoutDoc(await docFor(envId));
@@ -223,6 +257,32 @@ void main() {
     final skipped = await applyLayoutDoc(repo.db, withGhost, revision: 3);
     expect(skipped, 1);
     expect((await repo.layout.watchPlacedBooks(envId).first).length, 1);
+  });
+
+  test('a fetch does not clear a local copy\'s pending push', () async {
+    // The silent-loss path: place a book (the copy is dirty and waiting to
+    // sync), then fetch the room — e.g. after taking "theirs" on a 409. If the
+    // fetch cleared needsPush, that copy would never reach the server, and the
+    // published document would point at a copy_id nobody else can resolve.
+    final envId = await seedRoom(books: 1);
+    final placed = (await repo.layout.watchPlacedBooks(envId).first).single;
+    final copyId = placed.placement.copyId;
+    final before = await (repo.db.select(repo.db.physicalCopies)
+          ..where((c) => c.id.equals(copyId)))
+        .getSingle();
+    expect(before.needsPush, isTrue, reason: 'a locally placed copy is dirty');
+
+    await applyLayoutDoc(
+      repo.db,
+      parseLayoutDoc(await docFor(envId)),
+      revision: 2,
+    );
+
+    final after = await (repo.db.select(repo.db.physicalCopies)
+          ..where((c) => c.id.equals(copyId)))
+        .getSingle();
+    expect(after.needsPush, isTrue,
+        reason: 'the fetch must not swallow a pending push');
   });
 
   test('a copy minted by a fetch is not marked for push', () async {
