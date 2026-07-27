@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
+import 'annotations/highlight_palette.dart';
+import 'annotations/pdf_highlight_painter.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
 
@@ -65,14 +68,33 @@ class _ReaderPageState extends State<ReaderPage> {
 
   /// In-book text search. pdfrx does the work; this owns the query field's
   /// state and the match cursor.
-  late final PdfTextSearcher _searcher = PdfTextSearcher(_controller)
-    ..addListener(_onSearchChanged);
+  ///
+  /// **Created only once the viewer is ready**, never in a field initialiser.
+  /// `PdfTextSearcher`'s constructor calls `controller!.document`, and pdfrx's
+  /// `controller` getter is null until a document is loaded — so building one
+  /// during the first `build()` threw "Null check operator used on a null
+  /// value" and no PDF would open at all. Null here simply means "search isn't
+  /// available yet", which is true.
+  PdfTextSearcher? _searcher;
+
+  /// Draws stored highlights over the page (the "highlighter marker" look).
+  /// Owns its own text cache, and asks for a repaint when a page's text lands.
+  late final PdfHighlightPainter _highlights =
+      PdfHighlightPainter(onNeedsRepaint: () {
+    if (mounted) setState(() {});
+  });
+  StreamSubscription<List<Annotation>>? _annotationsSub;
   final _searchController = TextEditingController();
   bool _searching = false;
 
   @override
   void initState() {
     super.initState();
+    _annotationsSub =
+        _annotations.watchForBook(widget.book.id).listen((annotations) {
+      _highlights.update(annotations);
+      if (mounted) setState(() {});
+    });
     ReaderSettings.load().then((settings) {
       if (!mounted) return;
       setState(() {
@@ -88,8 +110,10 @@ class _ReaderPageState extends State<ReaderPage> {
     // Closing the session is fire-and-forget: the widget is going away, and a
     // dropped write costs one session row, not correctness.
     _session.end(page: _page);
-    _searcher.removeListener(_onSearchChanged);
-    _searcher.dispose();
+    _annotationsSub?.cancel();
+    _highlights.dispose();
+    _searcher?.removeListener(_onSearchChanged);
+    _searcher?.dispose();
     _searchController.dispose();
     _settings?.removeListener(_onSettingsChanged);
     super.dispose();
@@ -207,6 +231,13 @@ class _ReaderPageState extends State<ReaderPage> {
     final ranges = await selection.getSelectedTextRanges();
     if (ranges.isEmpty || !mounted) return;
 
+    // The colour is asked for first: it is part of *making* the highlight, and
+    // a marker you pick after the fact isn't how anyone uses one.
+    final colour = withNote
+        ? HighlightColor.fallback
+        : await pickHighlightColor(context);
+    if (colour == null || !mounted) return; // dismissed the sheet
+
     String? note;
     if (withNote) {
       note = await _promptNote(ranges.first.text);
@@ -225,6 +256,7 @@ class _ReaderPageState extends State<ReaderPage> {
         ),
         quotedText: range.text,
         note: note,
+        color: colour.argb,
       );
     }
     if (!mounted) return;
@@ -323,33 +355,36 @@ class _ReaderPageState extends State<ReaderPage> {
                 ),
                 onSubmitted: (query) {
                   if (query.trim().isEmpty) return;
-                  _searcher.startTextSearch(query.trim());
+                  _searcher?.startTextSearch(query.trim());
                 },
               )
             : Text(widget.book.title),
         actions: [
           if (_searching) ...[
-            if (_searcher.hasMatches)
+            if (_searcher?.hasMatches ?? false)
               Center(
                 child: Text(
-                  '${(_searcher.currentIndex ?? 0) + 1}/${_searcher.matches.length}',
+                  '${(_searcher!.currentIndex ?? 0) + 1}'
+                  '/${_searcher!.matches.length}',
                 ),
               ),
             IconButton(
               icon: const Icon(Icons.keyboard_arrow_up),
               tooltip: 'Previous match',
-              onPressed: _searcher.hasMatches ? _searcher.goToPrevMatch : null,
+              onPressed:
+                  (_searcher?.hasMatches ?? false) ? _searcher!.goToPrevMatch : null,
             ),
             IconButton(
               icon: const Icon(Icons.keyboard_arrow_down),
               tooltip: 'Next match',
-              onPressed: _searcher.hasMatches ? _searcher.goToNextMatch : null,
+              onPressed:
+                  (_searcher?.hasMatches ?? false) ? _searcher!.goToNextMatch : null,
             ),
             IconButton(
               icon: const Icon(Icons.close),
               tooltip: 'Close search',
               onPressed: () {
-                _searcher.resetTextSearch();
+                _searcher?.resetTextSearch();
                 _searchController.clear();
                 setState(() => _searching = false);
               },
@@ -394,7 +429,12 @@ class _ReaderPageState extends State<ReaderPage> {
           IconButton(
             icon: const Icon(Icons.search),
             tooltip: 'Search in this book',
-            onPressed: () => setState(() => _searching = true),
+            // Disabled until the document is loaded, which is also when the
+            // searcher exists — a search box that silently does nothing is
+            // worse than one that is visibly not ready yet.
+            onPressed: _searcher == null
+                ? null
+                : () => setState(() => _searching = true),
           ),
           PopupMenuButton<String>(
             tooltip: 'More',
@@ -430,9 +470,23 @@ class _ReaderPageState extends State<ReaderPage> {
         params: PdfViewerParams(
           backgroundColor: readerTheme.background,
           onPageChanged: _onPageChanged,
-          onViewerReady: (_, _) => _applyFit(),
+          onViewerReady: (_, _) {
+            _applyFit();
+            // Now the controller has a document, so the searcher can exist.
+            if (_searcher == null && mounted) {
+              setState(() {
+                _searcher = PdfTextSearcher(_controller)
+                  ..addListener(_onSearchChanged);
+              });
+            }
+          },
           // Draws the search highlights pdfrx maintains for the active query.
-          pagePaintCallbacks: [_searcher.pageTextMatchPaintCallback],
+          pagePaintCallbacks: [
+            // Highlights first, search matches on top: the transient thing you
+            // are hunting for right now should win over the permanent one.
+            _highlights.paint,
+            if (_searcher != null) _searcher!.pageTextMatchPaintCallback,
+          ],
           textSelectionParams: PdfTextSelectionParams(
             onTextSelectionChange: (selection) {
               _selection = selection;

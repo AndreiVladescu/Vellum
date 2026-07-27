@@ -8,6 +8,8 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
+import 'annotations/epub_highlight_html.dart';
+import 'annotations/highlight_palette.dart';
 import 'epub_book.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
@@ -98,9 +100,17 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   /// noise, and the locator's scroll fraction still returns you to the spot.
   String? _bookmarkOnChapter;
 
+  /// This book's annotations, so the chapter markup can carry its highlights.
+  List<Annotation> _bookAnnotations = const [];
+  StreamSubscription<List<Annotation>>? _annotationsSub;
+
   @override
   void initState() {
     super.initState();
+    _annotationsSub =
+        _annotations.watchForBook(widget.book.id).listen((annotations) {
+      if (mounted) setState(() => _bookAnnotations = annotations);
+    });
     _scroll.addListener(_onScroll);
     _selectionNotifier.addListener(_onSelectionChanged);
     ReaderSettings.load().then((settings) {
@@ -120,6 +130,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
   @override
   void dispose() {
+    _annotationsSub?.cancel();
     _saveDebounce?.cancel();
     _scroll.removeListener(_onScroll);
     _selectionNotifier.removeListener(_onSelectionChanged);
@@ -189,6 +200,11 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     final quote = plain.substring(start, end).trim();
     if (quote.isEmpty) return;
 
+    final colour = withNote
+        ? HighlightColor.fallback
+        : await pickHighlightColor(context);
+    if (colour == null || !mounted) return; // dismissed the sheet
+
     String? note;
     if (withNote) {
       note = await _promptNote(quote);
@@ -201,6 +217,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
       locator: EpubTextLocator(chapter: _chapter, start: start, end: end),
       quotedText: quote,
       note: note,
+      color: colour.argb,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -304,6 +321,55 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
         scrollFraction: _scrollFraction,
       );
     });
+  }
+
+  /// One screenful forward, rolling into the next chapter at the end.
+  ///
+  /// The unit people mean by "page" here is a screenful, not a chapter: tapping
+  /// the right edge repeatedly should walk through the book, and stopping dead
+  /// at the bottom of every chapter would make the gesture useless exactly
+  /// where it is most wanted.
+  void _pageForward(int count) {
+    if (_scroll.hasClients) {
+      final position = _scroll.position;
+      // A little overlap, so the line you were reading is still on screen —
+      // an exact viewport jump loses the sentence that straddles the fold.
+      final step = position.viewportDimension * 0.86;
+      if (position.pixels < position.maxScrollExtent - 4) {
+        _scroll.animateTo(
+          (position.pixels + step).clamp(0.0, position.maxScrollExtent),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+        return;
+      }
+    }
+    if (_chapter < count - 1) _goTo(_chapter + 1, count);
+  }
+
+  /// One screenful back, rolling into the previous chapter's *end*.
+  void _pageBack(int count) {
+    if (_scroll.hasClients) {
+      final position = _scroll.position;
+      final step = position.viewportDimension * 0.86;
+      if (position.pixels > 4) {
+        _scroll.animateTo(
+          (position.pixels - step).clamp(0.0, position.maxScrollExtent),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+        return;
+      }
+    }
+    if (_chapter > 0) {
+      _goTo(_chapter - 1, count);
+      // Land at the bottom of the previous chapter — going "back" to its first
+      // line would skip everything you were about to re-read.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      });
+    }
   }
 
   void _goTo(int index, int count) {
@@ -454,7 +520,17 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                 ),
             ],
           ),
-          body: GestureDetector(
+          body: LayoutBuilder(builder: (context, constraints) {
+            // The tap strips live in the *margin* beside the text column
+            // wherever there is one, so they don't sit on top of words you
+            // might want to select. On a narrow window there is no margin, and
+            // a minimum strip wins anyway: turning the page is the thing you do
+            // a thousand times more often than selecting a passage.
+            final measure = settings?.measure ?? 720;
+            final margin = ((constraints.maxWidth - measure) / 2).clamp(0, 96);
+            final strip = margin < 44.0 ? 44.0 : margin.toDouble();
+            return Stack(children: [
+              GestureDetector(
             // A tap toggles the chrome when the reader asked for a
             // distraction-free page; otherwise it does nothing, so a stray tap
             // can't hide the controls someone is using.
@@ -478,7 +554,11 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                       child: SelectionListener(
                         selectionNotifier: _selectionNotifier,
                         child: HtmlWidget(
-                          chapter.html,
+                          // Stored highlights painted into the markup, so the
+                          // text is coloured like a marker rather than only
+                          // listed in the panel.
+                          withHighlights(
+                              chapter.html, _bookAnnotations, _chapter),
                           // The reader's own typography, applied to the book's
                           // text only — the surrounding UI keeps following the
                           // system text scale.
@@ -492,6 +572,27 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               ),
             ),
           ),
+              // The edge tap zones. The chevron sits at the vertical middle of
+              // the page — where your thumb already is — and the whole strip is
+              // the target, not just the glyph.
+              _EdgeTurn(
+                width: strip,
+                alignment: Alignment.centerLeft,
+                icon: Icons.chevron_left,
+                tooltip: 'Back a page',
+                colour: readerTheme.foreground,
+                onTap: () => _pageBack(count),
+              ),
+              _EdgeTurn(
+                width: strip,
+                alignment: Alignment.centerRight,
+                icon: Icons.chevron_right,
+                tooltip: 'Forward a page',
+                colour: readerTheme.foreground,
+                onTap: () => _pageForward(count),
+              ),
+            ]);
+          }),
           // SafeArea(top:false) keeps the chapter controls above the Android
           // gesture/nav bar under edge-to-edge; the bar grows by that inset
           // rather than clipping, so no fixed height here.
@@ -534,6 +635,69 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// A page-turn strip down one edge of the reader (the whole strip is the
+/// target), with a chevron at the vertical middle as its affordance.
+///
+/// Deliberately faint: it is a hint that the edge does something, not a control
+/// competing with the prose. It brightens on hover so a mouse user can find it,
+/// which a touch user never needs.
+class _EdgeTurn extends StatefulWidget {
+  const _EdgeTurn({
+    required this.width,
+    required this.alignment,
+    required this.icon,
+    required this.tooltip,
+    required this.colour,
+    required this.onTap,
+  });
+
+  final double width;
+  final Alignment alignment;
+  final IconData icon;
+  final String tooltip;
+  final Color colour;
+  final VoidCallback onTap;
+
+  @override
+  State<_EdgeTurn> createState() => _EdgeTurnState();
+}
+
+class _EdgeTurnState extends State<_EdgeTurn> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: widget.alignment,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          // Opaque: a tap here turns the page and does not also fall through to
+          // the chrome toggle underneath.
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: Tooltip(
+            message: widget.tooltip,
+            child: SizedBox(
+              width: widget.width,
+              height: double.infinity,
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: _hovered ? 0.7 : 0.22,
+                  duration: const Duration(milliseconds: 120),
+                  child: Icon(widget.icon, size: 32, color: widget.colour),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
