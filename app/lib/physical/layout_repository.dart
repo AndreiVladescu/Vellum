@@ -234,6 +234,19 @@ class LayoutRepository {
     required BookPlacement placement,
     required List<PhysicalShelf> shelves,
   }) {
+    final shelf = nearestShelf(placement: placement, shelves: shelves);
+    final label = shelf?.label?.trim();
+    return (label == null || label.isEmpty) ? null : label;
+  }
+
+  /// The shelf a placement is standing on, or null — see [nearestShelfLabel]
+  /// for what "standing on" means. Exposed separately from the label because
+  /// grouping a room's books by shelf (the accessible room summary, plan 5
+  /// #42) needs the shelf itself, and an unlabelled shelf is still a shelf.
+  static PhysicalShelf? nearestShelf({
+    required BookPlacement placement,
+    required List<PhysicalShelf> shelves,
+  }) {
     PhysicalShelf? best;
     var bestDistance = double.infinity;
     for (final shelf in shelves) {
@@ -249,8 +262,7 @@ class LayoutRepository {
         best = shelf;
       }
     }
-    final label = best?.label?.trim();
-    return (label == null || label.isEmpty) ? null : label;
+    return best;
   }
 
   /// Every place a copy of [bookId] physically stands (plan 5 #28).

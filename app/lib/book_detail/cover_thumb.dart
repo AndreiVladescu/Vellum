@@ -40,11 +40,14 @@ class CoverThumbState extends State<CoverThumb> {
       onTap: widget.onTap,
       excludeSemantics: true,
       child: MouseRegion(
-        cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hover = true),
         onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
+        // InkWell, not GestureDetector: this is a button, and a
+        // GestureDetector is unreachable by keyboard (plan 5 #42). It also
+        // brings the click cursor and Enter/Space activation with it.
+        child: InkWell(
           onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(8),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: SizedBox(

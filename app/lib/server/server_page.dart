@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
@@ -123,8 +124,35 @@ class _ServerPageState extends State<ServerPage> {
     }
   }
 
+  /// The last phase announced, so a screen reader hears "Pushing books" once
+  /// rather than once per book. A progress bar is invisible to a screen reader
+  /// and a sync is the app's longest silent operation, so *something* has to
+  /// be said (plan 5 #42) — but a 400-book push announcing every increment
+  /// would be unusable. Phase changes are the meaningful events.
+  String _announcedPhase = '';
+
+  /// Speaks [message] to a screen reader, if this platform can.
+  ///
+  /// `sendAnnouncement` needs the view it belongs to, and
+  /// `MediaQuery.supportsAnnounceOf` is the platform's own answer to whether
+  /// announcements do anything here — checking it keeps this a no-op rather
+  /// than a silent failure on platforms that ignore the channel.
+  void _announce(String message) {
+    if (!mounted) return;
+    if (!MediaQuery.supportsAnnounceOf(context)) return;
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      message,
+      Directionality.of(context),
+    );
+  }
+
   void _onProgress(int done, int total, String phase) {
     if (!mounted) return;
+    if (phase != _announcedPhase) {
+      _announcedPhase = phase;
+      _announce(phase);
+    }
     setState(() {
       _phase = phase;
       _progress = total == 0 ? null : done / total;
@@ -141,6 +169,10 @@ class _ServerPageState extends State<ServerPage> {
         : (count == 0
               ? 'Already up to date.'
               : '$verb $count book${count == 1 ? '' : 's'}.');
+    // A snackbar is announced by the platform on Android but not reliably on
+    // desktop, and this is the one message that says whether the sync worked.
+    _announce(msg);
+    _announcedPhase = '';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),

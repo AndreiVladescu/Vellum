@@ -23,6 +23,7 @@ import 'locate.dart';
 import 'physical_metrics.dart';
 import 'placement_toolbar.dart';
 import 'room_painter.dart';
+import 'room_semantics.dart';
 import 'settle.dart';
 import 'shelf_dialogs.dart';
 
@@ -900,6 +901,48 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   // ---- build --------------------------------------------------------------
 
+  /// The room as a navigable list (plan 5 #42).
+  ///
+  /// The canvas carries the same information as one spoken summary, but a
+  /// summary can only be heard start to finish. This sheet is the version you
+  /// can move through item by item — and it turns out to be the fastest way to
+  /// answer "what's on the middle shelf?" with a mouse, too, which is why it
+  /// sits in the toolbar rather than behind an accessibility setting.
+  void _showRoomContents() {
+    final summaries = summarizeRoom(shelves: _shelves, placed: _placed);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: summaries.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('This room is empty. Add a shelf, then drop in '
+                    'books.'),
+              )
+            : ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final shelf in summaries)
+                    ListTile(
+                      leading: const Icon(Icons.shelves),
+                      title: Text(shelf.name),
+                      subtitle: Text(
+                        shelf.titles.isEmpty
+                            ? 'Empty'
+                            : shelf.titles.join(', '),
+                      ),
+                      // One node per shelf reading exactly like the canvas
+                      // summary, so both routes say the same thing.
+                      onTap: () => Navigator.pop(sheetContext),
+                    ),
+                ],
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -931,6 +974,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             tooltip: 'Add shelf',
             onPressed: _addShelf,
             icon: const Icon(Icons.shelves),
+          ),
+          IconButton(
+            tooltip: 'Room contents',
+            onPressed: _showRoomContents,
+            icon: const Icon(Icons.format_list_bulleted),
           ),
           IconButton(
             tooltip: 'Zoom in',
@@ -986,9 +1034,25 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                     _maybeFocusInitial();
                     // The boundary is what `_saveSnapshot` captures, so it wraps
                     // the room and nothing else — no app bar, no snackbar.
-                    return RepaintBoundary(
-                      key: _canvasKey,
-                      child: _buildCanvas(constraints),
+                    //
+                    // The Semantics wrapper is the canvas's accessible
+                    // alternative (plan 5 #42): a drag-and-drop spatial view
+                    // has no useful traversal order, so it reports as a single
+                    // node describing the room shelf by shelf, and
+                    // ExcludeSemantics stops the individual spines underneath
+                    // from also announcing themselves out of any order.
+                    return Semantics(
+                      container: true,
+                      label: roomSemanticLabel(
+                        summarizeRoom(shelves: _shelves, placed: _placed),
+                      ),
+                      hint: 'Use Room contents for a navigable list',
+                      child: ExcludeSemantics(
+                        child: RepaintBoundary(
+                          key: _canvasKey,
+                          child: _buildCanvas(constraints),
+                        ),
+                      ),
                     );
                   },
                 );

@@ -229,8 +229,13 @@ class BookSpine extends StatelessWidget {
       // The title is painted into the spine art; screen readers get it from the
       // label above, so drop the child semantics (incl. the Tooltip's message).
       excludeSemantics: true,
-      child: GestureDetector(
+      // InkWell rather than GestureDetector: a spine is the shelf's only way
+      // into a book, and a GestureDetector cannot be reached by keyboard at
+      // all (plan 5 #42). InkWell is focusable, activates on Enter/Space, and
+      // paints a focus overlay so a keyboard user can see where they are.
+      child: InkWell(
         onTap: onTap,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
         child: Tooltip(
           message: book.title,
           waitDuration: const Duration(milliseconds: 600),
@@ -455,8 +460,10 @@ class BookCover extends StatelessWidget {
       button: onTap != null,
       onTap: onTap,
       excludeSemantics: true,
-      child: GestureDetector(
+      // Keyboard-reachable, same reasoning as BookSpine above.
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
         child: Tooltip(
           message: book.title,
           waitDuration: const Duration(milliseconds: 600),
