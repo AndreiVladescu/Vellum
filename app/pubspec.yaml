@@ -55,6 +55,7 @@ dependencies:
   image_picker: ^1.2.3
   qr: ^4.0.0
   cryptography: ^2.9.0
+  dynamic_color: ^1.8.1
 
 dev_dependencies:
   flutter_test:

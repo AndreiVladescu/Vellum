@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import 'cover_color.dart';
+
 /// Visual parameters for a generated book spine.
 ///
 /// No online source provides spine images, so Vellum generates spines: a
@@ -50,6 +52,13 @@ class SpineStyle {
     Color(0xFFC8A02D),
   ];
 
+  // The palette above stays a set of real book-cloth colours rather than
+  // shades of the active seed: a shelf where every book is a tint of one hue
+  // looks like a colour swatch, not a library. What the theme drives is the
+  // *shelf* — the boards, via `ShelfMaterial` — and the chrome around it. The
+  // one thing that was theme-coupled here, the brown title ink, now comes from
+  // `spineTextColorFor` (plan 5 #39).
+
   static SpineStyle generate({
     required String title,
     String? author,
@@ -57,10 +66,7 @@ class SpineStyle {
   }) {
     final h = _fnv1a('$title|${author ?? ''}');
     final color = _palette[h % _palette.length];
-    final textColor =
-        ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-            ? Colors.white
-            : const Color(0xFF3A3226);
+    final textColor = spineTextColorFor(color);
     final pages = pageCount ?? 220;
     final width = 34.0 + ((pages - 120) / 14.0).clamp(0.0, 28.0);
     final heightFactor = 0.85 + ((h >> 4) % 14) / 100.0;

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -26,6 +27,7 @@ import 'server/server_client.dart';
 import 'server/server_page.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
+import 'settings/appearance.dart';
 import 'settings/book_face.dart';
 import 'settings/preferences_page.dart';
 import 'settings/shelf_sort.dart';
@@ -82,25 +84,33 @@ class VellumApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vellum',
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF7A5C3E), // leather-ish brown
-        brightness: Brightness.light,
-        // Guarantee ≥48dp tap targets on every platform (not just the mobile
-        // default) so touch/accessibility targets are always reachable.
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-      ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: const Color(0xFF7A5C3E),
-        brightness: Brightness.dark,
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-      ),
-      home: LibraryPage(
-        repository: repository,
-        profile: profile,
-        settings: settings,
-        connection: connection,
+    // The whole app is rebuilt on an appearance change, which is the point:
+    // seed, mode and material are meant to move everything at once, not just
+    // the screen you happen to be on (plan 5 #39). DynamicColorBuilder hands
+    // back nulls off Android, so the seed path is what runs everywhere else.
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) => DynamicColorBuilder(
+        builder: (lightDynamic, darkDynamic) {
+          final themes = vellumThemes(
+            seed: settings.seedColor,
+            dynamicLight: lightDynamic,
+            dynamicDark: darkDynamic,
+            useDynamic: settings.useDynamicColor,
+          );
+          return MaterialApp(
+            title: 'Vellum',
+            theme: themes.light,
+            darkTheme: themes.dark,
+            themeMode: settings.themeMode,
+            home: LibraryPage(
+              repository: repository,
+              profile: profile,
+              settings: settings,
+              connection: connection,
+            ),
+          );
+        },
       ),
     );
   }
@@ -1051,6 +1061,8 @@ class _LibraryPageState extends State<LibraryPage> {
       books: [for (final e in entries) e.book],
       bookFace: widget.settings.bookFace,
       spineArt: widget.settings.spineArt,
+      material: widget.settings.shelfMaterial,
+      typography: widget.settings.spineTypography,
       coverFileOf: repository.coverFileOf,
       detailBuilder: (book) => BookDetailPage(
         book: book,

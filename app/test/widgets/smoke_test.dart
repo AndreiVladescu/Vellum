@@ -175,6 +175,15 @@ void main() {
 
   testWidgets('preferences shows the spine-art control only in spine mode',
       (tester) async {
+    // A surface tall enough for the whole page. Preferences is a lazy ListView,
+    // so a control below the fold isn't built at all and `find.text` can't see
+    // it — which says nothing about the behaviour under test. Adding the
+    // Appearance section (plan 5 #39) above this one is what pushed it off the
+    // default 800x600 view.
+    tester.view.physicalSize = const Size(1200, 3200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     late LibraryRepository repo;
     late AppSettingsStore settings;
     late ServerConnection connection;
@@ -202,6 +211,12 @@ void main() {
     await _settle(tester);
     expect(find.text(label), findsNothing,
         reason: 'face-out mode hides the spine-art control');
+
+    // Take the tree down inside the test. On a surface this tall the trash
+    // tile's live drift `.watch()` is built too, and cancelling it at teardown
+    // schedules a zero-duration timer that trips the pending-timer check.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _settle(tester);
   });
 
   testWidgets('server page offers Sync now when connected', (tester) async {

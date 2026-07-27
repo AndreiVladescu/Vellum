@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
+import '../settings/appearance.dart';
 import '../settings/book_face.dart';
 import '../settings/spine_art.dart';
 import 'book_open_route.dart';
@@ -27,10 +28,20 @@ class ShelfView extends StatelessWidget {
     required this.detailBuilder,
     this.bookFace = BookFace.spine,
     this.spineArt = SpineArt.coverSlice,
+    this.material = ShelfMaterial.fallback,
+    this.typography = SpineTypography.normal,
     this.coverFileOf,
   });
 
   final List<Book> books;
+
+  /// What the boards are made of (plan 5 #39).
+  final ShelfMaterial material;
+
+  /// The user's spine size nudges. Applied at render rather than baked into
+  /// `book.spine_style`, so changing it restyles the shelf instead of
+  /// rewriting every book.
+  final SpineTypography typography;
 
   /// Whether books stand spine-out or face-out with their front cover.
   final BookFace bookFace;
@@ -62,6 +73,8 @@ class ShelfView extends StatelessWidget {
             row: rows[i],
             bookFace: bookFace,
             spineArt: spineArt,
+            material: material,
+            typography: typography,
             detailBuilder: detailBuilder,
             coverFileOf: coverFileOf,
           ),
@@ -72,7 +85,10 @@ class ShelfView extends StatelessWidget {
 
   double _widthOf(Book book) => bookFace == BookFace.cover
       ? _coverWidth
-      : SpineStyle.fromJson(book.spineStyle, title: book.title).width;
+      // The same scale the spine itself is drawn at, or the packer would lay
+      // out rows for a width the books no longer have.
+      : SpineStyle.fromJson(book.spineStyle, title: book.title).width *
+          typography.clampedWidth;
 
   List<List<Book>> _packIntoRows(double rowWidth) {
     final rows = <List<Book>>[[]];
@@ -95,6 +111,8 @@ class _ShelfRow extends StatelessWidget {
     required this.row,
     required this.bookFace,
     required this.spineArt,
+    required this.material,
+    required this.typography,
     required this.detailBuilder,
     required this.coverFileOf,
   });
@@ -102,6 +120,8 @@ class _ShelfRow extends StatelessWidget {
   final List<Book> row;
   final BookFace bookFace;
   final SpineArt spineArt;
+  final ShelfMaterial material;
+  final SpineTypography typography;
   final Widget Function(Book) detailBuilder;
   final File? Function(Book)? coverFileOf;
 
@@ -119,8 +139,6 @@ class _ShelfRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final board = dark ? const Color(0xFF4A4038) : const Color(0xFFB09B82);
     return Column(
       children: [
         SizedBox(
@@ -148,6 +166,7 @@ class _ShelfRow extends StatelessWidget {
                               book: book,
                               coverFile: coverFile,
                               spineArt: spineArt,
+                              typography: typography,
                               onTap: onTap,
                             );
                       return face(
@@ -161,16 +180,9 @@ class _ShelfRow extends StatelessWidget {
         ),
         Container(
           height: _boardHeight,
-          decoration: BoxDecoration(
-            color: board,
-            borderRadius: BorderRadius.circular(3),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: dark ? 0.5 : 0.25),
-                blurRadius: 4,
-                offset: const Offset(0, 3),
-              ),
-            ],
+          decoration: shelfBoardDecoration(
+            material,
+            Theme.of(context).brightness,
           ),
         ),
         const SizedBox(height: 26),
@@ -198,12 +210,14 @@ class BookSpine extends StatelessWidget {
     this.onTap,
     this.coverFile,
     this.spineArt = SpineArt.coverSlice,
+    this.typography = SpineTypography.normal,
   });
 
   final Book book;
   final VoidCallback? onTap;
   final File? coverFile;
   final SpineArt spineArt;
+  final SpineTypography typography;
 
   @override
   Widget build(BuildContext context) {
@@ -221,13 +235,14 @@ class BookSpine extends StatelessWidget {
           message: book.title,
           waitDuration: const Duration(milliseconds: 600),
           child: SizedBox(
-            width: style.width,
+            width: style.width * typography.clampedWidth,
             height: _bookAreaHeight * style.heightFactor,
             child: SpineFace(
               book: book,
               coverFile: coverFile,
               style: style,
               spineArt: spineArt,
+              titleScale: typography.clampedTitle,
             ),
           ),
         ),
@@ -246,11 +261,17 @@ class SpineFace extends StatelessWidget {
     this.coverFile,
     this.style,
     this.spineArt = SpineArt.coverSlice,
+    this.titleScale = 1.0,
   });
 
   final Book book;
   final File? coverFile;
   final SpineStyle? style;
+
+  /// Multiplier on the title painted down the spine (plan 5 #39). Defaults to
+  /// 1 so the physical view, which has no typography preference of its own,
+  /// keeps drawing spines exactly as before.
+  final double titleScale;
 
   /// How a covered book draws its spine. [SpineArt.dominantColor] uses the
   /// generated spine in the cover's extracted colour; until that colour has
@@ -331,12 +352,14 @@ class SpineFace extends StatelessWidget {
                   book.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 13,
+                    fontSize: 13 * titleScale,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.4,
-                    shadows: [Shadow(blurRadius: 4, color: Color(0xB3000000))],
+                    shadows: const [
+                      Shadow(blurRadius: 4, color: Color(0xB3000000)),
+                    ],
                   ),
                 ),
               ),
@@ -377,7 +400,7 @@ class SpineFace extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: style.textColor,
-                    fontSize: 13,
+                    fontSize: 13 * titleScale,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.4,
                   ),

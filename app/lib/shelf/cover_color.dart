@@ -49,8 +49,16 @@ Future<Color?> dominantColorOf(Uint8List bytes) async {
   return Color.fromARGB(255, s[0] ~/ s[3], s[1] ~/ s[3], s[2] ~/ s[3]);
 }
 
+/// Ink for a title printed on a light spine.
+///
+/// Near-black with a trace of warmth, and deliberately *not* the app's old
+/// leather-brown (`#3A3226`): a spine has to stay legible whatever seed the
+/// user picks (plan 5 #39), and a brown that suited one hardcoded theme is an
+/// assumption once the theme is a preference.
+const spineInk = Color(0xFF241F1A);
+
 /// A readable text colour for a spine of [background].
 Color spineTextColorFor(Color background) =>
     ThemeData.estimateBrightnessForColor(background) == Brightness.dark
         ? Colors.white
-        : const Color(0xFF3A3226);
+        : spineInk;

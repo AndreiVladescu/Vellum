@@ -15,6 +15,7 @@ import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../server/sync_service.dart';
 import 'app_settings.dart';
+import 'appearance.dart';
 import 'book_face.dart';
 import 'spine_art.dart';
 import 'trash_page.dart';
@@ -46,6 +47,9 @@ class PreferencesPage extends StatelessWidget {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
+            _SectionHeader('Appearance'),
+            _AppearanceSection(settings: settings),
+            const Divider(height: 24),
             _SectionHeader('Books on the shelf'),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -896,6 +900,279 @@ class _SectionHeader extends StatelessWidget {
         text,
         style: theme.textTheme.titleSmall
             ?.copyWith(color: theme.colorScheme.primary),
+      ),
+    );
+  }
+}
+
+/// Theme mode, seed colour, shelf material and spine size (plan 5 #39).
+///
+/// Grouped into one section because they are one decision — "what does my
+/// library look like" — taken in four parts, and splitting them across the page
+/// would make each feel like an unrelated switch.
+class _AppearanceSection extends StatelessWidget {
+  const _AppearanceSection({required this.settings});
+
+  final AppSettingsStore settings;
+
+  Future<void> _pickCustomSeed(BuildContext context) async {
+    // A grid of usable colours rather than a colour wheel: an arbitrary hue at
+    // arbitrary saturation makes a poor Material scheme, and every swatch here
+    // is one we know seeds cleanly.
+    const swatches = [
+      Color(0xFF7A5C3E), Color(0xFF9C5B3A), Color(0xFFA8482C),
+      Color(0xFF8C3A4E), Color(0xFF7A3E63), Color(0xFF5A4A8C),
+      Color(0xFF3B4C8F), Color(0xFF2E6E8E), Color(0xFF2E7D7B),
+      Color(0xFF3C6B4B), Color(0xFF5E7A3C), Color(0xFF56626D),
+    ];
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Custom colour'),
+        content: SizedBox(
+          width: 280,
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final colour in swatches)
+                InkWell(
+                  onTap: () => Navigator.pop(dialogContext, colour),
+                  customBorder: const CircleBorder(),
+                  child: Semantics(
+                    label: 'Seed colour swatch',
+                    button: true,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: colour,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(dialogContext).colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (picked != null) await settings.setCustomSeed(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final typography = settings.spineTypography;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: SegmentedButton<ThemeMode>(
+            segments: const [
+              ButtonSegment(
+                value: ThemeMode.system,
+                label: Text('System'),
+                icon: Icon(Icons.brightness_auto_outlined),
+              ),
+              ButtonSegment(
+                value: ThemeMode.light,
+                label: Text('Light'),
+                icon: Icon(Icons.light_mode_outlined),
+              ),
+              ButtonSegment(
+                value: ThemeMode.dark,
+                label: Text('Dark'),
+                icon: Icon(Icons.dark_mode_outlined),
+              ),
+            ],
+            selected: {settings.themeMode},
+            onSelectionChanged: (s) => settings.setThemeMode(s.first),
+          ),
+        ),
+        // Material You supersedes the seed, so say so rather than leaving the
+        // picker below looking broken.
+        if (defaultTargetPlatform == TargetPlatform.android)
+          SwitchListTile(
+            secondary: const Icon(Icons.colorize_outlined),
+            title: const Text('Use the system colours'),
+            subtitle: const Text(
+                'Material You, from your Android wallpaper. Overrides the '
+                'colour below'),
+            value: settings.useDynamicColor,
+            onChanged: settings.setUseDynamicColor,
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text('Colour', style: theme.textTheme.bodyMedium),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final preset in SeedPreset.values)
+                _SeedSwatch(
+                  color: preset.color,
+                  label: preset.label,
+                  selected: settings.seedPreset == preset,
+                  onTap: () => settings.setSeedPreset(preset),
+                ),
+              _SeedSwatch(
+                color: settings.seedColor,
+                label: 'Custom',
+                selected: settings.seedPreset == null,
+                custom: true,
+                onTap: () => _pickCustomSeed(context),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text('Shelf material', style: theme.textTheme.bodyMedium),
+        ),
+        RadioGroup<ShelfMaterial>(
+          groupValue: settings.shelfMaterial,
+          onChanged: (v) {
+            if (v != null) settings.setShelfMaterial(v);
+          },
+          child: Column(
+            children: [
+              for (final material in ShelfMaterial.values)
+                RadioListTile<ShelfMaterial>(
+                  value: material,
+                  title: Text(material.label),
+                  secondary: Container(
+                    width: 44,
+                    height: 16,
+                    decoration:
+                        shelfBoardDecoration(material, theme.brightness),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text('Spine size', style: theme.textTheme.bodyMedium),
+        ),
+        _ScaleSlider(
+          label: 'Title',
+          value: typography.clampedTitle,
+          onChanged: (v) => settings.setSpineTypography(
+            SpineTypography(titleScale: v, widthScale: typography.widthScale),
+          ),
+        ),
+        _ScaleSlider(
+          label: 'Thickness',
+          value: typography.clampedWidth,
+          onChanged: (v) => settings.setSpineTypography(
+            SpineTypography(titleScale: typography.titleScale, widthScale: v),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SeedSwatch extends StatelessWidget {
+  const _SeedSwatch({
+    required this.color,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.custom = false,
+  });
+
+  final Color color;
+  final String label;
+  final bool selected;
+  final bool custom;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      label: label,
+      button: true,
+      selected: selected,
+      child: Tooltip(
+        message: label,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected
+                    ? theme.colorScheme.onSurface
+                    : theme.colorScheme.outlineVariant,
+                width: selected ? 3 : 1,
+              ),
+            ),
+            child: custom
+                ? Icon(
+                    Icons.tune,
+                    size: 18,
+                    color: ThemeData.estimateBrightnessForColor(color) ==
+                            Brightness.dark
+                        ? Colors.white
+                        : Colors.black87,
+                  )
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScaleSlider extends StatelessWidget {
+  const _ScaleSlider({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          SizedBox(width: 80, child: Text(label)),
+          Expanded(
+            child: Slider(
+              min: SpineTypography.min,
+              max: SpineTypography.max,
+              divisions: 12,
+              value: value,
+              label: '${(value * 100).round()}%',
+              onChanged: onChanged,
+            ),
+          ),
+        ],
       ),
     );
   }

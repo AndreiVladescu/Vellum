@@ -1,9 +1,10 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import 'appearance.dart';
 import 'book_face.dart';
 import 'shelf_sort.dart';
 import 'spine_art.dart';
@@ -29,11 +30,103 @@ class AppSettingsStore extends ChangeNotifier {
   static const _backupFolderKey = 'settings.backupFolder';
   static const _backupKeepKey = 'settings.backupKeep';
   static const _lastBackupAtKey = 'settings.lastBackupAt';
+  // Appearance (plan 5 #39).
+  static const _themeModeKey = 'settings.themeMode';
+  static const _seedKey = 'settings.seedColor';
+  static const _dynamicColorKey = 'settings.useDynamicColor';
+  static const _shelfMaterialKey = 'settings.shelfMaterial';
+  static const _spineTitleScaleKey = 'settings.spineTitleScale';
+  static const _spineWidthScaleKey = 'settings.spineWidthScale';
 
   final SharedPreferences _prefs;
 
   static Future<AppSettingsStore> load() async =>
       AppSettingsStore._(await SharedPreferences.getInstance());
+
+  // ---- Appearance (plan 5 #39) --------------------------------------------
+
+  /// Light, dark, or follow the system. Previously not selectable at all.
+  ThemeMode get themeMode {
+    final stored = _prefs.getString(_themeModeKey);
+    return ThemeMode.values.where((m) => m.name == stored).firstOrNull ??
+        ThemeMode.system;
+  }
+
+  Future<void> setThemeMode(ThemeMode value) async {
+    await _prefs.setString(_themeModeKey, value.name);
+    notifyListeners();
+  }
+
+  /// The scheme seed. Stored as a preset name when it is one, and as `#RRGGBB`
+  /// when the user picked their own — so a preset survives us restyling it
+  /// later, while a custom colour survives us adding presets.
+  Color get seedColor {
+    final stored = _prefs.getString(_seedKey);
+    if (stored == null || stored.isEmpty) return SeedPreset.fallback.color;
+    final preset =
+        SeedPreset.values.where((p) => p.name == stored).firstOrNull;
+    if (preset != null) return preset.color;
+    if (stored.startsWith('#') && stored.length == 7) {
+      final value = int.tryParse(stored.substring(1), radix: 16);
+      if (value != null) return Color(value | 0xFF000000);
+    }
+    return SeedPreset.fallback.color;
+  }
+
+  /// The preset currently selected, or null when the seed is a custom colour.
+  SeedPreset? get seedPreset {
+    final stored = _prefs.getString(_seedKey);
+    if (stored == null || stored.isEmpty) return SeedPreset.fallback;
+    return SeedPreset.values.where((p) => p.name == stored).firstOrNull;
+  }
+
+  Future<void> setSeedPreset(SeedPreset value) async {
+    await _prefs.setString(_seedKey, value.name);
+    notifyListeners();
+  }
+
+  Future<void> setCustomSeed(Color value) async {
+    final rgb = value.toARGB32() & 0xFFFFFF;
+    await _prefs.setString(
+      _seedKey,
+      '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}',
+    );
+    notifyListeners();
+  }
+
+  /// Whether to take the scheme from Android's Material You wallpaper colours
+  /// instead of [seedColor]. Off by default, and a no-op where the platform
+  /// supplies nothing — the seed is then used as usual.
+  bool get useDynamicColor => _prefs.getBool(_dynamicColorKey) ?? false;
+
+  Future<void> setUseDynamicColor(bool value) async {
+    await _prefs.setBool(_dynamicColorKey, value);
+    notifyListeners();
+  }
+
+  /// What the shelf boards are made of.
+  ShelfMaterial get shelfMaterial {
+    final stored = _prefs.getString(_shelfMaterialKey);
+    return ShelfMaterial.values.where((m) => m.name == stored).firstOrNull ??
+        ShelfMaterial.fallback;
+  }
+
+  Future<void> setShelfMaterial(ShelfMaterial value) async {
+    await _prefs.setString(_shelfMaterialKey, value.name);
+    notifyListeners();
+  }
+
+  /// Spine title size and thickness multipliers.
+  SpineTypography get spineTypography => SpineTypography(
+        titleScale: _prefs.getDouble(_spineTitleScaleKey) ?? 1.0,
+        widthScale: _prefs.getDouble(_spineWidthScaleKey) ?? 1.0,
+      );
+
+  Future<void> setSpineTypography(SpineTypography value) async {
+    await _prefs.setDouble(_spineTitleScaleKey, value.clampedTitle);
+    await _prefs.setDouble(_spineWidthScaleKey, value.clampedWidth);
+    notifyListeners();
+  }
 
   Wallpaper get wallpaper {
     final stored = _prefs.getString(_wallpaperKey);
