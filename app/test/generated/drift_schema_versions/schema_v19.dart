@@ -4,7 +4,7 @@
 //
 import 'package:drift/drift.dart';
 
-class Series extends Table with TableInfo {
+class Series extends Table with TableInfo<Series, SeriesData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -35,8 +35,18 @@ class Series extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  SeriesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SeriesData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
   }
 
   @override
@@ -50,7 +60,133 @@ class Series extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class Books extends Table with TableInfo {
+class SeriesData extends DataClass implements Insertable<SeriesData> {
+  final String id;
+  final String name;
+  const SeriesData({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  SeriesCompanion toCompanion(bool nullToAbsent) {
+    return SeriesCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory SeriesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SeriesData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  SeriesData copyWith({String? id, String? name}) =>
+      SeriesData(id: id ?? this.id, name: name ?? this.name);
+  SeriesData copyWithCompanion(SeriesCompanion data) {
+    return SeriesData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeriesData(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SeriesData && other.id == this.id && other.name == this.name);
+}
+
+class SeriesCompanion extends UpdateCompanion<SeriesData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> rowid;
+  const SeriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SeriesCompanion.insert({
+    required String id,
+    required String name,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<SeriesData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SeriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return SeriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Books extends Table with TableInfo<Books, BooksData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -322,8 +458,118 @@ class Books extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  BooksData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BooksData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      subtitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtitle'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      isbn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}isbn'],
+      ),
+      publisher: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}publisher'],
+      ),
+      publishedYear: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}published_year'],
+      ),
+      pageCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page_count'],
+      ),
+      coverPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_path'],
+      ),
+      spineStyle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}spine_style'],
+      ),
+      seriesId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}series_id'],
+      ),
+      seriesIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}series_index'],
+      ),
+      readingProgress: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}reading_progress'],
+      ),
+      lastReadPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_read_page'],
+      ),
+      lastReadAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_read_at'],
+      ),
+      readerNotes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reader_notes'],
+      ),
+      sourceMetadata: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_metadata'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}needs_push'],
+      )!,
+      coverEtag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_etag'],
+      ),
+      needsProgressPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}needs_progress_push'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      rating: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rating'],
+      ),
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}started_at'],
+      ),
+      finishedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}finished_at'],
+      ),
+      readCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}read_count'],
+      )!,
+    );
   }
 
   @override
@@ -337,7 +583,826 @@ class Books extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class Authors extends Table with TableInfo {
+class BooksData extends DataClass implements Insertable<BooksData> {
+  final String id;
+  final String title;
+  final String? subtitle;
+  final String? description;
+  final String? isbn;
+  final String? publisher;
+  final int? publishedYear;
+  final int? pageCount;
+  final String? coverPath;
+  final String? spineStyle;
+  final String? seriesId;
+  final double? seriesIndex;
+  final double? readingProgress;
+  final int? lastReadPage;
+  final int? lastReadAt;
+  final String? readerNotes;
+  final String? sourceMetadata;
+  final int createdAt;
+  final int updatedAt;
+  final int needsPush;
+  final String? coverEtag;
+  final int needsProgressPush;
+  final String status;
+  final int? rating;
+  final int? startedAt;
+  final int? finishedAt;
+  final int readCount;
+  const BooksData({
+    required this.id,
+    required this.title,
+    this.subtitle,
+    this.description,
+    this.isbn,
+    this.publisher,
+    this.publishedYear,
+    this.pageCount,
+    this.coverPath,
+    this.spineStyle,
+    this.seriesId,
+    this.seriesIndex,
+    this.readingProgress,
+    this.lastReadPage,
+    this.lastReadAt,
+    this.readerNotes,
+    this.sourceMetadata,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.needsPush,
+    this.coverEtag,
+    required this.needsProgressPush,
+    required this.status,
+    this.rating,
+    this.startedAt,
+    this.finishedAt,
+    required this.readCount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || subtitle != null) {
+      map['subtitle'] = Variable<String>(subtitle);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || isbn != null) {
+      map['isbn'] = Variable<String>(isbn);
+    }
+    if (!nullToAbsent || publisher != null) {
+      map['publisher'] = Variable<String>(publisher);
+    }
+    if (!nullToAbsent || publishedYear != null) {
+      map['published_year'] = Variable<int>(publishedYear);
+    }
+    if (!nullToAbsent || pageCount != null) {
+      map['page_count'] = Variable<int>(pageCount);
+    }
+    if (!nullToAbsent || coverPath != null) {
+      map['cover_path'] = Variable<String>(coverPath);
+    }
+    if (!nullToAbsent || spineStyle != null) {
+      map['spine_style'] = Variable<String>(spineStyle);
+    }
+    if (!nullToAbsent || seriesId != null) {
+      map['series_id'] = Variable<String>(seriesId);
+    }
+    if (!nullToAbsent || seriesIndex != null) {
+      map['series_index'] = Variable<double>(seriesIndex);
+    }
+    if (!nullToAbsent || readingProgress != null) {
+      map['reading_progress'] = Variable<double>(readingProgress);
+    }
+    if (!nullToAbsent || lastReadPage != null) {
+      map['last_read_page'] = Variable<int>(lastReadPage);
+    }
+    if (!nullToAbsent || lastReadAt != null) {
+      map['last_read_at'] = Variable<int>(lastReadAt);
+    }
+    if (!nullToAbsent || readerNotes != null) {
+      map['reader_notes'] = Variable<String>(readerNotes);
+    }
+    if (!nullToAbsent || sourceMetadata != null) {
+      map['source_metadata'] = Variable<String>(sourceMetadata);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    map['needs_push'] = Variable<int>(needsPush);
+    if (!nullToAbsent || coverEtag != null) {
+      map['cover_etag'] = Variable<String>(coverEtag);
+    }
+    map['needs_progress_push'] = Variable<int>(needsProgressPush);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || rating != null) {
+      map['rating'] = Variable<int>(rating);
+    }
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<int>(startedAt);
+    }
+    if (!nullToAbsent || finishedAt != null) {
+      map['finished_at'] = Variable<int>(finishedAt);
+    }
+    map['read_count'] = Variable<int>(readCount);
+    return map;
+  }
+
+  BooksCompanion toCompanion(bool nullToAbsent) {
+    return BooksCompanion(
+      id: Value(id),
+      title: Value(title),
+      subtitle: subtitle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(subtitle),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      isbn: isbn == null && nullToAbsent ? const Value.absent() : Value(isbn),
+      publisher: publisher == null && nullToAbsent
+          ? const Value.absent()
+          : Value(publisher),
+      publishedYear: publishedYear == null && nullToAbsent
+          ? const Value.absent()
+          : Value(publishedYear),
+      pageCount: pageCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pageCount),
+      coverPath: coverPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverPath),
+      spineStyle: spineStyle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(spineStyle),
+      seriesId: seriesId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seriesId),
+      seriesIndex: seriesIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seriesIndex),
+      readingProgress: readingProgress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readingProgress),
+      lastReadPage: lastReadPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReadPage),
+      lastReadAt: lastReadAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReadAt),
+      readerNotes: readerNotes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readerNotes),
+      sourceMetadata: sourceMetadata == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceMetadata),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
+      coverEtag: coverEtag == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverEtag),
+      needsProgressPush: Value(needsProgressPush),
+      status: Value(status),
+      rating: rating == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rating),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      finishedAt: finishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishedAt),
+      readCount: Value(readCount),
+    );
+  }
+
+  factory BooksData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BooksData(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      subtitle: serializer.fromJson<String?>(json['subtitle']),
+      description: serializer.fromJson<String?>(json['description']),
+      isbn: serializer.fromJson<String?>(json['isbn']),
+      publisher: serializer.fromJson<String?>(json['publisher']),
+      publishedYear: serializer.fromJson<int?>(json['publishedYear']),
+      pageCount: serializer.fromJson<int?>(json['pageCount']),
+      coverPath: serializer.fromJson<String?>(json['coverPath']),
+      spineStyle: serializer.fromJson<String?>(json['spineStyle']),
+      seriesId: serializer.fromJson<String?>(json['seriesId']),
+      seriesIndex: serializer.fromJson<double?>(json['seriesIndex']),
+      readingProgress: serializer.fromJson<double?>(json['readingProgress']),
+      lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
+      lastReadAt: serializer.fromJson<int?>(json['lastReadAt']),
+      readerNotes: serializer.fromJson<String?>(json['readerNotes']),
+      sourceMetadata: serializer.fromJson<String?>(json['sourceMetadata']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      needsPush: serializer.fromJson<int>(json['needsPush']),
+      coverEtag: serializer.fromJson<String?>(json['coverEtag']),
+      needsProgressPush: serializer.fromJson<int>(json['needsProgressPush']),
+      status: serializer.fromJson<String>(json['status']),
+      rating: serializer.fromJson<int?>(json['rating']),
+      startedAt: serializer.fromJson<int?>(json['startedAt']),
+      finishedAt: serializer.fromJson<int?>(json['finishedAt']),
+      readCount: serializer.fromJson<int>(json['readCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'subtitle': serializer.toJson<String?>(subtitle),
+      'description': serializer.toJson<String?>(description),
+      'isbn': serializer.toJson<String?>(isbn),
+      'publisher': serializer.toJson<String?>(publisher),
+      'publishedYear': serializer.toJson<int?>(publishedYear),
+      'pageCount': serializer.toJson<int?>(pageCount),
+      'coverPath': serializer.toJson<String?>(coverPath),
+      'spineStyle': serializer.toJson<String?>(spineStyle),
+      'seriesId': serializer.toJson<String?>(seriesId),
+      'seriesIndex': serializer.toJson<double?>(seriesIndex),
+      'readingProgress': serializer.toJson<double?>(readingProgress),
+      'lastReadPage': serializer.toJson<int?>(lastReadPage),
+      'lastReadAt': serializer.toJson<int?>(lastReadAt),
+      'readerNotes': serializer.toJson<String?>(readerNotes),
+      'sourceMetadata': serializer.toJson<String?>(sourceMetadata),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'needsPush': serializer.toJson<int>(needsPush),
+      'coverEtag': serializer.toJson<String?>(coverEtag),
+      'needsProgressPush': serializer.toJson<int>(needsProgressPush),
+      'status': serializer.toJson<String>(status),
+      'rating': serializer.toJson<int?>(rating),
+      'startedAt': serializer.toJson<int?>(startedAt),
+      'finishedAt': serializer.toJson<int?>(finishedAt),
+      'readCount': serializer.toJson<int>(readCount),
+    };
+  }
+
+  BooksData copyWith({
+    String? id,
+    String? title,
+    Value<String?> subtitle = const Value.absent(),
+    Value<String?> description = const Value.absent(),
+    Value<String?> isbn = const Value.absent(),
+    Value<String?> publisher = const Value.absent(),
+    Value<int?> publishedYear = const Value.absent(),
+    Value<int?> pageCount = const Value.absent(),
+    Value<String?> coverPath = const Value.absent(),
+    Value<String?> spineStyle = const Value.absent(),
+    Value<String?> seriesId = const Value.absent(),
+    Value<double?> seriesIndex = const Value.absent(),
+    Value<double?> readingProgress = const Value.absent(),
+    Value<int?> lastReadPage = const Value.absent(),
+    Value<int?> lastReadAt = const Value.absent(),
+    Value<String?> readerNotes = const Value.absent(),
+    Value<String?> sourceMetadata = const Value.absent(),
+    int? createdAt,
+    int? updatedAt,
+    int? needsPush,
+    Value<String?> coverEtag = const Value.absent(),
+    int? needsProgressPush,
+    String? status,
+    Value<int?> rating = const Value.absent(),
+    Value<int?> startedAt = const Value.absent(),
+    Value<int?> finishedAt = const Value.absent(),
+    int? readCount,
+  }) => BooksData(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    subtitle: subtitle.present ? subtitle.value : this.subtitle,
+    description: description.present ? description.value : this.description,
+    isbn: isbn.present ? isbn.value : this.isbn,
+    publisher: publisher.present ? publisher.value : this.publisher,
+    publishedYear: publishedYear.present
+        ? publishedYear.value
+        : this.publishedYear,
+    pageCount: pageCount.present ? pageCount.value : this.pageCount,
+    coverPath: coverPath.present ? coverPath.value : this.coverPath,
+    spineStyle: spineStyle.present ? spineStyle.value : this.spineStyle,
+    seriesId: seriesId.present ? seriesId.value : this.seriesId,
+    seriesIndex: seriesIndex.present ? seriesIndex.value : this.seriesIndex,
+    readingProgress: readingProgress.present
+        ? readingProgress.value
+        : this.readingProgress,
+    lastReadPage: lastReadPage.present ? lastReadPage.value : this.lastReadPage,
+    lastReadAt: lastReadAt.present ? lastReadAt.value : this.lastReadAt,
+    readerNotes: readerNotes.present ? readerNotes.value : this.readerNotes,
+    sourceMetadata: sourceMetadata.present
+        ? sourceMetadata.value
+        : this.sourceMetadata,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
+    coverEtag: coverEtag.present ? coverEtag.value : this.coverEtag,
+    needsProgressPush: needsProgressPush ?? this.needsProgressPush,
+    status: status ?? this.status,
+    rating: rating.present ? rating.value : this.rating,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+    readCount: readCount ?? this.readCount,
+  );
+  BooksData copyWithCompanion(BooksCompanion data) {
+    return BooksData(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      subtitle: data.subtitle.present ? data.subtitle.value : this.subtitle,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      isbn: data.isbn.present ? data.isbn.value : this.isbn,
+      publisher: data.publisher.present ? data.publisher.value : this.publisher,
+      publishedYear: data.publishedYear.present
+          ? data.publishedYear.value
+          : this.publishedYear,
+      pageCount: data.pageCount.present ? data.pageCount.value : this.pageCount,
+      coverPath: data.coverPath.present ? data.coverPath.value : this.coverPath,
+      spineStyle: data.spineStyle.present
+          ? data.spineStyle.value
+          : this.spineStyle,
+      seriesId: data.seriesId.present ? data.seriesId.value : this.seriesId,
+      seriesIndex: data.seriesIndex.present
+          ? data.seriesIndex.value
+          : this.seriesIndex,
+      readingProgress: data.readingProgress.present
+          ? data.readingProgress.value
+          : this.readingProgress,
+      lastReadPage: data.lastReadPage.present
+          ? data.lastReadPage.value
+          : this.lastReadPage,
+      lastReadAt: data.lastReadAt.present
+          ? data.lastReadAt.value
+          : this.lastReadAt,
+      readerNotes: data.readerNotes.present
+          ? data.readerNotes.value
+          : this.readerNotes,
+      sourceMetadata: data.sourceMetadata.present
+          ? data.sourceMetadata.value
+          : this.sourceMetadata,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
+      coverEtag: data.coverEtag.present ? data.coverEtag.value : this.coverEtag,
+      needsProgressPush: data.needsProgressPush.present
+          ? data.needsProgressPush.value
+          : this.needsProgressPush,
+      status: data.status.present ? data.status.value : this.status,
+      rating: data.rating.present ? data.rating.value : this.rating,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      finishedAt: data.finishedAt.present
+          ? data.finishedAt.value
+          : this.finishedAt,
+      readCount: data.readCount.present ? data.readCount.value : this.readCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BooksData(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('subtitle: $subtitle, ')
+          ..write('description: $description, ')
+          ..write('isbn: $isbn, ')
+          ..write('publisher: $publisher, ')
+          ..write('publishedYear: $publishedYear, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('coverPath: $coverPath, ')
+          ..write('spineStyle: $spineStyle, ')
+          ..write('seriesId: $seriesId, ')
+          ..write('seriesIndex: $seriesIndex, ')
+          ..write('readingProgress: $readingProgress, ')
+          ..write('lastReadPage: $lastReadPage, ')
+          ..write('lastReadAt: $lastReadAt, ')
+          ..write('readerNotes: $readerNotes, ')
+          ..write('sourceMetadata: $sourceMetadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('coverEtag: $coverEtag, ')
+          ..write('needsProgressPush: $needsProgressPush, ')
+          ..write('status: $status, ')
+          ..write('rating: $rating, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('readCount: $readCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    title,
+    subtitle,
+    description,
+    isbn,
+    publisher,
+    publishedYear,
+    pageCount,
+    coverPath,
+    spineStyle,
+    seriesId,
+    seriesIndex,
+    readingProgress,
+    lastReadPage,
+    lastReadAt,
+    readerNotes,
+    sourceMetadata,
+    createdAt,
+    updatedAt,
+    needsPush,
+    coverEtag,
+    needsProgressPush,
+    status,
+    rating,
+    startedAt,
+    finishedAt,
+    readCount,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BooksData &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.subtitle == this.subtitle &&
+          other.description == this.description &&
+          other.isbn == this.isbn &&
+          other.publisher == this.publisher &&
+          other.publishedYear == this.publishedYear &&
+          other.pageCount == this.pageCount &&
+          other.coverPath == this.coverPath &&
+          other.spineStyle == this.spineStyle &&
+          other.seriesId == this.seriesId &&
+          other.seriesIndex == this.seriesIndex &&
+          other.readingProgress == this.readingProgress &&
+          other.lastReadPage == this.lastReadPage &&
+          other.lastReadAt == this.lastReadAt &&
+          other.readerNotes == this.readerNotes &&
+          other.sourceMetadata == this.sourceMetadata &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush &&
+          other.coverEtag == this.coverEtag &&
+          other.needsProgressPush == this.needsProgressPush &&
+          other.status == this.status &&
+          other.rating == this.rating &&
+          other.startedAt == this.startedAt &&
+          other.finishedAt == this.finishedAt &&
+          other.readCount == this.readCount);
+}
+
+class BooksCompanion extends UpdateCompanion<BooksData> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String?> subtitle;
+  final Value<String?> description;
+  final Value<String?> isbn;
+  final Value<String?> publisher;
+  final Value<int?> publishedYear;
+  final Value<int?> pageCount;
+  final Value<String?> coverPath;
+  final Value<String?> spineStyle;
+  final Value<String?> seriesId;
+  final Value<double?> seriesIndex;
+  final Value<double?> readingProgress;
+  final Value<int?> lastReadPage;
+  final Value<int?> lastReadAt;
+  final Value<String?> readerNotes;
+  final Value<String?> sourceMetadata;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<int> needsPush;
+  final Value<String?> coverEtag;
+  final Value<int> needsProgressPush;
+  final Value<String> status;
+  final Value<int?> rating;
+  final Value<int?> startedAt;
+  final Value<int?> finishedAt;
+  final Value<int> readCount;
+  final Value<int> rowid;
+  const BooksCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.subtitle = const Value.absent(),
+    this.description = const Value.absent(),
+    this.isbn = const Value.absent(),
+    this.publisher = const Value.absent(),
+    this.publishedYear = const Value.absent(),
+    this.pageCount = const Value.absent(),
+    this.coverPath = const Value.absent(),
+    this.spineStyle = const Value.absent(),
+    this.seriesId = const Value.absent(),
+    this.seriesIndex = const Value.absent(),
+    this.readingProgress = const Value.absent(),
+    this.lastReadPage = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
+    this.readerNotes = const Value.absent(),
+    this.sourceMetadata = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.coverEtag = const Value.absent(),
+    this.needsProgressPush = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.readCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BooksCompanion.insert({
+    required String id,
+    required String title,
+    this.subtitle = const Value.absent(),
+    this.description = const Value.absent(),
+    this.isbn = const Value.absent(),
+    this.publisher = const Value.absent(),
+    this.publishedYear = const Value.absent(),
+    this.pageCount = const Value.absent(),
+    this.coverPath = const Value.absent(),
+    this.spineStyle = const Value.absent(),
+    this.seriesId = const Value.absent(),
+    this.seriesIndex = const Value.absent(),
+    this.readingProgress = const Value.absent(),
+    this.lastReadPage = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
+    this.readerNotes = const Value.absent(),
+    this.sourceMetadata = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.coverEtag = const Value.absent(),
+    this.needsProgressPush = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.readCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title);
+  static Insertable<BooksData> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? subtitle,
+    Expression<String>? description,
+    Expression<String>? isbn,
+    Expression<String>? publisher,
+    Expression<int>? publishedYear,
+    Expression<int>? pageCount,
+    Expression<String>? coverPath,
+    Expression<String>? spineStyle,
+    Expression<String>? seriesId,
+    Expression<double>? seriesIndex,
+    Expression<double>? readingProgress,
+    Expression<int>? lastReadPage,
+    Expression<int>? lastReadAt,
+    Expression<String>? readerNotes,
+    Expression<String>? sourceMetadata,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? needsPush,
+    Expression<String>? coverEtag,
+    Expression<int>? needsProgressPush,
+    Expression<String>? status,
+    Expression<int>? rating,
+    Expression<int>? startedAt,
+    Expression<int>? finishedAt,
+    Expression<int>? readCount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (subtitle != null) 'subtitle': subtitle,
+      if (description != null) 'description': description,
+      if (isbn != null) 'isbn': isbn,
+      if (publisher != null) 'publisher': publisher,
+      if (publishedYear != null) 'published_year': publishedYear,
+      if (pageCount != null) 'page_count': pageCount,
+      if (coverPath != null) 'cover_path': coverPath,
+      if (spineStyle != null) 'spine_style': spineStyle,
+      if (seriesId != null) 'series_id': seriesId,
+      if (seriesIndex != null) 'series_index': seriesIndex,
+      if (readingProgress != null) 'reading_progress': readingProgress,
+      if (lastReadPage != null) 'last_read_page': lastReadPage,
+      if (lastReadAt != null) 'last_read_at': lastReadAt,
+      if (readerNotes != null) 'reader_notes': readerNotes,
+      if (sourceMetadata != null) 'source_metadata': sourceMetadata,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
+      if (coverEtag != null) 'cover_etag': coverEtag,
+      if (needsProgressPush != null) 'needs_progress_push': needsProgressPush,
+      if (status != null) 'status': status,
+      if (rating != null) 'rating': rating,
+      if (startedAt != null) 'started_at': startedAt,
+      if (finishedAt != null) 'finished_at': finishedAt,
+      if (readCount != null) 'read_count': readCount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BooksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<String?>? subtitle,
+    Value<String?>? description,
+    Value<String?>? isbn,
+    Value<String?>? publisher,
+    Value<int?>? publishedYear,
+    Value<int?>? pageCount,
+    Value<String?>? coverPath,
+    Value<String?>? spineStyle,
+    Value<String?>? seriesId,
+    Value<double?>? seriesIndex,
+    Value<double?>? readingProgress,
+    Value<int?>? lastReadPage,
+    Value<int?>? lastReadAt,
+    Value<String?>? readerNotes,
+    Value<String?>? sourceMetadata,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<int>? needsPush,
+    Value<String?>? coverEtag,
+    Value<int>? needsProgressPush,
+    Value<String>? status,
+    Value<int?>? rating,
+    Value<int?>? startedAt,
+    Value<int?>? finishedAt,
+    Value<int>? readCount,
+    Value<int>? rowid,
+  }) {
+    return BooksCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      description: description ?? this.description,
+      isbn: isbn ?? this.isbn,
+      publisher: publisher ?? this.publisher,
+      publishedYear: publishedYear ?? this.publishedYear,
+      pageCount: pageCount ?? this.pageCount,
+      coverPath: coverPath ?? this.coverPath,
+      spineStyle: spineStyle ?? this.spineStyle,
+      seriesId: seriesId ?? this.seriesId,
+      seriesIndex: seriesIndex ?? this.seriesIndex,
+      readingProgress: readingProgress ?? this.readingProgress,
+      lastReadPage: lastReadPage ?? this.lastReadPage,
+      lastReadAt: lastReadAt ?? this.lastReadAt,
+      readerNotes: readerNotes ?? this.readerNotes,
+      sourceMetadata: sourceMetadata ?? this.sourceMetadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
+      coverEtag: coverEtag ?? this.coverEtag,
+      needsProgressPush: needsProgressPush ?? this.needsProgressPush,
+      status: status ?? this.status,
+      rating: rating ?? this.rating,
+      startedAt: startedAt ?? this.startedAt,
+      finishedAt: finishedAt ?? this.finishedAt,
+      readCount: readCount ?? this.readCount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (subtitle.present) {
+      map['subtitle'] = Variable<String>(subtitle.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (isbn.present) {
+      map['isbn'] = Variable<String>(isbn.value);
+    }
+    if (publisher.present) {
+      map['publisher'] = Variable<String>(publisher.value);
+    }
+    if (publishedYear.present) {
+      map['published_year'] = Variable<int>(publishedYear.value);
+    }
+    if (pageCount.present) {
+      map['page_count'] = Variable<int>(pageCount.value);
+    }
+    if (coverPath.present) {
+      map['cover_path'] = Variable<String>(coverPath.value);
+    }
+    if (spineStyle.present) {
+      map['spine_style'] = Variable<String>(spineStyle.value);
+    }
+    if (seriesId.present) {
+      map['series_id'] = Variable<String>(seriesId.value);
+    }
+    if (seriesIndex.present) {
+      map['series_index'] = Variable<double>(seriesIndex.value);
+    }
+    if (readingProgress.present) {
+      map['reading_progress'] = Variable<double>(readingProgress.value);
+    }
+    if (lastReadPage.present) {
+      map['last_read_page'] = Variable<int>(lastReadPage.value);
+    }
+    if (lastReadAt.present) {
+      map['last_read_at'] = Variable<int>(lastReadAt.value);
+    }
+    if (readerNotes.present) {
+      map['reader_notes'] = Variable<String>(readerNotes.value);
+    }
+    if (sourceMetadata.present) {
+      map['source_metadata'] = Variable<String>(sourceMetadata.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<int>(needsPush.value);
+    }
+    if (coverEtag.present) {
+      map['cover_etag'] = Variable<String>(coverEtag.value);
+    }
+    if (needsProgressPush.present) {
+      map['needs_progress_push'] = Variable<int>(needsProgressPush.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (rating.present) {
+      map['rating'] = Variable<int>(rating.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<int>(startedAt.value);
+    }
+    if (finishedAt.present) {
+      map['finished_at'] = Variable<int>(finishedAt.value);
+    }
+    if (readCount.present) {
+      map['read_count'] = Variable<int>(readCount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BooksCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('subtitle: $subtitle, ')
+          ..write('description: $description, ')
+          ..write('isbn: $isbn, ')
+          ..write('publisher: $publisher, ')
+          ..write('publishedYear: $publishedYear, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('coverPath: $coverPath, ')
+          ..write('spineStyle: $spineStyle, ')
+          ..write('seriesId: $seriesId, ')
+          ..write('seriesIndex: $seriesIndex, ')
+          ..write('readingProgress: $readingProgress, ')
+          ..write('lastReadPage: $lastReadPage, ')
+          ..write('lastReadAt: $lastReadAt, ')
+          ..write('readerNotes: $readerNotes, ')
+          ..write('sourceMetadata: $sourceMetadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('coverEtag: $coverEtag, ')
+          ..write('needsProgressPush: $needsProgressPush, ')
+          ..write('status: $status, ')
+          ..write('rating: $rating, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('readCount: $readCount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Authors extends Table with TableInfo<Authors, AuthorsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -368,8 +1433,18 @@ class Authors extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  AuthorsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AuthorsData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
   }
 
   @override
@@ -383,7 +1458,133 @@ class Authors extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class BookAuthors extends Table with TableInfo {
+class AuthorsData extends DataClass implements Insertable<AuthorsData> {
+  final String id;
+  final String name;
+  const AuthorsData({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  AuthorsCompanion toCompanion(bool nullToAbsent) {
+    return AuthorsCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory AuthorsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AuthorsData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  AuthorsData copyWith({String? id, String? name}) =>
+      AuthorsData(id: id ?? this.id, name: name ?? this.name);
+  AuthorsData copyWithCompanion(AuthorsCompanion data) {
+    return AuthorsData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AuthorsData(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AuthorsData && other.id == this.id && other.name == this.name);
+}
+
+class AuthorsCompanion extends UpdateCompanion<AuthorsData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> rowid;
+  const AuthorsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AuthorsCompanion.insert({
+    required String id,
+    required String name,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<AuthorsData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AuthorsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return AuthorsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AuthorsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class BookAuthors extends Table with TableInfo<BookAuthors, BookAuthorsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -423,8 +1624,22 @@ class BookAuthors extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {bookId, authorId};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  BookAuthorsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BookAuthorsData(
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      authorId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author_id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+    );
   }
 
   @override
@@ -440,7 +1655,165 @@ class BookAuthors extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class Genres extends Table with TableInfo {
+class BookAuthorsData extends DataClass implements Insertable<BookAuthorsData> {
+  final String bookId;
+  final String authorId;
+  final int position;
+  const BookAuthorsData({
+    required this.bookId,
+    required this.authorId,
+    required this.position,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_id'] = Variable<String>(bookId);
+    map['author_id'] = Variable<String>(authorId);
+    map['position'] = Variable<int>(position);
+    return map;
+  }
+
+  BookAuthorsCompanion toCompanion(bool nullToAbsent) {
+    return BookAuthorsCompanion(
+      bookId: Value(bookId),
+      authorId: Value(authorId),
+      position: Value(position),
+    );
+  }
+
+  factory BookAuthorsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BookAuthorsData(
+      bookId: serializer.fromJson<String>(json['bookId']),
+      authorId: serializer.fromJson<String>(json['authorId']),
+      position: serializer.fromJson<int>(json['position']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bookId': serializer.toJson<String>(bookId),
+      'authorId': serializer.toJson<String>(authorId),
+      'position': serializer.toJson<int>(position),
+    };
+  }
+
+  BookAuthorsData copyWith({String? bookId, String? authorId, int? position}) =>
+      BookAuthorsData(
+        bookId: bookId ?? this.bookId,
+        authorId: authorId ?? this.authorId,
+        position: position ?? this.position,
+      );
+  BookAuthorsData copyWithCompanion(BookAuthorsCompanion data) {
+    return BookAuthorsData(
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      authorId: data.authorId.present ? data.authorId.value : this.authorId,
+      position: data.position.present ? data.position.value : this.position,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookAuthorsData(')
+          ..write('bookId: $bookId, ')
+          ..write('authorId: $authorId, ')
+          ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(bookId, authorId, position);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BookAuthorsData &&
+          other.bookId == this.bookId &&
+          other.authorId == this.authorId &&
+          other.position == this.position);
+}
+
+class BookAuthorsCompanion extends UpdateCompanion<BookAuthorsData> {
+  final Value<String> bookId;
+  final Value<String> authorId;
+  final Value<int> position;
+  final Value<int> rowid;
+  const BookAuthorsCompanion({
+    this.bookId = const Value.absent(),
+    this.authorId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BookAuthorsCompanion.insert({
+    required String bookId,
+    required String authorId,
+    this.position = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : bookId = Value(bookId),
+       authorId = Value(authorId);
+  static Insertable<BookAuthorsData> custom({
+    Expression<String>? bookId,
+    Expression<String>? authorId,
+    Expression<int>? position,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookId != null) 'book_id': bookId,
+      if (authorId != null) 'author_id': authorId,
+      if (position != null) 'position': position,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BookAuthorsCompanion copyWith({
+    Value<String>? bookId,
+    Value<String>? authorId,
+    Value<int>? position,
+    Value<int>? rowid,
+  }) {
+    return BookAuthorsCompanion(
+      bookId: bookId ?? this.bookId,
+      authorId: authorId ?? this.authorId,
+      position: position ?? this.position,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (authorId.present) {
+      map['author_id'] = Variable<String>(authorId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookAuthorsCompanion(')
+          ..write('bookId: $bookId, ')
+          ..write('authorId: $authorId, ')
+          ..write('position: $position, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Genres extends Table with TableInfo<Genres, GenresData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -471,8 +1844,18 @@ class Genres extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  GenresData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GenresData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
   }
 
   @override
@@ -486,7 +1869,133 @@ class Genres extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class BookGenres extends Table with TableInfo {
+class GenresData extends DataClass implements Insertable<GenresData> {
+  final String id;
+  final String name;
+  const GenresData({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  GenresCompanion toCompanion(bool nullToAbsent) {
+    return GenresCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory GenresData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GenresData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  GenresData copyWith({String? id, String? name}) =>
+      GenresData(id: id ?? this.id, name: name ?? this.name);
+  GenresData copyWithCompanion(GenresCompanion data) {
+    return GenresData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenresData(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GenresData && other.id == this.id && other.name == this.name);
+}
+
+class GenresCompanion extends UpdateCompanion<GenresData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> rowid;
+  const GenresCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GenresCompanion.insert({
+    required String id,
+    required String name,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<GenresData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GenresCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return GenresCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenresCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class BookGenres extends Table with TableInfo<BookGenres, BookGenresData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -517,8 +2026,18 @@ class BookGenres extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {bookId, genreId};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  BookGenresData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BookGenresData(
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      genreId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}genre_id'],
+      )!,
+    );
   }
 
   @override
@@ -534,7 +2053,137 @@ class BookGenres extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class BookFiles extends Table with TableInfo {
+class BookGenresData extends DataClass implements Insertable<BookGenresData> {
+  final String bookId;
+  final String genreId;
+  const BookGenresData({required this.bookId, required this.genreId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_id'] = Variable<String>(bookId);
+    map['genre_id'] = Variable<String>(genreId);
+    return map;
+  }
+
+  BookGenresCompanion toCompanion(bool nullToAbsent) {
+    return BookGenresCompanion(bookId: Value(bookId), genreId: Value(genreId));
+  }
+
+  factory BookGenresData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BookGenresData(
+      bookId: serializer.fromJson<String>(json['bookId']),
+      genreId: serializer.fromJson<String>(json['genreId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bookId': serializer.toJson<String>(bookId),
+      'genreId': serializer.toJson<String>(genreId),
+    };
+  }
+
+  BookGenresData copyWith({String? bookId, String? genreId}) => BookGenresData(
+    bookId: bookId ?? this.bookId,
+    genreId: genreId ?? this.genreId,
+  );
+  BookGenresData copyWithCompanion(BookGenresCompanion data) {
+    return BookGenresData(
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      genreId: data.genreId.present ? data.genreId.value : this.genreId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookGenresData(')
+          ..write('bookId: $bookId, ')
+          ..write('genreId: $genreId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(bookId, genreId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BookGenresData &&
+          other.bookId == this.bookId &&
+          other.genreId == this.genreId);
+}
+
+class BookGenresCompanion extends UpdateCompanion<BookGenresData> {
+  final Value<String> bookId;
+  final Value<String> genreId;
+  final Value<int> rowid;
+  const BookGenresCompanion({
+    this.bookId = const Value.absent(),
+    this.genreId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BookGenresCompanion.insert({
+    required String bookId,
+    required String genreId,
+    this.rowid = const Value.absent(),
+  }) : bookId = Value(bookId),
+       genreId = Value(genreId);
+  static Insertable<BookGenresData> custom({
+    Expression<String>? bookId,
+    Expression<String>? genreId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookId != null) 'book_id': bookId,
+      if (genreId != null) 'genre_id': genreId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BookGenresCompanion copyWith({
+    Value<String>? bookId,
+    Value<String>? genreId,
+    Value<int>? rowid,
+  }) {
+    return BookGenresCompanion(
+      bookId: bookId ?? this.bookId,
+      genreId: genreId ?? this.genreId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (genreId.present) {
+      map['genre_id'] = Variable<String>(genreId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookGenresCompanion(')
+          ..write('bookId: $bookId, ')
+          ..write('genreId: $genreId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class BookFiles extends Table with TableInfo<BookFiles, BookFilesData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -617,8 +2266,38 @@ class BookFiles extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  BookFilesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BookFilesData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      format: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}format'],
+      )!,
+      path: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}path'],
+      )!,
+      sizeBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}size_bytes'],
+      )!,
+      sha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sha256'],
+      )!,
+      addedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}added_at'],
+      )!,
+    );
   }
 
   @override
@@ -632,7 +2311,262 @@ class BookFiles extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class PhysicalCopies extends Table with TableInfo {
+class BookFilesData extends DataClass implements Insertable<BookFilesData> {
+  final String id;
+  final String bookId;
+  final String format;
+  final String path;
+  final int sizeBytes;
+  final String sha256;
+  final int addedAt;
+  const BookFilesData({
+    required this.id,
+    required this.bookId,
+    required this.format,
+    required this.path,
+    required this.sizeBytes,
+    required this.sha256,
+    required this.addedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['book_id'] = Variable<String>(bookId);
+    map['format'] = Variable<String>(format);
+    map['path'] = Variable<String>(path);
+    map['size_bytes'] = Variable<int>(sizeBytes);
+    map['sha256'] = Variable<String>(sha256);
+    map['added_at'] = Variable<int>(addedAt);
+    return map;
+  }
+
+  BookFilesCompanion toCompanion(bool nullToAbsent) {
+    return BookFilesCompanion(
+      id: Value(id),
+      bookId: Value(bookId),
+      format: Value(format),
+      path: Value(path),
+      sizeBytes: Value(sizeBytes),
+      sha256: Value(sha256),
+      addedAt: Value(addedAt),
+    );
+  }
+
+  factory BookFilesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BookFilesData(
+      id: serializer.fromJson<String>(json['id']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      format: serializer.fromJson<String>(json['format']),
+      path: serializer.fromJson<String>(json['path']),
+      sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
+      sha256: serializer.fromJson<String>(json['sha256']),
+      addedAt: serializer.fromJson<int>(json['addedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bookId': serializer.toJson<String>(bookId),
+      'format': serializer.toJson<String>(format),
+      'path': serializer.toJson<String>(path),
+      'sizeBytes': serializer.toJson<int>(sizeBytes),
+      'sha256': serializer.toJson<String>(sha256),
+      'addedAt': serializer.toJson<int>(addedAt),
+    };
+  }
+
+  BookFilesData copyWith({
+    String? id,
+    String? bookId,
+    String? format,
+    String? path,
+    int? sizeBytes,
+    String? sha256,
+    int? addedAt,
+  }) => BookFilesData(
+    id: id ?? this.id,
+    bookId: bookId ?? this.bookId,
+    format: format ?? this.format,
+    path: path ?? this.path,
+    sizeBytes: sizeBytes ?? this.sizeBytes,
+    sha256: sha256 ?? this.sha256,
+    addedAt: addedAt ?? this.addedAt,
+  );
+  BookFilesData copyWithCompanion(BookFilesCompanion data) {
+    return BookFilesData(
+      id: data.id.present ? data.id.value : this.id,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      format: data.format.present ? data.format.value : this.format,
+      path: data.path.present ? data.path.value : this.path,
+      sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
+      sha256: data.sha256.present ? data.sha256.value : this.sha256,
+      addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookFilesData(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('format: $format, ')
+          ..write('path: $path, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('sha256: $sha256, ')
+          ..write('addedAt: $addedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, bookId, format, path, sizeBytes, sha256, addedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BookFilesData &&
+          other.id == this.id &&
+          other.bookId == this.bookId &&
+          other.format == this.format &&
+          other.path == this.path &&
+          other.sizeBytes == this.sizeBytes &&
+          other.sha256 == this.sha256 &&
+          other.addedAt == this.addedAt);
+}
+
+class BookFilesCompanion extends UpdateCompanion<BookFilesData> {
+  final Value<String> id;
+  final Value<String> bookId;
+  final Value<String> format;
+  final Value<String> path;
+  final Value<int> sizeBytes;
+  final Value<String> sha256;
+  final Value<int> addedAt;
+  final Value<int> rowid;
+  const BookFilesCompanion({
+    this.id = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.format = const Value.absent(),
+    this.path = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.sha256 = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BookFilesCompanion.insert({
+    required String id,
+    required String bookId,
+    required String format,
+    required String path,
+    required int sizeBytes,
+    required String sha256,
+    this.addedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bookId = Value(bookId),
+       format = Value(format),
+       path = Value(path),
+       sizeBytes = Value(sizeBytes),
+       sha256 = Value(sha256);
+  static Insertable<BookFilesData> custom({
+    Expression<String>? id,
+    Expression<String>? bookId,
+    Expression<String>? format,
+    Expression<String>? path,
+    Expression<int>? sizeBytes,
+    Expression<String>? sha256,
+    Expression<int>? addedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bookId != null) 'book_id': bookId,
+      if (format != null) 'format': format,
+      if (path != null) 'path': path,
+      if (sizeBytes != null) 'size_bytes': sizeBytes,
+      if (sha256 != null) 'sha256': sha256,
+      if (addedAt != null) 'added_at': addedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BookFilesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bookId,
+    Value<String>? format,
+    Value<String>? path,
+    Value<int>? sizeBytes,
+    Value<String>? sha256,
+    Value<int>? addedAt,
+    Value<int>? rowid,
+  }) {
+    return BookFilesCompanion(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      format: format ?? this.format,
+      path: path ?? this.path,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      sha256: sha256 ?? this.sha256,
+      addedAt: addedAt ?? this.addedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (format.present) {
+      map['format'] = Variable<String>(format.value);
+    }
+    if (path.present) {
+      map['path'] = Variable<String>(path.value);
+    }
+    if (sizeBytes.present) {
+      map['size_bytes'] = Variable<int>(sizeBytes.value);
+    }
+    if (sha256.present) {
+      map['sha256'] = Variable<String>(sha256.value);
+    }
+    if (addedAt.present) {
+      map['added_at'] = Variable<int>(addedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookFilesCompanion(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('format: $format, ')
+          ..write('path: $path, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('sha256: $sha256, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class PhysicalCopies extends Table
+    with TableInfo<PhysicalCopies, PhysicalCopiesData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -716,8 +2650,38 @@ class PhysicalCopies extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  PhysicalCopiesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PhysicalCopiesData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
+      condition: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}condition'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}needs_push'],
+      )!,
+    );
   }
 
   @override
@@ -731,7 +2695,270 @@ class PhysicalCopies extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class Loans extends Table with TableInfo {
+class PhysicalCopiesData extends DataClass
+    implements Insertable<PhysicalCopiesData> {
+  final String id;
+  final String bookId;
+  final String? location;
+  final String? condition;
+  final String? notes;
+  final int updatedAt;
+  final int needsPush;
+  const PhysicalCopiesData({
+    required this.id,
+    required this.bookId,
+    this.location,
+    this.condition,
+    this.notes,
+    required this.updatedAt,
+    required this.needsPush,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['book_id'] = Variable<String>(bookId);
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
+    if (!nullToAbsent || condition != null) {
+      map['condition'] = Variable<String>(condition);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['updated_at'] = Variable<int>(updatedAt);
+    map['needs_push'] = Variable<int>(needsPush);
+    return map;
+  }
+
+  PhysicalCopiesCompanion toCompanion(bool nullToAbsent) {
+    return PhysicalCopiesCompanion(
+      id: Value(id),
+      bookId: Value(bookId),
+      location: location == null && nullToAbsent
+          ? const Value.absent()
+          : Value(location),
+      condition: condition == null && nullToAbsent
+          ? const Value.absent()
+          : Value(condition),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
+    );
+  }
+
+  factory PhysicalCopiesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PhysicalCopiesData(
+      id: serializer.fromJson<String>(json['id']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      location: serializer.fromJson<String?>(json['location']),
+      condition: serializer.fromJson<String?>(json['condition']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      needsPush: serializer.fromJson<int>(json['needsPush']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bookId': serializer.toJson<String>(bookId),
+      'location': serializer.toJson<String?>(location),
+      'condition': serializer.toJson<String?>(condition),
+      'notes': serializer.toJson<String?>(notes),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'needsPush': serializer.toJson<int>(needsPush),
+    };
+  }
+
+  PhysicalCopiesData copyWith({
+    String? id,
+    String? bookId,
+    Value<String?> location = const Value.absent(),
+    Value<String?> condition = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    int? updatedAt,
+    int? needsPush,
+  }) => PhysicalCopiesData(
+    id: id ?? this.id,
+    bookId: bookId ?? this.bookId,
+    location: location.present ? location.value : this.location,
+    condition: condition.present ? condition.value : this.condition,
+    notes: notes.present ? notes.value : this.notes,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
+  );
+  PhysicalCopiesData copyWithCompanion(PhysicalCopiesCompanion data) {
+    return PhysicalCopiesData(
+      id: data.id.present ? data.id.value : this.id,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      location: data.location.present ? data.location.value : this.location,
+      condition: data.condition.present ? data.condition.value : this.condition,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalCopiesData(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('location: $location, ')
+          ..write('condition: $condition, ')
+          ..write('notes: $notes, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, bookId, location, condition, notes, updatedAt, needsPush);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PhysicalCopiesData &&
+          other.id == this.id &&
+          other.bookId == this.bookId &&
+          other.location == this.location &&
+          other.condition == this.condition &&
+          other.notes == this.notes &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush);
+}
+
+class PhysicalCopiesCompanion extends UpdateCompanion<PhysicalCopiesData> {
+  final Value<String> id;
+  final Value<String> bookId;
+  final Value<String?> location;
+  final Value<String?> condition;
+  final Value<String?> notes;
+  final Value<int> updatedAt;
+  final Value<int> needsPush;
+  final Value<int> rowid;
+  const PhysicalCopiesCompanion({
+    this.id = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.location = const Value.absent(),
+    this.condition = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PhysicalCopiesCompanion.insert({
+    required String id,
+    required String bookId,
+    this.location = const Value.absent(),
+    this.condition = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bookId = Value(bookId);
+  static Insertable<PhysicalCopiesData> custom({
+    Expression<String>? id,
+    Expression<String>? bookId,
+    Expression<String>? location,
+    Expression<String>? condition,
+    Expression<String>? notes,
+    Expression<int>? updatedAt,
+    Expression<int>? needsPush,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bookId != null) 'book_id': bookId,
+      if (location != null) 'location': location,
+      if (condition != null) 'condition': condition,
+      if (notes != null) 'notes': notes,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PhysicalCopiesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bookId,
+    Value<String?>? location,
+    Value<String?>? condition,
+    Value<String?>? notes,
+    Value<int>? updatedAt,
+    Value<int>? needsPush,
+    Value<int>? rowid,
+  }) {
+    return PhysicalCopiesCompanion(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      location: location ?? this.location,
+      condition: condition ?? this.condition,
+      notes: notes ?? this.notes,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (condition.present) {
+      map['condition'] = Variable<String>(condition.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<int>(needsPush.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalCopiesCompanion(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('location: $location, ')
+          ..write('condition: $condition, ')
+          ..write('notes: $notes, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Loans extends Table with TableInfo<Loans, LoansData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -855,8 +3082,54 @@ class Loans extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  LoansData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LoansData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      copyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}copy_id'],
+      )!,
+      borrower: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}borrower'],
+      )!,
+      loanedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}loaned_at'],
+      )!,
+      returnedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}returned_at'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}needs_push'],
+      )!,
+      dueAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}due_at'],
+      ),
+      borrowerContact: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}borrower_contact'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      reminderSentAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_sent_at'],
+      ),
+    );
   }
 
   @override
@@ -870,7 +3143,387 @@ class Loans extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class CopyPhotos extends Table with TableInfo {
+class LoansData extends DataClass implements Insertable<LoansData> {
+  final String id;
+  final String copyId;
+  final String borrower;
+  final int loanedAt;
+  final int? returnedAt;
+  final int updatedAt;
+  final int needsPush;
+  final int? dueAt;
+  final String? borrowerContact;
+  final String? notes;
+  final int? reminderSentAt;
+  const LoansData({
+    required this.id,
+    required this.copyId,
+    required this.borrower,
+    required this.loanedAt,
+    this.returnedAt,
+    required this.updatedAt,
+    required this.needsPush,
+    this.dueAt,
+    this.borrowerContact,
+    this.notes,
+    this.reminderSentAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['copy_id'] = Variable<String>(copyId);
+    map['borrower'] = Variable<String>(borrower);
+    map['loaned_at'] = Variable<int>(loanedAt);
+    if (!nullToAbsent || returnedAt != null) {
+      map['returned_at'] = Variable<int>(returnedAt);
+    }
+    map['updated_at'] = Variable<int>(updatedAt);
+    map['needs_push'] = Variable<int>(needsPush);
+    if (!nullToAbsent || dueAt != null) {
+      map['due_at'] = Variable<int>(dueAt);
+    }
+    if (!nullToAbsent || borrowerContact != null) {
+      map['borrower_contact'] = Variable<String>(borrowerContact);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || reminderSentAt != null) {
+      map['reminder_sent_at'] = Variable<int>(reminderSentAt);
+    }
+    return map;
+  }
+
+  LoansCompanion toCompanion(bool nullToAbsent) {
+    return LoansCompanion(
+      id: Value(id),
+      copyId: Value(copyId),
+      borrower: Value(borrower),
+      loanedAt: Value(loanedAt),
+      returnedAt: returnedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(returnedAt),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
+      dueAt: dueAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueAt),
+      borrowerContact: borrowerContact == null && nullToAbsent
+          ? const Value.absent()
+          : Value(borrowerContact),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      reminderSentAt: reminderSentAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderSentAt),
+    );
+  }
+
+  factory LoansData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LoansData(
+      id: serializer.fromJson<String>(json['id']),
+      copyId: serializer.fromJson<String>(json['copyId']),
+      borrower: serializer.fromJson<String>(json['borrower']),
+      loanedAt: serializer.fromJson<int>(json['loanedAt']),
+      returnedAt: serializer.fromJson<int?>(json['returnedAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      needsPush: serializer.fromJson<int>(json['needsPush']),
+      dueAt: serializer.fromJson<int?>(json['dueAt']),
+      borrowerContact: serializer.fromJson<String?>(json['borrowerContact']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      reminderSentAt: serializer.fromJson<int?>(json['reminderSentAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'copyId': serializer.toJson<String>(copyId),
+      'borrower': serializer.toJson<String>(borrower),
+      'loanedAt': serializer.toJson<int>(loanedAt),
+      'returnedAt': serializer.toJson<int?>(returnedAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'needsPush': serializer.toJson<int>(needsPush),
+      'dueAt': serializer.toJson<int?>(dueAt),
+      'borrowerContact': serializer.toJson<String?>(borrowerContact),
+      'notes': serializer.toJson<String?>(notes),
+      'reminderSentAt': serializer.toJson<int?>(reminderSentAt),
+    };
+  }
+
+  LoansData copyWith({
+    String? id,
+    String? copyId,
+    String? borrower,
+    int? loanedAt,
+    Value<int?> returnedAt = const Value.absent(),
+    int? updatedAt,
+    int? needsPush,
+    Value<int?> dueAt = const Value.absent(),
+    Value<String?> borrowerContact = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    Value<int?> reminderSentAt = const Value.absent(),
+  }) => LoansData(
+    id: id ?? this.id,
+    copyId: copyId ?? this.copyId,
+    borrower: borrower ?? this.borrower,
+    loanedAt: loanedAt ?? this.loanedAt,
+    returnedAt: returnedAt.present ? returnedAt.value : this.returnedAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
+    dueAt: dueAt.present ? dueAt.value : this.dueAt,
+    borrowerContact: borrowerContact.present
+        ? borrowerContact.value
+        : this.borrowerContact,
+    notes: notes.present ? notes.value : this.notes,
+    reminderSentAt: reminderSentAt.present
+        ? reminderSentAt.value
+        : this.reminderSentAt,
+  );
+  LoansData copyWithCompanion(LoansCompanion data) {
+    return LoansData(
+      id: data.id.present ? data.id.value : this.id,
+      copyId: data.copyId.present ? data.copyId.value : this.copyId,
+      borrower: data.borrower.present ? data.borrower.value : this.borrower,
+      loanedAt: data.loanedAt.present ? data.loanedAt.value : this.loanedAt,
+      returnedAt: data.returnedAt.present
+          ? data.returnedAt.value
+          : this.returnedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
+      dueAt: data.dueAt.present ? data.dueAt.value : this.dueAt,
+      borrowerContact: data.borrowerContact.present
+          ? data.borrowerContact.value
+          : this.borrowerContact,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      reminderSentAt: data.reminderSentAt.present
+          ? data.reminderSentAt.value
+          : this.reminderSentAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LoansData(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('borrower: $borrower, ')
+          ..write('loanedAt: $loanedAt, ')
+          ..write('returnedAt: $returnedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('borrowerContact: $borrowerContact, ')
+          ..write('notes: $notes, ')
+          ..write('reminderSentAt: $reminderSentAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    copyId,
+    borrower,
+    loanedAt,
+    returnedAt,
+    updatedAt,
+    needsPush,
+    dueAt,
+    borrowerContact,
+    notes,
+    reminderSentAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LoansData &&
+          other.id == this.id &&
+          other.copyId == this.copyId &&
+          other.borrower == this.borrower &&
+          other.loanedAt == this.loanedAt &&
+          other.returnedAt == this.returnedAt &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush &&
+          other.dueAt == this.dueAt &&
+          other.borrowerContact == this.borrowerContact &&
+          other.notes == this.notes &&
+          other.reminderSentAt == this.reminderSentAt);
+}
+
+class LoansCompanion extends UpdateCompanion<LoansData> {
+  final Value<String> id;
+  final Value<String> copyId;
+  final Value<String> borrower;
+  final Value<int> loanedAt;
+  final Value<int?> returnedAt;
+  final Value<int> updatedAt;
+  final Value<int> needsPush;
+  final Value<int?> dueAt;
+  final Value<String?> borrowerContact;
+  final Value<String?> notes;
+  final Value<int?> reminderSentAt;
+  final Value<int> rowid;
+  const LoansCompanion({
+    this.id = const Value.absent(),
+    this.copyId = const Value.absent(),
+    this.borrower = const Value.absent(),
+    this.loanedAt = const Value.absent(),
+    this.returnedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.dueAt = const Value.absent(),
+    this.borrowerContact = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.reminderSentAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LoansCompanion.insert({
+    required String id,
+    required String copyId,
+    required String borrower,
+    this.loanedAt = const Value.absent(),
+    this.returnedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.dueAt = const Value.absent(),
+    this.borrowerContact = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.reminderSentAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       copyId = Value(copyId),
+       borrower = Value(borrower);
+  static Insertable<LoansData> custom({
+    Expression<String>? id,
+    Expression<String>? copyId,
+    Expression<String>? borrower,
+    Expression<int>? loanedAt,
+    Expression<int>? returnedAt,
+    Expression<int>? updatedAt,
+    Expression<int>? needsPush,
+    Expression<int>? dueAt,
+    Expression<String>? borrowerContact,
+    Expression<String>? notes,
+    Expression<int>? reminderSentAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (copyId != null) 'copy_id': copyId,
+      if (borrower != null) 'borrower': borrower,
+      if (loanedAt != null) 'loaned_at': loanedAt,
+      if (returnedAt != null) 'returned_at': returnedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
+      if (dueAt != null) 'due_at': dueAt,
+      if (borrowerContact != null) 'borrower_contact': borrowerContact,
+      if (notes != null) 'notes': notes,
+      if (reminderSentAt != null) 'reminder_sent_at': reminderSentAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LoansCompanion copyWith({
+    Value<String>? id,
+    Value<String>? copyId,
+    Value<String>? borrower,
+    Value<int>? loanedAt,
+    Value<int?>? returnedAt,
+    Value<int>? updatedAt,
+    Value<int>? needsPush,
+    Value<int?>? dueAt,
+    Value<String?>? borrowerContact,
+    Value<String?>? notes,
+    Value<int?>? reminderSentAt,
+    Value<int>? rowid,
+  }) {
+    return LoansCompanion(
+      id: id ?? this.id,
+      copyId: copyId ?? this.copyId,
+      borrower: borrower ?? this.borrower,
+      loanedAt: loanedAt ?? this.loanedAt,
+      returnedAt: returnedAt ?? this.returnedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
+      dueAt: dueAt ?? this.dueAt,
+      borrowerContact: borrowerContact ?? this.borrowerContact,
+      notes: notes ?? this.notes,
+      reminderSentAt: reminderSentAt ?? this.reminderSentAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (copyId.present) {
+      map['copy_id'] = Variable<String>(copyId.value);
+    }
+    if (borrower.present) {
+      map['borrower'] = Variable<String>(borrower.value);
+    }
+    if (loanedAt.present) {
+      map['loaned_at'] = Variable<int>(loanedAt.value);
+    }
+    if (returnedAt.present) {
+      map['returned_at'] = Variable<int>(returnedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<int>(needsPush.value);
+    }
+    if (dueAt.present) {
+      map['due_at'] = Variable<int>(dueAt.value);
+    }
+    if (borrowerContact.present) {
+      map['borrower_contact'] = Variable<String>(borrowerContact.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (reminderSentAt.present) {
+      map['reminder_sent_at'] = Variable<int>(reminderSentAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LoansCompanion(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('borrower: $borrower, ')
+          ..write('loanedAt: $loanedAt, ')
+          ..write('returnedAt: $returnedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('borrowerContact: $borrowerContact, ')
+          ..write('notes: $notes, ')
+          ..write('reminderSentAt: $reminderSentAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class CopyPhotos extends Table with TableInfo<CopyPhotos, CopyPhotosData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -929,8 +3582,30 @@ class CopyPhotos extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  CopyPhotosData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CopyPhotosData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      copyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}copy_id'],
+      )!,
+      path: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}path'],
+      )!,
+      takenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}taken_at'],
+      )!,
+      caption: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}caption'],
+      ),
+    );
   }
 
   @override
@@ -944,7 +3619,217 @@ class CopyPhotos extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class Shelves extends Table with TableInfo {
+class CopyPhotosData extends DataClass implements Insertable<CopyPhotosData> {
+  final String id;
+  final String copyId;
+  final String path;
+  final int takenAt;
+  final String? caption;
+  const CopyPhotosData({
+    required this.id,
+    required this.copyId,
+    required this.path,
+    required this.takenAt,
+    this.caption,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['copy_id'] = Variable<String>(copyId);
+    map['path'] = Variable<String>(path);
+    map['taken_at'] = Variable<int>(takenAt);
+    if (!nullToAbsent || caption != null) {
+      map['caption'] = Variable<String>(caption);
+    }
+    return map;
+  }
+
+  CopyPhotosCompanion toCompanion(bool nullToAbsent) {
+    return CopyPhotosCompanion(
+      id: Value(id),
+      copyId: Value(copyId),
+      path: Value(path),
+      takenAt: Value(takenAt),
+      caption: caption == null && nullToAbsent
+          ? const Value.absent()
+          : Value(caption),
+    );
+  }
+
+  factory CopyPhotosData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CopyPhotosData(
+      id: serializer.fromJson<String>(json['id']),
+      copyId: serializer.fromJson<String>(json['copyId']),
+      path: serializer.fromJson<String>(json['path']),
+      takenAt: serializer.fromJson<int>(json['takenAt']),
+      caption: serializer.fromJson<String?>(json['caption']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'copyId': serializer.toJson<String>(copyId),
+      'path': serializer.toJson<String>(path),
+      'takenAt': serializer.toJson<int>(takenAt),
+      'caption': serializer.toJson<String?>(caption),
+    };
+  }
+
+  CopyPhotosData copyWith({
+    String? id,
+    String? copyId,
+    String? path,
+    int? takenAt,
+    Value<String?> caption = const Value.absent(),
+  }) => CopyPhotosData(
+    id: id ?? this.id,
+    copyId: copyId ?? this.copyId,
+    path: path ?? this.path,
+    takenAt: takenAt ?? this.takenAt,
+    caption: caption.present ? caption.value : this.caption,
+  );
+  CopyPhotosData copyWithCompanion(CopyPhotosCompanion data) {
+    return CopyPhotosData(
+      id: data.id.present ? data.id.value : this.id,
+      copyId: data.copyId.present ? data.copyId.value : this.copyId,
+      path: data.path.present ? data.path.value : this.path,
+      takenAt: data.takenAt.present ? data.takenAt.value : this.takenAt,
+      caption: data.caption.present ? data.caption.value : this.caption,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CopyPhotosData(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('path: $path, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('caption: $caption')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, copyId, path, takenAt, caption);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CopyPhotosData &&
+          other.id == this.id &&
+          other.copyId == this.copyId &&
+          other.path == this.path &&
+          other.takenAt == this.takenAt &&
+          other.caption == this.caption);
+}
+
+class CopyPhotosCompanion extends UpdateCompanion<CopyPhotosData> {
+  final Value<String> id;
+  final Value<String> copyId;
+  final Value<String> path;
+  final Value<int> takenAt;
+  final Value<String?> caption;
+  final Value<int> rowid;
+  const CopyPhotosCompanion({
+    this.id = const Value.absent(),
+    this.copyId = const Value.absent(),
+    this.path = const Value.absent(),
+    this.takenAt = const Value.absent(),
+    this.caption = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CopyPhotosCompanion.insert({
+    required String id,
+    required String copyId,
+    required String path,
+    this.takenAt = const Value.absent(),
+    this.caption = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       copyId = Value(copyId),
+       path = Value(path);
+  static Insertable<CopyPhotosData> custom({
+    Expression<String>? id,
+    Expression<String>? copyId,
+    Expression<String>? path,
+    Expression<int>? takenAt,
+    Expression<String>? caption,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (copyId != null) 'copy_id': copyId,
+      if (path != null) 'path': path,
+      if (takenAt != null) 'taken_at': takenAt,
+      if (caption != null) 'caption': caption,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CopyPhotosCompanion copyWith({
+    Value<String>? id,
+    Value<String>? copyId,
+    Value<String>? path,
+    Value<int>? takenAt,
+    Value<String?>? caption,
+    Value<int>? rowid,
+  }) {
+    return CopyPhotosCompanion(
+      id: id ?? this.id,
+      copyId: copyId ?? this.copyId,
+      path: path ?? this.path,
+      takenAt: takenAt ?? this.takenAt,
+      caption: caption ?? this.caption,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (copyId.present) {
+      map['copy_id'] = Variable<String>(copyId.value);
+    }
+    if (path.present) {
+      map['path'] = Variable<String>(path.value);
+    }
+    if (takenAt.present) {
+      map['taken_at'] = Variable<int>(takenAt.value);
+    }
+    if (caption.present) {
+      map['caption'] = Variable<String>(caption.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CopyPhotosCompanion(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('path: $path, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('caption: $caption, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Shelves extends Table with TableInfo<Shelves, ShelvesData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1011,8 +3896,30 @@ class Shelves extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  ShelvesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShelvesData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}needs_push'],
+      )!,
+    );
   }
 
   @override
@@ -1026,7 +3933,212 @@ class Shelves extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class ShelfBooks extends Table with TableInfo {
+class ShelvesData extends DataClass implements Insertable<ShelvesData> {
+  final String id;
+  final String name;
+  final int sortOrder;
+  final int updatedAt;
+  final int needsPush;
+  const ShelvesData({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+    required this.updatedAt,
+    required this.needsPush,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['updated_at'] = Variable<int>(updatedAt);
+    map['needs_push'] = Variable<int>(needsPush);
+    return map;
+  }
+
+  ShelvesCompanion toCompanion(bool nullToAbsent) {
+    return ShelvesCompanion(
+      id: Value(id),
+      name: Value(name),
+      sortOrder: Value(sortOrder),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
+    );
+  }
+
+  factory ShelvesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShelvesData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      needsPush: serializer.fromJson<int>(json['needsPush']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'needsPush': serializer.toJson<int>(needsPush),
+    };
+  }
+
+  ShelvesData copyWith({
+    String? id,
+    String? name,
+    int? sortOrder,
+    int? updatedAt,
+    int? needsPush,
+  }) => ShelvesData(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
+  );
+  ShelvesData copyWithCompanion(ShelvesCompanion data) {
+    return ShelvesData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShelvesData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, sortOrder, updatedAt, needsPush);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShelvesData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.sortOrder == this.sortOrder &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush);
+}
+
+class ShelvesCompanion extends UpdateCompanion<ShelvesData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> sortOrder;
+  final Value<int> updatedAt;
+  final Value<int> needsPush;
+  final Value<int> rowid;
+  const ShelvesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ShelvesCompanion.insert({
+    required String id,
+    required String name,
+    this.sortOrder = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<ShelvesData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? sortOrder,
+    Expression<int>? updatedAt,
+    Expression<int>? needsPush,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ShelvesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? sortOrder,
+    Value<int>? updatedAt,
+    Value<int>? needsPush,
+    Value<int>? rowid,
+  }) {
+    return ShelvesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      sortOrder: sortOrder ?? this.sortOrder,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<int>(needsPush.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShelvesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class ShelfBooks extends Table with TableInfo<ShelfBooks, ShelfBooksData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1066,8 +4178,22 @@ class ShelfBooks extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {shelfId, bookId};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  ShelfBooksData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShelfBooksData(
+      shelfId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shelf_id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+    );
   }
 
   @override
@@ -1083,7 +4209,166 @@ class ShelfBooks extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class PhysicalEnvironments extends Table with TableInfo {
+class ShelfBooksData extends DataClass implements Insertable<ShelfBooksData> {
+  final String shelfId;
+  final String bookId;
+  final int position;
+  const ShelfBooksData({
+    required this.shelfId,
+    required this.bookId,
+    required this.position,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['shelf_id'] = Variable<String>(shelfId);
+    map['book_id'] = Variable<String>(bookId);
+    map['position'] = Variable<int>(position);
+    return map;
+  }
+
+  ShelfBooksCompanion toCompanion(bool nullToAbsent) {
+    return ShelfBooksCompanion(
+      shelfId: Value(shelfId),
+      bookId: Value(bookId),
+      position: Value(position),
+    );
+  }
+
+  factory ShelfBooksData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShelfBooksData(
+      shelfId: serializer.fromJson<String>(json['shelfId']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      position: serializer.fromJson<int>(json['position']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'shelfId': serializer.toJson<String>(shelfId),
+      'bookId': serializer.toJson<String>(bookId),
+      'position': serializer.toJson<int>(position),
+    };
+  }
+
+  ShelfBooksData copyWith({String? shelfId, String? bookId, int? position}) =>
+      ShelfBooksData(
+        shelfId: shelfId ?? this.shelfId,
+        bookId: bookId ?? this.bookId,
+        position: position ?? this.position,
+      );
+  ShelfBooksData copyWithCompanion(ShelfBooksCompanion data) {
+    return ShelfBooksData(
+      shelfId: data.shelfId.present ? data.shelfId.value : this.shelfId,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      position: data.position.present ? data.position.value : this.position,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShelfBooksData(')
+          ..write('shelfId: $shelfId, ')
+          ..write('bookId: $bookId, ')
+          ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(shelfId, bookId, position);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShelfBooksData &&
+          other.shelfId == this.shelfId &&
+          other.bookId == this.bookId &&
+          other.position == this.position);
+}
+
+class ShelfBooksCompanion extends UpdateCompanion<ShelfBooksData> {
+  final Value<String> shelfId;
+  final Value<String> bookId;
+  final Value<int> position;
+  final Value<int> rowid;
+  const ShelfBooksCompanion({
+    this.shelfId = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ShelfBooksCompanion.insert({
+    required String shelfId,
+    required String bookId,
+    this.position = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : shelfId = Value(shelfId),
+       bookId = Value(bookId);
+  static Insertable<ShelfBooksData> custom({
+    Expression<String>? shelfId,
+    Expression<String>? bookId,
+    Expression<int>? position,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (shelfId != null) 'shelf_id': shelfId,
+      if (bookId != null) 'book_id': bookId,
+      if (position != null) 'position': position,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ShelfBooksCompanion copyWith({
+    Value<String>? shelfId,
+    Value<String>? bookId,
+    Value<int>? position,
+    Value<int>? rowid,
+  }) {
+    return ShelfBooksCompanion(
+      shelfId: shelfId ?? this.shelfId,
+      bookId: bookId ?? this.bookId,
+      position: position ?? this.position,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (shelfId.present) {
+      map['shelf_id'] = Variable<String>(shelfId.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShelfBooksCompanion(')
+          ..write('shelfId: $shelfId, ')
+          ..write('bookId: $bookId, ')
+          ..write('position: $position, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class PhysicalEnvironments extends Table
+    with TableInfo<PhysicalEnvironments, PhysicalEnvironmentsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1135,8 +4420,29 @@ class PhysicalEnvironments extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  PhysicalEnvironmentsData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PhysicalEnvironmentsData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
   }
 
   @override
@@ -1150,7 +4456,195 @@ class PhysicalEnvironments extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class PhysicalShelves extends Table with TableInfo {
+class PhysicalEnvironmentsData extends DataClass
+    implements Insertable<PhysicalEnvironmentsData> {
+  final String id;
+  final String name;
+  final int sortOrder;
+  final int createdAt;
+  const PhysicalEnvironmentsData({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  PhysicalEnvironmentsCompanion toCompanion(bool nullToAbsent) {
+    return PhysicalEnvironmentsCompanion(
+      id: Value(id),
+      name: Value(name),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PhysicalEnvironmentsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PhysicalEnvironmentsData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  PhysicalEnvironmentsData copyWith({
+    String? id,
+    String? name,
+    int? sortOrder,
+    int? createdAt,
+  }) => PhysicalEnvironmentsData(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PhysicalEnvironmentsData copyWithCompanion(
+    PhysicalEnvironmentsCompanion data,
+  ) {
+    return PhysicalEnvironmentsData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalEnvironmentsData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PhysicalEnvironmentsData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class PhysicalEnvironmentsCompanion
+    extends UpdateCompanion<PhysicalEnvironmentsData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> sortOrder;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const PhysicalEnvironmentsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PhysicalEnvironmentsCompanion.insert({
+    required String id,
+    required String name,
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<PhysicalEnvironmentsData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? sortOrder,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PhysicalEnvironmentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? sortOrder,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return PhysicalEnvironmentsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalEnvironmentsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class PhysicalShelves extends Table
+    with TableInfo<PhysicalShelves, PhysicalShelvesData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1242,8 +4736,42 @@ class PhysicalShelves extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  PhysicalShelvesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PhysicalShelvesData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      environmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}environment_id'],
+      )!,
+      x1: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}x1'],
+      )!,
+      y1: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}y1'],
+      )!,
+      x2: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}x2'],
+      )!,
+      y2: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}y2'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
   }
 
   @override
@@ -1257,7 +4785,291 @@ class PhysicalShelves extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class BookPlacements extends Table with TableInfo {
+class PhysicalShelvesData extends DataClass
+    implements Insertable<PhysicalShelvesData> {
+  final String id;
+  final String environmentId;
+  final double x1;
+  final double y1;
+  final double x2;
+  final double y2;
+  final String? label;
+  final int createdAt;
+  const PhysicalShelvesData({
+    required this.id,
+    required this.environmentId,
+    required this.x1,
+    required this.y1,
+    required this.x2,
+    required this.y2,
+    this.label,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['environment_id'] = Variable<String>(environmentId);
+    map['x1'] = Variable<double>(x1);
+    map['y1'] = Variable<double>(y1);
+    map['x2'] = Variable<double>(x2);
+    map['y2'] = Variable<double>(y2);
+    if (!nullToAbsent || label != null) {
+      map['label'] = Variable<String>(label);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  PhysicalShelvesCompanion toCompanion(bool nullToAbsent) {
+    return PhysicalShelvesCompanion(
+      id: Value(id),
+      environmentId: Value(environmentId),
+      x1: Value(x1),
+      y1: Value(y1),
+      x2: Value(x2),
+      y2: Value(y2),
+      label: label == null && nullToAbsent
+          ? const Value.absent()
+          : Value(label),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PhysicalShelvesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PhysicalShelvesData(
+      id: serializer.fromJson<String>(json['id']),
+      environmentId: serializer.fromJson<String>(json['environmentId']),
+      x1: serializer.fromJson<double>(json['x1']),
+      y1: serializer.fromJson<double>(json['y1']),
+      x2: serializer.fromJson<double>(json['x2']),
+      y2: serializer.fromJson<double>(json['y2']),
+      label: serializer.fromJson<String?>(json['label']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'environmentId': serializer.toJson<String>(environmentId),
+      'x1': serializer.toJson<double>(x1),
+      'y1': serializer.toJson<double>(y1),
+      'x2': serializer.toJson<double>(x2),
+      'y2': serializer.toJson<double>(y2),
+      'label': serializer.toJson<String?>(label),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  PhysicalShelvesData copyWith({
+    String? id,
+    String? environmentId,
+    double? x1,
+    double? y1,
+    double? x2,
+    double? y2,
+    Value<String?> label = const Value.absent(),
+    int? createdAt,
+  }) => PhysicalShelvesData(
+    id: id ?? this.id,
+    environmentId: environmentId ?? this.environmentId,
+    x1: x1 ?? this.x1,
+    y1: y1 ?? this.y1,
+    x2: x2 ?? this.x2,
+    y2: y2 ?? this.y2,
+    label: label.present ? label.value : this.label,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PhysicalShelvesData copyWithCompanion(PhysicalShelvesCompanion data) {
+    return PhysicalShelvesData(
+      id: data.id.present ? data.id.value : this.id,
+      environmentId: data.environmentId.present
+          ? data.environmentId.value
+          : this.environmentId,
+      x1: data.x1.present ? data.x1.value : this.x1,
+      y1: data.y1.present ? data.y1.value : this.y1,
+      x2: data.x2.present ? data.x2.value : this.x2,
+      y2: data.y2.present ? data.y2.value : this.y2,
+      label: data.label.present ? data.label.value : this.label,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalShelvesData(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('x1: $x1, ')
+          ..write('y1: $y1, ')
+          ..write('x2: $x2, ')
+          ..write('y2: $y2, ')
+          ..write('label: $label, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, environmentId, x1, y1, x2, y2, label, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PhysicalShelvesData &&
+          other.id == this.id &&
+          other.environmentId == this.environmentId &&
+          other.x1 == this.x1 &&
+          other.y1 == this.y1 &&
+          other.x2 == this.x2 &&
+          other.y2 == this.y2 &&
+          other.label == this.label &&
+          other.createdAt == this.createdAt);
+}
+
+class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelvesData> {
+  final Value<String> id;
+  final Value<String> environmentId;
+  final Value<double> x1;
+  final Value<double> y1;
+  final Value<double> x2;
+  final Value<double> y2;
+  final Value<String?> label;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const PhysicalShelvesCompanion({
+    this.id = const Value.absent(),
+    this.environmentId = const Value.absent(),
+    this.x1 = const Value.absent(),
+    this.y1 = const Value.absent(),
+    this.x2 = const Value.absent(),
+    this.y2 = const Value.absent(),
+    this.label = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PhysicalShelvesCompanion.insert({
+    required String id,
+    required String environmentId,
+    required double x1,
+    required double y1,
+    required double x2,
+    required double y2,
+    this.label = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       environmentId = Value(environmentId),
+       x1 = Value(x1),
+       y1 = Value(y1),
+       x2 = Value(x2),
+       y2 = Value(y2);
+  static Insertable<PhysicalShelvesData> custom({
+    Expression<String>? id,
+    Expression<String>? environmentId,
+    Expression<double>? x1,
+    Expression<double>? y1,
+    Expression<double>? x2,
+    Expression<double>? y2,
+    Expression<String>? label,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (environmentId != null) 'environment_id': environmentId,
+      if (x1 != null) 'x1': x1,
+      if (y1 != null) 'y1': y1,
+      if (x2 != null) 'x2': x2,
+      if (y2 != null) 'y2': y2,
+      if (label != null) 'label': label,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PhysicalShelvesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? environmentId,
+    Value<double>? x1,
+    Value<double>? y1,
+    Value<double>? x2,
+    Value<double>? y2,
+    Value<String?>? label,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return PhysicalShelvesCompanion(
+      id: id ?? this.id,
+      environmentId: environmentId ?? this.environmentId,
+      x1: x1 ?? this.x1,
+      y1: y1 ?? this.y1,
+      x2: x2 ?? this.x2,
+      y2: y2 ?? this.y2,
+      label: label ?? this.label,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (environmentId.present) {
+      map['environment_id'] = Variable<String>(environmentId.value);
+    }
+    if (x1.present) {
+      map['x1'] = Variable<double>(x1.value);
+    }
+    if (y1.present) {
+      map['y1'] = Variable<double>(y1.value);
+    }
+    if (x2.present) {
+      map['x2'] = Variable<double>(x2.value);
+    }
+    if (y2.present) {
+      map['y2'] = Variable<double>(y2.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhysicalShelvesCompanion(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('x1: $x1, ')
+          ..write('y1: $y1, ')
+          ..write('x2: $x2, ')
+          ..write('y2: $y2, ')
+          ..write('label: $label, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class BookPlacements extends Table
+    with TableInfo<BookPlacements, BookPlacementsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1368,8 +5180,50 @@ class BookPlacements extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  BookPlacementsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BookPlacementsData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      environmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}environment_id'],
+      )!,
+      copyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}copy_id'],
+      )!,
+      x: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}x'],
+      )!,
+      y: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}y'],
+      )!,
+      rotation: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rotation'],
+      )!,
+      widthOverride: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}width_override'],
+      ),
+      heightOverride: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}height_override'],
+      ),
+      format: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}format'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
   }
 
   @override
@@ -1383,7 +5237,360 @@ class BookPlacements extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class LocalDeletions extends Table with TableInfo {
+class BookPlacementsData extends DataClass
+    implements Insertable<BookPlacementsData> {
+  final String id;
+  final String environmentId;
+  final String copyId;
+  final double x;
+  final double y;
+  final int rotation;
+  final double? widthOverride;
+  final double? heightOverride;
+  final String? format;
+  final int createdAt;
+  const BookPlacementsData({
+    required this.id,
+    required this.environmentId,
+    required this.copyId,
+    required this.x,
+    required this.y,
+    required this.rotation,
+    this.widthOverride,
+    this.heightOverride,
+    this.format,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['environment_id'] = Variable<String>(environmentId);
+    map['copy_id'] = Variable<String>(copyId);
+    map['x'] = Variable<double>(x);
+    map['y'] = Variable<double>(y);
+    map['rotation'] = Variable<int>(rotation);
+    if (!nullToAbsent || widthOverride != null) {
+      map['width_override'] = Variable<double>(widthOverride);
+    }
+    if (!nullToAbsent || heightOverride != null) {
+      map['height_override'] = Variable<double>(heightOverride);
+    }
+    if (!nullToAbsent || format != null) {
+      map['format'] = Variable<String>(format);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  BookPlacementsCompanion toCompanion(bool nullToAbsent) {
+    return BookPlacementsCompanion(
+      id: Value(id),
+      environmentId: Value(environmentId),
+      copyId: Value(copyId),
+      x: Value(x),
+      y: Value(y),
+      rotation: Value(rotation),
+      widthOverride: widthOverride == null && nullToAbsent
+          ? const Value.absent()
+          : Value(widthOverride),
+      heightOverride: heightOverride == null && nullToAbsent
+          ? const Value.absent()
+          : Value(heightOverride),
+      format: format == null && nullToAbsent
+          ? const Value.absent()
+          : Value(format),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory BookPlacementsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BookPlacementsData(
+      id: serializer.fromJson<String>(json['id']),
+      environmentId: serializer.fromJson<String>(json['environmentId']),
+      copyId: serializer.fromJson<String>(json['copyId']),
+      x: serializer.fromJson<double>(json['x']),
+      y: serializer.fromJson<double>(json['y']),
+      rotation: serializer.fromJson<int>(json['rotation']),
+      widthOverride: serializer.fromJson<double?>(json['widthOverride']),
+      heightOverride: serializer.fromJson<double?>(json['heightOverride']),
+      format: serializer.fromJson<String?>(json['format']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'environmentId': serializer.toJson<String>(environmentId),
+      'copyId': serializer.toJson<String>(copyId),
+      'x': serializer.toJson<double>(x),
+      'y': serializer.toJson<double>(y),
+      'rotation': serializer.toJson<int>(rotation),
+      'widthOverride': serializer.toJson<double?>(widthOverride),
+      'heightOverride': serializer.toJson<double?>(heightOverride),
+      'format': serializer.toJson<String?>(format),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  BookPlacementsData copyWith({
+    String? id,
+    String? environmentId,
+    String? copyId,
+    double? x,
+    double? y,
+    int? rotation,
+    Value<double?> widthOverride = const Value.absent(),
+    Value<double?> heightOverride = const Value.absent(),
+    Value<String?> format = const Value.absent(),
+    int? createdAt,
+  }) => BookPlacementsData(
+    id: id ?? this.id,
+    environmentId: environmentId ?? this.environmentId,
+    copyId: copyId ?? this.copyId,
+    x: x ?? this.x,
+    y: y ?? this.y,
+    rotation: rotation ?? this.rotation,
+    widthOverride: widthOverride.present
+        ? widthOverride.value
+        : this.widthOverride,
+    heightOverride: heightOverride.present
+        ? heightOverride.value
+        : this.heightOverride,
+    format: format.present ? format.value : this.format,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  BookPlacementsData copyWithCompanion(BookPlacementsCompanion data) {
+    return BookPlacementsData(
+      id: data.id.present ? data.id.value : this.id,
+      environmentId: data.environmentId.present
+          ? data.environmentId.value
+          : this.environmentId,
+      copyId: data.copyId.present ? data.copyId.value : this.copyId,
+      x: data.x.present ? data.x.value : this.x,
+      y: data.y.present ? data.y.value : this.y,
+      rotation: data.rotation.present ? data.rotation.value : this.rotation,
+      widthOverride: data.widthOverride.present
+          ? data.widthOverride.value
+          : this.widthOverride,
+      heightOverride: data.heightOverride.present
+          ? data.heightOverride.value
+          : this.heightOverride,
+      format: data.format.present ? data.format.value : this.format,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookPlacementsData(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('copyId: $copyId, ')
+          ..write('x: $x, ')
+          ..write('y: $y, ')
+          ..write('rotation: $rotation, ')
+          ..write('widthOverride: $widthOverride, ')
+          ..write('heightOverride: $heightOverride, ')
+          ..write('format: $format, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    environmentId,
+    copyId,
+    x,
+    y,
+    rotation,
+    widthOverride,
+    heightOverride,
+    format,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BookPlacementsData &&
+          other.id == this.id &&
+          other.environmentId == this.environmentId &&
+          other.copyId == this.copyId &&
+          other.x == this.x &&
+          other.y == this.y &&
+          other.rotation == this.rotation &&
+          other.widthOverride == this.widthOverride &&
+          other.heightOverride == this.heightOverride &&
+          other.format == this.format &&
+          other.createdAt == this.createdAt);
+}
+
+class BookPlacementsCompanion extends UpdateCompanion<BookPlacementsData> {
+  final Value<String> id;
+  final Value<String> environmentId;
+  final Value<String> copyId;
+  final Value<double> x;
+  final Value<double> y;
+  final Value<int> rotation;
+  final Value<double?> widthOverride;
+  final Value<double?> heightOverride;
+  final Value<String?> format;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const BookPlacementsCompanion({
+    this.id = const Value.absent(),
+    this.environmentId = const Value.absent(),
+    this.copyId = const Value.absent(),
+    this.x = const Value.absent(),
+    this.y = const Value.absent(),
+    this.rotation = const Value.absent(),
+    this.widthOverride = const Value.absent(),
+    this.heightOverride = const Value.absent(),
+    this.format = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BookPlacementsCompanion.insert({
+    required String id,
+    required String environmentId,
+    required String copyId,
+    required double x,
+    required double y,
+    this.rotation = const Value.absent(),
+    this.widthOverride = const Value.absent(),
+    this.heightOverride = const Value.absent(),
+    this.format = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       environmentId = Value(environmentId),
+       copyId = Value(copyId),
+       x = Value(x),
+       y = Value(y);
+  static Insertable<BookPlacementsData> custom({
+    Expression<String>? id,
+    Expression<String>? environmentId,
+    Expression<String>? copyId,
+    Expression<double>? x,
+    Expression<double>? y,
+    Expression<int>? rotation,
+    Expression<double>? widthOverride,
+    Expression<double>? heightOverride,
+    Expression<String>? format,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (environmentId != null) 'environment_id': environmentId,
+      if (copyId != null) 'copy_id': copyId,
+      if (x != null) 'x': x,
+      if (y != null) 'y': y,
+      if (rotation != null) 'rotation': rotation,
+      if (widthOverride != null) 'width_override': widthOverride,
+      if (heightOverride != null) 'height_override': heightOverride,
+      if (format != null) 'format': format,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BookPlacementsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? environmentId,
+    Value<String>? copyId,
+    Value<double>? x,
+    Value<double>? y,
+    Value<int>? rotation,
+    Value<double?>? widthOverride,
+    Value<double?>? heightOverride,
+    Value<String?>? format,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return BookPlacementsCompanion(
+      id: id ?? this.id,
+      environmentId: environmentId ?? this.environmentId,
+      copyId: copyId ?? this.copyId,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      rotation: rotation ?? this.rotation,
+      widthOverride: widthOverride ?? this.widthOverride,
+      heightOverride: heightOverride ?? this.heightOverride,
+      format: format ?? this.format,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (environmentId.present) {
+      map['environment_id'] = Variable<String>(environmentId.value);
+    }
+    if (copyId.present) {
+      map['copy_id'] = Variable<String>(copyId.value);
+    }
+    if (x.present) {
+      map['x'] = Variable<double>(x.value);
+    }
+    if (y.present) {
+      map['y'] = Variable<double>(y.value);
+    }
+    if (rotation.present) {
+      map['rotation'] = Variable<int>(rotation.value);
+    }
+    if (widthOverride.present) {
+      map['width_override'] = Variable<double>(widthOverride.value);
+    }
+    if (heightOverride.present) {
+      map['height_override'] = Variable<double>(heightOverride.value);
+    }
+    if (format.present) {
+      map['format'] = Variable<String>(format.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookPlacementsCompanion(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('copyId: $copyId, ')
+          ..write('x: $x, ')
+          ..write('y: $y, ')
+          ..write('rotation: $rotation, ')
+          ..write('widthOverride: $widthOverride, ')
+          ..write('heightOverride: $heightOverride, ')
+          ..write('format: $format, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class LocalDeletions extends Table
+    with TableInfo<LocalDeletions, LocalDeletionsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1427,8 +5634,22 @@ class LocalDeletions extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {bookId};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  LocalDeletionsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalDeletionsData(
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+    );
   }
 
   @override
@@ -1442,7 +5663,166 @@ class LocalDeletions extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class RemoteReadingPositions extends Table with TableInfo {
+class LocalDeletionsData extends DataClass
+    implements Insertable<LocalDeletionsData> {
+  final String bookId;
+  final int deletedAt;
+  final String kind;
+  const LocalDeletionsData({
+    required this.bookId,
+    required this.deletedAt,
+    required this.kind,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_id'] = Variable<String>(bookId);
+    map['deleted_at'] = Variable<int>(deletedAt);
+    map['kind'] = Variable<String>(kind);
+    return map;
+  }
+
+  LocalDeletionsCompanion toCompanion(bool nullToAbsent) {
+    return LocalDeletionsCompanion(
+      bookId: Value(bookId),
+      deletedAt: Value(deletedAt),
+      kind: Value(kind),
+    );
+  }
+
+  factory LocalDeletionsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalDeletionsData(
+      bookId: serializer.fromJson<String>(json['bookId']),
+      deletedAt: serializer.fromJson<int>(json['deletedAt']),
+      kind: serializer.fromJson<String>(json['kind']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bookId': serializer.toJson<String>(bookId),
+      'deletedAt': serializer.toJson<int>(deletedAt),
+      'kind': serializer.toJson<String>(kind),
+    };
+  }
+
+  LocalDeletionsData copyWith({String? bookId, int? deletedAt, String? kind}) =>
+      LocalDeletionsData(
+        bookId: bookId ?? this.bookId,
+        deletedAt: deletedAt ?? this.deletedAt,
+        kind: kind ?? this.kind,
+      );
+  LocalDeletionsData copyWithCompanion(LocalDeletionsCompanion data) {
+    return LocalDeletionsData(
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      kind: data.kind.present ? data.kind.value : this.kind,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalDeletionsData(')
+          ..write('bookId: $bookId, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('kind: $kind')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(bookId, deletedAt, kind);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalDeletionsData &&
+          other.bookId == this.bookId &&
+          other.deletedAt == this.deletedAt &&
+          other.kind == this.kind);
+}
+
+class LocalDeletionsCompanion extends UpdateCompanion<LocalDeletionsData> {
+  final Value<String> bookId;
+  final Value<int> deletedAt;
+  final Value<String> kind;
+  final Value<int> rowid;
+  const LocalDeletionsCompanion({
+    this.bookId = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalDeletionsCompanion.insert({
+    required String bookId,
+    this.deletedAt = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : bookId = Value(bookId);
+  static Insertable<LocalDeletionsData> custom({
+    Expression<String>? bookId,
+    Expression<int>? deletedAt,
+    Expression<String>? kind,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookId != null) 'book_id': bookId,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (kind != null) 'kind': kind,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalDeletionsCompanion copyWith({
+    Value<String>? bookId,
+    Value<int>? deletedAt,
+    Value<String>? kind,
+    Value<int>? rowid,
+  }) {
+    return LocalDeletionsCompanion(
+      bookId: bookId ?? this.bookId,
+      deletedAt: deletedAt ?? this.deletedAt,
+      kind: kind ?? this.kind,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(deletedAt.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalDeletionsCompanion(')
+          ..write('bookId: $bookId, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('kind: $kind, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class RemoteReadingPositions extends Table
+    with TableInfo<RemoteReadingPositions, RemoteReadingPositionsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1530,8 +5910,45 @@ class RemoteReadingPositions extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {bookId, deviceId};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  RemoteReadingPositionsData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RemoteReadingPositionsData(
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      deviceLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_label'],
+      ),
+      progress: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}progress'],
+      ),
+      page: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page'],
+      ),
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      ),
+      scroll: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}scroll'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
   }
 
   @override
@@ -1547,7 +5964,310 @@ class RemoteReadingPositions extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class Annotations extends Table with TableInfo {
+class RemoteReadingPositionsData extends DataClass
+    implements Insertable<RemoteReadingPositionsData> {
+  final String bookId;
+  final String deviceId;
+  final String? deviceLabel;
+  final double? progress;
+  final int? page;
+  final String? unit;
+  final double? scroll;
+  final int updatedAt;
+  const RemoteReadingPositionsData({
+    required this.bookId,
+    required this.deviceId,
+    this.deviceLabel,
+    this.progress,
+    this.page,
+    this.unit,
+    this.scroll,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_id'] = Variable<String>(bookId);
+    map['device_id'] = Variable<String>(deviceId);
+    if (!nullToAbsent || deviceLabel != null) {
+      map['device_label'] = Variable<String>(deviceLabel);
+    }
+    if (!nullToAbsent || progress != null) {
+      map['progress'] = Variable<double>(progress);
+    }
+    if (!nullToAbsent || page != null) {
+      map['page'] = Variable<int>(page);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    if (!nullToAbsent || scroll != null) {
+      map['scroll'] = Variable<double>(scroll);
+    }
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  RemoteReadingPositionsCompanion toCompanion(bool nullToAbsent) {
+    return RemoteReadingPositionsCompanion(
+      bookId: Value(bookId),
+      deviceId: Value(deviceId),
+      deviceLabel: deviceLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceLabel),
+      progress: progress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(progress),
+      page: page == null && nullToAbsent ? const Value.absent() : Value(page),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      scroll: scroll == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scroll),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RemoteReadingPositionsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RemoteReadingPositionsData(
+      bookId: serializer.fromJson<String>(json['bookId']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      deviceLabel: serializer.fromJson<String?>(json['deviceLabel']),
+      progress: serializer.fromJson<double?>(json['progress']),
+      page: serializer.fromJson<int?>(json['page']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      scroll: serializer.fromJson<double?>(json['scroll']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bookId': serializer.toJson<String>(bookId),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'deviceLabel': serializer.toJson<String?>(deviceLabel),
+      'progress': serializer.toJson<double?>(progress),
+      'page': serializer.toJson<int?>(page),
+      'unit': serializer.toJson<String?>(unit),
+      'scroll': serializer.toJson<double?>(scroll),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  RemoteReadingPositionsData copyWith({
+    String? bookId,
+    String? deviceId,
+    Value<String?> deviceLabel = const Value.absent(),
+    Value<double?> progress = const Value.absent(),
+    Value<int?> page = const Value.absent(),
+    Value<String?> unit = const Value.absent(),
+    Value<double?> scroll = const Value.absent(),
+    int? updatedAt,
+  }) => RemoteReadingPositionsData(
+    bookId: bookId ?? this.bookId,
+    deviceId: deviceId ?? this.deviceId,
+    deviceLabel: deviceLabel.present ? deviceLabel.value : this.deviceLabel,
+    progress: progress.present ? progress.value : this.progress,
+    page: page.present ? page.value : this.page,
+    unit: unit.present ? unit.value : this.unit,
+    scroll: scroll.present ? scroll.value : this.scroll,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RemoteReadingPositionsData copyWithCompanion(
+    RemoteReadingPositionsCompanion data,
+  ) {
+    return RemoteReadingPositionsData(
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      deviceLabel: data.deviceLabel.present
+          ? data.deviceLabel.value
+          : this.deviceLabel,
+      progress: data.progress.present ? data.progress.value : this.progress,
+      page: data.page.present ? data.page.value : this.page,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      scroll: data.scroll.present ? data.scroll.value : this.scroll,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RemoteReadingPositionsData(')
+          ..write('bookId: $bookId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('progress: $progress, ')
+          ..write('page: $page, ')
+          ..write('unit: $unit, ')
+          ..write('scroll: $scroll, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    bookId,
+    deviceId,
+    deviceLabel,
+    progress,
+    page,
+    unit,
+    scroll,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RemoteReadingPositionsData &&
+          other.bookId == this.bookId &&
+          other.deviceId == this.deviceId &&
+          other.deviceLabel == this.deviceLabel &&
+          other.progress == this.progress &&
+          other.page == this.page &&
+          other.unit == this.unit &&
+          other.scroll == this.scroll &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RemoteReadingPositionsCompanion
+    extends UpdateCompanion<RemoteReadingPositionsData> {
+  final Value<String> bookId;
+  final Value<String> deviceId;
+  final Value<String?> deviceLabel;
+  final Value<double?> progress;
+  final Value<int?> page;
+  final Value<String?> unit;
+  final Value<double?> scroll;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const RemoteReadingPositionsCompanion({
+    this.bookId = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.deviceLabel = const Value.absent(),
+    this.progress = const Value.absent(),
+    this.page = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.scroll = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RemoteReadingPositionsCompanion.insert({
+    required String bookId,
+    required String deviceId,
+    this.deviceLabel = const Value.absent(),
+    this.progress = const Value.absent(),
+    this.page = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.scroll = const Value.absent(),
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  }) : bookId = Value(bookId),
+       deviceId = Value(deviceId),
+       updatedAt = Value(updatedAt);
+  static Insertable<RemoteReadingPositionsData> custom({
+    Expression<String>? bookId,
+    Expression<String>? deviceId,
+    Expression<String>? deviceLabel,
+    Expression<double>? progress,
+    Expression<int>? page,
+    Expression<String>? unit,
+    Expression<double>? scroll,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookId != null) 'book_id': bookId,
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceLabel != null) 'device_label': deviceLabel,
+      if (progress != null) 'progress': progress,
+      if (page != null) 'page': page,
+      if (unit != null) 'unit': unit,
+      if (scroll != null) 'scroll': scroll,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RemoteReadingPositionsCompanion copyWith({
+    Value<String>? bookId,
+    Value<String>? deviceId,
+    Value<String?>? deviceLabel,
+    Value<double?>? progress,
+    Value<int?>? page,
+    Value<String?>? unit,
+    Value<double?>? scroll,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RemoteReadingPositionsCompanion(
+      bookId: bookId ?? this.bookId,
+      deviceId: deviceId ?? this.deviceId,
+      deviceLabel: deviceLabel ?? this.deviceLabel,
+      progress: progress ?? this.progress,
+      page: page ?? this.page,
+      unit: unit ?? this.unit,
+      scroll: scroll ?? this.scroll,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (deviceLabel.present) {
+      map['device_label'] = Variable<String>(deviceLabel.value);
+    }
+    if (progress.present) {
+      map['progress'] = Variable<double>(progress.value);
+    }
+    if (page.present) {
+      map['page'] = Variable<int>(page.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (scroll.present) {
+      map['scroll'] = Variable<double>(scroll.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RemoteReadingPositionsCompanion(')
+          ..write('bookId: $bookId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('progress: $progress, ')
+          ..write('page: $page, ')
+          ..write('unit: $unit, ')
+          ..write('scroll: $scroll, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Annotations extends Table with TableInfo<Annotations, AnnotationsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1657,8 +6377,50 @@ class Annotations extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  AnnotationsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AnnotationsData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      page: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page'],
+      ),
+      chapter: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}chapter'],
+      ),
+      locator: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}locator'],
+      ),
+      quotedText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quoted_text'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}color'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
   }
 
   @override
@@ -1672,7 +6434,357 @@ class Annotations extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class ReadingSessions extends Table with TableInfo {
+class AnnotationsData extends DataClass implements Insertable<AnnotationsData> {
+  final String id;
+  final String bookId;
+  final String kind;
+  final int? page;
+  final int? chapter;
+  final String? locator;
+  final String? quotedText;
+  final String? note;
+  final int? color;
+  final int createdAt;
+  const AnnotationsData({
+    required this.id,
+    required this.bookId,
+    required this.kind,
+    this.page,
+    this.chapter,
+    this.locator,
+    this.quotedText,
+    this.note,
+    this.color,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['book_id'] = Variable<String>(bookId);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || page != null) {
+      map['page'] = Variable<int>(page);
+    }
+    if (!nullToAbsent || chapter != null) {
+      map['chapter'] = Variable<int>(chapter);
+    }
+    if (!nullToAbsent || locator != null) {
+      map['locator'] = Variable<String>(locator);
+    }
+    if (!nullToAbsent || quotedText != null) {
+      map['quoted_text'] = Variable<String>(quotedText);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<int>(color);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  AnnotationsCompanion toCompanion(bool nullToAbsent) {
+    return AnnotationsCompanion(
+      id: Value(id),
+      bookId: Value(bookId),
+      kind: Value(kind),
+      page: page == null && nullToAbsent ? const Value.absent() : Value(page),
+      chapter: chapter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chapter),
+      locator: locator == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locator),
+      quotedText: quotedText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quotedText),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory AnnotationsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AnnotationsData(
+      id: serializer.fromJson<String>(json['id']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      page: serializer.fromJson<int?>(json['page']),
+      chapter: serializer.fromJson<int?>(json['chapter']),
+      locator: serializer.fromJson<String?>(json['locator']),
+      quotedText: serializer.fromJson<String?>(json['quotedText']),
+      note: serializer.fromJson<String?>(json['note']),
+      color: serializer.fromJson<int?>(json['color']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bookId': serializer.toJson<String>(bookId),
+      'kind': serializer.toJson<String>(kind),
+      'page': serializer.toJson<int?>(page),
+      'chapter': serializer.toJson<int?>(chapter),
+      'locator': serializer.toJson<String?>(locator),
+      'quotedText': serializer.toJson<String?>(quotedText),
+      'note': serializer.toJson<String?>(note),
+      'color': serializer.toJson<int?>(color),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  AnnotationsData copyWith({
+    String? id,
+    String? bookId,
+    String? kind,
+    Value<int?> page = const Value.absent(),
+    Value<int?> chapter = const Value.absent(),
+    Value<String?> locator = const Value.absent(),
+    Value<String?> quotedText = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+    Value<int?> color = const Value.absent(),
+    int? createdAt,
+  }) => AnnotationsData(
+    id: id ?? this.id,
+    bookId: bookId ?? this.bookId,
+    kind: kind ?? this.kind,
+    page: page.present ? page.value : this.page,
+    chapter: chapter.present ? chapter.value : this.chapter,
+    locator: locator.present ? locator.value : this.locator,
+    quotedText: quotedText.present ? quotedText.value : this.quotedText,
+    note: note.present ? note.value : this.note,
+    color: color.present ? color.value : this.color,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  AnnotationsData copyWithCompanion(AnnotationsCompanion data) {
+    return AnnotationsData(
+      id: data.id.present ? data.id.value : this.id,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      page: data.page.present ? data.page.value : this.page,
+      chapter: data.chapter.present ? data.chapter.value : this.chapter,
+      locator: data.locator.present ? data.locator.value : this.locator,
+      quotedText: data.quotedText.present
+          ? data.quotedText.value
+          : this.quotedText,
+      note: data.note.present ? data.note.value : this.note,
+      color: data.color.present ? data.color.value : this.color,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AnnotationsData(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('kind: $kind, ')
+          ..write('page: $page, ')
+          ..write('chapter: $chapter, ')
+          ..write('locator: $locator, ')
+          ..write('quotedText: $quotedText, ')
+          ..write('note: $note, ')
+          ..write('color: $color, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    bookId,
+    kind,
+    page,
+    chapter,
+    locator,
+    quotedText,
+    note,
+    color,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AnnotationsData &&
+          other.id == this.id &&
+          other.bookId == this.bookId &&
+          other.kind == this.kind &&
+          other.page == this.page &&
+          other.chapter == this.chapter &&
+          other.locator == this.locator &&
+          other.quotedText == this.quotedText &&
+          other.note == this.note &&
+          other.color == this.color &&
+          other.createdAt == this.createdAt);
+}
+
+class AnnotationsCompanion extends UpdateCompanion<AnnotationsData> {
+  final Value<String> id;
+  final Value<String> bookId;
+  final Value<String> kind;
+  final Value<int?> page;
+  final Value<int?> chapter;
+  final Value<String?> locator;
+  final Value<String?> quotedText;
+  final Value<String?> note;
+  final Value<int?> color;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const AnnotationsCompanion({
+    this.id = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.page = const Value.absent(),
+    this.chapter = const Value.absent(),
+    this.locator = const Value.absent(),
+    this.quotedText = const Value.absent(),
+    this.note = const Value.absent(),
+    this.color = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AnnotationsCompanion.insert({
+    required String id,
+    required String bookId,
+    required String kind,
+    this.page = const Value.absent(),
+    this.chapter = const Value.absent(),
+    this.locator = const Value.absent(),
+    this.quotedText = const Value.absent(),
+    this.note = const Value.absent(),
+    this.color = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bookId = Value(bookId),
+       kind = Value(kind);
+  static Insertable<AnnotationsData> custom({
+    Expression<String>? id,
+    Expression<String>? bookId,
+    Expression<String>? kind,
+    Expression<int>? page,
+    Expression<int>? chapter,
+    Expression<String>? locator,
+    Expression<String>? quotedText,
+    Expression<String>? note,
+    Expression<int>? color,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bookId != null) 'book_id': bookId,
+      if (kind != null) 'kind': kind,
+      if (page != null) 'page': page,
+      if (chapter != null) 'chapter': chapter,
+      if (locator != null) 'locator': locator,
+      if (quotedText != null) 'quoted_text': quotedText,
+      if (note != null) 'note': note,
+      if (color != null) 'color': color,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AnnotationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bookId,
+    Value<String>? kind,
+    Value<int?>? page,
+    Value<int?>? chapter,
+    Value<String?>? locator,
+    Value<String?>? quotedText,
+    Value<String?>? note,
+    Value<int?>? color,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return AnnotationsCompanion(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      kind: kind ?? this.kind,
+      page: page ?? this.page,
+      chapter: chapter ?? this.chapter,
+      locator: locator ?? this.locator,
+      quotedText: quotedText ?? this.quotedText,
+      note: note ?? this.note,
+      color: color ?? this.color,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (page.present) {
+      map['page'] = Variable<int>(page.value);
+    }
+    if (chapter.present) {
+      map['chapter'] = Variable<int>(chapter.value);
+    }
+    if (locator.present) {
+      map['locator'] = Variable<String>(locator.value);
+    }
+    if (quotedText.present) {
+      map['quoted_text'] = Variable<String>(quotedText.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<int>(color.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AnnotationsCompanion(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('kind: $kind, ')
+          ..write('page: $page, ')
+          ..write('chapter: $chapter, ')
+          ..write('locator: $locator, ')
+          ..write('quotedText: $quotedText, ')
+          ..write('note: $note, ')
+          ..write('color: $color, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class ReadingSessions extends Table
+    with TableInfo<ReadingSessions, ReadingSessionsData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1742,8 +6854,34 @@ class ReadingSessions extends Table with TableInfo {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
+  ReadingSessionsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReadingSessionsData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}started_at'],
+      )!,
+      endedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ended_at'],
+      )!,
+      startPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}start_page'],
+      ),
+      endPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_page'],
+      ),
+    );
   }
 
   @override
@@ -1755,6 +6893,245 @@ class ReadingSessions extends Table with TableInfo {
   List<String> get customConstraints => const ['PRIMARY KEY(id)'];
   @override
   bool get dontWriteConstraints => true;
+}
+
+class ReadingSessionsData extends DataClass
+    implements Insertable<ReadingSessionsData> {
+  final String id;
+  final String bookId;
+  final int startedAt;
+  final int endedAt;
+  final int? startPage;
+  final int? endPage;
+  const ReadingSessionsData({
+    required this.id,
+    required this.bookId,
+    required this.startedAt,
+    required this.endedAt,
+    this.startPage,
+    this.endPage,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['book_id'] = Variable<String>(bookId);
+    map['started_at'] = Variable<int>(startedAt);
+    map['ended_at'] = Variable<int>(endedAt);
+    if (!nullToAbsent || startPage != null) {
+      map['start_page'] = Variable<int>(startPage);
+    }
+    if (!nullToAbsent || endPage != null) {
+      map['end_page'] = Variable<int>(endPage);
+    }
+    return map;
+  }
+
+  ReadingSessionsCompanion toCompanion(bool nullToAbsent) {
+    return ReadingSessionsCompanion(
+      id: Value(id),
+      bookId: Value(bookId),
+      startedAt: Value(startedAt),
+      endedAt: Value(endedAt),
+      startPage: startPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startPage),
+      endPage: endPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endPage),
+    );
+  }
+
+  factory ReadingSessionsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReadingSessionsData(
+      id: serializer.fromJson<String>(json['id']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      startedAt: serializer.fromJson<int>(json['startedAt']),
+      endedAt: serializer.fromJson<int>(json['endedAt']),
+      startPage: serializer.fromJson<int?>(json['startPage']),
+      endPage: serializer.fromJson<int?>(json['endPage']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bookId': serializer.toJson<String>(bookId),
+      'startedAt': serializer.toJson<int>(startedAt),
+      'endedAt': serializer.toJson<int>(endedAt),
+      'startPage': serializer.toJson<int?>(startPage),
+      'endPage': serializer.toJson<int?>(endPage),
+    };
+  }
+
+  ReadingSessionsData copyWith({
+    String? id,
+    String? bookId,
+    int? startedAt,
+    int? endedAt,
+    Value<int?> startPage = const Value.absent(),
+    Value<int?> endPage = const Value.absent(),
+  }) => ReadingSessionsData(
+    id: id ?? this.id,
+    bookId: bookId ?? this.bookId,
+    startedAt: startedAt ?? this.startedAt,
+    endedAt: endedAt ?? this.endedAt,
+    startPage: startPage.present ? startPage.value : this.startPage,
+    endPage: endPage.present ? endPage.value : this.endPage,
+  );
+  ReadingSessionsData copyWithCompanion(ReadingSessionsCompanion data) {
+    return ReadingSessionsData(
+      id: data.id.present ? data.id.value : this.id,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
+      startPage: data.startPage.present ? data.startPage.value : this.startPage,
+      endPage: data.endPage.present ? data.endPage.value : this.endPage,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingSessionsData(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('startPage: $startPage, ')
+          ..write('endPage: $endPage')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, bookId, startedAt, endedAt, startPage, endPage);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReadingSessionsData &&
+          other.id == this.id &&
+          other.bookId == this.bookId &&
+          other.startedAt == this.startedAt &&
+          other.endedAt == this.endedAt &&
+          other.startPage == this.startPage &&
+          other.endPage == this.endPage);
+}
+
+class ReadingSessionsCompanion extends UpdateCompanion<ReadingSessionsData> {
+  final Value<String> id;
+  final Value<String> bookId;
+  final Value<int> startedAt;
+  final Value<int> endedAt;
+  final Value<int?> startPage;
+  final Value<int?> endPage;
+  final Value<int> rowid;
+  const ReadingSessionsCompanion({
+    this.id = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.endedAt = const Value.absent(),
+    this.startPage = const Value.absent(),
+    this.endPage = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReadingSessionsCompanion.insert({
+    required String id,
+    required String bookId,
+    required int startedAt,
+    required int endedAt,
+    this.startPage = const Value.absent(),
+    this.endPage = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bookId = Value(bookId),
+       startedAt = Value(startedAt),
+       endedAt = Value(endedAt);
+  static Insertable<ReadingSessionsData> custom({
+    Expression<String>? id,
+    Expression<String>? bookId,
+    Expression<int>? startedAt,
+    Expression<int>? endedAt,
+    Expression<int>? startPage,
+    Expression<int>? endPage,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bookId != null) 'book_id': bookId,
+      if (startedAt != null) 'started_at': startedAt,
+      if (endedAt != null) 'ended_at': endedAt,
+      if (startPage != null) 'start_page': startPage,
+      if (endPage != null) 'end_page': endPage,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReadingSessionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bookId,
+    Value<int>? startedAt,
+    Value<int>? endedAt,
+    Value<int?>? startPage,
+    Value<int?>? endPage,
+    Value<int>? rowid,
+  }) {
+    return ReadingSessionsCompanion(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      startedAt: startedAt ?? this.startedAt,
+      endedAt: endedAt ?? this.endedAt,
+      startPage: startPage ?? this.startPage,
+      endPage: endPage ?? this.endPage,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<int>(startedAt.value);
+    }
+    if (endedAt.present) {
+      map['ended_at'] = Variable<int>(endedAt.value);
+    }
+    if (startPage.present) {
+      map['start_page'] = Variable<int>(startPage.value);
+    }
+    if (endPage.present) {
+      map['end_page'] = Variable<int>(endPage.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingSessionsCompanion(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('startPage: $startPage, ')
+          ..write('endPage: $endPage, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
 }
 
 class DatabaseAtV19 extends GeneratedDatabase {
