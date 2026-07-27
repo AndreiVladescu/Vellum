@@ -25,6 +25,7 @@ import 'placement_toolbar.dart';
 import 'room_painter.dart';
 import 'room_semantics.dart';
 import 'settle.dart';
+import 'stocktake_page.dart';
 import 'shelf_dialogs.dart';
 
 /// A book's footprint (width × height) in metres, after rotation.
@@ -901,6 +902,17 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   // ---- build --------------------------------------------------------------
 
+  /// Walks this room against its map (plan 5 #30).
+  Future<void> _startStocktake() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => StocktakePage(
+        repository: repo,
+        environmentId: widget.environmentId,
+        scopeLabel: widget.environmentName,
+      ),
+    ));
+  }
+
   /// The room as a navigable list (plan 5 #42).
   ///
   /// The canvas carries the same information as one spoken summary, but a
@@ -998,6 +1010,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   await _printLabels();
                 case 'snapshot':
                   await _saveSnapshot();
+                case 'stocktake':
+                  await _startStocktake();
                 case 'help':
                   _showHelp();
               }
@@ -1010,6 +1024,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
               PopupMenuItem(
                 value: 'snapshot',
                 child: Text('Save a picture of this room'),
+              ),
+              PopupMenuItem(
+                value: 'stocktake',
+                child: Text('Stocktake this room…'),
               ),
               PopupMenuItem(value: 'help', child: Text('Help')),
             ],
