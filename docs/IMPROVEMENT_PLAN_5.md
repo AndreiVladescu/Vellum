@@ -70,13 +70,14 @@ is answerable from `git log`:
 | 21a | Wishlist for books you don't own yet | `b7b2c98` |
 | 39 | Appearance: theme, seed colour, shelf material | `d412537` |
 | 42 | A11y round two: keyboard, room summary, announcements | `c28b6da` |
+| 21c | Import from Calibre, CSV, or an OPDS catalog | `5aa90ca` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
 #14, #52, #26 and #21a from the "interleave anywhere" list. What remains is the
 rest of that list, which was never assigned to a phase: #9 (content-addressed
 blobs), #8 (SSE), #29/#30 (physical depth), #38 (l10n), #40 (Android
-background), #53 (send-to-e-reader) and #21c (Calibre/CSV/OPDS import). None of
-them blocks anything.
+background) and #53 (send-to-e-reader). None of them blocks anything, and
+**every item #21 covers is now done**.
 
 *#35's **virtualised table body** is deliberately not built. It was proposed as
 the fix for a DOM holding the whole library — but with search, sort and filters
@@ -98,9 +99,9 @@ take a string literal.
 **Phase 6** (§K) is complete: #47, #48, #49, #50 and #51 have all landed — so
 **every numbered item in this plan's six phases is done**.
 Still open from the interleave list: #9 content-addressed blobs, #8 SSE,
-#29/#30, #38 l10n, #40 Android background, #53 send-to-e-reader, and #21c
-(Calibre / CSV / OPDS import) — 21b was taken on its own because §I sequences it
-into Phase 3, and 21a has since landed separately.
+#29/#30, #38 l10n, #40 Android background and #53 send-to-e-reader. #21 is
+complete: 21b was taken on its own because §I sequences it into Phase 3, and
+21a and 21c landed separately afterwards.
 
 Two notes for whoever picks this up:
 
@@ -191,6 +192,24 @@ Two notes for whoever picks this up:
   equivalent. `SemanticsService.announce` is deprecated in current Flutter;
   `sendAnnouncement` needs the `View` and should be guarded with
   `MediaQuery.supportsAnnounceOf`.
+
+- **#21c's three readers converge before the pipeline, not after.** They all
+  produce a `CatalogEntry`, so the dry run, the duplicate check and the review
+  table are one implementation for all four sources. Two consequences worth
+  knowing: `classify` now prefers a stated title over `parseFilename` (which is
+  the entire reason to read Calibre rather than scan its folder), and a
+  candidate may legitimately have **no file** — a CSV export describes books
+  whose bytes are elsewhere, so "no hash" there means "nothing to hash" rather
+  than "unreadable".
+- **Calibre's metadata.db is copied before it is opened.** Calibre may be
+  running, and its schema has grown for fifteen years — so every optional table
+  (`identifiers`, `comments`, …) is read defensively and a missing one yields
+  an empty map rather than failing the catalogue. `pubdate`'s unset sentinel is
+  year 101 and must not become a publication date.
+- **The OPDS client is 1.x only**, deliberately: 2.0 is a different JSON format
+  with far less deployment, and the Atom feed is what servers actually publish.
+  Relative hrefs are resolved against the feed they came from at parse time —
+  doing it later is how a browser ends up navigating to the wrong host.
 
 **Status of plan 4:** §A 1–3, §B 4–6, §C 7–10, §D 11–13, §E 16–17 and §F 18 all
 landed. Still open and **carried into this plan unchanged**:
