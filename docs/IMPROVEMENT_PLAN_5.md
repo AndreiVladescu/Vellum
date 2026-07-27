@@ -76,7 +76,7 @@ is answerable from `git log`:
 | 9 | Content-addressed, refcounted blob store | `9540435` |
 | 8 | Live sync hints over SSE | `2471cb5` |
 | 38 | Localization scaffolding (en)* | `26da8ae` |
-| 29 | Room backdrop, furniture, and measurements | `HEAD` |
+| 29 | Room backdrop, furniture, and measurements | `9295076` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
 #14, #52, #26, #21a, #9, #8, #38 and #29 from the "interleave anywhere" list.
