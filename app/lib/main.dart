@@ -26,11 +26,15 @@ import 'server/server_client.dart';
 import 'server/server_page.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
+import 'settings/book_face.dart';
+import 'settings/preferences_page.dart';
 import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
+import 'shelf/command_palette.dart';
 import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
 import 'shelf/shelf_view.dart';
+import 'shortcuts.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -140,6 +144,10 @@ class _LibraryPageState extends State<LibraryPage> {
   bool _headerDismissed = false;
   Timer? _searchDebounce;
   final _searchController = TextEditingController();
+
+  /// Focus for the app-bar search box, so Ctrl+F can put the cursor in it
+  /// (plan 5 #26).
+  final _searchFocus = FocusNode();
 
   // One sync service for the whole app (launch auto-sync + the server page),
   // so its re-entrancy guard spans every way a sync can start.
@@ -335,6 +343,7 @@ class _LibraryPageState extends State<LibraryPage> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _searchFocus.dispose();
     _autoPusher.dispose();
     _incomingSub?.cancel();
     _incoming.dispose();
@@ -443,8 +452,181 @@ class _LibraryPageState extends State<LibraryPage> {
     setState(() => _genreFilter = genre);
   }
 
+  // ---- Keyboard shortcuts and the command palette (plan 5 #26) ------------
+
+  /// Everything the shelf can do, in one list: the key bindings, the palette,
+  /// and the tooltips all read from here, so an action can't be reachable one
+  /// way and invisible the others.
+  List<LibraryCommand> _commands() => [
+        LibraryCommand(
+          id: 'search',
+          label: 'Search your library',
+          icon: Icons.search,
+          key: LogicalKeyboardKey.keyF,
+          run: () {
+            setState(() => _tab = 0);
+            _searchFocus.requestFocus();
+            _searchController.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: _searchController.text.length,
+            );
+          },
+        ),
+        LibraryCommand(
+          id: 'add',
+          label: 'Add a book',
+          icon: Icons.add,
+          key: LogicalKeyboardKey.keyN,
+          run: () => _openAddBook(context),
+        ),
+        LibraryCommand(
+          id: 'import',
+          label: 'Import a folder',
+          icon: Icons.folder_open,
+          key: LogicalKeyboardKey.keyI,
+          run: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => FolderImportPage(
+              repository: repository,
+              settings: widget.settings,
+            ),
+          )),
+        ),
+        LibraryCommand(
+          id: 'scan',
+          label: 'Scan an ISBN barcode',
+          icon: Icons.barcode_reader,
+          run: () => _openScan(context),
+        ),
+        LibraryCommand(
+          id: 'face',
+          label: 'Switch between spines and covers',
+          icon: Icons.flip_to_front,
+          key: LogicalKeyboardKey.keyB,
+          run: () => widget.settings.setBookFace(
+            widget.settings.bookFace == BookFace.spine
+                ? BookFace.cover
+                : BookFace.spine,
+          ),
+        ),
+        LibraryCommand(
+          id: 'sync',
+          label: 'Sync with the server',
+          icon: Icons.cloud_sync_outlined,
+          key: LogicalKeyboardKey.f5,
+          run: _syncNow,
+        ),
+        LibraryCommand(
+          id: 'preferences',
+          label: 'Preferences',
+          icon: Icons.tune,
+          key: LogicalKeyboardKey.comma,
+          run: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => PreferencesPage(
+              settings: widget.settings,
+              repository: repository,
+              connection: widget.connection,
+              sync: _sync,
+            ),
+          )),
+        ),
+        LibraryCommand(
+          id: 'physical',
+          label: 'Physical libraries',
+          icon: Icons.grid_view_rounded,
+          run: () => setState(() => _tab = 1),
+        ),
+        // Not in the palette: opening the palette from inside it is a no-op,
+        // and Escape is a contextual key rather than a command anyone hunts
+        // for by name.
+        LibraryCommand(
+          id: 'palette',
+          label: 'Show all commands',
+          icon: Icons.keyboard_command_key,
+          key: LogicalKeyboardKey.keyK,
+          inPalette: false,
+          run: _openCommandPalette,
+        ),
+        LibraryCommand(
+          id: 'clear',
+          label: 'Clear search and filters',
+          icon: Icons.filter_alt_off_outlined,
+          key: LogicalKeyboardKey.escape,
+          inPalette: false,
+          run: _clearSearchAndFilters,
+        ),
+      ];
+
+  void _clearSearchAndFilters() {
+    _searchController.clear();
+    _searchFocus.unfocus();
+    setState(() {
+      _query = '';
+      _genreFilter = null;
+      _statusFilter = null;
+      _searchInsideBooks = false;
+    });
+  }
+
+  /// A sync the user asked for, so unlike the launch sync it reports what
+  /// happened either way — including "no server connected", which is otherwise
+  /// indistinguishable from a key that did nothing.
+  Future<void> _syncNow() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final conn = widget.connection;
+    final client = conn.client;
+    if (client == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No library server connected')),
+      );
+      return;
+    }
+    try {
+      final report = await _sync.sync(
+        client,
+        cursor: conn.syncCursor,
+        onCursor: conn.setSyncCursor,
+      );
+      messenger.showSnackBar(SnackBar(
+        content: Text('Synced — pulled ${report.pulled}, '
+            'pushed ${report.pushed}.'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+    }
+  }
+
+  void _openCommandPalette() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => CommandPalette(
+        commands: _commands(),
+        books: repository.watchAllBooks(),
+        onOpenBook: _openBook,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // CallbackShortcuts rather than a Shortcuts/Actions pair: the commands are
+    // already a list of callbacks, and an Intent+Action class per binding would
+    // be ceremony around nothing.
+    //
+    // The Focus goes *inside*, not outside: a key event walks up from whatever
+    // is focused, so CallbackShortcuts only sees it if it is an ancestor of the
+    // focused node. That nesting is also why a focused search box doesn't
+    // swallow these — it gets the event first and passes on the keys it has no
+    // use for, which is all of Ctrl+F/N/I/K/B, F5 and Escape.
+    return CallbackShortcuts(
+      bindings: shortcutsFor(_commands()),
+      child: Focus(
+        autofocus: true,
+        child: _scaffold(context),
+      ),
+    );
+  }
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       drawer: AppDrawer(
         profile: widget.profile,
@@ -457,6 +639,7 @@ class _LibraryPageState extends State<LibraryPage> {
           ? AppBar(
               title: TextField(
                 controller: _searchController,
+                focusNode: _searchFocus,
                 onChanged: _onQueryChanged,
                 decoration: const InputDecoration(
                   hintText: 'Search your library…',
@@ -464,7 +647,12 @@ class _LibraryPageState extends State<LibraryPage> {
                   border: InputBorder.none,
                 ),
               ),
-              actions: [_statusMenu(), _genreMenu(), _sortMenu()],
+              actions: [
+                _paletteButton(),
+                _statusMenu(),
+                _genreMenu(),
+                _sortMenu(),
+              ],
             )
           : AppBar(title: const Text('Physical libraries')),
       body: IndexedStack(
@@ -526,6 +714,14 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
     );
   }
+
+  /// The palette's own affordance. Without it the whole shortcut set is
+  /// invisible to anyone who never tries Ctrl+K — which is most people.
+  Widget _paletteButton() => IconButton(
+        icon: const Icon(Icons.keyboard_command_key),
+        tooltip: 'Commands (${commandModifierLabel()}K)',
+        onPressed: _openCommandPalette,
+      );
 
   Widget _sortMenu() => PopupMenuButton<ShelfSort>(
         icon: const Icon(Icons.sort),
