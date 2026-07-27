@@ -11,6 +11,7 @@ import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
 import 'edge_turn.dart';
+import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
 
@@ -136,15 +137,22 @@ class _ReaderPageState extends State<ReaderPage> {
 
   /// Re-anchors the current page for the chosen fit. `topCenter` leaves a tall
   /// page free to scroll (fit width); `all` frames the whole page.
-  void _applyFit() {
+  Future<void> _applyFit() async {
     final page = _page;
     if (page == null || !_controller.isReady) return;
-    _controller.goToPage(
-      pageNumber: page,
-      anchor: _settings?.pdfFit == PdfFit.page
-          ? PdfPageAnchor.all
-          : PdfPageAnchor.topCenter,
-    );
+    // Also what re-frames the page when the mode changes, so switching to
+    // paged mode lands on a page rather than leaving you across a seam.
+    _navigating = true;
+    try {
+      await _controller.goToPage(
+        pageNumber: page,
+        anchor: _settings?.pdfFit == PdfFit.page
+            ? PdfPageAnchor.all
+            : PdfPageAnchor.topCenter,
+      );
+    } finally {
+      _navigating = false;
+    }
   }
 
   Future<void> _promptPageJump() async {
@@ -199,38 +207,65 @@ class _ReaderPageState extends State<ReaderPage> {
   HighlightColor get _highlightColour =>
       HighlightColor.fromArgb(_settings?.highlightColor);
 
-  /// One screenful, or one page, depending on the mode.
+  /// The mode in force, before the settings have finished loading.
+  PdfPageMode get _mode => _settings?.pdfMode ?? PdfPageMode.scroll;
+
+  /// True while a jump is animating, which suspends [_clamp].
   ///
-  /// In [PdfPageMode.paged] the edges do what they do in a book: the next page.
-  /// In [PdfPageMode.scroll] the document is continuous, so they move a
-  /// screenful — a little short of one, so the line you were reading is still on
-  /// screen — and roll onto the following page by themselves.
+  /// The clamp holds the viewport inside the page nearest its centre; during a
+  /// turn the centre is briefly between two pages, and clamping those in-between
+  /// frames makes the animation stagger. The destination is already a page, so
+  /// there is nothing to enforce until it arrives.
+  bool _navigating = false;
+
+  /// The previous or next page. Only reachable in [PdfPageMode.paged] — in
+  /// scrolling mode the edges are not there, because scrolling is the control.
   Future<void> _step(int direction) async {
     if (!_controller.isReady) return;
-    if ((_settings?.pdfMode ?? PdfPageMode.scroll) == PdfPageMode.paged) {
-      final page = _page;
-      final count = _pageCount;
-      if (page == null || count == null) return;
-      final target = page + direction;
-      if (target < 1 || target > count) return;
+    final page = _page;
+    final count = _pageCount;
+    if (page == null || count == null) return;
+    final target = page + direction;
+    if (target < 1 || target > count) return;
+    _navigating = true;
+    try {
       await _controller.goToPage(
         pageNumber: target,
         anchor: _settings?.pdfFit == PdfFit.page
             ? PdfPageAnchor.all
             : PdfPageAnchor.topCenter,
       );
-      return;
+    } finally {
+      _navigating = false;
     }
-    final view = _controller.visibleRect;
-    final document = _controller.documentSize;
-    final step = view.height * 0.86 * direction;
-    await _controller.goToPosition(
-      documentOffset: Offset(
-        view.left,
-        (view.top + step).clamp(0.0, (document.height - view.height).clamp(0.0, double.infinity)),
-      ),
-      duration: const Duration(milliseconds: 220),
+  }
+
+  /// Pins the viewport inside one page, so paged mode is genuinely paged: you
+  /// cannot scroll a second page into view, and you cannot come to rest across
+  /// the seam between two. See [clampToPage].
+  Matrix4 _clamp(
+    Matrix4 matrix,
+    Size viewSize,
+    PdfPageLayout layout,
+    PdfViewerController? controller,
+  ) {
+    if (_navigating ||
+        controller == null ||
+        !controller.isReady ||
+        layout.pageLayouts.isEmpty) {
+      return matrix;
+    }
+    final zoom = matrix.zoom;
+    if (zoom <= 0) return matrix;
+    final centre = matrix.calcPosition(viewSize);
+    final page = layout.pageLayouts[nearestPage(layout.pageLayouts, centre)];
+    final clamped = clampToPage(
+      centre: centre,
+      page: page,
+      viewport: Size(viewSize.width / zoom, viewSize.height / zoom),
     );
+    if (clamped == centre) return matrix;
+    return controller.calcMatrixFor(clamped, zoom: zoom, viewSize: viewSize);
   }
 
   Future<void> _refreshBookmark(int page) async {
@@ -536,22 +571,30 @@ class _ReaderPageState extends State<ReaderPage> {
         params: PdfViewerParams(
           backgroundColor: readerTheme.background,
           onPageChanged: _onPageChanged,
-          // Twice pdfrx's default. Its 0.2 is a crawl on a desktop mouse: a
-          // notch of the wheel should move you a visible distance down the page.
-          scrollByMouseWheel: 0.4,
+          // Seven times pdfrx's default. Its 0.2 is a crawl on a desktop
+          // mouse — a notch moved about ten pixels — and reading a PDF is
+          // mostly wheel work.
+          scrollByMouseWheel: 1.5,
           // The scrollbar belongs to scrolling. In paged mode there is nothing
           // for it to represent — you are on a page, not somewhere in a river.
-          viewerOverlayBuilder:
-              (settings?.pdfMode ?? PdfPageMode.scroll) == PdfPageMode.scroll
-                  ? (context, size, handleLinkTap) => [
-                        PdfViewerScrollThumb(
-                          controller: _controller,
-                          orientation: ScrollbarOrientation.right,
-                          thumbSize: const Size(28, 44),
-                        ),
-                      ]
-                  : null,
+          viewerOverlayBuilder: _mode == PdfPageMode.scroll
+              ? (context, size, handleLinkTap) => [
+                    PdfViewerScrollThumb(
+                      controller: _controller,
+                      orientation: ScrollbarOrientation.right,
+                      // Big enough to grab with a mouse without aiming.
+                      thumbSize: const Size(32, 56),
+                      margin: 4,
+                    ),
+                  ]
+              : null,
+          normalizeMatrix: _mode == PdfPageMode.paged ? _clamp : null,
           onViewerReady: (_, _) {
+            // `onPageChanged` only fires on a *change*, so until you scrolled
+            // there was no current page: the counter was blank, Bookmark was
+            // disabled, and the edge buttons — which turn from `_page` — did
+            // nothing at all. Opening the book *is* arriving on a page.
+            if (_page == null) _onPageChanged(_controller.pageNumber);
             _applyFit();
             // Now the controller has a document, so the searcher can exist.
             if (_searcher == null && mounted) {
@@ -590,23 +633,27 @@ class _ReaderPageState extends State<ReaderPage> {
             ),
           ),
           // The same edge controls as the EPUB reader, so the two readers turn
-          // the same way. What a turn *means* follows the mode — see [_step].
-          ReaderEdgeTurn(
-            width: strip,
-            alignment: Alignment.centerLeft,
-            icon: Icons.chevron_left,
-            tooltip: 'Back a page',
-            colour: readerTheme.foreground,
-            onTap: () => _step(-1),
-          ),
-          ReaderEdgeTurn(
-            width: strip,
-            alignment: Alignment.centerRight,
-            icon: Icons.chevron_right,
-            tooltip: 'Forward a page',
-            colour: readerTheme.foreground,
-            onTap: () => _step(1),
-          ),
+          // the same way — but only where turning is the way you move. In
+          // scrolling mode they would be a second, worse scrollbar, and the
+          // right-hand one sat on top of the real one and ate its drags.
+          if (_mode == PdfPageMode.paged) ...[
+            ReaderEdgeTurn(
+              width: strip,
+              alignment: Alignment.centerLeft,
+              icon: Icons.chevron_left,
+              tooltip: 'Back a page',
+              colour: readerTheme.foreground,
+              onTap: () => _step(-1),
+            ),
+            ReaderEdgeTurn(
+              width: strip,
+              alignment: Alignment.centerRight,
+              icon: Icons.chevron_right,
+              tooltip: 'Forward a page',
+              colour: readerTheme.foreground,
+              onTap: () => _step(1),
+            ),
+          ],
         ]);
       }),
     );
