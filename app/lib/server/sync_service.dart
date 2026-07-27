@@ -788,8 +788,15 @@ class SyncService {
     // Only push books changed since their last successful push. `needsPush`
     // defaults true, so a fresh library still pushes everything once; the
     // server's no-op guard keeps that first sweep from churning timestamps.
-    final books =
-        await (db.select(db.books)..where((b) => b.needsPush.equals(true))).get();
+    //
+    // Trashed books (plan 5 #52) are excluded: they are neither dirty nor
+    // deleted as far as the server is concerned, and won't be either way until
+    // the grace period expires — at which point the real delete writes a
+    // tombstone and the loop above pushes *that*. Pushing them meanwhile would
+    // send edits the user has already taken back.
+    final books = await (db.select(db.books)
+          ..where((b) => b.needsPush.equals(true) & b.deletedAt.isNull()))
+        .get();
 
     // One list fetch gives the server's existing file hashes per book, so we
     // skip re-uploading files it already has without a `GET .../files` each.

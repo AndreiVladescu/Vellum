@@ -82,9 +82,14 @@ class LibraryQueries {
   /// A live count of everything waiting to be pushed to the server: dirty
   /// books plus pending local deletions. Drives the debounced background
   /// auto-push.
+  ///
+  /// Trashed books don't count: they stop pushing until the grace period
+  /// expires (plan 5 #52), so counting them would leave the badge permanently
+  /// claiming work the push will never do.
   Stream<int> watchDirtyCount() => db
       .customSelect(
-        'SELECT (SELECT COUNT(*) FROM books WHERE needs_push = 1) + '
+        'SELECT (SELECT COUNT(*) FROM books WHERE needs_push = 1 '
+        'AND deleted_at IS NULL) + '
         '(SELECT COUNT(*) FROM local_deletions) AS n',
         readsFrom: {db.books, db.localDeletions},
       )
@@ -223,16 +228,22 @@ class LibraryQueries {
   /// independent of any search/genre filter, so a page turn or a genre edit
   /// never invalidates it, only a book actually entering/leaving the scope.
   Stream<bool> _watchScopeEmpty(String? shelfId) {
+    // Trashed books (plan 5 #52) aren't in the scope either — a library whose
+    // every book is in the trash reads as empty, and gets the "add your first
+    // book" invitation rather than "nothing matched".
     final sql = shelfId == null
-        ? 'SELECT NOT EXISTS(SELECT 1 FROM books) AS empty'
-        : 'SELECT NOT EXISTS(SELECT 1 FROM shelf_books WHERE shelf_id = ?) AS empty';
+        ? 'SELECT NOT EXISTS(SELECT 1 FROM books WHERE deleted_at IS NULL) '
+            'AS empty'
+        : 'SELECT NOT EXISTS(SELECT 1 FROM shelf_books sb '
+            'JOIN books b ON b.id = sb.book_id '
+            'WHERE sb.shelf_id = ? AND b.deleted_at IS NULL) AS empty';
     return db
         .customSelect(
           sql,
           variables: shelfId == null ? [] : [Variable.withString(shelfId)],
           readsFrom: shelfId == null
               ? {db.books}
-              : {db.shelfBooks},
+              : {db.shelfBooks, db.books},
         )
         .watchSingle()
         .map((row) => row.read<bool>('empty'));
@@ -245,7 +256,10 @@ class LibraryQueries {
     String? status,
     ShelfSort sort = ShelfSort.title,
   }) {
-    final where = <String>[];
+    // Trash (plan 5 #52) is filtered here, once, for every caller of the
+    // view-model — the shelf, the header strip, and the facet counts all read
+    // this one query, so a trashed book disappears from all of them together.
+    final where = <String>['books.deleted_at IS NULL'];
     final vars = <Variable>[];
 
     if (shelfId != null) {

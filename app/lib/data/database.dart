@@ -66,6 +66,19 @@ class Books extends Table {
   DateTimeColumn get finishedAt => dateTime().nullable()();
   /// How many times this book has been finished, for re-reads.
   IntColumn get readCount => integer().withDefault(const Constant(0))();
+  // ---- Trash (plan 5 #52) --------------------------------------------------
+  /// When this book was moved to the trash, or null for a live book.
+  ///
+  /// **App-local, and deliberately so.** A trashed book is not deleted — no
+  /// tombstone is written, its files stay on disk, and the server is told
+  /// nothing — it is only hidden here until the grace period expires and the
+  /// real delete runs. Mirroring the column would make one device's second
+  /// thoughts another device's deletion, which is the opposite of the point.
+  ///
+  /// Everything that reads the library filters on `deleted_at IS NULL`;
+  /// [LibraryQueries] does it centrally for the shelf, and the push side
+  /// skips trashed rows so a book on its way out never reaches the server.
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -442,7 +455,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -664,6 +677,12 @@ class VellumDatabase extends _$VellumDatabase {
               );
             }
           }
+          if (from < 21) {
+            // Trash (plan 5 #52). App-local: a trashed book is still a book
+            // everywhere else, so there is no server migration — and never
+            // one, see the column's doc comment.
+            await addBookColumn('deleted_at', books.deletedAt);
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -752,9 +771,13 @@ class VellumDatabase extends _$VellumDatabase {
     }
   }
 
-  /// All books, alphabetically — reactive: the shelf UI rebuilds on changes.
-  Stream<List<Book>> watchAllBooks() =>
-      (select(books)..orderBy([(b) => OrderingTerm.asc(b.title)])).watch();
+  /// All *live* books, alphabetically — reactive: the shelf UI rebuilds on
+  /// changes. Trashed books (plan 5 #52) are excluded here rather than at each
+  /// call site, so nothing that asks for "the library" has to remember to.
+  Stream<List<Book>> watchAllBooks() => (select(books)
+        ..where((b) => b.deletedAt.isNull())
+        ..orderBy([(b) => OrderingTerm.asc(b.title)]))
+      .watch();
 
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'vellum');

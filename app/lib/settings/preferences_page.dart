@@ -17,6 +17,7 @@ import '../server/sync_service.dart';
 import 'app_settings.dart';
 import 'book_face.dart';
 import 'spine_art.dart';
+import 'trash_page.dart';
 import 'wallpaper.dart';
 
 /// Appearance preferences (how books are shown on the shelf, the shelf
@@ -124,6 +125,9 @@ class PreferencesPage extends StatelessWidget {
               repository: repository,
               connection: connection,
             ),
+            const Divider(height: 24),
+            _SectionHeader('Trash'),
+            _TrashTile(repository: repository),
             const Divider(height: 24),
             _SectionHeader('Library health'),
             _HealthSection(repository: repository, connection: connection),
@@ -893,6 +897,38 @@ class _SectionHeader extends StatelessWidget {
         style: theme.textTheme.titleSmall
             ?.copyWith(color: theme.colorScheme.primary),
       ),
+    );
+  }
+}
+
+/// The way into the trash (plan 5 #52), with a live count so a library with
+/// nothing waiting says so rather than making you open an empty page.
+class _TrashTile extends StatelessWidget {
+  const _TrashTile({required this.repository});
+
+  final LibraryRepository repository;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: repository.trash.watchTrashCount(),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return ListTile(
+          leading: const Icon(Icons.delete_outline),
+          title: const Text('Trash'),
+          subtitle: Text(count == 0
+              ? 'Nothing waiting to be deleted'
+              : '$count book${count == 1 ? '' : 's'}, deleted for good after '
+                  '${TrashService.graceperiod.inDays} days'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TrashPage(repository: repository),
+            ),
+          ),
+        );
+      },
     );
   }
 }

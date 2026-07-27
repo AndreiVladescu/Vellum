@@ -18,6 +18,7 @@ import 'reading_position_service.dart';
 import 'reading_status.dart';
 import 'series_service.dart';
 import 'shelf_service.dart';
+import 'trash_service.dart';
 
 // Physical-layout CRUD lives in LayoutRepository (reached via `.layout`);
 // re-export the pieces callers still import from here so their imports are
@@ -35,6 +36,7 @@ export 'reading_position_service.dart'
     show ReadingJumpOffer, ReadingPositionService, readingUnitForFormats;
 export 'reading_status.dart' show ReadingStatus, ReadingStatusService;
 export 'series_service.dart' show SeriesPlace, SeriesService;
+export 'trash_service.dart' show TrashService;
 
 /// All library operations the UI needs. A thin facade over the local
 /// database and filesystem store: each concern (queries, book lifecycle,
@@ -58,6 +60,7 @@ class LibraryRepository {
     required this.annotations,
     required this.readingStatus,
     required this.seriesService,
+    required this.trash,
   });
 
   final VellumDatabase db;
@@ -109,6 +112,10 @@ class LibraryRepository {
   /// `repository.seriesService`.
   final SeriesService seriesService;
 
+  /// The trash and its 30-day grace period (plan 5 #52). Reached as
+  /// `repository.trash`.
+  final TrashService trash;
+
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
     return _withDataDir(db, dir);
@@ -159,6 +166,7 @@ class LibraryRepository {
     final covers = CoverService(db, dir);
     final copyPhotos = CopyPhotoService(db, dir);
     final physical = PhysicalService(db, copyPhotos);
+    final writes = BookWriteService(db, dir, metadataService, covers);
     return LibraryRepository._(
       db: db,
       metadata: metadataService,
@@ -170,11 +178,12 @@ class LibraryRepository {
       physical: physical,
       copyPhotos: copyPhotos,
       files: FileService(db, dir, covers),
-      writes: BookWriteService(db, dir, metadataService, covers),
+      writes: writes,
       readingPositions: ReadingPositionService(db),
       annotations: AnnotationStore(db),
       readingStatus: ReadingStatusService(db),
       seriesService: SeriesService(db),
+      trash: TrashService(db, writes),
     );
   }
 
@@ -265,8 +274,17 @@ class LibraryRepository {
   Future<BookDetails> detailsFor(String bookId) => writes.detailsFor(bookId);
   Future<void> enrichFromSearch(String bookId, BookSearchResult result) =>
       writes.enrichFromSearch(bookId, result);
+  /// The permanent delete: tombstone, blobs, the lot. Reserved for the sweep,
+  /// "delete now" in the trash, a pull that says the server deleted the book,
+  /// and undoing an add that just happened. Everything a *user* calls "remove
+  /// from my library" should go through [trashBook] instead (plan 5 #52).
   Future<void> deleteBook(Book book, {bool recordTombstone = true}) =>
       writes.deleteBook(book, recordTombstone: recordTombstone);
+
+  // ---- Trash (plan 5 #52) -------------------------------------------------
+  Future<void> trashBook(String bookId) => trash.trash(bookId);
+  Future<void> restoreBook(String bookId) => trash.restore(bookId);
+  Stream<List<Book>> watchTrashedBooks() => trash.watchTrashed();
 
   // ---- Covers ---------------------------------------------------------
   File? coverFileOf(Book book) => covers.coverFileOf(book);

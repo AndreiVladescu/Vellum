@@ -4,6 +4,188 @@
 //
 import 'package:drift/drift.dart';
 
+class Series extends Table with TableInfo<Series, SeriesData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  Series(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL UNIQUE',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'series';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SeriesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SeriesData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
+  }
+
+  @override
+  Series createAlias(String alias) {
+    return Series(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const ['PRIMARY KEY(id)'];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class SeriesData extends DataClass implements Insertable<SeriesData> {
+  final String id;
+  final String name;
+  const SeriesData({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  SeriesCompanion toCompanion(bool nullToAbsent) {
+    return SeriesCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory SeriesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SeriesData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  SeriesData copyWith({String? id, String? name}) =>
+      SeriesData(id: id ?? this.id, name: name ?? this.name);
+  SeriesData copyWithCompanion(SeriesCompanion data) {
+    return SeriesData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeriesData(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SeriesData && other.id == this.id && other.name == this.name);
+}
+
+class SeriesCompanion extends UpdateCompanion<SeriesData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> rowid;
+  const SeriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SeriesCompanion.insert({
+    required String id,
+    required String name,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<SeriesData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SeriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return SeriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class Books extends Table with TableInfo<Books, BooksData> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -86,6 +268,22 @@ class Books extends Table with TableInfo<Books, BooksData> {
     aliasedName,
     true,
     type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> seriesId = GeneratedColumn<String>(
+    'series_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL REFERENCES series(id)',
+  );
+  late final GeneratedColumn<double> seriesIndex = GeneratedColumn<double>(
+    'series_index',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
@@ -180,6 +378,56 @@ class Books extends Table with TableInfo<Books, BooksData> {
         'NOT NULL DEFAULT 0 CHECK (needs_progress_push IN (0, 1))',
     defaultValue: const CustomExpression('0'),
   );
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT \'unread\'',
+    defaultValue: const CustomExpression('\'unread\''),
+  );
+  late final GeneratedColumn<int> rating = GeneratedColumn<int>(
+    'rating',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<int> startedAt = GeneratedColumn<int>(
+    'started_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<int> finishedAt = GeneratedColumn<int>(
+    'finished_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<int> readCount = GeneratedColumn<int>(
+    'read_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0',
+    defaultValue: const CustomExpression('0'),
+  );
+  late final GeneratedColumn<int> deletedAt = GeneratedColumn<int>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -192,6 +440,8 @@ class Books extends Table with TableInfo<Books, BooksData> {
     pageCount,
     coverPath,
     spineStyle,
+    seriesId,
+    seriesIndex,
     readingProgress,
     lastReadPage,
     lastReadAt,
@@ -202,6 +452,12 @@ class Books extends Table with TableInfo<Books, BooksData> {
     needsPush,
     coverEtag,
     needsProgressPush,
+    status,
+    rating,
+    startedAt,
+    finishedAt,
+    readCount,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -254,6 +510,14 @@ class Books extends Table with TableInfo<Books, BooksData> {
         DriftSqlType.string,
         data['${effectivePrefix}spine_style'],
       ),
+      seriesId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}series_id'],
+      ),
+      seriesIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}series_index'],
+      ),
       readingProgress: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}reading_progress'],
@@ -294,6 +558,30 @@ class Books extends Table with TableInfo<Books, BooksData> {
         DriftSqlType.int,
         data['${effectivePrefix}needs_progress_push'],
       )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      rating: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rating'],
+      ),
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}started_at'],
+      ),
+      finishedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}finished_at'],
+      ),
+      readCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}read_count'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -319,6 +607,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
   final int? pageCount;
   final String? coverPath;
   final String? spineStyle;
+  final String? seriesId;
+  final double? seriesIndex;
   final double? readingProgress;
   final int? lastReadPage;
   final int? lastReadAt;
@@ -329,6 +619,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
   final int needsPush;
   final String? coverEtag;
   final int needsProgressPush;
+  final String status;
+  final int? rating;
+  final int? startedAt;
+  final int? finishedAt;
+  final int readCount;
+  final int? deletedAt;
   const BooksData({
     required this.id,
     required this.title,
@@ -340,6 +636,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     this.pageCount,
     this.coverPath,
     this.spineStyle,
+    this.seriesId,
+    this.seriesIndex,
     this.readingProgress,
     this.lastReadPage,
     this.lastReadAt,
@@ -350,6 +648,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     required this.needsPush,
     this.coverEtag,
     required this.needsProgressPush,
+    required this.status,
+    this.rating,
+    this.startedAt,
+    this.finishedAt,
+    required this.readCount,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -380,6 +684,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     if (!nullToAbsent || spineStyle != null) {
       map['spine_style'] = Variable<String>(spineStyle);
     }
+    if (!nullToAbsent || seriesId != null) {
+      map['series_id'] = Variable<String>(seriesId);
+    }
+    if (!nullToAbsent || seriesIndex != null) {
+      map['series_index'] = Variable<double>(seriesIndex);
+    }
     if (!nullToAbsent || readingProgress != null) {
       map['reading_progress'] = Variable<double>(readingProgress);
     }
@@ -402,6 +712,20 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       map['cover_etag'] = Variable<String>(coverEtag);
     }
     map['needs_progress_push'] = Variable<int>(needsProgressPush);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || rating != null) {
+      map['rating'] = Variable<int>(rating);
+    }
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<int>(startedAt);
+    }
+    if (!nullToAbsent || finishedAt != null) {
+      map['finished_at'] = Variable<int>(finishedAt);
+    }
+    map['read_count'] = Variable<int>(readCount);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<int>(deletedAt);
+    }
     return map;
   }
 
@@ -431,6 +755,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       spineStyle: spineStyle == null && nullToAbsent
           ? const Value.absent()
           : Value(spineStyle),
+      seriesId: seriesId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seriesId),
+      seriesIndex: seriesIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seriesIndex),
       readingProgress: readingProgress == null && nullToAbsent
           ? const Value.absent()
           : Value(readingProgress),
@@ -453,6 +783,20 @@ class BooksData extends DataClass implements Insertable<BooksData> {
           ? const Value.absent()
           : Value(coverEtag),
       needsProgressPush: Value(needsProgressPush),
+      status: Value(status),
+      rating: rating == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rating),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      finishedAt: finishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishedAt),
+      readCount: Value(readCount),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -472,6 +816,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       pageCount: serializer.fromJson<int?>(json['pageCount']),
       coverPath: serializer.fromJson<String?>(json['coverPath']),
       spineStyle: serializer.fromJson<String?>(json['spineStyle']),
+      seriesId: serializer.fromJson<String?>(json['seriesId']),
+      seriesIndex: serializer.fromJson<double?>(json['seriesIndex']),
       readingProgress: serializer.fromJson<double?>(json['readingProgress']),
       lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
       lastReadAt: serializer.fromJson<int?>(json['lastReadAt']),
@@ -482,6 +828,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       needsPush: serializer.fromJson<int>(json['needsPush']),
       coverEtag: serializer.fromJson<String?>(json['coverEtag']),
       needsProgressPush: serializer.fromJson<int>(json['needsProgressPush']),
+      status: serializer.fromJson<String>(json['status']),
+      rating: serializer.fromJson<int?>(json['rating']),
+      startedAt: serializer.fromJson<int?>(json['startedAt']),
+      finishedAt: serializer.fromJson<int?>(json['finishedAt']),
+      readCount: serializer.fromJson<int>(json['readCount']),
+      deletedAt: serializer.fromJson<int?>(json['deletedAt']),
     );
   }
   @override
@@ -498,6 +850,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       'pageCount': serializer.toJson<int?>(pageCount),
       'coverPath': serializer.toJson<String?>(coverPath),
       'spineStyle': serializer.toJson<String?>(spineStyle),
+      'seriesId': serializer.toJson<String?>(seriesId),
+      'seriesIndex': serializer.toJson<double?>(seriesIndex),
       'readingProgress': serializer.toJson<double?>(readingProgress),
       'lastReadPage': serializer.toJson<int?>(lastReadPage),
       'lastReadAt': serializer.toJson<int?>(lastReadAt),
@@ -508,6 +862,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       'needsPush': serializer.toJson<int>(needsPush),
       'coverEtag': serializer.toJson<String?>(coverEtag),
       'needsProgressPush': serializer.toJson<int>(needsProgressPush),
+      'status': serializer.toJson<String>(status),
+      'rating': serializer.toJson<int?>(rating),
+      'startedAt': serializer.toJson<int?>(startedAt),
+      'finishedAt': serializer.toJson<int?>(finishedAt),
+      'readCount': serializer.toJson<int>(readCount),
+      'deletedAt': serializer.toJson<int?>(deletedAt),
     };
   }
 
@@ -522,6 +882,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     Value<int?> pageCount = const Value.absent(),
     Value<String?> coverPath = const Value.absent(),
     Value<String?> spineStyle = const Value.absent(),
+    Value<String?> seriesId = const Value.absent(),
+    Value<double?> seriesIndex = const Value.absent(),
     Value<double?> readingProgress = const Value.absent(),
     Value<int?> lastReadPage = const Value.absent(),
     Value<int?> lastReadAt = const Value.absent(),
@@ -532,6 +894,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     int? needsPush,
     Value<String?> coverEtag = const Value.absent(),
     int? needsProgressPush,
+    String? status,
+    Value<int?> rating = const Value.absent(),
+    Value<int?> startedAt = const Value.absent(),
+    Value<int?> finishedAt = const Value.absent(),
+    int? readCount,
+    Value<int?> deletedAt = const Value.absent(),
   }) => BooksData(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -545,6 +913,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     pageCount: pageCount.present ? pageCount.value : this.pageCount,
     coverPath: coverPath.present ? coverPath.value : this.coverPath,
     spineStyle: spineStyle.present ? spineStyle.value : this.spineStyle,
+    seriesId: seriesId.present ? seriesId.value : this.seriesId,
+    seriesIndex: seriesIndex.present ? seriesIndex.value : this.seriesIndex,
     readingProgress: readingProgress.present
         ? readingProgress.value
         : this.readingProgress,
@@ -559,6 +929,12 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     needsPush: needsPush ?? this.needsPush,
     coverEtag: coverEtag.present ? coverEtag.value : this.coverEtag,
     needsProgressPush: needsProgressPush ?? this.needsProgressPush,
+    status: status ?? this.status,
+    rating: rating.present ? rating.value : this.rating,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+    readCount: readCount ?? this.readCount,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   BooksData copyWithCompanion(BooksCompanion data) {
     return BooksData(
@@ -578,6 +954,10 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       spineStyle: data.spineStyle.present
           ? data.spineStyle.value
           : this.spineStyle,
+      seriesId: data.seriesId.present ? data.seriesId.value : this.seriesId,
+      seriesIndex: data.seriesIndex.present
+          ? data.seriesIndex.value
+          : this.seriesIndex,
       readingProgress: data.readingProgress.present
           ? data.readingProgress.value
           : this.readingProgress,
@@ -600,6 +980,14 @@ class BooksData extends DataClass implements Insertable<BooksData> {
       needsProgressPush: data.needsProgressPush.present
           ? data.needsProgressPush.value
           : this.needsProgressPush,
+      status: data.status.present ? data.status.value : this.status,
+      rating: data.rating.present ? data.rating.value : this.rating,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      finishedAt: data.finishedAt.present
+          ? data.finishedAt.value
+          : this.finishedAt,
+      readCount: data.readCount.present ? data.readCount.value : this.readCount,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -616,6 +1004,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
           ..write('pageCount: $pageCount, ')
           ..write('coverPath: $coverPath, ')
           ..write('spineStyle: $spineStyle, ')
+          ..write('seriesId: $seriesId, ')
+          ..write('seriesIndex: $seriesIndex, ')
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
@@ -625,13 +1015,19 @@ class BooksData extends DataClass implements Insertable<BooksData> {
           ..write('updatedAt: $updatedAt, ')
           ..write('needsPush: $needsPush, ')
           ..write('coverEtag: $coverEtag, ')
-          ..write('needsProgressPush: $needsProgressPush')
+          ..write('needsProgressPush: $needsProgressPush, ')
+          ..write('status: $status, ')
+          ..write('rating: $rating, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('readCount: $readCount, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     title,
     subtitle,
@@ -642,6 +1038,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     pageCount,
     coverPath,
     spineStyle,
+    seriesId,
+    seriesIndex,
     readingProgress,
     lastReadPage,
     lastReadAt,
@@ -652,7 +1050,13 @@ class BooksData extends DataClass implements Insertable<BooksData> {
     needsPush,
     coverEtag,
     needsProgressPush,
-  );
+    status,
+    rating,
+    startedAt,
+    finishedAt,
+    readCount,
+    deletedAt,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -667,6 +1071,8 @@ class BooksData extends DataClass implements Insertable<BooksData> {
           other.pageCount == this.pageCount &&
           other.coverPath == this.coverPath &&
           other.spineStyle == this.spineStyle &&
+          other.seriesId == this.seriesId &&
+          other.seriesIndex == this.seriesIndex &&
           other.readingProgress == this.readingProgress &&
           other.lastReadPage == this.lastReadPage &&
           other.lastReadAt == this.lastReadAt &&
@@ -676,7 +1082,13 @@ class BooksData extends DataClass implements Insertable<BooksData> {
           other.updatedAt == this.updatedAt &&
           other.needsPush == this.needsPush &&
           other.coverEtag == this.coverEtag &&
-          other.needsProgressPush == this.needsProgressPush);
+          other.needsProgressPush == this.needsProgressPush &&
+          other.status == this.status &&
+          other.rating == this.rating &&
+          other.startedAt == this.startedAt &&
+          other.finishedAt == this.finishedAt &&
+          other.readCount == this.readCount &&
+          other.deletedAt == this.deletedAt);
 }
 
 class BooksCompanion extends UpdateCompanion<BooksData> {
@@ -690,6 +1102,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
   final Value<int?> pageCount;
   final Value<String?> coverPath;
   final Value<String?> spineStyle;
+  final Value<String?> seriesId;
+  final Value<double?> seriesIndex;
   final Value<double?> readingProgress;
   final Value<int?> lastReadPage;
   final Value<int?> lastReadAt;
@@ -700,6 +1114,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
   final Value<int> needsPush;
   final Value<String?> coverEtag;
   final Value<int> needsProgressPush;
+  final Value<String> status;
+  final Value<int?> rating;
+  final Value<int?> startedAt;
+  final Value<int?> finishedAt;
+  final Value<int> readCount;
+  final Value<int?> deletedAt;
   final Value<int> rowid;
   const BooksCompanion({
     this.id = const Value.absent(),
@@ -712,6 +1132,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     this.pageCount = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.spineStyle = const Value.absent(),
+    this.seriesId = const Value.absent(),
+    this.seriesIndex = const Value.absent(),
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
@@ -722,6 +1144,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     this.needsPush = const Value.absent(),
     this.coverEtag = const Value.absent(),
     this.needsProgressPush = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.readCount = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BooksCompanion.insert({
@@ -735,6 +1163,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     this.pageCount = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.spineStyle = const Value.absent(),
+    this.seriesId = const Value.absent(),
+    this.seriesIndex = const Value.absent(),
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
@@ -745,6 +1175,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     this.needsPush = const Value.absent(),
     this.coverEtag = const Value.absent(),
     this.needsProgressPush = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.readCount = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -759,6 +1195,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     Expression<int>? pageCount,
     Expression<String>? coverPath,
     Expression<String>? spineStyle,
+    Expression<String>? seriesId,
+    Expression<double>? seriesIndex,
     Expression<double>? readingProgress,
     Expression<int>? lastReadPage,
     Expression<int>? lastReadAt,
@@ -769,6 +1207,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     Expression<int>? needsPush,
     Expression<String>? coverEtag,
     Expression<int>? needsProgressPush,
+    Expression<String>? status,
+    Expression<int>? rating,
+    Expression<int>? startedAt,
+    Expression<int>? finishedAt,
+    Expression<int>? readCount,
+    Expression<int>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -782,6 +1226,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
       if (pageCount != null) 'page_count': pageCount,
       if (coverPath != null) 'cover_path': coverPath,
       if (spineStyle != null) 'spine_style': spineStyle,
+      if (seriesId != null) 'series_id': seriesId,
+      if (seriesIndex != null) 'series_index': seriesIndex,
       if (readingProgress != null) 'reading_progress': readingProgress,
       if (lastReadPage != null) 'last_read_page': lastReadPage,
       if (lastReadAt != null) 'last_read_at': lastReadAt,
@@ -792,6 +1238,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
       if (needsPush != null) 'needs_push': needsPush,
       if (coverEtag != null) 'cover_etag': coverEtag,
       if (needsProgressPush != null) 'needs_progress_push': needsProgressPush,
+      if (status != null) 'status': status,
+      if (rating != null) 'rating': rating,
+      if (startedAt != null) 'started_at': startedAt,
+      if (finishedAt != null) 'finished_at': finishedAt,
+      if (readCount != null) 'read_count': readCount,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -807,6 +1259,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     Value<int?>? pageCount,
     Value<String?>? coverPath,
     Value<String?>? spineStyle,
+    Value<String?>? seriesId,
+    Value<double?>? seriesIndex,
     Value<double?>? readingProgress,
     Value<int?>? lastReadPage,
     Value<int?>? lastReadAt,
@@ -817,6 +1271,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     Value<int>? needsPush,
     Value<String?>? coverEtag,
     Value<int>? needsProgressPush,
+    Value<String>? status,
+    Value<int?>? rating,
+    Value<int?>? startedAt,
+    Value<int?>? finishedAt,
+    Value<int>? readCount,
+    Value<int?>? deletedAt,
     Value<int>? rowid,
   }) {
     return BooksCompanion(
@@ -830,6 +1290,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
       pageCount: pageCount ?? this.pageCount,
       coverPath: coverPath ?? this.coverPath,
       spineStyle: spineStyle ?? this.spineStyle,
+      seriesId: seriesId ?? this.seriesId,
+      seriesIndex: seriesIndex ?? this.seriesIndex,
       readingProgress: readingProgress ?? this.readingProgress,
       lastReadPage: lastReadPage ?? this.lastReadPage,
       lastReadAt: lastReadAt ?? this.lastReadAt,
@@ -840,6 +1302,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
       needsPush: needsPush ?? this.needsPush,
       coverEtag: coverEtag ?? this.coverEtag,
       needsProgressPush: needsProgressPush ?? this.needsProgressPush,
+      status: status ?? this.status,
+      rating: rating ?? this.rating,
+      startedAt: startedAt ?? this.startedAt,
+      finishedAt: finishedAt ?? this.finishedAt,
+      readCount: readCount ?? this.readCount,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -877,6 +1345,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     if (spineStyle.present) {
       map['spine_style'] = Variable<String>(spineStyle.value);
     }
+    if (seriesId.present) {
+      map['series_id'] = Variable<String>(seriesId.value);
+    }
+    if (seriesIndex.present) {
+      map['series_index'] = Variable<double>(seriesIndex.value);
+    }
     if (readingProgress.present) {
       map['reading_progress'] = Variable<double>(readingProgress.value);
     }
@@ -907,6 +1381,24 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
     if (needsProgressPush.present) {
       map['needs_progress_push'] = Variable<int>(needsProgressPush.value);
     }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (rating.present) {
+      map['rating'] = Variable<int>(rating.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<int>(startedAt.value);
+    }
+    if (finishedAt.present) {
+      map['finished_at'] = Variable<int>(finishedAt.value);
+    }
+    if (readCount.present) {
+      map['read_count'] = Variable<int>(readCount.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -926,6 +1418,8 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
           ..write('pageCount: $pageCount, ')
           ..write('coverPath: $coverPath, ')
           ..write('spineStyle: $spineStyle, ')
+          ..write('seriesId: $seriesId, ')
+          ..write('seriesIndex: $seriesIndex, ')
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
@@ -936,6 +1430,12 @@ class BooksCompanion extends UpdateCompanion<BooksData> {
           ..write('needsPush: $needsPush, ')
           ..write('coverEtag: $coverEtag, ')
           ..write('needsProgressPush: $needsProgressPush, ')
+          ..write('status: $status, ')
+          ..write('rating: $rating, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('readCount: $readCount, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2568,6 +3068,38 @@ class Loans extends Table with TableInfo<Loans, LoansData> {
     $customConstraints: 'NOT NULL DEFAULT 1 CHECK (needs_push IN (0, 1))',
     defaultValue: const CustomExpression('1'),
   );
+  late final GeneratedColumn<int> dueAt = GeneratedColumn<int>(
+    'due_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> borrowerContact = GeneratedColumn<String>(
+    'borrower_contact',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<int> reminderSentAt = GeneratedColumn<int>(
+    'reminder_sent_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2577,6 +3109,10 @@ class Loans extends Table with TableInfo<Loans, LoansData> {
     returnedAt,
     updatedAt,
     needsPush,
+    dueAt,
+    borrowerContact,
+    notes,
+    reminderSentAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2617,6 +3153,22 @@ class Loans extends Table with TableInfo<Loans, LoansData> {
         DriftSqlType.int,
         data['${effectivePrefix}needs_push'],
       )!,
+      dueAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}due_at'],
+      ),
+      borrowerContact: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}borrower_contact'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      reminderSentAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_sent_at'],
+      ),
     );
   }
 
@@ -2639,6 +3191,10 @@ class LoansData extends DataClass implements Insertable<LoansData> {
   final int? returnedAt;
   final int updatedAt;
   final int needsPush;
+  final int? dueAt;
+  final String? borrowerContact;
+  final String? notes;
+  final int? reminderSentAt;
   const LoansData({
     required this.id,
     required this.copyId,
@@ -2647,6 +3203,10 @@ class LoansData extends DataClass implements Insertable<LoansData> {
     this.returnedAt,
     required this.updatedAt,
     required this.needsPush,
+    this.dueAt,
+    this.borrowerContact,
+    this.notes,
+    this.reminderSentAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2660,6 +3220,18 @@ class LoansData extends DataClass implements Insertable<LoansData> {
     }
     map['updated_at'] = Variable<int>(updatedAt);
     map['needs_push'] = Variable<int>(needsPush);
+    if (!nullToAbsent || dueAt != null) {
+      map['due_at'] = Variable<int>(dueAt);
+    }
+    if (!nullToAbsent || borrowerContact != null) {
+      map['borrower_contact'] = Variable<String>(borrowerContact);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || reminderSentAt != null) {
+      map['reminder_sent_at'] = Variable<int>(reminderSentAt);
+    }
     return map;
   }
 
@@ -2674,6 +3246,18 @@ class LoansData extends DataClass implements Insertable<LoansData> {
           : Value(returnedAt),
       updatedAt: Value(updatedAt),
       needsPush: Value(needsPush),
+      dueAt: dueAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueAt),
+      borrowerContact: borrowerContact == null && nullToAbsent
+          ? const Value.absent()
+          : Value(borrowerContact),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      reminderSentAt: reminderSentAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderSentAt),
     );
   }
 
@@ -2690,6 +3274,10 @@ class LoansData extends DataClass implements Insertable<LoansData> {
       returnedAt: serializer.fromJson<int?>(json['returnedAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       needsPush: serializer.fromJson<int>(json['needsPush']),
+      dueAt: serializer.fromJson<int?>(json['dueAt']),
+      borrowerContact: serializer.fromJson<String?>(json['borrowerContact']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      reminderSentAt: serializer.fromJson<int?>(json['reminderSentAt']),
     );
   }
   @override
@@ -2703,6 +3291,10 @@ class LoansData extends DataClass implements Insertable<LoansData> {
       'returnedAt': serializer.toJson<int?>(returnedAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'needsPush': serializer.toJson<int>(needsPush),
+      'dueAt': serializer.toJson<int?>(dueAt),
+      'borrowerContact': serializer.toJson<String?>(borrowerContact),
+      'notes': serializer.toJson<String?>(notes),
+      'reminderSentAt': serializer.toJson<int?>(reminderSentAt),
     };
   }
 
@@ -2714,6 +3306,10 @@ class LoansData extends DataClass implements Insertable<LoansData> {
     Value<int?> returnedAt = const Value.absent(),
     int? updatedAt,
     int? needsPush,
+    Value<int?> dueAt = const Value.absent(),
+    Value<String?> borrowerContact = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    Value<int?> reminderSentAt = const Value.absent(),
   }) => LoansData(
     id: id ?? this.id,
     copyId: copyId ?? this.copyId,
@@ -2722,6 +3318,14 @@ class LoansData extends DataClass implements Insertable<LoansData> {
     returnedAt: returnedAt.present ? returnedAt.value : this.returnedAt,
     updatedAt: updatedAt ?? this.updatedAt,
     needsPush: needsPush ?? this.needsPush,
+    dueAt: dueAt.present ? dueAt.value : this.dueAt,
+    borrowerContact: borrowerContact.present
+        ? borrowerContact.value
+        : this.borrowerContact,
+    notes: notes.present ? notes.value : this.notes,
+    reminderSentAt: reminderSentAt.present
+        ? reminderSentAt.value
+        : this.reminderSentAt,
   );
   LoansData copyWithCompanion(LoansCompanion data) {
     return LoansData(
@@ -2734,6 +3338,14 @@ class LoansData extends DataClass implements Insertable<LoansData> {
           : this.returnedAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
+      dueAt: data.dueAt.present ? data.dueAt.value : this.dueAt,
+      borrowerContact: data.borrowerContact.present
+          ? data.borrowerContact.value
+          : this.borrowerContact,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      reminderSentAt: data.reminderSentAt.present
+          ? data.reminderSentAt.value
+          : this.reminderSentAt,
     );
   }
 
@@ -2746,7 +3358,11 @@ class LoansData extends DataClass implements Insertable<LoansData> {
           ..write('loanedAt: $loanedAt, ')
           ..write('returnedAt: $returnedAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('needsPush: $needsPush')
+          ..write('needsPush: $needsPush, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('borrowerContact: $borrowerContact, ')
+          ..write('notes: $notes, ')
+          ..write('reminderSentAt: $reminderSentAt')
           ..write(')'))
         .toString();
   }
@@ -2760,6 +3376,10 @@ class LoansData extends DataClass implements Insertable<LoansData> {
     returnedAt,
     updatedAt,
     needsPush,
+    dueAt,
+    borrowerContact,
+    notes,
+    reminderSentAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -2771,7 +3391,11 @@ class LoansData extends DataClass implements Insertable<LoansData> {
           other.loanedAt == this.loanedAt &&
           other.returnedAt == this.returnedAt &&
           other.updatedAt == this.updatedAt &&
-          other.needsPush == this.needsPush);
+          other.needsPush == this.needsPush &&
+          other.dueAt == this.dueAt &&
+          other.borrowerContact == this.borrowerContact &&
+          other.notes == this.notes &&
+          other.reminderSentAt == this.reminderSentAt);
 }
 
 class LoansCompanion extends UpdateCompanion<LoansData> {
@@ -2782,6 +3406,10 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
   final Value<int?> returnedAt;
   final Value<int> updatedAt;
   final Value<int> needsPush;
+  final Value<int?> dueAt;
+  final Value<String?> borrowerContact;
+  final Value<String?> notes;
+  final Value<int?> reminderSentAt;
   final Value<int> rowid;
   const LoansCompanion({
     this.id = const Value.absent(),
@@ -2791,6 +3419,10 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
     this.returnedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.needsPush = const Value.absent(),
+    this.dueAt = const Value.absent(),
+    this.borrowerContact = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.reminderSentAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LoansCompanion.insert({
@@ -2801,6 +3433,10 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
     this.returnedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.needsPush = const Value.absent(),
+    this.dueAt = const Value.absent(),
+    this.borrowerContact = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.reminderSentAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        copyId = Value(copyId),
@@ -2813,6 +3449,10 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
     Expression<int>? returnedAt,
     Expression<int>? updatedAt,
     Expression<int>? needsPush,
+    Expression<int>? dueAt,
+    Expression<String>? borrowerContact,
+    Expression<String>? notes,
+    Expression<int>? reminderSentAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2823,6 +3463,10 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
       if (returnedAt != null) 'returned_at': returnedAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (needsPush != null) 'needs_push': needsPush,
+      if (dueAt != null) 'due_at': dueAt,
+      if (borrowerContact != null) 'borrower_contact': borrowerContact,
+      if (notes != null) 'notes': notes,
+      if (reminderSentAt != null) 'reminder_sent_at': reminderSentAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2835,6 +3479,10 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
     Value<int?>? returnedAt,
     Value<int>? updatedAt,
     Value<int>? needsPush,
+    Value<int?>? dueAt,
+    Value<String?>? borrowerContact,
+    Value<String?>? notes,
+    Value<int?>? reminderSentAt,
     Value<int>? rowid,
   }) {
     return LoansCompanion(
@@ -2845,6 +3493,10 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
       returnedAt: returnedAt ?? this.returnedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       needsPush: needsPush ?? this.needsPush,
+      dueAt: dueAt ?? this.dueAt,
+      borrowerContact: borrowerContact ?? this.borrowerContact,
+      notes: notes ?? this.notes,
+      reminderSentAt: reminderSentAt ?? this.reminderSentAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2873,6 +3525,18 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
     if (needsPush.present) {
       map['needs_push'] = Variable<int>(needsPush.value);
     }
+    if (dueAt.present) {
+      map['due_at'] = Variable<int>(dueAt.value);
+    }
+    if (borrowerContact.present) {
+      map['borrower_contact'] = Variable<String>(borrowerContact.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (reminderSentAt.present) {
+      map['reminder_sent_at'] = Variable<int>(reminderSentAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2889,6 +3553,316 @@ class LoansCompanion extends UpdateCompanion<LoansData> {
           ..write('returnedAt: $returnedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('needsPush: $needsPush, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('borrowerContact: $borrowerContact, ')
+          ..write('notes: $notes, ')
+          ..write('reminderSentAt: $reminderSentAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class CopyPhotos extends Table with TableInfo<CopyPhotos, CopyPhotosData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  CopyPhotos(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> copyId = GeneratedColumn<String>(
+    'copy_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES physical_copies(id)',
+  );
+  late final GeneratedColumn<String> path = GeneratedColumn<String>(
+    'path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<int> takenAt = GeneratedColumn<int>(
+    'taken_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints:
+        'NOT NULL DEFAULT (CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER))',
+    defaultValue: const CustomExpression(
+      'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)',
+    ),
+  );
+  late final GeneratedColumn<String> caption = GeneratedColumn<String>(
+    'caption',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, copyId, path, takenAt, caption];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'copy_photos';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CopyPhotosData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CopyPhotosData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      copyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}copy_id'],
+      )!,
+      path: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}path'],
+      )!,
+      takenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}taken_at'],
+      )!,
+      caption: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}caption'],
+      ),
+    );
+  }
+
+  @override
+  CopyPhotos createAlias(String alias) {
+    return CopyPhotos(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const ['PRIMARY KEY(id)'];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class CopyPhotosData extends DataClass implements Insertable<CopyPhotosData> {
+  final String id;
+  final String copyId;
+  final String path;
+  final int takenAt;
+  final String? caption;
+  const CopyPhotosData({
+    required this.id,
+    required this.copyId,
+    required this.path,
+    required this.takenAt,
+    this.caption,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['copy_id'] = Variable<String>(copyId);
+    map['path'] = Variable<String>(path);
+    map['taken_at'] = Variable<int>(takenAt);
+    if (!nullToAbsent || caption != null) {
+      map['caption'] = Variable<String>(caption);
+    }
+    return map;
+  }
+
+  CopyPhotosCompanion toCompanion(bool nullToAbsent) {
+    return CopyPhotosCompanion(
+      id: Value(id),
+      copyId: Value(copyId),
+      path: Value(path),
+      takenAt: Value(takenAt),
+      caption: caption == null && nullToAbsent
+          ? const Value.absent()
+          : Value(caption),
+    );
+  }
+
+  factory CopyPhotosData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CopyPhotosData(
+      id: serializer.fromJson<String>(json['id']),
+      copyId: serializer.fromJson<String>(json['copyId']),
+      path: serializer.fromJson<String>(json['path']),
+      takenAt: serializer.fromJson<int>(json['takenAt']),
+      caption: serializer.fromJson<String?>(json['caption']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'copyId': serializer.toJson<String>(copyId),
+      'path': serializer.toJson<String>(path),
+      'takenAt': serializer.toJson<int>(takenAt),
+      'caption': serializer.toJson<String?>(caption),
+    };
+  }
+
+  CopyPhotosData copyWith({
+    String? id,
+    String? copyId,
+    String? path,
+    int? takenAt,
+    Value<String?> caption = const Value.absent(),
+  }) => CopyPhotosData(
+    id: id ?? this.id,
+    copyId: copyId ?? this.copyId,
+    path: path ?? this.path,
+    takenAt: takenAt ?? this.takenAt,
+    caption: caption.present ? caption.value : this.caption,
+  );
+  CopyPhotosData copyWithCompanion(CopyPhotosCompanion data) {
+    return CopyPhotosData(
+      id: data.id.present ? data.id.value : this.id,
+      copyId: data.copyId.present ? data.copyId.value : this.copyId,
+      path: data.path.present ? data.path.value : this.path,
+      takenAt: data.takenAt.present ? data.takenAt.value : this.takenAt,
+      caption: data.caption.present ? data.caption.value : this.caption,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CopyPhotosData(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('path: $path, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('caption: $caption')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, copyId, path, takenAt, caption);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CopyPhotosData &&
+          other.id == this.id &&
+          other.copyId == this.copyId &&
+          other.path == this.path &&
+          other.takenAt == this.takenAt &&
+          other.caption == this.caption);
+}
+
+class CopyPhotosCompanion extends UpdateCompanion<CopyPhotosData> {
+  final Value<String> id;
+  final Value<String> copyId;
+  final Value<String> path;
+  final Value<int> takenAt;
+  final Value<String?> caption;
+  final Value<int> rowid;
+  const CopyPhotosCompanion({
+    this.id = const Value.absent(),
+    this.copyId = const Value.absent(),
+    this.path = const Value.absent(),
+    this.takenAt = const Value.absent(),
+    this.caption = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CopyPhotosCompanion.insert({
+    required String id,
+    required String copyId,
+    required String path,
+    this.takenAt = const Value.absent(),
+    this.caption = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       copyId = Value(copyId),
+       path = Value(path);
+  static Insertable<CopyPhotosData> custom({
+    Expression<String>? id,
+    Expression<String>? copyId,
+    Expression<String>? path,
+    Expression<int>? takenAt,
+    Expression<String>? caption,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (copyId != null) 'copy_id': copyId,
+      if (path != null) 'path': path,
+      if (takenAt != null) 'taken_at': takenAt,
+      if (caption != null) 'caption': caption,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CopyPhotosCompanion copyWith({
+    Value<String>? id,
+    Value<String>? copyId,
+    Value<String>? path,
+    Value<int>? takenAt,
+    Value<String?>? caption,
+    Value<int>? rowid,
+  }) {
+    return CopyPhotosCompanion(
+      id: id ?? this.id,
+      copyId: copyId ?? this.copyId,
+      path: path ?? this.path,
+      takenAt: takenAt ?? this.takenAt,
+      caption: caption ?? this.caption,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (copyId.present) {
+      map['copy_id'] = Variable<String>(copyId.value);
+    }
+    if (path.present) {
+      map['path'] = Variable<String>(path.value);
+    }
+    if (takenAt.present) {
+      map['taken_at'] = Variable<int>(takenAt.value);
+    }
+    if (caption.present) {
+      map['caption'] = Variable<String>(caption.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CopyPhotosCompanion(')
+          ..write('id: $id, ')
+          ..write('copyId: $copyId, ')
+          ..write('path: $path, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('caption: $caption, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3476,8 +4450,32 @@ class PhysicalEnvironments extends Table
       'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)',
     ),
   );
+  late final GeneratedColumn<int> serverRevision = GeneratedColumn<int>(
+    'server_revision',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<int> needsPublish = GeneratedColumn<int>(
+    'needs_publish',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (needs_publish IN (0, 1))',
+    defaultValue: const CustomExpression('0'),
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, sortOrder, createdAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    sortOrder,
+    createdAt,
+    serverRevision,
+    needsPublish,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3508,6 +4506,14 @@ class PhysicalEnvironments extends Table
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
       )!,
+      serverRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_revision'],
+      ),
+      needsPublish: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}needs_publish'],
+      )!,
     );
   }
 
@@ -3528,11 +4534,15 @@ class PhysicalEnvironmentsData extends DataClass
   final String name;
   final int sortOrder;
   final int createdAt;
+  final int? serverRevision;
+  final int needsPublish;
   const PhysicalEnvironmentsData({
     required this.id,
     required this.name,
     required this.sortOrder,
     required this.createdAt,
+    this.serverRevision,
+    required this.needsPublish,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3541,6 +4551,10 @@ class PhysicalEnvironmentsData extends DataClass
     map['name'] = Variable<String>(name);
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<int>(createdAt);
+    if (!nullToAbsent || serverRevision != null) {
+      map['server_revision'] = Variable<int>(serverRevision);
+    }
+    map['needs_publish'] = Variable<int>(needsPublish);
     return map;
   }
 
@@ -3550,6 +4564,10 @@ class PhysicalEnvironmentsData extends DataClass
       name: Value(name),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
+      serverRevision: serverRevision == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverRevision),
+      needsPublish: Value(needsPublish),
     );
   }
 
@@ -3563,6 +4581,8 @@ class PhysicalEnvironmentsData extends DataClass
       name: serializer.fromJson<String>(json['name']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
+      serverRevision: serializer.fromJson<int?>(json['serverRevision']),
+      needsPublish: serializer.fromJson<int>(json['needsPublish']),
     );
   }
   @override
@@ -3573,6 +4593,8 @@ class PhysicalEnvironmentsData extends DataClass
       'name': serializer.toJson<String>(name),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<int>(createdAt),
+      'serverRevision': serializer.toJson<int?>(serverRevision),
+      'needsPublish': serializer.toJson<int>(needsPublish),
     };
   }
 
@@ -3581,11 +4603,17 @@ class PhysicalEnvironmentsData extends DataClass
     String? name,
     int? sortOrder,
     int? createdAt,
+    Value<int?> serverRevision = const Value.absent(),
+    int? needsPublish,
   }) => PhysicalEnvironmentsData(
     id: id ?? this.id,
     name: name ?? this.name,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
+    serverRevision: serverRevision.present
+        ? serverRevision.value
+        : this.serverRevision,
+    needsPublish: needsPublish ?? this.needsPublish,
   );
   PhysicalEnvironmentsData copyWithCompanion(
     PhysicalEnvironmentsCompanion data,
@@ -3595,6 +4623,12 @@ class PhysicalEnvironmentsData extends DataClass
       name: data.name.present ? data.name.value : this.name,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      serverRevision: data.serverRevision.present
+          ? data.serverRevision.value
+          : this.serverRevision,
+      needsPublish: data.needsPublish.present
+          ? data.needsPublish.value
+          : this.needsPublish,
     );
   }
 
@@ -3604,13 +4638,16 @@ class PhysicalEnvironmentsData extends DataClass
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('serverRevision: $serverRevision, ')
+          ..write('needsPublish: $needsPublish')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, sortOrder, createdAt);
+  int get hashCode =>
+      Object.hash(id, name, sortOrder, createdAt, serverRevision, needsPublish);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3618,7 +4655,9 @@ class PhysicalEnvironmentsData extends DataClass
           other.id == this.id &&
           other.name == this.name &&
           other.sortOrder == this.sortOrder &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.serverRevision == this.serverRevision &&
+          other.needsPublish == this.needsPublish);
 }
 
 class PhysicalEnvironmentsCompanion
@@ -3627,12 +4666,16 @@ class PhysicalEnvironmentsCompanion
   final Value<String> name;
   final Value<int> sortOrder;
   final Value<int> createdAt;
+  final Value<int?> serverRevision;
+  final Value<int> needsPublish;
   final Value<int> rowid;
   const PhysicalEnvironmentsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.serverRevision = const Value.absent(),
+    this.needsPublish = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PhysicalEnvironmentsCompanion.insert({
@@ -3640,6 +4683,8 @@ class PhysicalEnvironmentsCompanion
     required String name,
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.serverRevision = const Value.absent(),
+    this.needsPublish = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -3648,6 +4693,8 @@ class PhysicalEnvironmentsCompanion
     Expression<String>? name,
     Expression<int>? sortOrder,
     Expression<int>? createdAt,
+    Expression<int>? serverRevision,
+    Expression<int>? needsPublish,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3655,6 +4702,8 @@ class PhysicalEnvironmentsCompanion
       if (name != null) 'name': name,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
+      if (serverRevision != null) 'server_revision': serverRevision,
+      if (needsPublish != null) 'needs_publish': needsPublish,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3664,6 +4713,8 @@ class PhysicalEnvironmentsCompanion
     Value<String>? name,
     Value<int>? sortOrder,
     Value<int>? createdAt,
+    Value<int?>? serverRevision,
+    Value<int>? needsPublish,
     Value<int>? rowid,
   }) {
     return PhysicalEnvironmentsCompanion(
@@ -3671,6 +4722,8 @@ class PhysicalEnvironmentsCompanion
       name: name ?? this.name,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
+      serverRevision: serverRevision ?? this.serverRevision,
+      needsPublish: needsPublish ?? this.needsPublish,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3690,6 +4743,12 @@ class PhysicalEnvironmentsCompanion
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
+    if (serverRevision.present) {
+      map['server_revision'] = Variable<int>(serverRevision.value);
+    }
+    if (needsPublish.present) {
+      map['needs_publish'] = Variable<int>(needsPublish.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3703,6 +4762,8 @@ class PhysicalEnvironmentsCompanion
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
+          ..write('serverRevision: $serverRevision, ')
+          ..write('needsPublish: $needsPublish, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5849,8 +6910,360 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationsData> {
   }
 }
 
-class DatabaseAtV14 extends GeneratedDatabase {
-  DatabaseAtV14(QueryExecutor e) : super(e);
+class ReadingSessions extends Table
+    with TableInfo<ReadingSessions, ReadingSessionsData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ReadingSessions(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES books(id)',
+  );
+  late final GeneratedColumn<int> startedAt = GeneratedColumn<int>(
+    'started_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<int> endedAt = GeneratedColumn<int>(
+    'ended_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<int> startPage = GeneratedColumn<int>(
+    'start_page',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<int> endPage = GeneratedColumn<int>(
+    'end_page',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    bookId,
+    startedAt,
+    endedAt,
+    startPage,
+    endPage,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reading_sessions';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ReadingSessionsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReadingSessionsData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}started_at'],
+      )!,
+      endedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ended_at'],
+      )!,
+      startPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}start_page'],
+      ),
+      endPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_page'],
+      ),
+    );
+  }
+
+  @override
+  ReadingSessions createAlias(String alias) {
+    return ReadingSessions(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const ['PRIMARY KEY(id)'];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ReadingSessionsData extends DataClass
+    implements Insertable<ReadingSessionsData> {
+  final String id;
+  final String bookId;
+  final int startedAt;
+  final int endedAt;
+  final int? startPage;
+  final int? endPage;
+  const ReadingSessionsData({
+    required this.id,
+    required this.bookId,
+    required this.startedAt,
+    required this.endedAt,
+    this.startPage,
+    this.endPage,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['book_id'] = Variable<String>(bookId);
+    map['started_at'] = Variable<int>(startedAt);
+    map['ended_at'] = Variable<int>(endedAt);
+    if (!nullToAbsent || startPage != null) {
+      map['start_page'] = Variable<int>(startPage);
+    }
+    if (!nullToAbsent || endPage != null) {
+      map['end_page'] = Variable<int>(endPage);
+    }
+    return map;
+  }
+
+  ReadingSessionsCompanion toCompanion(bool nullToAbsent) {
+    return ReadingSessionsCompanion(
+      id: Value(id),
+      bookId: Value(bookId),
+      startedAt: Value(startedAt),
+      endedAt: Value(endedAt),
+      startPage: startPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startPage),
+      endPage: endPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endPage),
+    );
+  }
+
+  factory ReadingSessionsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReadingSessionsData(
+      id: serializer.fromJson<String>(json['id']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      startedAt: serializer.fromJson<int>(json['startedAt']),
+      endedAt: serializer.fromJson<int>(json['endedAt']),
+      startPage: serializer.fromJson<int?>(json['startPage']),
+      endPage: serializer.fromJson<int?>(json['endPage']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bookId': serializer.toJson<String>(bookId),
+      'startedAt': serializer.toJson<int>(startedAt),
+      'endedAt': serializer.toJson<int>(endedAt),
+      'startPage': serializer.toJson<int?>(startPage),
+      'endPage': serializer.toJson<int?>(endPage),
+    };
+  }
+
+  ReadingSessionsData copyWith({
+    String? id,
+    String? bookId,
+    int? startedAt,
+    int? endedAt,
+    Value<int?> startPage = const Value.absent(),
+    Value<int?> endPage = const Value.absent(),
+  }) => ReadingSessionsData(
+    id: id ?? this.id,
+    bookId: bookId ?? this.bookId,
+    startedAt: startedAt ?? this.startedAt,
+    endedAt: endedAt ?? this.endedAt,
+    startPage: startPage.present ? startPage.value : this.startPage,
+    endPage: endPage.present ? endPage.value : this.endPage,
+  );
+  ReadingSessionsData copyWithCompanion(ReadingSessionsCompanion data) {
+    return ReadingSessionsData(
+      id: data.id.present ? data.id.value : this.id,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
+      startPage: data.startPage.present ? data.startPage.value : this.startPage,
+      endPage: data.endPage.present ? data.endPage.value : this.endPage,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingSessionsData(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('startPage: $startPage, ')
+          ..write('endPage: $endPage')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, bookId, startedAt, endedAt, startPage, endPage);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReadingSessionsData &&
+          other.id == this.id &&
+          other.bookId == this.bookId &&
+          other.startedAt == this.startedAt &&
+          other.endedAt == this.endedAt &&
+          other.startPage == this.startPage &&
+          other.endPage == this.endPage);
+}
+
+class ReadingSessionsCompanion extends UpdateCompanion<ReadingSessionsData> {
+  final Value<String> id;
+  final Value<String> bookId;
+  final Value<int> startedAt;
+  final Value<int> endedAt;
+  final Value<int?> startPage;
+  final Value<int?> endPage;
+  final Value<int> rowid;
+  const ReadingSessionsCompanion({
+    this.id = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.endedAt = const Value.absent(),
+    this.startPage = const Value.absent(),
+    this.endPage = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReadingSessionsCompanion.insert({
+    required String id,
+    required String bookId,
+    required int startedAt,
+    required int endedAt,
+    this.startPage = const Value.absent(),
+    this.endPage = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bookId = Value(bookId),
+       startedAt = Value(startedAt),
+       endedAt = Value(endedAt);
+  static Insertable<ReadingSessionsData> custom({
+    Expression<String>? id,
+    Expression<String>? bookId,
+    Expression<int>? startedAt,
+    Expression<int>? endedAt,
+    Expression<int>? startPage,
+    Expression<int>? endPage,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bookId != null) 'book_id': bookId,
+      if (startedAt != null) 'started_at': startedAt,
+      if (endedAt != null) 'ended_at': endedAt,
+      if (startPage != null) 'start_page': startPage,
+      if (endPage != null) 'end_page': endPage,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReadingSessionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bookId,
+    Value<int>? startedAt,
+    Value<int>? endedAt,
+    Value<int?>? startPage,
+    Value<int?>? endPage,
+    Value<int>? rowid,
+  }) {
+    return ReadingSessionsCompanion(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      startedAt: startedAt ?? this.startedAt,
+      endedAt: endedAt ?? this.endedAt,
+      startPage: startPage ?? this.startPage,
+      endPage: endPage ?? this.endPage,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<int>(startedAt.value);
+    }
+    if (endedAt.present) {
+      map['ended_at'] = Variable<int>(endedAt.value);
+    }
+    if (startPage.present) {
+      map['start_page'] = Variable<int>(startPage.value);
+    }
+    if (endPage.present) {
+      map['end_page'] = Variable<int>(endPage.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingSessionsCompanion(')
+          ..write('id: $id, ')
+          ..write('bookId: $bookId, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('startPage: $startPage, ')
+          ..write('endPage: $endPage, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class DatabaseAtV21 extends GeneratedDatabase {
+  DatabaseAtV21(QueryExecutor e) : super(e);
+  late final Series series = Series(this);
   late final Books books = Books(this);
   late final Authors authors = Authors(this);
   late final BookAuthors bookAuthors = BookAuthors(this);
@@ -5859,6 +7272,7 @@ class DatabaseAtV14 extends GeneratedDatabase {
   late final BookFiles bookFiles = BookFiles(this);
   late final PhysicalCopies physicalCopies = PhysicalCopies(this);
   late final Loans loans = Loans(this);
+  late final CopyPhotos copyPhotos = CopyPhotos(this);
   late final Shelves shelves = Shelves(this);
   late final ShelfBooks shelfBooks = ShelfBooks(this);
   late final PhysicalEnvironments physicalEnvironments = PhysicalEnvironments(
@@ -5870,11 +7284,13 @@ class DatabaseAtV14 extends GeneratedDatabase {
   late final RemoteReadingPositions remoteReadingPositions =
       RemoteReadingPositions(this);
   late final Annotations annotations = Annotations(this);
+  late final ReadingSessions readingSessions = ReadingSessions(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    series,
     books,
     authors,
     bookAuthors,
@@ -5883,6 +7299,7 @@ class DatabaseAtV14 extends GeneratedDatabase {
     bookFiles,
     physicalCopies,
     loans,
+    copyPhotos,
     shelves,
     shelfBooks,
     physicalEnvironments,
@@ -5891,7 +7308,8 @@ class DatabaseAtV14 extends GeneratedDatabase {
     localDeletions,
     remoteReadingPositions,
     annotations,
+    readingSessions,
   ];
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 21;
 }
