@@ -65,13 +65,16 @@ is answerable from `git log`:
 | 47 | Publish and fetch physical room layouts | `b15a6d9` |
 | 48 | Rendered room view + public room links | `ef7c8ef` |
 | 49 | Borrow requests on shared physical books | `beab6b7` |
+| 52 | Trash with a 30-day grace before permanent delete | `97ee45b` |
+| 26 | Keyboard shortcuts and a command palette | `40d3062` |
+| 21a | Wishlist for books you don't own yet | `b7b2c98` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
-#14 from the interleave list. What remains is §I's **"interleave anywhere"** set,
-which was never assigned to a phase: #26 (shortcuts), #39 (theming), #42 (a11y
-round two), #9 (content-addressed blobs), #8 (SSE), #29/#30 (physical depth), #38
-(l10n), #40 (Android background), #52 (trash), #53 (send-to-e-reader), and #21a /
-#21c (wishlist, Calibre/CSV/OPDS import). None of them blocks anything.
+#14, #52, #26 and #21a from the "interleave anywhere" list. What remains is the
+rest of that list, which was never assigned to a phase: #39 (theming), #42 (a11y
+round two), #9 (content-addressed blobs), #8 (SSE), #29/#30 (physical depth),
+#38 (l10n), #40 (Android background), #53 (send-to-e-reader) and #21c
+(Calibre/CSV/OPDS import). None of them blocks anything.
 
 *#35's **virtualised table body** is deliberately not built. It was proposed as
 the fix for a DOM holding the whole library — but with search, sort and filters
@@ -92,11 +95,10 @@ take a string literal.
 
 **Phase 6** (§K) is complete: #47, #48, #49, #50 and #51 have all landed — so
 **every numbered item in this plan's six phases is done**.
-Still open from the interleave list: #26 shortcuts, #39 theming, #42 a11y
-round two, #9 content-addressed blobs, #8 SSE, #29/#30, #38 l10n, #40 Android
-background, #52 trash, #53 send-to-e-reader. #21a (wishlist) and #21c (Calibre /
-CSV / OPDS import) are also still open — 21b was taken on its own because §I
-sequences it into Phase 3 while the other two aren't.
+Still open from the interleave list: #39 theming, #42 a11y round two, #9
+content-addressed blobs, #8 SSE, #29/#30, #38 l10n, #40 Android background, #53
+send-to-e-reader, and #21c (Calibre / CSV / OPDS import) — 21b was taken on its
+own because §I sequences it into Phase 3, and 21a has since landed separately.
 
 Two notes for whoever picks this up:
 
@@ -147,6 +149,25 @@ Two notes for whoever picks this up:
 - #21b's merge is the one destructive operation in the app. It moves everything
   in a single transaction, tombstones the loser so the merge propagates, and logs
   what moved; `test/dedupe/merge_service_test.dart` is the contract.
+- **#52's `deletedAt` is app-local and must stay that way** — it is added to the
+  list in `CLAUDE.md` and to `schema_parity.rs`'s doc comment. Trashing does not
+  touch `updatedAt` or `needsPush` (a trashed book is neither dirty nor deleted
+  server-side yet), and the push query excludes it; only the sweep's real delete
+  writes the tombstone. Merge (#21b) and the scanner's undo deliberately still
+  hard-delete: neither is a user removing a book from their library.
+- **#26's `CallbackShortcuts` must sit *above* the focused node**, not below it:
+  a key event walks up from whatever has focus, so `Focus(child:
+  CallbackShortcuts(...))` silently binds nothing. That nesting is also why a
+  focused search box doesn't swallow the bindings. One `LibraryCommand` list in
+  `lib/shortcuts.dart` drives the key map, the palette and the tooltips.
+- **#21a rides `books.status`, and the exclusions stop at the views.** A wanted
+  book is filtered out of `watchAllBooks`, the view-model and `scopeEmpty`, but
+  still syncs like any other row — the wishlist is a fact about you, not about
+  the device. `WishlistService.noteAcquired` is called from
+  `LibraryRepository.attachFile` / `addPhysicalCopy` rather than from the
+  services themselves, so promotion happens wherever ownership actually
+  changes. `SeriesPlace` gained `wanted`/`openGaps` so gap detection can offer a
+  volume once and then stop.
 
 **Status of plan 4:** §A 1–3, §B 4–6, §C 7–10, §D 11–13, §E 16–17 and §F 18 all
 landed. Still open and **carried into this plan unchanged**:
