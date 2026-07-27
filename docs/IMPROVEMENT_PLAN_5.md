@@ -77,7 +77,7 @@ is answerable from `git log`:
 | 8 | Live sync hints over SSE | `2471cb5` |
 | 38 | Localization scaffolding (en)* | `26da8ae` |
 | 29 | Room backdrop, furniture, and measurements | `9295076` |
-| 40 | Android background sync, shortcuts, widget* | `HEAD` |
+| 40 | Android background sync, shortcuts, widget* | `1581448` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
 every item on the "interleave anywhere" list. **Improvement plan 5 is complete:
