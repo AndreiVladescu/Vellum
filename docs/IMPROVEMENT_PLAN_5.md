@@ -71,13 +71,14 @@ is answerable from `git log`:
 | 39 | Appearance: theme, seed colour, shelf material | `d412537` |
 | 42 | A11y round two: keyboard, room summary, announcements | `c28b6da` |
 | 21c | Import from Calibre, CSV, or an OPDS catalog | `5aa90ca` |
+| 53 | Send a book to an e-reader by email | `56287a5` |
+| 30 | Stocktake a shelf against its placements | `d0ce62b` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
 #14, #52, #26 and #21a from the "interleave anywhere" list. What remains is the
 rest of that list, which was never assigned to a phase: #9 (content-addressed
-blobs), #8 (SSE), #29/#30 (physical depth), #38 (l10n), #40 (Android
-background) and #53 (send-to-e-reader). None of them blocks anything, and
-**every item #21 covers is now done**.
+blobs), #8 (SSE), #29 (room realism), #38 (l10n) and #40 (Android background).
+None of them blocks anything, and **every item #21 covers is now done**.
 
 *#35's **virtualised table body** is deliberately not built. It was proposed as
 the fix for a DOM holding the whole library — but with search, sort and filters
@@ -98,10 +99,10 @@ take a string literal.
 
 **Phase 6** (§K) is complete: #47, #48, #49, #50 and #51 have all landed — so
 **every numbered item in this plan's six phases is done**.
-Still open from the interleave list: #9 content-addressed blobs, #8 SSE,
-#29/#30, #38 l10n, #40 Android background and #53 send-to-e-reader. #21 is
-complete: 21b was taken on its own because §I sequences it into Phase 3, and
-21a and 21c landed separately afterwards.
+Still open from the interleave list: #9 content-addressed blobs, #8 SSE, #29
+(room realism — #30, its other half, has landed), #38 l10n and #40 Android
+background. #21 is complete: 21b was taken on its own because §I sequences it
+into Phase 3, and 21a and 21c landed separately afterwards.
 
 Two notes for whoever picks this up:
 
@@ -210,6 +211,23 @@ Two notes for whoever picks this up:
   with far less deployment, and the Atom feed is what servers actually publish.
   Relative hrefs are resolved against the feed they came from at parse time —
   doing it later is how a browser ends up navigating to the wrong host.
+
+- **#53's header says "no schema change" and that was wrong.** The item body
+  asks for *per-user* saved addresses, which is server state by definition, so
+  migration 0021 adds a `send_targets` JSON blob to `app_user`. Server-only,
+  like every other `app_user` column — accounts don't exist in the app's schema,
+  so there is no drift counterpart and no `schema_parity.rs` entry. The other
+  thing worth knowing: `AppError` gained a `BadGateway`, because a relay
+  refusing a message is *actionable by the user* (approve the sender, pick a
+  smaller file) and swallowing it as an internal error would hide the fix.
+- **#30 matches by book, not by copy or placement.** A person walking a shelf
+  identifies a title; asking them to tell two identical copies apart by
+  placement id is asking for a number they cannot see. So two copies of one
+  book here are confirmed together by one sighting — deliberately optimistic,
+  and the alternative would be wrong far more often than right. A scan matching
+  no book in the library is ignored rather than reported: "you own something
+  uncatalogued" is the import flow's problem, and mixing it in would bury the
+  discrepancies a stocktake exists to show.
 
 **Status of plan 4:** §A 1–3, §B 4–6, §C 7–10, §D 11–13, §E 16–17 and §F 18 all
 landed. Still open and **carried into this plan unchanged**:
