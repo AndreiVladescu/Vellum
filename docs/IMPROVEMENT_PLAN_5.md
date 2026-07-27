@@ -73,13 +73,15 @@ is answerable from `git log`:
 | 21c | Import from Calibre, CSV, or an OPDS catalog | `5aa90ca` |
 | 53 | Send a book to an e-reader by email | `56287a5` |
 | 30 | Stocktake a shelf against its placements | `d0ce62b` |
+| 9 | Content-addressed, refcounted blob store | `9540435` |
+| 8 | Live sync hints over SSE | `2471cb5` |
 | 38 | Localization scaffolding (en)* | `26da8ae` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
-#14, #52, #26, #21a and #38 from the "interleave anywhere" list. What remains is
-the rest of that list, which was never assigned to a phase: #9 (content-addressed
-blobs), #8 (SSE), #29 (room realism) and #40 (Android background). None of them
-blocks anything, and **every item #21 covers is now done**.
+#14, #52, #26, #21a, #9, #8 and #38 from the "interleave anywhere" list. What
+remains is the rest of that list, which was never assigned to a phase: **#29**
+(room realism) and **#40** (Android background). Neither blocks anything, and
+**every item #21 covers is now done**.
 
 *#38 ships the **scaffolding plus two migrated areas** (the shelf in `main.dart`
 and the add-book flow), which is what the plan asked for — it says explicitly to
@@ -107,8 +109,8 @@ take a string literal.
 
 **Phase 6** (§K) is complete: #47, #48, #49, #50 and #51 have all landed — so
 **every numbered item in this plan's six phases is done**.
-Still open from the interleave list: #9 content-addressed blobs, #8 SSE, #29
-(room realism — #30, its other half, has landed) and #40 Android background. #21 is complete: 21b was taken on its own because §I sequences it
+Still open from the interleave list: #29 (room realism — #30, its other half, has
+landed) and #40 (Android background). #21 is complete: 21b was taken on its own because §I sequences it
 into Phase 3, and 21a and 21c landed separately afterwards.
 
 Two notes for whoever picks this up:
