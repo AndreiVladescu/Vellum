@@ -186,6 +186,14 @@ async fn main() -> anyhow::Result<()> {
     // Sweep temp files left by uploads a previous run couldn't finish.
     sweep_tmp_files(&state.data_dir.join("files")).await;
 
+    // Move pre-#9 blobs into the content-addressed layout (plan 5 #9). One
+    // shot, marker-guarded, and awaited rather than spawned: it rewrites
+    // `book_file.path`, and serving a download from a path being moved out from
+    // under it would be a self-inflicted 404.
+    if let Err(e) = vellum_server::backfill_content_addressed(&state).await {
+        tracing::warn!("blobs: content-addressed backfill did not finish: {e:?}");
+    }
+
     // The content-search worker (plan 5 #32). Queueing what has no index row
     // yet is what makes switching the feature on retroactive: a server that ran
     // for a year without it catches up here rather than only indexing uploads

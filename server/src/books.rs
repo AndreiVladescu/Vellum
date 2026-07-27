@@ -1153,8 +1153,12 @@ pub async fn delete(
 
     // Blob removal is best-effort and stays after the commit: a failed unlink
     // only leaks a file, it must not roll back the (committed) delete.
+    //
+    // Refcounted since plan 5 #9: blobs are content-addressed, so another book
+    // may legitimately point at the same bytes. Unlinking unconditionally would
+    // delete a file that is still in use — the failure mode this replaces.
     for rel in files.into_iter().chain(cover.flatten()) {
-        let _ = tokio::fs::remove_file(state.data_dir.join(rel)).await;
+        crate::blobs::unlink_if_unreferenced(&state, &rel).await;
     }
     // The title is captured before the row goes, which is the whole point:
     // "who deleted that book?" needs to name the book after it is gone.

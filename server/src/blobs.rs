@@ -331,12 +331,23 @@ pub async fn upload_file(
         return Err(AppError::BadRequest(msg.into()));
     }
 
-    // Promote the temp file to its final name and record it.
-    let rel = format!("files/{file_id}.{ext}");
-    let full = state.data_dir.join(&rel);
-    tokio::fs::rename(&tmp, &full).await.map_err(internal)?;
-
+    // Promote the temp file into its content-addressed home (plan 5 #9).
+    //
+    // The rename only happens when the target is absent: identical bytes are
+    // already on disk, and overwriting them would rewrite a file other rows
+    // point at for no gain. Same-directory rename is atomic, so a reader never
+    // sees a half-written blob.
     let sha = hex::encode(hasher.finalize());
+    let rel = content_addressed_rel(&sha, &ext);
+    let full = state.data_dir.join(&rel);
+    if let Some(parent) = full.parent() {
+        tokio::fs::create_dir_all(parent).await.map_err(internal)?;
+    }
+    if tokio::fs::metadata(&full).await.is_ok() {
+        let _ = tokio::fs::remove_file(&tmp).await;
+    } else {
+        tokio::fs::rename(&tmp, &full).await.map_err(internal)?;
+    }
     sqlx::query(
         "INSERT INTO book_file (id, book_id, format, path, size_bytes, sha256) \
          VALUES (?, ?, ?, ?, ?, ?)",
@@ -1401,6 +1412,176 @@ pub(crate) fn image_mime(bytes: &[u8]) -> Option<&'static str> {
         Sniffed::WebP => Some("image/webp"),
         _ => None,
     }
+}
+
+/// Where a book file with content hash [sha] and extension [ext] lives
+/// (plan 5 #9).
+///
+/// Content-addressed, so the same bytes are stored once no matter how many
+/// books or users reference them: `book_file.sha256` was already computed and
+/// stored on every upload, so the dedupe key existed and was simply unused.
+/// The two-hex-character shard keeps any one directory to a few hundred entries
+/// on a large library rather than tens of thousands, which some filesystems
+/// handle badly and every `ls` handles badly.
+///
+/// **Covers deliberately stay keyed by book id.** A cover is one-per-book by
+/// construction, so content-addressing them would dedupe only identical art
+/// across different books — a small win that would also change `cover_path`,
+/// which travels in the sync payload and is validated by
+/// `books::validate_cover_path`. Not worth a cross-cutting change.
+pub(crate) fn content_addressed_rel(sha: &str, ext: &str) -> String {
+    format!("files/{}/{}.{}", &sha[..2], sha, ext)
+}
+
+/// Moves every pre-#9 book file into the content-addressed layout.
+///
+/// A migration can't do this — SQL cannot move files — so it runs once at
+/// startup, guarded by a marker in `meta`. Three properties make it safe to
+/// run against a live library:
+///
+/// - **Idempotent.** A path already in the new layout is skipped, so an
+///   interrupted run simply continues on the next boot, and the marker is only
+///   a shortcut past work that would otherwise be a no-op.
+/// - **Rehashes rather than trusting `sha256`.** The stored hash is what the
+///   uploader computed; if a blob was ever replaced out of band the two would
+///   disagree, and moving the file to a name that lies about its contents would
+///   bake that in forever.
+/// - **Database last.** The file is copied into place *before* the row is
+///   updated, so a crash between the two leaves a duplicate blob (harmless, and
+///   the orphan sweep finds it) rather than a row pointing at nothing.
+pub async fn backfill_content_addressed(state: &AppState) -> anyhow::Result<u64> {
+    let done: Option<String> = sqlx::query_scalar("SELECT value FROM meta WHERE key = ?")
+        .bind(BLOB_BACKFILL_KEY)
+        .fetch_optional(&state.db)
+        .await?;
+    if done.is_some() {
+        return Ok(0);
+    }
+
+    let rows: Vec<(String, String, String)> =
+        sqlx::query_as("SELECT id, path, format FROM book_file")
+            .fetch_all(&state.db)
+            .await?;
+    let mut moved = 0u64;
+    for (id, rel, format) in rows {
+        if is_content_addressed(&rel) || !is_safe_rel(&rel) {
+            continue;
+        }
+        let from = state.data_dir.join(&rel);
+        let Ok(bytes) = tokio::fs::read(&from).await else {
+            // The row points at nothing; the integrity sweep reports it as a
+            // missing file. Leaving the path alone keeps that report honest.
+            continue;
+        };
+        let sha = hex::encode(Sha256::digest(&bytes));
+        let ext = if format.is_empty() {
+            std::path::Path::new(&rel)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("bin")
+                .to_ascii_lowercase()
+        } else {
+            format.to_ascii_lowercase()
+        };
+        let new_rel = content_addressed_rel(&sha, &ext);
+        let to = state.data_dir.join(&new_rel);
+        if let Some(parent) = to.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        if tokio::fs::metadata(&to).await.is_err() {
+            tokio::fs::rename(&from, &to).await?;
+        }
+        sqlx::query("UPDATE book_file SET path = ?, sha256 = ? WHERE id = ?")
+            .bind(&new_rel)
+            .bind(&sha)
+            .bind(&id)
+            .execute(&state.db)
+            .await?;
+        // The old file is only removed once nothing points at it: two rows may
+        // have shared one pre-#9 blob if it was ever hand-linked.
+        if from != to {
+            unlink_if_unreferenced(state, &rel).await;
+        }
+        moved += 1;
+    }
+
+    sqlx::query("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)")
+        .bind(BLOB_BACKFILL_KEY)
+        .bind(moved.to_string())
+        .execute(&state.db)
+        .await?;
+    if moved > 0 {
+        tracing::info!(moved, "blobs: migrated to the content-addressed layout");
+    }
+    Ok(moved)
+}
+
+const BLOB_BACKFILL_KEY: &str = "blobs.content_addressed";
+
+/// Whether [rel] is one of our own content-addressed file paths.
+///
+/// Stricter than [`is_safe_rel`], and used when *writing* a path into the
+/// database: the traversal guard proves a path can't escape the data dir, this
+/// proves it is a blob we minted rather than any other file inside it.
+pub(crate) fn is_content_addressed(rel: &str) -> bool {
+    let Some(rest) = rel.strip_prefix("files/") else {
+        return false;
+    };
+    let Some((shard, name)) = rest.split_once('/') else {
+        return false;
+    };
+    let Some((sha, ext)) = name.rsplit_once('.') else {
+        return false;
+    };
+    shard.len() == 2
+        && sha.len() == 64
+        && sha.starts_with(shard)
+        && sha
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+        && sha.bytes().all(|b| b.is_ascii_hexdigit())
+        && !ext.is_empty()
+        && ext
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+}
+
+/// Whether any row still points at [rel], so a blob is only unlinked when the
+/// last reference to it goes (plan 5 #9).
+///
+/// Content addressing means two books can legitimately share one file on disk;
+/// deleting either used to take the bytes with it and silently break the other.
+/// Covers are checked too — they are book-id keyed today, but a refcount that
+/// only knew about half the tables would be a trap for whoever changes that.
+pub(crate) async fn blob_is_referenced(
+    db: &sqlx::SqlitePool,
+    rel: &str,
+    excluding_file_id: Option<&str>,
+) -> bool {
+    let files: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM book_file WHERE path = ? AND id IS NOT ?")
+            .bind(rel)
+            .bind(excluding_file_id)
+            .fetch_one(db)
+            .await
+            .unwrap_or(0);
+    if files > 0 {
+        return true;
+    }
+    let covers: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM book WHERE cover_path = ?")
+        .bind(rel)
+        .fetch_one(db)
+        .await
+        .unwrap_or(0);
+    covers > 0
+}
+
+/// Unlinks [rel] only when nothing references it any more.
+pub(crate) async fn unlink_if_unreferenced(state: &AppState, rel: &str) {
+    if blob_is_referenced(&state.db, rel, None).await {
+        return;
+    }
+    let _ = tokio::fs::remove_file(state.data_dir.join(rel)).await;
 }
 
 pub(crate) fn is_safe_rel(rel: &str) -> bool {

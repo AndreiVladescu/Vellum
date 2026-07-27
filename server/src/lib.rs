@@ -45,6 +45,10 @@ pub use throttle::RateLimiter;
 
 /// Re-exported for `main.rs`: the content-search backlog queue and worker
 /// (plan 5 #32).
+/// Re-exported for `main.rs`: the one-shot move of pre-#9 blobs into the
+/// content-addressed layout (plan 5 #9).
+pub use blobs::backfill_content_addressed;
+
 pub use text_index::{
     drain as drain_text_index, enqueue_missing as enqueue_missing_text,
     run_worker as run_text_worker,

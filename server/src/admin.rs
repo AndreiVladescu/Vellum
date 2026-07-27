@@ -82,8 +82,21 @@ pub async fn sweep(
     let mut orphan_blobs = Vec::new();
     let mut orphan_bytes = 0;
     let mut deleted = 0;
-    for sub in ["covers", "files"] {
-        let dir = state.data_dir.join(sub);
+    // `files/` is sharded two hex characters deep since plan 5 #9, so the walk
+    // descends one level there. `covers/` is flat apart from `covers/thumbs/`,
+    // a derived cache with no rows behind it, which stays skipped.
+    let mut dirs: Vec<String> = vec!["covers".to_string(), "files".to_string()];
+    if let Ok(mut shards) = tokio::fs::read_dir(state.data_dir.join("files")).await {
+        while let Ok(Some(shard)) = shards.next_entry().await {
+            let name = shard.file_name().to_string_lossy().to_string();
+            let is_shard = name.len() == 2 && name.bytes().all(|b| b.is_ascii_hexdigit());
+            if is_shard && shard.file_type().await.map(|t| t.is_dir()).unwrap_or(false) {
+                dirs.push(format!("files/{name}"));
+            }
+        }
+    }
+    for sub in dirs {
+        let dir = state.data_dir.join(&sub);
         let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
             continue;
         };
@@ -97,7 +110,7 @@ pub async fn sweep(
             let Ok(kind) = entry.file_type().await else {
                 continue;
             };
-            // `covers/thumbs/` is a derived cache with no rows behind it.
+            // Shard directories are walked in their own pass above.
             if kind.is_dir() {
                 continue;
             }
