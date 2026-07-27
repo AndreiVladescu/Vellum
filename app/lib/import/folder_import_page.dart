@@ -5,9 +5,13 @@ import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
+import 'calibre_import.dart';
+import 'catalog_entry.dart';
+import 'csv_import.dart';
 import 'filename_metadata.dart';
 import 'folder_import_service.dart';
 import 'import_plan.dart';
+import 'opds_browser_page.dart';
 
 /// The bulk folder import wizard (plan 5 #15): pick a folder, review what the
 /// import *would* do, then run it.
@@ -93,6 +97,78 @@ class _FolderImportPageState extends State<FolderImportPage> {
     final picked = await getDirectoryPath(confirmButtonText: 'Scan');
     if (picked == null) return;
     await _scan(picked);
+  }
+
+  // ---- External catalogues (plan 5 #21c) ----------------------------------
+
+  /// Reads rows from an external catalogue into the same review table a folder
+  /// scan produces. [read] does the source-specific part and everything after
+  /// it is shared.
+  Future<void> _scanCatalog(
+    Future<List<CatalogEntry>> Function() read, {
+    required String sourceLabel,
+  }) async {
+    setState(() {
+      _folder = null;
+      _phase = _Phase.scanning;
+      _cancelRequested = false;
+      _progress = (done: 0, total: 0, label: sourceLabel);
+    });
+    List<CatalogEntry> entries;
+    try {
+      entries = await read();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _phase = _Phase.pick);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    if (!mounted) return;
+    final plan = await _service.scanEntries(
+      entries,
+      onProgress: (done, total, label) {
+        if (mounted) {
+          setState(() => _progress = (done: done, total: total, label: label));
+        }
+      },
+      isCancelled: () async => _cancelRequested,
+    );
+    if (!mounted) return;
+    _applyPlan(plan);
+  }
+
+  Future<void> _pickCalibreLibrary() async {
+    final picked = await getDirectoryPath(confirmButtonText: 'Read');
+    if (picked == null) return;
+    await _scanCatalog(
+      () => CalibreImport.read(Directory(picked)),
+      sourceLabel: 'Reading the Calibre catalogue…',
+    );
+  }
+
+  Future<void> _pickCatalogFile() async {
+    const group = XTypeGroup(
+      label: 'Catalogues',
+      extensions: ['csv', 'json', 'txt'],
+    );
+    final picked = await openFile(acceptedTypeGroups: const [group]);
+    if (picked == null) return;
+    await _scanCatalog(
+      () => CsvImport.readFile(File(picked.path)),
+      sourceLabel: 'Reading the catalogue file…',
+    );
+  }
+
+  Future<void> _browseOpds() async {
+    final entries = await Navigator.of(context).push<List<CatalogEntry>>(
+      MaterialPageRoute(builder: (_) => const OpdsBrowserPage()),
+    );
+    if (entries == null || entries.isEmpty || !mounted) return;
+    await _scanCatalog(
+      () async => entries,
+      sourceLabel: 'Checking what you already have…',
+    );
   }
 
   Future<void> _scan(String path) async {
@@ -195,7 +271,12 @@ class _FolderImportPageState extends State<FolderImportPage> {
         ],
       ),
       body: switch (_phase) {
-        _Phase.pick => _PickStep(onPick: _pickFolder),
+        _Phase.pick => _PickStep(
+            onPick: _pickFolder,
+            onCalibre: _pickCalibreLibrary,
+            onCatalogFile: _pickCatalogFile,
+            onOpds: _browseOpds,
+          ),
         _Phase.scanning => _BusyStep(
             title: _isShare
                 ? 'Checking the shared files…'
@@ -444,43 +525,102 @@ class _FolderImportPageState extends State<FolderImportPage> {
   }
 }
 
+/// Where the books are coming from (plan 5 #21c).
+///
+/// All four routes converge on the same review table, which is the whole point
+/// of the shared pipeline: whatever you import, you see what it would do before
+/// it does it.
 class _PickStep extends StatelessWidget {
-  const _PickStep({required this.onPick});
+  const _PickStep({
+    required this.onPick,
+    required this.onCalibre,
+    required this.onCatalogFile,
+    required this.onOpds,
+  });
 
   final VoidCallback onPick;
+  final VoidCallback onCalibre;
+  final VoidCallback onCatalogFile;
+  final VoidCallback onOpds;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: ListView(
+          shrinkWrap: true,
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.folder_open, size: 56),
-              const SizedBox(height: 16),
-              Text('Add a folder of books',
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              const Text(
-                'Vellum looks for PDFs and EPUBs, including inside subfolders, '
-                'and shows you what it found before importing anything.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: onPick,
-                icon: const Icon(Icons.folder_open),
-                label: const Text('Choose folder…'),
-              ),
-            ],
-          ),
+          children: [
+            const Icon(Icons.library_add_outlined, size: 56),
+            const SizedBox(height: 16),
+            Text('Where are your books?',
+                style: theme.textTheme.headlineSmall,
+                textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(
+              'Whichever you choose, Vellum shows you what it found — and what '
+              'it thinks you already have — before importing anything.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 24),
+            _SourceTile(
+              icon: Icons.folder_open,
+              title: 'A folder of files',
+              subtitle: 'PDFs and EPUBs, including subfolders',
+              onTap: onPick,
+            ),
+            _SourceTile(
+              icon: Icons.local_library_outlined,
+              title: 'A Calibre library',
+              subtitle: 'Keeps your titles, authors, series, tags and covers',
+              onTap: onCalibre,
+            ),
+            _SourceTile(
+              icon: Icons.table_chart_outlined,
+              title: 'A CSV or JSON catalogue',
+              subtitle: 'Including an export from the Vellum console',
+              onTap: onCatalogFile,
+            ),
+            _SourceTile(
+              icon: Icons.rss_feed,
+              title: 'An OPDS catalogue',
+              subtitle: 'Browse another server and pull what you want',
+              onTap: onOpds,
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _SourceTile extends StatelessWidget {
+  const _SourceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ListTile(
+          leading: Icon(icon),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: onTap,
+        ),
+      );
 }
 
 class _BusyStep extends StatelessWidget {

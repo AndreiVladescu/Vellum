@@ -7,6 +7,7 @@ import 'package:drift/drift.dart' show Value;
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import 'catalog_entry.dart';
 import 'filename_metadata.dart';
 import 'import_plan.dart';
 
@@ -194,6 +195,57 @@ class FolderImportService {
     return candidates;
   }
 
+  /// The dry run over rows from an external catalogue (plan 5 #21c).
+  ///
+  /// Same duplicate check and same review table as a folder scan — that is the
+  /// point of converging on [CatalogEntry] first. Entries that bring a file are
+  /// hashed (so re-importing a Calibre library you already imported reports
+  /// duplicates rather than doubling it); metadata-only entries skip straight
+  /// to the title/author/ISBN heuristics, which is all there is to go on.
+  Future<List<ImportCandidate>> scanEntries(
+    List<CatalogEntry> entries, {
+    ImportProgress? onProgress,
+    Future<bool> Function()? isCancelled,
+  }) async {
+    final library = await libraryFingerprint();
+    final candidates = <ImportCandidate>[];
+    for (var i = 0; i < entries.length; i++) {
+      if (await isCancelled?.call() ?? false) break;
+      final entry = entries[i];
+      onProgress?.call(i, entries.length, entry.title);
+      String? hash;
+      String? error;
+      var size = 0;
+      final path = entry.filePath;
+      if (path != null) {
+        try {
+          final file = File(path);
+          size = await file.length();
+          hash = await sha256OfFile(file);
+        } catch (e) {
+          // The catalogue names a file that isn't there — a moved Calibre
+          // library, most often. Say so on the row rather than dropping it.
+          error = 'file not readable: $e';
+        }
+      } else {
+        // Nothing to read, so nothing to yield to; keep the progress callback
+        // responsive over a long metadata-only import.
+        await Future<void>.delayed(Duration.zero);
+      }
+      candidates.add(classify(
+        path: path ?? entry.title,
+        sizeBytes: size,
+        format: path == null ? '' : _formatOf(path),
+        sha256: hash,
+        library: library,
+        entry: entry,
+        error: error,
+      ));
+    }
+    onProgress?.call(entries.length, entries.length, '');
+    return candidates;
+  }
+
   /// Creates a book per candidate and attaches its file.
   ///
   /// Each row is independent: a failure is recorded and the run continues, the
@@ -217,17 +269,20 @@ class FolderImportService {
       final c = candidates[i];
       onProgress?.call(i, candidates.length, c.meta.title ?? filenameStem(c.path));
       try {
-        final bookId = await repository.createCustomBook(
-          title: c.meta.title ?? filenameStem(c.path),
-          author: c.meta.authors.isEmpty ? null : c.meta.authors.join(', '),
-          publishedYear: c.meta.year,
-        );
-        if (c.meta.publisher != null) {
-          await (repository.db.update(repository.db.books)
-                ..where((b) => b.id.equals(bookId)))
-              .write(BooksCompanion(publisher: Value(c.meta.publisher)));
+        final bookId = await _createBook(c);
+        // A catalogue row may bring no file at all (a CSV export describes
+        // books whose bytes live elsewhere); that is a complete import, not a
+        // failure, so the attach is conditional rather than assumed.
+        final file = c.entry?.filePath ?? (c.entry == null ? c.path : null);
+        if (file != null) await repository.attachFile(bookId, file);
+        final cover = c.entry?.coverPath;
+        if (cover != null) {
+          try {
+            await repository.setCoverFromFile(bookId, cover);
+          } catch (_) {
+            // A missing or unreadable cover must not lose the book.
+          }
         }
-        await repository.attachFile(bookId, c.path);
         outcomes.add(ImportOutcome(path: c.path, bookId: bookId));
       } catch (e) {
         outcomes.add(ImportOutcome(path: c.path, error: '$e'));
@@ -235,6 +290,47 @@ class FolderImportService {
     }
     onProgress?.call(candidates.length, candidates.length, '');
     return ImportReport(outcomes: outcomes, cancelled: cancelled);
+  }
+
+  /// Creates the book row for one candidate.
+  ///
+  /// A catalogue entry (plan 5 #21c) states far more than a file name can
+  /// guess, so everything it carries is written: ISBN and description make the
+  /// book immediately useful without an online lookup, and series and genres
+  /// are the two things a Calibre user would most notice losing.
+  Future<String> _createBook(ImportCandidate c) async {
+    final entry = c.entry;
+    final db = repository.db;
+    final bookId = await repository.createCustomBook(
+      title: entry?.title ?? c.meta.title ?? filenameStem(c.path),
+      author: (entry?.authors ?? c.meta.authors).isEmpty
+          ? null
+          : (entry?.authors ?? c.meta.authors).join(', '),
+      publishedYear: entry?.year ?? c.meta.year,
+      description: entry?.description,
+    );
+    final publisher = entry?.publisher ?? c.meta.publisher;
+    if (publisher != null || entry != null) {
+      await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+        BooksCompanion(
+          publisher: Value(publisher),
+          subtitle: Value(entry?.subtitle),
+          isbn: Value(entry?.isbn),
+          pageCount: Value(entry?.pageCount),
+        ),
+      );
+    }
+    if (entry != null) {
+      if (entry.genres.isNotEmpty) {
+        await repository.setGenres(bookId, entry.genres);
+      }
+      final series = entry.series;
+      if (series != null && series.trim().isNotEmpty) {
+        await repository.seriesService
+            .setSeries(bookId, series, entry.seriesIndex);
+      }
+    }
+    return bookId;
   }
 
   /// Fills in online metadata for books imported from file names, one at a time

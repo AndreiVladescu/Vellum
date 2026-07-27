@@ -1,3 +1,4 @@
+import 'catalog_entry.dart';
 import 'filename_metadata.dart';
 
 /// What an import would do with one file — decided **before** anything is
@@ -47,6 +48,7 @@ class ImportCandidate {
     this.matchedBookId,
     this.matchedTitle,
     this.error,
+    this.entry,
   });
 
   final String path;
@@ -69,6 +71,12 @@ class ImportCandidate {
 
   final String? error;
 
+  /// What an external catalogue said about this book (plan 5 #21c), when the
+  /// row came from one. Null for a plain folder import, where [meta] — a guess
+  /// from the file name — is all there is. When present it wins: a source that
+  /// states the title has no reason to defer to a parse of the file name.
+  final CatalogEntry? entry;
+
   /// Whether this row is imported by default. Duplicates are deselected but
   /// still shown — "nothing happened to 200 of my files" is worse than a list.
   bool get selectedByDefault => status == ImportStatus.newBook;
@@ -89,6 +97,7 @@ class ImportCandidate {
         matchedBookId: matchedBookId ?? this.matchedBookId,
         matchedTitle: matchedTitle ?? this.matchedTitle,
         error: error,
+        entry: entry,
       );
 }
 
@@ -127,9 +136,20 @@ ImportCandidate classify({
   required List<LibraryFingerprint> library,
   String? isbn,
   String? error,
+  CatalogEntry? entry,
 }) {
-  final meta = parseFilename(filenameStem(path));
-  if (sha256 == null) {
+  // A catalogue's own statement beats a parse of the file name — that is the
+  // whole reason to read Calibre rather than its folder (plan 5 #21c). It also
+  // supplies the ISBN, which makes the decisive arm below live rather than
+  // dormant for these sources.
+  final meta = entry?.asFilenameMeta ?? parseFilename(filenameStem(path));
+  isbn ??= entry?.isbn;
+  // A catalogue row may legitimately bring no file (a CSV export describes
+  // books whose bytes are elsewhere), so "no hash" there means "nothing to
+  // hash", not "unreadable". A row that *does* name a file and still has no
+  // hash is the error case this guard is for.
+  final expectsFile = entry == null || entry.filePath != null;
+  if (sha256 == null && expectsFile) {
     return ImportCandidate(
       path: path,
       sizeBytes: sizeBytes,
@@ -137,11 +157,12 @@ ImportCandidate classify({
       meta: meta,
       status: ImportStatus.skip,
       error: error ?? 'unreadable',
+      entry: entry,
     );
   }
 
   for (final book in library) {
-    if (book.fileHashes.contains(sha256)) {
+    if (sha256 != null && book.fileHashes.contains(sha256)) {
       return ImportCandidate(
         path: path,
         sizeBytes: sizeBytes,
@@ -151,6 +172,7 @@ ImportCandidate classify({
         sha256: sha256,
         matchedBookId: book.bookId,
         matchedTitle: book.title,
+        entry: entry,
       );
     }
   }
@@ -171,6 +193,7 @@ ImportCandidate classify({
           sha256: sha256,
           matchedBookId: book.bookId,
           matchedTitle: book.title,
+          entry: entry,
         );
       }
     }
@@ -203,6 +226,7 @@ ImportCandidate classify({
         sha256: sha256,
         matchedBookId: book.bookId,
         matchedTitle: book.title,
+        entry: entry,
       );
     }
   }
@@ -214,6 +238,7 @@ ImportCandidate classify({
     meta: meta,
     status: ImportStatus.newBook,
     sha256: sha256,
+    entry: entry,
   );
 }
 
