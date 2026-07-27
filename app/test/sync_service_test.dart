@@ -665,6 +665,58 @@ void main() {
     expect((await repo.watchBook('dirty').first)?.needsPush, false);
   });
 
+  test('a trashed book never pushes, and pushes as a deletion once swept',
+      () async {
+    // Plan 5 #52's sync interplay: during the grace period the book is neither
+    // dirty nor deleted as far as the server is concerned, so the push must say
+    // nothing about it at all. Only the sweep turns it into a real deletion.
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db
+        .into(db.books)
+        .insert(BooksCompanion.insert(id: 'trashed', title: 'Trashed'));
+    await repo.trashBook('trashed');
+
+    final pushed = <String>[];
+    final deleted = <String>[];
+    VellumServerClient clientFor() => _client((req) async {
+          final path = req.url.path;
+          if (req.method == 'PUT' &&
+              path.startsWith('/api/books/') &&
+              !path.endsWith('/cover')) {
+            pushed.add(path.split('/').last);
+            return http.Response('{}', 200);
+          }
+          if (req.method == 'DELETE' && path.startsWith('/api/books/')) {
+            deleted.add(path.split('/').last);
+            return http.Response('', 204);
+          }
+          if (req.method == 'GET' && path == '/api/deletions') {
+            return http.Response('[]', 200);
+          }
+          if (req.method == 'GET' && path == '/api/shelves') return _noShelves();
+          if (req.method == 'GET' && path == '/api/copies') return _noCopies();
+          if (req.method == 'GET' && path == '/api/loans') return _noLoans();
+          return http.Response('[]', 200);
+        });
+
+    final report = await SyncService(repo).push(clientFor());
+    expect(pushed, isEmpty, reason: 'the server hears nothing about it yet');
+    expect(deleted, isEmpty, reason: 'and it is not a deletion yet either');
+    expect(report.pushed, 0);
+    expect(await db.select(db.books).get(), hasLength(1),
+        reason: 'still recoverable locally');
+
+    // Age it past the grace period and sweep: now it becomes a real deletion.
+    await repo.trash.sweep(
+      now: DateTime.now().add(TrashService.graceperiod * 2),
+    );
+    await SyncService(repo).push(clientFor());
+    expect(deleted, ['trashed']);
+    expect(await db.select(db.localDeletions).get(), isEmpty,
+        reason: 'tombstone cleared once the server was told');
+  });
+
   test('pull clears the dirty flag on adopted books', () async {
     final repo = await _repo(dir);
     final db = repo.db;

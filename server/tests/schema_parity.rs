@@ -5,9 +5,10 @@
 //! for the tables that sync over REST.
 //!
 //! App-local-only columns/tables (reading state, reader_notes, source_metadata,
-//! the physical-layout tables, local_deletions) are intentionally NOT part of
-//! the server schema, so they don't appear here. `book.owner_id` is the mirror
-//! image: a server-only column, present here but not in the app.
+//! deleted_at — the trash's grace period, plan 5 #52 — the physical-layout
+//! tables, local_deletions) are intentionally NOT part of the server schema, so
+//! they don't appear here. `book.owner_id` is the mirror image: a server-only
+//! column, present here but not in the app.
 //!
 //! `reading_progress` (migration 0011, plan 5 #5) is excluded on purpose, not by
 //! oversight: it is a per-(book, user, device) channel with no column-for-column

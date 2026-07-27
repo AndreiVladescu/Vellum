@@ -24,8 +24,9 @@ depend on the server being reachable.
 
 Exception: a few `book` columns are **app-local-only by design** and must NOT be
 added to the server schema or sync payloads — reading state, `readerNotes`
-(personal), and `sourceMetadata` (the import snapshot behind "revert to
-defaults"). This still holds after plan 5 #5: reading *position* can now be
+(personal), `sourceMetadata` (the import snapshot behind "revert to
+defaults"), and `deletedAt` (the trash's grace period, plan 5 #52: a trashed
+book is hidden locally and *not* deleted anywhere until the sweep runs). This still holds after plan 5 #5: reading *position* can now be
 mirrored through a separate, opt-in, per-device `reading_progress` table
 (`server/src/reading.rs`), which never touches the `book` row or its payload.
 `readerNotes` and `sourceMetadata` have no channel at all.

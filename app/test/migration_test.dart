@@ -190,7 +190,14 @@ void main() {
   // To add a version: bump schemaVersion, write the migration, then run
   //   dart run drift_dev schema dump lib/data/database.dart test/drift_schemas
   //   dart run drift_dev schema generate test/drift_schemas \
-  //     test/generated/drift_schema_versions --data-classes --companions
+  //     test/generated/drift_schema_versions
+  //
+  // Do NOT pass --data-classes / --companions. The verifier only ever asks a
+  // snapshot to *create* its tables and then diffs `sqlite_schema`; it never
+  // calls `map()`, so those flags add a data class and a companion per table
+  // per version — 84k lines of dead code across 20 snapshots — and regenerate
+  // every existing file in the process, burying the one real change. This
+  // comment said otherwise until 2026-07-27, and the churn duly happened.
   group('every historical schema version migrates cleanly to the latest', () {
     final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
     final latest = versions.GeneratedHelper.versions.last;

@@ -513,6 +513,17 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -542,6 +553,7 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     startedAt,
     finishedAt,
     readCount,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -745,6 +757,12 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         readCount.isAcceptableOrUnknown(data['read_count']!, _readCountMeta),
       );
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -862,6 +880,10 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.int,
         data['${effectivePrefix}read_count'],
       )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -903,6 +925,19 @@ class Book extends DataClass implements Insertable<Book> {
 
   /// How many times this book has been finished, for re-reads.
   final int readCount;
+
+  /// When this book was moved to the trash, or null for a live book.
+  ///
+  /// **App-local, and deliberately so.** A trashed book is not deleted — no
+  /// tombstone is written, its files stay on disk, and the server is told
+  /// nothing — it is only hidden here until the grace period expires and the
+  /// real delete runs. Mirroring the column would make one device's second
+  /// thoughts another device's deletion, which is the opposite of the point.
+  ///
+  /// Everything that reads the library filters on `deleted_at IS NULL`;
+  /// [LibraryQueries] does it centrally for the shelf, and the push side
+  /// skips trashed rows so a book on its way out never reaches the server.
+  final DateTime? deletedAt;
   const Book({
     required this.id,
     required this.title,
@@ -931,6 +966,7 @@ class Book extends DataClass implements Insertable<Book> {
     this.startedAt,
     this.finishedAt,
     required this.readCount,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1000,6 +1036,9 @@ class Book extends DataClass implements Insertable<Book> {
       map['finished_at'] = Variable<DateTime>(finishedAt);
     }
     map['read_count'] = Variable<int>(readCount);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -1068,6 +1107,9 @@ class Book extends DataClass implements Insertable<Book> {
           ? const Value.absent()
           : Value(finishedAt),
       readCount: Value(readCount),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -1104,6 +1146,7 @@ class Book extends DataClass implements Insertable<Book> {
       startedAt: serializer.fromJson<DateTime?>(json['startedAt']),
       finishedAt: serializer.fromJson<DateTime?>(json['finishedAt']),
       readCount: serializer.fromJson<int>(json['readCount']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -1137,6 +1180,7 @@ class Book extends DataClass implements Insertable<Book> {
       'startedAt': serializer.toJson<DateTime?>(startedAt),
       'finishedAt': serializer.toJson<DateTime?>(finishedAt),
       'readCount': serializer.toJson<int>(readCount),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -1168,6 +1212,7 @@ class Book extends DataClass implements Insertable<Book> {
     Value<DateTime?> startedAt = const Value.absent(),
     Value<DateTime?> finishedAt = const Value.absent(),
     int? readCount,
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => Book(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -1202,6 +1247,7 @@ class Book extends DataClass implements Insertable<Book> {
     startedAt: startedAt.present ? startedAt.value : this.startedAt,
     finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
     readCount: readCount ?? this.readCount,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   Book copyWithCompanion(BooksCompanion data) {
     return Book(
@@ -1254,6 +1300,7 @@ class Book extends DataClass implements Insertable<Book> {
           ? data.finishedAt.value
           : this.finishedAt,
       readCount: data.readCount.present ? data.readCount.value : this.readCount,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -1286,7 +1333,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('rating: $rating, ')
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
-          ..write('readCount: $readCount')
+          ..write('readCount: $readCount, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
@@ -1320,6 +1368,7 @@ class Book extends DataClass implements Insertable<Book> {
     startedAt,
     finishedAt,
     readCount,
+    deletedAt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1351,7 +1400,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.rating == this.rating &&
           other.startedAt == this.startedAt &&
           other.finishedAt == this.finishedAt &&
-          other.readCount == this.readCount);
+          other.readCount == this.readCount &&
+          other.deletedAt == this.deletedAt);
 }
 
 class BooksCompanion extends UpdateCompanion<Book> {
@@ -1382,6 +1432,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<DateTime?> startedAt;
   final Value<DateTime?> finishedAt;
   final Value<int> readCount;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const BooksCompanion({
     this.id = const Value.absent(),
@@ -1411,6 +1462,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.startedAt = const Value.absent(),
     this.finishedAt = const Value.absent(),
     this.readCount = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BooksCompanion.insert({
@@ -1441,6 +1493,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.startedAt = const Value.absent(),
     this.finishedAt = const Value.absent(),
     this.readCount = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -1472,6 +1525,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<DateTime>? startedAt,
     Expression<DateTime>? finishedAt,
     Expression<int>? readCount,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1502,6 +1556,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (startedAt != null) 'started_at': startedAt,
       if (finishedAt != null) 'finished_at': finishedAt,
       if (readCount != null) 'read_count': readCount,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1534,6 +1589,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<DateTime?>? startedAt,
     Value<DateTime?>? finishedAt,
     Value<int>? readCount,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return BooksCompanion(
@@ -1564,6 +1620,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
       startedAt: startedAt ?? this.startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
       readCount: readCount ?? this.readCount,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1652,6 +1709,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (readCount.present) {
       map['read_count'] = Variable<int>(readCount.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1688,6 +1748,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
           ..write('readCount: $readCount, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8799,6 +8860,7 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<DateTime?> startedAt,
       Value<DateTime?> finishedAt,
       Value<int> readCount,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$BooksTableUpdateCompanionBuilder =
@@ -8830,6 +8892,7 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<DateTime?> startedAt,
       Value<DateTime?> finishedAt,
       Value<int> readCount,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -9121,6 +9184,11 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<int> get readCount => $composableBuilder(
     column: $table.readCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9462,6 +9530,11 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$SeriesTableOrderingComposer get seriesId {
     final $$SeriesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9594,6 +9667,9 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<int> get readCount =>
       $composableBuilder(column: $table.readCount, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 
   $$SeriesTableAnnotationComposer get seriesId {
     final $$SeriesTableAnnotationComposer composer = $composerBuilder(
@@ -9858,6 +9934,7 @@ class $$BooksTableTableManager
                 Value<DateTime?> startedAt = const Value.absent(),
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<int> readCount = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion(
                 id: id,
@@ -9887,6 +9964,7 @@ class $$BooksTableTableManager
                 startedAt: startedAt,
                 finishedAt: finishedAt,
                 readCount: readCount,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9918,6 +9996,7 @@ class $$BooksTableTableManager
                 Value<DateTime?> startedAt = const Value.absent(),
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<int> readCount = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion.insert(
                 id: id,
@@ -9947,6 +10026,7 @@ class $$BooksTableTableManager
                 startedAt: startedAt,
                 finishedAt: finishedAt,
                 readCount: readCount,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -48,6 +48,11 @@ Future<void> main() async {
   // the app look broken once a day. It also never throws — see `runIfDue`.
   unawaited(BackupScheduler(repository: repository, settings: settings)
       .runIfDue());
+  // Expire the trash (plan 5 #52). Not awaited, for the same reason as the
+  // backup above: the books involved are already invisible, so nothing on the
+  // first frame depends on the sweep having run. It swallows its own errors —
+  // a file the OS won't release just waits for the next launch.
+  unawaited(repository.trash.sweep());
   runApp(VellumApp(
     repository: repository,
     profile: profile,

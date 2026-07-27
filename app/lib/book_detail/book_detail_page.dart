@@ -496,18 +496,22 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     foregroundColor: theme.colorScheme.error,
                   ),
                   onPressed: () async {
-                    // Capture the navigator now: deleting the book makes the
-                    // parent StreamBuilder emit null and unmount this widget,
-                    // so `context` would no longer be mounted to pop with.
+                    // Capture both now: trashing the book makes the parent
+                    // StreamBuilder emit null and unmount this widget, so
+                    // `context` would no longer be mounted to pop or to show
+                    // the undo snackbar with.
                     final navigator = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (dialogContext) => AlertDialog(
-                        title: Text('Remove “${book.title}”?'),
-                        content: const Text(
-                          'This deletes the book, its downloaded cover, and '
-                          'any attached files from your library. There is no '
-                          'undo.',
+                        title: Text('Move “${book.title}” to the trash?'),
+                        content: Text(
+                          'It leaves your shelf now and is deleted for good '
+                          'after ${TrashService.graceperiod.inDays} days. '
+                          'Until then you can restore it from '
+                          'Preferences → Trash — its cover and files are '
+                          'kept.',
                         ),
                         actions: [
                           TextButton(
@@ -523,17 +527,29 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                             ),
                             onPressed: () =>
                                 Navigator.of(dialogContext).pop(true),
-                            child: const Text('Remove'),
+                            child: const Text('Move to trash'),
                           ),
                         ],
                       ),
                     );
                     if (confirmed != true) return;
-                    await repository.deleteBook(book);
+                    await repository.trashBook(book.id);
                     navigator.pop();
+                    // The grace period makes an in-place undo cheap and
+                    // honest: restoring is one column write, not a restore
+                    // from backup.
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text('“${book.title}” moved to the trash'),
+                        action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () => repository.restoreBook(book.id),
+                        ),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('Remove from library'),
+                  label: const Text('Move to trash'),
                 ),
               ),
             ],
