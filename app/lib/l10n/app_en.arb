@@ -1,0 +1,150 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Vellum",
+  "@appTitle": {
+    "description": "The application name. Not translated."
+  },
+
+  "searchHint": "Search your library…",
+  "@searchHint": {
+    "description": "Placeholder in the shelf's search field."
+  },
+
+  "shelfAll": "All",
+  "@shelfAll": {
+    "description": "The chip selecting every book rather than one shelf."
+  },
+
+  "shelfNew": "New shelf",
+  "@shelfNew": {
+    "description": "Chip that creates a new custom shelf."
+  },
+
+  "addBook": "Add book",
+  "@addBook": {
+    "description": "Primary action on the shelf."
+  },
+
+  "scanBarcode": "Scan an ISBN barcode",
+  "@scanBarcode": {
+    "description": "Tooltip on the barcode-scanning button."
+  },
+
+  "shelfEmptyTitle": "Your shelf is empty",
+  "@shelfEmptyTitle": {},
+
+  "shelfEmptyBody": "Add your first book to see it here.",
+  "@shelfEmptyBody": {},
+
+  "customShelfEmptyTitle": "This shelf is empty",
+  "@customShelfEmptyTitle": {},
+
+  "customShelfEmptyBody": "Add books to it from their detail page.",
+  "@customShelfEmptyBody": {},
+
+  "importFolder": "Import a folder",
+  "@importFolder": {},
+
+  "clearSearchAndFilters": "Clear search and filters",
+  "@clearSearchAndFilters": {},
+
+  "noBooksMatch": "No books match “{query}”.",
+  "@noBooksMatch": {
+    "description": "Empty state when a text search matches nothing.",
+    "placeholders": { "query": { "type": "String" } }
+  },
+
+  "noBooksInGenre": "No books tagged “{genre}”.",
+  "@noBooksInGenre": {
+    "placeholders": { "genre": { "type": "String" } }
+  },
+
+  "noBooksInGenreMatch": "No “{genre}” books match “{query}”.",
+  "@noBooksInGenreMatch": {
+    "placeholders": {
+      "genre": { "type": "String" },
+      "query": { "type": "String" }
+    }
+  },
+
+  "bookAdded": "“{title}” added to your shelf",
+  "@bookAdded": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+
+  "syncResult": "Synced — pulled {pulled}, pushed {pushed}.",
+  "@syncResult": {
+    "description": "Result of a manual sync with no issues.",
+    "placeholders": {
+      "pulled": { "type": "int" },
+      "pushed": { "type": "int" }
+    }
+  },
+
+  "syncIssues": "{count, plural, =1{1 issue} other{{count} issues}}",
+  "@syncIssues": {
+    "description": "ICU plural. The app used to build this by hand as '$n issue${n == 1 ? '' : 's'}', which no other language survives — that pattern is the reason this item exists.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "newFilesInWatchedFolder": "{count, plural, =1{1 new file} other{{count} new files}} in your watched folder.",
+  "@newFilesInWatchedFolder": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "review": "Review",
+  "@review": {},
+
+  "noServerConnected": "No library server connected",
+  "@noServerConnected": {},
+
+  "syncFailed": "Sync failed: {error}",
+  "@syncFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "sortBy": "Sort by {field}",
+  "@sortBy": {
+    "placeholders": { "field": { "type": "String" } }
+  },
+
+  "filterByGenre": "Filter by genre",
+  "@filterByGenre": {},
+
+  "filterByStatus": "Filter by reading status",
+  "@filterByStatus": {},
+
+  "anyStatus": "Any status",
+  "@anyStatus": {},
+
+  "allGenres": "All genres",
+  "@allGenres": {},
+
+  "noGenresYet": "No genres yet",
+  "@noGenresYet": {},
+
+  "physicalLibraries": "Physical libraries",
+  "@physicalLibraries": {},
+
+  "newLibrary": "New library",
+  "@newLibrary": {},
+
+  "shelfTab": "Shelf",
+  "@shelfTab": {},
+
+  "physicalTab": "Physical",
+  "@physicalTab": {},
+
+  "searchTitles": "Titles",
+  "@searchTitles": {},
+
+  "searchInContents": "In book contents",
+  "@searchInContents": {},
+
+  "commandsTooltip": "Commands ({shortcut})",
+  "@commandsTooltip": {
+    "description": "Tooltip on the command-palette button; the shortcut is e.g. Ctrl+K.",
+    "placeholders": { "shortcut": { "type": "String" } }
+  }
+}

@@ -56,6 +56,9 @@ dependencies:
   qr: ^4.0.0
   cryptography: ^2.9.0
   dynamic_color: ^1.8.1
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +78,9 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+
+  # Turns on gen_l10n codegen (plan 5 #38); configured by l10n.yaml.
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

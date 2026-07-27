@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'l10n/gen/app_localizations.dart';
 
 import 'account/user_profile.dart';
 import 'add_book/add_book_page.dart';
@@ -101,6 +104,11 @@ class VellumApp extends StatelessWidget {
           );
           return MaterialApp(
             title: 'Vellum',
+            // Localization scaffolding (plan 5 #38). English only for now; the
+            // point is that every string added from here on has somewhere to
+            // go, and that plurals are ICU rather than `n == 1 ? '' : 's'`.
+            localizationsDelegates: L10n.localizationsDelegates,
+            supportedLocales: L10n.supportedLocales,
             theme: themes.light,
             darkTheme: themes.dark,
             themeMode: settings.themeMode,

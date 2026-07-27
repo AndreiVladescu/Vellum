@@ -1,0 +1,17 @@
+# Localization codegen (plan 5 #38).
+#
+# English only for now — the scaffolding is the deliverable, not a translation.
+# `output-dir` puts the generated code in the tree at `lib/l10n/gen/`, so it is
+# greppable and reviewable like any other source rather than hiding in
+# `.dart_tool`. (`synthetic-package` was the old way to ask for this and is now
+# a no-op — Flutter removed it.)
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-dir: lib/l10n/gen
+output-class: L10n
+# A missing translation should be visible while translating, not silently fall
+# back forever — but it must never be a build failure in a repo shipping one
+# locale.
+untranslated-messages-file: lib/l10n/untranslated.json
+nullable-getter: false
