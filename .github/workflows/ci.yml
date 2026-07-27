@@ -54,6 +54,14 @@ jobs:
       # step to forget after editing database.dart.
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: git diff --exit-code -- lib/data/database.g.dart
+      # Same idea for the localization codegen (plan 5 #38): the generated
+      # classes are committed so they're reviewable, which only works if they
+      # match the ARB. Regenerating and failing on a diff catches a message
+      # added without re-running gen-l10n.
+      - run: flutter gen-l10n
+      - run: git diff --exit-code -- lib/l10n/
+      # No new hardcoded user-facing strings in the files already migrated.
+      - run: ./tool/check_l10n.sh
       - run: flutter analyze
       - run: flutter test
       # Already covered by `flutter test` above; run it again verbosely so its

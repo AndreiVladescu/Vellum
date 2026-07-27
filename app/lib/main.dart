@@ -4,8 +4,6 @@ import 'dart:io';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-
 import 'l10n/gen/app_localizations.dart';
 
 import 'account/user_profile.dart';
@@ -103,7 +101,7 @@ class VellumApp extends StatelessWidget {
             useDynamic: settings.useDynamicColor,
           );
           return MaterialApp(
-            title: 'Vellum',
+            title: 'Vellum', // i18n-ignore: a proper noun, never translated
             // Localization scaffolding (plan 5 #38). English only for now; the
             // point is that every string added from here on has somewhere to
             // go, and that plurals are ICU rather than `n == 1 ? '' : 's'`.
@@ -328,13 +326,15 @@ class _LibraryPageState extends State<LibraryPage> {
     }).length;
     if (unseen == 0 || !mounted) return;
 
+    final l10n = L10n.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 8),
-        content: Text('$unseen new file${unseen == 1 ? '' : 's'} in your '
-            'watched folder.'),
+        // ICU, not `'$n file${n == 1 ? '' : 's'}'` — the hand-built plural this
+        // item exists to remove (plan 5 #38). No other language survives it.
+        content: Text(l10n.newFilesInWatchedFolder(unseen)),
         action: SnackBarAction(
-          label: 'Review',
+          label: l10n.review,
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => FolderImportPage(
@@ -377,7 +377,7 @@ class _LibraryPageState extends State<LibraryPage> {
       ));
       if (added != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('“$added” added to your shelf')),
+          SnackBar(content: Text(L10n.of(context).bookAdded(added))),
         );
       }
       return;
@@ -428,7 +428,7 @@ class _LibraryPageState extends State<LibraryPage> {
     );
     if (addedTitle != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('“$addedTitle” added to your shelf')),
+        SnackBar(content: Text(L10n.of(context).bookAdded(addedTitle))),
       );
     }
   }
@@ -510,10 +510,15 @@ class _LibraryPageState extends State<LibraryPage> {
   /// Everything the shelf can do, in one list: the key bindings, the palette,
   /// and the tooltips all read from here, so an action can't be reachable one
   /// way and invisible the others.
-  List<LibraryCommand> _commands() => [
+  /// Everything the shelf can do, localized (plan 5 #38): the palette searches
+  /// these by name, so they have to be in the reader's language or the search
+  /// box is useless to them.
+  List<LibraryCommand> _commands() {
+    final l10n = L10n.of(context);
+    return [
         LibraryCommand(
           id: 'search',
-          label: 'Search your library',
+          label: l10n.cmdSearch,
           icon: Icons.search,
           key: LogicalKeyboardKey.keyF,
           run: () {
@@ -527,14 +532,14 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         LibraryCommand(
           id: 'add',
-          label: 'Add a book',
+          label: l10n.addABook,
           icon: Icons.add,
           key: LogicalKeyboardKey.keyN,
           run: () => _openAddBook(context),
         ),
         LibraryCommand(
           id: 'import',
-          label: 'Import a folder',
+          label: l10n.cmdImportFolder,
           icon: Icons.folder_open,
           key: LogicalKeyboardKey.keyI,
           run: () => Navigator.of(context).push(MaterialPageRoute(
@@ -546,13 +551,13 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         LibraryCommand(
           id: 'scan',
-          label: 'Scan an ISBN barcode',
+          label: l10n.scanBarcode,
           icon: Icons.barcode_reader,
           run: () => _openScan(context),
         ),
         LibraryCommand(
           id: 'wishlist',
-          label: 'Wishlist',
+          label: l10n.cmdWishlist,
           icon: Icons.bookmark_border,
           run: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => WishlistPage(
@@ -564,13 +569,13 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         LibraryCommand(
           id: 'wish-add',
-          label: 'Add a book you want',
+          label: l10n.cmdAddWish,
           icon: Icons.bookmark_add_outlined,
           run: () => promptAddToWishlist(context, repository),
         ),
         LibraryCommand(
           id: 'face',
-          label: 'Switch between spines and covers',
+          label: l10n.cmdToggleFace,
           icon: Icons.flip_to_front,
           key: LogicalKeyboardKey.keyB,
           run: () => widget.settings.setBookFace(
@@ -581,14 +586,14 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         LibraryCommand(
           id: 'sync',
-          label: 'Sync with the server',
+          label: l10n.cmdSync,
           icon: Icons.cloud_sync_outlined,
           key: LogicalKeyboardKey.f5,
           run: _syncNow,
         ),
         LibraryCommand(
           id: 'preferences',
-          label: 'Preferences',
+          label: l10n.cmdPreferences,
           icon: Icons.tune,
           key: LogicalKeyboardKey.comma,
           run: () => Navigator.of(context).push(MaterialPageRoute(
@@ -602,7 +607,7 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         LibraryCommand(
           id: 'physical',
-          label: 'Physical libraries',
+          label: l10n.physicalLibraries,
           icon: Icons.grid_view_rounded,
           run: () => setState(() => _tab = 1),
         ),
@@ -611,7 +616,7 @@ class _LibraryPageState extends State<LibraryPage> {
         // for by name.
         LibraryCommand(
           id: 'palette',
-          label: 'Show all commands',
+          label: l10n.cmdShowCommands,
           icon: Icons.keyboard_command_key,
           key: LogicalKeyboardKey.keyK,
           inPalette: false,
@@ -619,13 +624,14 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         LibraryCommand(
           id: 'clear',
-          label: 'Clear search and filters',
+          label: l10n.clearSearchAndFilters,
           icon: Icons.filter_alt_off_outlined,
           key: LogicalKeyboardKey.escape,
           inPalette: false,
           run: _clearSearchAndFilters,
         ),
-      ];
+    ];
+  }
 
   void _clearSearchAndFilters() {
     _searchController.clear();
@@ -643,11 +649,14 @@ class _LibraryPageState extends State<LibraryPage> {
   /// indistinguishable from a key that did nothing.
   Future<void> _syncNow() async {
     final messenger = ScaffoldMessenger.of(context);
+    // Read before the first await: a BuildContext is not safe to touch after
+    // one, and the lookup is a synchronous inherited-widget read.
+    final l10n = L10n.of(context);
     final conn = widget.connection;
     final client = conn.client;
     if (client == null) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('No library server connected')),
+        SnackBar(content: Text(l10n.noServerConnected)),
       );
       return;
     }
@@ -658,11 +667,10 @@ class _LibraryPageState extends State<LibraryPage> {
         onCursor: conn.setSyncCursor,
       );
       messenger.showSnackBar(SnackBar(
-        content: Text('Synced — pulled ${report.pulled}, '
-            'pushed ${report.pushed}.'),
+        content: Text(l10n.syncResult(report.pulled, report.pushed)),
       ));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.syncFailed('$e'))));
     }
   }
 
@@ -698,6 +706,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _scaffold(BuildContext context) {
+    final l10n = L10n.of(context);
     return Scaffold(
       drawer: AppDrawer(
         profile: widget.profile,
@@ -712,9 +721,9 @@ class _LibraryPageState extends State<LibraryPage> {
                 controller: _searchController,
                 focusNode: _searchFocus,
                 onChanged: _onQueryChanged,
-                decoration: const InputDecoration(
-                  hintText: 'Search your library…',
-                  icon: Icon(Icons.search),
+                decoration: InputDecoration(
+                  hintText: l10n.searchHint,
+                  icon: const Icon(Icons.search),
                   border: InputBorder.none,
                 ),
               ),
@@ -725,7 +734,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 _sortMenu(),
               ],
             )
-          : AppBar(title: const Text('Physical libraries')),
+          : AppBar(title: Text(l10n.physicalLibraries)),
       body: IndexedStack(
         index: _tab,
         children: [
@@ -740,16 +749,16 @@ class _LibraryPageState extends State<LibraryPage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: 'Shelf',
+            icon: const Icon(Icons.menu_book_outlined),
+            selectedIcon: const Icon(Icons.menu_book),
+            label: l10n.shelfTab,
           ),
           NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view_rounded),
-            label: 'Physical',
+            icon: const Icon(Icons.grid_view_outlined),
+            selectedIcon: const Icon(Icons.grid_view_rounded),
+            label: l10n.physicalTab,
           ),
         ],
       ),
@@ -764,7 +773,7 @@ class _LibraryPageState extends State<LibraryPage> {
               children: [
                 FloatingActionButton.small(
                   heroTag: 'scan',
-                  tooltip: 'Scan an ISBN barcode',
+                  tooltip: l10n.scanBarcode,
                   onPressed: () => _openScan(context),
                   child: const Icon(Icons.barcode_reader),
                 ),
@@ -773,7 +782,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   heroTag: 'add',
                   onPressed: () => _openAddBook(context),
                   icon: const Icon(Icons.add),
-                  label: const Text('Add book'),
+                  label: Text(l10n.addBook),
                 ),
               ],
             )
@@ -781,31 +790,37 @@ class _LibraryPageState extends State<LibraryPage> {
               onPressed: () =>
                   promptCreateLibrary(context, repository, widget.settings),
               icon: const Icon(Icons.add),
-              label: const Text('New library'),
+              label: Text(l10n.newLibrary),
             ),
     );
   }
 
   /// The palette's own affordance. Without it the whole shortcut set is
   /// invisible to anyone who never tries Ctrl+K — which is most people.
-  Widget _paletteButton() => IconButton(
-        icon: const Icon(Icons.keyboard_command_key),
-        tooltip: 'Commands (${commandModifierLabel()}K)',
-        onPressed: _openCommandPalette,
+  Widget _paletteButton() => Builder(
+        builder: (context) => IconButton(
+          icon: const Icon(Icons.keyboard_command_key),
+          tooltip: L10n.of(context).commandsTooltip('${commandModifierLabel()}K'),
+          onPressed: _openCommandPalette,
+        ),
       );
 
-  Widget _sortMenu() => PopupMenuButton<ShelfSort>(
-        icon: const Icon(Icons.sort),
-        tooltip: 'Sort',
-        initialValue: widget.settings.shelfSort,
-        onSelected: widget.settings.setShelfSort,
-        itemBuilder: (context) => [
-          for (final s in ShelfSort.values)
-            PopupMenuItem(
-              value: s,
-              child: Text('Sort by ${s.label.toLowerCase()}'),
-            ),
-        ],
+  Widget _sortMenu() => Builder(
+        builder: (context) => PopupMenuButton<ShelfSort>(
+          icon: const Icon(Icons.sort),
+          tooltip: L10n.of(context).sort,
+          initialValue: widget.settings.shelfSort,
+          onSelected: widget.settings.setShelfSort,
+          itemBuilder: (context) => [
+            for (final s in ShelfSort.values)
+              PopupMenuItem(
+                value: s,
+                child: Text(
+                  L10n.of(context).sortBy(s.label.toLowerCase()),
+                ),
+              ),
+          ],
+        ),
       );
 
   /// Genre filter: lists every genre in the library so you can filter the shelf
@@ -822,7 +837,7 @@ class _LibraryPageState extends State<LibraryPage> {
         active ? Icons.bookmark : Icons.bookmark_border,
         color: active ? theme.colorScheme.primary : null,
       ),
-      tooltip: 'Filter by reading status',
+      tooltip: L10n.of(context).filterByStatus,
       itemBuilder: (context) => [
         PopupMenuItem(
           value: 'all',
@@ -868,20 +883,20 @@ class _LibraryPageState extends State<LibraryPage> {
                 active ? Icons.filter_alt : Icons.filter_alt_outlined,
                 color: active ? theme.colorScheme.primary : null,
               ),
-              tooltip: 'Filter by genre',
+              tooltip: L10n.of(context).filterByGenre,
               // NOTE: PopupMenuButton.onSelected never fires for a null value
               // (a null pop is indistinguishable from dismissing the menu), so
               // each item clears/sets the filter via its own onTap instead.
               itemBuilder: (context) => [
                 if (all.isEmpty)
-                  const PopupMenuItem<String?>(
+                  PopupMenuItem<String?>(
                     enabled: false,
-                    child: Text('No genres yet'),
+                    child: Text(L10n.of(context).noGenresYet),
                   ),
                 if (active)
                   PopupMenuItem<String?>(
                     onTap: () => setState(() => _genreFilter = null),
-                    child: const Text('All genres'),
+                    child: Text(L10n.of(context).allGenres),
                   ),
                 for (final g in all)
                   PopupMenuItem<String?>(
@@ -951,16 +966,16 @@ class _LibraryPageState extends State<LibraryPage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
                     child: SegmentedButton<bool>(
-                      segments: const [
+                      segments: [
                         ButtonSegment(
                           value: false,
-                          label: Text('Titles'),
-                          icon: Icon(Icons.menu_book_outlined),
+                          label: Text(L10n.of(context).searchTitles),
+                          icon: const Icon(Icons.menu_book_outlined),
                         ),
                         ButtonSegment(
                           value: true,
-                          label: Text('In book contents'),
-                          icon: Icon(Icons.find_in_page_outlined),
+                          label: Text(L10n.of(context).searchInContents),
+                          icon: const Icon(Icons.find_in_page_outlined),
                         ),
                       ],
                       selected: {_searchInsideBooks},
@@ -1027,7 +1042,7 @@ class _LibraryPageState extends State<LibraryPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _noMatchMessage(),
+                _noMatchMessage(L10n.of(context)),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -1043,7 +1058,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   });
                 },
                 icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('Clear search and filters'),
+                label: Text(L10n.of(context).clearSearchAndFilters),
               ),
             ],
           ),
@@ -1059,13 +1074,17 @@ class _LibraryPageState extends State<LibraryPage> {
               color: theme.colorScheme.primary.withValues(alpha: 0.7),
             ),
             const SizedBox(height: 16),
-            Text(onCustomShelf ? 'This shelf is empty' : 'Your shelf is empty',
-                style: theme.textTheme.titleMedium),
+            Text(
+              onCustomShelf
+                  ? L10n.of(context).customShelfEmptyTitle
+                  : L10n.of(context).shelfEmptyTitle,
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: 6),
             Text(
               onCustomShelf
-                  ? 'Add books to it from their detail page.'
-                  : 'Add your first book to see it here.',
+                  ? L10n.of(context).customShelfEmptyBody
+                  : L10n.of(context).shelfEmptyBody,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
             if (!onCustomShelf) ...[
@@ -1078,7 +1097,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   FilledButton.icon(
                     onPressed: () => _openAddBook(context),
                     icon: const Icon(Icons.add),
-                    label: const Text('Add a book'),
+                    label: Text(L10n.of(context).addABook),
                   ),
                   OutlinedButton.icon(
                     onPressed: () => Navigator.of(context).push(
@@ -1090,7 +1109,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       ),
                     ),
                     icon: const Icon(Icons.folder_open),
-                    label: const Text('Import a folder'),
+                    label: Text(L10n.of(context).importFolder),
                   ),
                 ],
               ),
@@ -1118,14 +1137,14 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// Explains why the shelf is empty given the active genre filter and/or
   /// search text, so the message matches whichever controls are in effect.
-  String _noMatchMessage() {
+  String _noMatchMessage(L10n l10n) {
     final q = _query.trim();
     final genre = _genreFilter;
     if (genre != null && q.isNotEmpty) {
-      return 'No “$genre” books match “$q”.';
+      return l10n.noBooksInGenreMatch(genre, q);
     }
-    if (genre != null) return 'No books tagged “$genre”.';
-    return 'No books match “$q”.';
+    if (genre != null) return l10n.noBooksInGenre(genre);
+    return l10n.noBooksMatch(q);
   }
 
   /// The horizontal chip row: All + each shelf + "New shelf". Selecting a chip
@@ -1140,7 +1159,7 @@ class _LibraryPageState extends State<LibraryPage> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: ChoiceChip(
-              label: const Text('All'),
+              label: Text(L10n.of(context).shelfAll),
               selected: active == null,
               onSelected: (_) => widget.settings.setSelectedShelfId(null),
             ),
@@ -1162,7 +1181,7 @@ class _LibraryPageState extends State<LibraryPage> {
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: ActionChip(
               avatar: const Icon(Icons.add, size: 18),
-              label: const Text('New shelf'),
+              label: Text(L10n.of(context).shelfNew),
               onPressed: _promptNewShelf,
             ),
           ),
@@ -1187,13 +1206,13 @@ class _LibraryPageState extends State<LibraryPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit_outlined),
-              title: const Text('Rename shelf'),
+              title: Text(L10n.of(context).renameShelf),
               onTap: () => Navigator.pop(context, 'rename'),
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
-              title: const Text('Delete shelf'),
-              subtitle: const Text('The books stay in your library'),
+              title: Text(L10n.of(context).deleteShelf),
+              subtitle: Text(L10n.of(context).deleteShelfSubtitle),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
@@ -1222,17 +1241,18 @@ class _LibraryPageState extends State<LibraryPage> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Shelf name'),
+          decoration:
+              InputDecoration(hintText: L10n.of(context).shelfNameHint),
           onSubmitted: (v) => Navigator.pop(context, v.trim()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(L10n.of(context).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
+            child: Text(L10n.of(context).save),
           ),
         ],
       ),

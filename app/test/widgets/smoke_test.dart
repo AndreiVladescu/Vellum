@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/account/user_profile.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/main.dart';
 import 'package:vellum/server/connection_store.dart';
 import 'package:vellum/server/server_page.dart';
@@ -109,6 +110,11 @@ void main() {
     final profile = await UserProfileStore.load();
     final connection = await ServerConnection.load();
     return MaterialApp(
+      // The real app registers these (plan 5 #38); a page that looks a string
+      // up would otherwise throw on a null L10n, which is the point of
+      // `nullable-getter: false`.
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: LibraryPage(
         repository: repo,
         profile: profile,

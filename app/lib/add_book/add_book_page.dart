@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../data/book_file_validation.dart';
 import '../data/library_repository.dart';
 import '../data/metadata.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
 
 /// Add a book: search Open Library / Google Books and pick an edition, or create
@@ -94,8 +95,13 @@ class _AddBookPageState extends State<AddBookPage> {
   }
 
   Future<void> _pickFile() async {
-    const group = XTypeGroup(label: 'Books', extensions: ['pdf', 'epub']);
-    final picked = await openFile(acceptedTypeGroups: const [group]);
+    // The group name shows in the system file dialog, so it is user-facing —
+    // read before the await, like every other lookup that spans one.
+    final group = XTypeGroup(
+      label: L10n.of(context).bookFilesTypeGroup,
+      extensions: const ['pdf', 'epub'],
+    );
+    final picked = await openFile(acceptedTypeGroups: [group]);
     if (picked != null) await _acceptFile(picked.path, picked.name);
   }
 
@@ -182,8 +188,9 @@ class _AddBookPageState extends State<AddBookPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Add a book')),
+      appBar: AppBar(title: Text(l10n.addBookTitle)),
       body: Column(
         children: [
           Padding(
@@ -194,7 +201,7 @@ class _AddBookPageState extends State<AddBookPage> {
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _search(),
               decoration: InputDecoration(
-                hintText: 'Title, author, or ISBN',
+                hintText: l10n.addBookSearchHint,
                 prefixIcon: const Icon(Icons.search),
                 border: const OutlineInputBorder(),
                 suffixIcon: _searching
@@ -218,10 +225,10 @@ class _AddBookPageState extends State<AddBookPage> {
                   flex: 2,
                   child: TextField(
                     controller: _authorController,
-                    decoration: const InputDecoration(
-                      hintText: 'Author(s) — for a book you create',
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: l10n.addBookAuthorHint,
+                      prefixIcon: const Icon(Icons.person_outline),
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
@@ -231,9 +238,9 @@ class _AddBookPageState extends State<AddBookPage> {
                   child: TextField(
                     controller: _yearController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      hintText: 'Year',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: l10n.addBookYearHint,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
@@ -248,7 +255,7 @@ class _AddBookPageState extends State<AddBookPage> {
                 FilledButton.tonalIcon(
                   onPressed: _busy ? null : _search,
                   icon: const Icon(Icons.search),
-                  label: const Text('Search'),
+                  label: Text(l10n.search),
                 ),
                 const SizedBox(width: 10),
                 FilledButton.icon(
@@ -260,7 +267,7 @@ class _AddBookPageState extends State<AddBookPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.add),
-                  label: const Text('Create book'),
+                  label: Text(l10n.createBook),
                 ),
               ],
             ),
@@ -332,8 +339,10 @@ class _AddBookPageState extends State<AddBookPage> {
   Widget _buildResults() {
     final results = _results;
     if (results == null) {
-      return const Center(
-        child: Text('Search for a book, or create one above.'),
+      return Builder(
+        builder: (context) => Center(
+          child: Text(L10n.of(context).addBookPrompt),
+        ),
       );
     }
     if (results.isEmpty) {

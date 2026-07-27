@@ -812,6 +812,28 @@ opens, so swiping it away is never punished by it returning. Every empty state
 (shelf, no-search-match, physical tab, loans) carries one line of what-to-do-next
 copy **and** a primary action.
 
+**Localization scaffolding** (app, plan 5 #38) is `flutter_localizations` +
+`gen_l10n`, an `l10n.yaml`, and `lib/l10n/app_en.arb`. **English is the only
+locale, and the scaffolding is the deliverable** — the point is that every string
+added from here on has somewhere to go, because retrofitting i18n after another
+twenty features is materially harder than doing it now.
+
+Three decisions. The generated classes go to **`lib/l10n/gen/` and are
+committed**, not hidden in `.dart_tool`: they are greppable and reviewable like
+any other source, and CI regenerates them and fails on a diff, so a message added
+to the ARB without re-running `gen-l10n` is caught in review rather than silently
+leaving the string hardcoded. Migration is **incremental, one feature area per
+commit** (the shelf and the add-book flow first), and `tool/check_l10n.sh` guards
+only the files already listed as migrated — a repo-wide rule would be noise for
+the ninety per cent that hasn't moved, and adding a file to that list is the last
+step of migrating it. Plurals are **ICU**: the app used to build
+`'$n issue${n == 1 ? '' : 's'}'` by hand, which no other language survives, and
+that pattern is the reason this item exists at all.
+
+`nullable-getter: false` means `L10n.of(context)` throws rather than returning
+null — so a widget test that pumps a page without the delegates fails loudly
+instead of rendering an app with no words in it.
+
 **Finding and merging duplicates** (app, plan 5 #21b) exists because a library
 grown by bulk import will contain them. *Find duplicates* in the drawer compares
 three ways, and the ordering is the safety property: an identical **file hash** or

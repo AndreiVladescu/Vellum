@@ -43,6 +43,11 @@
   "customShelfEmptyBody": "Add books to it from their detail page.",
   "@customShelfEmptyBody": {},
 
+  "addABook": "Add a book",
+  "@addABook": {
+    "description": "Button in the empty-shelf state. Distinct from addBook, which labels the persistent FAB."
+  },
+
   "importFolder": "Import a folder",
   "@importFolder": {},
 
@@ -104,6 +109,11 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
+  "sort": "Sort",
+  "@sort": {
+    "description": "Tooltip on the shelf's sort menu."
+  },
+
   "sortBy": "Sort by {field}",
   "@sortBy": {
     "placeholders": { "field": { "type": "String" } }
@@ -141,6 +151,80 @@
 
   "searchInContents": "In book contents",
   "@searchInContents": {},
+
+  "addBookTitle": "Add a book",
+  "@addBookTitle": {
+    "description": "Title of the add-book page."
+  },
+
+  "addBookSearchHint": "Title, author, or ISBN",
+  "@addBookSearchHint": {},
+
+  "addBookAuthorHint": "Author(s) — for a book you create",
+  "@addBookAuthorHint": {},
+
+  "addBookYearHint": "Year",
+  "@addBookYearHint": {},
+
+  "search": "Search",
+  "@search": {},
+
+  "createBook": "Create book",
+  "@createBook": {},
+
+  "addBookPrompt": "Search for a book, or create one above.",
+  "@addBookPrompt": {
+    "description": "Shown before any search has been run."
+  },
+
+  "cmdSearch": "Search your library",
+  "@cmdSearch": {
+    "description": "Command-palette entries (plan 5 #26). These are searched by name, so they read as verbs."
+  },
+
+  "cmdImportFolder": "Import a folder",
+  "@cmdImportFolder": {},
+
+  "cmdWishlist": "Wishlist",
+  "@cmdWishlist": {},
+
+  "cmdAddWish": "Add a book you want",
+  "@cmdAddWish": {},
+
+  "cmdToggleFace": "Switch between spines and covers",
+  "@cmdToggleFace": {},
+
+  "cmdSync": "Sync with the server",
+  "@cmdSync": {},
+
+  "cmdPreferences": "Preferences",
+  "@cmdPreferences": {},
+
+  "cmdShowCommands": "Show all commands",
+  "@cmdShowCommands": {},
+
+  "renameShelf": "Rename shelf",
+  "@renameShelf": {},
+
+  "deleteShelf": "Delete shelf",
+  "@deleteShelf": {},
+
+  "deleteShelfSubtitle": "The books stay in your library",
+  "@deleteShelfSubtitle": {},
+
+  "shelfNameHint": "Shelf name",
+  "@shelfNameHint": {},
+
+  "cancel": "Cancel",
+  "@cancel": {},
+
+  "save": "Save",
+  "@save": {},
+
+  "bookFilesTypeGroup": "Books",
+  "@bookFilesTypeGroup": {
+    "description": "Name of the PDF/EPUB group in the system file picker."
+  },
 
   "commandsTooltip": "Commands ({shortcut})",
   "@commandsTooltip": {
