@@ -73,7 +73,7 @@ is answerable from `git log`:
 | 21c | Import from Calibre, CSV, or an OPDS catalog | `5aa90ca` |
 | 53 | Send a book to an e-reader by email | `56287a5` |
 | 30 | Stocktake a shelf against its placements | `d0ce62b` |
-| 38 | Localization scaffolding (en)* | `HEAD` |
+| 38 | Localization scaffolding (en)* | `26da8ae` |
 
 **Every item §I sequences into a phase is now done** — Phases 1 through 6, plus
 #14, #52, #26, #21a and #38 from the "interleave anywhere" list. What remains is
