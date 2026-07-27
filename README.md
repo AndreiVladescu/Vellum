@@ -14,9 +14,15 @@ shelf, instead of scrolling a grid of covers.
   and cover, or create a custom book and drop in your own PDF/EPUB. Edit any
   detail later (or use a PDF's first page as its cover), keep private reader
   notes, and revert an imported book to its library defaults.
+- **A wishlist too** — keep books you want but don't own; scan a barcode in a
+  shop, or fill a gap in a series you collect. They stay off the shelf until you
+  attach a file or record a copy, which moves them into the library by itself.
 - **Integrated reader** — read your PDFs and EPUBs right in the app.
+- **Keyboard-first on desktop** — Ctrl+K opens a command palette that runs any
+  action or jumps to any book; the common ones have their own shortcuts.
 - **Backed up** — export the whole library (database, covers, files) to a
-  single archive and restore it anywhere.
+  single archive and restore it anywhere. Removing a book puts it in a trash
+  that holds it for 30 days, so a mis-click isn't a restore-from-backup.
 - **Share it (optional)** — a self-hosted server adds accounts and roles, book
   groups, sharing (whole library, a group, or one book), public per-book links
   with expiry / one-time download, an OPDS feed for e-readers, and a web admin
