@@ -232,11 +232,12 @@ class LibraryQueries {
     // every book is in the trash reads as empty, and gets the "add your first
     // book" invitation rather than "nothing matched".
     final sql = shelfId == null
-        ? 'SELECT NOT EXISTS(SELECT 1 FROM books WHERE deleted_at IS NULL) '
-            'AS empty'
-        : 'SELECT NOT EXISTS(SELECT 1 FROM shelf_books sb '
-            'JOIN books b ON b.id = sb.book_id '
-            'WHERE sb.shelf_id = ? AND b.deleted_at IS NULL) AS empty';
+        ? "SELECT NOT EXISTS(SELECT 1 FROM books WHERE deleted_at IS NULL "
+            "AND status <> 'wishlist') AS empty"
+        : "SELECT NOT EXISTS(SELECT 1 FROM shelf_books sb "
+            "JOIN books b ON b.id = sb.book_id "
+            "WHERE sb.shelf_id = ? AND b.deleted_at IS NULL "
+            "AND b.status <> 'wishlist') AS empty";
     return db
         .customSelect(
           sql,
@@ -273,6 +274,12 @@ class LibraryQueries {
       // query rather than a second one, so the shelf still costs one stream.
       where.add('books.status = ?');
       vars.add(Variable.withString(status));
+    } else {
+      // Wishlist entries (plan 5 #21a) are books you don't own, so they're not
+      // on the shelf. Excluded here rather than by every caller, and only when
+      // no status was asked for — a caller that explicitly wants
+      // `status = 'wishlist'` gets exactly that.
+      where.add("books.status <> 'wishlist'");
     }
     if (genre != null && genre.isNotEmpty) {
       where.add(

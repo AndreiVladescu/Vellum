@@ -15,11 +15,17 @@ class ScannedBook {
     required this.isbn13,
     required this.title,
     this.duplicateOf,
+    this.wanted = false,
   });
 
   final String bookId;
   final String isbn13;
   final String title;
+
+  /// True when this scan went to the wishlist rather than the library
+  /// (plan 5 #21a) — the bookshop case, where you scan what you're holding
+  /// without claiming to have bought it.
+  final bool wanted;
 
   /// Title of an existing book this one looks like, if any. The book is still
   /// added — the scan is the user's assertion that they hold a copy — but it is
@@ -48,9 +54,14 @@ class ScanPage extends StatefulWidget {
     required this.repository,
     this.barcodes,
     this.cameraAvailable,
+    this.initialWishlist = false,
   });
 
   final LibraryRepository repository;
+
+  /// Whether the session starts in wishlist mode. The toggle is on screen
+  /// either way; this is for opening the scanner straight from the wishlist.
+  final bool initialWishlist;
 
   /// Barcode source. Null means "use the device camera"; a stream can be
   /// supplied instead, which is how the flow is tested without a camera.
@@ -77,6 +88,11 @@ class _ScanPageState extends State<ScanPage> {
   StreamSubscription<String>? _subscription;
   bool _busy = false;
   String? _message;
+
+  /// Where the next scan goes. Session state, not a preference: you're either
+  /// cataloguing your shelves or standing in a shop, and which one is obvious
+  /// at the time.
+  late bool _toWishlist = widget.initialWishlist;
 
   bool get _useCamera =>
       widget.cameraAvailable ??
@@ -128,7 +144,10 @@ class _ScanPageState extends State<ScanPage> {
       }
       // Flag (don't block) a book that looks like one already here.
       final existing = await _duplicateOf(isbn13, result.title, result.authors);
-      final bookId = await widget.repository.addFromSearch(result);
+      final wanted = _toWishlist;
+      final bookId = wanted
+          ? await widget.repository.wishlist.addFromSearch(result)
+          : await widget.repository.addFromSearch(result);
       if (!mounted) return;
       setState(() {
         _added.insert(
@@ -138,6 +157,7 @@ class _ScanPageState extends State<ScanPage> {
             isbn13: isbn13,
             title: result.title,
             duplicateOf: existing,
+            wanted: wanted,
           ),
         );
       });
@@ -256,6 +276,25 @@ class _ScanPageState extends State<ScanPage> {
               ),
             ),
           Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  label: Text('I own it'),
+                  icon: Icon(Icons.library_add_check_outlined),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text('I want it'),
+                  icon: Icon(Icons.bookmark_add_outlined),
+                ),
+              ],
+              selected: {_toWishlist},
+              onSelectionChanged: (s) => setState(() => _toWishlist = s.first),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
               children: [
@@ -310,14 +349,18 @@ class _ScanPageState extends State<ScanPage> {
                     itemBuilder: (context, i) {
                       final book = _added[i];
                       return ListTile(
-                        leading: Icon(book.duplicateOf == null
-                            ? Icons.check_circle_outline
-                            : Icons.copy_outlined),
+                        leading: Icon(book.duplicateOf != null
+                            ? Icons.copy_outlined
+                            : book.wanted
+                                ? Icons.bookmark_added_outlined
+                                : Icons.check_circle_outline),
                         title: Text(book.title,
                             maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: Text(book.duplicateOf == null
-                            ? formatIsbn13(book.isbn13)
-                            : 'Possible duplicate of “${book.duplicateOf}”'),
+                        subtitle: Text(book.duplicateOf != null
+                            ? 'Possible duplicate of “${book.duplicateOf}”'
+                            : book.wanted
+                                ? '${formatIsbn13(book.isbn13)} · wishlist'
+                                : formatIsbn13(book.isbn13)),
                         trailing: TextButton(
                           onPressed: () => _undo(book),
                           child: const Text('Undo'),

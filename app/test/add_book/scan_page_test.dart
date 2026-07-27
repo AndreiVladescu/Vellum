@@ -68,6 +68,7 @@ void main() {
       build(
     WidgetTester tester, {
     Map<String, String> known = const {'9780441013593': 'Dune'},
+    bool initialWishlist = false,
   }) async {
     late LibraryRepository repo;
     late StreamController<String> codes;
@@ -85,6 +86,7 @@ void main() {
           repository: repo,
           barcodes: codes.stream,
           cameraAvailable: false,
+          initialWishlist: initialWishlist,
         ),
       );
     });
@@ -215,5 +217,49 @@ void main() {
 
     expect(find.textContaining('doesn’t look like an ISBN'), findsOneWidget);
     expect(await t.repo.db.select(t.repo.db.books).get(), isEmpty);
+  });
+
+  testWidgets('in wishlist mode a scan is wanted, not owned', (tester) async {
+    // The bookshop case (plan 5 #21a): you scan what you're holding to remember
+    // it, and it must not turn up on the shelf as though you'd bought it.
+    final t = await build(tester, initialWishlist: true);
+    await tester.pumpWidget(t.app);
+    await settle(tester);
+
+    t.codes.add('9780441013593');
+    await settle(tester);
+
+    expect(find.text('Dune'), findsOneWidget);
+    await tester.runAsync(() async {
+      final wanted = await t.repo.wishlist.watchWishlist().first;
+      expect([for (final b in wanted) b.title], ['Dune']);
+      expect(await t.repo.watchAllBooks().first, isEmpty,
+          reason: 'and it is not in the library');
+    });
+  });
+
+  testWidgets('the toggle switches where the next scan goes', (tester) async {
+    final t = await build(tester, known: const {
+      '9780441013593': 'Dune',
+      '9780575081581': 'Neuromancer',
+    });
+    await tester.pumpWidget(t.app);
+    await settle(tester);
+
+    t.codes.add('9780441013593');
+    await settle(tester);
+    await tester.runAsync(() async {
+      expect(await t.repo.watchAllBooks().first, hasLength(1));
+    });
+
+    await tester.tap(find.text('I want it'));
+    await settle(tester);
+    t.codes.add('9780575081581');
+    await settle(tester);
+
+    await tester.runAsync(() async {
+      expect(await t.repo.wishlist.watchWishlist().first, hasLength(1),
+          reason: 'the second scan followed the toggle');
+    });
   });
 }

@@ -35,6 +35,7 @@ import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
 import 'shelf/shelf_view.dart';
 import 'shortcuts.dart';
+import 'wishlist/wishlist_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -498,6 +499,24 @@ class _LibraryPageState extends State<LibraryPage> {
           run: () => _openScan(context),
         ),
         LibraryCommand(
+          id: 'wishlist',
+          label: 'Wishlist',
+          icon: Icons.bookmark_border,
+          run: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => WishlistPage(
+              repository: repository,
+              settings: widget.settings,
+              connection: widget.connection,
+            ),
+          )),
+        ),
+        LibraryCommand(
+          id: 'wish-add',
+          label: 'Add a book you want',
+          icon: Icons.bookmark_add_outlined,
+          run: () => promptAddToWishlist(context, repository),
+        ),
+        LibraryCommand(
           id: 'face',
           label: 'Switch between spines and covers',
           icon: Icons.flip_to_front,
@@ -758,7 +777,9 @@ class _LibraryPageState extends State<LibraryPage> {
           onTap: () => setState(() => _statusFilter = null),
           child: Text(active ? 'Any status' : 'Any status ✓'),
         ),
-        for (final status in ReadingStatus.values)
+        // Owned states only: "wishlist" isn't a reading status and has its own
+        // view (plan 5 #21a).
+        for (final status in ReadingStatus.ownedStates)
           PopupMenuItem(
             value: status.name,
             onTap: () => setState(() => _statusFilter = status),
