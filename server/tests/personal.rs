@@ -318,6 +318,78 @@ async fn deleting_an_annotation_leaves_a_tombstone_for_the_other_devices() {
 }
 
 #[tokio::test]
+async fn annotation_tombstones_stay_out_of_the_shared_deletions_list() {
+    // Plan 6 #3, finding P1. `/deletions` is unscoped on purpose — a deleted
+    // book is a library-wide fact — so an annotation tombstone sitting in it
+    // handed every authenticated account the ids and timings of every other
+    // account's deletions.
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let stranger = add_member(&app, &master, "stranger@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/annotations/secret-note",
+        Some(&master),
+        Some(json!({ "book_id": book, "kind": "highlight" })),
+    )
+    .await;
+    call(
+        &app,
+        "DELETE",
+        "/api/annotations/secret-note",
+        Some(&master),
+        None,
+    )
+    .await;
+
+    let (status, body) = call(&app, "GET", "/api/deletions", Some(&stranger), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let all = body.as_array().unwrap();
+    assert!(
+        !all.iter().any(|d| d["book_id"] == "secret-note"),
+        "leaked another account's annotation deletion: {body}"
+    );
+    assert!(
+        !all.iter().any(|d| d["kind"] == "annotation"),
+        "no annotation tombstone belongs in this list: {body}"
+    );
+
+    // Book tombstones still travel, which is what the list is for.
+    call(&app, "DELETE", &format!("/api/books/{book}"), Some(&master), None).await;
+    let (_, body) = call(&app, "GET", "/api/deletions", Some(&stranger), None).await;
+    assert!(
+        body.as_array().unwrap().iter().any(|d| d["book_id"] == book),
+        "book deletions must still propagate: {body}"
+    );
+}
+
+#[tokio::test]
+async fn an_oversized_avatar_is_refused_in_words() {
+    // Plan 6 #3, finding P2. axum's 2 MB default rejected a 3 MB upload before
+    // `put_avatar`'s own 4 MB check could, with "Failed to buffer the request
+    // body" — a limit that disagreed with the documented one and an error that
+    // mentioned neither avatars nor a size.
+    let app = test_app().await;
+    let token = register(&app, "solo@lib.test").await;
+
+    let mut big = png();
+    big.resize(3 * 1024 * 1024, 0);
+    let (status, body) = call_bytes(&app, "PUT", "/api/profile/avatar", &token, big).await;
+    assert_eq!(status, StatusCode::OK, "3 MB is under the stated cap: {body}");
+
+    let mut too_big = png();
+    too_big.resize(5 * 1024 * 1024, 0);
+    let (status, _) = call_bytes(&app, "PUT", "/api/profile/avatar", &token, too_big).await;
+    assert_eq!(
+        status,
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "and past it the body limit stops it before anything is read"
+    );
+}
+
+#[tokio::test]
 async fn my_deletions_are_not_another_accounts_business() {
     // The shared /deletions list is unscoped by design — a deleted book is a
     // library-wide fact. A deleted highlight is not.

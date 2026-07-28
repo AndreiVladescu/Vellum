@@ -1226,8 +1226,21 @@ pub async fn deletions(
     } else {
         format!("WHERE {}", conditions.join(" AND "))
     };
-    let sql =
-        format!("SELECT book_id, deleted_at, kind FROM deletion {filter} ORDER BY deleted_at");
+    // Annotation tombstones are deliberately excluded: this endpoint is
+    // unscoped — a deleted book is a library-wide fact every device needs —
+    // but which of *my* highlights I threw away is not. They have their own
+    // per-user endpoint (`personal::list_annotation_deletions`); leaving them
+    // here let any authenticated account read the ids and timings of every
+    // other account's deletions (plan 6 #3, finding P1).
+    let sql = format!(
+        "SELECT book_id, deleted_at, kind FROM deletion \
+         {} kind != 'annotation' ORDER BY deleted_at",
+        if filter.is_empty() {
+            "WHERE".to_string()
+        } else {
+            format!("{filter} AND")
+        }
+    );
     let mut query = sqlx::query_as::<_, DeletionDto>(&sql);
     if let Some(ts) = since {
         query = query.bind(ts.to_string());

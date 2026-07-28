@@ -279,7 +279,12 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route(
             "/profile/avatar",
             get(personal::get_avatar)
-                .put(personal::put_avatar)
+                // Stated explicitly so `put_avatar`'s own 4 MB check is the one
+                // that fires. Without it axum's 2 MB default rejected a 3 MB
+                // upload first, with "Failed to buffer the request body" — a
+                // limit that disagreed with the documented one and an error
+                // that named neither (plan 6 #3, finding P2).
+                .put(personal::put_avatar.layer(DefaultBodyLimit::max(4 * 1024 * 1024)))
                 .delete(personal::delete_avatar),
         )
         .route("/loans", get(loans::list))

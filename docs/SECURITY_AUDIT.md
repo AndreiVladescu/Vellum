@@ -43,11 +43,68 @@ environment — running them is a recommendation below.
 | L4 | 🟡 | ✅ Fixed (2026-07-11) | Login throttle keyed by email only (no per-IP cap) | `server/src/throttle.rs`, `auth.rs` |
 | L5 | 🟡 | ✅ Fixed (2026-07-25) | Basic-auth cache holds unsalted SHA-256 of passwords in memory | `server/src/auth.rs` |
 | L6 | 🟡 | ✅ Hardened (2026-07-25) | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
+| P1 | 🟡 | ✅ Fixed (2026-07-28) | Annotation tombstones readable by every account via the unscoped `/deletions` | `server/src/books.rs` |
+| P2 | 🔵 | ✅ Fixed (2026-07-28) | Avatar upload's stated 4 MB cap unreachable behind axum's 2 MB default | `server/src/lib.rs` |
 
 > **Remediation note (2026-07-11):** H1, M1, M2 (destructive, low-effort) plus a
 > second round — M3 (opt-in), M4, L3, L4 — have been hardened (see the ✅ notes in
 > each section). Still open: M4's `flutter_secure_storage` major upgrade, and
 > L1, L2, L5, L6.
+
+---
+
+## Round 3 — the personal-data endpoints (2026-07-28)
+
+Covers `server/src/personal.rs` and migration 0023 (annotations, reading
+sittings, private notes, profile photo), added after the original audit. The
+review followed plan 6 #3's checklist; two findings, both fixed, plus four
+invariants confirmed by reading and by driving a live server.
+
+### 🟡 P1 — Annotation tombstones leaked through the shared deletions list
+
+Annotation deletions were recorded in the shared `deletion` table so the
+existing tombstone machinery would carry them. But `GET /api/deletions` is
+**unscoped by design** — a deleted book is a library-wide fact every device
+needs — so any authenticated account could read the ids and timings of every
+other account's annotation deletions.
+
+Confirmed live: account B, unrelated to A's book, saw
+`{"book_id":"secret-note","kind":"annotation"}` after A deleted it. The
+disclosure is an opaque id plus a timestamp, no content — hence 🟡 rather than
+🟠 — but it is cross-account information that should not exist.
+
+**Fixed** by excluding `kind = 'annotation'` from that endpoint. They already
+had a per-user endpoint (`personal::list_annotation_deletions`, scoped by
+`owner_id`); the shared list was a leftover from the first implementation.
+
+### 🔵 P2 — The avatar's stated size cap could never fire
+
+`put_avatar` checks for 4 MB and returns "avatar must be under 4 MB". It never
+ran: body limits in this server are per-route, the avatar route had none, and
+axum's 2 MB default rejected the request first with "Failed to buffer the
+request body" — an error naming neither avatars nor a size, at a limit that
+disagreed with the documented one.
+
+Not a memory-safety problem (the default limit was doing the protecting), but a
+stated invariant that wasn't the real one. **Fixed** by giving the route an
+explicit 4 MB `DefaultBodyLimit`, so the handler's own check is what answers.
+
+### Confirmed, no change needed
+
+- **Avatar paths cannot traverse.** The path is `avatars/<user id>` where the id
+  comes from the token, and ids are server-generated UUIDs (`insert_user`).
+  Nothing client-supplied reaches the filesystem.
+- **Every list is doubly scoped.** All three (`annotations`, `sessions`,
+  `notes`) filter on `user_id` *and* join `access_predicate()`, so a book that
+  stops being shared stops returning your rows with it.
+- **Ids cannot be taken over.** The annotation upsert carries
+  `WHERE annotation.user_id = ?` on the update half; another account guessing an
+  id gets 404, not a write. Tested.
+- **No unbounded decode.** Avatars are stored and served as bytes, sniffed by
+  magic number and never decoded server-side, so M1's pixel-bomb reasoning does
+  not reapply. SVG is not in the accepted set, so no script-in-image path.
+
+*Round 3 reflects the code at `2fb63f4`.*
 
 ---
 
@@ -395,7 +452,8 @@ These are genuine strengths worth preserving:
 6. **L1–L6** — Address as defense-in-depth: security headers, per-IP login cap,
    keyring-unavailable warning, and sandboxing the PDF render subprocesses.
 
-*This audit reflects the code at commit `b4fa85f` (branch `main`). It is a
+*Rounds 1–2 reflect the code at commit `b4fa85f`; round 3 at `2fb63f4` (branch
+`main`). It is a
 best-effort manual review, not a guarantee of completeness; a follow-up with
 `cargo audit`, dependency scanning, and fuzzing of the upload/parse paths is
 recommended.*
