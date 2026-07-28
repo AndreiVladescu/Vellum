@@ -17,6 +17,8 @@
 /// meant.
 library;
 
+import 'package:flutter/material.dart';
+
 import '../../data/database.dart';
 import 'annotation_locator.dart';
 import 'highlight_palette.dart';
@@ -28,8 +30,9 @@ import 'highlight_palette.dart';
 String withHighlights(
   String html,
   List<Annotation> annotations,
-  int chapter,
-) {
+  int chapter, {
+  Color? ink,
+}) {
   final wanted = <({String quote, int at, int? color})>[];
   for (final a in annotations) {
     final locator = AnnotationLocator.decode(a.locator);
@@ -66,10 +69,14 @@ String withHighlights(
   runs.sort((a, b) => a.start.compareTo(b.start));
   final buffer = StringBuffer();
   var cursor = 0;
+  // The text colour has to be stated. `<mark>` carries a built-in `color:#000`,
+  // which on a dark page is black words inside a dark stain — invisible.
+  final textColour = cssHex(ink ?? const Color(0xFF000000));
   for (final run in runs) {
     buffer
       ..write(html.substring(cursor, run.start))
-      ..write('<mark style="background-color:${_cssRgba(run.colour)}">')
+      ..write('<mark style="background-color:${_cssRgba(run.colour)};'
+          'color:$textColour">')
       ..write(html.substring(run.start, run.end))
       ..write('</mark>');
     cursor = run.end;
@@ -121,6 +128,14 @@ String _cssRgba(HighlightColor colour) {
   final g = (c.g * 255).round();
   final b = (c.b * 255).round();
   return 'rgba($r,$g,$b,0.42)';
+}
+
+/// A colour as CSS, for the places the book's markup must be told directly.
+String cssHex(Color c) {
+  final value = (c.r * 255).round() << 16 |
+      (c.g * 255).round() << 8 |
+      (c.b * 255).round();
+  return '#${value.toRadixString(16).padLeft(6, '0')}';
 }
 
 /// A chapter's visible text alongside where in the markup each character came

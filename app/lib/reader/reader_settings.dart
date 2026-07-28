@@ -165,14 +165,26 @@ class ReaderSettings extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Night mode for PDFs, which are pre-rendered pages the reader theme can't
-  /// restyle — the only way to darken one is to filter the raster.
-  bool get pdfNightMode => _prefs.getBool(_nightModeKey) ?? false;
+  /// Black paper, white type, pictures in grey — in both formats.
+  ///
+  /// Separate from the page colours above rather than a fifth [ReaderTheme],
+  /// because it is not only a colour: it also greys out the pictures, and for a
+  /// PDF it is a filter over a rendered page rather than a choice about how to
+  /// draw one. It overrides the page colour while it is on.
+  ///
+  /// The stored key still says `pdfNightMode`: it began as a PDF-only switch,
+  /// and renaming the key would silently turn the setting off for everyone who
+  /// had already found it.
+  bool get darkPages => _prefs.getBool(_nightModeKey) ?? false;
 
-  Future<void> setPdfNightMode(bool value) async {
+  Future<void> setDarkPages(bool value) async {
     await _prefs.setBool(_nightModeKey, value);
     notifyListeners();
   }
+
+  /// The page colours actually in force. [darkPages] wins over [theme]: it is
+  /// the more specific request, and sepia-with-dark-pages means nothing.
+  ReaderTheme get effectiveTheme => darkPages ? ReaderTheme.dark : theme;
 
   PdfPageMode get pdfMode {
     final stored = _prefs.getString(_pdfModeKey);
@@ -211,20 +223,6 @@ class ReaderSettings extends ChangeNotifier {
         fontFamily: font.family,
         fontSize: fontSize,
         height: lineHeight,
-        color: theme.foreground,
+        color: effectiveTheme.foreground,
       );
 }
-
-/// The colour filter that turns a rendered PDF page into night mode.
-///
-/// Not a naive invert: a plain inversion turns white paper into pure black and,
-/// worse, turns photographs into negatives. This inverts luminance while pulling
-/// the result toward a warm near-black/near-grey — dark enough to read in bed,
-/// without the harsh contrast or the blue cast a straight `1 - x` gives.
-const nightModeMatrix = <double>[
-  // R'      G'      B'      A'  offset
-  -0.90, -0.05, -0.05, 0, 235, //
-  -0.05, -0.90, -0.05, 0, 230, //
-  -0.05, -0.05, -0.90, 0, 220, //
-  0, 0, 0, 1, 0, //
-];

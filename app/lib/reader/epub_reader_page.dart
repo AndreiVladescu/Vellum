@@ -10,6 +10,7 @@ import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/epub_highlight_html.dart';
 import 'annotations/highlight_palette.dart';
+import 'dark_pages.dart';
 import 'edge_turn.dart';
 import 'epub_book.dart';
 import 'reader_settings.dart';
@@ -466,7 +467,8 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
         }
         final chapter = epub.chapters[_chapter];
         final settings = _settings;
-        final readerTheme = settings?.theme ?? ReaderTheme.light;
+        final dark = settings?.darkPages ?? false;
+        final readerTheme = settings?.effectiveTheme ?? ReaderTheme.light;
         return Scaffold(
           backgroundColor: readerTheme.background,
           // Immersive mode drops the bar entirely rather than fading it: a
@@ -568,12 +570,31 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                           // text is coloured like a marker rather than only
                           // listed in the panel.
                           withHighlights(
-                              chapter.html, _bookAnnotations, _chapter),
+                            // Dark pages: the book's own colours come out
+                            // first, or a heading that asked for near-black
+                            // stays near-black on a near-black page.
+                            dark
+                                ? withoutBookColours(chapter.html)
+                                : chapter.html,
+                            _bookAnnotations,
+                            _chapter,
+                            ink: readerTheme.foreground,
+                          ),
                           // The reader's own typography, applied to the book's
                           // text only — the surrounding UI keeps following the
                           // system text scale.
                           textStyle: settings?.bodyTextStyle() ??
                               TextStyle(color: readerTheme.foreground),
+                          // Dark pages: the book's own colours would otherwise
+                          // win — a stylesheet saying `color: #222` is black
+                          // text on a black page. Its *pictures* are handled by
+                          // the factory, which greys them.
+                          customStylesBuilder: dark
+                              ? (element) => element.localName == 'mark'
+                                  ? null
+                                  : {'color': cssHex(readerTheme.foreground)}
+                              : null,
+                          factoryBuilder: dark ? DarkPagesFactory.new : null,
                         ),
                       ),
                     ),
@@ -627,6 +648,10 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      // The bar takes the reader's page colour, so its text has
+                      // to take the reader's ink — the app theme's would be
+                      // dark-on-dark here.
+                      style: TextStyle(color: readerTheme.foreground),
                     ),
                   ),
                 ),

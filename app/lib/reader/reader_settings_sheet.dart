@@ -60,8 +60,12 @@ class ReaderSettingsSheet extends StatelessWidget {
                     for (final theme in ReaderTheme.values)
                       ChoiceChip(
                         label: Text(theme.label),
-                        selected: settings.theme == theme,
-                        onSelected: (_) => settings.setTheme(theme),
+                        selected: !settings.darkPages && settings.theme == theme,
+                        // Greyed out while dark pages are on, rather than
+                        // hidden: it should be obvious *why* the page is black
+                        // and which switch to flick to change it.
+                        onSelected:
+                            settings.darkPages ? null : (_) => settings.setTheme(theme),
                         avatar: Container(
                           decoration: BoxDecoration(
                             color: theme.background,
@@ -71,6 +75,14 @@ class ReaderSettingsSheet extends StatelessWidget {
                         ),
                       ),
                   ],
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Dark pages'),
+                  subtitle: const Text(
+                      'Black paper, white type, pictures in grey'),
+                  value: settings.darkPages,
+                  onChanged: settings.setDarkPages,
                 ),
                 if (showTypography) ...[
                   const SizedBox(height: 16),
@@ -135,14 +147,6 @@ class ReaderSettingsSheet extends StatelessWidget {
                     ],
                     selected: {settings.pdfFit},
                     onSelectionChanged: (s) => settings.setPdfFit(s.first),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Night mode'),
-                    subtitle: const Text(
-                        'Darkens the page without turning photos into negatives'),
-                    value: settings.pdfNightMode,
-                    onChanged: settings.setPdfNightMode,
                   ),
                 ],
                 SwitchListTile(

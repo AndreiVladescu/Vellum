@@ -10,6 +10,7 @@ import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
+import 'dark_pages.dart';
 import 'edge_turn.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
@@ -413,7 +414,8 @@ class _ReaderPageState extends State<ReaderPage> {
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
-    final readerTheme = settings?.theme ?? ReaderTheme.light;
+    final dark = settings?.darkPages ?? false;
+    final readerTheme = settings?.effectiveTheme ?? ReaderTheme.light;
     return Scaffold(
       backgroundColor: readerTheme.background,
       appBar: _chromeHidden
@@ -562,14 +564,17 @@ class _ReaderPageState extends State<ReaderPage> {
             onTap: settings?.immersive == true
                 ? () => setState(() => _chromeHidden = !_chromeHidden)
                 : null,
-            child: _nightModeWrap(
-              enabled: settings?.pdfNightMode ?? false,
+            child: darkPageWrap(
+              enabled: dark,
               child: PdfViewer.file(
         widget.file.path,
         controller: _controller,
         initialPageNumber: widget.initialPage ?? widget.book.lastReadPage ?? 1,
         params: PdfViewerParams(
-          backgroundColor: readerTheme.background,
+          // Inside the filter, so it has to be the colour that *inverts* to
+          // the one we want: a dark background here would come out white.
+          backgroundColor:
+              dark ? ReaderTheme.light.background : readerTheme.background,
           onPageChanged: _onPageChanged,
           // Seven times pdfrx's default. Its 0.2 is a crawl on a desktop
           // mouse — a notch moved about ten pixels — and reading a PDF is
@@ -659,16 +664,4 @@ class _ReaderPageState extends State<ReaderPage> {
     );
   }
 
-  /// Applies the night-mode filter to a rendered page.
-  ///
-  /// A `ColorFiltered` wrap rather than a per-page paint: the pages are rasters,
-  /// so the only way to darken them is to filter the pixels, and doing it once
-  /// around the viewer keeps every page (and the gaps between them) consistent.
-  Widget _nightModeWrap({required bool enabled, required Widget child}) =>
-      enabled
-          ? ColorFiltered(
-              colorFilter: const ColorFilter.matrix(nightModeMatrix),
-              child: child,
-            )
-          : child;
 }
