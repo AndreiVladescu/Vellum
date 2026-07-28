@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import '../account/user_profile.dart';
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
 import '../snack_bars.dart';
@@ -22,6 +23,7 @@ class ServerPage extends StatefulWidget {
     required this.repository,
     required this.sync,
     required this.settings,
+    this.profile,
   });
 
   final ServerConnection connection;
@@ -31,6 +33,10 @@ class ServerPage extends StatefulWidget {
   /// (plan 5 #5) — the manual Sync action honours the same preference the
   /// launch sync does.
   final AppSettingsStore settings;
+
+  /// The local profile, so signing in can reconcile it with the account
+  /// (plan 6 #5). Optional: the page works without one, it just can't ask.
+  final UserProfileStore? profile;
 
   /// The app-wide sync service (shared with the launch auto-sync, so its
   /// re-entrancy guard spans both).
@@ -319,7 +325,63 @@ class _ServerPageState extends State<ServerPage> {
               );
         await widget.connection.saveSession(url: url, auth: auth);
         await widget.connection.fetchCapabilities();
+        await _reconcileProfile(auth.user.displayName);
       });
+
+  /// Two names, one person — asks which to keep.
+  ///
+  /// The local profile and the server account were unrelated until now: you
+  /// could be "Ana" here and signed in as bob@example.com, with nothing saying
+  /// so. Personal-data sync then resolved the difference by whichever timestamp
+  /// was newer, silently, and the thing that changed was your name and face.
+  ///
+  /// So it is asked once, at the moment the two first meet, in the same shape
+  /// as "Resume where you left off?" — the app's existing answer to *two
+  /// truths, don't guess*. After this the newest-wins rule is fine, because the
+  /// two are known to be the same person.
+  Future<void> _reconcileProfile(String accountName) async {
+    final profile = widget.profile;
+    if (profile == null || !mounted) return;
+    final local = profile.name.trim();
+    final remote = accountName.trim();
+    // Nothing to ask when this device has no name yet, or they already agree.
+    if (local.isEmpty || remote.isEmpty || local == remote) {
+      if (local.isEmpty && remote.isNotEmpty) {
+        await profile.adopt(name: remote);
+      }
+      return;
+    }
+
+    final keepLocal = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Which name is yours?'),
+        content: Text(
+          'This device calls you “$local”. The account you just signed into is '
+          '“$remote”.\n\nWhichever you keep will be used on every device '
+          'signed into this account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Use “$remote”'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Keep “$local”'),
+          ),
+        ],
+      ),
+    );
+    if (keepLocal == null) return; // dismissed — decide nothing, ask next time
+    if (!keepLocal) {
+      await profile.adopt(name: remote);
+    } else {
+      // Keeping the local name means it is the newer truth; the next sync
+      // publishes it. Re-stamping is what makes that so.
+      await profile.save(name: local, email: profile.email);
+    }
+  }
 
   Future<void> _syncNow() => _run(() async {
         final client = widget.connection.client;

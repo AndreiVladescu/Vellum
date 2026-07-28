@@ -214,10 +214,19 @@ class SyncService {
     final localRows = await db.select(db.books).get();
     final localUpdatedAt = {for (final row in localRows) row.id: row.updatedAt};
     final localCoverEtag = {for (final row in localRows) row.id: row.coverEtag};
+    // Books with edits made here that haven't reached the server yet. If one of
+    // those is overwritten below, the edit is gone — see the note there.
+    final locallyEdited = {
+      for (final row in localRows)
+        if (row.needsPush) row.id: row.title,
+    };
 
     // Books whose metadata we actually applied this pull; their authors/genres
     // are replaced afterwards (outside the metadata transaction).
     final applied = <ServerBook>[];
+    // Collected inside the transaction, reported after it — adding to `issues`
+    // from in here would be undone by a rollback.
+    final overwritten = <SyncIssue>[];
 
     await db.transaction(() async {
       for (final b in books) {
@@ -231,6 +240,22 @@ class SyncService {
         final server = b.updatedAt;
         if (local != null && server != null && !local.isBefore(server)) {
           continue;
+        }
+        // Last-write-wins is the rule and is not being reopened — field-level
+        // merge was considered and rejected in plan 3. But *silence* is a
+        // separate choice from last-write-wins, and it is the one worth
+        // changing: an edit made here, never pushed, and now replaced by a
+        // newer one from elsewhere used to vanish with nothing said anywhere.
+        // The sync report already exists and already surfaces; use it.
+        final pendingTitle = locallyEdited[b.id];
+        if (pendingTitle != null) {
+          overwritten.add(SyncIssue(
+            bookId: b.id,
+            title: pendingTitle,
+            stage: 'overwritten',
+            message: 'Your unsent changes to “$pendingTitle” were replaced by a '
+                'newer version from another device.',
+          ));
         }
         applied.add(b);
 
@@ -258,6 +283,8 @@ class SyncService {
             );
       }
     });
+    // The transaction stuck, so the overwrites really happened.
+    issues.addAll(overwritten);
 
     // Series membership for the adopted rows (plan 5 #17). Resolved by name, so
     // two devices converge on one series row; null means the server says the

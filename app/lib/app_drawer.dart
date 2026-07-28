@@ -39,6 +39,7 @@ class AppDrawer extends StatelessWidget {
         repository: repository,
         sync: sync,
         settings: settings,
+        profile: profile,
       ),
     ));
   }
@@ -115,13 +116,21 @@ class AppDrawer extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: [
           ListenableBuilder(
-            listenable: profile,
+            // Both: the header shows the profile's name and photo *and* the
+            // account it syncs as, so connecting has to repaint it too.
+            listenable: Listenable.merge([profile, connection]),
             builder: (context, _) => UserAccountsDrawerHeader(
               currentAccountPicture: ProfileAvatar(profile: profile, radius: 30),
               accountName:
                   Text(profile.isSet ? profile.name : 'Set up your profile'),
+              // The identity you sync as, visible without opening a screen:
+              // the local profile's email is not the account's, and until this
+              // was shown the two could differ with nothing saying so.
               accountEmail: Text(
-                  profile.email.isEmpty ? 'Local library' : profile.email),
+                connection.isConnected
+                    ? connection.email
+                    : (profile.email.isEmpty ? 'Local library' : profile.email),
+              ),
               onDetailsPressed: () => _openAccount(context),
             ),
           ),

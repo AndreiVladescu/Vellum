@@ -309,6 +309,76 @@ void main() {
     expect(await repo.db.select(repo.db.annotations).get(), isEmpty);
   });
 
+  test('an overwritten local edit is reported rather than vanishing', () async {
+    // Last-write-wins stays — field-level merge was rejected in plan 3 — but
+    // silence was a separate choice, and the wrong one: an edit made here and
+    // never pushed used to be replaced with nothing said anywhere.
+    final repo = await _repo();
+    await (repo.db.update(repo.db.books)..where((b) => b.id.equals('b1'))).write(
+      BooksCompanion(
+        title: const Value('Dune, my edit'),
+        needsPush: const Value(true),
+        updatedAt: Value(DateTime(2026, 7, 1)),
+      ),
+    );
+
+    final report = await SyncService(repo).pull(_client((req) async {
+      if (req.url.path == '/api/books') {
+        return http.Response(
+          jsonEncode({
+            'server_now': '2026-07-28 00:00:00',
+            'books': [
+              {
+                'id': 'b1',
+                'title': 'Dune, from the laptop',
+                'updated_at': '2026-07-27 00:00:00',
+              }
+            ],
+          }),
+          200,
+        );
+      }
+      return _server()(req);
+    }));
+
+    final overwritten =
+        report.issues.where((i) => i.stage == 'overwritten').toList();
+    expect(overwritten, hasLength(1));
+    expect(overwritten.single.message, contains('Dune, my edit'));
+    expect(overwritten.single.message, contains('another device'));
+
+    // And the server's version did win — the report is a notice, not a veto.
+    final book = await (repo.db.select(repo.db.books)
+          ..where((b) => b.id.equals('b1')))
+        .getSingle();
+    expect(book.title, 'Dune, from the laptop');
+  });
+
+  test('a book with no unsent edits is replaced quietly', () async {
+    // The common case. Reporting every incoming update as an overwrite would
+    // make the report useless.
+    final repo = await _repo();
+    final report = await SyncService(repo).pull(_client((req) async {
+      if (req.url.path == '/api/books') {
+        return http.Response(
+          jsonEncode({
+            'server_now': '2026-07-28 00:00:00',
+            'books': [
+              {
+                'id': 'b1',
+                'title': 'Dune, from the laptop',
+                'updated_at': '2026-07-27 00:00:00',
+              }
+            ],
+          }),
+          200,
+        );
+      }
+      return _server()(req);
+    }));
+    expect(report.issues.where((i) => i.stage == 'overwritten'), isEmpty);
+  });
+
   test('an older server is not reported as broken on every sync', () async {
     // A server without migration 0023 answers 404 for all of this. The library
     // still syncs; complaining once a minute forever would be noise.
