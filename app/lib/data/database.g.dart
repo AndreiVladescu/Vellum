@@ -4417,8 +4417,43 @@ class $CopyPhotosTable extends CopyPhotos
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, copyId, path, takenAt, caption];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _needsPushMeta = const VerificationMeta(
+    'needsPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPush = GeneratedColumn<bool>(
+    'needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    copyId,
+    path,
+    takenAt,
+    caption,
+    updatedAt,
+    needsPush,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4464,6 +4499,18 @@ class $CopyPhotosTable extends CopyPhotos
         caption.isAcceptableOrUnknown(data['caption']!, _captionMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_push')) {
+      context.handle(
+        _needsPushMeta,
+        needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
+      );
+    }
     return context;
   }
 
@@ -4493,6 +4540,14 @@ class $CopyPhotosTable extends CopyPhotos
         DriftSqlType.string,
         data['${effectivePrefix}caption'],
       ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_push'],
+      )!,
     );
   }
 
@@ -4510,12 +4565,16 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
   final String path;
   final DateTime takenAt;
   final String? caption;
+  final DateTime updatedAt;
+  final bool needsPush;
   const CopyPhoto({
     required this.id,
     required this.copyId,
     required this.path,
     required this.takenAt,
     this.caption,
+    required this.updatedAt,
+    required this.needsPush,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4527,6 +4586,8 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
     if (!nullToAbsent || caption != null) {
       map['caption'] = Variable<String>(caption);
     }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
 
@@ -4539,6 +4600,8 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
       caption: caption == null && nullToAbsent
           ? const Value.absent()
           : Value(caption),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
     );
   }
 
@@ -4553,6 +4616,8 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
       path: serializer.fromJson<String>(json['path']),
       takenAt: serializer.fromJson<DateTime>(json['takenAt']),
       caption: serializer.fromJson<String?>(json['caption']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
   @override
@@ -4564,6 +4629,8 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
       'path': serializer.toJson<String>(path),
       'takenAt': serializer.toJson<DateTime>(takenAt),
       'caption': serializer.toJson<String?>(caption),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
 
@@ -4573,12 +4640,16 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
     String? path,
     DateTime? takenAt,
     Value<String?> caption = const Value.absent(),
+    DateTime? updatedAt,
+    bool? needsPush,
   }) => CopyPhoto(
     id: id ?? this.id,
     copyId: copyId ?? this.copyId,
     path: path ?? this.path,
     takenAt: takenAt ?? this.takenAt,
     caption: caption.present ? caption.value : this.caption,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
   );
   CopyPhoto copyWithCompanion(CopyPhotosCompanion data) {
     return CopyPhoto(
@@ -4587,6 +4658,8 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
       path: data.path.present ? data.path.value : this.path,
       takenAt: data.takenAt.present ? data.takenAt.value : this.takenAt,
       caption: data.caption.present ? data.caption.value : this.caption,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
 
@@ -4597,13 +4670,16 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
           ..write('copyId: $copyId, ')
           ..write('path: $path, ')
           ..write('takenAt: $takenAt, ')
-          ..write('caption: $caption')
+          ..write('caption: $caption, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, copyId, path, takenAt, caption);
+  int get hashCode =>
+      Object.hash(id, copyId, path, takenAt, caption, updatedAt, needsPush);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4612,7 +4688,9 @@ class CopyPhoto extends DataClass implements Insertable<CopyPhoto> {
           other.copyId == this.copyId &&
           other.path == this.path &&
           other.takenAt == this.takenAt &&
-          other.caption == this.caption);
+          other.caption == this.caption &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush);
 }
 
 class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
@@ -4621,6 +4699,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
   final Value<String> path;
   final Value<DateTime> takenAt;
   final Value<String?> caption;
+  final Value<DateTime> updatedAt;
+  final Value<bool> needsPush;
   final Value<int> rowid;
   const CopyPhotosCompanion({
     this.id = const Value.absent(),
@@ -4628,6 +4708,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
     this.path = const Value.absent(),
     this.takenAt = const Value.absent(),
     this.caption = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CopyPhotosCompanion.insert({
@@ -4636,6 +4718,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
     required String path,
     this.takenAt = const Value.absent(),
     this.caption = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        copyId = Value(copyId),
@@ -4646,6 +4730,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
     Expression<String>? path,
     Expression<DateTime>? takenAt,
     Expression<String>? caption,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4654,6 +4740,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
       if (path != null) 'path': path,
       if (takenAt != null) 'taken_at': takenAt,
       if (caption != null) 'caption': caption,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4664,6 +4752,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
     Value<String>? path,
     Value<DateTime>? takenAt,
     Value<String?>? caption,
+    Value<DateTime>? updatedAt,
+    Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
     return CopyPhotosCompanion(
@@ -4672,6 +4762,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
       path: path ?? this.path,
       takenAt: takenAt ?? this.takenAt,
       caption: caption ?? this.caption,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4694,6 +4786,12 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
     if (caption.present) {
       map['caption'] = Variable<String>(caption.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<bool>(needsPush.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4708,6 +4806,8 @@ class CopyPhotosCompanion extends UpdateCompanion<CopyPhoto> {
           ..write('path: $path, ')
           ..write('takenAt: $takenAt, ')
           ..write('caption: $caption, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -13640,6 +13740,8 @@ typedef $$CopyPhotosTableCreateCompanionBuilder =
       required String path,
       Value<DateTime> takenAt,
       Value<String?> caption,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 typedef $$CopyPhotosTableUpdateCompanionBuilder =
@@ -13649,6 +13751,8 @@ typedef $$CopyPhotosTableUpdateCompanionBuilder =
       Value<String> path,
       Value<DateTime> takenAt,
       Value<String?> caption,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 
@@ -13701,6 +13805,16 @@ class $$CopyPhotosTableFilterComposer
 
   ColumnFilters<String> get caption => $composableBuilder(
     column: $table.caption,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13757,6 +13871,16 @@ class $$CopyPhotosTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PhysicalCopiesTableOrderingComposer get copyId {
     final $$PhysicalCopiesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -13801,6 +13925,12 @@ class $$CopyPhotosTableAnnotationComposer
 
   GeneratedColumn<String> get caption =>
       $composableBuilder(column: $table.caption, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsPush =>
+      $composableBuilder(column: $table.needsPush, builder: (column) => column);
 
   $$PhysicalCopiesTableAnnotationComposer get copyId {
     final $$PhysicalCopiesTableAnnotationComposer composer = $composerBuilder(
@@ -13859,6 +13989,8 @@ class $$CopyPhotosTableTableManager
                 Value<String> path = const Value.absent(),
                 Value<DateTime> takenAt = const Value.absent(),
                 Value<String?> caption = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CopyPhotosCompanion(
                 id: id,
@@ -13866,6 +13998,8 @@ class $$CopyPhotosTableTableManager
                 path: path,
                 takenAt: takenAt,
                 caption: caption,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -13875,6 +14009,8 @@ class $$CopyPhotosTableTableManager
                 required String path,
                 Value<DateTime> takenAt = const Value.absent(),
                 Value<String?> caption = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CopyPhotosCompanion.insert(
                 id: id,
@@ -13882,6 +14018,8 @@ class $$CopyPhotosTableTableManager
                 path: path,
                 takenAt: takenAt,
                 caption: caption,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

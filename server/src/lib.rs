@@ -287,6 +287,21 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
                 .put(personal::put_avatar.layer(DefaultBodyLimit::max(4 * 1024 * 1024)))
                 .delete(personal::delete_avatar),
         )
+        // Photos of a physical copy (plan 6 #4). Library data, not personal:
+        // they hang off a copy and are visible to whoever the book is shared
+        // with, like its covers.
+        .route("/copy-photos", get(physical_copies::list_photos))
+        .route(
+            "/copy-photos/{id}",
+            put(physical_copies::upsert_photo).delete(physical_copies::delete_photo),
+        )
+        .route(
+            "/copy-photos/{id}/image",
+            get(physical_copies::get_photo_image).put(
+                physical_copies::put_photo_image
+                    .layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
+            ),
+        )
         .route("/loans", get(loans::list))
         .route("/loans/{id}", put(loans::upsert).delete(loans::delete))
         // Optional cross-device reading position (plan 5 #5). Per-(book, user,

@@ -921,6 +921,69 @@ class VellumServerClient {
     _body(res);
   }
 
+  // ---- copy photos (plan 6 #4) --------------------------------------------
+  //
+  // Library data, so the split is the same as a book and its file: a row with
+  // the caption, and the bytes separately. A metadata push then doesn't carry
+  // megabytes, and a failed transfer doesn't lose the caption.
+
+  Future<({String? serverNow, List<ServerCopyPhoto> entries})> listCopyPhotos({
+    String? cursor,
+  }) async {
+    final uri = _uri('/api/copy-photos')
+        .replace(queryParameters: {'cursor': cursor ?? ''});
+    final map = _body(await _http.get(uri, headers: _headers))
+        as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      entries: [
+        for (final e in (map['photos'] as List? ?? []))
+          ServerCopyPhoto.fromJson(e as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  Future<void> pushCopyPhoto({
+    required String id,
+    required String copyId,
+    String? caption,
+    DateTime? takenAt,
+    DateTime? updatedAt,
+  }) async {
+    _body(await _http.put(
+      _uri('/api/copy-photos/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        'copy_id': copyId,
+        'caption': caption,
+        'taken_at': formatServerTime(takenAt),
+        'updated_at': formatServerTime(updatedAt),
+      }),
+    ));
+  }
+
+  Future<void> deleteCopyPhoto(String id) async {
+    _body(await _http.delete(_uri('/api/copy-photos/$id'), headers: _headers));
+  }
+
+  Future<void> uploadCopyPhotoImage(String id, Uint8List bytes) async {
+    _body(await _http.put(
+      _uri('/api/copy-photos/$id/image'),
+      headers: {..._headers, 'content-type': 'application/octet-stream'},
+      body: bytes,
+    ));
+  }
+
+  /// The photo's bytes, or null when the server has the row but not the image
+  /// yet — the two are uploaded separately, so that gap is normal.
+  Future<Uint8List?> downloadCopyPhotoImage(String id) async {
+    final res =
+        await _http.get(_uri('/api/copy-photos/$id/image'), headers: _headers);
+    if (res.statusCode == 404) return null;
+    if (res.statusCode >= 400) _body(res);
+    return res.bodyBytes;
+  }
+
   // ---- personal data ------------------------------------------------------
   //
   // Annotations, sittings, private notes and the profile. Every one of these is
@@ -1318,6 +1381,31 @@ class ServerShelf {
 /// One device's reading position in one book (plan 5 #5). Always this
 /// account's own — the server never returns another user's row, so there is no
 /// user field to carry.
+/// A photo of a physical copy, as the server holds it.
+class ServerCopyPhoto {
+  ServerCopyPhoto({
+    required this.id,
+    required this.copyId,
+    this.caption,
+    this.takenAt,
+    this.updatedAt,
+  });
+
+  factory ServerCopyPhoto.fromJson(Map<String, dynamic> json) => ServerCopyPhoto(
+        id: json['id'] as String,
+        copyId: json['copy_id'] as String,
+        caption: json['caption'] as String?,
+        takenAt: ServerBook._parseServerTime(json['taken_at'] as String?),
+        updatedAt: ServerBook._parseServerTime(json['updated_at'] as String?),
+      );
+
+  final String id;
+  final String copyId;
+  final String? caption;
+  final DateTime? takenAt;
+  final DateTime? updatedAt;
+}
+
 /// One of the caller's annotations as the server holds it.
 class ServerAnnotation {
   ServerAnnotation({

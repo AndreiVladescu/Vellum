@@ -39,8 +39,14 @@ with. That is why `readerNotes` is a `book_note` row server-side rather than a
 column, and why it carries its own `readerNotesUpdatedAt`/`readerNotesNeedsPush`
 in the app rather than riding the book's.
 
-A server without migration 0023 answers 404 to all of it; the app treats that as
-"not supported yet" and syncs the library regardless — see
+**Copy photos are library data, not personal** (migration 0024): they hang off a
+physical copy, which already syncs, and are visible to whoever the book is
+shared with — like its covers. So they carry the ordinary
+`updatedAt`/`needsPush` pair and go through the blob pattern (a row, then the
+bytes), not the per-user channel above.
+
+A server without migrations 0023/0024 answers 404 to all of it; the app treats
+that as "not supported yet" and syncs the library regardless — see
 `_serverLacksPersonal`.
 
 IDs are UUID strings. Book files and cover images live on the filesystem; the

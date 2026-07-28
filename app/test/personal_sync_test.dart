@@ -37,6 +37,9 @@ Future<http.Response> Function(http.Request) _server({
   List<String>? deletedAnnotations,
   List<Map<String, dynamic>>? pushedSessions,
   List<Map<String, dynamic>>? pushedNotes,
+  List<Map<String, dynamic>> copyPhotos = const [],
+  List<Map<String, dynamic>>? pushedCopyPhotos,
+  List<String>? uploadedPhotoImages,
   bool personalSupported = true,
 }) {
   return (req) async {
@@ -78,6 +81,9 @@ Future<http.Response> Function(http.Request) _server({
         case '/api/loans':
           return http.Response(
               jsonEncode({'server_now': now, 'loans': []}), 200);
+        case '/api/copy-photos':
+          return http.Response(
+              jsonEncode({'server_now': now, 'photos': copyPhotos}), 200);
         case '/api/deletions':
           return http.Response('[]', 200);
       }
@@ -92,6 +98,24 @@ Future<http.Response> Function(http.Request) _server({
     }
     if (req.method == 'PUT' && path.startsWith('/api/sessions/')) {
       pushedSessions?.add(jsonDecode(req.body) as Map<String, dynamic>);
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'PUT' && path.endsWith('/image') &&
+        path.startsWith('/api/copy-photos/')) {
+      uploadedPhotoImages?.add(path.split('/')[3]);
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'GET' && path.startsWith('/api/copy-photos/') &&
+        path.endsWith('/image')) {
+      // A one-pixel PNG is enough: the sync only stores the bytes.
+      return http.Response.bytes(
+          [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0], 200);
+    }
+    if (req.method == 'PUT' && path.startsWith('/api/copy-photos/')) {
+      pushedCopyPhotos?.add({
+        'id': path.split('/').last,
+        ...jsonDecode(req.body) as Map<String, dynamic>,
+      });
       return http.Response('{}', 200);
     }
     if (req.method == 'PUT' && path.startsWith('/api/notes/')) {
@@ -377,6 +401,95 @@ void main() {
       return _server()(req);
     }));
     expect(report.issues.where((i) => i.stage == 'overwritten'), isEmpty);
+  });
+
+  group('copy photos', () {
+    // Library data, not personal: a photo hangs off a copy, and a copy is
+    // visible to whoever the book is shared with.
+    Future<LibraryRepository> withCopy() async {
+      final repo = await _repo();
+      await repo.db.into(repo.db.physicalCopies).insert(
+            PhysicalCopiesCompanion.insert(
+              id: 'c1',
+              bookId: 'b1',
+              needsPush: const Value(false),
+            ),
+          );
+      return repo;
+    }
+
+    test('one taken here is pushed with its bytes', () async {
+      final repo = await withCopy();
+      final pushed = <Map<String, dynamic>>[];
+      final uploaded = <String>[];
+
+      final source = File('${repo.dataDir.path}/source.jpg');
+      await source.writeAsBytes([0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0]);
+      final id = await repo.copyPhotos
+          .addPhoto('c1', source.path, caption: 'top shelf');
+
+      await SyncService(repo).push(_client(_server(
+        pushedCopyPhotos: pushed,
+        uploadedPhotoImages: uploaded,
+      )));
+
+      expect(pushed, hasLength(1));
+      expect(pushed.single['caption'], 'top shelf');
+      expect(uploaded, [id], reason: 'the row is nothing without the image');
+
+      final stored = await (repo.db.select(repo.db.copyPhotos)
+            ..where((ph) => ph.id.equals(id)))
+          .getSingle();
+      expect(stored.needsPush, isFalse);
+    });
+
+    test('one from another device arrives with its bytes on disk', () async {
+      final repo = await withCopy();
+      await SyncService(repo).pull(_client(_server(copyPhotos: [
+        {
+          'id': 'remote-photo',
+          'copy_id': 'c1',
+          'path': 'copy-photos/remote-photo',
+          'caption': 'their shelf',
+          'taken_at': '2026-07-20 10:00:00',
+          'updated_at': '2026-07-20 10:00:00',
+        }
+      ])));
+
+      final all = await repo.db.select(repo.db.copyPhotos).get();
+      expect(all, hasLength(1));
+      expect(all.single.caption, 'their shelf');
+      expect(all.single.needsPush, isFalse);
+      expect(File('${repo.dataDir.path}/${all.single.path}').existsSync(), isTrue,
+          reason: 'a row without its image renders as a gap');
+    });
+
+    test('a photo for a copy this device lacks is skipped', () async {
+      final repo = await _repo(); // no copy at all
+      await SyncService(repo).pull(_client(_server(copyPhotos: [
+        {
+          'id': 'orphan',
+          'copy_id': 'not-here',
+          'path': 'copy-photos/orphan',
+          'taken_at': '2026-07-20 10:00:00',
+          'updated_at': '2026-07-20 10:00:00',
+        }
+      ])));
+      expect(await repo.db.select(repo.db.copyPhotos).get(), isEmpty);
+    });
+
+    test('deleting one leaves a tombstone to send', () async {
+      final repo = await withCopy();
+      final source = File('${repo.dataDir.path}/source.jpg');
+      await source.writeAsBytes([0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0]);
+      final id = await repo.copyPhotos.addPhoto('c1', source.path);
+
+      await repo.copyPhotos.deletePhoto(id);
+      final tombstones = await (repo.db.select(repo.db.localDeletions)
+            ..where((d) => d.kind.equals('copy_photo')))
+          .get();
+      expect(tombstones.map((t) => t.bookId), [id]);
+    });
   });
 
   test('an older server is not reported as broken on every sync', () async {

@@ -956,3 +956,182 @@ async fn a_member_cannot_see_the_invite_list() {
     let (status, _) = call(&app, "GET", "/api/invites", Some(&friend), None).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+// ---- copy photos (plan 6 #4) ----------------------------------------------
+//
+// Library data rather than personal: a photo hangs off a copy, and a copy is
+// visible to whoever the book is shared with. So the tests here are about the
+// *opposite* property to the ones above — that it is shared, correctly, with
+// the people who can already see the book, and with nobody else.
+
+async fn create_copy(app: &axum::Router, token: &str, book: &str) -> String {
+    let id = uuid::Uuid::new_v4().to_string();
+    let (status, body) = call(
+        app,
+        "PUT",
+        &format!("/api/copies/{id}"),
+        Some(token),
+        Some(json!({ "book_id": book, "location": "Shelf A" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create copy: {body}");
+    id
+}
+
+#[tokio::test]
+async fn a_copy_photo_round_trips_with_its_bytes() {
+    let app = test_app().await;
+    let token = register(&app, "solo@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    let copy = create_copy(&app, &token, &book).await;
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/copy-photos/p1",
+        Some(&token),
+        Some(json!({ "copy_id": copy, "caption": "top shelf, by the window" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    // The path is the server's choice, never the client's — the rule that
+    // closed H1 for covers.
+    assert_eq!(body["path"], "copy-photos/p1");
+
+    let (status, body) = call_bytes(&app, "PUT", "/api/copy-photos/p1/image", &token, png()).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let (status, list) = call(&app, "GET", "/api/copy-photos?cursor=", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let photos = list["photos"].as_array().unwrap();
+    assert_eq!(photos.len(), 1);
+    assert_eq!(photos[0]["caption"], "top shelf, by the window");
+}
+
+#[tokio::test]
+async fn a_photo_is_visible_to_whoever_can_see_the_book() {
+    // The deliberate difference from personal data: this is *not* private.
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    let copy = create_copy(&app, &master, &book).await;
+    call(
+        &app,
+        "PUT",
+        "/api/copy-photos/p1",
+        Some(&master),
+        Some(json!({ "copy_id": copy })),
+    )
+    .await;
+    call_bytes(&app, "PUT", "/api/copy-photos/p1/image", &master, png()).await;
+
+    // Before the share: invisible.
+    let (_, list) = call(&app, "GET", "/api/copy-photos?cursor=", Some(&friend), None).await;
+    assert!(list["photos"].as_array().unwrap().is_empty());
+    let (status, _) = call(&app, "GET", "/api/copy-photos/p1/image", Some(&friend), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": "friend@lib.test", "permission": "viewer"
+        })),
+    )
+    .await;
+
+    // After: visible, because the book is.
+    let (_, list) = call(&app, "GET", "/api/copy-photos?cursor=", Some(&friend), None).await;
+    assert_eq!(list["photos"].as_array().unwrap().len(), 1);
+    let (status, _) = call(&app, "GET", "/api/copy-photos/p1/image", Some(&friend), None).await;
+    assert_eq!(status, StatusCode::OK, "a viewer may look at it");
+}
+
+#[tokio::test]
+async fn a_viewer_cannot_add_or_remove_photos() {
+    // Looking is view; changing what a copy carries is editing.
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    let copy = create_copy(&app, &master, &book).await;
+    call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": "friend@lib.test", "permission": "viewer"
+        })),
+    )
+    .await;
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/copy-photos/nope",
+        Some(&friend),
+        Some(json!({ "copy_id": copy })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn deleting_a_photo_tombstones_it_and_removes_the_file() {
+    let app = test_app().await;
+    let token = register(&app, "solo@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    let copy = create_copy(&app, &token, &book).await;
+    call(
+        &app,
+        "PUT",
+        "/api/copy-photos/p1",
+        Some(&token),
+        Some(json!({ "copy_id": copy })),
+    )
+    .await;
+    call_bytes(&app, "PUT", "/api/copy-photos/p1/image", &token, png()).await;
+
+    let (status, _) = call(&app, "DELETE", "/api/copy-photos/p1", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call(&app, "GET", "/api/copy-photos/p1/image", Some(&token), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "the bytes go with the row");
+
+    let (_, body) = call(&app, "GET", "/api/deletions?kind=copy_photo", Some(&token), None).await;
+    assert!(
+        body.as_array().unwrap().iter().any(|d| d["book_id"] == "p1"),
+        "the other device has to learn it went: {body}"
+    );
+}
+
+#[tokio::test]
+async fn a_photo_that_is_not_an_image_is_refused() {
+    let app = test_app().await;
+    let token = register(&app, "solo@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    let copy = create_copy(&app, &token, &book).await;
+    call(
+        &app,
+        "PUT",
+        "/api/copy-photos/p1",
+        Some(&token),
+        Some(json!({ "copy_id": copy })),
+    )
+    .await;
+    let (status, _) = call_bytes(
+        &app,
+        "PUT",
+        "/api/copy-photos/p1/image",
+        &token,
+        b"not an image at all".to_vec(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

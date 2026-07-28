@@ -82,6 +82,7 @@ class CopyPhotoService {
             takenAt: Value(takenAt ?? DateTime.now()),
             caption:
                 Value(trimmed == null || trimmed.isEmpty ? null : trimmed),
+            updatedAt: Value(DateTime.now()),
           ),
         );
     return id;
@@ -92,6 +93,8 @@ class CopyPhotoService {
     return (db.update(db.copyPhotos)..where((ph) => ph.id.equals(photoId)))
         .write(CopyPhotosCompanion(
       caption: Value(trimmed == null || trimmed.isEmpty ? null : trimmed),
+      updatedAt: Value(DateTime.now()),
+      needsPush: const Value(true),
     ));
   }
 
@@ -102,11 +105,26 @@ class CopyPhotoService {
           ..where((ph) => ph.id.equals(photoId)))
         .getSingleOrNull();
     if (photo == null) return;
-    await (db.delete(db.copyPhotos)..where((ph) => ph.id.equals(photoId))).go();
+    await db.transaction(() async {
+      await (db.delete(db.copyPhotos)..where((ph) => ph.id.equals(photoId)))
+          .go();
+      // A tombstone, so the other devices stop showing it rather than pushing
+      // it back on their next sync (plan 6 #4).
+      await db.into(db.localDeletions).insertOnConflictUpdate(
+            LocalDeletionsCompanion.insert(
+              bookId: photoId,
+              kind: const Value('copy_photo'),
+            ),
+          );
+    });
     await deleteBlobs([photo]);
   }
 
   /// Drops every photo of a copy, blobs included.
+  ///
+  /// No tombstones: the copy's own deletion already tells the server, and the
+  /// server's `ON DELETE CASCADE` takes its photos with it. One tombstone per
+  /// photo would be noise saying the same thing.
   Future<void> deletePhotosOfCopy(String copyId) async {
     final photos = await photosOf(copyId);
     await (db.delete(db.copyPhotos)..where((ph) => ph.copyId.equals(copyId)))

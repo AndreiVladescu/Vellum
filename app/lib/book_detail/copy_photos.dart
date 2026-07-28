@@ -77,6 +77,18 @@ Future<String?> addCopyPhoto(
             title: const Text('Choose an existing one'),
             onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
           ),
+          // Said here rather than left to be discovered: a photo of a copy is
+          // often a photo of a room, and these travel with the copy to anyone
+          // the book is shared with — unlike your highlights and notes, which
+          // are yours alone (plan 6 #4).
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Text(
+              'Photos travel with the copy — anyone you share this book with '
+              'can see them.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
         ],
       ),
     ),

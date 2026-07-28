@@ -225,6 +225,12 @@ class Loans extends Table {
 /// catalogue payload for a mid-sized library. Only [path] is stored here; the
 /// bytes live under `photos/` in the data dir and ride backups.
 @DataClassName('CopyPhoto')
+/// Photos of a physical copy.
+///
+/// Library data rather than personal (plan 6 #4): a photo hangs off a copy,
+/// copies sync, and it is visible to whoever the book is shared with — like its
+/// covers. That is why these carry the same `updatedAt`/`needsPush` pair as
+/// every other synced row, and not the per-user channel `readerNotes` uses.
 class CopyPhotos extends Table {
   TextColumn get id => text()();
   TextColumn get copyId => text().references(PhysicalCopies, #id)();
@@ -233,6 +239,8 @@ class CopyPhotos extends Table {
   TextColumn get path => text()();
   DateTimeColumn get takenAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get caption => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -506,7 +514,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -790,6 +798,20 @@ class VellumDatabase extends _$VellumDatabase {
             ]) {
               if (!sessionCols.contains(name)) {
                 await m.addColumn(readingSessions, column);
+              }
+            }
+          }
+          if (from < 24) {
+            // Copy photos start syncing (plan 6 #4). Existing rows default to
+            // needs_push = true so the first sync after upgrading publishes the
+            // photos already taken, rather than stranding them.
+            final photoCols = await columnsOf('copy_photos');
+            for (final (name, column) in [
+              ('updated_at', copyPhotos.updatedAt),
+              ('needs_push', copyPhotos.needsPush),
+            ]) {
+              if (!photoCols.contains(name)) {
+                await m.addColumn(copyPhotos, column);
               }
             }
           }

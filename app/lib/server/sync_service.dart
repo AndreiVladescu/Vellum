@@ -467,6 +467,7 @@ class SyncService {
     final loanResult = await _pullLoans(client, cursor, issues);
     // Personal data last: an annotation or a sitting names a book, and its
     // foreign key needs that book already applied above.
+    final photoResult = await _pullCopyPhotos(client, cursor, issues);
     final personalPulled = await _pullPersonal(client, cursor, issues);
     await _syncProfile(client, issues);
 
@@ -480,11 +481,13 @@ class SyncService {
           shelfResult.pulled +
           copyResult.pulled +
           loanResult.pulled +
+          photoResult.pulled +
           personalPulled,
       deletedLocally: deletedLocally +
           shelfResult.deletedLocally +
           copyResult.deletedLocally +
-          loanResult.deletedLocally,
+          loanResult.deletedLocally +
+          photoResult.deletedLocally,
       issues: issues,
     );
   }
@@ -957,6 +960,7 @@ class SyncService {
     final shelfResult = await _pushShelves(client, issues);
     final copyResult = await _pushCopies(client, issues);
     final loanResult = await _pushLoans(client, issues);
+    final photoPushed = await _pushCopyPhotos(client, issues);
     final personalPushed = await _pushPersonal(client, issues);
 
     return SyncReport(
@@ -964,6 +968,7 @@ class SyncService {
           shelfResult.pushed +
           copyResult.pushed +
           loanResult.pushed +
+          photoPushed +
           personalPushed,
       deletedRemotely: deletedRemotely +
           shelfResult.deletedRemotely +
@@ -971,6 +976,155 @@ class SyncService {
           loanResult.deletedRemotely,
       issues: issues,
     );
+  }
+
+  // ---- copy photos (plan 6 #4) --------------------------------------------
+  //
+  // Library data, so this is the blob pattern rather than the personal one: a
+  // row, then its bytes. Photos ride *after* copies in both directions — a
+  // photo names a copy, and the foreign key needs it there first.
+
+  Future<({int pulled, int deletedLocally})> _pullCopyPhotos(
+    VellumServerClient client,
+    String? cursor,
+    List<SyncIssue> issues,
+  ) async {
+    final db = _db;
+    var pulled = 0;
+    var deletedLocally = 0;
+    try {
+      for (final id
+          in await client.listDeletions(since: cursor, kind: 'copy_photo')) {
+        final rows = await (db.select(db.copyPhotos)
+              ..where((ph) => ph.id.equals(id)))
+            .get();
+        for (final row in rows) {
+          final file = File(p.join(_dataDir.path, row.path));
+          if (file.existsSync()) {
+            try {
+              await file.delete();
+            } catch (_) {
+              // The row goes either way; a stray image is swept by Library
+              // health rather than being worth failing a sync over.
+            }
+          }
+        }
+        deletedLocally +=
+            await (db.delete(db.copyPhotos)..where((ph) => ph.id.equals(id)))
+                .go();
+      }
+
+      final known = {
+        for (final c in await db.select(db.physicalCopies).get()) c.id,
+      };
+      final remote = await client.listCopyPhotos(cursor: cursor);
+      for (final photo in remote.entries) {
+        // A copy this device doesn't have — a share it hasn't taken, or a copy
+        // whose own pull failed. The foreign key would otherwise abort.
+        if (!known.contains(photo.copyId)) continue;
+        final local = await (db.select(db.copyPhotos)
+              ..where((ph) => ph.id.equals(photo.id)))
+            .getSingleOrNull();
+        if (local != null &&
+            photo.updatedAt != null &&
+            !local.updatedAt.isBefore(photo.updatedAt!)) {
+          continue;
+        }
+        // The id comes off the wire and is about to become a file path, so it
+        // goes through the same check covers and book files use (M2).
+        if (!_isSafeSegment(photo.id)) continue;
+        final rel = p.join(CopyPhotoService.dirName, '${photo.id}.jpg');
+        final file = File(p.join(_dataDir.path, rel));
+        if (!file.existsSync()) {
+          try {
+            final bytes = await client.downloadCopyPhotoImage(photo.id);
+            if (bytes != null) {
+              await file.parent.create(recursive: true);
+              await file.writeAsBytes(bytes, flush: true);
+            }
+          } catch (e) {
+            issues.add(_personalIssue('file', 'A copy photo could not be '
+                'downloaded: $e'));
+            continue; // no row without its image — it would render as a gap
+          }
+        }
+        await db.into(db.copyPhotos).insertOnConflictUpdate(
+              CopyPhotosCompanion.insert(
+                id: photo.id,
+                copyId: photo.copyId,
+                path: rel,
+                caption: Value(photo.caption),
+                takenAt: Value(photo.takenAt ?? DateTime.now()),
+                updatedAt: Value(photo.updatedAt ?? DateTime.now()),
+                needsPush: const Value(false),
+              ),
+            );
+        pulled++;
+      }
+    } catch (e) {
+      if (!_serverLacksPersonal(e)) {
+        issues.add(_personalIssue('pull', 'Copy photos could not be pulled: $e'));
+      }
+    }
+    return (pulled: pulled, deletedLocally: deletedLocally);
+  }
+
+  Future<int> _pushCopyPhotos(
+    VellumServerClient client,
+    List<SyncIssue> issues,
+  ) async {
+    final db = _db;
+    var pushed = 0;
+
+    final tombstones = await (db.select(db.localDeletions)
+          ..where((d) => d.kind.equals('copy_photo')))
+        .get();
+    for (final t in tombstones) {
+      try {
+        await client.deleteCopyPhoto(t.bookId);
+        await (db.delete(db.localDeletions)
+              ..where((d) => d.bookId.equals(t.bookId)))
+            .go();
+        pushed++;
+      } catch (e) {
+        if (_serverLacksPersonal(e)) {
+          await (db.delete(db.localDeletions)
+                ..where((d) => d.bookId.equals(t.bookId)))
+              .go();
+        } else {
+          issues.add(_personalIssue('delete', 'A copy photo deletion could '
+              'not be sent: $e'));
+        }
+      }
+    }
+
+    final dirty = await (db.select(db.copyPhotos)
+          ..where((ph) => ph.needsPush.equals(true)))
+        .get();
+    for (final photo in dirty) {
+      try {
+        await client.pushCopyPhoto(
+          id: photo.id,
+          copyId: photo.copyId,
+          caption: photo.caption,
+          takenAt: photo.takenAt,
+          updatedAt: photo.updatedAt,
+        );
+        final file = File(p.join(_dataDir.path, photo.path));
+        if (file.existsSync()) {
+          await client.uploadCopyPhotoImage(photo.id, await file.readAsBytes());
+        }
+        await (db.update(db.copyPhotos)
+              ..where((row) => row.id.equals(photo.id)))
+            .write(const CopyPhotosCompanion(needsPush: Value(false)));
+        pushed++;
+      } catch (e) {
+        // View-only, or a copy the server doesn't have yet. It stays dirty and
+        // rides the next sync.
+        issues.add(_personalIssue('push', 'A copy photo could not be sent: $e'));
+      }
+    }
+    return pushed;
   }
 
   // ---- personal data ------------------------------------------------------

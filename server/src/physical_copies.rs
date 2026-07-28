@@ -255,3 +255,226 @@ async fn fetch_copy(state: &AppState, id: &str) -> AppResult<Json<CopyDto>> {
     .ok_or_else(|| AppError::NotFound("physical copy not found".into()))?;
     Ok(Json(copy))
 }
+
+
+// ---- copy photos (plan 6 #4) ----------------------------------------------
+//
+// Photos of a copy are library data, not personal data: they hang off a copy,
+// which already syncs, and are visible to whoever the book is shared with —
+// like its covers and files. So this follows the *blob* pattern rather than
+// `personal.rs`: a row holding a path, with the bytes going through the same
+// store as everything else.
+
+#[derive(Serialize, sqlx::FromRow)]
+pub struct CopyPhotoDto {
+    pub id: String,
+    pub copy_id: String,
+    pub path: String,
+    pub caption: Option<String>,
+    pub taken_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Deserialize)]
+pub struct CopyPhotoInput {
+    pub copy_id: String,
+    pub caption: Option<String>,
+    pub taken_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+pub async fn list_photos(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<ListQuery>,
+) -> AppResult<Json<serde_json::Value>> {
+    let since = q.cursor.as_deref().map(str::trim).filter(|c| !c.is_empty());
+    let filter = if since.is_some() {
+        " AND cp.updated_at >= ?"
+    } else {
+        ""
+    };
+    // Two joins deep: a photo belongs to a copy, which belongs to a book, and
+    // the book is what access is decided on.
+    let sql = format!(
+        "SELECT cp.id, cp.copy_id, cp.path, cp.caption, cp.taken_at, cp.updated_at \
+         FROM copy_photo cp \
+         JOIN physical_copy pc ON pc.id = cp.copy_id \
+         JOIN book b ON b.id = pc.book_id \
+         WHERE {} {filter} ORDER BY cp.id",
+        access_predicate()
+    );
+    let mut query = sqlx::query_as::<_, CopyPhotoDto>(&sql)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id);
+    if let Some(ts) = since {
+        query = query.bind(ts.to_string());
+    }
+    let photos = query.fetch_all(&state.db).await?;
+
+    if q.cursor.is_some() {
+        let server_now: String = sqlx::query_scalar("SELECT datetime('now')")
+            .fetch_one(&state.db)
+            .await?;
+        Ok(Json(serde_json::json!({
+            "server_now": server_now,
+            "photos": photos,
+        })))
+    } else {
+        Ok(Json(serde_json::to_value(photos)?))
+    }
+}
+
+/// Records a photo against a copy. The bytes are uploaded separately, to
+/// `PUT /copy-photos/{id}/image` — same split as a book and its file, so a
+/// metadata push doesn't carry megabytes and a failed byte transfer doesn't
+/// lose the caption.
+pub async fn upsert_photo(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+    Json(input): Json<CopyPhotoInput>,
+) -> AppResult<Json<CopyPhotoDto>> {
+    if !crate::access::copy_access(&state, &user, &input.copy_id)
+        .await?
+        .can_edit()
+    {
+        return Err(AppError::NotFound("no such copy".into()));
+    }
+    // The path is server-chosen, never client-supplied: the same rule that
+    // closed H1 for covers. A client that could name the path could name one
+    // outside the store.
+    let rel = format!("copy-photos/{id}");
+    sqlx::query(
+        "INSERT INTO copy_photo (id, copy_id, path, caption, taken_at, updated_at) \
+         VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')), COALESCE(?, datetime('now'))) \
+         ON CONFLICT(id) DO UPDATE SET \
+            caption = excluded.caption, taken_at = excluded.taken_at, \
+            updated_at = excluded.updated_at \
+         WHERE excluded.updated_at >= copy_photo.updated_at",
+    )
+    .bind(&id)
+    .bind(&input.copy_id)
+    .bind(&rel)
+    .bind(&input.caption)
+    .bind(&input.taken_at)
+    .bind(&input.updated_at)
+    .execute(&state.db)
+    .await?;
+
+    let row: CopyPhotoDto = sqlx::query_as(
+        "SELECT id, copy_id, path, caption, taken_at, updated_at FROM copy_photo WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_one(&state.db)
+    .await?;
+    Ok(Json(row))
+}
+
+pub async fn delete_photo(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    let copy_id: Option<String> = sqlx::query_scalar("SELECT copy_id FROM copy_photo WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?;
+    let copy_id = copy_id.ok_or_else(|| AppError::NotFound("no such photo".into()))?;
+    if !crate::access::copy_access(&state, &user, &copy_id)
+        .await?
+        .can_edit()
+    {
+        return Err(AppError::NotFound("no such photo".into()));
+    }
+    sqlx::query("DELETE FROM copy_photo WHERE id = ?")
+        .bind(&id)
+        .execute(&state.db)
+        .await?;
+    let _ = tokio::fs::remove_file(state.data_dir.join(format!("copy-photos/{id}"))).await;
+    sqlx::query(
+        "INSERT INTO deletion (book_id, kind, deleted_at) \
+         VALUES (?, 'copy_photo', datetime('now')) \
+         ON CONFLICT(book_id) DO UPDATE SET deleted_at = excluded.deleted_at",
+    )
+    .bind(&id)
+    .execute(&state.db)
+    .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// Uploads the photo's bytes. Sniffed by magic number like every other image
+/// here — a declared content type is a claim, not evidence — and capped by the
+/// route's own body limit rather than by a check that can never fire.
+pub async fn put_photo_image(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+    body: axum::body::Bytes,
+) -> AppResult<Json<serde_json::Value>> {
+    let copy_id: Option<String> = sqlx::query_scalar("SELECT copy_id FROM copy_photo WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?;
+    let copy_id = copy_id.ok_or_else(|| AppError::NotFound("no such photo".into()))?;
+    if !crate::access::copy_access(&state, &user, &copy_id)
+        .await?
+        .can_edit()
+    {
+        return Err(AppError::NotFound("no such photo".into()));
+    }
+    if !matches!(
+        crate::blobs::sniff(&body),
+        crate::blobs::Sniffed::Jpeg
+            | crate::blobs::Sniffed::Png
+            | crate::blobs::Sniffed::Gif
+            | crate::blobs::Sniffed::WebP
+    ) {
+        return Err(AppError::BadRequest("that is not an image".into()));
+    }
+    let full = state.data_dir.join(format!("copy-photos/{id}"));
+    if let Some(parent) = full.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+    tokio::fs::write(&full, &body)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "ok": true, "size": body.len() })))
+}
+
+pub async fn get_photo_image(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<axum::response::Response> {
+    let copy_id: Option<String> = sqlx::query_scalar("SELECT copy_id FROM copy_photo WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?;
+    let copy_id = copy_id.ok_or_else(|| AppError::NotFound("no such photo".into()))?;
+    // View, not edit: seeing a shelf you have read access to is reading.
+    if !crate::access::copy_access(&state, &user, &copy_id)
+        .await?
+        .can_view()
+    {
+        return Err(AppError::NotFound("no such photo".into()));
+    }
+    let bytes = tokio::fs::read(state.data_dir.join(format!("copy-photos/{id}")))
+        .await
+        .map_err(|_| AppError::NotFound("no image yet".into()))?;
+    let content_type = match crate::blobs::sniff(&bytes) {
+        crate::blobs::Sniffed::Png => "image/png",
+        crate::blobs::Sniffed::Jpeg => "image/jpeg",
+        crate::blobs::Sniffed::Gif => "image/gif",
+        crate::blobs::Sniffed::WebP => "image/webp",
+        _ => "application/octet-stream",
+    };
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, content_type)
+        .body(bytes.into())
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
