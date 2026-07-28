@@ -17,6 +17,14 @@ enum ReaderTheme {
   final String label;
   final Color background;
   final Color foreground;
+
+  /// Whether the page is dark enough that the book's own colours have to go.
+  ///
+  /// Asked of the *theme*, not of the dark-pages switch: choosing the dark page
+  /// colour puts you on a black page just as surely, and a heading whose
+  /// stylesheet asked for near-black is invisible on it either way. Measured
+  /// rather than named, so a repalette can't quietly leave this behind.
+  bool get isDark => background.computeLuminance() < 0.3;
 }
 
 /// Type family for EPUB body text. Bundled families only — a reader that offers

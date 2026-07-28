@@ -132,6 +132,14 @@ void main() {
     expect(out[0], lessThan(out[1]), reason: 'what tilt remains is an inversion');
   });
 
+  test('only the dark palette counts as a dark page', () {
+    // What decides whether a book's own colours are stripped out of its markup.
+    expect(ReaderTheme.dark.isDark, isTrue);
+    for (final theme in [ReaderTheme.light, ReaderTheme.sepia, ReaderTheme.grey]) {
+      expect(theme.isDark, isFalse, reason: '${theme.label} is a light page');
+    }
+  });
+
   test('dark pages override the page colour rather than fighting it', () async {
     final settings = await ReaderSettings.load();
     await settings.setTheme(ReaderTheme.sepia);

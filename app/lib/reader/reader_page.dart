@@ -6,12 +6,14 @@ import 'package:pdfrx/pdfrx.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../shortcuts.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
 import 'dark_pages.dart';
 import 'edge_turn.dart';
+import 'reader_hotkeys.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
@@ -94,9 +96,22 @@ class _ReaderPageState extends State<ReaderPage> {
   final _searchController = TextEditingController();
   bool _searching = false;
 
+  /// Ctrl+F / Ctrl+G, which have to work before the page is clicked.
+  late final ReaderHotkeys _hotkeys = ReaderHotkeys(
+    isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+    onFind: _openSearch,
+    onGoTo: _promptPageJump,
+    onEscape: () {
+      if (!_searching) return false;
+      _closeSearch();
+      return true;
+    },
+  );
+
   @override
   void initState() {
     super.initState();
+    _hotkeys.attach();
     _annotationsSub =
         _annotations.watchForBook(widget.book.id).listen((annotations) {
       _highlights.update(annotations);
@@ -114,6 +129,7 @@ class _ReaderPageState extends State<ReaderPage> {
 
   @override
   void dispose() {
+    _hotkeys.detach();
     // Closing the session is fire-and-forget: the widget is going away, and a
     // dropped write costs one session row, not correctness.
     _session.end(page: _page);
@@ -460,21 +476,21 @@ class _ReaderPageState extends State<ReaderPage> {
             ),
             IconButton(
               icon: const Icon(Icons.close),
-              tooltip: 'Close search',
-              onPressed: () {
-                _searcher?.resetTextSearch();
-                _searchController.clear();
-                setState(() => _searching = false);
-              },
+              tooltip: 'Close search (Esc)',
+              onPressed: _closeSearch,
             ),
           ],
           if (!_searching) ...[
           if (_page != null && _pageCount != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Text('$_page / $_pageCount'),
+            // The counter is the obvious place to press when you want a
+            // particular page, so it is the control rather than a label with
+            // the real one buried in the overflow menu.
+            TextButton(
+              onPressed: _promptPageJump,
+              style: TextButton.styleFrom(
+                foregroundColor: readerTheme.foreground,
               ),
+              child: Text('$_page / $_pageCount'),
             ),
           // Selection-dependent actions appear only while text is selected, so
           // the bar isn't a row of buttons that silently do nothing.
@@ -525,13 +541,11 @@ class _ReaderPageState extends State<ReaderPage> {
           ),
           IconButton(
             icon: const Icon(Icons.search),
-            tooltip: 'Search in this book',
+            tooltip: 'Search in this book (${commandModifierLabel()}F)',
             // Disabled until the document is loaded, which is also when the
             // searcher exists — a search box that silently does nothing is
             // worse than one that is visibly not ready yet.
-            onPressed: _searcher == null
-                ? null
-                : () => setState(() => _searching = true),
+            onPressed: _searcher == null ? null : _openSearch,
           ),
           PopupMenuButton<String>(
             tooltip: 'More',
@@ -546,9 +560,13 @@ class _ReaderPageState extends State<ReaderPage> {
                   }
               }
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'jump', child: Text('Go to page…')),
-              PopupMenuItem(value: 'options', child: Text('Reading options…')),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'jump',
+                child: Text('Go to page…  ${commandModifierLabel()}G'),
+              ),
+              const PopupMenuItem(
+                  value: 'options', child: Text('Reading options…')),
             ],
           ),
           ],
@@ -664,4 +682,16 @@ class _ReaderPageState extends State<ReaderPage> {
     );
   }
 
+  /// Opens the in-book search, if the document is loaded enough to have one.
+  void _openSearch() {
+    if (_searcher == null || _searching) return;
+    setState(() => _searching = true);
+  }
+
+  void _closeSearch() {
+    if (!_searching) return;
+    _searcher?.resetTextSearch();
+    _searchController.clear();
+    setState(() => _searching = false);
+  }
 }

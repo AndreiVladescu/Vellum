@@ -58,6 +58,16 @@ SingleActivator? activatorFor(LibraryCommand command, {required bool meta}) {
   return SingleActivator(key, control: !meta, meta: meta);
 }
 
+/// A Ctrl/⌘ + [key] activator, for screens outside the library shell.
+///
+/// The readers have their own shortcuts and no command palette to register
+/// them with, but "the command modifier" has to mean the same thing there — so
+/// they ask here rather than each writing `control: !Platform.isMacOS`.
+SingleActivator commandShortcut(LogicalKeyboardKey key, {bool? meta}) {
+  final useMeta = meta ?? usesMetaModifier;
+  return SingleActivator(key, control: !useMeta, meta: useMeta);
+}
+
 /// How a shortcut is written next to its menu item — "Ctrl+F", "⌘F", "F5".
 String? shortcutLabelFor(LibraryCommand command, {required bool meta}) {
   final key = command.key;

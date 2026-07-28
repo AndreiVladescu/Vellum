@@ -64,6 +64,20 @@ void main() {
       expect(shortcutsFor([scan], meta: false), isEmpty);
     });
 
+
+    test('the readers get the same modifier without restating the rule', () {
+      // The reader pages have their own shortcuts and no command palette to
+      // register them with, so they build activators directly — but Ctrl vs ⌘
+      // has to stay one decision.
+      final ctrl = commandShortcut(LogicalKeyboardKey.keyF, meta: false);
+      expect(ctrl.control, isTrue);
+      expect(ctrl.meta, isFalse);
+      expect(ctrl.trigger, LogicalKeyboardKey.keyF);
+
+      final cmd = commandShortcut(LogicalKeyboardKey.keyG, meta: true);
+      expect(cmd.control, isFalse);
+      expect(cmd.meta, isTrue);
+    });
     test('shortcutsFor binds every keyed command to its own callback', () {
       final fired = <String>[];
       final commands = [

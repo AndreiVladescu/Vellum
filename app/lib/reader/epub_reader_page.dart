@@ -6,6 +6,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../shortcuts.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/epub_highlight_html.dart';
@@ -13,6 +14,8 @@ import 'annotations/highlight_palette.dart';
 import 'dark_pages.dart';
 import 'edge_turn.dart';
 import 'epub_book.dart';
+import 'epub_search.dart';
+import 'reader_hotkeys.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
 
@@ -106,9 +109,34 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   List<Annotation> _bookAnnotations = const [];
   StreamSubscription<List<Annotation>>? _annotationsSub;
 
+  /// The parsed book, once the future has resolved — so the shortcuts, which
+  /// live outside the FutureBuilder, can reach the text they search.
+  EpubBook? _loaded;
+
+  /// In-book search. Unlike the PDF side there is no package to hand this to,
+  /// so [searchEpub] does it over the chapters' plain text.
+  bool _searching = false;
+  final _searchController = TextEditingController();
+  List<EpubSearchHit> _hits = const [];
+  bool _hitsTruncated = false;
+  int _hitIndex = 0;
+
+  /// Ctrl+F / Ctrl+G, which have to work before the page is clicked.
+  late final ReaderHotkeys _hotkeys = ReaderHotkeys(
+    isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+    onFind: _openSearch,
+    onGoTo: _promptChapterJump,
+    onEscape: () {
+      if (!_searching) return false;
+      _closeSearch();
+      return true;
+    },
+  );
+
   @override
   void initState() {
     super.initState();
+    _hotkeys.attach();
     _annotationsSub =
         _annotations.watchForBook(widget.book.id).listen((annotations) {
       if (mounted) setState(() => _bookAnnotations = annotations);
@@ -132,12 +160,14 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
   @override
   void dispose() {
+    _hotkeys.detach();
     _annotationsSub?.cancel();
     _saveDebounce?.cancel();
     _scroll.removeListener(_onScroll);
     _selectionNotifier.removeListener(_onSelectionChanged);
     _selectionNotifier.dispose();
     _settings?.removeListener(_onSettingsChanged);
+    _searchController.dispose();
     _session.end(page: _chapter + 1);
     _scroll.dispose();
     super.dispose();
@@ -270,6 +300,100 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
       ),
     );
     return saved == true ? controller.text : null;
+  }
+
+  void _openSearch() {
+    if (_searching || _loaded == null) return;
+    setState(() => _searching = true);
+  }
+
+  void _closeSearch() {
+    if (!_searching) return;
+    _searchController.clear();
+    setState(() {
+      _searching = false;
+      _hits = const [];
+      _hitsTruncated = false;
+      _hitIndex = 0;
+    });
+  }
+
+  /// Runs the query and jumps to the first hit.
+  ///
+  /// On submit rather than on every keystroke: `plainText` re-extracts each
+  /// chapter from its markup, so searching a long book is work worth doing once
+  /// per question rather than once per letter.
+  void _runSearch(String query) {
+    final epub = _loaded;
+    if (epub == null) return;
+    final result = searchEpub(epub.chapters, query);
+    setState(() {
+      _hits = result.hits;
+      _hitsTruncated = result.truncated;
+      _hitIndex = 0;
+    });
+    if (_hits.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No match for “${query.trim()}”')),
+      );
+      return;
+    }
+    _goToHit(0);
+  }
+
+  void _stepHit(int by) {
+    if (_hits.isEmpty) return;
+    // Wraps, like every find bar: the match after the last one is the first.
+    final next = (_hitIndex + by) % _hits.length;
+    setState(() => _hitIndex = next < 0 ? next + _hits.length : next);
+    _goToHit(_hitIndex);
+  }
+
+  void _goToHit(int index) {
+    final epub = _loaded;
+    if (epub == null || index < 0 || index >= _hits.length) return;
+    final hit = _hits[index];
+    _goTo(hit.chapter, epub.chapters.length);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final max = _scroll.position.maxScrollExtent;
+      if (max > 0) _scroll.jumpTo(hit.fraction.clamp(0, 1) * max);
+    });
+  }
+
+  /// Go to chapter N. Chapters are what this reader turns, and what the saved
+  /// position counts, so they are the unit the box asks for.
+  Future<void> _promptChapterJump() async {
+    final count = _count;
+    if (count <= 0) return; // the book hasn't opened yet
+    final controller = TextEditingController();
+    final target = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Go to chapter (1–$count)'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          onSubmitted: (value) =>
+              Navigator.pop(dialogContext, int.tryParse(value)),
+          decoration: const InputDecoration(hintText: 'Chapter number'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, int.tryParse(controller.text)),
+            child: const Text('Go'),
+          ),
+        ],
+      ),
+    );
+    if (target == null || !mounted) return;
+    _goTo(target.clamp(1, count) - 1, count);
   }
 
   void _openPanel(EpubBook epub) {
@@ -453,6 +577,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
         }
         final count = epub.chapters.length;
         _count = count;
+        _loaded = epub;
         if (!_restored) {
           // Saved position is 1-based (like PDF pages); clamp for safety.
           _restored = true;
@@ -469,6 +594,12 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
         final settings = _settings;
         final dark = settings?.darkPages ?? false;
         final readerTheme = settings?.effectiveTheme ?? ReaderTheme.light;
+        // The book's colours have to go on any dark page, not only when the
+        // dark-pages switch put it there — picking the Dark page colour lands
+        // you on black paper too, and a heading that asked for near-black is
+        // invisible on it. Greying the pictures stays with the switch: that was
+        // asked for as part of dark pages, not as part of a page colour.
+        final darkPage = readerTheme.isDark;
         return Scaffold(
           backgroundColor: readerTheme.background,
           // Immersive mode drops the bar entirely rather than fading it: a
@@ -478,13 +609,50 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               : AppBar(
             backgroundColor: readerTheme.background,
             foregroundColor: readerTheme.foreground,
-            title: Text(widget.book.title),
+            title: _searching
+                ? TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    style: TextStyle(color: readerTheme.foreground),
+                    decoration: const InputDecoration(
+                      hintText: 'Search in this book',
+                      border: InputBorder.none,
+                    ),
+                    onSubmitted: _runSearch,
+                  )
+                : Text(widget.book.title),
             actions: [
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text('${_chapter + 1} / $count'),
+              if (_searching) ...[
+                if (_hits.isNotEmpty)
+                  Center(
+                    child: Text('${_hitIndex + 1}/${_hits.length}'
+                        '${_hitsTruncated ? '+' : ''}'),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_up),
+                  tooltip: 'Previous match',
+                  onPressed: _hits.isEmpty ? null : () => _stepHit(-1),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                  tooltip: 'Next match',
+                  onPressed: _hits.isEmpty ? null : () => _stepHit(1),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close search (Esc)',
+                  onPressed: _closeSearch,
+                ),
+              ],
+              if (!_searching) ...[
+              // The counter is the obvious place to press when you want a
+              // particular chapter, so it is the control rather than a label.
+              TextButton(
+                onPressed: _promptChapterJump,
+                style: TextButton.styleFrom(
+                  foregroundColor: readerTheme.foreground,
+                ),
+                child: Text('${_chapter + 1} / $count'),
               ),
               if (_selectionRange != null) ...[
                 IconButton(
@@ -520,6 +688,11 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                 onPressed: () => _openPanel(epub),
               ),
               IconButton(
+                tooltip: 'Search in this book (${commandModifierLabel()}F)',
+                icon: const Icon(Icons.search),
+                onPressed: _openSearch,
+              ),
+              IconButton(
                 tooltip: 'Chapters',
                 icon: const Icon(Icons.toc),
                 onPressed: () => _pickChapter(epub),
@@ -534,6 +707,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                     typography: true,
                   ),
                 ),
+              ],
             ],
           ),
           body: LayoutBuilder(builder: (context, constraints) {
@@ -573,7 +747,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                             // Dark pages: the book's own colours come out
                             // first, or a heading that asked for near-black
                             // stays near-black on a near-black page.
-                            dark
+                            darkPage
                                 ? withoutBookColours(chapter.html)
                                 : chapter.html,
                             _bookAnnotations,
@@ -589,7 +763,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                           // win — a stylesheet saying `color: #222` is black
                           // text on a black page. Its *pictures* are handled by
                           // the factory, which greys them.
-                          customStylesBuilder: dark
+                          customStylesBuilder: darkPage
                               ? (element) => element.localName == 'mark'
                                   ? null
                                   : {'color': cssHex(readerTheme.foreground)}
