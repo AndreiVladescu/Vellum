@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
 import 'calibre_import.dart';
+import 'catalog_format_help.dart';
 import 'catalog_entry.dart';
 import 'csv_import.dart';
 import 'filename_metadata.dart';
@@ -581,8 +582,16 @@ class _PickStep extends StatelessWidget {
             _SourceTile(
               icon: Icons.table_chart_outlined,
               title: 'A CSV or JSON catalogue',
-              subtitle: 'Including an export from the Vellum console',
+              subtitle: 'A spreadsheet, or an export from Goodreads or the '
+                  'Vellum console',
               onTap: onCatalogFile,
+              // The question that follows choosing this is always "how should
+              // the file look?", so the answer is next to the choice rather
+              // than behind an error message after the first attempt.
+              trailing: TextButton(
+                onPressed: () => CatalogFormatSheet.show(context),
+                child: const Text('How?'),
+              ),
             ),
             _SourceTile(
               icon: Icons.rss_feed,
@@ -603,12 +612,17 @@ class _SourceTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.trailing,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+
+  /// Shown instead of the chevron, for a source that needs explaining before
+  /// it can be chosen.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -617,7 +631,7 @@ class _SourceTile extends StatelessWidget {
           leading: Icon(icon),
           title: Text(title),
           subtitle: Text(subtitle),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: trailing ?? const Icon(Icons.chevron_right),
           onTap: onTap,
         ),
       );

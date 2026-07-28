@@ -17,7 +17,12 @@ shelf, instead of scrolling a grid of covers.
 - **A wishlist too** — keep books you want but don't own; scan a barcode in a
   shop, or fill a gap in a series you collect. They stay off the shelf until you
   attach a file or record a copy, which moves them into the library by itself.
-- **Integrated reader** — read your PDFs and EPUBs right in the app.
+- **Bring a whole library at once** — import a folder of files, a Calibre
+  library, an OPDS catalogue, or a CSV/JSON list exported from Goodreads or
+  elsewhere. See [docs/IMPORTING.md](docs/IMPORTING.md) for how to structure a
+  catalogue file and how file names are read.
+- **Integrated reader** — read your PDFs and EPUBs right in the app, with
+  highlights in four marker colours and dark pages for both formats.
 - **Keyboard-first on desktop** — Ctrl+K opens a command palette that runs any
   action or jumps to any book; the common ones have their own shortcuts.
 - **Backed up** — export the whole library (database, covers, files) to a
