@@ -21,14 +21,28 @@ plan 5's problem statement, which describes the code as it was in July.
 
 ## The items
 
-| # | Item | Why it blocks v1 |
-|---|---|---|
-| 1 | **The People screen** | You cannot add a second user without `curl` |
-| 2 | **Desktop release artifacts** | Every desktop user must install a C++ toolchain first |
-| 3 | **Audit the personal-data endpoints** | New attack surface, reviewed only by its author |
-| 4 | **Copy photos sync** | The last personal thing stranded on one device |
-| 5 | **Reconcile the local profile with the account** | Two identities, no relationship, silent resolution |
-| 6 | **Last-write-wins leaves no trace** | An overwritten edit is invisible |
+**All six are done** (2026-07-28). Commits listed so "still true?" is answerable
+from `git log`.
+
+| # | Item | Why it blocked v1 | Commit |
+|---|---|---|---|
+| 1 | **The People screen** | You cannot add a second user without `curl` | `ba5bedc` |
+| 2 | **Desktop release artifacts** | Every desktop user must install a C++ toolchain first | `2fb63f4` |
+| 3 | **Audit the personal-data endpoints** | New attack surface, reviewed only by its author | `878d71b` |
+| 4 | **Copy photos sync** | The last personal thing stranded on one device | `461a7cc` |
+| 5 | **Reconcile the local profile with the account** | Two identities, no relationship, silent resolution | `0b59470` |
+| 6 | **Last-write-wins leaves no trace** | An overwritten edit is invisible | `0b59470` |
+
+Two findings came out of #3, both fixed and both reproduced against a running
+server before the fix: annotation tombstones were readable by every account
+through the unscoped `/deletions` list, and the avatar upload's stated 4 MB cap
+could never fire behind axum's 2 MB default. See `docs/SECURITY_AUDIT.md`
+round 3.
+
+What #4 turned out to be worth deciding rather than assuming: copy photos are
+**library** data, not personal — they hang off a copy, which already syncs, and
+are visible to whoever the book is shared with. The UI now says so where photos
+are added, because a photo of a copy is often a photo of a room.
 
 ---
 
