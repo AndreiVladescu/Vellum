@@ -24,19 +24,26 @@ visually separated from everything above it. The confirmation should be more
 than a Yes/No — for something this final, typing the number of books or the word
 DELETE is the usual pattern, and is cheap to build.
 
-**? Open — the scope, and it matters most here:**
+**Decided (2026-07-28): trash locally, leave the server alone.** Every book
+goes to the 30-day trash on this device; the server's copy is untouched. That
+reuses machinery that already exists, cannot harm anyone the library is shared
+with, and stays recoverable.
 
-- **Through the trash, or permanent?** Trash makes it recoverable for 30 days
-  and reuses machinery that already exists; permanent is what "delete
-  everything" sounds like and frees the disk immediately.
-- **What counts as "all books"?** Just book rows and their files/covers, or also
-  physical copies, loans and their history, shelves, rooms, wishlist entries,
-  highlights and reading statistics?
-- **What does "remote" mean?** Deleting from the server removes the books for
-  *everyone* the library is shared with, not just this device. If the account is
-  a member rather than the owner, it may not be allowed to at all. An
-  alternative reading is "delete my local copy and stop syncing", which is a
-  very different button.
+Two consequences to build for, both of which the UI has to say plainly:
+
+- **The books come back on the next sync**, because the server still has them
+  and the local rows are trashed rather than tombstoned. If the intent is
+  "reset this device", the button should offer to disconnect from the server as
+  well — otherwise it looks broken.
+- **Disk space is not freed until the sweep runs** (30 days), or until the
+  trash is emptied from the section directly above it in Preferences. Worth
+  saying in the confirmation, and worth offering "empty the trash now" straight
+  afterwards.
+
+Still to settle when building it: whether physical copies, loans, shelves,
+rooms and wishlist entries go too, or only books. The safest default is
+**books only**, since everything else is either about objects you still own or
+about people you lent to.
 
 ---
 
@@ -98,16 +105,19 @@ Back to leave. This is the standard Android pattern and works with a mouse on
 desktop too. Actions worth having from the start: move to trash, add/remove a
 genre, and whatever "another library" turns out to mean.
 
-**? Open — what is "another library"?** The app has several things that could be
-meant, and they are not alike:
+**Decided (2026-07-28): the digital shelves, and "move" really means move** —
+the selected books leave the shelf being viewed and join the one picked. Not
+the physical shelves in a room, and not server book groups.
 
-- a **physical library** (a room, with shelves you place copies on)
-- a **shelf** inside one of those rooms
-- a **book group** on the server (used for sharing a subset with someone)
-- a **genre/tag**, which is how books are grouped on the digital shelf
+**One thing this leaves open, with a proposed answer.** "Move" is only
+well-defined when you are looking at a shelf; from the whole library there is
+nothing to leave. Proposal, unless you say otherwise: the action reads **Move to
+shelf** when viewing a shelf and **Add to shelf** when viewing everything, doing
+exactly what it says in each case. Same sheet, one word different, and it never
+silently removes a book from a shelf you could not see.
 
-Moving books between *rooms* only makes sense for physical copies; moving
-between *groups* only makes sense when connected to a server.
+`ShelfBooks` is many-to-many with a `position`, so both are cheap: a move is one
+delete plus one insert, and the target position goes at the end.
 
 ---
 
@@ -129,10 +139,24 @@ What the console does *not* have, which the app does:
 - importing a **CSV/JSON catalogue**, or a Calibre library, or OPDS
 - the duplicate check before anything is written
 
-**? Open — which of those is meant?** If it is "drag a PDF onto the console and
-have it become a book, metadata and all", that is a contained feature. If it is
-"the whole import wizard, in the browser", that is much larger and mostly a
-re-implementation of `folder_import_page.dart` against the API.
+**Decided (2026-07-28): the whole import wizard, in the browser.** All four
+sources, with the dry-run review and the duplicate check before anything is
+written.
+
+This is the largest item in this document by some distance, and worth splitting
+when it is picked up. A sensible order, each useful on its own:
+
+1. **CSV/JSON catalogue** — the parser is pure logic and already exists twice
+   (`csv_import.dart`, and the console's own "Import CSV"); this is mostly the
+   review screen.
+2. **A folder of files** — needs the browser's directory picker, filename
+   parsing, and per-file upload with progress.
+3. **Calibre and OPDS** — the two that need the server to reach out or read a
+   directory structure, and the two most likely to be wanted least.
+
+The duplicate check should run **server-side** and be shared with the app's
+importer rather than re-implemented in JavaScript, or the two will disagree
+about what counts as a duplicate.
 
 ---
 
@@ -144,16 +168,14 @@ simpler.
 **Today.** `server/web/console.css` is 348 lines: a dark theme with custom
 properties, a dense data table, chips, modals, toasts.
 
-**? Open — simpler in which direction?** These pull apart:
+**Decided (2026-07-28): calmer, not lighter and not rearranged.** Same layout,
+same dark palette, same controls — it should stop shouting. Concretely: fewer
+borders and drop them to a dimmer line colour, no shadows, more whitespace
+between rows and around the table, one accent colour instead of four, and
+regular weight where bold is doing decoration rather than carrying meaning.
 
-- **Calmer visuals** — fewer borders and shadows, more whitespace, fewer
-  accent colours, lighter weight type.
-- **Less on screen at once** — which is really item 7 below, and would make the
-  page feel simpler without touching a single colour.
-- **A lighter palette** — the console is dark; the app follows the system.
-
-Knowing which of these is the itch decides whether this is a CSS pass or a
-layout redesign.
+A pure CSS pass, then — `console.css` only, no markup changes — which also makes
+it safe to do alongside item 7 without the two conflicting.
 
 ---
 
@@ -190,7 +212,7 @@ together.
    about.
 4. **#4** — the largest app-side piece, and worth doing after #7 so the two
    selection models can be designed to match.
-5. **#5** — after its question is answered, since the answer changes the size by
-   an order of magnitude.
-6. **#1** — last, deliberately: it is the only irreversible one, and it should
-   be built when there is time to be careful rather than squeezed in.
+5. **#1** — small now that it is scoped to a local trash, and the trash makes it
+   forgiving.
+6. **#5** — last, and in the three stages above rather than as one piece: it is
+   larger than everything else here put together.
