@@ -20,6 +20,7 @@ import 'import/folder_import_page.dart';
 import 'import/folder_import_service.dart';
 import 'import/import_plan.dart';
 import 'import/incoming_share.dart';
+import 'navigation_history.dart';
 import 'onboarding/first_run_sheet.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
@@ -81,7 +82,7 @@ Future<void> main() async {
 }
 
 class VellumApp extends StatelessWidget {
-  const VellumApp({
+  VellumApp({
     super.key,
     required this.repository,
     required this.profile,
@@ -93,6 +94,10 @@ class VellumApp extends StatelessWidget {
   final UserProfileStore profile;
   final AppSettingsStore settings;
   final ServerConnection connection;
+
+  /// Back/forward for the mouse's side buttons. Owned here because it is both a
+  /// navigator observer and something the shell reports its tab changes to.
+  final NavigationHistory _history = NavigationHistory();
 
   @override
   Widget build(BuildContext context) {
@@ -120,11 +125,19 @@ class VellumApp extends StatelessWidget {
             theme: themes.light,
             darkTheme: themes.dark,
             themeMode: settings.themeMode,
+            navigatorObservers: [_history],
+            // Inside the app, so `Navigator.of` here is the one being driven,
+            // and above every route, so the buttons work on any screen.
+            builder: (context, child) => MouseNavigation(
+              history: _history,
+              child: child ?? const SizedBox.shrink(),
+            ),
             home: LibraryPage(
               repository: repository,
               profile: profile,
               settings: settings,
               connection: connection,
+              history: _history,
             ),
           );
         },
@@ -140,12 +153,17 @@ class LibraryPage extends StatefulWidget {
     required this.profile,
     required this.settings,
     required this.connection,
+    this.history,
   });
 
   final LibraryRepository repository;
   final UserProfileStore profile;
   final AppSettingsStore settings;
   final ServerConnection connection;
+
+  /// Told about tab changes so the mouse's back button can undo one. Optional
+  /// so tests can pump the shell without one.
+  final NavigationHistory? history;
 
   @override
   State<LibraryPage> createState() => _LibraryPageState();
@@ -208,9 +226,23 @@ class _LibraryPageState extends State<LibraryPage> {
 
   LibraryRepository get repository => widget.repository;
 
+  /// Switches section, remembering where we were so the mouse's back button can
+  /// undo it. Every tab change goes through here — one that didn't would leave
+  /// a hole in the history that back silently skips over.
+  void _goToTab(int tab) {
+    if (tab == _tab) return;
+    widget.history?.recordSection(_tab);
+    setState(() => _tab = tab);
+  }
+
   @override
   void initState() {
     super.initState();
+    final history = widget.history;
+    if (history != null) {
+      history.applySection = (section) => setState(() => _tab = section);
+      history.currentSection = () => _tab;
+    }
     _autoSync();
     _autoPusher.start();
     _live.start();
@@ -545,7 +577,7 @@ class _LibraryPageState extends State<LibraryPage> {
         ));
       case FirstRunAction.createRoom:
         if (!mounted) return;
-        setState(() => _tab = 1);
+        _goToTab(1);
         await promptCreateLibrary(context, repository, widget.settings);
     }
   }
@@ -595,7 +627,7 @@ class _LibraryPageState extends State<LibraryPage> {
           icon: Icons.search,
           key: LogicalKeyboardKey.keyF,
           run: () {
-            setState(() => _tab = 0);
+            _goToTab(0);
             _searchFocus.requestFocus();
             _searchController.selection = TextSelection(
               baseOffset: 0,
@@ -682,7 +714,7 @@ class _LibraryPageState extends State<LibraryPage> {
           id: 'physical',
           label: l10n.physicalLibraries,
           icon: Icons.grid_view_rounded,
-          run: () => setState(() => _tab = 1),
+          run: () => _goToTab(1),
         ),
         // Not in the palette: opening the palette from inside it is a no-op,
         // and Escape is a contextual key rather than a command anyone hunts
@@ -821,7 +853,7 @@ class _LibraryPageState extends State<LibraryPage> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        onDestinationSelected: _goToTab,
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.menu_book_outlined),
