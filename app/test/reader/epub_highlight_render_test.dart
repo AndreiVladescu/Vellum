@@ -37,6 +37,8 @@ Annotation _highlight(String quote, {int? color}) => Annotation(
       quotedText: quote,
       color: color,
       createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+      needsPush: false,
     );
 
 void main() {

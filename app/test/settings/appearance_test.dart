@@ -176,6 +176,7 @@ void main() {
           id: id,
           title: title,
           needsPush: true,
+          readerNotesNeedsPush: false,
           needsProgressPush: false,
           status: 'unread',
           readCount: 0,

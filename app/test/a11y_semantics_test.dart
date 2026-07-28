@@ -82,6 +82,7 @@ Book _book(String title) => Book(
       id: 'b1',
       title: title,
       needsPush: true,
+      readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,

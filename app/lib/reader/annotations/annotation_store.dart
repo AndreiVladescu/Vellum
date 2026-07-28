@@ -57,7 +57,9 @@ class AnnotationStore {
   ///
   /// [locator] carries the fine position; [page]/[chapter] are stored alongside
   /// it so the panel can sort without parsing JSON. Nothing here bumps the
-  /// book's sync clock: an annotation is not catalogue data.
+  /// *book's* sync clock — an annotation is not catalogue data — but it does
+  /// stamp the annotation's own `updatedAt` and mark it for push, which is what
+  /// carries a highlight to your other devices.
   Future<String> add({
     required String bookId,
     required AnnotationKind kind,
@@ -79,6 +81,7 @@ class AnnotationStore {
           quotedText: Value(_blankToNull(quotedText)),
           note: Value(_blankToNull(note)),
           color: Value(color),
+          updatedAt: Value(DateTime.now()),
         ));
     return id;
   }
@@ -91,16 +94,37 @@ class AnnotationStore {
   /// annotation a lie about the book.
   Future<void> setNote(String id, String? note) =>
       (db.update(db.annotations)..where((a) => a.id.equals(id)))
-          .write(AnnotationsCompanion(note: Value(_blankToNull(note))));
+          .write(AnnotationsCompanion(
+        note: Value(_blankToNull(note)),
+        updatedAt: Value(DateTime.now()),
+        needsPush: const Value(true),
+      ));
 
   Future<void> setColor(String id, int? color) =>
       (db.update(db.annotations)..where((a) => a.id.equals(id)))
-          .write(AnnotationsCompanion(color: Value(color)));
+          .write(AnnotationsCompanion(
+        color: Value(color),
+        updatedAt: Value(DateTime.now()),
+        needsPush: const Value(true),
+      ));
 
-  Future<void> delete(String id) =>
-      (db.delete(db.annotations)..where((a) => a.id.equals(id))).go();
+  /// Deletes locally *and* leaves a tombstone, so the next sync tells the other
+  /// devices instead of them pushing the annotation straight back.
+  Future<void> delete(String id) => db.transaction(() async {
+        await (db.delete(db.annotations)..where((a) => a.id.equals(id))).go();
+        await db.into(db.localDeletions).insertOnConflictUpdate(
+              LocalDeletionsCompanion.insert(
+                bookId: id,
+                kind: const Value('annotation'),
+              ),
+            );
+      });
 
   /// Drops every annotation for a book — used when the book itself goes.
+  ///
+  /// No tombstones here on purpose: the book's own deletion already tells the
+  /// server, and its `ON DELETE CASCADE` takes the annotations with it. One
+  /// tombstone per highlight would be noise saying the same thing.
   Future<void> deleteForBook(String bookId) =>
       (db.delete(db.annotations)..where((a) => a.bookId.equals(bookId))).go();
 

@@ -52,6 +52,7 @@ Book _book(String id, String title) => Book(
       createdAt: DateTime(2024),
       updatedAt: DateTime(2024),
       needsPush: false,
+      readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,
@@ -66,6 +67,7 @@ Future<void> _seed(LibraryRepository repo, String id, String title) async {
           id: id,
           title: title,
           needsPush: const Value(false),
+          readerNotesNeedsPush: const Value(false),
         ),
       );
 }

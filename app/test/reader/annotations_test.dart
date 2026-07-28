@@ -145,6 +145,7 @@ void main() {
             id: 'b1',
             title: 'Dune',
             needsPush: const Value(false),
+            readerNotesNeedsPush: const Value(false),
           ));
       return repo;
     }
@@ -262,6 +263,7 @@ void main() {
     Book book(String title) => Book(
           id: 'b1',
           title: title,
+          readerNotesNeedsPush: false,
           createdAt: DateTime(2024),
           updatedAt: DateTime(2024),
           needsPush: false,
@@ -286,6 +288,8 @@ void main() {
           quotedText: quote,
           note: note,
           createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          needsPush: false,
         );
 
     test('a book exports as headed, quoted Markdown', () {

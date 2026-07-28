@@ -27,6 +27,7 @@ mod events;
 mod groups;
 mod layouts;
 mod loans;
+mod personal;
 mod mail;
 mod metadata;
 mod observability;
@@ -246,6 +247,34 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             put(physical_copies::upsert).delete(physical_copies::delete),
         )
         // Loan history (plan 5 #4, last of the trio) — same shape again.
+        // Personal data (annotations, sittings, private notes, profile) —
+        // scoped to the caller, never to the library. See personal.rs.
+        .route(
+            "/annotations",
+            get(personal::list_annotations),
+        )
+        .route(
+            "/annotations/{id}",
+            put(personal::upsert_annotation).delete(personal::delete_annotation),
+        )
+        .route(
+            "/annotations/deletions",
+            get(personal::list_annotation_deletions),
+        )
+        .route("/sessions", get(personal::list_sessions))
+        .route("/sessions/{id}", put(personal::upsert_session))
+        .route("/notes", get(personal::list_notes))
+        .route("/notes/{book_id}", put(personal::upsert_note))
+        .route(
+            "/profile",
+            get(personal::get_profile).put(personal::update_profile),
+        )
+        .route(
+            "/profile/avatar",
+            get(personal::get_avatar)
+                .put(personal::put_avatar)
+                .delete(personal::delete_avatar),
+        )
         .route("/loans", get(loans::list))
         .route("/loans/{id}", put(loans::upsert).delete(loans::delete))
         // Optional cross-device reading position (plan 5 #5). Per-(book, user,

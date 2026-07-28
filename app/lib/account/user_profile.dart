@@ -17,6 +17,7 @@ class UserProfileStore extends ChangeNotifier {
   static const _nameKey = 'profile.name';
   static const _emailKey = 'profile.email';
   static const _photoKey = 'profile.photo';
+  static const _updatedKey = 'profile.updatedAt';
 
   /// The folder the avatar is written to, under the library's data directory.
   /// Beside `covers` and `files` on purpose: the backup archive copies whole
@@ -50,9 +51,38 @@ class UserProfileStore extends ChangeNotifier {
 
   bool get canSetPhoto => _dataDir != null;
 
+  /// When this profile last changed here — the key the account sync compares
+  /// against the server's `profile_updated_at` to decide which side is newer.
+  DateTime? get updatedAt {
+    final stored = _prefs.getInt(_updatedKey);
+    return stored == null ? null : DateTime.fromMillisecondsSinceEpoch(stored);
+  }
+
+  Future<void> _stamp([DateTime? at]) => _prefs.setInt(
+        _updatedKey,
+        (at ?? DateTime.now()).millisecondsSinceEpoch,
+      );
+
+  /// Takes the account's name as this device's, without re-publishing it —
+  /// the stamp is the server's, so the next sync sees the two agree.
+  Future<void> adopt({required String name, DateTime? at}) async {
+    await _prefs.setString(_nameKey, name.trim());
+    await _stamp(at);
+    notifyListeners();
+  }
+
+  /// Takes the account's photo. Same as [setPhoto] but stamped with the
+  /// server's clock, so adopting it doesn't look like a local edit that then
+  /// needs pushing back.
+  Future<void> adoptPhoto(Uint8List bytes, {DateTime? at}) async {
+    await setPhoto(bytes);
+    await _stamp(at);
+  }
+
   Future<void> save({required String name, required String email}) async {
     await _prefs.setString(_nameKey, name.trim());
     await _prefs.setString(_emailKey, email.trim());
+    await _stamp();
     notifyListeners();
   }
 
@@ -78,6 +108,7 @@ class UserProfileStore extends ChangeNotifier {
     final previous = photoPath;
     await _prefs.setString(_photoKey, file.path);
     await _deleteQuietly(previous);
+    await _stamp();
     notifyListeners();
   }
 
@@ -85,6 +116,7 @@ class UserProfileStore extends ChangeNotifier {
     final previous = photoPath;
     await _prefs.remove(_photoKey);
     await _deleteQuietly(previous);
+    await _stamp();
     notifyListeners();
   }
 

@@ -24,11 +24,13 @@ ReadingSession _session({
       endedAt: start.add(length),
       startPage: startPage,
       endPage: endPage,
+      needsPush: false,
     );
 
 Book _book({DateTime? finishedAt, String id = 'b1'}) => Book(
       id: id,
       title: 'Book $id',
+      readerNotesNeedsPush: false,
       finishedAt: finishedAt,
       status: finishedAt == null ? 'reading' : 'finished',
       readCount: finishedAt == null ? 0 : 1,

@@ -198,7 +198,8 @@ class _LibraryPageState extends State<LibraryPage> {
 
   // One sync service for the whole app (launch auto-sync + the server page),
   // so its re-entrancy guard spans every way a sync can start.
-  late final SyncService _sync = SyncService(widget.repository);
+  late final SyncService _sync =
+      SyncService(widget.repository, profile: widget.profile);
 
   // Debounced background push of dirty books while connected, so a long editing
   // session keeps the server/console fresh without waiting for the next launch.

@@ -23,13 +23,25 @@ depend on the server being reachable.
 - Server: SQL migrations in `server/migrations/`
 
 Exception: a few `book` columns are **app-local-only by design** and must NOT be
-added to the server schema or sync payloads — reading state, `readerNotes`
-(personal), `sourceMetadata` (the import snapshot behind "revert to
-defaults"), and `deletedAt` (the trash's grace period, plan 5 #52: a trashed
-book is hidden locally and *not* deleted anywhere until the sweep runs). This still holds after plan 5 #5: reading *position* can now be
-mirrored through a separate, opt-in, per-device `reading_progress` table
-(`server/src/reading.rs`), which never touches the `book` row or its payload.
-`readerNotes` and `sourceMetadata` have no channel at all.
+added to the server schema or the *book* sync payload — `sourceMetadata` (the
+import snapshot behind "revert to defaults") and `deletedAt` (the trash's grace
+period, plan 5 #52: a trashed book is hidden locally and *not* deleted anywhere
+until the sweep runs).
+
+**Personal data has its own channel, never the book row.** Reading position
+(plan 5 #5) goes through the opt-in per-device `reading_progress` table
+(`server/src/reading.rs`); highlights/notes/bookmarks, reading sittings,
+`readerNotes` and the profile photo go through `server/src/personal.rs`
+(migration 0023). Every one of those tables is keyed by `user_id` taken from the
+token, because a shared library holds several people's marks in the same book —
+putting any of it on `book` would publish it to everyone the library is shared
+with. That is why `readerNotes` is a `book_note` row server-side rather than a
+column, and why it carries its own `readerNotesUpdatedAt`/`readerNotesNeedsPush`
+in the app rather than riding the book's.
+
+A server without migration 0023 answers 404 to all of it; the app treats that as
+"not supported yet" and syncs the library regardless — see
+`_serverLacksPersonal`.
 
 IDs are UUID strings. Book files and cover images live on the filesystem; the
 DB stores paths and hashes only. Loans are a separate table from physical

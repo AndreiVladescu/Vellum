@@ -28,6 +28,16 @@ class Books extends Table {
   DateTimeColumn get lastReadAt => dateTime().nullable()();
   // Personal reader notes. Local-only — never pushed to or pulled from a server.
   TextColumn get readerNotes => text().nullable()();
+
+  /// The private note's own clock and outbox flag.
+  ///
+  /// Separate from the book's `updatedAt`/`needsPush` because the note does not
+  /// travel with the book: it goes to `/api/notes`, a per-user table, so that a
+  /// library shared with someone else does not hand them your notes. Editing a
+  /// note must therefore not look like editing the catalogue entry.
+  DateTimeColumn get readerNotesUpdatedAt => dateTime().nullable()();
+  BoolColumn get readerNotesNeedsPush =>
+      boolean().withDefault(const Constant(false))();
   // JSON snapshot of the official library metadata this book was imported with,
   // so edits can be reverted to the source. Null for custom (manual) books.
   TextColumn get sourceMetadata => text().nullable()();
@@ -426,6 +436,14 @@ class Annotations extends Table {
   IntColumn get color => integer().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
+  /// Last-write-wins key, and what a delta pull compares against. Bumped on
+  /// every edit — recolouring a highlight or rewriting a note both count.
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Waiting to be pushed. Same convention as every other synced table: set on
+  /// local write, cleared once the server has it.
+  BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -448,6 +466,15 @@ class ReadingSessions extends Table {
   DateTimeColumn get endedAt => dateTime()();
   IntColumn get startPage => integer().nullable()();
   IntColumn get endPage => integer().nullable()();
+
+  /// Which device this sitting happened on, so statistics can still answer
+  /// "where do I actually read" once they span three of them.
+  TextColumn get deviceId => text().nullable()();
+  TextColumn get deviceLabel => text().nullable()();
+
+  /// Waiting to be pushed. A session is an immutable fact, so this is only ever
+  /// set once — there is no edit to re-push and no conflict to resolve.
+  BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -479,7 +506,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -726,6 +753,44 @@ class VellumDatabase extends _$VellumDatabase {
             }
             if (!(await columnsOf('physical_shelves')).contains('kind')) {
               await m.addColumn(physicalShelves, physicalShelves.kind);
+            }
+          }
+          if (from < 23) {
+            // Personal data reaches the server (annotations, sittings, private
+            // notes, profile). These columns are what makes it syncable:
+            // `updated_at` for last-write-wins, `needs_push` for the outbox.
+            //
+            // Existing rows default to needs_push = true, which is right — they
+            // predate the server knowing about them, so the first sync after
+            // this upgrade is what publishes a library's back catalogue of
+            // highlights rather than silently leaving it behind.
+            final annotationCols = await columnsOf('annotations');
+            for (final (name, column) in [
+              ('updated_at', annotations.updatedAt),
+              ('needs_push', annotations.needsPush),
+            ]) {
+              if (!annotationCols.contains(name)) {
+                await m.addColumn(annotations, column);
+              }
+            }
+            final bookCols = await columnsOf('books');
+            for (final (name, column) in [
+              ('reader_notes_updated_at', books.readerNotesUpdatedAt),
+              ('reader_notes_needs_push', books.readerNotesNeedsPush),
+            ]) {
+              if (!bookCols.contains(name)) {
+                await m.addColumn(books, column);
+              }
+            }
+            final sessionCols = await columnsOf('reading_sessions');
+            for (final (name, column) in [
+              ('device_id', readingSessions.deviceId),
+              ('device_label', readingSessions.deviceLabel),
+              ('needs_push', readingSessions.needsPush),
+            ]) {
+              if (!sessionCols.contains(name)) {
+                await m.addColumn(readingSessions, column);
+              }
             }
           }
         },

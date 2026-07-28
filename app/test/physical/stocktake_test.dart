@@ -9,6 +9,7 @@ Book book(String id, String title) => Book(
       id: id,
       title: title,
       needsPush: true,
+      readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,

@@ -921,6 +921,207 @@ class VellumServerClient {
     _body(res);
   }
 
+  // ---- personal data ------------------------------------------------------
+  //
+  // Annotations, sittings, private notes and the profile. Every one of these is
+  // scoped server-side to the caller's account, so none of them takes a user
+  // id: asking for someone else's is not something the API allows a client to
+  // express.
+
+  Future<({String? serverNow, List<ServerAnnotation> entries})> listAnnotations({
+    String? cursor,
+  }) async {
+    final uri = _uri('/api/annotations')
+        .replace(queryParameters: {'cursor': cursor ?? ''});
+    final map = _body(await _http.get(uri, headers: _headers))
+        as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      entries: [
+        for (final e in (map['entries'] as List? ?? []))
+          ServerAnnotation.fromJson(e as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  /// Annotation ids this account deleted, so a device stops showing them
+  /// instead of pushing them back. Its own endpoint rather than the shared
+  /// `/deletions` list — see `personal.rs`.
+  Future<({String? serverNow, List<({String id, DateTime? deletedAt})> entries})>
+      listAnnotationDeletions({String? cursor}) async {
+    final uri = _uri('/api/annotations/deletions')
+        .replace(queryParameters: {'cursor': cursor ?? ''});
+    final map = _body(await _http.get(uri, headers: _headers))
+        as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      entries: [
+        for (final e in (map['entries'] as List? ?? []))
+          (
+            id: (e as Map<String, dynamic>)['id'] as String,
+            deletedAt: ServerBook._parseServerTime(e['deleted_at'] as String?),
+          ),
+      ],
+    );
+  }
+
+  Future<void> pushAnnotation({
+    required String id,
+    required String bookId,
+    required String kind,
+    int? page,
+    int? chapter,
+    String? locator,
+    String? quotedText,
+    String? note,
+    int? color,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/annotations/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        'book_id': bookId,
+        'kind': kind,
+        // Explicit nulls, not omissions: clearing a note or a colour is a real
+        // edit, and an omitted field would leave the old value on the server.
+        'page': page,
+        'chapter': chapter,
+        'locator': locator,
+        'quoted_text': quotedText,
+        'note': note,
+        'color': color,
+        'created_at': formatServerTime(createdAt),
+        'updated_at': formatServerTime(updatedAt),
+      }),
+    );
+    _body(res);
+  }
+
+  Future<void> deleteAnnotation(String id) async {
+    _body(await _http.delete(_uri('/api/annotations/$id'), headers: _headers));
+  }
+
+  Future<({String? serverNow, List<ServerSession> entries})> listSessions({
+    String? cursor,
+  }) async {
+    final uri =
+        _uri('/api/sessions').replace(queryParameters: {'cursor': cursor ?? ''});
+    final map = _body(await _http.get(uri, headers: _headers))
+        as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      entries: [
+        for (final e in (map['entries'] as List? ?? []))
+          ServerSession.fromJson(e as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  Future<void> pushSession({
+    required String id,
+    required String bookId,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    int? startPage,
+    int? endPage,
+    String? deviceId,
+    String? deviceLabel,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/sessions/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        'book_id': bookId,
+        'started_at': formatServerTime(startedAt),
+        'ended_at': formatServerTime(endedAt),
+        'start_page': startPage,
+        'end_page': endPage,
+        'device_id': deviceId,
+        'device_label': deviceLabel,
+      }),
+    );
+    _body(res);
+  }
+
+  Future<({String? serverNow, List<({String bookId, String note, DateTime? updatedAt})> entries})>
+      listBookNotes({String? cursor}) async {
+    final uri =
+        _uri('/api/notes').replace(queryParameters: {'cursor': cursor ?? ''});
+    final map = _body(await _http.get(uri, headers: _headers))
+        as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      entries: [
+        for (final e in (map['entries'] as List? ?? []))
+          (
+            bookId: (e as Map<String, dynamic>)['book_id'] as String,
+            note: e['note'] as String? ?? '',
+            updatedAt: ServerBook._parseServerTime(e['updated_at'] as String?),
+          ),
+      ],
+    );
+  }
+
+  Future<void> pushBookNote({
+    required String bookId,
+    required String note,
+    DateTime? updatedAt,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/notes/$bookId'),
+      headers: _headers,
+      body: jsonEncode({
+        'note': note,
+        'updated_at': formatServerTime(updatedAt),
+      }),
+    );
+    _body(res);
+  }
+
+  // ---- profile -------------------------------------------------------------
+
+  Future<({String displayName, bool hasAvatar, DateTime? updatedAt})>
+      fetchProfile() async {
+    final map = _body(await _http.get(_uri('/api/profile'), headers: _headers))
+        as Map<String, dynamic>;
+    return (
+      displayName: map['display_name'] as String? ?? '',
+      hasAvatar: map['has_avatar'] == true || map['has_avatar'] == 1,
+      updatedAt: ServerBook._parseServerTime(map['profile_updated_at'] as String?),
+    );
+  }
+
+  Future<void> pushDisplayName(String displayName) async {
+    _body(await _http.put(
+      _uri('/api/profile'),
+      headers: _headers,
+      body: jsonEncode({'display_name': displayName}),
+    ));
+  }
+
+  /// The avatar bytes, or null when the account has none.
+  Future<Uint8List?> fetchAvatar() async {
+    final res = await _http.get(_uri('/api/profile/avatar'), headers: _headers);
+    if (res.statusCode == 404) return null;
+    if (res.statusCode >= 400) _body(res);
+    return res.bodyBytes;
+  }
+
+  Future<void> pushAvatar(Uint8List bytes) async {
+    final res = await _http.put(
+      _uri('/api/profile/avatar'),
+      headers: {..._headers, 'content-type': 'application/octet-stream'},
+      body: bytes,
+    );
+    _body(res);
+  }
+
+  Future<void> deleteAvatar() async {
+    _body(await _http.delete(_uri('/api/profile/avatar'), headers: _headers));
+  }
+
   // ---- reading position (plan 5 #5) ----------------------------------------
 
   /// This account's reading positions across all its devices, as the delta-pull
@@ -1117,6 +1318,85 @@ class ServerShelf {
 /// One device's reading position in one book (plan 5 #5). Always this
 /// account's own — the server never returns another user's row, so there is no
 /// user field to carry.
+/// One of the caller's annotations as the server holds it.
+class ServerAnnotation {
+  ServerAnnotation({
+    required this.id,
+    required this.bookId,
+    required this.kind,
+    this.page,
+    this.chapter,
+    this.locator,
+    this.quotedText,
+    this.note,
+    this.color,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory ServerAnnotation.fromJson(Map<String, dynamic> json) =>
+      ServerAnnotation(
+        id: json['id'] as String,
+        bookId: json['book_id'] as String,
+        kind: json['kind'] as String,
+        page: (json['page'] as num?)?.toInt(),
+        chapter: (json['chapter'] as num?)?.toInt(),
+        locator: json['locator'] as String?,
+        quotedText: json['quoted_text'] as String?,
+        note: json['note'] as String?,
+        color: (json['color'] as num?)?.toInt(),
+        createdAt: ServerBook._parseServerTime(json['created_at'] as String?),
+        updatedAt: ServerBook._parseServerTime(json['updated_at'] as String?),
+      );
+
+  final String id;
+  final String bookId;
+  final String kind;
+  final int? page;
+  final int? chapter;
+  final String? locator;
+  final String? quotedText;
+  final String? note;
+  final int? color;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+}
+
+/// One reading sitting as the server holds it. Immutable, so there is no
+/// `updatedAt` to compare — only the id decides whether it is already known.
+class ServerSession {
+  ServerSession({
+    required this.id,
+    required this.bookId,
+    required this.startedAt,
+    required this.endedAt,
+    this.startPage,
+    this.endPage,
+    this.deviceId,
+    this.deviceLabel,
+  });
+
+  factory ServerSession.fromJson(Map<String, dynamic> json) => ServerSession(
+        id: json['id'] as String,
+        bookId: json['book_id'] as String,
+        startedAt: ServerBook._parseServerTime(json['started_at'] as String?) ?? DateTime.now(),
+        endedAt: ServerBook._parseServerTime(json['ended_at'] as String?) ?? DateTime.now(),
+        startPage: (json['start_page'] as num?)?.toInt(),
+        endPage: (json['end_page'] as num?)?.toInt(),
+        deviceId: json['device_id'] as String?,
+        deviceLabel: json['device_label'] as String?,
+      );
+
+  final String id;
+  final String bookId;
+  final DateTime startedAt;
+  final DateTime endedAt;
+  final int? startPage;
+  final int? endPage;
+  final String? deviceId;
+  final String? deviceLabel;
+}
+
 class ServerReadingPosition {
   ServerReadingPosition({
     required this.bookId,

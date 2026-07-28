@@ -384,6 +384,31 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _readerNotesUpdatedAtMeta =
+      const VerificationMeta('readerNotesUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> readerNotesUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'reader_notes_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _readerNotesNeedsPushMeta =
+      const VerificationMeta('readerNotesNeedsPush');
+  @override
+  late final GeneratedColumn<bool> readerNotesNeedsPush = GeneratedColumn<bool>(
+    'reader_notes_needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("reader_notes_needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _sourceMetadataMeta = const VerificationMeta(
     'sourceMetadata',
   );
@@ -542,6 +567,8 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     lastReadPage,
     lastReadAt,
     readerNotes,
+    readerNotesUpdatedAt,
+    readerNotesNeedsPush,
     sourceMetadata,
     createdAt,
     updatedAt,
@@ -682,6 +709,24 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         readerNotes.isAcceptableOrUnknown(
           data['reader_notes']!,
           _readerNotesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reader_notes_updated_at')) {
+      context.handle(
+        _readerNotesUpdatedAtMeta,
+        readerNotesUpdatedAt.isAcceptableOrUnknown(
+          data['reader_notes_updated_at']!,
+          _readerNotesUpdatedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reader_notes_needs_push')) {
+      context.handle(
+        _readerNotesNeedsPushMeta,
+        readerNotesNeedsPush.isAcceptableOrUnknown(
+          data['reader_notes_needs_push']!,
+          _readerNotesNeedsPushMeta,
         ),
       );
     }
@@ -836,6 +881,14 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.string,
         data['${effectivePrefix}reader_notes'],
       ),
+      readerNotesUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}reader_notes_updated_at'],
+      ),
+      readerNotesNeedsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}reader_notes_needs_push'],
+      )!,
       sourceMetadata: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}source_metadata'],
@@ -910,6 +963,15 @@ class Book extends DataClass implements Insertable<Book> {
   final int? lastReadPage;
   final DateTime? lastReadAt;
   final String? readerNotes;
+
+  /// The private note's own clock and outbox flag.
+  ///
+  /// Separate from the book's `updatedAt`/`needsPush` because the note does not
+  /// travel with the book: it goes to `/api/notes`, a per-user table, so that a
+  /// library shared with someone else does not hand them your notes. Editing a
+  /// note must therefore not look like editing the catalogue entry.
+  final DateTime? readerNotesUpdatedAt;
+  final bool readerNotesNeedsPush;
   final String? sourceMetadata;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -955,6 +1017,8 @@ class Book extends DataClass implements Insertable<Book> {
     this.lastReadPage,
     this.lastReadAt,
     this.readerNotes,
+    this.readerNotesUpdatedAt,
+    required this.readerNotesNeedsPush,
     this.sourceMetadata,
     required this.createdAt,
     required this.updatedAt,
@@ -1015,6 +1079,10 @@ class Book extends DataClass implements Insertable<Book> {
     if (!nullToAbsent || readerNotes != null) {
       map['reader_notes'] = Variable<String>(readerNotes);
     }
+    if (!nullToAbsent || readerNotesUpdatedAt != null) {
+      map['reader_notes_updated_at'] = Variable<DateTime>(readerNotesUpdatedAt);
+    }
+    map['reader_notes_needs_push'] = Variable<bool>(readerNotesNeedsPush);
     if (!nullToAbsent || sourceMetadata != null) {
       map['source_metadata'] = Variable<String>(sourceMetadata);
     }
@@ -1086,6 +1154,10 @@ class Book extends DataClass implements Insertable<Book> {
       readerNotes: readerNotes == null && nullToAbsent
           ? const Value.absent()
           : Value(readerNotes),
+      readerNotesUpdatedAt: readerNotesUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(readerNotesUpdatedAt),
+      readerNotesNeedsPush: Value(readerNotesNeedsPush),
       sourceMetadata: sourceMetadata == null && nullToAbsent
           ? const Value.absent()
           : Value(sourceMetadata),
@@ -1135,6 +1207,12 @@ class Book extends DataClass implements Insertable<Book> {
       lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
       lastReadAt: serializer.fromJson<DateTime?>(json['lastReadAt']),
       readerNotes: serializer.fromJson<String?>(json['readerNotes']),
+      readerNotesUpdatedAt: serializer.fromJson<DateTime?>(
+        json['readerNotesUpdatedAt'],
+      ),
+      readerNotesNeedsPush: serializer.fromJson<bool>(
+        json['readerNotesNeedsPush'],
+      ),
       sourceMetadata: serializer.fromJson<String?>(json['sourceMetadata']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1169,6 +1247,10 @@ class Book extends DataClass implements Insertable<Book> {
       'lastReadPage': serializer.toJson<int?>(lastReadPage),
       'lastReadAt': serializer.toJson<DateTime?>(lastReadAt),
       'readerNotes': serializer.toJson<String?>(readerNotes),
+      'readerNotesUpdatedAt': serializer.toJson<DateTime?>(
+        readerNotesUpdatedAt,
+      ),
+      'readerNotesNeedsPush': serializer.toJson<bool>(readerNotesNeedsPush),
       'sourceMetadata': serializer.toJson<String?>(sourceMetadata),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1201,6 +1283,8 @@ class Book extends DataClass implements Insertable<Book> {
     Value<int?> lastReadPage = const Value.absent(),
     Value<DateTime?> lastReadAt = const Value.absent(),
     Value<String?> readerNotes = const Value.absent(),
+    Value<DateTime?> readerNotesUpdatedAt = const Value.absent(),
+    bool? readerNotesNeedsPush,
     Value<String?> sourceMetadata = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -1234,6 +1318,10 @@ class Book extends DataClass implements Insertable<Book> {
     lastReadPage: lastReadPage.present ? lastReadPage.value : this.lastReadPage,
     lastReadAt: lastReadAt.present ? lastReadAt.value : this.lastReadAt,
     readerNotes: readerNotes.present ? readerNotes.value : this.readerNotes,
+    readerNotesUpdatedAt: readerNotesUpdatedAt.present
+        ? readerNotesUpdatedAt.value
+        : this.readerNotesUpdatedAt,
+    readerNotesNeedsPush: readerNotesNeedsPush ?? this.readerNotesNeedsPush,
     sourceMetadata: sourceMetadata.present
         ? sourceMetadata.value
         : this.sourceMetadata,
@@ -1283,6 +1371,12 @@ class Book extends DataClass implements Insertable<Book> {
       readerNotes: data.readerNotes.present
           ? data.readerNotes.value
           : this.readerNotes,
+      readerNotesUpdatedAt: data.readerNotesUpdatedAt.present
+          ? data.readerNotesUpdatedAt.value
+          : this.readerNotesUpdatedAt,
+      readerNotesNeedsPush: data.readerNotesNeedsPush.present
+          ? data.readerNotesNeedsPush.value
+          : this.readerNotesNeedsPush,
       sourceMetadata: data.sourceMetadata.present
           ? data.sourceMetadata.value
           : this.sourceMetadata,
@@ -1323,6 +1417,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
           ..write('readerNotes: $readerNotes, ')
+          ..write('readerNotesUpdatedAt: $readerNotesUpdatedAt, ')
+          ..write('readerNotesNeedsPush: $readerNotesNeedsPush, ')
           ..write('sourceMetadata: $sourceMetadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1357,6 +1453,8 @@ class Book extends DataClass implements Insertable<Book> {
     lastReadPage,
     lastReadAt,
     readerNotes,
+    readerNotesUpdatedAt,
+    readerNotesNeedsPush,
     sourceMetadata,
     createdAt,
     updatedAt,
@@ -1390,6 +1488,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.lastReadPage == this.lastReadPage &&
           other.lastReadAt == this.lastReadAt &&
           other.readerNotes == this.readerNotes &&
+          other.readerNotesUpdatedAt == this.readerNotesUpdatedAt &&
+          other.readerNotesNeedsPush == this.readerNotesNeedsPush &&
           other.sourceMetadata == this.sourceMetadata &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -1421,6 +1521,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<int?> lastReadPage;
   final Value<DateTime?> lastReadAt;
   final Value<String?> readerNotes;
+  final Value<DateTime?> readerNotesUpdatedAt;
+  final Value<bool> readerNotesNeedsPush;
   final Value<String?> sourceMetadata;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1451,6 +1553,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
     this.readerNotes = const Value.absent(),
+    this.readerNotesUpdatedAt = const Value.absent(),
+    this.readerNotesNeedsPush = const Value.absent(),
     this.sourceMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1482,6 +1586,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
     this.readerNotes = const Value.absent(),
+    this.readerNotesUpdatedAt = const Value.absent(),
+    this.readerNotesNeedsPush = const Value.absent(),
     this.sourceMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1514,6 +1620,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<int>? lastReadPage,
     Expression<DateTime>? lastReadAt,
     Expression<String>? readerNotes,
+    Expression<DateTime>? readerNotesUpdatedAt,
+    Expression<bool>? readerNotesNeedsPush,
     Expression<String>? sourceMetadata,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1545,6 +1653,10 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (lastReadPage != null) 'last_read_page': lastReadPage,
       if (lastReadAt != null) 'last_read_at': lastReadAt,
       if (readerNotes != null) 'reader_notes': readerNotes,
+      if (readerNotesUpdatedAt != null)
+        'reader_notes_updated_at': readerNotesUpdatedAt,
+      if (readerNotesNeedsPush != null)
+        'reader_notes_needs_push': readerNotesNeedsPush,
       if (sourceMetadata != null) 'source_metadata': sourceMetadata,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1578,6 +1690,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<int?>? lastReadPage,
     Value<DateTime?>? lastReadAt,
     Value<String?>? readerNotes,
+    Value<DateTime?>? readerNotesUpdatedAt,
+    Value<bool>? readerNotesNeedsPush,
     Value<String?>? sourceMetadata,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -1609,6 +1723,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       lastReadPage: lastReadPage ?? this.lastReadPage,
       lastReadAt: lastReadAt ?? this.lastReadAt,
       readerNotes: readerNotes ?? this.readerNotes,
+      readerNotesUpdatedAt: readerNotesUpdatedAt ?? this.readerNotesUpdatedAt,
+      readerNotesNeedsPush: readerNotesNeedsPush ?? this.readerNotesNeedsPush,
       sourceMetadata: sourceMetadata ?? this.sourceMetadata,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1676,6 +1792,16 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (readerNotes.present) {
       map['reader_notes'] = Variable<String>(readerNotes.value);
     }
+    if (readerNotesUpdatedAt.present) {
+      map['reader_notes_updated_at'] = Variable<DateTime>(
+        readerNotesUpdatedAt.value,
+      );
+    }
+    if (readerNotesNeedsPush.present) {
+      map['reader_notes_needs_push'] = Variable<bool>(
+        readerNotesNeedsPush.value,
+      );
+    }
     if (sourceMetadata.present) {
       map['source_metadata'] = Variable<String>(sourceMetadata.value);
     }
@@ -1737,6 +1863,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
           ..write('readerNotes: $readerNotes, ')
+          ..write('readerNotesUpdatedAt: $readerNotesUpdatedAt, ')
+          ..write('readerNotesNeedsPush: $readerNotesNeedsPush, ')
           ..write('sourceMetadata: $sourceMetadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -7954,6 +8082,33 @@ class $AnnotationsTable extends Annotations
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _needsPushMeta = const VerificationMeta(
+    'needsPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPush = GeneratedColumn<bool>(
+    'needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -7966,6 +8121,8 @@ class $AnnotationsTable extends Annotations
     note,
     color,
     createdAt,
+    updatedAt,
+    needsPush,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -8042,6 +8199,18 @@ class $AnnotationsTable extends Annotations
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_push')) {
+      context.handle(
+        _needsPushMeta,
+        needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
+      );
+    }
     return context;
   }
 
@@ -8091,6 +8260,14 @@ class $AnnotationsTable extends Annotations
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_push'],
+      )!,
     );
   }
 
@@ -8122,6 +8299,14 @@ class Annotation extends DataClass implements Insertable<Annotation> {
   /// Highlight colour as an ARGB int, or null for the default.
   final int? color;
   final DateTime createdAt;
+
+  /// Last-write-wins key, and what a delta pull compares against. Bumped on
+  /// every edit — recolouring a highlight or rewriting a note both count.
+  final DateTime updatedAt;
+
+  /// Waiting to be pushed. Same convention as every other synced table: set on
+  /// local write, cleared once the server has it.
+  final bool needsPush;
   const Annotation({
     required this.id,
     required this.bookId,
@@ -8133,6 +8318,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     this.note,
     this.color,
     required this.createdAt,
+    required this.updatedAt,
+    required this.needsPush,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -8159,6 +8346,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       map['color'] = Variable<int>(color);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
 
@@ -8182,6 +8371,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           ? const Value.absent()
           : Value(color),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      needsPush: Value(needsPush),
     );
   }
 
@@ -8201,6 +8392,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       note: serializer.fromJson<String?>(json['note']),
       color: serializer.fromJson<int?>(json['color']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
   @override
@@ -8217,6 +8410,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       'note': serializer.toJson<String?>(note),
       'color': serializer.toJson<int?>(color),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
 
@@ -8231,6 +8426,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     Value<String?> note = const Value.absent(),
     Value<int?> color = const Value.absent(),
     DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? needsPush,
   }) => Annotation(
     id: id ?? this.id,
     bookId: bookId ?? this.bookId,
@@ -8242,6 +8439,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     note: note.present ? note.value : this.note,
     color: color.present ? color.value : this.color,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    needsPush: needsPush ?? this.needsPush,
   );
   Annotation copyWithCompanion(AnnotationsCompanion data) {
     return Annotation(
@@ -8257,6 +8456,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       note: data.note.present ? data.note.value : this.note,
       color: data.color.present ? data.color.value : this.color,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
 
@@ -8272,7 +8473,9 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           ..write('quotedText: $quotedText, ')
           ..write('note: $note, ')
           ..write('color: $color, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
   }
@@ -8289,6 +8492,8 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     note,
     color,
     createdAt,
+    updatedAt,
+    needsPush,
   );
   @override
   bool operator ==(Object other) =>
@@ -8303,7 +8508,9 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           other.quotedText == this.quotedText &&
           other.note == this.note &&
           other.color == this.color &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.needsPush == this.needsPush);
 }
 
 class AnnotationsCompanion extends UpdateCompanion<Annotation> {
@@ -8317,6 +8524,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
   final Value<String?> note;
   final Value<int?> color;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<bool> needsPush;
   final Value<int> rowid;
   const AnnotationsCompanion({
     this.id = const Value.absent(),
@@ -8329,6 +8538,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.note = const Value.absent(),
     this.color = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AnnotationsCompanion.insert({
@@ -8342,6 +8553,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.note = const Value.absent(),
     this.color = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        bookId = Value(bookId),
@@ -8357,6 +8570,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Expression<String>? note,
     Expression<int>? color,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -8370,6 +8585,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       if (note != null) 'note': note,
       if (color != null) 'color': color,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -8385,6 +8602,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Value<String?>? note,
     Value<int?>? color,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
     return AnnotationsCompanion(
@@ -8398,6 +8617,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       note: note ?? this.note,
       color: color ?? this.color,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -8435,6 +8656,12 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<bool>(needsPush.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -8454,6 +8681,8 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
           ..write('note: $note, ')
           ..write('color: $color, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8531,6 +8760,43 @@ class $ReadingSessionsTable extends ReadingSessions
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deviceLabelMeta = const VerificationMeta(
+    'deviceLabel',
+  );
+  @override
+  late final GeneratedColumn<String> deviceLabel = GeneratedColumn<String>(
+    'device_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _needsPushMeta = const VerificationMeta(
+    'needsPush',
+  );
+  @override
+  late final GeneratedColumn<bool> needsPush = GeneratedColumn<bool>(
+    'needs_push',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_push" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -8539,6 +8805,9 @@ class $ReadingSessionsTable extends ReadingSessions
     endedAt,
     startPage,
     endPage,
+    deviceId,
+    deviceLabel,
+    needsPush,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -8593,6 +8862,27 @@ class $ReadingSessionsTable extends ReadingSessions
         endPage.isAcceptableOrUnknown(data['end_page']!, _endPageMeta),
       );
     }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    }
+    if (data.containsKey('device_label')) {
+      context.handle(
+        _deviceLabelMeta,
+        deviceLabel.isAcceptableOrUnknown(
+          data['device_label']!,
+          _deviceLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('needs_push')) {
+      context.handle(
+        _needsPushMeta,
+        needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
+      );
+    }
     return context;
   }
 
@@ -8626,6 +8916,18 @@ class $ReadingSessionsTable extends ReadingSessions
         DriftSqlType.int,
         data['${effectivePrefix}end_page'],
       ),
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      ),
+      deviceLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_label'],
+      ),
+      needsPush: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_push'],
+      )!,
     );
   }
 
@@ -8642,6 +8944,15 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
   final DateTime endedAt;
   final int? startPage;
   final int? endPage;
+
+  /// Which device this sitting happened on, so statistics can still answer
+  /// "where do I actually read" once they span three of them.
+  final String? deviceId;
+  final String? deviceLabel;
+
+  /// Waiting to be pushed. A session is an immutable fact, so this is only ever
+  /// set once — there is no edit to re-push and no conflict to resolve.
+  final bool needsPush;
   const ReadingSession({
     required this.id,
     required this.bookId,
@@ -8649,6 +8960,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     required this.endedAt,
     this.startPage,
     this.endPage,
+    this.deviceId,
+    this.deviceLabel,
+    required this.needsPush,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -8663,6 +8977,13 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     if (!nullToAbsent || endPage != null) {
       map['end_page'] = Variable<int>(endPage);
     }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    if (!nullToAbsent || deviceLabel != null) {
+      map['device_label'] = Variable<String>(deviceLabel);
+    }
+    map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
 
@@ -8678,6 +8999,13 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       endPage: endPage == null && nullToAbsent
           ? const Value.absent()
           : Value(endPage),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      deviceLabel: deviceLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceLabel),
+      needsPush: Value(needsPush),
     );
   }
 
@@ -8693,6 +9021,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       endedAt: serializer.fromJson<DateTime>(json['endedAt']),
       startPage: serializer.fromJson<int?>(json['startPage']),
       endPage: serializer.fromJson<int?>(json['endPage']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      deviceLabel: serializer.fromJson<String?>(json['deviceLabel']),
+      needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
   @override
@@ -8705,6 +9036,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       'endedAt': serializer.toJson<DateTime>(endedAt),
       'startPage': serializer.toJson<int?>(startPage),
       'endPage': serializer.toJson<int?>(endPage),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'deviceLabel': serializer.toJson<String?>(deviceLabel),
+      'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
 
@@ -8715,6 +9049,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     DateTime? endedAt,
     Value<int?> startPage = const Value.absent(),
     Value<int?> endPage = const Value.absent(),
+    Value<String?> deviceId = const Value.absent(),
+    Value<String?> deviceLabel = const Value.absent(),
+    bool? needsPush,
   }) => ReadingSession(
     id: id ?? this.id,
     bookId: bookId ?? this.bookId,
@@ -8722,6 +9059,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     endedAt: endedAt ?? this.endedAt,
     startPage: startPage.present ? startPage.value : this.startPage,
     endPage: endPage.present ? endPage.value : this.endPage,
+    deviceId: deviceId.present ? deviceId.value : this.deviceId,
+    deviceLabel: deviceLabel.present ? deviceLabel.value : this.deviceLabel,
+    needsPush: needsPush ?? this.needsPush,
   );
   ReadingSession copyWithCompanion(ReadingSessionsCompanion data) {
     return ReadingSession(
@@ -8731,6 +9071,11 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
       startPage: data.startPage.present ? data.startPage.value : this.startPage,
       endPage: data.endPage.present ? data.endPage.value : this.endPage,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      deviceLabel: data.deviceLabel.present
+          ? data.deviceLabel.value
+          : this.deviceLabel,
+      needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
 
@@ -8742,14 +9087,26 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           ..write('startedAt: $startedAt, ')
           ..write('endedAt: $endedAt, ')
           ..write('startPage: $startPage, ')
-          ..write('endPage: $endPage')
+          ..write('endPage: $endPage, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, bookId, startedAt, endedAt, startPage, endPage);
+  int get hashCode => Object.hash(
+    id,
+    bookId,
+    startedAt,
+    endedAt,
+    startPage,
+    endPage,
+    deviceId,
+    deviceLabel,
+    needsPush,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -8759,7 +9116,10 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           other.startedAt == this.startedAt &&
           other.endedAt == this.endedAt &&
           other.startPage == this.startPage &&
-          other.endPage == this.endPage);
+          other.endPage == this.endPage &&
+          other.deviceId == this.deviceId &&
+          other.deviceLabel == this.deviceLabel &&
+          other.needsPush == this.needsPush);
 }
 
 class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
@@ -8769,6 +9129,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
   final Value<DateTime> endedAt;
   final Value<int?> startPage;
   final Value<int?> endPage;
+  final Value<String?> deviceId;
+  final Value<String?> deviceLabel;
+  final Value<bool> needsPush;
   final Value<int> rowid;
   const ReadingSessionsCompanion({
     this.id = const Value.absent(),
@@ -8777,6 +9140,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     this.endedAt = const Value.absent(),
     this.startPage = const Value.absent(),
     this.endPage = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.deviceLabel = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReadingSessionsCompanion.insert({
@@ -8786,6 +9152,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     required DateTime endedAt,
     this.startPage = const Value.absent(),
     this.endPage = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.deviceLabel = const Value.absent(),
+    this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        bookId = Value(bookId),
@@ -8798,6 +9167,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     Expression<DateTime>? endedAt,
     Expression<int>? startPage,
     Expression<int>? endPage,
+    Expression<String>? deviceId,
+    Expression<String>? deviceLabel,
+    Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -8807,6 +9179,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
       if (endedAt != null) 'ended_at': endedAt,
       if (startPage != null) 'start_page': startPage,
       if (endPage != null) 'end_page': endPage,
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceLabel != null) 'device_label': deviceLabel,
+      if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -8818,6 +9193,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     Value<DateTime>? endedAt,
     Value<int?>? startPage,
     Value<int?>? endPage,
+    Value<String?>? deviceId,
+    Value<String?>? deviceLabel,
+    Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
     return ReadingSessionsCompanion(
@@ -8827,6 +9205,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
       endedAt: endedAt ?? this.endedAt,
       startPage: startPage ?? this.startPage,
       endPage: endPage ?? this.endPage,
+      deviceId: deviceId ?? this.deviceId,
+      deviceLabel: deviceLabel ?? this.deviceLabel,
+      needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -8852,6 +9233,15 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     if (endPage.present) {
       map['end_page'] = Variable<int>(endPage.value);
     }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (deviceLabel.present) {
+      map['device_label'] = Variable<String>(deviceLabel.value);
+    }
+    if (needsPush.present) {
+      map['needs_push'] = Variable<bool>(needsPush.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -8867,6 +9257,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
           ..write('endedAt: $endedAt, ')
           ..write('startPage: $startPage, ')
           ..write('endPage: $endPage, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9174,6 +9567,8 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
       Value<String?> readerNotes,
+      Value<DateTime?> readerNotesUpdatedAt,
+      Value<bool> readerNotesNeedsPush,
       Value<String?> sourceMetadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -9206,6 +9601,8 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
       Value<String?> readerNotes,
+      Value<DateTime?> readerNotesUpdatedAt,
+      Value<bool> readerNotesNeedsPush,
       Value<String?> sourceMetadata,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -9454,6 +9851,16 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<String> get readerNotes => $composableBuilder(
     column: $table.readerNotes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get readerNotesUpdatedAt => $composableBuilder(
+    column: $table.readerNotesUpdatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get readerNotesNeedsPush => $composableBuilder(
+    column: $table.readerNotesNeedsPush,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9800,6 +10207,16 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get readerNotesUpdatedAt => $composableBuilder(
+    column: $table.readerNotesUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get readerNotesNeedsPush => $composableBuilder(
+    column: $table.readerNotesNeedsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get sourceMetadata => $composableBuilder(
     column: $table.sourceMetadata,
     builder: (column) => ColumnOrderings(column),
@@ -9951,6 +10368,16 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<String> get readerNotes => $composableBuilder(
     column: $table.readerNotes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get readerNotesUpdatedAt => $composableBuilder(
+    column: $table.readerNotesUpdatedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get readerNotesNeedsPush => $composableBuilder(
+    column: $table.readerNotesNeedsPush,
     builder: (column) => column,
   );
 
@@ -10248,6 +10675,8 @@ class $$BooksTableTableManager
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
                 Value<String?> readerNotes = const Value.absent(),
+                Value<DateTime?> readerNotesUpdatedAt = const Value.absent(),
+                Value<bool> readerNotesNeedsPush = const Value.absent(),
                 Value<String?> sourceMetadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -10278,6 +10707,8 @@ class $$BooksTableTableManager
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
                 readerNotes: readerNotes,
+                readerNotesUpdatedAt: readerNotesUpdatedAt,
+                readerNotesNeedsPush: readerNotesNeedsPush,
                 sourceMetadata: sourceMetadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -10310,6 +10741,8 @@ class $$BooksTableTableManager
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
                 Value<String?> readerNotes = const Value.absent(),
+                Value<DateTime?> readerNotesUpdatedAt = const Value.absent(),
+                Value<bool> readerNotesNeedsPush = const Value.absent(),
                 Value<String?> sourceMetadata = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -10340,6 +10773,8 @@ class $$BooksTableTableManager
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
                 readerNotes: readerNotes,
+                readerNotesUpdatedAt: readerNotesUpdatedAt,
+                readerNotesNeedsPush: readerNotesNeedsPush,
                 sourceMetadata: sourceMetadata,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -16109,6 +16544,8 @@ typedef $$AnnotationsTableCreateCompanionBuilder =
       Value<String?> note,
       Value<int?> color,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 typedef $$AnnotationsTableUpdateCompanionBuilder =
@@ -16123,6 +16560,8 @@ typedef $$AnnotationsTableUpdateCompanionBuilder =
       Value<String?> note,
       Value<int?> color,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 
@@ -16199,6 +16638,16 @@ class $$AnnotationsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16280,6 +16729,16 @@ class $$AnnotationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$BooksTableOrderingComposer get bookId {
     final $$BooksTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -16341,6 +16800,12 @@ class $$AnnotationsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsPush =>
+      $composableBuilder(column: $table.needsPush, builder: (column) => column);
 
   $$BooksTableAnnotationComposer get bookId {
     final $$BooksTableAnnotationComposer composer = $composerBuilder(
@@ -16404,6 +16869,8 @@ class $$AnnotationsTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<int?> color = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion(
                 id: id,
@@ -16416,6 +16883,8 @@ class $$AnnotationsTableTableManager
                 note: note,
                 color: color,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16430,6 +16899,8 @@ class $$AnnotationsTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<int?> color = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion.insert(
                 id: id,
@@ -16442,6 +16913,8 @@ class $$AnnotationsTableTableManager
                 note: note,
                 color: color,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -16519,6 +16992,9 @@ typedef $$ReadingSessionsTableCreateCompanionBuilder =
       required DateTime endedAt,
       Value<int?> startPage,
       Value<int?> endPage,
+      Value<String?> deviceId,
+      Value<String?> deviceLabel,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 typedef $$ReadingSessionsTableUpdateCompanionBuilder =
@@ -16529,6 +17005,9 @@ typedef $$ReadingSessionsTableUpdateCompanionBuilder =
       Value<DateTime> endedAt,
       Value<int?> startPage,
       Value<int?> endPage,
+      Value<String?> deviceId,
+      Value<String?> deviceLabel,
+      Value<bool> needsPush,
       Value<int> rowid,
     });
 
@@ -16597,6 +17076,21 @@ class $$ReadingSessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$BooksTableFilterComposer get bookId {
     final $$BooksTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -16655,6 +17149,21 @@ class $$ReadingSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsPush => $composableBuilder(
+    column: $table.needsPush,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$BooksTableOrderingComposer get bookId {
     final $$BooksTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -16702,6 +17211,17 @@ class $$ReadingSessionsTableAnnotationComposer
 
   GeneratedColumn<int> get endPage =>
       $composableBuilder(column: $table.endPage, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get needsPush =>
+      $composableBuilder(column: $table.needsPush, builder: (column) => column);
 
   $$BooksTableAnnotationComposer get bookId {
     final $$BooksTableAnnotationComposer composer = $composerBuilder(
@@ -16763,6 +17283,9 @@ class $$ReadingSessionsTableTableManager
                 Value<DateTime> endedAt = const Value.absent(),
                 Value<int?> startPage = const Value.absent(),
                 Value<int?> endPage = const Value.absent(),
+                Value<String?> deviceId = const Value.absent(),
+                Value<String?> deviceLabel = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingSessionsCompanion(
                 id: id,
@@ -16771,6 +17294,9 @@ class $$ReadingSessionsTableTableManager
                 endedAt: endedAt,
                 startPage: startPage,
                 endPage: endPage,
+                deviceId: deviceId,
+                deviceLabel: deviceLabel,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16781,6 +17307,9 @@ class $$ReadingSessionsTableTableManager
                 required DateTime endedAt,
                 Value<int?> startPage = const Value.absent(),
                 Value<int?> endPage = const Value.absent(),
+                Value<String?> deviceId = const Value.absent(),
+                Value<String?> deviceLabel = const Value.absent(),
+                Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingSessionsCompanion.insert(
                 id: id,
@@ -16789,6 +17318,9 @@ class $$ReadingSessionsTableTableManager
                 endedAt: endedAt,
                 startPage: startPage,
                 endPage: endPage,
+                deviceId: deviceId,
+                deviceLabel: deviceLabel,
+                needsPush: needsPush,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

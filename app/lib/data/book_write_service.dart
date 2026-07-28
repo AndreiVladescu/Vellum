@@ -229,10 +229,19 @@ class BookWriteService {
     'DELETE FROM genres WHERE id NOT IN (SELECT genre_id FROM book_genres)',
   );
 
-  /// Personal notes — stored locally only, never pushed to a server.
+  /// Personal notes about a book.
+  ///
+  /// They sync to your *account*, not to the library: `/api/notes` is keyed by
+  /// (user, book), so a library shared with someone else never hands them your
+  /// notes. Hence the note's own clock and outbox flag rather than the book's —
+  /// editing a note is not editing the catalogue entry.
   Future<void> setReaderNotes(String bookId, String? notes) async {
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
-      BooksCompanion(readerNotes: Value(_blankToNull(notes))),
+      BooksCompanion(
+        readerNotes: Value(_blankToNull(notes)),
+        readerNotesUpdatedAt: Value(DateTime.now()),
+        readerNotesNeedsPush: const Value(true),
+      ),
     );
   }
 

@@ -4,11 +4,18 @@
 //! CLAUDE.md. The expected column lists below double as the canonical contract
 //! for the tables that sync over REST.
 //!
-//! App-local-only columns/tables (reading state, reader_notes, source_metadata,
-//! deleted_at — the trash's grace period, plan 5 #52 — the physical-layout
-//! tables, local_deletions) are intentionally NOT part of the server schema, so
-//! they don't appear here. `book.owner_id` is the mirror image: a server-only
+//! App-local-only columns/tables (reading state, source_metadata, deleted_at —
+//! the trash's grace period, plan 5 #52 — the physical-layout tables,
+//! local_deletions) are intentionally NOT part of the server schema, so they
+//! don't appear here. `book.owner_id` is the mirror image: a server-only
 //! column, present here but not in the app.
+//!
+//! The personal tables (migration 0023: annotation, reading_session, book_note)
+//! are excluded for the same reason as `reading_progress` below — they are
+//! keyed by `user_id`, which the app has no column for, and `book_note` is a
+//! whole table on this side against one column (`books.reader_notes`) on the
+//! other. Their contract is `server/tests/personal.rs`, which tests the
+//! behaviour that actually matters: isolation between accounts.
 //!
 //! `reading_progress` (migration 0011, plan 5 #5) is excluded on purpose, not by
 //! oversight: it is a per-(book, user, device) channel with no column-for-column

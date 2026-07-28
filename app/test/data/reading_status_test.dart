@@ -32,6 +32,7 @@ void main() {
           readingProgress: Value(progress),
           status: Value(status),
           needsPush: const Value(false),
+          readerNotesNeedsPush: const Value(false),
         ));
     return repo;
   }
@@ -89,6 +90,7 @@ void main() {
           createdAt: DateTime(2024),
           updatedAt: DateTime(2024),
           needsPush: false,
+          readerNotesNeedsPush: false,
           needsProgressPush: false,
         );
 

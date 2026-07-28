@@ -25,6 +25,7 @@ Book _book(
       createdAt: created ?? DateTime(2024),
       updatedAt: DateTime(2024),
       needsPush: false,
+      readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,

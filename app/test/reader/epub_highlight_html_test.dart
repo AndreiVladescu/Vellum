@@ -31,6 +31,8 @@ Annotation _highlight({
       quotedText: quote,
       color: color,
       createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+      needsPush: false,
     );
 
 /// The visible text of the result, so a test can assert what the reader sees

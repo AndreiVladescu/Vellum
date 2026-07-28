@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
 
+import '../account/user_profile.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shelf/spine_style.dart';
@@ -69,9 +70,14 @@ typedef SyncProgress = void Function(int done, int total, String phase);
 /// has distinct dependencies (a server client) and side effects (a "pull" also
 /// pushes covers back). Reuse one instance so [pull]/[push] can't overlap.
 class SyncService {
-  SyncService(this.repository);
+  SyncService(this.repository, {this.profile});
 
   final LibraryRepository repository;
+
+  /// The local profile, when there is one to keep in step with the account.
+  /// Optional so background sync and tests can run without it — the library
+  /// syncs perfectly well on its own; this only carries your name and photo.
+  final UserProfileStore? profile;
 
   /// How many blob transfers (cover/file up/downloads) run at once. Independent
   /// transfers otherwise serialize into a sum-of-latencies; 4 keeps a personal
@@ -432,6 +438,10 @@ class SyncService {
     final shelfResult = await _pullShelves(client, cursor, issues);
     final copyResult = await _pullCopies(client, cursor, issues);
     final loanResult = await _pullLoans(client, cursor, issues);
+    // Personal data last: an annotation or a sitting names a book, and its
+    // foreign key needs that book already applied above.
+    final personalPulled = await _pullPersonal(client, cursor, issues);
+    await _syncProfile(client, issues);
 
     // Advance the cursor to the server's clock so the next pull is a delta.
     // Done last, so a mid-pull failure leaves the old cursor and the next pull
@@ -442,7 +452,8 @@ class SyncService {
       pulled: applied.length +
           shelfResult.pulled +
           copyResult.pulled +
-          loanResult.pulled,
+          loanResult.pulled +
+          personalPulled,
       deletedLocally: deletedLocally +
           shelfResult.deletedLocally +
           copyResult.deletedLocally +
@@ -919,15 +930,324 @@ class SyncService {
     final shelfResult = await _pushShelves(client, issues);
     final copyResult = await _pushCopies(client, issues);
     final loanResult = await _pushLoans(client, issues);
+    final personalPushed = await _pushPersonal(client, issues);
 
     return SyncReport(
-      pushed: pushed + shelfResult.pushed + copyResult.pushed + loanResult.pushed,
+      pushed: pushed +
+          shelfResult.pushed +
+          copyResult.pushed +
+          loanResult.pushed +
+          personalPushed,
       deletedRemotely: deletedRemotely +
           shelfResult.deletedRemotely +
           copyResult.deletedRemotely +
           loanResult.deletedRemotely,
       issues: issues,
     );
+  }
+
+  // ---- personal data ------------------------------------------------------
+  //
+  // Highlights, notes, bookmarks and reading sittings. Everything here is
+  // scoped to the account server-side, so a shared library holds several
+  // people's marks in the same book without any of them seeing the others'.
+  //
+  // Two shapes, handled differently on purpose:
+  //
+  // - **Annotations are mutable**, so they are last-write-wins on `updatedAt`
+  //   with tombstones, exactly like books.
+  // - **Sessions are immutable facts**, so the merge is a union keyed by id.
+  //   Nothing is ever edited, so nothing can conflict — a re-push is the same
+  //   fact arriving twice, and the server ignores it.
+
+  /// Brings the local profile and the account's in step.
+  ///
+  /// Last-write-wins on the server's `profile_updated_at` against the local
+  /// stamp, and the photo follows the name: whichever side is newer wins both,
+  /// so a device never ends up with one person's name and another's face.
+  ///
+  /// Runs on the pull side and pushes as part of it, because the comparison
+  /// needs both stamps in hand at once — splitting it across the two passes
+  /// would mean fetching the profile twice to answer one question.
+  Future<void> _syncProfile(
+    VellumServerClient client,
+    List<SyncIssue> issues,
+  ) async {
+    final local = profile;
+    if (local == null) return;
+    try {
+      final remote = await client.fetchProfile();
+      final localStamp = local.updatedAt;
+      final remoteStamp = remote.updatedAt;
+      final remoteIsNewer = localStamp == null ||
+          (remoteStamp != null && remoteStamp.isAfter(localStamp));
+
+      if (remoteIsNewer) {
+        if (remote.displayName.isNotEmpty && remote.displayName != local.name) {
+          await local.adopt(name: remote.displayName, at: remoteStamp);
+        }
+        final bytes = await client.fetchAvatar();
+        if (bytes != null) {
+          await local.adoptPhoto(bytes, at: remoteStamp);
+        } else if (local.photoPath != null) {
+          await local.clearPhoto();
+        }
+        return;
+      }
+
+      // Ours is newer (or the account has nothing yet): publish it.
+      if (local.name.isNotEmpty && local.name != remote.displayName) {
+        await client.pushDisplayName(local.name);
+      }
+      final path = local.photoPath;
+      if (path != null) {
+        final file = File(path);
+        if (file.existsSync()) await client.pushAvatar(await file.readAsBytes());
+      } else if (remote.hasAvatar) {
+        await client.deleteAvatar();
+      }
+    } catch (e) {
+      if (!_serverLacksPersonal(e)) {
+        issues.add(
+            _personalIssue('push', 'Your profile could not be synced: $e'));
+      }
+    }
+  }
+
+  /// Whether this failure is just an older server that predates personal data.
+  ///
+  /// A server without migration 0023 has no `/api/annotations` at all, and
+  /// answers 404. That is not a problem to report on every sync forever — it is
+  /// a server that hasn't been upgraded, and the library still syncs perfectly
+  /// well without it. Same reasoning as the batch-push capability probe.
+  ///
+  /// Reads the status off the exception rather than matching on the message:
+  /// a 404 whose body happens to spell out something else is still a 404, and
+  /// a message containing "404" for another reason is not.
+  bool _serverLacksPersonal(Object error) =>
+      error is ServerException && error.statusCode == 404;
+
+  /// Personal-data failures have no single book to name, so they report under
+  /// the category rather than pretending to.
+  SyncIssue _personalIssue(String stage, String message) => SyncIssue(
+        bookId: '',
+        title: 'Personal data',
+        stage: stage,
+        message: message,
+      );
+
+  Future<int> _pullPersonal(
+    VellumServerClient client,
+    String? cursor,
+    List<SyncIssue> issues,
+  ) async {
+    final db = _db;
+    var pulled = 0;
+    // Books this device actually has. An annotation whose book failed its own
+    // pull — or belongs to a share this device hasn't taken — would otherwise
+    // violate the foreign key and abort the whole sync.
+    final known = {
+      for (final b in await db.select(db.books).get()) b.id,
+    };
+
+    try {
+      final deletions = await client.listAnnotationDeletions(cursor: cursor);
+      for (final tombstone in deletions.entries) {
+        final removed = await (db.delete(db.annotations)
+              ..where((a) => a.id.equals(tombstone.id)))
+            .go();
+        if (removed > 0) pulled++;
+      }
+
+      final remote = await client.listAnnotations(cursor: cursor);
+      for (final a in remote.entries) {
+        if (!known.contains(a.bookId)) continue;
+        final local = await (db.select(db.annotations)
+              ..where((row) => row.id.equals(a.id)))
+            .getSingleOrNull();
+        // Last-write-wins, and a tie keeps what is already here: re-applying
+        // an identical row would only clear its `needsPush` for no reason.
+        if (local != null &&
+            a.updatedAt != null &&
+            !local.updatedAt.isBefore(a.updatedAt!)) {
+          continue;
+        }
+        await db.into(db.annotations).insertOnConflictUpdate(
+              AnnotationsCompanion.insert(
+                id: a.id,
+                bookId: a.bookId,
+                kind: a.kind,
+                page: Value(a.page),
+                chapter: Value(a.chapter),
+                locator: Value(a.locator),
+                quotedText: Value(a.quotedText),
+                note: Value(a.note),
+                color: Value(a.color),
+                createdAt: Value(a.createdAt ?? DateTime.now()),
+                updatedAt: Value(a.updatedAt ?? DateTime.now()),
+                // It came *from* the server, so it is not waiting to go there.
+                needsPush: const Value(false),
+              ),
+            );
+        pulled++;
+      }
+    } catch (e) {
+      if (!_serverLacksPersonal(e)) {
+        issues.add(_personalIssue('pull', 'Annotations could not be pulled: $e'));
+      }
+    }
+
+    try {
+      final remote = await client.listSessions(cursor: cursor);
+      for (final s in remote.entries) {
+        if (!known.contains(s.bookId)) continue;
+        await db.into(db.readingSessions).insertOnConflictUpdate(
+              ReadingSessionsCompanion.insert(
+                id: s.id,
+                bookId: s.bookId,
+                startedAt: s.startedAt,
+                endedAt: s.endedAt,
+                startPage: Value(s.startPage),
+                endPage: Value(s.endPage),
+                deviceId: Value(s.deviceId),
+                deviceLabel: Value(s.deviceLabel),
+                needsPush: const Value(false),
+              ),
+            );
+        pulled++;
+      }
+    } catch (e) {
+      if (!_serverLacksPersonal(e)) {
+        issues.add(
+            _personalIssue('pull', 'Reading sessions could not be pulled: $e'));
+      }
+    }
+
+    try {
+      final notes = await client.listBookNotes(cursor: cursor);
+      for (final n in notes.entries) {
+        if (!known.contains(n.bookId)) continue;
+        await (db.update(db.books)..where((b) => b.id.equals(n.bookId))).write(
+          BooksCompanion(
+            readerNotes: Value(n.note.isEmpty ? null : n.note),
+            readerNotesUpdatedAt: Value(n.updatedAt),
+            readerNotesNeedsPush: const Value(false),
+          ),
+        );
+        pulled++;
+      }
+    } catch (e) {
+      if (!_serverLacksPersonal(e)) {
+        issues.add(
+            _personalIssue('pull', 'Reader notes could not be pulled: $e'));
+      }
+    }
+    return pulled;
+  }
+
+  Future<int> _pushPersonal(
+    VellumServerClient client,
+    List<SyncIssue> issues,
+  ) async {
+    final db = _db;
+    var pushed = 0;
+
+    // Deletions first, so a delete followed by a re-add in the same window
+    // lands in that order rather than the reverse.
+    final tombstones = await (db.select(db.localDeletions)
+          ..where((d) => d.kind.equals('annotation')))
+        .get();
+    for (final t in tombstones) {
+      try {
+        await client.deleteAnnotation(t.bookId);
+        await (db.delete(db.localDeletions)
+              ..where((d) => d.bookId.equals(t.bookId)))
+            .go();
+        pushed++;
+      } catch (e) {
+        // A 404 means the server never had it — the tombstone has done its job
+        // either way, so it goes rather than being retried forever.
+        if (e.toString().contains('404')) {
+          await (db.delete(db.localDeletions)
+                ..where((d) => d.bookId.equals(t.bookId)))
+              .go();
+        } else {
+          issues.add(_personalIssue('delete', 'An annotation deletion could not be sent: $e'));
+        }
+      }
+    }
+
+    final dirty = await (db.select(db.annotations)
+          ..where((a) => a.needsPush.equals(true)))
+        .get();
+    for (final a in dirty) {
+      try {
+        await client.pushAnnotation(
+          id: a.id,
+          bookId: a.bookId,
+          kind: a.kind,
+          page: a.page,
+          chapter: a.chapter,
+          locator: a.locator,
+          quotedText: a.quotedText,
+          note: a.note,
+          color: a.color,
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
+        );
+        await (db.update(db.annotations)..where((row) => row.id.equals(a.id)))
+            .write(const AnnotationsCompanion(needsPush: Value(false)));
+        pushed++;
+      } catch (e) {
+        // A book the server doesn't have (or won't share) is not an error worth
+        // stopping for — the annotation stays dirty and rides the next sync,
+        // once its book has been pushed.
+        issues.add(_personalIssue('push', 'An annotation could not be sent: $e'));
+      }
+    }
+
+    final sessions = await (db.select(db.readingSessions)
+          ..where((s) => s.needsPush.equals(true)))
+        .get();
+    for (final s in sessions) {
+      try {
+        await client.pushSession(
+          id: s.id,
+          bookId: s.bookId,
+          startedAt: s.startedAt,
+          endedAt: s.endedAt,
+          startPage: s.startPage,
+          endPage: s.endPage,
+          deviceId: s.deviceId,
+          deviceLabel: s.deviceLabel,
+        );
+        await (db.update(db.readingSessions)
+              ..where((row) => row.id.equals(s.id)))
+            .write(const ReadingSessionsCompanion(needsPush: Value(false)));
+        pushed++;
+      } catch (e) {
+        issues.add(_personalIssue('push', 'A reading session could not be sent: $e'));
+      }
+    }
+
+    final notedBooks = await (db.select(db.books)
+          ..where((b) => b.readerNotesNeedsPush.equals(true)))
+        .get();
+    for (final b in notedBooks) {
+      try {
+        await client.pushBookNote(
+          bookId: b.id,
+          note: b.readerNotes ?? '',
+          updatedAt: b.readerNotesUpdatedAt,
+        );
+        await (db.update(db.books)..where((row) => row.id.equals(b.id)))
+            .write(const BooksCompanion(readerNotesNeedsPush: Value(false)));
+        pushed++;
+      } catch (e) {
+        issues.add(_personalIssue('push', 'A reader note could not be sent: $e'));
+      }
+    }
+    return pushed;
   }
 
   /// Pushes local shelf deletions, then dirty (`needsPush`) shelves with

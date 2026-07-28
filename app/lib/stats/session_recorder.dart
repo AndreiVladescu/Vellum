@@ -16,9 +16,15 @@ import '../data/database.dart';
 /// per day, average pages per session, streaks) would measure interruptions
 /// rather than reading.
 class SessionRecorder {
-  SessionRecorder(this.db);
+  SessionRecorder(this.db, {this.deviceId, this.deviceLabel});
 
   final VellumDatabase db;
+
+  /// Which device this sitting happened on, so statistics stay answerable once
+  /// they span three of them. Null in tests and anywhere the settings aren't
+  /// to hand — the session is still recorded, just unattributed.
+  final String? deviceId;
+  final String? deviceLabel;
 
   static const _uuid = Uuid();
 
@@ -57,6 +63,8 @@ class SessionRecorder {
           endedAt: at,
           startPage: Value(page),
           endPage: Value(page),
+          deviceId: Value(deviceId),
+          deviceLabel: Value(deviceLabel),
         ));
     _sessionId = id;
     return id;
@@ -71,6 +79,9 @@ class SessionRecorder {
       ReadingSessionsCompanion(
         endedAt: Value(now ?? DateTime.now()),
         endPage: page == null ? const Value.absent() : Value(page),
+        // Still unsent: a sitting is only worth publishing once it is over,
+        // and `end` is what settles its final page and duration.
+        needsPush: const Value(true),
       ),
     );
   }
