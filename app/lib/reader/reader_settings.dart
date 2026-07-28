@@ -18,12 +18,19 @@ enum ReaderTheme {
   final Color background;
   final Color foreground;
 
+  /// The page colours you can choose. [dark] is not among them: it is what
+  /// night mode looks like, not a paper colour.
+  ///
+  /// Offering both was offering the same thing twice — a dark page from here
+  /// and a dark page from the switch, differing only in whether the pictures
+  /// were greyed, which is not a distinction anyone should have to make.
+  static const choices = [light, sepia, grey];
+
   /// Whether the page is dark enough that the book's own colours have to go.
   ///
-  /// Asked of the *theme*, not of the dark-pages switch: choosing the dark page
-  /// colour puts you on a black page just as surely, and a heading whose
-  /// stylesheet asked for near-black is invisible on it either way. Measured
-  /// rather than named, so a repalette can't quietly leave this behind.
+  /// Measured rather than named, so a repalette can't quietly leave this
+  /// behind: a heading whose stylesheet asked for near-black is invisible on a
+  /// near-black page, whatever put it there.
   bool get isDark => background.computeLuminance() < 0.3;
 }
 
@@ -84,8 +91,23 @@ enum PdfPageMode {
 class ReaderSettings extends ChangeNotifier {
   ReaderSettings._(this._prefs);
 
-  static Future<ReaderSettings> load() async =>
-      ReaderSettings._(await SharedPreferences.getInstance());
+  static Future<ReaderSettings> load() async {
+    final settings = ReaderSettings._(await SharedPreferences.getInstance());
+    await settings._adoptNightMode();
+    return settings;
+  }
+
+  /// Moves anyone who had chosen the Dark *page colour* onto night mode.
+  ///
+  /// The two did the same job, so Dark is no longer offered — but a stored
+  /// `dark` would otherwise fall through to Light, and someone who reads at
+  /// night would open their book to a white page. They asked for a dark page;
+  /// this is where a dark page lives now.
+  Future<void> _adoptNightMode() async {
+    if (_prefs.getString(_themeKey) != ReaderTheme.dark.name) return;
+    await _prefs.setBool(_nightModeKey, true);
+    await _prefs.remove(_themeKey);
+  }
 
   final SharedPreferences _prefs;
 
@@ -175,24 +197,23 @@ class ReaderSettings extends ChangeNotifier {
 
   /// Black paper, white type, pictures in grey — in both formats.
   ///
-  /// Separate from the page colours above rather than a fifth [ReaderTheme],
-  /// because it is not only a colour: it also greys out the pictures, and for a
-  /// PDF it is a filter over a rendered page rather than a choice about how to
-  /// draw one. It overrides the page colour while it is on.
+  /// A switch rather than a fourth page colour, because it is not only a
+  /// colour: it greys out the pictures, and for a PDF it is a filter over a
+  /// rendered page rather than a choice about how to draw one. It overrides the
+  /// page colour while it is on.
   ///
-  /// The stored key still says `pdfNightMode`: it began as a PDF-only switch,
-  /// and renaming the key would silently turn the setting off for everyone who
-  /// had already found it.
-  bool get darkPages => _prefs.getBool(_nightModeKey) ?? false;
+  /// The stored key has always been `pdfNightMode` — it began as a PDF-only
+  /// switch — and now the name matches again.
+  bool get nightMode => _prefs.getBool(_nightModeKey) ?? false;
 
-  Future<void> setDarkPages(bool value) async {
+  Future<void> setNightMode(bool value) async {
     await _prefs.setBool(_nightModeKey, value);
     notifyListeners();
   }
 
-  /// The page colours actually in force. [darkPages] wins over [theme]: it is
-  /// the more specific request, and sepia-with-dark-pages means nothing.
-  ReaderTheme get effectiveTheme => darkPages ? ReaderTheme.dark : theme;
+  /// The page colours actually in force. [nightMode] brings its own, which is
+  /// why [ReaderTheme.dark] still exists without being on offer.
+  ReaderTheme get effectiveTheme => nightMode ? ReaderTheme.dark : theme;
 
   PdfPageMode get pdfMode {
     final stored = _prefs.getString(_pdfModeKey);

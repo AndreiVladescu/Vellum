@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vellum/reader/dark_pages.dart';
+import 'package:vellum/reader/night_mode.dart';
 import 'package:vellum/reader/reader_settings.dart';
 import 'package:vellum/reader/reader_settings_sheet.dart';
 
@@ -19,7 +19,7 @@ void main() {
     expect(settings.lineHeight, 1.5);
     expect(settings.measure, 720.0);
     expect(settings.pdfFit, PdfFit.width);
-    expect(settings.darkPages, false);
+    expect(settings.nightMode, false);
     expect(settings.immersive, false);
   });
 
@@ -31,7 +31,7 @@ void main() {
     await settings.setLineHeight(1.8);
     await settings.setMeasure(900);
     await settings.setPdfFit(PdfFit.page);
-    await settings.setDarkPages(true);
+    await settings.setNightMode(true);
     await settings.setImmersive(true);
 
     // A second load is the next launch.
@@ -42,7 +42,7 @@ void main() {
     expect(reloaded.lineHeight, 1.8);
     expect(reloaded.measure, 900);
     expect(reloaded.pdfFit, PdfFit.page);
-    expect(reloaded.darkPages, true);
+    expect(reloaded.nightMode, true);
     expect(reloaded.immersive, true);
   });
 
@@ -76,14 +76,14 @@ void main() {
     final settings = await ReaderSettings.load();
     var notifications = 0;
     settings.addListener(() => notifications++);
-    await settings.setTheme(ReaderTheme.dark);
+    await settings.setTheme(ReaderTheme.sepia);
     await settings.setFontSize(20);
     expect(notifications, 2);
   });
 
   test('bodyTextStyle reflects the current settings and theme', () async {
     final settings = await ReaderSettings.load();
-    await settings.setTheme(ReaderTheme.dark);
+    await settings.setTheme(ReaderTheme.grey);
     await settings.setFont(ReaderFont.mono);
     await settings.setFontSize(19);
     await settings.setLineHeight(1.7);
@@ -92,11 +92,12 @@ void main() {
     expect(style.fontFamily, 'monospace');
     expect(style.fontSize, 19);
     expect(style.height, 1.7);
-    expect(style.color, ReaderTheme.dark.foreground);
+    expect(style.color, ReaderTheme.grey.foreground);
   });
 
   test('every theme is legible — background and foreground really differ', () {
     // Cheap guard against a future palette tweak producing dark-on-dark.
+    // Over `values`, not `choices`: night mode's palette has to pass too.
     for (final theme in ReaderTheme.values) {
       final delta =
           (theme.background.computeLuminance() - theme.foreground.computeLuminance())
@@ -110,10 +111,10 @@ void main() {
     // and a saturated colour must come out near grey — the point of draining it
     // is that a photograph reads as a photograph instead of as a negative.
     double channel(int row, List<double> rgb) =>
-        darkPageMatrix[row * 5 + 0] * rgb[0] +
-        darkPageMatrix[row * 5 + 1] * rgb[1] +
-        darkPageMatrix[row * 5 + 2] * rgb[2] +
-        darkPageMatrix[row * 5 + 4];
+        nightModeMatrix[row * 5 + 0] * rgb[0] +
+        nightModeMatrix[row * 5 + 1] * rgb[1] +
+        nightModeMatrix[row * 5 + 2] * rgb[2] +
+        nightModeMatrix[row * 5 + 4];
 
     final white = [255.0, 255.0, 255.0];
     final black = [0.0, 0.0, 0.0];
@@ -135,18 +136,42 @@ void main() {
   test('only the dark palette counts as a dark page', () {
     // What decides whether a book's own colours are stripped out of its markup.
     expect(ReaderTheme.dark.isDark, isTrue);
-    for (final theme in [ReaderTheme.light, ReaderTheme.sepia, ReaderTheme.grey]) {
+    for (final theme in ReaderTheme.choices) {
       expect(theme.isDark, isFalse, reason: '${theme.label} is a light page');
     }
   });
 
-  test('dark pages override the page colour rather than fighting it', () async {
+  test('Dark is not offered as a page colour — night mode is where it lives', () {
+    expect(ReaderTheme.choices, isNot(contains(ReaderTheme.dark)));
+    expect(ReaderTheme.choices, hasLength(3));
+  });
+
+  test('someone already on the Dark page colour is moved to night mode', () async {
+    // Without this they would fall through to Light: a reader who set a dark
+    // page opening their book to a white one.
+    SharedPreferences.setMockInitialValues({'reader.theme': 'dark'});
+    final settings = await ReaderSettings.load();
+    expect(settings.nightMode, isTrue);
+    expect(settings.effectiveTheme, ReaderTheme.dark);
+    // And the stale choice is gone, so turning night mode off lands on Light
+    // rather than silently back on a colour that is no longer offered.
+    expect(settings.theme, ReaderTheme.light);
+  });
+
+  test('a page colour that is still offered is left alone', () async {
+    SharedPreferences.setMockInitialValues({'reader.theme': 'sepia'});
+    final settings = await ReaderSettings.load();
+    expect(settings.nightMode, isFalse);
+    expect(settings.theme, ReaderTheme.sepia);
+  });
+
+  test('night mode overrides the page colour rather than fighting it', () async {
     final settings = await ReaderSettings.load();
     await settings.setTheme(ReaderTheme.sepia);
     expect(settings.effectiveTheme, ReaderTheme.sepia);
-    await settings.setDarkPages(true);
+    await settings.setNightMode(true);
     expect(settings.effectiveTheme, ReaderTheme.dark,
-        reason: 'sepia-with-dark-pages means nothing');
+        reason: 'sepia-at-night means nothing');
     expect(settings.theme, ReaderTheme.sepia,
         reason: 'the choice is remembered for when dark pages go off again');
   });
@@ -183,8 +208,8 @@ void main() {
     await tester.pump();
     expect(find.text('Typeface'), findsOneWidget);
     expect(find.text('Text size'), findsOneWidget);
-    expect(find.text('Dark pages'), findsOneWidget,
-        reason: 'dark pages apply to both formats');
+    expect(find.text('Night mode'), findsOneWidget,
+        reason: 'night mode applies to both formats');
 
     // PDF: fit and night mode, no typography (a rendered page can't reflow).
     await tester.pumpWidget(MaterialApp(
@@ -198,7 +223,7 @@ void main() {
     ));
     await tester.pump();
     expect(find.text('Typeface'), findsNothing);
-    expect(find.text('Dark pages'), findsOneWidget);
+    expect(find.text('Night mode'), findsOneWidget);
     expect(find.text('Page fit'), findsOneWidget);
     // The shared row is present either way.
     expect(find.text('Hide controls while reading'), findsOneWidget);

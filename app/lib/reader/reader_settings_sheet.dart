@@ -57,15 +57,15 @@ class ReaderSettingsSheet extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final theme in ReaderTheme.values)
+                    for (final theme in ReaderTheme.choices)
                       ChoiceChip(
                         label: Text(theme.label),
-                        selected: !settings.darkPages && settings.theme == theme,
-                        // Greyed out while dark pages are on, rather than
+                        selected: !settings.nightMode && settings.theme == theme,
+                        // Greyed out while night mode is on, rather than
                         // hidden: it should be obvious *why* the page is black
                         // and which switch to flick to change it.
                         onSelected:
-                            settings.darkPages ? null : (_) => settings.setTheme(theme),
+                            settings.nightMode ? null : (_) => settings.setTheme(theme),
                         avatar: Container(
                           decoration: BoxDecoration(
                             color: theme.background,
@@ -78,11 +78,11 @@ class ReaderSettingsSheet extends StatelessWidget {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Dark pages'),
+                  title: const Text('Night mode'),
                   subtitle: const Text(
-                      'Black paper, white type, pictures in grey'),
-                  value: settings.darkPages,
-                  onChanged: settings.setDarkPages,
+                      'Black pages, white type, pictures in grey'),
+                  value: settings.nightMode,
+                  onChanged: settings.setNightMode,
                 ),
                 if (showTypography) ...[
                   const SizedBox(height: 16),

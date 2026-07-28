@@ -22,7 +22,7 @@ shelf, instead of scrolling a grid of covers.
   elsewhere. See [docs/IMPORTING.md](docs/IMPORTING.md) for how to structure a
   catalogue file and how file names are read.
 - **Integrated reader** — read your PDFs and EPUBs right in the app, with
-  highlights in four marker colours and dark pages for both formats.
+  highlights in four marker colours and a night mode for both formats.
 - **Keyboard-first on desktop** — Ctrl+K opens a command palette that runs any
   action or jumps to any book; the common ones have their own shortcuts.
 - **Backed up** — export the whole library (database, covers, files) to a

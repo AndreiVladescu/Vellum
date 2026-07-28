@@ -11,7 +11,7 @@ import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/epub_highlight_html.dart';
 import 'annotations/highlight_palette.dart';
-import 'dark_pages.dart';
+import 'night_mode.dart';
 import 'edge_turn.dart';
 import 'epub_book.dart';
 import 'epub_search.dart';
@@ -592,13 +592,12 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
         }
         final chapter = epub.chapters[_chapter];
         final settings = _settings;
-        final dark = settings?.darkPages ?? false;
+        final dark = settings?.nightMode ?? false;
         final readerTheme = settings?.effectiveTheme ?? ReaderTheme.light;
-        // The book's colours have to go on any dark page, not only when the
-        // dark-pages switch put it there — picking the Dark page colour lands
-        // you on black paper too, and a heading that asked for near-black is
-        // invisible on it. Greying the pictures stays with the switch: that was
-        // asked for as part of dark pages, not as part of a page colour.
+        // Asked of the page rather than of the switch. They amount to the same
+        // thing now that Dark is not a page colour, but the rule that matters
+        // is "the paper is dark, so the book's own near-black type has to go" —
+        // and that stays true whatever a future palette does.
         final darkPage = readerTheme.isDark;
         return Scaffold(
           backgroundColor: readerTheme.background,
@@ -744,7 +743,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                           // text is coloured like a marker rather than only
                           // listed in the panel.
                           withHighlights(
-                            // Dark pages: the book's own colours come out
+                            // Night mode: the book's own colours come out
                             // first, or a heading that asked for near-black
                             // stays near-black on a near-black page.
                             darkPage
@@ -759,7 +758,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                           // system text scale.
                           textStyle: settings?.bodyTextStyle() ??
                               TextStyle(color: readerTheme.foreground),
-                          // Dark pages: the book's own colours would otherwise
+                          // Night mode: the book's own colours would otherwise
                           // win — a stylesheet saying `color: #222` is black
                           // text on a black page. Its *pictures* are handled by
                           // the factory, which greys them.
@@ -768,7 +767,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                                   ? null
                                   : {'color': cssHex(readerTheme.foreground)}
                               : null,
-                          factoryBuilder: dark ? DarkPagesFactory.new : null,
+                          factoryBuilder: dark ? NightModeFactory.new : null,
                         ),
                       ),
                     ),

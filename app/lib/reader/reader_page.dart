@@ -11,7 +11,7 @@ import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
-import 'dark_pages.dart';
+import 'night_mode.dart';
 import 'edge_turn.dart';
 import 'reader_hotkeys.dart';
 import 'pdf_paged_view.dart';
@@ -430,7 +430,7 @@ class _ReaderPageState extends State<ReaderPage> {
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
-    final dark = settings?.darkPages ?? false;
+    final dark = settings?.nightMode ?? false;
     final readerTheme = settings?.effectiveTheme ?? ReaderTheme.light;
     return Scaffold(
       backgroundColor: readerTheme.background,
@@ -582,7 +582,7 @@ class _ReaderPageState extends State<ReaderPage> {
             onTap: settings?.immersive == true
                 ? () => setState(() => _chromeHidden = !_chromeHidden)
                 : null,
-            child: darkPageWrap(
+            child: nightModeWrap(
               enabled: dark,
               child: PdfViewer.file(
         widget.file.path,

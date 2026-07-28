@@ -1,4 +1,4 @@
-/// Dark pages: black paper, white type, pictures in grey.
+/// Night mode: black pages, white type, pictures in grey.
 ///
 /// **Two mechanisms, because the two formats are not the same kind of thing.**
 /// An EPUB is text this app lays out, so it is simply *drawn* dark — the page
@@ -29,7 +29,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 ///
 /// The rows are the desaturation mix (Rec. 601 luma weights, blended 9:1 toward
 /// grey) scaled by 0.90 and negated, which is the inversion.
-const darkPageMatrix = <double>[
+const nightModeMatrix = <double>[
   // R'      G'      B'      A'  offset
   -0.3322, -0.4755, -0.0923, 0, 240, //
   -0.2422, -0.5655, -0.0923, 0, 240, //
@@ -57,7 +57,7 @@ const greyImageMatrix = <double>[
 /// element, which would mean re-implementing image loading, sizing and data-URI
 /// decoding to change one colour. Overriding [buildImage] lets the package do
 /// all of that and wraps whatever it produced.
-class DarkPagesFactory extends WidgetFactory {
+class NightModeFactory extends WidgetFactory {
   @override
   Widget? buildImage(BuildTree tree, ImageMetadata data) {
     final built = super.buildImage(tree, data);
@@ -112,14 +112,14 @@ final _colourAttribute = RegExp(
   caseSensitive: false,
 );
 
-/// Applies [darkPageMatrix] to [child] when [enabled].
+/// Applies [nightModeMatrix] to [child] when [enabled].
 ///
 /// One wrap around the viewer rather than a per-page paint: the pages are
 /// rasters, so filtering the pixels is the only way to darken them, and doing it
 /// once keeps every page — and the gaps between them — consistent.
-Widget darkPageWrap({required bool enabled, required Widget child}) => enabled
+Widget nightModeWrap({required bool enabled, required Widget child}) => enabled
     ? ColorFiltered(
-        colorFilter: const ColorFilter.matrix(darkPageMatrix),
+        colorFilter: const ColorFilter.matrix(nightModeMatrix),
         child: child,
       )
     : child;

@@ -1,11 +1,11 @@
-// Taking a book's own colours out of its markup for dark pages.
+// Taking a book's own colours out of its markup for night mode.
 //
 // The bug this exists for: `customStylesBuilder` loses to an element's `style`
 // attribute, which is exactly where books put `color: #222`. Overriding was not
 // enough — the declaration has to be gone, and it has to go without taking the
 // author's layout with it.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vellum/reader/dark_pages.dart';
+import 'package:vellum/reader/night_mode.dart';
 
 void main() {
   test('a colour the book asked for is removed', () {
@@ -13,7 +13,7 @@ void main() {
     expect(withoutBookColours(html), isNot(contains('#111111')));
   });
 
-  test('a light background box does not survive onto a dark page', () {
+  test('a light background box does not survive onto a night-mode page', () {
     // White type on the reader's white callout, in the middle of black paper.
     const html = '<div style="background-color:#fff;padding:8px">Note</div>';
     final out = withoutBookColours(html);
