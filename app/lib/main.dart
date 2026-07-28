@@ -42,6 +42,7 @@ import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
 import 'shelf/shelf_view.dart';
 import 'shortcuts.dart';
+import 'snack_bars.dart';
 import 'wishlist/wishlist_page.dart';
 
 Future<void> main() async {
@@ -400,7 +401,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
     final l10n = L10n.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      appSnackBar(
         duration: const Duration(seconds: 8),
         // ICU, not `'$n file${n == 1 ? '' : 's'}'` — the hand-built plural this
         // item exists to remove (plan 5 #38). No other language survives it.

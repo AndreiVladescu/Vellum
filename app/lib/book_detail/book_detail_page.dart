@@ -7,8 +7,10 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../loans/borrow_requests.dart';
 import '../physical/find_copy.dart';
+import '../reader/annotations/annotations_panel.dart';
 import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
+import '../snack_bars.dart';
 import 'cover_thumb.dart';
 import 'edit_book_sheet.dart';
 import 'formats_section.dart';
@@ -16,7 +18,6 @@ import 'genres_section.dart';
 import 'lend_sheet.dart';
 import 'physical_copies_section.dart';
 import 'read_button.dart';
-import '../reader/annotations/annotations_panel.dart';
 import 'reader_notes_section.dart';
 import 'send_to_device_sheet.dart';
 
@@ -557,7 +558,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     // honest: restoring is one column write, not a restore
                     // from backup.
                     messenger.showSnackBar(
-                      SnackBar(
+                      appSnackBar(
                         content: Text('“${book.title}” moved to the trash'),
                         action: SnackBarAction(
                           label: 'Undo',

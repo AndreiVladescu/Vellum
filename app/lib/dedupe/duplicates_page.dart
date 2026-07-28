@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../import/import_plan.dart';
+import '../snack_bars.dart';
 import 'duplicate_finder.dart';
 import 'merge_service.dart';
 
@@ -78,7 +79,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
       _pairs = _find();
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      appSnackBar(
         content: const Text('Merged'),
         action: SnackBarAction(
           label: 'What moved',

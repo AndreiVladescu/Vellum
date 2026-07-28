@@ -5,6 +5,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
+import '../snack_bars.dart';
 
 /// Books you want but don't own (plan 5 #21a).
 ///
@@ -140,7 +141,7 @@ class _WishTile extends StatelessWidget {
               // Through the trash like every other delete (plan 5 #52) — a
               // wishlist entry can be a mis-tap too.
               await repository.trashBook(book.id);
-              messenger.showSnackBar(SnackBar(
+              messenger.showSnackBar(appSnackBar(
                 content: Text('“${book.title}” removed'),
                 action: SnackBarAction(
                   label: 'Undo',

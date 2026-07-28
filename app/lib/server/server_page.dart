@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart';
 
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
+import '../snack_bars.dart';
 import 'cert_trust.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
@@ -174,7 +175,7 @@ class _ServerPageState extends State<ServerPage> {
     _announce(msg);
     _announcedPhase = '';
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      appSnackBar(
         content: Text(msg),
         action: report.hasIssues
             ? SnackBarAction(
@@ -352,7 +353,7 @@ class _ServerPageState extends State<ServerPage> {
             : 'Pulled ${report.pulled}, pushed ${report.pushed}'
                 '${report.hasIssues ? ', $n issue${n == 1 ? '' : 's'}' : ''}.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          appSnackBar(
             content: Text(msg),
             action: report.hasIssues
                 ? SnackBarAction(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/external_open.dart';
+import '../snack_bars.dart';
 
 /// A ready-made catalogue file, which is also the documentation.
 ///
@@ -73,7 +74,7 @@ class _SheetBody extends StatelessWidget {
   Future<void> _saveTemplate(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final location = await getSaveLocation(
-      suggestedName: 'vellum-books.csv',
+      suggestedName: 'vellum_import_template.csv',
       acceptedTypeGroups: const [
         XTypeGroup(label: 'CSV', extensions: ['csv']),
       ],
@@ -82,7 +83,7 @@ class _SheetBody extends StatelessWidget {
     final file = File(location.path);
     await file.writeAsString(catalogTemplateCsv);
     messenger.showSnackBar(
-      SnackBar(
+      appSnackBar(
         content: Text('Saved to ${location.path}'),
         action: SnackBarAction(
           label: 'Open',

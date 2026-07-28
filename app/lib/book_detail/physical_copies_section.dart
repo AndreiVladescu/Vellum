@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../snack_bars.dart';
 import 'copy_photos.dart';
 
 /// Prompts for a borrower's name. Returns the trimmed name, or null if the user
@@ -304,7 +305,7 @@ class PhysicalCopyTile extends StatelessWidget {
     await repository.returnLoan(active.id);
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(SnackBar(
+    messenger.showSnackBar(appSnackBar(
       content: Text('Returned by ${active.borrower}'),
       action: SnackBarAction(
         label: 'Photograph it',
