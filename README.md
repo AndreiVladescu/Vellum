@@ -37,8 +37,15 @@ is uploaded anywhere, unless you deliberately set up the optional server.
 
 ## Getting it running
 
-There are no prebuilt downloads yet, so you build it once from source. It takes
-about ten minutes, most of which is the toolchain downloading.
+**If there is a [release](https://github.com/AndreiVladescu/Vellum/releases)**,
+download the build for your system — Linux, Windows, macOS or Android — and skip
+this section. On Linux, keep the extracted folder together: the executable needs
+`lib/` and `data/` beside it. The desktop builds are unsigned, so macOS wants
+right-click → Open on the first launch and Windows SmartScreen wants
+*More info → Run anyway*.
+
+To build it yourself instead — or if there is no release yet — it takes about
+ten minutes, most of which is the toolchain downloading.
 
 ### 1. Install Flutter
 
