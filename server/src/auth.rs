@@ -1,7 +1,7 @@
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use axum::Json;
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{FromRequestParts, State, Path};
 use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -484,6 +484,114 @@ pub async fn list_users(
     .fetch_all(&state.db)
     .await?;
     Ok(Json(users))
+}
+
+/// Master-only: change whether an account is a master.
+///
+/// The library must never end up with **no** master — that is an account nobody
+/// can administer, recoverable only by editing the database by hand. So a
+/// demotion checks there is another one first, which also covers the obvious
+/// mistake of demoting yourself.
+pub async fn set_user_role(
+    State(state): State<AppState>,
+    caller: AuthUser,
+    Path(id): Path<String>,
+    Json(input): Json<RoleInput>,
+) -> AppResult<Json<AuthUser>> {
+    require_master(&caller)?;
+    let target: Option<AuthUser> =
+        sqlx::query_as("SELECT id, email, display_name, is_master FROM app_user WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&state.db)
+            .await?;
+    let target = target.ok_or_else(|| AppError::NotFound("no such user".into()))?;
+
+    if target.is_master && !input.is_master {
+        let others: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM app_user WHERE is_master = 1 AND id != ?",
+        )
+        .bind(&id)
+        .fetch_one(&state.db)
+        .await?;
+        if others == 0 {
+            return Err(AppError::BadRequest(
+                "that is the only master — promote someone else first".into(),
+            ));
+        }
+    }
+
+    sqlx::query("UPDATE app_user SET is_master = ? WHERE id = ?")
+        .bind(input.is_master)
+        .bind(&id)
+        .execute(&state.db)
+        .await?;
+    crate::audit::record(
+        &state,
+        Some(&caller),
+        if input.is_master {
+            "user.promote"
+        } else {
+            "user.demote"
+        },
+        "user",
+        &id,
+        Some(&target.email),
+    )
+    .await;
+
+    Ok(Json(AuthUser {
+        is_master: input.is_master,
+        ..target
+    }))
+}
+
+/// Master-only: remove an account.
+///
+/// Everything that account owns goes with it — `app_user`'s `ON DELETE CASCADE`
+/// reaches its sessions, shares, invites, annotations, sittings, notes and
+/// reading positions. The *books* stay: they belong to the library, and
+/// `book.owner_id` is nullable precisely so removing a person does not delete
+/// what they catalogued.
+pub async fn delete_user(
+    State(state): State<AppState>,
+    caller: AuthUser,
+    Path(id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    require_master(&caller)?;
+    if id == caller.id {
+        // Not a safety net so much as a sanity one: removing the account you
+        // are authenticated as logs you out mid-request and, if you were the
+        // last master, locks everyone out for good.
+        return Err(AppError::BadRequest(
+            "you cannot remove your own account".into(),
+        ));
+    }
+    let target: Option<AuthUser> =
+        sqlx::query_as("SELECT id, email, display_name, is_master FROM app_user WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&state.db)
+            .await?;
+    let target = target.ok_or_else(|| AppError::NotFound("no such user".into()))?;
+
+    sqlx::query("DELETE FROM app_user WHERE id = ?")
+        .bind(&id)
+        .execute(&state.db)
+        .await?;
+    crate::audit::record(
+        &state,
+        Some(&caller),
+        "user.delete",
+        "user",
+        &id,
+        Some(&target.email),
+    )
+    .await;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+pub struct RoleInput {
+    pub is_master: bool,
 }
 
 // ---- helpers --------------------------------------------------------------

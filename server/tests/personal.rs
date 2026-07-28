@@ -683,3 +683,204 @@ async fn a_cursor_returns_only_what_changed_since() {
     assert_eq!(list[0]["id"], "new");
     assert!(body["server_now"].is_string(), "the next cursor");
 }
+
+// ---- administering people (plan 6 #1) -------------------------------------
+//
+// The endpoints behind the console's People screen. The rule worth defending is
+// that a library can never end up with no master: that is an account nobody can
+// administer, recoverable only by editing the database by hand.
+
+#[tokio::test]
+async fn the_master_can_promote_and_demote() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    add_member(&app, &master, "friend@lib.test").await;
+
+    let (_, users) = call(&app, "GET", "/api/users", Some(&master), None).await;
+    let friend = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["email"] == "friend@lib.test")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{friend}"),
+        Some(&master),
+        Some(json!({ "is_master": true })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["is_master"], true);
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{friend}"),
+        Some(&master),
+        Some(json!({ "is_master": false })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["is_master"], false);
+}
+
+#[tokio::test]
+async fn the_last_master_cannot_be_demoted() {
+    // Otherwise the library has no administrator and no way back.
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let (_, me) = call(&app, "GET", "/api/auth/me", Some(&master), None).await;
+    let id = me["id"].as_str().unwrap();
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{id}"),
+        Some(&master),
+        Some(json!({ "is_master": false })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        body["error"].as_str().unwrap().contains("only master"),
+        "the message has to say why: {body}"
+    );
+}
+
+#[tokio::test]
+async fn a_member_cannot_promote_themselves() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let (_, me) = call(&app, "GET", "/api/auth/me", Some(&friend), None).await;
+    let id = me["id"].as_str().unwrap();
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{id}"),
+        Some(&friend),
+        Some(json!({ "is_master": true })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn removing_an_account_takes_its_personal_data_but_leaves_the_books() {
+    // The cascade the People screen has to warn about before it happens.
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": "friend@lib.test", "permission": "editor"
+        })),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/annotations/theirs",
+        Some(&friend),
+        Some(json!({ "book_id": book, "kind": "highlight" })),
+    )
+    .await;
+
+    let (_, users) = call(&app, "GET", "/api/users", Some(&master), None).await;
+    let id = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["email"] == "friend@lib.test")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let (status, body) = call(
+        &app,
+        "DELETE",
+        &format!("/api/users/{id}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    // Their session is gone with them.
+    let (status, _) = call(&app, "GET", "/api/auth/me", Some(&friend), None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    // The book they annotated is still in the library.
+    let (status, _) = call(&app, "GET", &format!("/api/books/{book}"), Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK, "removing a person is not removing books");
+}
+
+#[tokio::test]
+async fn you_cannot_remove_your_own_account() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let (_, me) = call(&app, "GET", "/api/auth/me", Some(&master), None).await;
+    let id = me["id"].as_str().unwrap();
+
+    let (status, _) = call(&app, "DELETE", &format!("/api/users/{id}"), Some(&master), None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn pending_invites_are_listed_and_can_be_withdrawn() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "newcomer@lib.test", "permission": "viewer" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let (status, list) = call(&app, "GET", "/api/invites", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let invites = list.as_array().unwrap();
+    assert_eq!(invites.len(), 1);
+    assert_eq!(invites[0]["email"], "newcomer@lib.test");
+    let id = invites[0]["id"].as_str().unwrap().to_string();
+
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/invites/{id}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, list) = call(&app, "GET", "/api/invites", Some(&master), None).await;
+    assert!(list.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_member_cannot_see_the_invite_list() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let (status, _) = call(&app, "GET", "/api/invites", Some(&friend), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

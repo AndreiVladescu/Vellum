@@ -765,6 +765,67 @@ pub struct InviteCreated {
 /// Registration is closed after the first account, so this is how a second
 /// person gets in without the master typing a password on their behalf and
 /// sending it over a chat app.
+/// One outstanding invite, for the People screen. The token is **not** here —
+/// only its hash is stored, and echoing even that would turn a list endpoint
+/// into a way to redeem someone else's invitation. (Distinct from the private
+/// `PendingInvite` below, which is what the redeem path reads.)
+#[derive(serde::Serialize, sqlx::FromRow)]
+pub struct InviteSummary {
+    pub id: String,
+    pub email: String,
+    pub scope: Option<String>,
+    pub permission: String,
+    pub expires_at: String,
+    pub created_at: String,
+}
+
+/// Master-only: invites that are still live — not redeemed, not expired.
+///
+/// Anything else is history rather than a pending action, and a list that grows
+/// forever is one nobody reads.
+pub async fn list_invites(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Vec<InviteSummary>>> {
+    if !user.is_master {
+        return Err(AppError::Forbidden("only the master may see invites".into()));
+    }
+    let rows = sqlx::query_as::<_, InviteSummary>(
+        "SELECT token_hash AS id, email, scope, permission, expires_at, created_at \
+         FROM invite \
+         WHERE used_at IS NULL AND expires_at > datetime('now') \
+         ORDER BY created_at DESC",
+    )
+    .fetch_all(&state.db)
+    .await?;
+    Ok(Json(rows))
+}
+
+/// Master-only: withdraw an invite that hasn't been used.
+///
+/// Identified by the token *hash*, which is what `list_invites` hands back —
+/// so revoking needs the list, and holding the emailed link is not enough.
+pub async fn revoke_invite(
+    State(state): State<AppState>,
+    user: AuthUser,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    if !user.is_master {
+        return Err(AppError::Forbidden(
+            "only the master may revoke invites".into(),
+        ));
+    }
+    let removed = sqlx::query("DELETE FROM invite WHERE token_hash = ? AND used_at IS NULL")
+        .bind(&id)
+        .execute(&state.db)
+        .await?
+        .rows_affected();
+    if removed == 0 {
+        return Err(AppError::NotFound("no such pending invite".into()));
+    }
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
 pub async fn create_invite(
     State(state): State<AppState>,
     user: AuthUser,

@@ -1529,3 +1529,136 @@ async function showStats(){
     </div>
    </div>`;
 }
+
+
+// ---- people (plan 6 #1) ---------------------------------------------------
+//
+// Administering the accounts in a shared library. Master-only, and the only
+// place it exists: creating a second user used to mean hand-crafting an
+// authenticated HTTP request, which made every sharing feature unreachable in
+// practice.
+//
+// Inviting is preferred over creating with a password. An invite lets the
+// person choose their own, and never puts a password the admin knows into the
+// database — the same reasoning as the reset flow.
+
+async function showPeople(){
+  let users, invites;
+  try {
+    users = await api('GET','/api/users');
+  } catch(e){
+    toast(/master/.test(e.message)
+      ? 'Only the library owner can manage people.'
+      : e.message);
+    return;
+  }
+  // Invites need SMTP to be *sent*, but the list works regardless — a server
+  // without mail still mints links to pass along by hand.
+  try { invites = await api('GET','/api/invites'); } catch(e){ invites = []; }
+
+  const rows = users.map(u => `
+    <div class="row" style="justify-content:space-between; gap:12px;
+        padding:8px 0; border-bottom:1px solid var(--line)">
+      <span>
+        <strong>${esc(u.display_name || u.email)}</strong>
+        ${u.is_master ? '<span class="muted"> · owner</span>' : ''}
+        <div class="muted" style="font-size:12px">${esc(u.email)}</div>
+      </span>
+      <span class="row" style="gap:6px">
+        <button class="btn sm" onclick="setRole('${u.id}', ${!u.is_master})">
+          ${u.is_master ? 'Make member' : 'Make owner'}</button>
+        <button class="btn sm" onclick="resetFor('${esc(u.email)}')">Send reset</button>
+        <button class="btn sm danger" onclick="removePerson('${u.id}','${esc(u.email)}')">
+          Remove</button>
+      </span>
+    </div>`).join('');
+
+  const pending = invites.length ? `
+    <p class="muted" style="margin:14px 0 4px">Invited, not yet joined</p>` +
+    invites.map(i => `
+    <div class="row" style="justify-content:space-between; gap:12px;
+        padding:6px 0; font-size:13px">
+      <span>${esc(i.email)}
+        <span class="muted">· ${esc(i.permission)}${i.scope ? ' · ' + esc(i.scope) : ''}</span>
+      </span>
+      <button class="btn sm" onclick="revokeInvite('${i.id}')">Withdraw</button>
+    </div>`).join('') : '';
+
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(680px,95vw)">
+      <h2 style="margin:0 0 4px">People</h2>
+      <p class="muted" style="margin:0 0 12px">Everyone with an account on this
+        server. An owner can manage people and see the whole library; a member
+        sees only what has been shared with them.</p>
+      <div style="max-height:50vh; overflow:auto">${rows}${pending}</div>
+      <div class="row" style="gap:8px; margin-top:14px; align-items:flex-end">
+        <div class="group" style="flex:1">
+          <input id="inv-email" type="text" placeholder="Email to invite"
+                 style="width:100%" autocomplete="off">
+        </div>
+        <select id="inv-perm">
+          <option value="viewer">Can read</option>
+          <option value="editor">Can edit</option>
+        </select>
+        <button class="btn primary" onclick="invitePerson()">Invite</button>
+      </div>
+      <p class="muted" style="font-size:12px; margin:8px 0 0">
+        They choose their own password. Without SMTP configured the link is
+        shown here to pass along yourself.</p>
+      <div class="row" style="justify-content:flex-end; margin-top:12px">
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div></div>`;
+}
+
+async function setRole(id, isMaster){
+  try {
+    await api('PUT','/api/users/'+id, { is_master: isMaster });
+    toast(isMaster ? 'Now an owner.' : 'Now a member.');
+    showPeople();
+  } catch(e){ toast(e.message); }
+}
+
+// Removing an account is the one action here that destroys something, so it
+// says exactly what goes: the cascade takes their highlights, sittings, notes
+// and shares, and leaves the books.
+async function removePerson(id, email){
+  if (!confirm(
+    'Remove ' + email + '?\n\n' +
+    "Their highlights, notes, reading history and shares go with them. " +
+    'Books they added stay in the library.')) return;
+  try {
+    await api('DELETE','/api/users/'+id);
+    toast('Removed.');
+    showPeople();
+  } catch(e){ toast(e.message); }
+}
+
+async function invitePerson(){
+  const email = document.getElementById('inv-email').value.trim();
+  if (!email) { toast('An email is needed.'); return; }
+  const permission = document.getElementById('inv-perm').value;
+  try {
+    const res = await api('POST','/api/invites',
+      { email, scope: 'all', permission });
+    // `url` comes back only when the server couldn't email it.
+    if (res && res.url) prompt('Send them this link:', res.url);
+    else toast('Invitation sent.');
+    showPeople();
+  } catch(e){ toast(e.message); }
+}
+
+async function revokeInvite(id){
+  try {
+    await api('DELETE','/api/invites/'+encodeURIComponent(id));
+    showPeople();
+  } catch(e){ toast(e.message); }
+}
+
+async function resetFor(email){
+  try {
+    await api('POST','/api/auth/forgot', { email });
+    toast('If mail is configured, a reset link is on its way.');
+  } catch(e){ toast(e.message); }
+}

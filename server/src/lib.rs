@@ -184,6 +184,13 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/auth/reset", post(auth::reset))
         .route("/auth/me", get(auth::me))
         .route("/users", get(auth::list_users).post(auth::create_user))
+        // Administering the people in a shared library (plan 6 #1). Master-only,
+        // and console-only by design — this is a desk job, not something to
+        // duplicate into the app.
+        .route(
+            "/users/{id}",
+            put(auth::set_user_role).delete(auth::delete_user),
+        )
         // Online metadata search + add a chosen result.
         .route("/metadata/search", get(discover::search))
         .route("/metadata/analyze", post(discover::analyze))
@@ -303,7 +310,11 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/shares/{id}", delete(shares::delete))
         // Emailed member invites (plan 5 #31, stage 3). Minting is master-only;
         // redeeming is necessarily unauthenticated — the invitee has no account.
-        .route("/invites", post(shares::create_invite))
+        .route(
+            "/invites",
+            get(shares::list_invites).post(shares::create_invite),
+        )
+        .route("/invites/{id}", axum::routing::delete(shares::revoke_invite))
         .route("/invites/redeem", post(shares::redeem_invite))
         // Public per-book links (no account required to read).
         .route(
