@@ -53,7 +53,7 @@ Future<void> main() async {
   // insets itself; custom bottom bars use SafeArea (see the EPUB reader).
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   final repository = await LibraryRepository.open(VellumDatabase());
-  final profile = await UserProfileStore.load();
+  final profile = await UserProfileStore.load(dataDir: repository.dataDir);
   final settings = await AppSettingsStore.load();
   final connection = await ServerConnection.load();
   // The background-sync schedule (plan 5 #40). Re-applied on every launch so a

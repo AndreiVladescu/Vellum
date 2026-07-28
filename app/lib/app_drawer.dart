@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'account/account_page.dart';
+import 'account/profile_avatar.dart';
 import 'account/user_profile.dart';
 import 'data/library_repository.dart';
 import 'dedupe/duplicates_page.dart';
@@ -116,10 +117,7 @@ class AppDrawer extends StatelessWidget {
           ListenableBuilder(
             listenable: profile,
             builder: (context, _) => UserAccountsDrawerHeader(
-              currentAccountPicture: CircleAvatar(
-                child: Text(profile.initial,
-                    style: const TextStyle(fontSize: 24)),
-              ),
+              currentAccountPicture: ProfileAvatar(profile: profile, radius: 30),
               accountName:
                   Text(profile.isSet ? profile.name : 'Set up your profile'),
               accountEmail: Text(
