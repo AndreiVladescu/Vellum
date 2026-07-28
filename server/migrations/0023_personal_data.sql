@@ -77,4 +77,15 @@ CREATE INDEX idx_book_note_updated ON book_note(user_id, updated_at);
 -- pointer and its timestamp are here. `display_name` is already on app_user —
 -- this is what lets a device tell whether its copy is stale.
 ALTER TABLE app_user ADD COLUMN avatar_path TEXT;
-ALTER TABLE app_user ADD COLUMN profile_updated_at TEXT NOT NULL DEFAULT (datetime('now'));
+-- The default is a **constant**, then backfilled. SQLite rejects a
+-- non-constant default on ADD COLUMN — but only when the table already has
+-- rows, which is why `DEFAULT (datetime('now'))` passed every test (all fresh,
+-- all empty) and failed on the first real server, which had an account in it.
+--
+-- The epoch is the right placeholder rather than an arbitrary one: it means
+-- "this account has never set a profile", so the first sync from a device that
+-- has one treats the device as newer and publishes it, which is what should
+-- happen.
+ALTER TABLE app_user ADD COLUMN profile_updated_at TEXT NOT NULL
+    DEFAULT '1970-01-01 00:00:00';
+UPDATE app_user SET profile_updated_at = datetime('now');

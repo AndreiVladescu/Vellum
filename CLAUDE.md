@@ -82,7 +82,16 @@ cargo clippy
 
 `VELLUM_DB=<path>` overrides the SQLite file location. Migrations in
 `server/migrations/` run automatically at startup via `sqlx::migrate!` —
-never edit an already-applied migration file; add a new one.
+never edit an already-applied migration file; add a new one. (sqlx checksums
+them: editing one that has been applied makes every existing server refuse to
+start.)
+
+**Never `ALTER TABLE ... ADD COLUMN ... DEFAULT (expr)`.** SQLite rejects a
+non-constant default — but *only when the table already has rows*, so it passes
+every test against a fresh database and fails on the first real server. Use a
+constant default and a backfilling `UPDATE`. `tests/migrations_with_data.rs`
+guards both halves: it migrates a *populated* database, and it scans the
+migration sources for the pattern.
 
 ## Conventions
 
