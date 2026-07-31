@@ -1,7 +1,7 @@
 # Next features — requested 2026-07-28
 
-Nine items, written down as asked and **not implemented yet**. Items 8 and 9 came
-out of the discussion rather than the original list. Each records
+Ten items, written down as asked and **not implemented yet**. Items 8, 9 and 10
+came out of the discussion rather than the original list. Each records
 what was asked for, what the code does today (checked, not remembered), and what
 is still open. Open questions are marked **?** — some change the work
 materially, and are worth answering before anything is built.
@@ -278,6 +278,60 @@ viewer-only sharing already means everywhere else.
 
 ---
 
+## 10. Cosmetics in a physical room
+
+**Asked for.** A way to put decoration in a physical library — the room should
+look like a room, not only like shelf geometry.
+
+**Today.** A room holds three things: an optional backdrop photo, `physical_shelves`
+segments (shelf / side panel / divider / label, all of them a line between two
+points), and `book_placements`. There is nowhere to put a plant, a lamp, a
+framed picture or a pair of bookends, and the segment model is the wrong shape
+for them — a pot plant is not a line.
+
+**The shape that fits: a prop.** A fourth kind of thing in the room, with its
+own table, drawn by `room_painter` alongside the shelves:
+
+| field | |
+|---|---|
+| `id`, `environmentId` | as everything else in the room |
+| `kind` | `plant`, `lamp`, `frame`, `vase`, `clock`, `bookend`, `boxes`, `cat` |
+| `x`, `y` | world metres, bottom-left, exactly like a placement |
+| `width`, `height` | metres — real sizes, so a lamp next to a paperback looks right |
+| `rotation`, `flip` | a bookend has a handedness |
+| `tint` | one of the room palette's colours, so props don't fight the spines |
+| `z` | in front of the shelf or behind it |
+
+**Three things that make this cheaper than it looks:**
+
+1. **No server work at all.** A room publishes as one opaque JSON document
+   (`layouts::publish` checks only "is an object" and a 512 KiB cap), so props
+   ride the existing publish/revision/409 path as a `props` array. No migration,
+   no endpoint, no schema-parity entry. Older viewers — including `web/room.js` —
+   ignore the key and draw the room exactly as they do today.
+2. **Props settle like books.** `settle()` already answers "where does this come
+   to rest, and what is in the way"; a plant dropped on a shelf should use it
+   unchanged. A **bookend** is the nice case: it is a prop *and* a barrier, which
+   is the machinery dividers now use, so it works the moment it is drawn.
+3. **Draw them, don't ship them.** Each prop is a small `Path` in code — a dozen
+   shapes, no image assets, nothing to license, no pixelation at any zoom, and
+   they take the room's own palette. A photo-cut-out prop is the alternative and
+   is worse on every one of those counts.
+
+**Do this part first, it is a third of the value for a tenth of the work:** the
+room's *own* look. Wall and floor colours on `physical_environments`, a floor
+line at y = 0 with a skirting board, and a soft shadow under each shelf. That is
+one migration column and a few lines in the painter, it needs no new concepts,
+and it is what makes an empty room stop looking like graph paper.
+
+**One open question.** Are props part of the *library* (they describe a room, so
+everyone the room is shared with sees them) or personal to the device? Rooms are
+already library data and are shared viewer-only, so library is the consistent
+answer — but a cat on someone else's shelf is a different kind of statement from
+a shelf, and it is worth deciding on purpose rather than by default.
+
+---
+
 ## Suggested order
 
 1. **#2** — a real bug with a known one-line fix, on the platform it was
@@ -295,3 +349,7 @@ viewer-only sharing already means everywhere else.
    the browser currently shows more than the app does.
 8. **#5** — last, and in the three stages above rather than as one piece: it is
    larger than everything else here put together.
+
+**#10** sits outside this order: its first stage (wall, floor, shadows) is small
+enough to slot in anywhere, and the props themselves are a want rather than a
+gap — worth doing when the room is otherwise finished.
