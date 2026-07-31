@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'room_measure.dart';
@@ -7,10 +9,17 @@ import 'physical_metrics.dart';
 
 /// What the shelf dialog returns: endpoints, height, and an optional label.
 class ShelfSpec {
-  ShelfSpec(this.left, this.right, this.y, this.label, this.kind);
+  ShelfSpec(this.left, this.right, this.y, this.label, this.kind, {double? y2})
+      : y2 = y2 ?? y;
   final double left;
   final double right;
   final double y;
+
+  /// The other end of the segment vertically. Equal to [y] for a shelf, which
+  /// is flat; an upright (a side panel, a divider) runs between two heights,
+  /// and before this existed it collapsed to a flat line and drew as a three
+  /// pixel smudge — which is why a divider appeared to do nothing.
+  final double y2;
   final String? label;
 
   /// What this segment is (plan 5 #29): a shelf books rest on, or furniture
@@ -28,12 +37,16 @@ class ShelfDialog extends StatefulWidget {
     this.initialRight,
     this.initialLabel,
     this.initialKind = ShelfKind.shelf,
+    this.initialTopY,
     this.fill,
   });
   final double defaultY;
   final String title;
   final double? initialLeft;
   final double? initialRight;
+
+  /// The upper end of an upright, when editing one.
+  final double? initialTopY;
   final String? initialLabel;
   final ShelfKind initialKind;
 
@@ -52,14 +65,41 @@ class _ShelfDialogState extends State<ShelfDialog> {
   late final _right =
       TextEditingController(text: (widget.initialRight ?? 1.0).toString());
   late final _height = TextEditingController(text: widget.defaultY.toString());
+  late final _top = TextEditingController(
+    text: (widget.initialTopY ?? widget.defaultY + 0.9).toString(),
+  );
   late final _label = TextEditingController(text: widget.initialLabel ?? '');
   late ShelfKind _kind = widget.initialKind;
+
+  /// An upright is authored as one X and two heights; a shelf as two X's and
+  /// one height. Same row in the database either way — see [ShelfSpec.y2].
+  bool get _isUpright => !_kind.holdsBooks && _kind != ShelfKind.marker;
+
+  /// What Add would return, or null when the numbers don't describe a segment.
+  /// A shelf needs width, an upright needs height; a label is a point and needs
+  /// neither.
+  ShelfSpec? get _spec {
+    final label = _label.text.trim().isEmpty ? null : _label.text.trim();
+    final y = double.tryParse(_height.text) ?? widget.defaultY;
+    if (_isUpright) {
+      final x = double.tryParse(_left.text) ?? 0;
+      final top = double.tryParse(_top.text) ?? (y + 0.9);
+      if ((top - y).abs() < 0.01) return null;
+      return ShelfSpec(x, x, math.min(y, top), label, _kind,
+          y2: math.max(y, top));
+    }
+    final left = double.tryParse(_left.text) ?? 0;
+    final right = double.tryParse(_right.text) ?? 1;
+    if (_kind != ShelfKind.marker && right - left < 0.01) return null;
+    return ShelfSpec(left, right, y, label, _kind);
+  }
 
   @override
   void dispose() {
     _left.dispose();
     _right.dispose();
     _height.dispose();
+    _top.dispose();
     _label.dispose();
     super.dispose();
   }
@@ -70,6 +110,7 @@ class _ShelfDialogState extends State<ShelfDialog> {
           padding: const EdgeInsets.only(top: 10),
           child: TextField(
             controller: c,
+            onChanged: (_) => setState(() {}),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: label,
@@ -84,9 +125,11 @@ class _ShelfDialogState extends State<ShelfDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'A shelf is a flat line between two points (metres).',
-              style: TextStyle(fontSize: 12),
+            Text(
+              _isUpright
+                  ? 'An upright runs between two heights at one X (metres).'
+                  : 'A shelf is a flat line between two points (metres).',
+              style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 8),
             // Furniture reuses this dialog because it *is* the same geometry —
@@ -110,21 +153,35 @@ class _ShelfDialogState extends State<ShelfDialog> {
                   setState(() => _kind = value ?? ShelfKind.shelf),
             ),
             if (!_kind.holdsBooks)
-              const Padding(
-                padding: EdgeInsets.only(top: 6),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Books never rest on this — it only draws.',
-                  style: TextStyle(fontSize: 12),
+                  _isUpright
+                      ? 'Books never rest on this, and none can be slid '
+                          'through it.'
+                      : 'Books never rest on this — it only draws.',
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
-            Row(
-              children: [
-                Expanded(child: field('Left X (m)', _left)),
-                const SizedBox(width: 8),
-                Expanded(child: field('Right X (m)', _right)),
-              ],
-            ),
-            field('Height Y (m)', _height),
+            if (_isUpright) ...[
+              field('X (m)', _left),
+              Row(
+                children: [
+                  Expanded(child: field('From Y (m)', _height)),
+                  const SizedBox(width: 8),
+                  Expanded(child: field('To Y (m)', _top)),
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(child: field('Left X (m)', _left)),
+                  const SizedBox(width: 8),
+                  Expanded(child: field('Right X (m)', _right)),
+                ],
+              ),
+              field('Height Y (m)', _height),
+            ],
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: TextField(
@@ -149,22 +206,9 @@ class _ShelfDialogState extends State<ShelfDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: () {
-            final left = double.tryParse(_left.text) ?? 0;
-            final right = double.tryParse(_right.text) ?? 1;
-            final y = double.tryParse(_height.text) ?? widget.defaultY;
-            if (right <= left) return;
-            Navigator.pop(
-              context,
-              ShelfSpec(
-                left,
-                right,
-                y,
-                _label.text.trim().isEmpty ? null : _label.text.trim(),
-                _kind,
-              ),
-            );
-          },
+          // Disabled rather than a no-op: pressing Add and having nothing
+          // happen, with no reason given, is how a dialog looks broken.
+          onPressed: _spec == null ? null : () => Navigator.pop(context, _spec),
           child: const Text('Add'),
         ),
       ],

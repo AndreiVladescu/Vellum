@@ -129,4 +129,67 @@ void main() {
     expect(r.onSurface, isTrue);
     expect(r.y, closeTo(0.5, 1e-9));
   });
+
+  group('uprights (a side panel, a divider)', () {
+    // Furniture holds nothing up — it is never in `shelves` — but a book slid
+    // along a shelf still has to stop at it. Before this, "Divider" was a kind
+    // in the picker with no consequence anywhere: books passed straight
+    // through one.
+    const divider = SettleBox(x: 1.0, y: 1.0, w: 0.018, h: 0.4);
+
+    test('a book dropped onto a divider is pushed clear of it', () {
+      final r = settle(
+        x: 0.99, // overlapping the divider
+        y: 1.3,
+        w: 0.05,
+        h: 0.2,
+        shelves: [shelfAt(1.0, 0, 2)],
+        others: const [],
+        barriers: const [divider],
+      );
+      expect(r.onSurface, isTrue);
+      expect(r.y, closeTo(1.0, 1e-9));
+      expect(
+        r.x + 0.05 <= 1.0 + 1e-9 || r.x >= 1.018 - 1e-9,
+        isTrue,
+        reason: 'came to rest inside the divider: x = ${r.x}',
+      );
+    });
+
+    test('no drop position anywhere along the shelf lands inside a divider',
+        () {
+      // The invariant, rather than one engineered squeeze: wherever the book is
+      // released and however the packing shuffles it, the result may not
+      // overlap the divider.
+      for (var drop = 0.80; drop < 1.20; drop += 0.01) {
+        final r = settle(
+          x: drop,
+          y: 1.3,
+          w: 0.05,
+          h: 0.2,
+          shelves: [shelfAt(1.0, 0, 2)],
+          others: const [SettleBox(x: 0.0, y: 1.0, w: 0.78, h: 0.2)],
+          barriers: const [divider],
+        );
+        final overlapsX = r.x < 1.018 - 1e-9 && r.x + 0.05 > 1.0 + 1e-9;
+        final overlapsY = r.y < 1.4 - 1e-9 && r.y + 0.2 > 1.0 + 1e-9;
+        expect(overlapsX && overlapsY, isFalse,
+            reason: 'released at $drop, came to rest at (${r.x}, ${r.y})');
+      }
+    });
+
+    test('a divider is not a surface — nothing rests on its top edge', () {
+      final r = settle(
+        x: 1.0,
+        y: 1.5, // released above the divider's top (1.4), left of the shelf end
+        w: 0.05,
+        h: 0.2,
+        shelves: const [],
+        others: const [],
+        barriers: const [divider],
+      );
+      expect(r.onSurface, isFalse,
+          reason: 'balanced a book on a divider’s edge');
+    });
+  });
 }

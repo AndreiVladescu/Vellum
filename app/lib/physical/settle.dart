@@ -74,6 +74,12 @@ bool restsOnShelf(SettleBox o, SettleSegment s, {double tol = 0.02}) {
   return o.x + o.w > left && o.x < right && (o.y - top).abs() <= tol;
 }
 
+/// [barriers] are uprights — a bookcase's side panel, a divider between
+/// sections — that a book cannot occupy but also cannot rest on top of. They
+/// take part in every overlap test below, so a book nudged along a shelf stops
+/// at one instead of sliding through it, but they are deliberately absent from
+/// the surface candidates: a divider is a vertical line, and landing a book on
+/// its top edge would balance it on a plank's thickness.
 SettleResult settle({
   required double x,
   required double y,
@@ -81,8 +87,10 @@ SettleResult settle({
   required double h,
   required List<SettleSegment> shelves,
   required List<SettleBox> others,
+  List<SettleBox> barriers = const [],
 }) {
   const tol = 0.02; // 2 cm snap tolerance
+  final obstacles = barriers.isEmpty ? others : [...others, ...barriers];
 
   // Every surface under the release point (overlapping in X, at/below the
   // bottom), highest first. Shelves keep their span so the book can be clamped
@@ -113,7 +121,7 @@ SettleResult settle({
     var bx = x;
     for (var pass = 0; pass < 16; pass++) {
       var moved = false;
-      for (final o in others) {
+      for (final o in obstacles) {
         final vOverlap = by < o.y + o.h - 1e-6 && by + h > o.y + 1e-6;
         final hOverlap = bx < o.x + o.w - 1e-6 && bx + w > o.x + 1e-6;
         if (vOverlap && hOverlap) {
@@ -130,7 +138,7 @@ SettleResult settle({
     if (c.isShelf && w <= c.right - c.left) {
       bx = bx.clamp(c.left, c.right - w);
     }
-    if (!_overlapsAny(bx, by, w, h, others)) {
+    if (!_overlapsAny(bx, by, w, h, obstacles)) {
       return SettleResult(x: bx, y: by, onSurface: true);
     }
   }

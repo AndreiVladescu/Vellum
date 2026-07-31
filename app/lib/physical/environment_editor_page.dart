@@ -33,6 +33,12 @@ import 'shelf_dialogs.dart';
 /// A book's footprint (width × height) in metres, after rotation.
 typedef _Foot = ({double w, double h});
 
+/// How thick an upright is treated as being when it comes to books bumping into
+/// it (metres). A panel or divider is drawn from a single X, so without this it
+/// would have no width to collide with — 18 mm is what a shelf board actually
+/// measures.
+const _barrierThickness = 0.018;
+
 /// The shelf editor: a front-elevation, to-scale view of one physical
 /// environment. Pan and pinch-zoom the room; drag books so they rest on the
 /// nearest shelf or on top of another book (no overlaps); tap a book to rotate,
@@ -460,6 +466,21 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         if (ShelfKind.parse(s.kind).holdsBooks)
           SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2),
     ];
+    // ...but furniture with a vertical extent is still in the way. A side panel
+    // is the end of a bookcase and a divider splits a shelf into sections;
+    // either way a book slid along the shelf has to stop at it rather than pass
+    // through. Zero-height rows are skipped: those are the flat, pre-#29 ones
+    // that never had an upright to speak of.
+    final barriers = [
+      for (final s in _shelves)
+        if (!ShelfKind.parse(s.kind).holdsBooks && (s.y2 - s.y1).abs() > 1e-9)
+          SettleBox(
+            x: math.min(s.x1, s.x2),
+            y: math.min(s.y1, s.y2),
+            w: math.max((s.x2 - s.x1).abs(), _barrierThickness),
+            h: (s.y2 - s.y1).abs(),
+          ),
+    ];
     final others = _placed
         .where((p) => p.placement.id != draggedId)
         .map((p) {
@@ -479,6 +500,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       h: h,
       shelves: shelves,
       others: others,
+      barriers: barriers,
     );
     return (pos: Offset(r.x, r.y), onSurface: r.onSurface);
   }
@@ -552,7 +574,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       x1: result.left,
       y1: result.y,
       x2: result.right,
-      y2: result.y,
+      y2: result.y2,
       label: result.label,
       kind: result.kind,
     );
@@ -767,11 +789,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       context: context,
       builder: (_) => ShelfDialog(
         title: 'Edit shelf',
-        defaultY: s.y1,
+        defaultY: math.min(s.y1, s.y2),
         initialLeft: math.min(s.x1, s.x2),
         initialRight: math.max(s.x1, s.x2),
         initialLabel: s.label,
         initialKind: ShelfKind.parse(s.kind),
+        initialTopY: math.max(s.y1, s.y2),
         // "42 cm of 90 cm used" — the number you actually want while deciding
         // whether to move this shelf (plan 5 #29).
         fill: fillOf(shelf: s, placed: _placed),
@@ -790,7 +813,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       x1: result.left,
       y1: result.y,
       x2: result.right,
-      y2: result.y,
+      y2: result.y2,
       label: Value(result.label),
       kind: result.kind,
     );
