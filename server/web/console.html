@@ -24,66 +24,66 @@
 <div id="app" class="hidden">
   <div id="topbar">
     <header>
-      <img class="logo" src="/assets/logo.svg" alt="" width="30" height="30">
+      <img class="logo" src="/assets/logo.svg" alt="" width="26" height="26">
       <h1>Vellum</h1>
       <span class="eyebrow">Console</span>
       <span class="muted" id="who"></span>
       <span class="spacer"></span>
       <span class="muted" id="count"></span>
-      <button class="btn" onclick="loadAll()">Refresh</button>
-      <button class="btn" onclick="showCert()">Certificate</button>
-      <button class="btn" onclick="showStats()">Server</button>
-      <button class="btn" onclick="showActivity()">Activity</button>
-      <button class="btn" onclick="showRooms()">Rooms</button>
-      <button class="btn" onclick="showRequests()">Requests</button>
-      <button class="btn" onclick="showPeople()">People</button>
-      <button class="btn" onclick="logout()">Log out</button>
+      <button class="btn sm quiet" onclick="loadAll()">Refresh</button>
+      <div class="menu-wrap">
+        <button class="btn sm" onclick="toggleMenu(event,'m-manage')">Manage</button>
+        <div class="menu hidden" id="m-manage">
+          <button onclick="pick(showPeople)">People</button>
+          <button onclick="pick(showStats)">Library server</button>
+          <button onclick="pick(showActivity)">Activity</button>
+          <button onclick="pick(showRooms)">Rooms</button>
+          <button onclick="pick(showRequests)">Borrow requests</button>
+          <hr>
+          <button onclick="pick(showCert)">Certificate</button>
+          <button onclick="pick(logout)">Log out</button>
+        </div>
+      </div>
     </header>
 
     <div class="toolbar">
-      <button class="btn primary" onclick="openAddBook()">＋ Add book</button>
-      <button class="btn" onclick="openImport()">Import CSV</button>
-      <span class="sep"></span>
-      <div class="group">
-        <input id="newtag" type="text" placeholder="New tag name" style="width:140px">
-        <button class="btn" onclick="createTag()">Create tag</button>
-      </div>
-      <span class="sep"></span>
-      <div class="group">
-        <select id="bulktag"></select>
-        <button class="btn" onclick="bulkTag(true)">Tag</button>
-        <button class="btn" onclick="bulkTag(false)">Untag</button>
-      </div>
-      <button class="btn" onclick="openBulkEdit()">Edit selected</button>
-      <button class="btn" onclick="enrichSelected()">Fetch metadata</button>
-      <button class="btn" onclick="uploadToSelected()">Upload to selected</button>
-      <button class="btn danger" onclick="deleteSelected()">Delete selected</button>
-      <span class="spacer"></span>
-      <button class="btn sm" onclick="exportCSV()">Export CSV</button>
-      <button class="btn sm" onclick="exportJSON()">Export JSON</button>
-      <button class="btn sm" onclick="openColumns()">Columns ▾</button>
-      <button class="btn sm" onclick="toggleDensity()">Density</button>
-    </div>
-
-    <div class="toolbar">
-      <input id="q" type="text" placeholder="Search title, author, ISBN…"
-             oninput="setQ(this.value)" style="width:240px" autocomplete="off">
-      <span class="muted">Tags:</span>
-      <span id="tagfilters"></span>
-      <span class="sep"></span>
-      <span id="missingfilters"></span>
-      <button class="btn sm" onclick="clearFilters()">Clear filters</button>
-      <span class="sep"></span>
-      <!-- Saved views (plan 5 #35): a name for how you like to look at the
-           library, kept in this browser like the density toggle. -->
-      <span class="muted">Views:</span>
-      <span id="views"></span>
-      <button class="btn sm" onclick="saveView()">Save this view</button>
+      <button class="btn primary" onclick="openAddBook()">Add book</button>
+      <input id="q" type="search" placeholder="Search title, author, ISBN…"
+             oninput="setQ(this.value)" autocomplete="off">
       <!-- Content search (plan 5 #32). Hidden unless this server advertises
            `content_search`: a button that can only 400 is worse than none. -->
-      <span class="sep hidden" id="contentsep"></span>
       <button class="btn sm hidden" id="contentbtn"
               onclick="searchContents()">Search inside books</button>
+      <span class="spacer"></span>
+      <div class="menu-wrap">
+        <button class="btn sm" onclick="toggleMenu(event,'m-library')">Library</button>
+        <div class="menu hidden" id="m-library">
+          <div class="label">Add</div>
+          <button onclick="pick(openImport)">Import from CSV…</button>
+          <button onclick="pick(createTag)">New tag…</button>
+          <div class="label">Export</div>
+          <button onclick="pick(exportCSV)">Export CSV</button>
+          <button onclick="pick(exportJSON)">Export JSON</button>
+          <div class="label">This table</div>
+          <button onclick="pick(openColumns)">Choose columns…</button>
+          <button onclick="pick(toggleDensity)">Compact rows</button>
+          <button onclick="pick(saveView)">Save this view…</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Only rendered while rows are selected: these are the controls that
+         used to sit on screen doing nothing most of the time. -->
+    <div class="toolbar hidden" id="selbar"></div>
+
+    <div class="toolbar">
+      <span class="muted">Tags:</span>
+      <span id="tagfilters"></span>
+      <span id="missingfilters"></span>
+      <span class="muted hidden" id="viewslabel">Views:</span>
+      <span id="views"></span>
+      <span class="spacer"></span>
+      <button class="btn sm quiet" onclick="clearFilters()">Clear filters</button>
     </div>
   </div>
 

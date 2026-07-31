@@ -199,6 +199,13 @@ function clearFilters(){
   renderFilters(); reload();
 }
 
+/// Shows a label only when the thing it labels exists — an empty console
+/// otherwise reads as "Tags: Views:" with nothing after either.
+function showLabelIf(id, hasContent){
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('hidden', !hasContent);
+}
+
 function renderFilters(){
   document.getElementById('tagfilters').innerHTML =
     S.groups.map(g=>`<button class="fchip ${S.fTag===g.id?'on':''}" onclick="toggleTagFilter('${g.id}')">${esc(g.name)}</button>`).join('')
@@ -237,12 +244,8 @@ function statusCell(b){
 function colCount(){ return 4 + OPT_COLS.filter(([k])=>S.cols.has(k)).length; }
 
 function render(){
-  // bulk-tag dropdown
-  const sel = document.getElementById('bulktag');
-  sel.innerHTML = S.groups.length
-    ? S.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')
-    : '<option value="">(no tags yet)</option>';
-
+  // The bulk-tag dropdown lives in the selection bar now, which is built below
+  // — it only exists while there is a selection to act on.
   document.getElementById('thead').innerHTML = headHtml();
 
   S.view = computeRows();
@@ -287,8 +290,13 @@ function render(){
   }
 
   const selShown = S.view.filter(b=>S.selected.has(b.id)).length;
+  // The header keeps the totals; the selection count moved into the bar that
+  // appears with it, so it isn't said twice.
   document.getElementById('count').textContent =
-    `${S.view.length} shown · ${S.total} total · ${S.selected.size} selected`;
+    `${S.view.length} shown · ${S.total} total`;
+  renderSelectionBar();
+  // After the bar has been added or removed, since it changes the height.
+  syncStickyHead();
   document.getElementById('selall').checked = S.view.length>0 && selShown===S.view.length;
 
   // Search, sort and filters run on the server since plan 5 #35, so "no
@@ -880,10 +888,12 @@ function dropOn(e, id, tr){
 // ---- tags ---------------------------------------------------------------
 
 async function createTag(){
-  const input = document.getElementById('newtag');
-  const name = input.value.trim();
+  // Asked for rather than typed into a box that sat in the toolbar unused:
+  // making a tag is occasional, and a permanent input for it is permanent
+  // clutter.
+  const name = (prompt('Name the new tag:', '') || '').trim();
   if (!name) return;
-  try { await api('POST','/api/groups',{ name }); input.value=''; await loadAll(); toast('Tag created'); }
+  try { await api('POST','/api/groups',{ name }); await loadAll(); toast('Tag created'); }
   catch(e){ toast(e.message); }
 }
 
@@ -1379,6 +1389,9 @@ function renderViews(){
   const host = document.getElementById('views');
   if (!host) return;
   const views = savedViews();
+  // No saved views means no "Views:" label — it would introduce a heading for
+  // an empty space, which is how the filter row came to look busy.
+  showLabelIf('viewslabel', views.length > 0);
   host.innerHTML = views.map(v =>
     `<span class="fchip">
        <span class="link" onclick="applyView('${esc(v.name).replace(/'/g,"&#39;")}')">${esc(v.name)}</span>
@@ -1662,3 +1675,76 @@ async function resetFor(email){
     toast('If mail is configured, a reset link is on its way.');
   } catch(e){ toast(e.message); }
 }
+
+
+// ---- menus (plan 6 #7) ----------------------------------------------------
+//
+// The console had twenty-odd controls above the table, most of them doing
+// nothing until something was selected. They live in two menus now, and the
+// selection-dependent ones only exist while there is a selection.
+
+function toggleMenu(event, id){
+  event.stopPropagation();
+  const menu = document.getElementById(id);
+  const wasOpen = !menu.classList.contains('hidden');
+  closeMenus();
+  if (!wasOpen) menu.classList.remove('hidden');
+}
+
+function closeMenus(){
+  for (const m of document.querySelectorAll('.menu')) m.classList.add('hidden');
+}
+
+/// Runs a menu item and closes the menu — every item wants both, and forgetting
+/// the second half leaves the menu hanging over whatever it just opened.
+function pick(fn){
+  closeMenus();
+  fn();
+}
+
+document.addEventListener('click', closeMenus);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
+
+/// The bar that appears when rows are selected. Rebuilt on every render so the
+/// count is honest and the tag list matches the tags that currently exist.
+function renderSelectionBar(){
+  const bar = document.getElementById('selbar');
+  if (!bar) return;
+  const n = S.selected.size;
+  if (n === 0){ bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+  const tags = (S.groups || []).length
+    ? S.groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')
+    : '<option value="">(no tags yet)</option>';
+  bar.classList.remove('hidden');
+  bar.innerHTML = `
+    <span class="count">${n} selected</span>
+    <span class="sep"></span>
+    <div class="group">
+      <select id="bulktag">${tags}</select>
+      <button class="btn sm" onclick="bulkTag(true)">Tag</button>
+      <button class="btn sm" onclick="bulkTag(false)">Untag</button>
+    </div>
+    <span class="sep"></span>
+    <button class="btn sm" onclick="openBulkEdit()">Edit</button>
+    <button class="btn sm" onclick="enrichSelected()">Fetch metadata</button>
+    <button class="btn sm" onclick="uploadToSelected()">Upload file</button>
+    <span class="spacer"></span>
+    <button class="btn sm danger" onclick="deleteSelected()">Delete</button>
+    <button class="btn sm quiet" onclick="clearSelection()">Clear</button>`;
+}
+
+function clearSelection(){ S.selected.clear(); render(); }
+
+/// Keeps the sticky table head directly under the chrome.
+///
+/// It used to be a hard-coded 150px, which was fine when the toolbars were a
+/// fixed stack. The chrome now grows and shrinks — the selection bar comes and
+/// goes, and rows wrap on a narrow window — so the offset is measured instead
+/// of guessed, or the head floats over the toolbar or leaves a gap under it.
+function syncStickyHead(){
+  const bar = document.getElementById('topbar');
+  if (!bar) return;
+  document.documentElement.style.setProperty(
+    '--thead-top', bar.getBoundingClientRect().height + 'px');
+}
+addEventListener('resize', syncStickyHead);
