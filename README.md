@@ -45,7 +45,9 @@ right-click → Open on the first launch and Windows SmartScreen wants
 *More info → Run anyway*.
 
 To build it yourself instead — or if there is no release yet — it takes about
-ten minutes, most of which is the toolchain downloading.
+ten minutes, most of which is the toolchain downloading. What follows is the
+short version; [DEVELOPER.md](DEVELOPER.md) has the detailed guide for each
+platform, including Windows and Android.
 
 ### 1. Install Flutter
 
@@ -121,8 +123,8 @@ shortcut to the binary inside it.
 
 ### Android
 
-Vellum builds for Android too. That needs a signing key and a few more steps —
-see [For developers](#for-developers).
+Vellum builds for Android too. That needs JDK 17, the Android SDK and a signing
+key — see [DEVELOPER.md](DEVELOPER.md#app-android).
 
 ---
 
@@ -232,7 +234,7 @@ Your library is on your own disk, in two places:
 | What | Linux | macOS | Windows |
 |---|---|---|---|
 | Database | `~/Documents/vellum.sqlite` | `~/Documents/vellum.sqlite` | `Documents\vellum.sqlite` |
-| Books, covers, settings | `~/.local/share/com.avladescu.vellum/` | `~/Library/Application Support/com.avladescu.vellum/` | `%APPDATA%\com.avladescu.vellum\` |
+| Books, covers, settings | `~/.local/share/com.avladescu.vellum/` | `~/Library/Application Support/com.avladescu.vellum/` | `%APPDATA%\com.avladescu\Vellum\` |
 
 **Back it up from inside the app**: ☰ → *Preferences* → *Backup* writes the
 database, covers and book files into a single archive, optionally encrypted with
@@ -349,6 +351,10 @@ Being honest about what this is:
 
 ## For developers
 
+**Start with [DEVELOPER.md](DEVELOPER.md)** — the full build guide: what to
+install on Linux, Windows and macOS, how to build the app and the server on each,
+Android and Docker, the test loop, schema changes, and how a release is cut.
+
 | Directory | What | Stack |
 |---|---|---|
 | [`app/`](app/) | Desktop (Linux/Windows/macOS) + Android app | Flutter, SQLite (drift) |
@@ -370,28 +376,15 @@ The architecture, data model and build order are in
 
 | | |
 |---|---|
+| [DEVELOPER.md](DEVELOPER.md) | Building, testing and releasing, on every platform |
 | [docs/IMPORTING.md](docs/IMPORTING.md) | Catalogue file formats and filename rules |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Running the server properly |
 | [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) | Screen readers, contrast, text scaling |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Where the time goes, and the budgets |
 | [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) | What has been reviewed, and what hasn't |
 
-### Building for Android
-
-Release builds need a signing keystore. Copy
-[`android/key.properties.example`](app/android/key.properties.example) to
-`android/key.properties` (gitignored) and fill it in — that file documents the
-one-time `keytool` command. Without it, release builds fall back to the debug
-key so a fresh checkout still runs, but such a build isn't distributable.
-
-```sh
-cd app
-flutter build appbundle --release             # for Play (delivers per-ABI, ~30 MB)
-flutter build apk --release --split-per-abi   # sideload APKs, one per ABI
-```
-
-Prefer the app bundle for the store: a single fat APK carries every ABI
-(arm64 + armeabi-v7a + x86_64 + pdfium/sqlite natives, ~87 MB).
+Building for Windows, Android, or anything beyond the quick commands above is in
+**[DEVELOPER.md](DEVELOPER.md)**.
 
 ---
 
