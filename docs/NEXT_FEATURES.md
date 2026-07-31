@@ -1,6 +1,7 @@
 # Next features — requested 2026-07-28
 
-Seven items, written down as asked and **not implemented yet**. Each records
+Eight items, written down as asked and **not implemented yet** (item 8 came out
+of the discussion below). Each records
 what was asked for, what the code does today (checked, not remembered), and what
 is still open. Open questions are marked **?** — some change the work
 materially, and are worth answering before anything is built.
@@ -29,21 +30,18 @@ goes to the 30-day trash on this device; the server's copy is untouched. That
 reuses machinery that already exists, cannot harm anyone the library is shared
 with, and stays recoverable.
 
-Two consequences to build for, both of which the UI has to say plainly:
+**The books coming back on the next sync is fine, and not a bug** (decided
+2026-07-28): pressing Sync means you want the library, so bringing it back is
+the honest answer. No disconnect prompt, no special case — the delete clears
+this device, and Sync is how you undo that if you change your mind.
 
-- **The books come back on the next sync**, because the server still has them
-  and the local rows are trashed rather than tombstoned. If the intent is
-  "reset this device", the button should offer to disconnect from the server as
-  well — otherwise it looks broken.
-- **Disk space is not freed until the sweep runs** (30 days), or until the
-  trash is emptied from the section directly above it in Preferences. Worth
-  saying in the confirmation, and worth offering "empty the trash now" straight
-  afterwards.
+One thing the confirmation should still say: **disk space is not freed until
+the sweep runs** (30 days) or the trash is emptied from the section directly
+above it in Preferences. Offering "empty the trash now" straight afterwards
+saves a second trip.
 
-Still to settle when building it: whether physical copies, loans, shelves,
-rooms and wishlist entries go too, or only books. The safest default is
-**books only**, since everything else is either about objects you still own or
-about people you lent to.
+Scope is now **books only** — see item 8, which is where "and my physical
+copies too" is properly answered.
 
 ---
 
@@ -109,12 +107,14 @@ genre, and whatever "another library" turns out to mean.
 the selected books leave the shelf being viewed and join the one picked. Not
 the physical shelves in a room, and not server book groups.
 
-**One thing this leaves open, with a proposed answer.** "Move" is only
-well-defined when you are looking at a shelf; from the whole library there is
-nothing to leave. Proposal, unless you say otherwise: the action reads **Move to
-shelf** when viewing a shelf and **Add to shelf** when viewing everything, doing
-exactly what it says in each case. Same sheet, one word different, and it never
-silently removes a book from a shelf you could not see.
+**When it is ambiguous, ask** (decided 2026-07-28). "Move" is only well-defined
+when you are looking at a shelf; from the whole library there is nothing to
+leave. So the sheet that asks which shelf also asks what to do — *Move here* or
+*Add here* — rather than the app picking one and being quietly wrong half the
+time. Two buttons on a sheet that is already open costs nothing.
+
+When you *are* viewing a shelf, Move can be the default of the two, since that
+is what was asked for.
 
 `ShelfBooks` is many-to-many with a `position`, so both are cheap: a move is one
 delete plus one insert, and the target position goes at the end.
@@ -203,6 +203,50 @@ together.
 
 ---
 
+## 8. A sync dialogue: choose what syncs
+
+**Asked for.** Instead of "everything or nothing", a dialogue where you pick
+which resources sync — books, physical copies, loans, and so on.
+
+**Today.** Sync is all-or-nothing per pass: `SyncService.sync()` runs books,
+covers, files, shelves, copies, loans, copy photos and personal data in one go.
+The single exception is reading position, which has its own opt-in
+(`settings.syncReadingPosition`) because it is per-device rather than
+per-library.
+
+**Shape.** A screen — reached from *Library server*, and shown once when first
+connecting — listing each resource with a switch:
+
+| | |
+|---|---|
+| Books, covers and files | the catalogue itself |
+| Physical copies and rooms | where your books live |
+| Loans | who has what, and the history |
+| Highlights, notes and bookmarks | personal, per account |
+| Reading sittings | personal, per account |
+| Reading position | already its own opt-in |
+| Copy photos | pictures of your shelves |
+
+Each switch skips the matching pass in `_pull`/`_push`. The plumbing is mostly
+in place: those passes are already separate methods returning their own counts,
+so this is a settings object threaded through plus the switches themselves.
+
+**Two things worth getting right:**
+
+- **Turning one off should offer to un-publish it**, the way "Sync reading
+  position" already does with `forgetDevice`. Otherwise switching loans off
+  leaves them on the server forever, which is not what someone unticking a box
+  about their lending history expects.
+- **Off must mean off in both directions.** A resource that stops pushing but
+  keeps pulling would look like it is still syncing, and one that stops pulling
+  but keeps pushing quietly publishes what you asked it not to.
+
+This also answers the open question in item 1: nothing else needs deciding about
+what "delete all books" reaches, because what leaves this device and what
+reaches the server become separate, explicit choices.
+
+---
+
 ## Suggested order
 
 1. **#2** — a real bug with a known one-line fix, on the platform it was
@@ -214,5 +258,7 @@ together.
    selection models can be designed to match.
 5. **#1** — small now that it is scoped to a local trash, and the trash makes it
    forgiving.
-6. **#5** — last, and in the three stages above rather than as one piece: it is
+6. **#8** — after #1, since the two share the question of what "my library"
+   consists of, and #8 is the one that answers it properly.
+7. **#5** — last, and in the three stages above rather than as one piece: it is
    larger than everything else here put together.
