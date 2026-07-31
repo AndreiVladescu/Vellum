@@ -382,6 +382,42 @@ pub fn test_mailer(host: &str, from: &str) -> mail::Mailer {
 }
 
 /// Build the full application router.
+/// The OPDS feeds, with the HTTP Basic challenge attached to *their* 401s only.
+///
+/// E-readers speak Basic auth and need `WWW-Authenticate` to know to ask for
+/// credentials. Browsers react to the same header by popping their own native
+/// credential dialog — which, when it was sent on every 401 in the server, sat
+/// on top of the console from the moment the page loaded and reappeared on
+/// every failed sign-in, leaving no way to log in through the console's own
+/// form at all. So the challenge lives here, on the routes that want it, rather
+/// than in `AppError::Unauthorized`.
+fn opds_routes() -> Router<AppState> {
+    Router::new()
+        .route("/opds", get(opds::root))
+        .route("/opds/all", get(opds::all))
+        .route("/opds/recent", get(opds::recent))
+        .route("/opds/authors", get(opds::authors))
+        .route("/opds/authors/{name}", get(opds::by_author))
+        .route("/opds/genres", get(opds::genres))
+        .route("/opds/genres/{name}", get(opds::by_genre))
+        .route("/opds/groups", get(opds::groups))
+        .route("/opds/groups/{id}", get(opds::by_group))
+        .route("/opds/search", get(opds::search))
+        .route("/opds/search.xml", get(opds::search_description))
+        .route("/opds/v2", get(opds::v2_root))
+        .layer(axum::middleware::map_response(add_basic_challenge))
+}
+
+async fn add_basic_challenge(mut response: axum::response::Response) -> axum::response::Response {
+    if response.status() == axum::http::StatusCode::UNAUTHORIZED {
+        response.headers_mut().insert(
+            axum::http::header::WWW_AUTHENTICATE,
+            axum::http::HeaderValue::from_static("Basic realm=\"Vellum\""),
+        );
+    }
+    response
+}
+
 pub fn router(state: AppState) -> Router {
     let api = api_routes(state.max_upload_bytes);
     Router::new()
@@ -413,18 +449,7 @@ pub fn router(state: AppState) -> Router {
         // feeds hang off it and are paged. `/opds/all` is what the old flat
         // `/opds` was, so an existing client that bookmarked the root still
         // finds every book one hop away.
-        .route("/opds", get(opds::root))
-        .route("/opds/all", get(opds::all))
-        .route("/opds/recent", get(opds::recent))
-        .route("/opds/authors", get(opds::authors))
-        .route("/opds/authors/{name}", get(opds::by_author))
-        .route("/opds/genres", get(opds::genres))
-        .route("/opds/genres/{name}", get(opds::by_genre))
-        .route("/opds/groups", get(opds::groups))
-        .route("/opds/groups/{id}", get(opds::by_group))
-        .route("/opds/search", get(opds::search))
-        .route("/opds/search.xml", get(opds::search_description))
-        .route("/opds/v2", get(opds::v2_root))
+        .merge(opds_routes())
         .nest("/api", api.clone())
         .nest("/api/v1", api)
         .with_state(state)

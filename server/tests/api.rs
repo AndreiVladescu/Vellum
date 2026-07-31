@@ -4355,3 +4355,70 @@ async fn responses_carry_baseline_security_headers() {
             .contains("frame-ancestors 'none'")
     );
 }
+
+
+/// A browser must never be handed an HTTP Basic challenge.
+///
+/// The bug this pins: every 401 carried `WWW-Authenticate: Basic realm="Vellum"`
+/// — added so OPDS e-readers would prompt — and browsers answer that header
+/// with their own native credential dialog. It appeared over the console the
+/// moment the page loaded, popped again on every failed sign-in, and left no
+/// way to log in through the console's own form.
+#[tokio::test]
+async fn api_401s_carry_no_basic_challenge() {
+    let app = test_app().await;
+
+    // What the console does on load, before it has a token.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/books")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        response.headers().get("www-authenticate").is_none(),
+        "a browser would pop its own login dialog over the console"
+    );
+
+    // And a failed sign-in, which is where it reappeared on every attempt.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/login")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({ "email": "nobody@lib.test", "password": "wrongwrong" }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(response.headers().get("www-authenticate").is_none());
+}
+
+/// The other half: e-readers still get their challenge, or OPDS stops working.
+#[tokio::test]
+async fn opds_401s_still_challenge_for_e_readers() {
+    let app = test_app().await;
+    let response = app
+        .oneshot(Request::builder().uri("/opds").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response
+            .headers()
+            .get("www-authenticate")
+            .and_then(|v| v.to_str().ok()),
+        Some("Basic realm=\"Vellum\""),
+        "an e-reader needs this to know to ask for credentials"
+    );
+}

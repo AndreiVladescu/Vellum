@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    http::{StatusCode, header},
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde_json::json;
@@ -47,15 +47,12 @@ impl AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // 401s carry a Basic challenge so OPDS e-readers show a login prompt.
-        if let AppError::Unauthorized(m) = &self {
-            return (
-                StatusCode::UNAUTHORIZED,
-                [(header::WWW_AUTHENTICATE, "Basic realm=\"Vellum\"")],
-                Json(json!({ "error": m })),
-            )
-                .into_response();
-        }
+        // No `WWW-Authenticate` here, deliberately. A Basic challenge on a 401
+        // makes a *browser* pop its own native credential dialog over the
+        // console — which appeared the moment the page loaded, again on every
+        // failed sign-in, and left no way to log in through the console's own
+        // form. OPDS e-readers do need the challenge, so it is added by a layer
+        // on those routes alone (see `opds_challenge` in lib.rs).
         let (status, message) = match self {
             AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m),
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m),
