@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/page_insets.dart';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -691,7 +692,7 @@ class _ServerPageState extends State<ServerPage> {
     final conn = widget.connection;
     final caps = conn.capabilities;
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: pageInsets(context, EdgeInsets.all(24)),
       children: [
         Card(
           child: ListTile(
@@ -810,7 +811,7 @@ class _ServerPageState extends State<ServerPage> {
   Widget _buildSignIn(BuildContext context) {
     final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: pageInsets(context, EdgeInsets.all(24)),
       children: [
         Text(
           _registerMode ? 'Create the master account' : 'Sign in to a server',

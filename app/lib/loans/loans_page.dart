@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/page_insets.dart';
 import 'package:flutter/services.dart';
 
 import '../data/library_repository.dart';
@@ -80,6 +81,7 @@ class LoansPage extends StatelessWidget {
           }
 
           return ListView(
+            padding: pageInsets(context, EdgeInsets.zero),
             children: [
               _SectionHeader('Out now (${active.length})'),
               if (active.isEmpty)

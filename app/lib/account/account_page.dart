@@ -1,4 +1,5 @@
 import 'package:file_selector/file_selector.dart';
+import '../widgets/page_insets.dart';
 import 'package:flutter/material.dart';
 
 import '../snack_bars.dart';
@@ -66,7 +67,7 @@ class _AccountPageState extends State<AccountPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Account')),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: pageInsets(context, EdgeInsets.all(24)),
         children: [
           // Listens rather than relying on setState: the photo can change from
           // the drawer as well, and a page that only repaints its own edits

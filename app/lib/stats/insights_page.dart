@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/page_insets.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
@@ -116,7 +117,7 @@ class _InsightsPageState extends State<InsightsPage> {
             );
           }
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: pageInsets(context, EdgeInsets.all(16)),
             children: [
               _StatRow(stats: [
                 (label: 'Current streak', value: '${data.currentStreak}d'),

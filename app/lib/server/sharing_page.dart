@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/page_insets.dart';
 import 'package:flutter/services.dart';
 
 import 'connection_store.dart';
@@ -85,7 +86,7 @@ class _SharingPageState extends State<SharingPage> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: pageInsets(context, EdgeInsets.all(16)),
                     children: [
                       _groupsSection(context),
                       const Divider(height: 32),

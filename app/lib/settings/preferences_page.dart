@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/page_insets.dart';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
@@ -46,7 +47,7 @@ class PreferencesPage extends StatelessWidget {
       body: ListenableBuilder(
         listenable: settings,
         builder: (context, _) => ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: pageInsets(context, EdgeInsets.symmetric(vertical: 8)),
           children: [
             _SectionHeader('Appearance'),
             _AppearanceSection(settings: settings),

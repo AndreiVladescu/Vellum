@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/page_insets.dart';
 
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
@@ -182,6 +183,7 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
           : _incoming == null
               ? const Center(child: CircularProgressIndicator())
               : ListView(
+                  padding: pageInsets(context, EdgeInsets.zero),
                   children: [
                     _Header('To answer (${pending.length})'),
                     if (pending.isEmpty)

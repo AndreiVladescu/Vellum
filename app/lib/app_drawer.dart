@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'widgets/page_insets.dart';
 
 import 'account/account_page.dart';
 import 'account/profile_avatar.dart';
@@ -113,7 +114,7 @@ class AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Drawer(
       child: ListView(
-        padding: EdgeInsets.zero,
+        padding: pageInsets(context, EdgeInsets.zero),
         children: [
           ListenableBuilder(
             // Both: the header shows the profile's name and photo *and* the

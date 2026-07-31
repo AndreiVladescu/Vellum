@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/page_insets.dart';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -474,7 +475,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
     final report = _report!;
     final folder = _folder;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: pageInsets(context, EdgeInsets.all(16)),
       children: [
         Text(
           report.cancelled
@@ -552,7 +553,7 @@ class _PickStep extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 460),
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.all(24),
+          padding: pageInsets(context, EdgeInsets.all(24)),
           children: [
             const Icon(Icons.library_add_outlined, size: 56),
             const SizedBox(height: 16),

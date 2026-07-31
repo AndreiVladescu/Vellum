@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/page_insets.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
@@ -183,6 +184,7 @@ class _StocktakePageState extends State<StocktakePage> {
         ),
         Expanded(
           child: ListView(
+            padding: pageInsets(context, EdgeInsets.zero),
             children: [
               for (final entry in rows)
                 CheckboxListTile(
@@ -233,6 +235,7 @@ class _StocktakePageState extends State<StocktakePage> {
       );
     }
     return ListView(
+      padding: pageInsets(context, EdgeInsets.zero),
       children: [
         if (result.missing.isNotEmpty) ...[
           _Header(

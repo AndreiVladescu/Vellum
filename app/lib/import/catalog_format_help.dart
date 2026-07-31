@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/page_insets.dart';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -99,7 +100,7 @@ class _SheetBody extends StatelessWidget {
     final muted = TextStyle(color: theme.colorScheme.onSurfaceVariant);
     return ListView(
       controller: controller,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+      padding: pageInsets(context, EdgeInsets.fromLTRB(20, 0, 20, 28)),
       children: [
         Text('How to structure the file', style: theme.textTheme.titleLarge),
         const SizedBox(height: 8),

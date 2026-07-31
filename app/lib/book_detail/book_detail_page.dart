@@ -1,4 +1,5 @@
 import 'package:desktop_drop/desktop_drop.dart';
+import '../widgets/page_insets.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
@@ -396,7 +397,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                 )
               : null,
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: pageInsets(context, EdgeInsets.all(24)),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

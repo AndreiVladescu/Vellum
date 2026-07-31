@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/page_insets.dart';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -212,7 +213,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
                 : ListView(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                        padding: pageInsets(context, EdgeInsets.fromLTRB(16, 8, 16, 4)),
                         child: Text(feed.title,
                             style: theme.textTheme.titleMedium),
                       ),
