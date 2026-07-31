@@ -256,6 +256,36 @@ class BookSpine extends StatelessWidget {
   }
 }
 
+/// The decode height a spine of [wantedPx] physical pixels asks its cover for,
+/// rounded up to the next power of two.
+///
+/// **This is why zooming the physical room used to blank every book.**
+/// `cacheHeight` is part of an `Image`'s cache key: it wraps the file provider
+/// in a `ResizeImage` keyed on that number. In the room the spine's on-screen
+/// height changes on *every frame* of a pinch, so a raw `height * dpr` minted a
+/// new provider per frame — each one a fresh asynchronous decode off the disk,
+/// each one showing nothing until it finished, and each one retained in the
+/// image cache, evicting the rest of the shelf while it was at it.
+///
+/// Buckets fix the cause: a whole zoom gesture reuses one decoded bitmap, and
+/// the GPU scales it, which is free. Powers of two because they double —
+/// crossing a boundary means the image was already off by up to 2×, which is
+/// about where a resample starts to show.
+///
+/// Clamped at both ends: never below 64 (a thumbnail's worth, so a distant
+/// spine still costs something to look at) and never above 2048 (past that the
+/// slice on screen is a few hundred pixels wide and the rest is memory).
+int spineDecodeHeight(double wantedPx) {
+  const min = 64;
+  const max = 2048;
+  if (!wantedPx.isFinite || wantedPx <= min) return min;
+  var bucket = min;
+  while (bucket < wantedPx && bucket < max) {
+    bucket *= 2;
+  }
+  return bucket;
+}
+
 /// The spine artwork alone, filling its parent (the caller sizes it): a slice of
 /// the cover image if there is one, otherwise the generated spine. Shared by the
 /// digital shelf and the physical-layout view, so a book looks the same in both.
@@ -324,7 +354,12 @@ class SpineFace extends StatelessWidget {
                 cover,
                 fit: BoxFit.cover,
                 alignment: Alignment.centerLeft,
-                cacheHeight: (h * dpr).round(),
+                cacheHeight: spineDecodeHeight(h * dpr),
+                // Keep the previous frame on screen while a new decode runs.
+                // Crossing a bucket boundary swaps the provider, and without
+                // this the spine goes blank until the new bitmap arrives —
+                // which is the flicker this whole arrangement exists to avoid.
+                gaplessPlayback: true,
                 // Orphaned path: fall back to a plain fill; the shading and
                 // title overlays below still render (coverless spine look).
                 errorBuilder: (_, _, _) => ColoredBox(color: s.color),
