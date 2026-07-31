@@ -18,6 +18,7 @@ import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
 import 'book_picker.dart';
+import 'bulk_place.dart';
 import 'labels.dart';
 import 'locate.dart';
 import 'physical_metrics.dart';
@@ -580,30 +581,121 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     );
   }
 
-  Future<void> _addBook() async {
-    final book = await showModalBottomSheet<Book>(
+  /// Bulk add: tick any number of books, choose a shelf, and they are packed
+  /// onto it left to right.
+  ///
+  /// [shelf] pre-selects the target — how *Add books to this shelf…* arrives
+  /// here. Otherwise the shelf is chosen after picking, from a list showing how
+  /// much room each one has left, because "will they fit" is the question you
+  /// actually have at that moment.
+  Future<void> _addBooks({PhysicalShelf? shelf}) async {
+    final placedIds = {for (final pb in _placed) pb.book.id};
+    final books = await showModalBottomSheet<List<Book>>(
       context: context,
       showDragHandle: true,
-      builder: (_) => BookPicker(repository: repo),
+      isScrollControlled: true,
+      builder: (_) => BookPicker(
+        repository: repo,
+        alreadyPlacedIds: placedIds,
+        title: shelf == null
+            ? 'Add books to ${widget.environmentName}'
+            : 'Add books to ${shelfName(shelf, _shelves)}',
+      ),
     );
-    if (book == null || _origin == null || !mounted) return;
-    // Drop at the centre of the view, then let it settle onto a surface.
-    final size = context.size ?? const Size(400, 600);
-    final centre = _screenToWorld(Offset(size.width / 2, size.height / 2));
-    final f = _foot(book, 0, null, null, null);
-    final settled = _settle(
-      draggedId: '',
-      x: centre.dx - f.w / 2,
-      y: centre.dy,
-      w: f.w,
-      h: f.h,
+    if (books == null || books.isEmpty || !mounted) return;
+
+    final target = shelf ?? await _askWhichShelf(books.length);
+    if (target == null || !mounted) return;
+    await _placeOnShelf(target, books);
+  }
+
+  /// The shelves books can rest on, with how full each one is — furniture is
+  /// left out, since nothing can be packed onto it.
+  List<PhysicalShelf> get _bookShelves => [
+        for (final s in _shelves)
+          if (ShelfKind.parse(s.kind).holdsBooks) s,
+      ];
+
+  Future<PhysicalShelf?> _askWhichShelf(int count) async {
+    final shelves = _bookShelves;
+    if (shelves.isEmpty) {
+      _say('This room has no shelves yet — add one first.');
+      return null;
+    }
+    if (shelves.length == 1) return shelves.single;
+    // Highest first: that is the order they appear on screen, and matching the
+    // picture beats sorting by anything cleverer.
+    final ordered = [...shelves]..sort(
+        (a, b) => math.max(b.y1, b.y2).compareTo(math.max(a.y1, a.y2)),
+      );
+    if (!mounted) return null;
+    return showDialog<PhysicalShelf>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text('Put $count ${count == 1 ? 'book' : 'books'} on…'),
+        children: [
+          for (final s in ordered)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(s),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(shelfName(s, _shelves)),
+                subtitle: Text(fillOf(shelf: s, placed: _placed).describe()),
+              ),
+            ),
+        ],
+      ),
     );
-    await repo.layout.placeBook(
+  }
+
+  /// Packs [books] into the free space on [shelf] and writes them in one go.
+  Future<void> _placeOnShelf(PhysicalShelf shelf, List<Book> books) async {
+    final surface = math.max(shelf.y1, shelf.y2);
+    final left = math.min(shelf.x1, shelf.x2);
+    final right = math.max(shelf.x1, shelf.x2);
+
+    // What is in the way: books already resting here, plus any upright that
+    // crosses this shelf — a divider sections the shelf, so a batch packs up to
+    // it and continues on the far side rather than through it.
+    final occupied = <({double start, double end})>[
+      for (final pb in _placed)
+        if ((pb.placement.y - surface).abs() <= 0.02)
+          (start: pb.placement.x, end: pb.placement.x + _footOf(pb).w),
+      for (final s in _shelves)
+        if (!ShelfKind.parse(s.kind).holdsBooks &&
+            math.min(s.y1, s.y2) <= surface + 0.02 &&
+            math.max(s.y1, s.y2) > surface + 0.02)
+          (
+            start: math.min(s.x1, s.x2),
+            end: math.min(s.x1, s.x2) +
+                math.max((s.x2 - s.x1).abs(), _barrierThickness),
+          ),
+    ];
+
+    final result = packOntoShelf(
+      shelfLeft: left,
+      shelfRight: right,
+      widths: [for (final b in books) _foot(b, 0, null, null, null).w],
+      occupied: occupied,
+    );
+
+    final placed = await repo.layout.placeBooks(
       widget.environmentId,
-      book.id,
-      x: settled.pos.dx,
-      y: settled.pos.dy,
+      [
+        for (final p in result.placed)
+          (bookId: books[p.index].id, x: p.x, y: surface),
+      ],
     );
+    if (!mounted) return;
+
+    final where = shelfName(shelf, _shelves);
+    if (result.unplaced.isEmpty) {
+      _say('Added $placed ${placed == 1 ? 'book' : 'books'} to $where.');
+    } else if (placed == 0) {
+      _say('No room on $where — nothing was added.');
+    } else {
+      _say('Added $placed to $where; ${result.unplaced.length} did not fit.');
+    }
   }
 
   Future<void> _rotateSelected(PlacedBook pb) async {
@@ -765,14 +857,21 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     final choice = await showMenu<String>(
       context: context,
       position: _menuPosition(global),
-      items: const [
-        PopupMenuItem(value: 'edit', child: Text('Edit shelf…')),
-        PopupMenuItem(value: 'tidy', child: Text('Tidy this shelf…')),
-        PopupMenuItem(value: 'delete', child: Text('Delete shelf')),
+      items: [
+        if (ShelfKind.parse(s.kind).holdsBooks)
+          const PopupMenuItem(
+            value: 'fill',
+            child: Text('Add books to this shelf…'),
+          ),
+        const PopupMenuItem(value: 'edit', child: Text('Edit shelf…')),
+        const PopupMenuItem(value: 'tidy', child: Text('Tidy this shelf…')),
+        const PopupMenuItem(value: 'delete', child: Text('Delete shelf')),
       ],
     );
     if (choice == null || !mounted) return;
     switch (choice) {
+      case 'fill':
+        await _addBooks(shelf: s);
       case 'delete':
         await repo.layout.deleteShelf(s.id);
         await _applyGravity();
@@ -1281,9 +1380,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       floatingActionButton: _selectedId != null
           ? null
           : FloatingActionButton.extended(
-              onPressed: _addBook,
+              onPressed: _addBooks,
               icon: const Icon(Icons.add),
-              label: const Text('Add book'),
+              label: const Text('Add books'),
             ),
     );
   }

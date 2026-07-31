@@ -78,7 +78,7 @@ double pixelDistanceBetween(double x1, double y1, double x2, double y2) =>
     math.sqrt(math.pow(x2 - x1, 2) + math.pow(y2 - y1, 2));
 
 /// A measured distance, formatted the way someone standing at a bookcase reads
-/// it: centimetres up to a metre, then metres with one decimal.
+/// it: centimetres up to a metre, then metres to two decimals.
 ///
 /// Rounded to the nearest centimetre because the input is a finger on a screen
 /// — showing `43.7241 cm` would claim a precision the gesture doesn't have.
@@ -120,6 +120,23 @@ class ShelfFill {
     if (isOverfull) return '$used on a $total shelf — overfull';
     return '$used of $total used · ${formatDistance(freeM)} free';
   }
+}
+
+/// A shelf's name for a menu or a message.
+///
+/// Its label when it has one. When it doesn't, the height it sits at — because
+/// a chooser listing "Unlabelled shelf" three times tells you nothing, and
+/// "Shelf at 1.4 m" is what you would say pointing at the bookcase. [siblings]
+/// is the rest of the room, used only to decide whether a label is ambiguous:
+/// two shelves both labelled "Cookbooks" get their heights too.
+String shelfName(PhysicalShelf shelf, List<PhysicalShelf> siblings) {
+  final label = shelf.label?.trim();
+  final height = formatDistance(math.max(shelf.y1, shelf.y2));
+  if (label == null || label.isEmpty) return 'Shelf at $height';
+  final sameLabel = siblings
+      .where((s) => (s.label?.trim() ?? '') == label)
+      .length;
+  return sameLabel > 1 ? '$label ($height)' : label;
 }
 
 /// Measures how much of [shelf] its resting books take up.

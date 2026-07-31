@@ -13,9 +13,12 @@ PhysicalShelf _shelf({
   double x2 = 0.9,
   double y = 1.0,
   String kind = 'shelf',
+  String id = 's1',
+  String? label,
 }) =>
     PhysicalShelf(
-      id: 's1',
+      id: id,
+      label: label,
       environmentId: 'e1',
       x1: x1,
       y1: y,
@@ -227,6 +230,33 @@ void main() {
       expect(fitsOn(fill, 0.0099), isFalse);
       expect(fitsOn(fill, 0.01), isFalse, reason: 'exactly flush is not a fit');
       expect(fitsOn(fill, 0.02), isFalse);
+    });
+  });
+
+  group('shelfName', () {
+    test('uses the label when there is one', () {
+      final s = _shelf(label: 'Cookbooks');
+      expect(shelfName(s, [s]), 'Cookbooks');
+    });
+
+    test('falls back to the height, so a chooser can tell them apart', () {
+      // Three rows all reading "Unlabelled shelf" is a list you cannot use.
+      final low = _shelf(id: 'a', y: 0.4);
+      final high = _shelf(id: 'b', y: 1.45);
+      expect(shelfName(low, [low, high]), 'Shelf at 40 cm');
+      expect(shelfName(high, [low, high]), 'Shelf at 1.45 m');
+    });
+
+    test('disambiguates two shelves sharing a label', () {
+      final a = _shelf(id: 'a', y: 0.4, label: 'Cookbooks');
+      final b = _shelf(id: 'b', y: 1.2, label: 'Cookbooks');
+      expect(shelfName(a, [a, b]), 'Cookbooks (40 cm)');
+      expect(shelfName(b, [a, b]), 'Cookbooks (1.20 m)');
+    });
+
+    test('a blank label counts as no label', () {
+      final s = _shelf(label: '   ', y: 1.0);
+      expect(shelfName(s, [s]), 'Shelf at 1.00 m');
     });
   });
 }

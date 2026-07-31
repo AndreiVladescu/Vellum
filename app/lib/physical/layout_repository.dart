@@ -423,6 +423,39 @@ class LayoutRepository {
     await markDirty(environmentId);
   }
 
+  /// Places several books at once, each with its own position (the bulk-add
+  /// flow). Every copy and placement is written in **one** transaction, so a
+  /// batch of forty either lands whole or not at all — and the room is marked
+  /// dirty once rather than forty times, which is what a per-book loop would
+  /// have cost in sync churn.
+  ///
+  /// Returns the number of books placed.
+  Future<int> placeBooks(
+    String environmentId,
+    List<({String bookId, double x, double y})> books,
+  ) async {
+    if (books.isEmpty) return 0;
+    await db.transaction(() async {
+      for (final b in books) {
+        final copyId = _uuid.v4();
+        await db.into(db.physicalCopies).insert(
+              PhysicalCopiesCompanion.insert(id: copyId, bookId: b.bookId),
+            );
+        await db.into(db.bookPlacements).insert(
+              BookPlacementsCompanion.insert(
+                id: _uuid.v4(),
+                environmentId: environmentId,
+                copyId: copyId,
+                x: b.x,
+                y: b.y,
+              ),
+            );
+      }
+    });
+    await markDirty(environmentId);
+    return books.length;
+  }
+
   /// Partial update of a placement; omitted arguments are left unchanged.
   /// Pass a `Value(null)` for a size override to clear it back to the default.
   Future<void> updatePlacement(
