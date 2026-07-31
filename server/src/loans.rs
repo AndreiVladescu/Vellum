@@ -136,6 +136,7 @@ pub async fn upsert(
     Path(id): Path<String>,
     Json(input): Json<LoanInput>,
 ) -> AppResult<Json<LoanDto>> {
+    crate::ids::check("loan", &id)?;
     if input.borrower.trim().is_empty() {
         return Err(AppError::BadRequest("borrower is required".into()));
     }

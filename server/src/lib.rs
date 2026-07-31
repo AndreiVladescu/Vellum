@@ -25,6 +25,7 @@ mod discover;
 mod error;
 mod events;
 mod groups;
+mod ids;
 mod layouts;
 mod loans;
 mod personal;
@@ -456,6 +457,10 @@ pub fn router(state: AppState) -> Router {
         // Baseline security headers on every response (defence in depth for the
         // console/public pages and blob downloads). See docs/SECURITY_AUDIT.md (L3).
         .layer(axum::middleware::from_fn(security_headers))
+        // Before any handler: a path segment must not be hiding a separator.
+        // Ids from the URL end up in filesystem paths, and axum decodes a
+        // captured segment — so `..%2F..%2Fx` used to arrive as `../../x`.
+        .layer(axum::middleware::from_fn(ids::reject_smuggled_separators))
         // Outermost, so every response — including one rejected before any
         // handler runs — carries a request id (plan 5 #37).
         .layer(axum::middleware::from_fn(observability::request_id))

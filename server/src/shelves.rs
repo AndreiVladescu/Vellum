@@ -165,6 +165,7 @@ pub async fn upsert(
     Path(id): Path<String>,
     Json(input): Json<ShelfInput>,
 ) -> AppResult<Json<ShelfDto>> {
+    crate::ids::check("shelf", &id)?;
     if input.name.trim().is_empty() {
         return Err(AppError::BadRequest("shelf name is required".into()));
     }

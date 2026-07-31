@@ -111,6 +111,7 @@ pub async fn upsert(
     Path(id): Path<String>,
     Json(input): Json<CopyInput>,
 ) -> AppResult<Json<CopyDto>> {
+    crate::ids::check("copy", &id)?;
     let existing: Option<(String, String)> =
         sqlx::query_as("SELECT book_id, updated_at FROM physical_copy WHERE id = ?")
             .bind(&id)
@@ -336,6 +337,7 @@ pub async fn upsert_photo(
     Path(id): Path<String>,
     Json(input): Json<CopyPhotoInput>,
 ) -> AppResult<Json<CopyPhotoDto>> {
+    crate::ids::check("photo", &id)?;
     if !crate::access::copy_access(&state, &user, &input.copy_id)
         .await?
         .can_edit()

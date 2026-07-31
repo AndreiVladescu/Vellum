@@ -145,6 +145,7 @@ pub async fn upsert_annotation(
     Path(id): Path<String>,
     Json(input): Json<AnnotationInput>,
 ) -> AppResult<Json<AnnotationDto>> {
+    crate::ids::check("annotation", &id)?;
     if !matches!(input.kind.as_str(), "highlight" | "note" | "bookmark") {
         return Err(AppError::BadRequest(
             "kind must be 'highlight', 'note' or 'bookmark'".into(),
@@ -334,6 +335,7 @@ pub async fn upsert_session(
     Path(id): Path<String>,
     Json(input): Json<SessionInput>,
 ) -> AppResult<Json<SessionDto>> {
+    crate::ids::check("session", &id)?;
     require_view(&state, &user, &input.book_id).await?;
     sqlx::query(
         "INSERT INTO reading_session \

@@ -153,6 +153,7 @@ pub async fn publish(
     Path(id): Path<String>,
     Json(input): Json<PublishInput>,
 ) -> AppResult<Json<LayoutSummary>> {
+    crate::ids::check("layout", &id)?;
     if input.name.trim().is_empty() {
         return Err(AppError::BadRequest("name is required".into()));
     }

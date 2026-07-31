@@ -603,6 +603,7 @@ async fn upsert_one(
     id: &str,
     input: BookInput,
 ) -> AppResult<UpsertOutcome> {
+    crate::ids::check("book", id)?;
     if input.title.trim().is_empty() {
         return Err(AppError::BadRequest("title is required".into()));
     }
