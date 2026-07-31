@@ -54,4 +54,33 @@ void main() {
     expect(part.existsSync(), false, reason: 'interrupted .part removed');
     expect(complete.existsSync(), true, reason: 'complete file kept');
   });
+
+  test('deleting a book with a photographed copy takes the photos with it',
+      () async {
+    // Copy photos (plan 6 #4) hang off a physical copy, which `deleteBook`
+    // removes — but `copy_photos.copy_id` is a foreign key with no cascade, and
+    // foreign keys are enforced. Deleting the book used to abort on it, so a
+    // book you had photographed could not be deleted at all.
+    final repo = await _repo(dir);
+    final db = repo.db;
+
+    await db
+        .into(db.books)
+        .insert(BooksCompanion.insert(id: 'b1', title: 'Photographed'));
+    final copyId = await repo.physical.addPhysicalCopy('b1');
+    final source = File(p.join(dir.path, 'shot.jpg'))
+      ..writeAsStringSync('pretend jpeg');
+    final photoId = await repo.copyPhotos.addPhoto(copyId, source.path);
+    final stored = File(p.join(dir.path, 'photos', '$photoId.jpg'));
+    expect(stored.existsSync(), true);
+
+    final book = await repo.watchBook('b1').first as Book;
+    await repo.deleteBook(book);
+
+    expect(await repo.watchBook('b1').first, isNull);
+    expect(await db.select(db.copyPhotos).get(), isEmpty,
+        reason: 'the photo rows went with the copy');
+    expect(stored.existsSync(), false,
+        reason: 'and so did the image on disk');
+  });
 }

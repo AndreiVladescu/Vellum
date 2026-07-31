@@ -560,6 +560,20 @@ class BookWriteService {
     final attachedFiles = await (db.select(
       db.bookFiles,
     )..where((f) => f.bookId.equals(book.id))).get();
+    // Photos of this book's copies, read before the rows go — `copy_photos`
+    // has no ON DELETE CASCADE, so the `physical_copies` delete below trips the
+    // foreign key unless they are cleared first, and after the delete there is
+    // nothing left to tell us which files to unlink. Same reasoning as
+    // `PhysicalService.deletePhysicalCopy`.
+    final copyPhotos = await (db.select(db.copyPhotos)
+          ..where(
+            (ph) => ph.copyId.isInQuery(
+              db.selectOnly(db.physicalCopies)
+                ..addColumns([db.physicalCopies.id])
+                ..where(db.physicalCopies.bookId.equals(book.id)),
+            ),
+          ))
+        .get();
     await db.transaction(() async {
       if (recordTombstone) {
         await db
@@ -602,6 +616,11 @@ class BookWriteService {
         [book.id],
       );
       await db.customStatement(
+        'DELETE FROM copy_photos WHERE copy_id IN '
+        '(SELECT id FROM physical_copies WHERE book_id = ?)',
+        [book.id],
+      );
+      await db.customStatement(
         'DELETE FROM physical_copies WHERE book_id = ?',
         [book.id],
       );
@@ -611,6 +630,10 @@ class BookWriteService {
     if (cover != null && await cover.exists()) await cover.delete();
     for (final f in attachedFiles) {
       final file = File(p.join(_dataDir.path, f.path));
+      if (await file.exists()) await file.delete();
+    }
+    for (final photo in copyPhotos) {
+      final file = File(p.join(_dataDir.path, photo.path));
       if (await file.exists()) await file.delete();
     }
   }
