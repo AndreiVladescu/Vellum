@@ -1,6 +1,6 @@
 # Next features — requested 2026-07-28
 
-Ten items, written down as asked and **not implemented yet**. Items 8, 9 and 10
+Eleven items, written down as asked and **not implemented yet**. Items 8 to 11
 came out of the discussion rather than the original list. Each records
 what was asked for, what the code does today (checked, not remembered), and what
 is still open. Open questions are marked **?** — some change the work
@@ -332,6 +332,146 @@ a shelf, and it is worth deciding on purpose rather than by default.
 
 ---
 
+## 11. Bookcase styles, and accessories you can bring your own art to
+
+**Asked for.** User-modifiable styles of bookcase, plus accessories — book
+nooks, small decorations. The proposal: a transparent collider box carrying the
+image of the accessory, either imported or chosen from a decorations menu.
+
+This is item 10 taken seriously. #10 asks *what* a prop is; this asks *where the
+art comes from* and *how furniture gets a look*, which turn out to be the two
+decisions that cost money.
+
+### The collider idea is right, and wants a third layer
+
+A book placement is already a footprint in metres plus an image drawn in it, so
+an accessory is a placement that isn't a book — most of the room's machinery
+applies unchanged. But an image's bounding box is almost never its footprint: a
+plant's pot is a small rect at bottom centre while its leaves overhang the
+neighbouring books, and a hanging picture has no footprint at all. So three
+layers, not two:
+
+| Layer | What | Why separate |
+|---|---|---|
+| **Artwork** | The image or vector, at its own aspect ratio | May overhang the collider — leaves, a lamp shade |
+| **Collider** | A rect in metres, or nothing | What `settle` and the barrier logic see |
+| **Anchor** | Where in the artwork the collider sits | The pot, not the bounding box |
+
+And the collider needs a *kind*, because this room's whole model is what rests
+on what:
+
+- **solid** — books can't occupy it (a lamp, a bookend). This is the barrier
+  path dividers already use.
+- **surface** — a top edge books *can* rest on (a stack of boxes, a nook's
+  roof). This is `SettleSegment`.
+- **none** — no physics: a poster on the back panel, a rug.
+- **aperture** — a hole things go inside. See the nook below.
+
+Three of those four are existing code paths. An accessory is mostly a new
+*renderer* over geometry the room already understands.
+
+### Bookcase styles: a generator, not a container
+
+A bookcase today is implied — some shelf segments and some panels. **Keep it
+that way.** Making a bookcase a first-class object with child shelves is
+conceptually cleaner and is a trap: it invalidates everything that reasons about
+a flat list of shelves (fill, tidy, stocktake, printed labels, the accessible
+room summary, the published room document, the console's renderer) and
+immediately raises "what happens when I drag one shelf out of a bookcase",
+which has no good answer.
+
+Instead, a **template that emits segments**: pick a style, give it a width,
+height and shelf count, and it writes the rows it is made of in one transaction.
+Style is then presentation over unchanged geometry — a `style` string per
+segment that the painter interprets (pine, walnut, painted steel, glass, wire).
+Nothing downstream needs to know. If a bookcase should move or delete as a unit,
+that is a `group_id` tag on the segments, not a hierarchy.
+
+The payoff is the same one the bulk book add just delivered a layer up: **a room
+built in four gestures instead of forty.**
+
+### Where the art comes from — the fork that decides the cost
+
+| Source | Cost |
+|---|---|
+| **Vector, drawn in code** | No assets, no licensing, no pixelation, takes the room palette. Every new prop is a code change and a release. |
+| **Bundled raster assets** | Licensing is a real chore for a GitHub-release project, and app size grows for something most people won't use. |
+| **User-imported images** | The most powerful, and the most hidden work — see below. |
+
+Imported images carry five problems worth knowing before starting:
+
+1. **Transparency is mandatory and users won't know it.** A JPEG of a plant
+   brings a white rectangle onto the shelf. PNG/WebP with alpha, and the import
+   dialog has to *say so* the way the CSV importer states its columns.
+2. **Pixels aren't metres.** An import needs a scale, which means asking "how
+   tall is this really?" — the conversation `BackdropCalibration` already has.
+   Reuse it rather than inventing a second one.
+3. **The anchor must be set by hand**, or everything floats: a one-time "drag
+   the footprint onto the base of the object" step.
+4. **Sync changes shape.** Vector props ride the room document (opaque JSON
+   server-side, 512 KiB cap) with **no server work at all**. Images can't — they
+   need the blob channel (a row, then the bytes, as copy photos do in migration
+   0024), and therefore a migration and an endpoint. This is the single biggest
+   cost difference between the two options.
+5. **A shared room renders someone else's untrusted image on your device.**
+   Backdrop photos set the precedent, but sharing multiplies it.
+
+**Recommendation: built-in vector props first, imports as a separate later
+stage.** Not because imports are wrong — because the two have almost disjoint
+costs and the first is nearly free.
+
+### The book nook is a room inside a room
+
+The cheap version is a sticker with a solid collider: most of the visual payoff,
+and it is just another prop.
+
+The interesting version is that a nook's aperture **is a
+`physical_environment`** — Vellum already has environments with their own
+backdrop, calibration, shelves and placements. Placing one inside another gives
+nested rooms for free (a nook in a bookcase in a study), and tapping it zooms
+into the editor that already exists.
+
+Build the cheap one; give the prop an optional `contains_environment_id` from
+day one and leave it null, so the door stays open.
+
+### The part that will actually go wrong
+
+This is a **content problem wearing a code problem's clothes**. The engine is
+about a week; the twelve decorations that look good *together* are the real
+work, and imported art will not match — one object has a baked-in shadow,
+another has perspective, a third is lit from the left. The room is a flat front
+elevation, so anything with perspective reads as pasted on.
+
+Three mitigations, designed in rather than bolted on:
+
+1. **State the contract at import**: front elevation, no perspective,
+   transparent background.
+2. **An optional palette tint** per prop, to pull imported art toward the room's
+   colours.
+3. **Vellum draws the contact shadow itself**, at the collider's base. If every
+   object gets the same soft shadow from the same source, mismatched artwork
+   still *sits* on the shelf consistently. This one detail does more for
+   coherence than any amount of asset curation.
+
+### Two things to decide up front
+
+- **Z-order.** Today it is backdrop → shelves → books. Props need at least three
+  named bands (behind books, among them, in front) — not a free-form float, or
+  everything ends up at 0.5.
+- **Library or personal?** Same question as #10, with a sharper edge: if props
+  are personal they stay out of the sync path entirely and get much cheaper.
+
+### Staging
+
+1. **Bookcase templates** — no new concepts, no sync work, immediately felt.
+2. **Segment styles** — a `style` field the painter interprets.
+3. **Vector props** with the four collider kinds; rides the existing room
+   document.
+4. **Imported images** — calibration, anchor, blob channel, migration.
+5. **Nested environments** for nooks, only if 3 and 4 land well.
+
+---
+
 ## Suggested order
 
 1. **#2** — a real bug with a known one-line fix, on the platform it was
@@ -350,6 +490,9 @@ a shelf, and it is worth deciding on purpose rather than by default.
 8. **#5** — last, and in the three stages above rather than as one piece: it is
    larger than everything else here put together.
 
-**#10** sits outside this order: its first stage (wall, floor, shadows) is small
-enough to slot in anywhere, and the props themselves are a want rather than a
-gap — worth doing when the room is otherwise finished.
+**#10 and #11** sit outside this order. Their cheap first stages — the room's own
+wall, floor and shadows (#10), and bookcase templates (#11) — are small enough to
+slot in anywhere and are what an empty room most obviously lacks. Everything past
+that is a want rather than a gap: worth doing when the room is otherwise
+finished, and #11 stage 4 (imported art) is the only part of either that needs a
+server migration.
