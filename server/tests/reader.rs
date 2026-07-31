@@ -439,3 +439,64 @@ async fn the_reader_page_is_served_for_both_shapes() {
         assert_eq!(res.status(), StatusCode::OK, "{uri}");
     }
 }
+
+#[tokio::test]
+async fn a_share_link_downloads_a_book_whose_title_is_not_ascii() {
+    // The Content-Disposition filename is built from the book's title, and
+    // `sanitize_filename` keeps anything `char::is_alphanumeric` accepts —
+    // which is Unicode-aware, so "Cărți" survives intact. `HeaderValue` only
+    // accepts visible ASCII, so building the header used to panic and the
+    // client got a dropped connection instead of their book.
+    let (app, _db) = app().await;
+    let token = master(&app).await;
+
+    let (_, created) = call(
+        &app,
+        "POST",
+        "/api/books",
+        Some(&token),
+        Some(serde_json::json!({ "title": "Cărți de citit — 日本語" })),
+    )
+    .await;
+    let book = created["id"].as_str().unwrap().to_string();
+    upload_epub(&app, &token, &book).await;
+
+    let (_, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&token),
+        Some(serde_json::json!({ "book_id": book })),
+    )
+    .await;
+    let share = link["url"].as_str().unwrap().rsplit('/').next().unwrap();
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/public/{share}/file"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // And the header is still useful: the name survives as UTF-8 in the
+    // RFC 5987 form, with an ASCII fallback for clients that ignore it.
+    let disposition = res
+        .headers()
+        .get(axum::http::header::CONTENT_DISPOSITION)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        disposition.contains("filename*=UTF-8''"),
+        "no UTF-8 filename offered: {disposition}"
+    );
+    assert!(
+        disposition.contains("C%C4%83r%C8%9Bi"),
+        "the real title should be recoverable: {disposition}"
+    );
+}

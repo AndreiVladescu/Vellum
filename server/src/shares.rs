@@ -653,7 +653,6 @@ pub async fn public_file(
         .fetch_one(&state.db)
         .await?;
 
-    let filename = format!("{}.{}", sanitize_filename(&title), format);
     let mime = match format.as_str() {
         "epub" => "application/epub+zip",
         "pdf" => "application/pdf",
@@ -665,9 +664,7 @@ pub async fn public_file(
     headers.insert(header::CONTENT_TYPE, mime.parse().unwrap());
     headers.insert(
         header::CONTENT_DISPOSITION,
-        format!("attachment; filename=\"{filename}\"")
-            .parse()
-            .unwrap(),
+        content_disposition(&title, &format),
     );
     if let Some(len) = len {
         headers.insert(header::CONTENT_LENGTH, len.into());
@@ -675,11 +672,49 @@ pub async fn public_file(
     Ok(response)
 }
 
+/// The download's `Content-Disposition`, in both forms RFC 6266 allows.
+///
+/// A header value is bytes, not text, so the plain `filename="…"` parameter can
+/// only carry ASCII — but `char::is_alphanumeric` is Unicode-aware, so
+/// [`sanitize_filename`] happily kept the "ă" in *Cărți* and the raw UTF-8 went
+/// out on the wire. Browsers decode that as Latin-1 and you get *CÄƒrÈ›i.epub*.
+///
+/// So: an ASCII-only `filename` for anything that only understands that, and
+/// `filename*=UTF-8''…` (RFC 5987) with the real title for everything modern,
+/// which every current browser prefers when both are present.
+fn content_disposition(title: &str, format: &str) -> axum::http::HeaderValue {
+    let ascii = format!("{}.{}", sanitize_filename(title), format);
+    let utf8 = rfc5987_encode(&format!("{}.{}", title.trim(), format));
+    // Both halves are now ASCII by construction, so this cannot fail.
+    axum::http::HeaderValue::from_str(&format!(
+        "attachment; filename=\"{ascii}\"; filename*=UTF-8''{utf8}"
+    ))
+    .unwrap_or_else(|_| axum::http::HeaderValue::from_static("attachment"))
+}
+
+/// Percent-encode to RFC 5987's `attr-char` set: unreserved plus a short list of
+/// punctuation. Everything else — including every non-ASCII byte — is escaped.
+fn rfc5987_encode(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        let keep = byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~');
+        if keep {
+            out.push(byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
+/// The ASCII fallback name. Anything outside plain ASCII letters and digits
+/// becomes `_`, so a title in another script degrades to underscores rather
+/// than to mojibake — the UTF-8 parameter above is what actually carries it.
 fn sanitize_filename(title: &str) -> String {
     let cleaned: String = title
         .chars()
         .map(|c| {
-            if c.is_alphanumeric() || c == ' ' || c == '-' {
+            if c.is_ascii_alphanumeric() || c == ' ' || c == '-' {
                 c
             } else {
                 '_'
