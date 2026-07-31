@@ -534,19 +534,28 @@ desktop (no camera) can paste it. *Save a picture of this room* captures exactly
 the framing on screen, because framing is what the pan and zoom are for.
 
 **Condition photos** (app, plan 5 #51) settle the other half of a loan: what the
-book looked like when it left. An app-local `copy_photos` table stores a caption,
-a timestamp and a *path* — the bytes live under `photos/` in the data dir and ride
-backups, which are the only copy of them that ever leaves the device. Lending
+book looked like when it left. A `copy_photos` table stores a caption, a timestamp
+and a *path*; the bytes live under `photos/` in the data dir and ride backups.
+Lending
 offers "photograph its condition first" as an opt-in tick per loan (it matters for
 a stranger, it is noise for a flatmate), and marking a return offers the shot again
 from the snackbar, where it costs nothing to ignore.
 
-Photos are **app-local permanently**, not "for now" like #18's judgements: copies
-and loans sync, but photo blobs are the exact weight that channel must not
-silently acquire — one photo outweighs the whole catalogue payload of a mid-sized
-library. Deleting a copy therefore reads its photo rows *before* the transaction
-that clears them and unlinks the blobs after it commits; a sweep that ran
-afterwards would find no rows and leak every file.
+Photos **sync with the copy** (plan 6 #4, migration 0024). They were app-local
+until then, on the reasoning that photo blobs are the exact weight the catalogue
+channel must not silently acquire — one photo outweighs the whole metadata
+payload of a mid-sized library. That objection is answered by *how* they travel
+rather than by not travelling: they use the blob pattern, a row then its bytes,
+the same as covers and book files, so a metadata push still carries no images.
+
+They are **library data, not personal data**: a photo hangs off a copy, and a
+copy is visible to whoever the book is shared with — which is a real consequence,
+since a photo of a copy is often a photo of a room, and the sheet that offers to
+take one says so.
+
+Deleting a copy still reads its photo rows *before* the transaction that clears
+them and unlinks the blobs after it commits; a sweep that ran afterwards would
+find no rows and leak every file.
 
 **A copy's location is derived, not stored** (app, plan 5 #50).
 `physical_copy.location` is free text typed once when the copy was added, while a
@@ -580,6 +589,13 @@ table keeps the shape of it — **one row per sitting**, not per page turn — a
 *Reading insights* in the drawer draws streaks, pages a day, a 12-week heat map,
 books finished per month and the genre split of what you finish, with `CustomPaint`
 rather than a charting dependency.
+
+Sittings **sync to the account** (plan 6, migration 0023), so statistics span
+every device you read on rather than telling each one a partial truth. They are
+immutable facts, which makes the merge a union keyed by id: a sitting happened,
+nothing about it is ever edited, and re-pushing one is the same fact arriving
+twice rather than a duplicate row. Each carries the `device_id` it happened on,
+so "where do I actually read" stays answerable.
 
 Two details do the work. **Coalescing:** reopening a book within two minutes
 extends the previous session instead of starting a new one, so a phone call
@@ -620,10 +636,16 @@ plan 4 §E15's in-chapter scroll restore. The chapter index is authoritative if 
 two ever disagree.
 
 **Annotations** (app, plan 5 #22) are bookmarks, highlights and notes, all in one
-app-local `annotations` table discriminated by `kind` — they differ only in which
-fields they carry. Personal marginalia, so they stay on the device like
-`readerNotes`; if they ever sync they get their own table and endpoint, never a
-column on the book row.
+`annotations` table discriminated by `kind` — they differ only in which fields
+they carry.
+
+They **sync to the account** (plan 6, migration 0023), and along exactly the line
+this section predicted while they were still app-local: their own table and their
+own endpoint, never a column on the book row. `readerNotes` went the same way, as
+a `book_note` row keyed by `(user, book)` rather than the column it is in the app.
+The rule that shapes all of it is that a library can be shared, so every one of
+these tables is keyed by a `user_id` taken from the token — my highlights in a
+book you lent me are not yours to read. See `server/src/personal.rs`.
 
 Position is stored as **versioned JSON** (`annotation_locator.dart`) because the
 two formats are not equally trustworthy. A PDF locator is objective: a page plus a

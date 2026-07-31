@@ -312,10 +312,6 @@ td .celledit { width:100%; }
   padding:10px 16px; border-radius:var(--radius); z-index:40;
   box-shadow:0 6px 20px rgba(0,0,0,.14);
 }
-.kbd {
-  font-family:var(--mono); background:var(--chip); border:1px solid var(--line);
-  border-radius:4px; padding:0 5px; font-size:.8rem;
-}
 
 @media (max-width: 760px) {
   th, td { padding:8px 10px; }

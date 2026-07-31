@@ -1,7 +1,7 @@
 # Next features — requested 2026-07-28
 
-Eight items, written down as asked and **not implemented yet** (item 8 came out
-of the discussion below). Each records
+Nine items, written down as asked and **not implemented yet**. Items 8 and 9 came
+out of the discussion rather than the original list. Each records
 what was asked for, what the code does today (checked, not remembered), and what
 is still open. Open questions are marked **?** — some change the work
 materially, and are worth answering before anything is built.
@@ -247,6 +247,37 @@ reaches the server become separate, explicit choices.
 
 ---
 
+## 9. Rooms shared with you are invisible in the app
+
+**Found while answering "how does the rooms feature work?"** — not asked for, but
+it is a gap rather than a preference.
+
+**Today.** A room is published as one document (`layout`), and it can be *shared*
+— `shares.rs` accepts `scope: 'layout'`, viewer-only. The console can list and
+draw a room shared with you. The app cannot: `fetchLayout(id)` takes an id the
+device already knows, which in practice means a room this device published. There
+is no "rooms shared with me" list anywhere in the app.
+
+So the second tab — the place rooms actually live — shows only your own, while
+the browser shows everyone's. That is backwards.
+
+**What to build.** `GET /api/layouts` already returns what the caller can see,
+with an `owned` flag per row (`LayoutSummary`), so the server side exists. The app
+needs a list of them in the physical tab and a way to open one read-only.
+
+**The question to settle first.** Opening someone else's room can mean two
+things, and they age differently:
+
+- **Mirror it read-only** — fetch on demand, draw it, never write it to the local
+  tables. Always current, useless offline, and it cannot be edited by mistake.
+- **Copy it in** — import it as a room of your own, which then diverges from
+  theirs and needs the same publish/409 conversation as any other room.
+
+Read-only mirroring is the smaller and more honest of the two, and matches what
+viewer-only sharing already means everywhere else.
+
+---
+
 ## Suggested order
 
 1. **#2** — a real bug with a known one-line fix, on the platform it was
@@ -260,5 +291,7 @@ reaches the server become separate, explicit choices.
    forgiving.
 6. **#8** — after #1, since the two share the question of what "my library"
    consists of, and #8 is the one that answers it properly.
-7. **#5** — last, and in the three stages above rather than as one piece: it is
+7. **#9** — small once its one question is answered, and it closes a gap where
+   the browser currently shows more than the app does.
+8. **#5** — last, and in the three stages above rather than as one piece: it is
    larger than everything else here put together.

@@ -333,7 +333,7 @@ on there.
 
 Being honest about what this is:
 
-- **The code was written by an LLM.** It is tested — around 800 automated tests
+- **The code was written by an LLM.** It is tested — over 840 automated tests
   run against it, and the readers and importers have been driven by hand — but
   that is not the same as years of use by many people.
 - **It never deletes your original files.** Importing copies files into its own
@@ -356,7 +356,7 @@ Being honest about what this is:
 
 ```sh
 cd app
-flutter test          # ~800 tests
+flutter test          # ~845 tests
 flutter analyze       # lint and static analysis
 dart run build_runner build --delete-conflicting-outputs   # after schema changes
 
