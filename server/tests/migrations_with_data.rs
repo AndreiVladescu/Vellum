@@ -97,6 +97,19 @@ async fn a_populated_database_upgrades_to_the_latest_schema() {
         .execute(&pool)
         .await
         .unwrap();
+        // Tombstones under the old key, so 0025's table rebuild has rows to
+        // carry across rather than migrating an empty table.
+        for (id, kind) in [("gone-1", "book"), ("gone-2", "shelf")] {
+            sqlx::query(
+                "INSERT INTO deletion (book_id, owner_id, kind, deleted_at) \
+                 VALUES (?, 'u1', ?, datetime('now'))",
+            )
+            .bind(id)
+            .bind(kind)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
         pool.close().await;
     }
 
@@ -122,6 +135,23 @@ async fn a_populated_database_upgrades_to_the_latest_schema() {
     assert!(
         stamp.as_str() > "2000-01-01",
         "existing accounts are backfilled, not left at the placeholder: {stamp}"
+    );
+
+    // 0025 rebuilds `deletion` around a (kind, entity_id) key. A rebuild that
+    // loses rows would silently resurrect everything anyone had deleted.
+    let kept: Vec<(String, String, Option<String>)> = sqlx::query_as(
+        "SELECT entity_id, kind, owner_id FROM deletion ORDER BY entity_id",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        kept,
+        vec![
+            ("gone-1".into(), "book".into(), Some("u1".into())),
+            ("gone-2".into(), "shelf".into(), Some("u1".into())),
+        ],
+        "the tombstones came through the rebuild intact"
     );
 
     let _ = std::fs::remove_file(&path);

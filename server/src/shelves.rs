@@ -198,7 +198,7 @@ pub async fn upsert(
     if is_update {
         let current = fetch_shelf(&state, &id).await?.0;
         let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE book_id = ?)")
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'shelf')")
                 .bind(&id)
                 .fetch_one(&state.db)
                 .await?;
@@ -234,7 +234,7 @@ pub async fn upsert(
             .await?;
     }
     // Re-creating a shelf at a tombstoned id revives it, same as books::upsert.
-    sqlx::query("DELETE FROM deletion WHERE book_id = ? AND kind = 'shelf'")
+    sqlx::query("DELETE FROM deletion WHERE entity_id = ? AND kind = 'shelf'")
         .bind(&id)
         .execute(&mut *tx)
         .await?;
@@ -299,7 +299,7 @@ pub async fn delete(
     }
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id, kind) VALUES (?, ?, 'shelf')")
+    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'shelf')")
         .bind(&id)
         .bind(&owner_id)
         .execute(&mut *tx)

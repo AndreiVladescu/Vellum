@@ -688,7 +688,7 @@ async fn upsert_one(
         // A live tombstone for this id (a crashed delete) must still be cleared,
         // so it isn't a no-op even when the data matches — fall through to write.
         let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE book_id = ?)")
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'book')")
                 .bind(id)
                 .fetch_one(&state.db)
                 .await?;
@@ -746,7 +746,7 @@ async fn upsert_one(
     // Re-creating a book at a tombstoned id revives it — drop the tombstone so
     // it isn't deleted again on the next pull. Cleared on both branches so a
     // revived-then-updated id can't leave a stale tombstone behind.
-    sqlx::query("DELETE FROM deletion WHERE book_id = ?")
+    sqlx::query("DELETE FROM deletion WHERE entity_id = ? AND kind = 'book'")
         .bind(id)
         .execute(&mut *tx)
         .await?;
@@ -1140,7 +1140,7 @@ pub async fn delete(
 
     // Record a tombstone so a client that pulls after this delete removes the
     // book locally instead of treating its absence as "nothing to do".
-    sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id) VALUES (?, ?)")
+    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id) VALUES (?, ?)")
         .bind(&id)
         .bind(&owner_id)
         .execute(&mut *tx)
@@ -1233,7 +1233,7 @@ pub async fn deletions(
     // here let any authenticated account read the ids and timings of every
     // other account's deletions (plan 6 #3, finding P1).
     let sql = format!(
-        "SELECT book_id, deleted_at, kind FROM deletion \
+        "SELECT entity_id AS book_id, deleted_at, kind FROM deletion \
          {} kind != 'annotation' ORDER BY deleted_at",
         if filter.is_empty() {
             "WHERE".to_string()

@@ -3660,7 +3660,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
 
     // ...with a tombstone alongside it, as a crash between the two delete
     // statements would leave.
-    sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id) VALUES (?, NULL)")
+    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id) VALUES (?, NULL)")
         .bind("stale-1")
         .execute(&db)
         .await
@@ -3681,6 +3681,53 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
         list.as_array().unwrap().is_empty(),
         "stale tombstone should be cleared by the upsert"
     );
+}
+
+#[tokio::test]
+async fn a_tombstone_is_keyed_by_kind_as_well_as_id() {
+    // Migration 0025. `deletion` used to be keyed by the id alone, from when it
+    // only held books. Ids are UUIDs so nothing has collided in practice, but
+    // every write site is an INSERT OR REPLACE — a collision would silently
+    // overwrite the other kind's tombstone rather than error, resurrecting a
+    // deleted row on someone's next pull. Both must now survive.
+    let (app, db) = test_app_with_db().await;
+    let master = register_master(&app).await;
+
+    for kind in ["book", "shelf", "loan"] {
+        sqlx::query("INSERT INTO deletion (entity_id, kind, owner_id) VALUES ('same-id', ?, NULL)")
+            .bind(kind)
+            .execute(&db)
+            .await
+            .unwrap();
+    }
+
+    let (_, list) = call(&app, "GET", "/api/deletions", Some(&master), None).await;
+    let kinds: Vec<&str> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds.len(), 3, "one tombstone per kind, not one in total");
+
+    // And clearing one kind must leave the others standing: re-creating the
+    // *book* is not a statement about the shelf or the loan.
+    call(
+        &app,
+        "PUT",
+        "/api/books/same-id",
+        Some(&master),
+        Some(json!({ "title": "Dune" })),
+    )
+    .await;
+    let (_, list) = call(&app, "GET", "/api/deletions", Some(&master), None).await;
+    let kinds: Vec<&str> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds, ["shelf", "loan"], "cleared more than the book");
 }
 
 #[tokio::test]

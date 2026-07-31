@@ -189,7 +189,7 @@ pub async fn upsert(
     if is_update {
         let current = fetch_loan(&state, &id).await?.0;
         let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE book_id = ?)")
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'loan')")
                 .bind(&id)
                 .fetch_one(&state.db)
                 .await?;
@@ -243,7 +243,7 @@ pub async fn upsert(
         .execute(&mut *tx)
         .await?;
     }
-    sqlx::query("DELETE FROM deletion WHERE book_id = ? AND kind = 'loan'")
+    sqlx::query("DELETE FROM deletion WHERE entity_id = ? AND kind = 'loan'")
         .bind(&id)
         .execute(&mut *tx)
         .await?;
@@ -281,7 +281,7 @@ pub async fn delete(
     }
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id, kind) VALUES (?, ?, 'loan')")
+    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'loan')")
         .bind(&id)
         .bind(&owner_id)
         .execute(&mut *tx)

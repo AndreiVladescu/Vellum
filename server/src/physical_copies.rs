@@ -154,7 +154,7 @@ pub async fn upsert(
     if is_update {
         let current = fetch_copy(&state, &id).await?.0;
         let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE book_id = ?)")
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'copy')")
                 .bind(&id)
                 .fetch_one(&state.db)
                 .await?;
@@ -195,7 +195,7 @@ pub async fn upsert(
         .execute(&mut *tx)
         .await?;
     }
-    sqlx::query("DELETE FROM deletion WHERE book_id = ? AND kind = 'copy'")
+    sqlx::query("DELETE FROM deletion WHERE entity_id = ? AND kind = 'copy'")
         .bind(&id)
         .execute(&mut *tx)
         .await?;
@@ -230,7 +230,7 @@ pub async fn delete(
     }
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("INSERT OR REPLACE INTO deletion (book_id, owner_id, kind) VALUES (?, ?, 'copy')")
+    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'copy')")
         .bind(&id)
         .bind(&owner_id)
         .execute(&mut *tx)
@@ -394,9 +394,9 @@ pub async fn delete_photo(
         .await?;
     let _ = tokio::fs::remove_file(state.data_dir.join(format!("copy-photos/{id}"))).await;
     sqlx::query(
-        "INSERT INTO deletion (book_id, kind, deleted_at) \
+        "INSERT INTO deletion (entity_id, kind, deleted_at) \
          VALUES (?, 'copy_photo', datetime('now')) \
-         ON CONFLICT(book_id) DO UPDATE SET deleted_at = excluded.deleted_at",
+         ON CONFLICT(kind, entity_id) DO UPDATE SET deleted_at = excluded.deleted_at",
     )
     .bind(&id)
     .execute(&state.db)

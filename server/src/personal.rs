@@ -223,9 +223,9 @@ pub async fn delete_annotation(
     // back on their next sync. `owner_id` scopes it to this user — another
     // account's pull must not see it.
     sqlx::query(
-        "INSERT INTO deletion (book_id, owner_id, kind, deleted_at) \
+        "INSERT INTO deletion (entity_id, owner_id, kind, deleted_at) \
          VALUES (?, ?, 'annotation', datetime('now')) \
-         ON CONFLICT(book_id) DO UPDATE SET deleted_at = excluded.deleted_at",
+         ON CONFLICT(kind, entity_id) DO UPDATE SET deleted_at = excluded.deleted_at",
     )
     .bind(&id)
     .bind(&user.id)
@@ -258,7 +258,7 @@ pub async fn list_annotation_deletions(
         ""
     };
     let sql = format!(
-        "SELECT book_id AS id, deleted_at FROM deletion \
+        "SELECT entity_id AS id, deleted_at FROM deletion \
          WHERE kind = 'annotation' AND owner_id = ? {filter} ORDER BY deleted_at"
     );
     let mut query = sqlx::query_as::<_, AnnotationTombstoneDto>(&sql).bind(&user.id);
