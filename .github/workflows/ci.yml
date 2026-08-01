@@ -135,6 +135,19 @@ jobs:
       #    parsing; a maintenance warning, not a vulnerability, unfixable here.
       - run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0192
 
+  # The console's importer parses catalogues in the browser, and a parser is
+  # exactly the kind of code that breaks quietly. No framework: it runs the real
+  # console.js in a `vm` context with a DOM stub.
+  console-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check server/web/console.js
+      - run: node server/web/tests/import_parse.test.js
+
   # The Docker image is part of the product (plan 5 #36), so a change that breaks
   # it should fail here rather than at someone's `docker compose up`. The image
   # is built and then actually *run*: a build that produces a container which

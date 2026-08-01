@@ -26,6 +26,7 @@ mod error;
 mod events;
 mod groups;
 mod ids;
+mod import_check;
 mod layouts;
 mod loans;
 mod personal;
@@ -194,6 +195,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             put(auth::set_user_role).delete(auth::delete_user),
         )
         // Online metadata search + add a chosen result.
+        // The duplicate check, shared by the console's importer and (in time)
+        // the app's, so the two cannot disagree (next features #5).
+        .route("/import/check", post(import_check::check))
         .route("/metadata/search", get(discover::search))
         .route("/metadata/analyze", post(discover::analyze))
         .route("/books/from-search", post(discover::add_from_search))
