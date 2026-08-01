@@ -1,16 +1,18 @@
 # Next features — requested 2026-07-28
 
-Eleven items, written down as asked and **not implemented yet**. Items 8 to 11
-came out of the discussion rather than the original list. Each records
-what was asked for, what the code does today (checked, not remembered), and what
-is still open. Open questions are marked **?** — some change the work
-materially, and are worth answering before anything is built.
+Eleven items. **Eight are now built** — each marked *Done* with its commit —
+leaving #5 (the console import wizard) and the two room items, #10 and #11.
+Items 8 to 11 came out of the discussion rather than the original list.
 
-Ordered as they were given, not by priority; a suggested order is at the bottom.
+Each entry keeps what was asked for and what the code did at the time, because
+the reasoning is what makes the decisions checkable later. Where a decision was
+made, it says so with its date.
 
 ---
 
 ## 1. Delete every book, from Settings
+
+> **Done** — commit `aacf5d4` — Preferences → *Danger zone*. Typed-word confirmation, trashes locally, offers *Empty trash* straight after.
 
 **Asked for.** An option hidden inside Settings that deletes all books, local
 *and* remote, behind a confirmation dialog so it can't be hit by mistake.
@@ -47,6 +49,8 @@ copies too" is properly answered.
 
 ## 2. The "Move to trash" button sits under Android's navigation bar
 
+> **Done** — commit `f95f569` — `pageInsets()` applied to all 16 page-level scroll views.
+
 **Asked for.** On Android the button is behind the system navigation buttons.
 Move it up, or make the page taller so it fits.
 
@@ -70,6 +74,8 @@ Grepping for `EdgeInsets.all(` on a page-level `ListView` would find them.
 
 ## 3. Make the message after deleting a book dismissible by tapping
 
+> **Done** — commit `592d413` — the gesture wraps the message, not the bar, so *Undo* still undoes.
+
 **Asked for.** The bar shown after deleting a book (and similar) should be
 tappable to dismiss, so it can be got rid of faster.
 
@@ -89,6 +95,8 @@ has to undo, not merely dismiss.
 ---
 
 ## 4. Select several books and act on them at once (Android especially)
+
+> **Done** — commit `fbd3675` — long-press or right-click to start; trash and move/add-to-shelf.
 
 **Asked for.** A way to select books in the library and then do a batch job —
 delete, or move them to another library inside the app.
@@ -162,6 +170,8 @@ about what counts as a duplicate.
 
 ## 6. Simplify the console's look
 
+> **Done** — the console CSS was rewritten minimalist (paper/ink palette, hairline rules, one accent).
+
 **Asked for.** Modify the CSS — or whatever changed — to something a little
 simpler.
 
@@ -180,6 +190,8 @@ it safe to do alongside item 7 without the two conflicting.
 ---
 
 ## 7. Put the many buttons into menus
+
+> **Done** — the header has Refresh + a **Manage** menu, the toolbar Add book + search + a **Library** menu, and selection actions appear only when something is selected.
 
 **Asked for.** There are lots of buttons; group the complicated ones into a
 menu.
@@ -204,6 +216,8 @@ together.
 ---
 
 ## 8. A sync dialogue: choose what syncs
+
+> **Done** — commit `634510d` — `SyncScope` threaded through every pass. **Not done:** un-publishing what is already on the server, which needs endpoints only reading position has.
 
 **Asked for.** Instead of "everything or nothing", a dialogue where you pick
 which resources sync — books, physical copies, loans, and so on.
@@ -248,6 +262,8 @@ reaches the server become separate, explicit choices.
 ---
 
 ## 9. Rooms shared with you are invisible in the app
+
+> **Done** — commit `c79c0cb` — read-only mirror, answering the open question in favour of mirroring rather than copying.
 
 **Found while answering "how does the rooms feature work?"** — not asked for, but
 it is a gap rather than a preference.
@@ -472,23 +488,21 @@ Three mitigations, designed in rather than bolted on:
 
 ---
 
-## Suggested order
+## What is left
 
-1. **#2** — a real bug with a known one-line fix, on the platform it was
-   reported from.
-2. **#3** — small, and improves every message in the app at once.
-3. **#7 + #6** — together; the console is the thing two of the seven items are
-   about.
-4. **#4** — the largest app-side piece, and worth doing after #7 so the two
-   selection models can be designed to match.
-5. **#1** — small now that it is scoped to a local trash, and the trash makes it
-   forgiving.
-6. **#8** — after #1, since the two share the question of what "my library"
-   consists of, and #8 is the one that answers it properly.
-7. **#9** — small once its one question is answered, and it closes a gap where
-   the browser currently shows more than the app does.
-8. **#5** — last, and in the three stages above rather than as one piece: it is
-   larger than everything else here put together.
+The order below was followed: #2, #3, #7+#6, #4, #1, #8, #9 are all in. What
+remains:
+
+- **#5 — the import wizard in the console.** Larger than everything else here
+  put together, and worth doing in the three stages above rather than as one
+  piece. The duplicate check should run server-side and be shared with the app's
+  importer, or the two will disagree about what counts as a duplicate.
+- **#8's un-publish half.** Switching a resource off stops it syncing from now
+  on; it does not reach back for what is already on the server. Doing that needs
+  a bulk forget endpoint per resource — reading position is the only one that
+  has one today (`forgetDevice`). The screen says so rather than leaving it to
+  be discovered.
+- **#10 and #11 — the room.** See below.
 
 **#10 and #11** sit outside this order. Their cheap first stages — the room's own
 wall, floor and shadows (#10), and bookcase templates (#11) — are small enough to
