@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 use crate::auth::AuthUser;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 /// One row the caller is thinking of importing.
 #[derive(Deserialize)]
@@ -48,6 +48,15 @@ pub struct Candidate {
 pub struct CheckInput {
     pub candidates: Vec<Candidate>,
 }
+
+/// The most rows one call may ask about.
+///
+/// The matching below is quadratic in the worst arm — every candidate against
+/// every visible book — so an uncapped list is a denial of service an ordinary
+/// member can trigger: 5,000 candidates against a 200-book library measured at
+/// 11 seconds of CPU, and it scales with both. A real catalogue import sends
+/// its rows in batches anyway, so this costs nothing legitimate.
+const MAX_CANDIDATES: usize = 1000;
 
 /// Why a candidate looks like something already in the library. Ordered
 /// strongest first, which is the order the caller should trust them in.
@@ -80,6 +89,12 @@ pub async fn check(
     user: AuthUser,
     Json(input): Json<CheckInput>,
 ) -> AppResult<Json<Vec<Verdict>>> {
+    if input.candidates.len() > MAX_CANDIDATES {
+        return Err(AppError::BadRequest(format!(
+            "too many rows in one check ({}); send at most {MAX_CANDIDATES} at a time",
+            input.candidates.len()
+        )));
+    }
     // Only books the caller can see: a collision they have no access to is not
     // information they are entitled to, and importing "again" is the right
     // outcome for a book that is not theirs.
@@ -97,35 +112,49 @@ pub async fn check(
     let authors = crate::books::author_map_for(&state, &ids).await?;
     let hashes = file_hashes_for(&state, &ids).await?;
 
+    // The two *certain* signals are exact equality, so they go in a map and
+    // cost one lookup each instead of a pass over the library. Only the fuzzy
+    // title arm has to compare against everything, which is what MAX_CANDIDATES
+    // bounds.
+    let mut by_sha: std::collections::HashMap<&str, (&String, &String)> = Default::default();
+    let mut by_isbn: std::collections::HashMap<String, (&String, &String)> = Default::default();
+    for (id, title, isbn) in &existing {
+        if let Some(shas) = hashes.get(id) {
+            for sha in shas {
+                by_sha.entry(sha.as_str()).or_insert((id, title));
+            }
+        }
+        if let Some(normalized) = normalize_isbn(isbn.as_deref()) {
+            by_isbn.entry(normalized).or_insert((id, title));
+        }
+    }
+
     let mut verdicts = Vec::with_capacity(input.candidates.len());
     for c in &input.candidates {
         let mut best: Option<(Reason, &String, &String)> = None;
 
-        for (id, title, isbn) in &existing {
-            let reason = if let (Some(want), Some(have)) = (&c.sha256, hashes.get(id))
-                && have.contains(want)
-            {
-                Some(Reason::SameFile)
-            } else if let (Some(a), Some(b)) = (
-                normalize_isbn(c.isbn.as_deref()),
-                normalize_isbn(isbn.as_deref()),
-            ) && a == b
-            {
-                Some(Reason::SameIsbn)
-            } else if titles_match(&c.title, title)
-                && authors_agree(
-                    &c.authors,
-                    authors.get(id).map(|v| v.as_slice()).unwrap_or(&[]),
-                )
-            {
-                Some(Reason::SimilarTitle)
-            } else {
-                None
-            };
-            if let Some(reason) = reason
-                && best.as_ref().is_none_or(|(b, _, _)| reason < *b)
-            {
-                best = Some((reason, id, title));
+        if let Some(sha) = c.sha256.as_deref()
+            && let Some((id, title)) = by_sha.get(sha)
+        {
+            best = Some((Reason::SameFile, id, title));
+        }
+        if best.is_none()
+            && let Some(isbn) = normalize_isbn(c.isbn.as_deref())
+            && let Some((id, title)) = by_isbn.get(&isbn)
+        {
+            best = Some((Reason::SameIsbn, id, title));
+        }
+        if best.is_none() {
+            for (id, title, _) in &existing {
+                if titles_match(&c.title, title)
+                    && authors_agree(
+                        &c.authors,
+                        authors.get(id).map(|v| v.as_slice()).unwrap_or(&[]),
+                    )
+                {
+                    best = Some((Reason::SimilarTitle, id, title));
+                    break;
+                }
             }
         }
 
@@ -157,10 +186,23 @@ async fn file_hashes_for(
     if ids.is_empty() {
         return Ok(out);
     }
-    let rows: Vec<(String, String)> =
-        sqlx::query_as("SELECT book_id, sha256 FROM book_file WHERE sha256 <> ''")
-            .fetch_all(&state.db)
-            .await?;
+    // Scoped to the books the caller can see. It used to read every row in the
+    // table: harmless as written, because the map is only ever indexed by a
+    // visible id — and one careless edit away from handing back a collision
+    // with somebody else's book.
+    let mut sql =
+        String::from("SELECT book_id, sha256 FROM book_file WHERE sha256 <> '' AND book_id IN (");
+    sql.push_str(
+        &std::iter::repeat_n("?", ids.len())
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+    sql.push(')');
+    let mut query = sqlx::query_as::<_, (String, String)>(&sql);
+    for id in ids {
+        query = query.bind(id);
+    }
+    let rows: Vec<(String, String)> = query.fetch_all(&state.db).await?;
     for (book_id, sha) in rows {
         out.entry(book_id).or_default().push(sha);
     }

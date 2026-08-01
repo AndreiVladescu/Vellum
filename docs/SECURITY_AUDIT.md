@@ -1,6 +1,7 @@
 # Vellum — Security Audit
 
-**Date:** 2026-07-11
+**Last reviewed:** 2026-08-01 (see *Second review* below)
+**First audit:** 2026-07-11
 **Scope:** `server/` (Rust axum + sqlx sync backend) and `app/` (Flutter client),
 including authentication, RBAC, blob/upload handling, the web console, sync, and
 third-party dependency versions.
@@ -45,6 +46,11 @@ environment — running them is a recommendation below.
 | L6 | 🟡 | ✅ Hardened (2026-07-25) | Untrusted-PDF cover render shells out to `gs`/`mutool`/`pdftoppm` | `server/src/blobs.rs` |
 | P1 | 🟡 | ✅ Fixed (2026-07-28) | Annotation tombstones readable by every account via the unscoped `/deletions` | `server/src/books.rs` |
 | P2 | 🔵 | ✅ Fixed (2026-07-28) | Avatar upload's stated 4 MB cap unreachable behind axum's 2 MB default | `server/src/lib.rs` |
+| S1 | 🔴 | ✅ Fixed (2026-08-01) | Arbitrary file **write** outside the data directory via a client-chosen id | `server/src/books.rs`, `blobs.rs`, `physical_copies.rs` |
+| S2 | 🟠 | ✅ Fixed (2026-08-01) | Unbounded quadratic work in `/api/import/check` (authenticated DoS) | `server/src/import_check.rs` |
+| S3 | 🟡 | ✅ Fixed (2026-08-01) | Duplicate check read every `book_file` row regardless of visibility | `server/src/import_check.rs` |
+| S4 | 🟡 | ✅ Fixed (2026-08-01) | Tombstones keyed by id alone, so a cross-kind collision would silently overwrite | `server/migrations/0025_deletion_key.sql` |
+| S5 | 🔵 | ℹ️ Accepted | Console interpolates ids into inline `onclick` handlers | `server/web/console.js` |
 
 > **Remediation note (2026-07-11):** H1, M1, M2 (destructive, low-effort) plus a
 > second round — M3 (opt-in), M4, L3, L4 — have been hardened (see the ✅ notes in
@@ -439,7 +445,7 @@ These are genuine strengths worth preserving:
 
 ---
 
-## Prioritized remediation checklist
+## Prioritized remediation checklist *(from the first audit — all now done)*
 
 1. **H1** — Stop accepting/serving a client-controlled `cover_path`; restrict
    cover paths to server-generated `covers/<uuid>.<ext>`. *(highest priority)*
@@ -448,12 +454,147 @@ These are genuine strengths worth preserving:
    them as filesystem paths on the app side.
 4. **M3** — Add a bootstrap secret and/or document register-before-expose.
 5. **M4** — Wire `cargo audit` + `flutter pub outdated` into CI; plan
-   `flutter_secure_storage` 9→10.
+   `flutter_secure_storage` 9→10. *(`cargo audit` and `osv-scanner` both run in
+   CI as of 2026-08-01; the latter covers Dart, Rust, Actions and Docker.)*
 6. **L1–L6** — Address as defense-in-depth: security headers, per-IP login cap,
    keyring-unavailable warning, and sandboxing the PDF render subprocesses.
 
-*Rounds 1–2 reflect the code at commit `b4fa85f`; round 3 at `2fb63f4` (branch
-`main`). It is a
-best-effort manual review, not a guarantee of completeness; a follow-up with
-`cargo audit`, dependency scanning, and fuzzing of the upload/parse paths is
-recommended.*
+*Rounds 1–2 reflect the code at commit `b4fa85f`; round 3 at `2fb63f4`.*
+
+---
+
+# Second review — 2026-08-01
+
+**Scope:** everything added since the first audit — the personal-data channel
+(annotations, sittings, notes, profile photos), copy photos, the un-publish
+endpoints, the shared duplicate check and the console import wizard, room
+layouts and props, plus a re-read of the id → filesystem paths across the whole
+server.
+
+**Method:** manual source review, plus this time the automated scanning the
+first audit could only recommend: `cargo audit` and `osv-scanner` both run in
+CI, the latter covering the Flutter, Rust, GitHub Actions and Docker dependency
+sets from one advisory database. Each finding below was **reproduced before
+being fixed** — S1 by writing a file outside the data directory, S2 by timing a
+request. Still no fuzzing.
+
+## 🔴 S1 — Arbitrary file write outside the data directory
+
+**Where:** any handler interpolating a path parameter into a path —
+`covers/{id}.{ext}` in `blobs.rs`, `copy-photos/{id}` in `physical_copies.rs`.
+
+**What.** Sync is id-driven: `PUT /books/{id}` creates a book under whatever id
+the caller picks. axum percent-decodes a captured path segment, so
+`..%2F..%2Fescaped` arrives at the handler as `../../escaped`. Creating a book
+with that id and then uploading its cover wrote the file **outside the store** —
+demonstrated landing at `/tmp/escaped.png` from a data directory two levels
+below it. Any account with edit rights could write anywhere the server process
+could write, which on a typical deployment includes the database itself.
+
+This is the sibling of H1 from the first audit. H1 was the *body* field
+(`cover_path`) and was fixed; the id in the *URL* reaches the same place and was
+missed, because the two look nothing alike at the call site.
+
+**Fixed** in `1f14fa5`, in two layers:
+
+- `ids::reject_smuggled_separators`, middleware that runs before any handler and
+  refuses a path segment whose percent-decoded form contains `/`, `\` or NUL, or
+  is `.`/`..`. Wildcard routes are unaffected: their separators are real ones in
+  the URL, not smuggled inside a segment.
+- `ids::check`, a whitelist (`[A-Za-z0-9._-]`, 1–128 chars, not `.`/`..`) applied
+  at every handler that accepts a client-chosen id, so nothing hostile reaches
+  the database either.
+
+`tests/path_safety.rs` pins the attack and that ordinary ids — uuids, `book-1`,
+`A_book.2` — still work.
+
+## 🟠 S2 — Unbounded quadratic work in the duplicate check
+
+**Where:** `import_check.rs::check`.
+
+**What.** `POST /api/import/check` accepted an unbounded `candidates` array and
+compared each one against every visible book, with a Levenshtein distance in the
+worst arm. Measured: **5,000 candidates against a 200-book library took 11.5
+seconds** of CPU on an async worker, and it scales with both sides. Any member
+could repeat it; no rate limit applied.
+
+**Fixed** by capping a request at 1,000 rows — a real import batches anyway — and
+by indexing the two *exact* signals (file hash, ISBN) into maps, so only the
+fuzzy title arm still touches the whole library. The same 1,000-row batch now
+answers in well under a second. `tests/import_check.rs` asserts both the refusal
+and that a legitimate batch stays fast.
+
+## 🟡 S3 — Duplicate check read every file hash on the server
+
+**Where:** `import_check.rs::file_hashes_for`.
+
+**What.** The query selected every row of `book_file` regardless of who could
+see the book, ignoring the `ids` argument it was given. Not a disclosure as
+written — the map is only ever indexed by a visible id — but it loaded other
+accounts' file hashes into memory on every call, and was one careless edit away
+from reporting a collision with somebody else's book.
+
+**Fixed:** the query is now bound to the visible ids.
+
+## 🟡 S4 — Tombstones keyed by id alone
+
+**Where:** the `deletion` table, keyed by `book_id` since migration 0005.
+
+**What.** The table grew a `kind` and came to hold tombstones for seven kinds of
+thing, but kept a primary key that assumed an id could only be deleted once
+across all of them. Every write site is an `INSERT OR REPLACE`/`ON CONFLICT`, so
+a cross-kind collision would not error — it would silently overwrite the other
+kind's tombstone and resurrect a deleted row on the next pull. Ids are UUIDs, so
+nothing has collided in practice.
+
+**Fixed** in migration 0025: rebuilt with `PRIMARY KEY (kind, entity_id)`. Wire
+format unchanged. Verified against a copy of a live database.
+
+## 🔵 S5 — Console interpolates ids into inline handlers *(accepted)*
+
+`console.js` builds `onclick="titleClick('${b.id}')"` — an id inside a JS string
+inside an HTML attribute, with no escaping suitable for that context. It is not
+currently reachable: since S1, the server refuses any id outside
+`[A-Za-z0-9._-]`, so no quote or angle bracket can get into one.
+
+Left as is because the correct fix is data attributes and event delegation
+throughout the console, which is a refactor rather than a patch, and the id
+whitelist is a hard boundary rather than an escaping trick. **If that whitelist
+is ever relaxed, this becomes stored XSS in the admin console** — that sentence
+is the reason this finding is recorded rather than dropped.
+
+## Positive controls confirmed this round
+
+- **The personal-data channel is scoped by `user_id` from the token
+  everywhere**, including the separate `/annotations/deletions` endpoint added
+  after P1. A shared library holds several people's highlights in the same book
+  without any of them seeing the others'.
+- **Un-publish (`DELETE /api/mine/{resource}`) is scoped to the caller in every
+  case** — library data through the books they own, personal data by `user_id` —
+  and the master is deliberately *not* treated as owning everything, so
+  "forget my loans" from the master account means theirs. Pinned by tests that
+  seed two accounts and assert the other's rows survive.
+- **The duplicate check does not report a collision in a book the caller cannot
+  see**, which would disclose both its existence and its title.
+- **The console import wizard escapes every field it renders** (title, authors,
+  file name, and the matched book's title).
+- **The import wizard's file uploads go through the existing magic-byte check**,
+  so a renamed executable is refused as it always was.
+- **Bearer tokens, not cookies**, so none of these state-changing endpoints is
+  CSRF-reachable.
+
+## Still not done
+
+- **No fuzzing** of the upload and parse paths (EPUB zip, PDF, images). This
+  remains the largest untested surface and the recommendation carries over.
+- **No dynamic testing** against a running server beyond the reproductions above
+  and the end-to-end sync test in CI.
+- **The PDF render shell-outs** (`gs`, `mutool`, `pdftoppm`) are bounded by a
+  timeout and a semaphore but are not sandboxed. Unchanged since L6.
+- **`spin` 0.9.8 is yanked** and reachable only as a transitive dependency;
+  `cargo audit` reports it as a warning. No action available until upstream
+  moves.
+
+*This round reflects the code at commit `1ec3fc3` on `main`. As before: a
+best-effort manual review by the same author as the code, which is a real
+limitation and the reason the fuzzing recommendation keeps repeating.*

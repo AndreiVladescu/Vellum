@@ -266,3 +266,70 @@ async fn a_collision_in_a_book_you_cannot_see_is_not_reported() {
         body[0]
     );
 }
+
+/// An oversized list is refused rather than served slowly.
+///
+/// Before the cap, 5,000 candidates against a 200-book library took 11 seconds
+/// of CPU on the async runtime, repeatable by any member — a denial of service
+/// with no special conditions at all.
+#[tokio::test]
+async fn an_oversized_check_is_refused_rather_than_ground_through() {
+    let app = app().await;
+    let token = register(&app, "master@lib.test").await;
+    for i in 0..200 {
+        call(
+            &app,
+            "PUT",
+            &format!("/api/books/b{i}"),
+            Some(&token),
+            Some(json!({ "title": format!("Some Book Number {i}"), "authors": ["An Author"] })),
+        )
+        .await;
+    }
+    let candidates: Vec<serde_json::Value> = (0..5000)
+        .map(|i| {
+            json!({ "key": i.to_string(), "title": format!("Another Title {i}"),
+                         "authors": ["An Author"] })
+        })
+        .collect();
+
+    let start = std::time::Instant::now();
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/import/check",
+        Some(&token),
+        Some(json!({ "candidates": candidates })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    // And it says so quickly — the point is that the work never starts.
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(2),
+        "took {:?} to refuse",
+        start.elapsed()
+    );
+
+    // A batch inside the cap still works, and is fast.
+    let ok: Vec<serde_json::Value> = (0..1000)
+        .map(|i| {
+            json!({ "key": i.to_string(), "title": format!("Another Title {i}"),
+                         "authors": ["An Author"] })
+        })
+        .collect();
+    let start = std::time::Instant::now();
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/import/check",
+        Some(&token),
+        Some(json!({ "candidates": ok })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(5),
+        "a legitimate batch took {:?}",
+        start.elapsed()
+    );
+}
