@@ -240,5 +240,55 @@
   "@commandsTooltip": {
     "description": "Tooltip on the command-palette button; the shortcut is e.g. Ctrl+K.",
     "placeholders": { "shortcut": { "type": "String" } }
+  },
+
+  "selectionCount": "{count} selected",
+  "@selectionCount": {
+    "description": "Contextual app-bar title while books are selected on the shelf.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "putOnShelf": "Put on a shelf",
+  "@putOnShelf": {
+    "description": "Batch action: place the selected books on a shelf."
+  },
+
+  "moveToTrash": "Move to trash",
+  "@moveToTrash": {
+    "description": "Batch action: send the selected books to the trash."
+  },
+
+  "undo": "Undo",
+  "@undo": {
+    "description": "Undoes the action a message just reported."
+  },
+
+  "trashedBooks": "{count, plural, =1{Moved 1 book to the trash} other{Moved {count} books to the trash}}",
+  "@trashedBooks": {
+    "description": "Confirmation after trashing a selection. ICU plural, for the reason syncIssues exists.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "noShelvesYet": "You have no shelves yet — make one first.",
+  "@noShelvesYet": {
+    "description": "Shown when a batch shelf action is attempted with no shelves to put books on."
+  },
+
+  "movedToShelf": "Moved {count} to {shelf}",
+  "@movedToShelf": {
+    "description": "Confirmation after moving books onto a shelf, off the one being viewed.",
+    "placeholders": {
+      "count": { "type": "int" },
+      "shelf": { "type": "String" }
+    }
+  },
+
+  "addedToShelf": "Added {count} to {shelf}",
+  "@addedToShelf": {
+    "description": "Confirmation after adding books to a shelf without taking them off another.",
+    "placeholders": {
+      "count": { "type": "int" },
+      "shelf": { "type": "String" }
+    }
   }
 }

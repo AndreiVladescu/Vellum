@@ -753,6 +753,7 @@ class _LibraryPageState extends State<LibraryPage> {
   /// operate on the selection, and leaving the search visible would invite a
   /// filter change that silently alters what "the selection" means.
   PreferredSizeWidget _selectionBar() {
+    final l10n = L10n.of(context);
     final count = _selection.length;
     return AppBar(
       leading: IconButton(
@@ -760,16 +761,16 @@ class _LibraryPageState extends State<LibraryPage> {
         tooltip: MaterialLocalizations.of(context).cancelButtonLabel,
         onPressed: () => setState(_selection.clear),
       ),
-      title: Text('$count selected'),
+      title: Text(l10n.selectionCount(count)),
       actions: [
         IconButton(
           icon: const Icon(Icons.playlist_add),
-          tooltip: 'Put on a shelf',
+          tooltip: l10n.putOnShelf,
           onPressed: _moveSelectionToShelf,
         ),
         IconButton(
           icon: const Icon(Icons.delete_outline),
-          tooltip: 'Move to trash',
+          tooltip: l10n.moveToTrash,
           onPressed: _trashSelection,
         ),
       ],
@@ -787,6 +788,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<void> _trashSelection() async {
     final ids = _selection.toList();
+    final l10n = L10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     for (final id in ids) {
       await repository.trashBook(id);
@@ -794,13 +796,9 @@ class _LibraryPageState extends State<LibraryPage> {
     if (!mounted) return;
     setState(_selection.clear);
     messenger.showSnackBar(appSnackBar(
-      content: Text(
-        ids.length == 1
-            ? 'Moved 1 book to the trash'
-            : 'Moved ${ids.length} books to the trash',
-      ),
+      content: Text(l10n.trashedBooks(ids.length)),
       action: SnackBarAction(
-        label: 'Undo',
+        label: l10n.undo,
         onPressed: () async {
           for (final id in ids) {
             await repository.trash.restore(id);
@@ -815,12 +813,13 @@ class _LibraryPageState extends State<LibraryPage> {
   /// you are looking at a shelf, and from the whole library there is nothing to
   /// leave. Decided in next features #4.
   Future<void> _moveSelectionToShelf() async {
+    final l10n = L10n.of(context);
     final fromShelfId = widget.settings.selectedShelfId;
     final shelves = await repository.watchShelves().first;
     if (!mounted) return;
     if (shelves.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(appSnackBar(
-        content: const Text('You have no shelves yet — make one first.'),
+        content: Text(l10n.noShelvesYet),
       ));
       return;
     }
@@ -848,9 +847,10 @@ class _LibraryPageState extends State<LibraryPage> {
     }
     if (!mounted) return;
     setState(_selection.clear);
-    final verb = choice.move ? 'Moved' : 'Added';
     ScaffoldMessenger.of(context).showSnackBar(appSnackBar(
-      content: Text('$verb ${books.length} to ${choice.shelf.name}'),
+      content: Text(choice.move
+          ? l10n.movedToShelf(books.length, choice.shelf.name)
+          : l10n.addedToShelf(books.length, choice.shelf.name)),
     ));
   }
 
