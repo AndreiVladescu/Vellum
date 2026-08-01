@@ -27,6 +27,7 @@ import 'placement_toolbar.dart';
 import 'room_backdrop.dart';
 import 'room_measure.dart';
 import 'room_painter.dart';
+import 'room_prop.dart';
 import 'room_semantics.dart';
 import 'settle.dart';
 import 'shelf_snap.dart';
@@ -81,6 +82,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   // Latest stream data, so gesture callbacks can hit-test.
   List<PhysicalShelf> _shelves = const [];
   List<PlacedBook> _placed = const [];
+  List<RoomProp> _props = const [];
+
+  /// The prop being dragged, and where it currently is. Kept separate from the
+  /// book drag: a prop has no placement, no copy and no rotation, and merging
+  /// the two paths would mean a null check on every line of both.
+  String? _dragPropId;
+  Offset _propDragPos = Offset.zero;
 
   String? _selectedId;
 
@@ -345,10 +353,40 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       return;
     }
     // Topmost book under the finger, if any.
+    final dragPropId = _dragPropId;
     _dragId = null;
     _dragShelfId = null;
+    _dragPropId = null;
     _dragGroup = const [];
     _ridingIds = const {};
+
+    // A released prop settles like a book: onto the highest surface beneath it,
+    // nudged clear of whatever is already there. Dropped in mid-air it goes
+    // back where it came from rather than floating, because unlike a book there
+    // is no "not on a shelf any more" state for it to fall into.
+    if (dragPropId != null) {
+      final prop = _props.firstWhere((p) => p.id == dragPropId);
+      if (_moved) {
+        final settled = _settle(
+          draggedId: prop.id,
+          x: _propDragPos.dx,
+          y: _propDragPos.dy,
+          w: prop.widthM,
+          h: prop.heightM,
+        );
+        if (settled.onSurface) {
+          () async {
+            await repo.layout.moveProp(
+              prop.id,
+              x: settled.pos.dx,
+              y: settled.pos.dy,
+            );
+          }();
+        }
+      }
+      setState(() {});
+      return;
+    }
     for (final pb in _placed.reversed) {
       if (_screenRectOf(pb).contains(focal)) {
         _dragId = pb.placement.id;
@@ -358,9 +396,21 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         break;
       }
     }
+    // A prop, before the shelf it is standing on — it is drawn on top, so it
+    // should be grabbed first.
+    if (_dragId == null) {
+      for (final prop in _props.reversed) {
+        if (_propRect(prop).contains(focal)) {
+          _dragPropId = prop.id;
+          _propDragPos = Offset(prop.x, prop.y);
+          _grabWorld = _screenToWorld(focal) - _propDragPos;
+          break;
+        }
+      }
+    }
     // Otherwise a shelf — any shelf can be dragged, and the books resting on it
     // ride along (captured here so they follow live and persist on release).
-    if (_dragId == null) {
+    if (_dragId == null && _dragPropId == null) {
       for (final s in _shelves.reversed) {
         if (_shelfHitRect(s).contains(focal)) {
           _dragShelfId = s.id;
@@ -389,7 +439,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       setState(() => _measureTo = _screenToWorld(focal));
       return;
     }
-    final draggingItem = _dragId != null || _dragShelfId != null;
+    final draggingItem =
+        _dragId != null || _dragShelfId != null || _dragPropId != null;
     if (d.scale != 1.0 || d.pointerCount >= 2 || !draggingItem) {
       // Pan + zoom the camera, anchoring the world point grabbed at start.
       final newScale = (_camStartScale * d.scale).clamp(_minScale, _maxScale);
@@ -400,6 +451,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           focal.dy + _camWorldFocal.dy * newScale,
         );
       });
+      _moved = true;
+      return;
+    }
+    if (_dragPropId != null) {
+      // A prop is one widget with no riders, so a plain setState is cheap
+      // enough — the book path needs a notifier because it also moves an
+      // overlay and everything resting on the shelf.
+      setState(() => _propDragPos = _screenToWorld(focal) - _grabWorld);
       _moved = true;
       return;
     }
@@ -443,10 +502,40 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       for (final pb in _placed)
         if (_ridingIds.contains(pb.placement.id)) pb,
     ];
+    final dragPropId = _dragPropId;
     _dragId = null;
     _dragShelfId = null;
+    _dragPropId = null;
     _dragGroup = const [];
     _ridingIds = const {};
+
+    // A released prop settles like a book: onto the highest surface beneath it,
+    // nudged clear of whatever is already there. Dropped in mid-air it goes
+    // back where it came from rather than floating, because unlike a book there
+    // is no "not on a shelf any more" state for it to fall into.
+    if (dragPropId != null) {
+      final prop = _props.firstWhere((p) => p.id == dragPropId);
+      if (_moved) {
+        final settled = _settle(
+          draggedId: prop.id,
+          x: _propDragPos.dx,
+          y: _propDragPos.dy,
+          w: prop.widthM,
+          h: prop.heightM,
+        );
+        if (settled.onSurface) {
+          () async {
+            await repo.layout.moveProp(
+              prop.id,
+              x: settled.pos.dx,
+              y: settled.pos.dy,
+            );
+          }();
+        }
+      }
+      setState(() {});
+      return;
+    }
 
     // Finished dragging a shelf: persist the shifted endpoints and carry every
     // book that was resting on it by the same delta, then settle.
@@ -563,6 +652,15 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             h: (s.y2 - s.y1).abs(),
           ),
     ];
+    // A prop standing on a shelf occupies shelf, so books nudge around it —
+    // but as a *barrier*, not as a surface. Handed over as an ordinary
+    // neighbour, `settle` would happily balance a paperback on a statuette's
+    // head, since anything with a top is somewhere to stack.
+    final propBoxes = [
+      for (final prop in _props)
+        if (prop.id != draggedId)
+          SettleBox(x: prop.x, y: prop.y, w: prop.widthM, h: prop.heightM),
+    ];
     final others = _placed
         .where((p) => p.placement.id != draggedId)
         .map((p) {
@@ -582,7 +680,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       h: h,
       shelves: shelves,
       others: others,
-      barriers: barriers,
+      barriers: [...barriers, ...propBoxes],
     );
     return (pos: Offset(r.x, r.y), onSurface: r.onSurface);
   }
@@ -646,6 +744,62 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   ///
   /// Dropped at the right-hand edge of what is already in the room, so a second
   /// bookcase stands beside the first rather than inside it.
+  /// Stands a prop in the room, settled onto whatever is under the middle of
+  /// the view — the same landing a book gets, so an ornament ends up *on* a
+  /// shelf rather than hanging in the air.
+  Future<void> _addProp() async {
+    final kind = await showModalBottomSheet<PropKind>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Put something on a shelf',
+                  style: Theme.of(sheetContext).textTheme.titleMedium),
+            ),
+            for (final k in PropKind.values)
+              ListTile(
+                leading: SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: PropArt(
+                    kind: k,
+                    color: Theme.of(sheetContext).colorScheme.tertiary,
+                  ),
+                ),
+                title: Text(k.label),
+                subtitle: Text(
+                  '${formatDistance(k.width)} × ${formatDistance(k.height)}',
+                ),
+                onTap: () => Navigator.pop(sheetContext, k),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (kind == null || _origin == null || !mounted) return;
+
+    final size = context.size ?? const Size(400, 600);
+    final centre = _screenToWorld(Offset(size.width / 2, size.height / 2));
+    final settled = _settle(
+      draggedId: '',
+      x: centre.dx - kind.width / 2,
+      y: centre.dy,
+      w: kind.width,
+      h: kind.height,
+    );
+    await repo.layout.addProp(
+      widget.environmentId,
+      kind: kind,
+      x: settled.pos.dx,
+      y: settled.pos.dy,
+    );
+    if (mounted) _say('Added a ${kind.label.toLowerCase()}. Drag it to move it.');
+  }
+
   Future<void> _addBookcase() async {
     final spec = await showDialog<BookcaseSpec>(
       context: context,
@@ -1024,6 +1178,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         return;
       }
     }
+    for (final prop in _props.reversed) {
+      if (_propRect(prop).contains(local)) {
+        await _propMenu(prop, global);
+        return;
+      }
+    }
     for (final s in _shelves.reversed) {
       if (_shelfHitRect(s).contains(local)) {
         final picking = _grouping;
@@ -1069,6 +1229,24 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       case 'remove':
         await _removeSelected(pb);
     }
+  }
+
+  Future<void> _propMenu(RoomProp prop, Offset global) async {
+    final kind = PropKind.parse(prop.kind);
+    final choice = await showMenu<String>(
+      context: context,
+      position: _menuPosition(global),
+      items: [
+        PopupMenuItem(
+          value: 'remove',
+          child: Text('Remove the ${kind.label.toLowerCase()}'),
+        ),
+      ],
+    );
+    if (choice != 'remove') return;
+    await repo.layout.deleteProp(prop.id);
+    // Books that were pushed aside by it can spread back out.
+    await _applyGravity();
   }
 
   Future<void> _shelfMenu(PhysicalShelf s, Offset global) async {
@@ -1630,6 +1808,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             icon: const Icon(Icons.horizontal_rule),
           ),
           IconButton(
+            tooltip: 'Put something on a shelf',
+            onPressed: _addProp,
+            icon: const Icon(Icons.emoji_objects_outlined),
+          ),
+          IconButton(
             tooltip: 'Room contents',
             onPressed: _showRoomContents,
             icon: const Icon(Icons.format_list_bulleted),
@@ -1726,6 +1909,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
               stream: repo.layout.watchPlacedBooks(widget.environmentId),
               builder: (context, bookSnap) {
                 _placed = bookSnap.data ?? const [];
+                return StreamBuilder<List<RoomProp>>(
+                  stream: repo.layout.watchProps(widget.environmentId),
+                  builder: (context, propSnap) {
+                _props = propSnap.data ?? const [];
                 return LayoutBuilder(
                   builder: (context, constraints) {
                     _origin ??= Offset(40, constraints.maxHeight - 90);
@@ -1752,6 +1939,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                         ),
                       ),
                     );
+                  },
+                );
                   },
                 );
               },
@@ -1886,6 +2075,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             ),
           ),
         ),
+        // Props sit behind the books: an ornament pushed to the back of a
+        // shelf is the ordinary case, and a statuette in front of a spine you
+        // are trying to read is not.
+        for (final prop in _props) _propWidget(prop),
         // Books (each in its own RepaintBoundary; the one being dragged is
         // drawn as a live overlay instead of in this static list).
         for (final pb in _placed)
@@ -2062,6 +2255,38 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         },
       ),
     );
+  }
+
+  /// One prop, positioned and drawn. Dragging moves it; a long-press or a
+  /// right-click offers to take it away.
+  Widget _propWidget(RoomProp prop) {
+    final kind = PropKind.parse(prop.kind);
+    final dragging = _dragPropId == prop.id;
+    final at = dragging ? _propDragPos : Offset(prop.x, prop.y);
+    final topLeft = _worldToScreen(Offset(at.dx, at.dy + prop.heightM));
+    return Positioned(
+      left: topLeft.dx,
+      top: topLeft.dy,
+      width: prop.widthM * _scale,
+      height: prop.heightM * _scale,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: dragging ? 0.75 : 1,
+          child: PropArt(
+            kind: kind,
+            // The room's own colour rather than one of its own, so a shelf of
+            // ornaments reads as one scene instead of a collection of stickers.
+            color: Theme.of(context).colorScheme.tertiary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The screen box a prop occupies, for hit-testing.
+  Rect _propRect(RoomProp prop) {
+    final topLeft = _worldToScreen(Offset(prop.x, prop.y + prop.heightM));
+    return topLeft & Size(prop.widthM * _scale, prop.heightM * _scale);
   }
 
   /// The visual for a placed book: the same spine artwork as the digital shelf

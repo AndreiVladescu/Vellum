@@ -7516,6 +7516,508 @@ class BookPlacementsCompanion extends UpdateCompanion<BookPlacement> {
   }
 }
 
+class $RoomPropsTable extends RoomProps
+    with TableInfo<$RoomPropsTable, RoomProp> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoomPropsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _environmentIdMeta = const VerificationMeta(
+    'environmentId',
+  );
+  @override
+  late final GeneratedColumn<String> environmentId = GeneratedColumn<String>(
+    'environment_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES physical_environments (id)',
+    ),
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _xMeta = const VerificationMeta('x');
+  @override
+  late final GeneratedColumn<double> x = GeneratedColumn<double>(
+    'x',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _yMeta = const VerificationMeta('y');
+  @override
+  late final GeneratedColumn<double> y = GeneratedColumn<double>(
+    'y',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _widthMMeta = const VerificationMeta('widthM');
+  @override
+  late final GeneratedColumn<double> widthM = GeneratedColumn<double>(
+    'width_m',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _heightMMeta = const VerificationMeta(
+    'heightM',
+  );
+  @override
+  late final GeneratedColumn<double> heightM = GeneratedColumn<double>(
+    'height_m',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    environmentId,
+    kind,
+    x,
+    y,
+    widthM,
+    heightM,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'room_props';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoomProp> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('environment_id')) {
+      context.handle(
+        _environmentIdMeta,
+        environmentId.isAcceptableOrUnknown(
+          data['environment_id']!,
+          _environmentIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_environmentIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('x')) {
+      context.handle(_xMeta, x.isAcceptableOrUnknown(data['x']!, _xMeta));
+    } else if (isInserting) {
+      context.missing(_xMeta);
+    }
+    if (data.containsKey('y')) {
+      context.handle(_yMeta, y.isAcceptableOrUnknown(data['y']!, _yMeta));
+    } else if (isInserting) {
+      context.missing(_yMeta);
+    }
+    if (data.containsKey('width_m')) {
+      context.handle(
+        _widthMMeta,
+        widthM.isAcceptableOrUnknown(data['width_m']!, _widthMMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_widthMMeta);
+    }
+    if (data.containsKey('height_m')) {
+      context.handle(
+        _heightMMeta,
+        heightM.isAcceptableOrUnknown(data['height_m']!, _heightMMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_heightMMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RoomProp map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoomProp(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      environmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}environment_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      x: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}x'],
+      )!,
+      y: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}y'],
+      )!,
+      widthM: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}width_m'],
+      )!,
+      heightM: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}height_m'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RoomPropsTable createAlias(String alias) {
+    return $RoomPropsTable(attachedDatabase, alias);
+  }
+}
+
+class RoomProp extends DataClass implements Insertable<RoomProp> {
+  final String id;
+  final String environmentId;
+
+  /// A [PropKind] name. Text rather than an int so a database read by an older
+  /// build shows an unknown prop rather than the wrong one.
+  final String kind;
+  final double x;
+  final double y;
+
+  /// Its footprint in metres. Stored per prop rather than taken from the kind,
+  /// so one can be made bigger or smaller without every other one changing.
+  final double widthM;
+  final double heightM;
+  final DateTime createdAt;
+  const RoomProp({
+    required this.id,
+    required this.environmentId,
+    required this.kind,
+    required this.x,
+    required this.y,
+    required this.widthM,
+    required this.heightM,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['environment_id'] = Variable<String>(environmentId);
+    map['kind'] = Variable<String>(kind);
+    map['x'] = Variable<double>(x);
+    map['y'] = Variable<double>(y);
+    map['width_m'] = Variable<double>(widthM);
+    map['height_m'] = Variable<double>(heightM);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  RoomPropsCompanion toCompanion(bool nullToAbsent) {
+    return RoomPropsCompanion(
+      id: Value(id),
+      environmentId: Value(environmentId),
+      kind: Value(kind),
+      x: Value(x),
+      y: Value(y),
+      widthM: Value(widthM),
+      heightM: Value(heightM),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory RoomProp.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoomProp(
+      id: serializer.fromJson<String>(json['id']),
+      environmentId: serializer.fromJson<String>(json['environmentId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      x: serializer.fromJson<double>(json['x']),
+      y: serializer.fromJson<double>(json['y']),
+      widthM: serializer.fromJson<double>(json['widthM']),
+      heightM: serializer.fromJson<double>(json['heightM']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'environmentId': serializer.toJson<String>(environmentId),
+      'kind': serializer.toJson<String>(kind),
+      'x': serializer.toJson<double>(x),
+      'y': serializer.toJson<double>(y),
+      'widthM': serializer.toJson<double>(widthM),
+      'heightM': serializer.toJson<double>(heightM),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  RoomProp copyWith({
+    String? id,
+    String? environmentId,
+    String? kind,
+    double? x,
+    double? y,
+    double? widthM,
+    double? heightM,
+    DateTime? createdAt,
+  }) => RoomProp(
+    id: id ?? this.id,
+    environmentId: environmentId ?? this.environmentId,
+    kind: kind ?? this.kind,
+    x: x ?? this.x,
+    y: y ?? this.y,
+    widthM: widthM ?? this.widthM,
+    heightM: heightM ?? this.heightM,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  RoomProp copyWithCompanion(RoomPropsCompanion data) {
+    return RoomProp(
+      id: data.id.present ? data.id.value : this.id,
+      environmentId: data.environmentId.present
+          ? data.environmentId.value
+          : this.environmentId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      x: data.x.present ? data.x.value : this.x,
+      y: data.y.present ? data.y.value : this.y,
+      widthM: data.widthM.present ? data.widthM.value : this.widthM,
+      heightM: data.heightM.present ? data.heightM.value : this.heightM,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoomProp(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('kind: $kind, ')
+          ..write('x: $x, ')
+          ..write('y: $y, ')
+          ..write('widthM: $widthM, ')
+          ..write('heightM: $heightM, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, environmentId, kind, x, y, widthM, heightM, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoomProp &&
+          other.id == this.id &&
+          other.environmentId == this.environmentId &&
+          other.kind == this.kind &&
+          other.x == this.x &&
+          other.y == this.y &&
+          other.widthM == this.widthM &&
+          other.heightM == this.heightM &&
+          other.createdAt == this.createdAt);
+}
+
+class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
+  final Value<String> id;
+  final Value<String> environmentId;
+  final Value<String> kind;
+  final Value<double> x;
+  final Value<double> y;
+  final Value<double> widthM;
+  final Value<double> heightM;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const RoomPropsCompanion({
+    this.id = const Value.absent(),
+    this.environmentId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.x = const Value.absent(),
+    this.y = const Value.absent(),
+    this.widthM = const Value.absent(),
+    this.heightM = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RoomPropsCompanion.insert({
+    required String id,
+    required String environmentId,
+    required String kind,
+    required double x,
+    required double y,
+    required double widthM,
+    required double heightM,
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       environmentId = Value(environmentId),
+       kind = Value(kind),
+       x = Value(x),
+       y = Value(y),
+       widthM = Value(widthM),
+       heightM = Value(heightM);
+  static Insertable<RoomProp> custom({
+    Expression<String>? id,
+    Expression<String>? environmentId,
+    Expression<String>? kind,
+    Expression<double>? x,
+    Expression<double>? y,
+    Expression<double>? widthM,
+    Expression<double>? heightM,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (environmentId != null) 'environment_id': environmentId,
+      if (kind != null) 'kind': kind,
+      if (x != null) 'x': x,
+      if (y != null) 'y': y,
+      if (widthM != null) 'width_m': widthM,
+      if (heightM != null) 'height_m': heightM,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RoomPropsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? environmentId,
+    Value<String>? kind,
+    Value<double>? x,
+    Value<double>? y,
+    Value<double>? widthM,
+    Value<double>? heightM,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return RoomPropsCompanion(
+      id: id ?? this.id,
+      environmentId: environmentId ?? this.environmentId,
+      kind: kind ?? this.kind,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      widthM: widthM ?? this.widthM,
+      heightM: heightM ?? this.heightM,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (environmentId.present) {
+      map['environment_id'] = Variable<String>(environmentId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (x.present) {
+      map['x'] = Variable<double>(x.value);
+    }
+    if (y.present) {
+      map['y'] = Variable<double>(y.value);
+    }
+    if (widthM.present) {
+      map['width_m'] = Variable<double>(widthM.value);
+    }
+    if (heightM.present) {
+      map['height_m'] = Variable<double>(heightM.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoomPropsCompanion(')
+          ..write('id: $id, ')
+          ..write('environmentId: $environmentId, ')
+          ..write('kind: $kind, ')
+          ..write('x: $x, ')
+          ..write('y: $y, ')
+          ..write('widthM: $widthM, ')
+          ..write('heightM: $heightM, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $LocalDeletionsTable extends LocalDeletions
     with TableInfo<$LocalDeletionsTable, LocalDeletion> {
   @override
@@ -9613,6 +10115,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     this,
   );
   late final $BookPlacementsTable bookPlacements = $BookPlacementsTable(this);
+  late final $RoomPropsTable roomProps = $RoomPropsTable(this);
   late final $LocalDeletionsTable localDeletions = $LocalDeletionsTable(this);
   late final $RemoteReadingPositionsTable remoteReadingPositions =
       $RemoteReadingPositionsTable(this);
@@ -9640,6 +10143,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     physicalEnvironments,
     physicalShelves,
     bookPlacements,
+    roomProps,
     localDeletions,
     remoteReadingPositions,
     annotations,
@@ -15066,6 +15570,24 @@ final class $$PhysicalEnvironmentsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$RoomPropsTable, List<RoomProp>>
+  _roomPropsRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
+    db.roomProps,
+    aliasName: 'physical_environments__id__room_props__environment_id',
+  );
+
+  $$RoomPropsTableProcessedTableManager get roomPropsRefs {
+    final manager = $$RoomPropsTableTableManager(
+      $_db,
+      $_db.roomProps,
+    ).filter((f) => f.environmentId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_roomPropsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$PhysicalEnvironmentsTableFilterComposer
@@ -15188,6 +15710,31 @@ class $$PhysicalEnvironmentsTableFilterComposer
           }) => $$BookPlacementsTableFilterComposer(
             $db: $db,
             $table: $db.bookPlacements,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> roomPropsRefs(
+    Expression<bool> Function($$RoomPropsTableFilterComposer f) f,
+  ) {
+    final $$RoomPropsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.roomProps,
+      getReferencedColumn: (t) => t.environmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoomPropsTableFilterComposer(
+            $db: $db,
+            $table: $db.roomProps,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -15396,6 +15943,31 @@ class $$PhysicalEnvironmentsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> roomPropsRefs<T extends Object>(
+    Expression<T> Function($$RoomPropsTableAnnotationComposer a) f,
+  ) {
+    final $$RoomPropsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.roomProps,
+      getReferencedColumn: (t) => t.environmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoomPropsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.roomProps,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PhysicalEnvironmentsTableTableManager
@@ -15414,6 +15986,7 @@ class $$PhysicalEnvironmentsTableTableManager
           PrefetchHooks Function({
             bool physicalShelvesRefs,
             bool bookPlacementsRefs,
+            bool roomPropsRefs,
           })
         > {
   $$PhysicalEnvironmentsTableTableManager(
@@ -15512,12 +16085,17 @@ class $$PhysicalEnvironmentsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({physicalShelvesRefs = false, bookPlacementsRefs = false}) {
+              ({
+                physicalShelvesRefs = false,
+                bookPlacementsRefs = false,
+                roomPropsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (physicalShelvesRefs) db.physicalShelves,
                     if (bookPlacementsRefs) db.bookPlacements,
+                    if (roomPropsRefs) db.roomProps,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -15564,6 +16142,27 @@ class $$PhysicalEnvironmentsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (roomPropsRefs)
+                        await $_getPrefetchedData<
+                          PhysicalEnvironment,
+                          $PhysicalEnvironmentsTable,
+                          RoomProp
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PhysicalEnvironmentsTableReferences
+                              ._roomPropsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PhysicalEnvironmentsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).roomPropsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.environmentId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -15587,6 +16186,7 @@ typedef $$PhysicalEnvironmentsTableProcessedTableManager =
       PrefetchHooks Function({
         bool physicalShelvesRefs,
         bool bookPlacementsRefs,
+        bool roomPropsRefs,
       })
     >;
 typedef $$PhysicalShelvesTableCreateCompanionBuilder =
@@ -16529,6 +17129,384 @@ typedef $$BookPlacementsTableProcessedTableManager =
       (BookPlacement, $$BookPlacementsTableReferences),
       BookPlacement,
       PrefetchHooks Function({bool environmentId, bool copyId})
+    >;
+typedef $$RoomPropsTableCreateCompanionBuilder =
+    RoomPropsCompanion Function({
+      required String id,
+      required String environmentId,
+      required String kind,
+      required double x,
+      required double y,
+      required double widthM,
+      required double heightM,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$RoomPropsTableUpdateCompanionBuilder =
+    RoomPropsCompanion Function({
+      Value<String> id,
+      Value<String> environmentId,
+      Value<String> kind,
+      Value<double> x,
+      Value<double> y,
+      Value<double> widthM,
+      Value<double> heightM,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$RoomPropsTableReferences
+    extends BaseReferences<_$VellumDatabase, $RoomPropsTable, RoomProp> {
+  $$RoomPropsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PhysicalEnvironmentsTable _environmentIdTable(_$VellumDatabase db) =>
+      db.physicalEnvironments.createAlias(
+        'room_props__environment_id__physical_environments__id',
+      );
+
+  $$PhysicalEnvironmentsTableProcessedTableManager get environmentId {
+    final $_column = $_itemColumn<String>('environment_id')!;
+
+    final manager = $$PhysicalEnvironmentsTableTableManager(
+      $_db,
+      $_db.physicalEnvironments,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_environmentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$RoomPropsTableFilterComposer
+    extends Composer<_$VellumDatabase, $RoomPropsTable> {
+  $$RoomPropsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get x => $composableBuilder(
+    column: $table.x,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get y => $composableBuilder(
+    column: $table.y,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get widthM => $composableBuilder(
+    column: $table.widthM,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get heightM => $composableBuilder(
+    column: $table.heightM,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PhysicalEnvironmentsTableFilterComposer get environmentId {
+    final $$PhysicalEnvironmentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.environmentId,
+      referencedTable: $db.physicalEnvironments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhysicalEnvironmentsTableFilterComposer(
+            $db: $db,
+            $table: $db.physicalEnvironments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoomPropsTableOrderingComposer
+    extends Composer<_$VellumDatabase, $RoomPropsTable> {
+  $$RoomPropsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get x => $composableBuilder(
+    column: $table.x,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get y => $composableBuilder(
+    column: $table.y,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get widthM => $composableBuilder(
+    column: $table.widthM,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get heightM => $composableBuilder(
+    column: $table.heightM,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PhysicalEnvironmentsTableOrderingComposer get environmentId {
+    final $$PhysicalEnvironmentsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.environmentId,
+          referencedTable: $db.physicalEnvironments,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PhysicalEnvironmentsTableOrderingComposer(
+                $db: $db,
+                $table: $db.physicalEnvironments,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$RoomPropsTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $RoomPropsTable> {
+  $$RoomPropsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<double> get x =>
+      $composableBuilder(column: $table.x, builder: (column) => column);
+
+  GeneratedColumn<double> get y =>
+      $composableBuilder(column: $table.y, builder: (column) => column);
+
+  GeneratedColumn<double> get widthM =>
+      $composableBuilder(column: $table.widthM, builder: (column) => column);
+
+  GeneratedColumn<double> get heightM =>
+      $composableBuilder(column: $table.heightM, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$PhysicalEnvironmentsTableAnnotationComposer get environmentId {
+    final $$PhysicalEnvironmentsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.environmentId,
+          referencedTable: $db.physicalEnvironments,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PhysicalEnvironmentsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.physicalEnvironments,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$RoomPropsTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $RoomPropsTable,
+          RoomProp,
+          $$RoomPropsTableFilterComposer,
+          $$RoomPropsTableOrderingComposer,
+          $$RoomPropsTableAnnotationComposer,
+          $$RoomPropsTableCreateCompanionBuilder,
+          $$RoomPropsTableUpdateCompanionBuilder,
+          (RoomProp, $$RoomPropsTableReferences),
+          RoomProp,
+          PrefetchHooks Function({bool environmentId})
+        > {
+  $$RoomPropsTableTableManager(_$VellumDatabase db, $RoomPropsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RoomPropsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RoomPropsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RoomPropsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> environmentId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<double> x = const Value.absent(),
+                Value<double> y = const Value.absent(),
+                Value<double> widthM = const Value.absent(),
+                Value<double> heightM = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoomPropsCompanion(
+                id: id,
+                environmentId: environmentId,
+                kind: kind,
+                x: x,
+                y: y,
+                widthM: widthM,
+                heightM: heightM,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String environmentId,
+                required String kind,
+                required double x,
+                required double y,
+                required double widthM,
+                required double heightM,
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoomPropsCompanion.insert(
+                id: id,
+                environmentId: environmentId,
+                kind: kind,
+                x: x,
+                y: y,
+                widthM: widthM,
+                heightM: heightM,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$RoomPropsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({environmentId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (environmentId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.environmentId,
+                                referencedTable: $$RoomPropsTableReferences
+                                    ._environmentIdTable(db),
+                                referencedColumn: $$RoomPropsTableReferences
+                                    ._environmentIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$RoomPropsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $RoomPropsTable,
+      RoomProp,
+      $$RoomPropsTableFilterComposer,
+      $$RoomPropsTableOrderingComposer,
+      $$RoomPropsTableAnnotationComposer,
+      $$RoomPropsTableCreateCompanionBuilder,
+      $$RoomPropsTableUpdateCompanionBuilder,
+      (RoomProp, $$RoomPropsTableReferences),
+      RoomProp,
+      PrefetchHooks Function({bool environmentId})
     >;
 typedef $$LocalDeletionsTableCreateCompanionBuilder =
     LocalDeletionsCompanion Function({
@@ -17870,6 +18848,8 @@ class $VellumDatabaseManager {
       $$PhysicalShelvesTableTableManager(_db, _db.physicalShelves);
   $$BookPlacementsTableTableManager get bookPlacements =>
       $$BookPlacementsTableTableManager(_db, _db.bookPlacements);
+  $$RoomPropsTableTableManager get roomProps =>
+      $$RoomPropsTableTableManager(_db, _db.roomProps);
   $$LocalDeletionsTableTableManager get localDeletions =>
       $$LocalDeletionsTableTableManager(_db, _db.localDeletions);
   $$RemoteReadingPositionsTableTableManager get remoteReadingPositions =>

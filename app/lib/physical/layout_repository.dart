@@ -7,6 +7,7 @@ import '../data/database.dart';
 import '../data/physical_service.dart';
 import 'locate.dart';
 import 'bookcase_template.dart';
+import 'room_prop.dart';
 import 'room_measure.dart';
 
 /// A placement joined with the book it shows, for rendering an environment.
@@ -180,6 +181,11 @@ class LayoutRepository {
       }
       await (db.delete(db.physicalShelves)
             ..where((s) => s.environmentId.equals(id)))
+          .go();
+      // Props reference the room with no ON DELETE cascade, and foreign keys
+      // are enforced — exactly the trap copy photos fell into, where deleting a
+      // photographed book aborted on the constraint.
+      await (db.delete(db.roomProps)..where((p) => p.environmentId.equals(id)))
           .go();
       await (db.delete(db.physicalEnvironments)..where((e) => e.id.equals(id)))
           .go();
@@ -572,6 +578,58 @@ class LayoutRepository {
     });
     await markDirty(environmentId);
     return books.length;
+  }
+
+  // ---- props (next features #10) -------------------------------------------
+
+  Stream<List<RoomProp>> watchProps(String environmentId) =>
+      (db.select(db.roomProps)
+            ..where((p) => p.environmentId.equals(environmentId)))
+          .watch();
+
+  /// Stands a prop in the room at ([x], [y]) — its bottom-left corner, like a
+  /// book placement, so the same settling code puts it on a shelf.
+  Future<String> addProp(
+    String environmentId, {
+    required PropKind kind,
+    required double x,
+    required double y,
+    double? width,
+    double? height,
+  }) async {
+    final id = _uuid.v4();
+    await db.into(db.roomProps).insert(
+          RoomPropsCompanion.insert(
+            id: id,
+            environmentId: environmentId,
+            kind: kind.name,
+            x: x,
+            y: y,
+            widthM: width ?? kind.width,
+            heightM: height ?? kind.height,
+          ),
+        );
+    await markDirty(environmentId);
+    return id;
+  }
+
+  Future<void> moveProp(String id, {required double x, required double y}) async {
+    await (db.update(db.roomProps)..where((p) => p.id.equals(id)))
+        .write(RoomPropsCompanion(x: Value(x), y: Value(y)));
+    await db.customStatement(
+      'UPDATE physical_environments SET needs_publish = 1 WHERE id = '
+      '(SELECT environment_id FROM room_props WHERE id = ?)',
+      [id],
+    );
+  }
+
+  Future<void> deleteProp(String id) async {
+    await db.customStatement(
+      'UPDATE physical_environments SET needs_publish = 1 WHERE id = '
+      '(SELECT environment_id FROM room_props WHERE id = ?)',
+      [id],
+    );
+    await (db.delete(db.roomProps)..where((p) => p.id.equals(id))).go();
   }
 
   /// Partial update of a placement; omitted arguments are left unchanged.

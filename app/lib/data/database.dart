@@ -372,6 +372,35 @@ class PhysicalShelves extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// A decorative object standing in a room (next features #10).
+///
+/// **App-local, like the backdrop and the room's colours.** The published
+/// document is geometry — where the books are — and a statuette is not that.
+/// Nothing here syncs, which is also why it costs no server migration.
+///
+/// `(x, y)` is the bottom-left corner in world metres, exactly like a book
+/// placement, so a prop settles onto a shelf through the same code books do.
+@DataClassName('RoomProp')
+class RoomProps extends Table {
+  TextColumn get id => text()();
+  TextColumn get environmentId => text().references(PhysicalEnvironments, #id)();
+
+  /// A [PropKind] name. Text rather than an int so a database read by an older
+  /// build shows an unknown prop rather than the wrong one.
+  TextColumn get kind => text()();
+  RealColumn get x => real()();
+  RealColumn get y => real()();
+
+  /// Its footprint in metres. Stored per prop rather than taken from the kind,
+  /// so one can be made bigger or smaller without every other one changing.
+  RealColumn get widthM => real()();
+  RealColumn get heightM => real()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// A single physical copy placed in an environment. `(x, y)` is the bottom-left
 /// of its footprint in metres; `rotation` is 0 (spine up) or 90 (lying flat).
 /// The width (thickness) and height default from the book's page count but can
@@ -528,6 +557,7 @@ class ReadingSessions extends Table {
   PhysicalEnvironments,
   PhysicalShelves,
   BookPlacements,
+  RoomProps,
   LocalDeletions,
   RemoteReadingPositions,
   Annotations,
@@ -538,7 +568,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 27;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -837,6 +867,13 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 27) {
+            // Room props (next features #10). App-local, so no server
+            // migration; guarded like every other step.
+            if (!(await tableNames()).contains('room_props')) {
+              await m.createTable(roomProps);
             }
           }
           if (from < 26) {

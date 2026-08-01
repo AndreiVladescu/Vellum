@@ -1,9 +1,9 @@
 # Next features — requested 2026-07-28
 
-Eleven items. **Ten are built** — each marked *Done* with its commit. What is
-left is one stage of #10 (placeable props) and the parts of #11 that were
-deliberately declined. Items 8 to 11 came out of the discussion rather than the
-original list.
+Eleven items. **All eleven have shipped at least their agreed scope** — each
+marked *Done* with its commit. What is left is the parts of #5 and #11 that were
+deliberately declined, and the richer half of #10's prop vocabulary. Items 8 to
+11 came out of the discussion rather than the original list.
 
 Each entry keeps what was asked for and what the code did at the time, because
 the reasoning is what makes the decisions checkable later. Where a decision was
@@ -307,11 +307,14 @@ viewer-only sharing already means everywhere else.
 
 ## 10. Cosmetics in a physical room
 
-> **Stage 1 done** — commit `992537a`. Schema v25 adds wall and floor colours
-> and a surfaces switch; the painter draws the floor, a skirting board and a
-> contact shadow under every plank. **Stage 2, the props themselves, is not
-> built** — the design below stands and was chosen (2026-08-01) over stopping at
-> stage 1.
+> **Done.** Stage 1 in `992537a`: schema v25 adds wall and floor colours and a
+> surfaces switch, and the painter draws the floor, a skirting board and a
+> contact shadow under every plank. Stage 2 followed: schema v27 adds a
+> `room_props` table and six drawn props — statuette, plant, vase, clock, boxes,
+> bookend — placed by settling like a book, dragged to move, and treated as
+> *barriers* rather than surfaces so nothing balances on an ornament. A small
+> demo set rather than the full vocabulary below; the anchor/collider split and
+> imported artwork are still only designed.
 
 **Asked for.** A way to put decoration in a physical library — the room should
 look like a room, not only like shelf geometry.
@@ -514,12 +517,11 @@ Three mitigations, designed in rather than bolted on:
 
 Everything in the original order is in. What remains, smallest first:
 
-- **#10 stage 2 — placeable props.** The one piece asked for and not yet built.
-  A props table (plant, lamp, frame, vase, clock, bookend, boxes, cat) drawn as
-  vector paths, settling onto shelves the way books do, with a bookend acting as
-  a barrier — the machinery dividers and bookcase sides already use. It rides
-  the room document, so no server migration. The three-layer artwork / collider
-  / anchor split in #11 is the shape it should take.
+- **#10's richer props.** Six exist as a demo. What is designed but not built is
+  the three-layer artwork / collider / anchor split from #11 — today a prop's
+  artwork *is* its collider, so nothing can overhang its footprint (a plant's
+  leaves, a lamp's shade). Props are also app-local rather than in the room
+  document, so a shared room does not show them.
 - **#5's remaining sources** — Calibre and OPDS in the console. The two that
   need the server to reach out or read a directory structure, and by the
   document's own reckoning the two most likely to be wanted least.
