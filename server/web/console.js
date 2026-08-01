@@ -35,6 +35,78 @@ function key(g,b){ return g+'|'+b; }
 function authorStr(b){ return (b.authors||[]).join(', '); }
 function bookTags(b){ return S.groups.filter(g=>S.members.has(key(g.id,b.id))); }
 
+// ---- delegated events ---------------------------------------------------
+//
+// **Why nothing here uses `onclick="fn('${value}')"`.** That is a JS string
+// inside an HTML attribute, and an HTML parser decodes character references in
+// attribute values *before* the JS engine is handed the source. So `esc()` —
+// which turns `'` into `&#39;` — is undone on the way in, and a room named
+//
+//     My room'+alert(document.domain)+'
+//
+// executes when the master opens the rooms list. Any member can publish a room,
+// so that was stored XSS from a low-privileged account into the admin console
+// (security audit, S5).
+//
+// Escaping for a nested context correctly is possible and is a trap: it has to
+// be right every time, at thirty call sites, forever. Data attributes are plain
+// text — escaped once as HTML, read back through `dataset`, never parsed as
+// code — so the nesting simply does not exist.
+const ACTIONS = {
+  tagfilter: el => toggleTagFilter(el.dataset.id),
+  missing: el => toggleMissing(el.dataset.key),
+  sort: el => sortBy(el.dataset.col),
+  removetag: el => removeTag(el.dataset.group, el.dataset.book),
+  titleclick: el => titleClick(el.dataset.book),
+  quickadd: el => quickAdd(el, el.dataset.book),
+  openreader: el => openReader(el.dataset.book),
+  pickupload: el => pickUpload(el.dataset.book),
+  openlink: el => openLink(el.dataset.book),
+  detailpick: el => detailPick(el.dataset.book, el.dataset.accept),
+  deletebook: el => deleteBook(el.dataset.book),
+  enrichdetail: el => enrichFromDetail(el.dataset.book),
+  savedetail: el => saveDetail(el.dataset.book),
+  createlink: el => createLink(el.dataset.book),
+  copyurl: el => copyUrl(el.dataset.url),
+  decide: el => decideRequest(el.dataset.id, el.dataset.decision),
+  viewroom: el => window.open('/room/' + encodeURIComponent(el.dataset.id), '_blank', 'noopener'),
+  shareroom: el => shareRoom(el.dataset.id, el.dataset.name),
+  activity: el => showActivity(el.dataset.before === '' ? null : Number(el.dataset.before)),
+  setrole: el => setRole(el.dataset.id, el.dataset.master === '1'),
+  resetfor: el => resetFor(el.dataset.email),
+  removeperson: el => removePerson(el.dataset.id, el.dataset.email),
+  revokeinvite: el => revokeInvite(el.dataset.id),
+  applyview: el => applyView(el.dataset.name),
+  deleteview: el => deleteView(el.dataset.name),
+};
+
+const DBL_ACTIONS = {
+  titleedit: (el, ev) => titleDbl(ev, el.dataset.book),
+  startedit: (el, ev) => startEdit(ev, el.dataset.book, el.dataset.field),
+};
+
+const CHANGE_ACTIONS = {
+  togglerow: el => toggleRow(el.dataset.book, el.checked),
+  importtoggle: el => importToggle(Number(el.dataset.index), el.checked),
+  togglecol: el => toggleCol(el.dataset.key, el.checked),
+};
+
+function delegate(type, table, attr) {
+  document.addEventListener(type, ev => {
+    const el = ev.target.closest('[' + attr + ']');
+    if (!el) return;
+    const fn = table[el.getAttribute(attr)];
+    if (fn) fn(el, ev);
+  });
+}
+delegate('click', ACTIONS, 'data-act');
+delegate('dblclick', DBL_ACTIONS, 'data-dblact');
+delegate('change', CHANGE_ACTIONS, 'data-changeact');
+document.addEventListener('drop', ev => {
+  const el = ev.target.closest('[data-dropbook]');
+  if (el) dropOn(ev, el.dataset.dropbook, el);
+});
+
 async function api(method, path, body){
   const res = await fetch(path, {
     method,
@@ -208,11 +280,11 @@ function showLabelIf(id, hasContent){
 
 function renderFilters(){
   document.getElementById('tagfilters').innerHTML =
-    S.groups.map(g=>`<button class="fchip ${S.fTag===g.id?'on':''}" onclick="toggleTagFilter('${g.id}')">${esc(g.name)}</button>`).join('')
+    S.groups.map(g=>`<button class="fchip ${S.fTag===g.id?'on':''}" data-act="tagfilter" data-id="${esc(g.id)}">${esc(g.name)}</button>`).join('')
     + `<button class="fchip ${S.fTag==='untagged'?'on':''}" onclick="toggleUntagged()">Untagged</button>`;
   document.getElementById('missingfilters').innerHTML =
     [['file','No file'],['cover','No cover'],['year','No year'],['author','No author']]
-      .map(([k,l])=>`<button class="fchip ${S.fMissing===k?'on':''}" onclick="toggleMissing('${k}')">${l}</button>`).join('');
+      .map(([k,l])=>`<button class="fchip ${S.fMissing===k?'on':''}" data-act="missing" data-key="${esc(k)}">${l}</button>`).join('');
 }
 
 // ---- table --------------------------------------------------------------
@@ -221,7 +293,7 @@ function arrow(col){ return S.sort.col===col ? (S.sort.dir==='asc'?' ▲':' ▼'
 
 function headHtml(){
   const th = (col,label,w)=>
-    `<th class="sortable" ${w?`style="width:${w}"`:''} onclick="sortBy('${col}')">${label}${arrow(col)}</th>`;
+    `<th class="sortable" ${w?`style="width:${w}"`:''} data-act="sort" data-col="${esc(col)}">${label}${arrow(col)}</th>`;
   let h = '<tr><th style="width:34px"><input type="checkbox" id="selall" onchange="toggleAll(this.checked)"></th>';
   if (S.cols.has('cover'))  h += '<th style="width:44px">Cover</th>';
   h += th('title','Title');
@@ -261,28 +333,28 @@ function render(){
   } else {
     rows.innerHTML = S.view.map((b,i)=>{
       const chips = bookTags(b).map(g=>
-        `<span class="chip">${esc(g.name)}<button title="Remove tag" onclick="removeTag('${g.id}','${b.id}')">×</button></span>`
+        `<span class="chip">${esc(g.name)}<button title="Remove tag" data-act="removetag" data-group="${esc(g.id)}" data-book="${esc(b.id)}">×</button></span>`
       ).join('');
       const rowCls = [S.selected.has(b.id)?'sel':'', i===S.cursor?'cursor':''].filter(Boolean).join(' ');
       let r = `<tr class="${rowCls}"
-          ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropOn(event,'${b.id}',this)"
+          ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" data-dropbook="${esc(b.id)}"
           title="Drop a PDF/EPUB or cover image here">
-        <td><input type="checkbox" ${S.selected.has(b.id)?'checked':''} onchange="toggleRow('${b.id}',this.checked)"></td>`;
+        <td><input type="checkbox" ${S.selected.has(b.id)?'checked':''} data-changeact="togglerow" data-book="${esc(b.id)}"></td>`;
       if (S.cols.has('cover'))
         r += `<td>${b.cover_path
           ? `<img class="thumb" data-src="/api/books/${b.id}/cover?w=160&t=${encodeURIComponent(b.updated_at||'')}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'nothumb'}))">`
           : '<span class="nothumb"></span>'}</td>`;
-      r += `<td class="title"><span class="link" onclick="titleClick('${b.id}')" ondblclick="titleDbl(event,'${b.id}')">${esc(b.title)}</span></td>`;
+      r += `<td class="title"><span class="link" data-act="titleclick" data-dblact="titleedit" data-book="${esc(b.id)}">${esc(b.title)}</span></td>`;
       if (S.cols.has('author')) r += `<td class="muted">${authorStr(b)?esc(authorStr(b)):'<span class="dim">—</span>'}</td>`;
-      if (S.cols.has('year'))   r += `<td class="year editable" ondblclick="startEdit(event,'${b.id}','year')">${b.published_year??''}</td>`;
+      if (S.cols.has('year'))   r += `<td class="year editable" data-dblact="startedit" data-book="${esc(b.id)}" data-field="year">${b.published_year??''}</td>`;
       if (S.cols.has('pages'))  r += `<td class="year">${b.page_count??''}</td>`;
       if (S.cols.has('status')) r += `<td>${statusCell(b)}</td>`;
-      r += `<td>${chips}<button class="addtag" onclick="quickAdd(this,'${b.id}')">＋ tag</button></td>`;
+      r += `<td>${chips}<button class="addtag" data-act="quickadd" data-book="${esc(b.id)}">＋ tag</button></td>`;
       if (S.cols.has('added'))  r += `<td class="muted">${esc((b.created_at||'').slice(0,10))}</td>`;
       r += `<td class="actions">
-        <button class="btn sm" onclick="openReader('${b.id}')">Read</button>
-        <button class="btn sm" onclick="pickUpload('${b.id}')">Upload</button>
-        <button class="btn sm" onclick="openLink('${b.id}')">Link</button>
+        <button class="btn sm" data-act="openreader" data-book="${esc(b.id)}">Read</button>
+        <button class="btn sm" data-act="pickupload" data-book="${esc(b.id)}">Upload</button>
+        <button class="btn sm" data-act="openlink" data-book="${esc(b.id)}">Link</button>
       </td></tr>`;
       return r;
     }).join('');
@@ -788,7 +860,7 @@ function importRenderReview(){
       : v.reason === 'same_isbn' ? `<b>same ISBN</b> as “${esc(v.title)}”`
       : `looks like “${esc(v.title)}”`;
     return `<tr>
-      <td><input type="checkbox" ${it.include?'checked':''} onchange="importToggle(${i}, this.checked)"></td>
+      <td><input type="checkbox" ${it.include?'checked':''} data-changeact="importtoggle" data-index="${i}"></td>
       <td class="title">${esc(it.title)}</td>
       <td>${esc((it.authors||[]).join(', '))}</td>
       <td>${it.file ? esc(it.file.name) : ''}</td>
@@ -885,7 +957,7 @@ function openColumns(){
     <div class="modal">
       <h2>Columns</h2>
       <div class="colgrid">
-        ${OPT_COLS.map(([k,l])=>`<label><input type="checkbox" ${S.cols.has(k)?'checked':''} onchange="toggleCol('${k}',this.checked)">${l}</label>`).join('')}
+        ${OPT_COLS.map(([k,l])=>`<label><input type="checkbox" ${S.cols.has(k)?'checked':''} data-changeact="togglecol" data-key="${esc(k)}">${l}</label>`).join('')}
       </div>
       <div class="row"><button class="btn primary" onclick="closeModal()">Done</button></div>
     </div>
@@ -1195,7 +1267,7 @@ async function openDetail(id){
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal" style="width:min(720px,95vw); max-height:90vh; overflow:auto">
       <div style="display:flex; gap:16px">
-        <div class="cover-box" onclick="detailPick('${id}','image/*')">
+        <div class="cover-box" data-act="detailpick" data-book="${esc(id)}" data-accept="image/*">
           <span class="hint">No cover</span>
           <img data-src="/api/books/${id}/cover?t=${Date.now()}" alt="" onerror="this.remove()">
           <div class="overlay">Change cover</div>
@@ -1216,12 +1288,12 @@ async function openDetail(id){
       ${files}
       <div class="row" style="justify-content:space-between; margin-top:16px">
         <div>
-          <button class="btn danger" onclick="deleteBook('${id}')">Delete</button>
-          <button class="btn" onclick="enrichFromDetail('${id}')">Fetch metadata</button>
+          <button class="btn danger" data-act="deletebook" data-book="${esc(id)}">Delete</button>
+          <button class="btn" data-act="enrichdetail" data-book="${esc(id)}">Fetch metadata</button>
         </div>
         <div>
           <button class="btn" onclick="closeModal()">Close</button>
-          <button class="btn primary" onclick="saveDetail('${id}')">Save</button>
+          <button class="btn primary" data-act="savedetail" data-book="${esc(id)}">Save</button>
         </div>
       </div>
     </div>
@@ -1283,7 +1355,7 @@ function openLink(bookId){
       <div id="m-out"></div>
       <div class="row">
         <button class="btn" onclick="closeModal()">Close</button>
-        <button class="btn primary" id="m-create" onclick="createLink('${bookId}')">Create link</button>
+        <button class="btn primary" id="m-create" data-act="createlink" data-book="${esc(bookId)}">Create link</button>
       </div>
     </div>
    </div>`;
@@ -1358,7 +1430,7 @@ async function createLink(bookId){
     const out = document.getElementById('m-out');
     out.innerHTML = `<label>Share this link</label>
       <div class="linkout" id="m-url">${esc(r.url)}</div>
-      <div class="row"><button class="btn" onclick="copyUrl('${esc(r.url)}')">Copy</button></div>`;
+      <div class="row"><button class="btn" data-act="copyurl" data-url="${esc(r.url)}">Copy</button></div>`;
     document.getElementById('m-create').disabled = true;
   } catch(e){ toast(e.message); }
 }
@@ -1431,8 +1503,8 @@ async function showRequests(){
         ${r.note ? `<div class="muted" style="font-size:12px">“${esc(r.note)}”</div>` : ''}
       </span>
       <span class="row" style="gap:6px">
-        <button class="btn sm" onclick="decideRequest('${r.id}','declined')">Decline</button>
-        <button class="btn sm primary" onclick="decideRequest('${r.id}','approved')">Lend it</button>
+        <button class="btn sm" data-act="decide" data-id="${esc(r.id)}" data-decision="declined">Decline</button>
+        <button class="btn sm primary" data-act="decide" data-id="${esc(r.id)}" data-decision="approved">Lend it</button>
       </span>
     </div>`).join('')
     : '<p class="muted">Nobody is waiting on you.</p>';
@@ -1493,8 +1565,8 @@ async function showRooms(){
       <span><strong>${esc(r.name)}</strong>
         <span class="muted">· revision ${r.revision}${r.mine ? '' : ' · shared with you'}</span></span>
       <span class="row" style="gap:6px">
-        <button class="btn sm" onclick="window.open('/room/${esc(r.id)}','_blank','noopener')">View</button>
-        ${r.mine ? `<button class="btn sm" onclick="shareRoom('${esc(r.id)}','${esc(r.name)}')">Public link</button>` : ''}
+        <button class="btn sm" data-act="viewroom" data-id="${esc(r.id)}">View</button>
+        ${r.mine ? `<button class="btn sm" data-act="shareroom" data-id="${esc(r.id)}" data-name="${esc(r.name)}">Public link</button>` : ''}
       </span>
     </div>`).join('')
     : '<p class="muted">No rooms have been published yet. Arrange one in the app and publish it.</p>';
@@ -1595,8 +1667,8 @@ function renderViews(){
   showLabelIf('viewslabel', views.length > 0);
   host.innerHTML = views.map(v =>
     `<span class="fchip">
-       <span class="link" onclick="applyView('${esc(v.name).replace(/'/g,"&#39;")}')">${esc(v.name)}</span>
-       <button title="Forget this view" onclick="deleteView('${esc(v.name).replace(/'/g,"&#39;")}')">×</button>
+       <span class="link" data-act="applyview" data-name="${esc(v.name)}">${esc(v.name)}</span>
+       <button title="Forget this view" data-act="deleteview" data-name="${esc(v.name)}">×</button>
      </span>`).join('');
 }
 
@@ -1634,7 +1706,7 @@ async function showActivity(before){
       <div style="max-height:60vh; overflow:auto">${rows}</div>
       <div class="row" style="justify-content:space-between; margin-top:12px">
         ${body.next_before
-          ? `<button class="btn" onclick="showActivity(${body.next_before})">Older</button>`
+          ? `<button class="btn" data-act="activity" data-before="${esc(body.next_before ?? '')}">Older</button>`
           : '<span></span>'}
         <button class="btn" onclick="closeModal()">Close</button>
       </div>
@@ -1779,10 +1851,10 @@ async function showPeople(){
         <div class="muted" style="font-size:12px">${esc(u.email)}</div>
       </span>
       <span class="row" style="gap:6px">
-        <button class="btn sm" onclick="setRole('${u.id}', ${!u.is_master})">
+        <button class="btn sm" data-act="setrole" data-id="${esc(u.id)}" data-master="${u.is_master ? '0' : '1'}">
           ${u.is_master ? 'Make member' : 'Make owner'}</button>
-        <button class="btn sm" onclick="resetFor('${esc(u.email)}')">Send reset</button>
-        <button class="btn sm danger" onclick="removePerson('${u.id}','${esc(u.email)}')">
+        <button class="btn sm" data-act="resetfor" data-email="${esc(u.email)}">Send reset</button>
+        <button class="btn sm danger" data-act="removeperson" data-id="${esc(u.id)}" data-email="${esc(u.email)}">
           Remove</button>
       </span>
     </div>`).join('');
@@ -1795,7 +1867,7 @@ async function showPeople(){
       <span>${esc(i.email)}
         <span class="muted">· ${esc(i.permission)}${i.scope ? ' · ' + esc(i.scope) : ''}</span>
       </span>
-      <button class="btn sm" onclick="revokeInvite('${i.id}')">Withdraw</button>
+      <button class="btn sm" data-act="revokeinvite" data-id="${esc(i.id)}">Withdraw</button>
     </div>`).join('') : '';
 
   document.getElementById('modal-root').innerHTML = `

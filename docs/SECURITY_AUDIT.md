@@ -50,7 +50,7 @@ environment — running them is a recommendation below.
 | S2 | 🟠 | ✅ Fixed (2026-08-01) | Unbounded quadratic work in `/api/import/check` (authenticated DoS) | `server/src/import_check.rs` |
 | S3 | 🟡 | ✅ Fixed (2026-08-01) | Duplicate check read every `book_file` row regardless of visibility | `server/src/import_check.rs` |
 | S4 | 🟡 | ✅ Fixed (2026-08-01) | Tombstones keyed by id alone, so a cross-kind collision would silently overwrite | `server/migrations/0025_deletion_key.sql` |
-| S5 | 🔵 | ℹ️ Accepted | Console interpolates ids into inline `onclick` handlers | `server/web/console.js` |
+| S5 | 🔴 | ✅ Fixed (2026-08-01) | Stored XSS in the admin console via values interpolated into inline handlers | `server/web/console.js` |
 
 > **Remediation note (2026-07-11):** H1, M1, M2 (destructive, low-effort) plus a
 > second round — M3 (opt-in), M4, L3, L4 — have been hardened (see the ✅ notes in
@@ -550,18 +550,54 @@ nothing has collided in practice.
 **Fixed** in migration 0025: rebuilt with `PRIMARY KEY (kind, entity_id)`. Wire
 format unchanged. Verified against a copy of a live database.
 
-## 🔵 S5 — Console interpolates ids into inline handlers *(accepted)*
+## 🔴 S5 — Stored XSS in the admin console
 
-`console.js` builds `onclick="titleClick('${b.id}')"` — an id inside a JS string
-inside an HTML attribute, with no escaping suitable for that context. It is not
-currently reachable: since S1, the server refuses any id outside
-`[A-Za-z0-9._-]`, so no quote or angle bracket can get into one.
+> **This finding was first recorded as 🔵 informational and "accepted", on the
+> reasoning that the interpolated values were all ids and ids are whitelisted.
+> That was wrong.** The same handlers also interpolate *names*, *emails* and
+> *URLs*, which are not whitelisted and are attacker-controlled. Re-rated 🔴 and
+> fixed the same day. Recorded here rather than quietly edited, because
+> "checked the ids and stopped looking" is the mistake worth remembering.
 
-Left as is because the correct fix is data attributes and event delegation
-throughout the console, which is a refactor rather than a patch, and the id
-whitelist is a hard boundary rather than an escaping trick. **If that whitelist
-is ever relaxed, this becomes stored XSS in the admin console** — that sentence
-is the reason this finding is recorded rather than dropped.
+**Where:** `console.js`, 31 inline handlers of the form
+`onclick="fn('${esc(value)}')"`.
+
+**What.** That is a JavaScript string inside an HTML attribute, and an HTML
+parser decodes character references in attribute values **before** the engine is
+handed the source. `esc()` turns `'` into `&#39;`; the parser turns it back. So:
+
+```
+written:  onclick="shareRoom('l1','My room&#39;+alert(document.domain)+&#39;')"
+executed: shareRoom('l1','My room'+alert(document.domain)+'')
+```
+
+**Reachable by any member.** `layouts::publish` checks only that a room name is
+non-empty, and a member may publish rooms. The console's *Rooms* screen renders
+every published room's name into that handler, so a member could name a room
+
+```
+My room'+alert(document.domain)+'
+```
+
+and have it execute in the **master's** session the next time they opened the
+list — with the master's token in `sessionStorage`, and every admin action
+available to it. Confirmed end to end against a running server: the API accepts
+the name and returns it verbatim.
+
+Saved-view names and user emails reach the same context through
+`applyView`/`deleteView`, `resetFor` and `removePerson`. The view-name sites even
+carried a second `.replace(/'/g,"&#39;")` on top of `esc()`, which does nothing —
+the character was already escaped, and it is the *decoding* that undoes it.
+
+**Fixed** by removing the nested context rather than escaping for it. Every
+handler is now a `data-` attribute read through `dataset`, dispatched from three
+delegated listeners (`ACTIONS`, `DBL_ACTIONS`, `CHANGE_ACTIONS`). A data
+attribute is plain text: escaped once as HTML, never parsed as code.
+
+Escaping correctly for the nested case is possible, and is a trap — it has to be
+right at every call site, forever, and the failure is silent. `web/tests/
+import_parse.test.js` now fails the build on any `on*=` handler containing an
+interpolation; the guard was verified by reintroducing one.
 
 ## Positive controls confirmed this round
 
@@ -577,7 +613,8 @@ is the reason this finding is recorded rather than dropped.
 - **The duplicate check does not report a collision in a book the caller cannot
   see**, which would disclose both its existence and its title.
 - **The console import wizard escapes every field it renders** (title, authors,
-  file name, and the matched book's title).
+  file name, and the matched book's title) — and, since S5, renders them as text
+  and data attributes only, never into a handler.
 - **The import wizard's file uploads go through the existing magic-byte check**,
   so a renamed executable is refused as it always was.
 - **Bearer tokens, not cookies**, so none of these state-changing endpoints is
@@ -594,6 +631,18 @@ is the reason this finding is recorded rather than dropped.
 - **`spin` 0.9.8 is yanked** and reachable only as a transitive dependency;
   `cargo audit` reports it as a warning. No action available until upstream
   moves.
+
+## What this round says about the method
+
+Three of the five findings were in code written since the first audit, and two
+of those (S2, S3) were written the same week they were found. S5 was worse: it
+was *seen*, rated informational, and waved through on an argument that only
+covered a third of the affected call sites.
+
+The reviewer being the code's author is the limitation behind all of that. It is
+why the fuzzing recommendation below keeps repeating rather than being closed,
+and why anyone reading this should treat "reviewed" as meaning "read carefully
+by one interested party", not "assured".
 
 *This round reflects the code at commit `1ec3fc3` on `main`. As before: a
 best-effort manual review by the same author as the code, which is a real

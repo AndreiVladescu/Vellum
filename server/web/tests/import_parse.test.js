@@ -156,6 +156,26 @@ check('a title containing a dash is not mistaken for an author', () => {
   assert.deepEqual(m.authors, []);
 });
 
+// ---- no inline handlers carrying interpolated values ----------------------
+//
+// The security audit's S5: `onclick="fn('${value}')"` is a JS string inside an
+// HTML attribute, and the parser decodes `&#39;` back to `'` before the JS
+// engine sees it — so HTML-escaping is undone and a room named
+// `x'+alert(1)+'` executes in the admin console. Data attributes have no such
+// nesting. A source check, because the failure is silent and only one call
+// site has to be wrong.
+console.log('inline handlers');
+check('no on*= handler interpolates a value', () => {
+  const offenders = [];
+  source.split('\n').forEach((line, i) => {
+    // The doc comment on ACTIONS quotes the pattern it forbids.
+    if (line.includes('onclick="fn(')) return;
+    if (/on[a-z]+="[^"]*\$\{/.test(line)) offenders.push(i + 1 + ': ' + line.trim());
+  });
+  assert.deepEqual(offenders, [],
+    'use data-* attributes and the delegated ACTIONS table:\n' + offenders.join('\n'));
+});
+
 if (failures) {
   console.log('\n' + failures + ' failure(s)');
   process.exit(1);
