@@ -37,6 +37,7 @@ import 'settings/book_face.dart';
 import 'settings/preferences_page.dart';
 import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
+import 'shelf/shelf_target_sheet.dart';
 import 'shelf/command_palette.dart';
 import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
@@ -185,6 +186,11 @@ class _LibraryPageState extends State<LibraryPage> {
   // The reading-status facet (plan 5 #18), or null for "any status".
   ReadingStatus? _statusFilter;
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
+
+  /// Book ids ticked in selection mode (next features #4). Empty means the mode
+  /// is off — there is no separate flag, because a selection of nothing has
+  /// nothing to act on and an app bar counting to zero is just in the way.
+  final Set<String> _selection = {};
   // The continue-reading / recently-added strip (plan 5 #25), hidden for this
   // session only: its value is reappearing when you come back mid-book, not
   // being a preference to manage.
@@ -735,13 +741,134 @@ class _LibraryPageState extends State<LibraryPage> {
           icon: Icons.filter_alt_off_outlined,
           key: LogicalKeyboardKey.escape,
           inPalette: false,
-          run: _clearSearchAndFilters,
+          run: _escape,
         ),
     ];
   }
 
+  /// The contextual app bar shown while books are ticked (next features #4).
+  ///
+  /// Replaces the search bar rather than sitting under it: the actions here all
+  /// operate on the selection, and leaving the search visible would invite a
+  /// filter change that silently alters what "the selection" means.
+  PreferredSizeWidget _selectionBar() {
+    final count = _selection.length;
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: MaterialLocalizations.of(context).cancelButtonLabel,
+        onPressed: () => setState(_selection.clear),
+      ),
+      title: Text('$count selected'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.playlist_add),
+          tooltip: 'Put on a shelf',
+          onPressed: _moveSelectionToShelf,
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline),
+          tooltip: 'Move to trash',
+          onPressed: _trashSelection,
+        ),
+      ],
+    );
+  }
+
+  /// The books currently ticked, in shelf order.
+  Future<List<Book>> _selectedBooks() async {
+    final all = await repository.watchAllBooks().first;
+    return [
+      for (final b in all)
+        if (_selection.contains(b.id)) b,
+    ];
+  }
+
+  Future<void> _trashSelection() async {
+    final ids = _selection.toList();
+    final messenger = ScaffoldMessenger.of(context);
+    for (final id in ids) {
+      await repository.trashBook(id);
+    }
+    if (!mounted) return;
+    setState(_selection.clear);
+    messenger.showSnackBar(appSnackBar(
+      content: Text(
+        ids.length == 1
+            ? 'Moved 1 book to the trash'
+            : 'Moved ${ids.length} books to the trash',
+      ),
+      action: SnackBarAction(
+        label: 'Undo',
+        onPressed: () async {
+          for (final id in ids) {
+            await repository.trash.restore(id);
+          }
+        },
+      ),
+    ));
+  }
+
+  /// Puts the selection on a shelf. The sheet asks *which* shelf and *what to
+  /// do* — Move or Add — rather than guessing: "move" is only well defined when
+  /// you are looking at a shelf, and from the whole library there is nothing to
+  /// leave. Decided in next features #4.
+  Future<void> _moveSelectionToShelf() async {
+    final fromShelfId = widget.settings.selectedShelfId;
+    final shelves = await repository.watchShelves().first;
+    if (!mounted) return;
+    if (shelves.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(appSnackBar(
+        content: const Text('You have no shelves yet — make one first.'),
+      ));
+      return;
+    }
+    final books = await _selectedBooks();
+    if (!mounted) return;
+
+    final choice = await showModalBottomSheet<({Shelf shelf, bool move})>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => ShelfTargetSheet(
+        shelves: shelves,
+        count: books.length,
+        // Move is only offered when there is a shelf to leave, and is the
+        // default there because that is what was asked for.
+        canMove: fromShelfId != null,
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    for (final book in books) {
+      if (choice.move && fromShelfId != null && fromShelfId != choice.shelf.id) {
+        await repository.removeFromShelf(book.id, fromShelfId);
+      }
+      await repository.addToShelf(book.id, choice.shelf.id);
+    }
+    if (!mounted) return;
+    setState(_selection.clear);
+    final verb = choice.move ? 'Moved' : 'Added';
+    ScaffoldMessenger.of(context).showSnackBar(appSnackBar(
+      content: Text('$verb ${books.length} to ${choice.shelf.name}'),
+    ));
+  }
+
+  /// Escape and the system Back gesture: leave selection mode first, and only
+  /// clear the search once nothing is ticked. Otherwise one key does two
+  /// unrelated things at once and you lose a selection you were building.
+  void _escape() {
+    if (_selection.isNotEmpty) {
+      setState(_selection.clear);
+      return;
+    }
+    _clearSearchAndFilters();
+  }
+
+  void _toggleSelected(Book book) => setState(() {
+        if (!_selection.remove(book.id)) _selection.add(book.id);
+      });
+
   void _clearSearchAndFilters() {
-    _searchController.clear();
     _searchFocus.unfocus();
     setState(() {
       _query = '';
@@ -807,7 +934,16 @@ class _LibraryPageState extends State<LibraryPage> {
       bindings: shortcutsFor(_commands()),
       child: Focus(
         autofocus: true,
-        child: _scaffold(context),
+        // Android's Back leaves selection mode rather than leaving the app —
+        // the standard behaviour for a contextual bar, and the only way out on
+        // a phone, where there is no Escape key.
+        child: PopScope(
+          canPop: _selection.isEmpty,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) setState(_selection.clear);
+          },
+          child: _scaffold(context),
+        ),
       ),
     );
   }
@@ -822,7 +958,9 @@ class _LibraryPageState extends State<LibraryPage> {
         repository: widget.repository,
         sync: _sync,
       ),
-      appBar: _tab == 0
+      appBar: _tab == 0 && _selection.isNotEmpty
+          ? _selectionBar()
+          : _tab == 0
           ? AppBar(
               title: TextField(
                 controller: _searchController,
@@ -1231,6 +1369,9 @@ class _LibraryPageState extends State<LibraryPage> {
     }
     return ShelfView(
       books: [for (final e in entries) e.book],
+      selected: _selection,
+      onToggleSelected: _toggleSelected,
+      selectionMode: _selection.isNotEmpty,
       bookFace: widget.settings.bookFace,
       spineArt: widget.settings.spineArt,
       material: widget.settings.shelfMaterial,

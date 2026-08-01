@@ -88,7 +88,16 @@ class _BookOpenTransition extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: bookFace,
+                        // The face is a copy of the spine, mounted here in the
+                        // route's overlay rather than on the shelf — and an
+                        // overlay has no Material above it, so the InkWell
+                        // inside the spine tripped `debugCheckHasMaterial` on
+                        // every book opened in a debug build. Transparent, so
+                        // the artwork is unchanged.
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: bookFace,
+                        ),
                       ),
                     ),
                   ),

@@ -31,9 +31,24 @@ class ShelfView extends StatelessWidget {
     this.material = ShelfMaterial.fallback,
     this.typography = SpineTypography.normal,
     this.coverFileOf,
+    this.selected = const {},
+    this.onToggleSelected,
+    this.selectionMode = false,
   });
 
   final List<Book> books;
+
+  /// Book ids currently ticked (next features #4).
+  final Set<String> selected;
+
+  /// Toggles a book in the selection. Null means this shelf has no selection
+  /// mode at all — a long-press then does nothing, as before.
+  final void Function(Book)? onToggleSelected;
+
+  /// While true a plain tap toggles instead of opening the book. Distinct from
+  /// `selected.isNotEmpty` only so the caller stays in charge of when the mode
+  /// ends.
+  final bool selectionMode;
 
   /// What the boards are made of (plan 5 #39).
   final ShelfMaterial material;
@@ -77,6 +92,9 @@ class ShelfView extends StatelessWidget {
             typography: typography,
             detailBuilder: detailBuilder,
             coverFileOf: coverFileOf,
+            selected: selected,
+            onToggleSelected: onToggleSelected,
+            selectionMode: selectionMode,
           ),
         );
       },
@@ -115,9 +133,15 @@ class _ShelfRow extends StatelessWidget {
     required this.typography,
     required this.detailBuilder,
     required this.coverFileOf,
+    required this.selected,
+    required this.onToggleSelected,
+    required this.selectionMode,
   });
 
   final List<Book> row;
+  final Set<String> selected;
+  final void Function(Book)? onToggleSelected;
+  final bool selectionMode;
   final BookFace bookFace;
   final SpineArt spineArt;
   final ShelfMaterial material;
@@ -155,12 +179,19 @@ class _ShelfRow extends StatelessWidget {
                   child: Builder(
                     builder: (bookContext) {
                       final coverFile = coverFileOf?.call(book);
-                      Widget face({VoidCallback? onTap}) =>
-                          bookFace == BookFace.cover
+                      final toggle = onToggleSelected;
+                      final isSelected = selected.contains(book.id);
+                      Widget face({
+                        VoidCallback? onTap,
+                        VoidCallback? onLongPress,
+                        bool ticked = false,
+                      }) => bookFace == BookFace.cover
                           ? BookCover(
                               book: book,
                               coverFile: coverFile,
                               onTap: onTap,
+                              onLongPress: onLongPress,
+                              selected: ticked,
                             )
                           : BookSpine(
                               book: book,
@@ -168,9 +199,19 @@ class _ShelfRow extends StatelessWidget {
                               spineArt: spineArt,
                               typography: typography,
                               onTap: onTap,
+                              onLongPress: onLongPress,
+                              selected: ticked,
                             );
                       return face(
-                        onTap: () => _openBook(bookContext, book, face()),
+                        // In selection mode a tap ticks; otherwise it opens the
+                        // book, as it always has. The pull-out animation is
+                        // handed the *unticked* face, so a book doesn't fly off
+                        // the shelf wearing a checkmark.
+                        onTap: selectionMode && toggle != null
+                            ? () => toggle(book)
+                            : () => _openBook(bookContext, book, face()),
+                        onLongPress: toggle == null ? null : () => toggle(book),
+                        ticked: isSelected,
                       );
                     },
                   ),
@@ -186,6 +227,52 @@ class _ShelfRow extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 26),
+      ],
+    );
+  }
+}
+
+/// The tick over a book that is part of the current selection (next features
+/// #4).
+///
+/// Drawn over the artwork rather than replacing it, and the book is only
+/// *dimmed* rather than hidden: the point of a visual shelf is that you
+/// recognise books by their spines, and a selection that hides them would make
+/// you check the count instead of looking.
+class SelectedBookOverlay extends StatelessWidget {
+  const SelectedBookOverlay({
+    super.key,
+    required this.selected,
+    required this.child,
+  });
+
+  final bool selected;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!selected) return child;
+    final scheme = Theme.of(context).colorScheme;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Opacity(opacity: 0.55, child: child),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: 0.30),
+            border: Border.all(color: scheme.primary, width: 2),
+          ),
+        ),
+        Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Icon(Icons.check_circle,
+                size: 18, color: scheme.primary, shadows: const [
+              Shadow(color: Color(0x99000000), blurRadius: 3),
+            ]),
+          ),
+        ),
       ],
     );
   }
@@ -208,6 +295,8 @@ class BookSpine extends StatelessWidget {
     super.key,
     required this.book,
     this.onTap,
+    this.onLongPress,
+    this.selected = false,
     this.coverFile,
     this.spineArt = SpineArt.coverSlice,
     this.typography = SpineTypography.normal,
@@ -215,6 +304,13 @@ class BookSpine extends StatelessWidget {
 
   final Book book;
   final VoidCallback? onTap;
+
+  /// Enters selection mode (next features #4). Also fired by a right-click,
+  /// which is what a mouse user reaches for.
+  final VoidCallback? onLongPress;
+
+  /// Ticked in selection mode: dimmed, with a check over it.
+  final bool selected;
   final File? coverFile;
   final SpineArt spineArt;
   final SpineTypography typography;
@@ -235,19 +331,32 @@ class BookSpine extends StatelessWidget {
       // paints a focus overlay so a keyboard user can see where they are.
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
+        onSecondaryTap: onLongPress,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
         child: Tooltip(
           message: book.title,
           waitDuration: const Duration(milliseconds: 600),
+          // A Tooltip's default trigger on touch is a long-press, and it wins
+          // the gesture arena against the InkWell above it — so with selection
+          // mode on, holding a spine showed the title instead of ticking the
+          // book. Hover is unaffected (it ignores triggerMode), so the desktop
+          // tooltip still works.
+          triggerMode: onLongPress != null
+              ? TooltipTriggerMode.manual
+              : TooltipTriggerMode.longPress,
           child: SizedBox(
             width: style.width * typography.clampedWidth,
             height: _bookAreaHeight * style.heightFactor,
-            child: SpineFace(
-              book: book,
-              coverFile: coverFile,
-              style: style,
-              spineArt: spineArt,
-              titleScale: typography.clampedTitle,
+            child: SelectedBookOverlay(
+              selected: selected,
+              child: SpineFace(
+                book: book,
+                coverFile: coverFile,
+                style: style,
+                spineArt: spineArt,
+                titleScale: typography.clampedTitle,
+              ),
             ),
           ),
         ),
@@ -480,10 +589,21 @@ class SpineFace extends StatelessWidget {
 /// image if there is one, otherwise a cover generated in the book's spine
 /// style. Used when the shelf is in [BookFace.cover] mode.
 class BookCover extends StatelessWidget {
-  const BookCover({super.key, required this.book, this.onTap, this.coverFile});
+  const BookCover({
+    super.key,
+    required this.book,
+    this.onTap,
+    this.onLongPress,
+    this.selected = false,
+    this.coverFile,
+  });
 
   final Book book;
   final VoidCallback? onTap;
+
+  /// Enters selection mode — see [BookSpine.onLongPress].
+  final VoidCallback? onLongPress;
+  final bool selected;
   final File? coverFile;
 
   @override
@@ -498,14 +618,26 @@ class BookCover extends StatelessWidget {
       // Keyboard-reachable, same reasoning as BookSpine above.
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
+        onSecondaryTap: onLongPress,
         borderRadius: BorderRadius.circular(4),
         child: Tooltip(
           message: book.title,
           waitDuration: const Duration(milliseconds: 600),
+          // A Tooltip's default trigger on touch is a long-press, and it wins
+          // the gesture arena against the InkWell above it — so with selection
+          // mode on, holding a spine showed the title instead of ticking the
+          // book. Hover is unaffected (it ignores triggerMode), so the desktop
+          // tooltip still works.
+          triggerMode: onLongPress != null
+              ? TooltipTriggerMode.manual
+              : TooltipTriggerMode.longPress,
           child: SizedBox(
             width: _coverWidth,
             height: _bookAreaHeight,
-            child: ClipRRect(
+            child: SelectedBookOverlay(
+              selected: selected,
+              child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               // Non-null path means "has a cover"; decode below full res but by
               // the box *height* (a 2:3 cover in this taller box is height-driven,
@@ -519,6 +651,7 @@ class BookCover extends StatelessWidget {
                       errorBuilder: (_, _, _) => _generatedCover(),
                     )
                   : _generatedCover(),
+              ),
             ),
           ),
         ),
