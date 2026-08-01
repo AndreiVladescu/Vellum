@@ -41,6 +41,7 @@ mod shares;
 mod shelves;
 mod text_index;
 mod throttle;
+mod unpublish;
 pub mod tls;
 mod web;
 
@@ -313,6 +314,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             get(reading::list).delete(reading::forget_device),
         )
         .route("/reading-progress/{book_id}", put(reading::upsert))
+        // Taking a resource back off the server (next features #8). Scoped to
+        // the caller in every case — see `unpublish`.
+        .route("/mine/{resource}", delete(unpublish::forget))
         // User-to-user shares.
         // Published room layouts (plan 5 #47). A document store: whole-document
         // publish with a revision, 409 on a stale base.

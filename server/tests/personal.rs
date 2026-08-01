@@ -1135,3 +1135,151 @@ async fn a_photo_that_is_not_an_image_is_refused() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+/// Un-publishing (next features #8): a switch turned off can take back what is
+/// already on the server, and it must take back *only the caller's*.
+#[tokio::test]
+async fn un_publishing_removes_my_rows_and_leaves_everyone_else_alone() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let other = add_member(&app, &master, "other@lib.test").await;
+
+    // Each account owns a book, a copy of it, and a loan of that copy.
+    for (token, book) in [(&master, "mine"), (&other, "theirs")] {
+        let (status, _) = call(
+            &app,
+            "PUT",
+            &format!("/api/books/{book}"),
+            Some(token),
+            Some(json!({ "title": book })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = call(
+            &app,
+            "PUT",
+            &format!("/api/copies/copy-{book}"),
+            Some(token),
+            Some(json!({ "book_id": book })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = call(
+            &app,
+            "PUT",
+            &format!("/api/loans/loan-{book}"),
+            Some(token),
+            Some(json!({
+                "copy_id": format!("copy-{book}"),
+                "borrower": "A friend",
+                "loaned_at": "2026-01-01 00:00:00",
+            })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "seeding {book}");
+    }
+
+    let (status, body) =
+        call(&app, "DELETE", "/api/mine/loans", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["deleted"], 1, "should have forgotten exactly one loan");
+
+    // Mine is gone...
+    let (_, mine) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    let listed: Vec<&str> = mine
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["id"].as_str().unwrap())
+        .collect();
+    assert!(!listed.contains(&"loan-mine"), "my loan survived: {mine}");
+
+    // ...and theirs is untouched, which is the whole risk of a bulk delete.
+    let (_, theirs) = call(&app, "GET", "/api/loans", Some(&other), None).await;
+    let listed: Vec<&str> = theirs
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["id"].as_str().unwrap())
+        .collect();
+    assert!(
+        listed.contains(&"loan-theirs"),
+        "un-publishing reached another account's loan: {theirs}"
+    );
+
+    // A tombstone went out, so this account's other devices drop it too rather
+    // than pushing it straight back.
+    let (_, deletions) =
+        call(&app, "GET", "/api/deletions?kind=loan", Some(&master), None).await;
+    assert!(
+        deletions
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["book_id"] == "loan-mine"),
+        "no tombstone, so the next push would resurrect it: {deletions}"
+    );
+}
+
+#[tokio::test]
+async fn un_publishing_my_marks_leaves_another_account_s_alone() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let other = add_member(&app, &master, "other@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    // Shared as an editor so the other account can mark it too.
+    call(
+        &app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": "other@lib.test", "permission": "editor"
+        })),
+    )
+    .await;
+
+    for (token, id) in [(&master, "a-mine"), (&other, "a-theirs")] {
+        let (status, _) = call(
+            &app,
+            "PUT",
+            &format!("/api/annotations/{id}"),
+            Some(token),
+            Some(json!({
+                "book_id": book,
+                "kind": "highlight",
+                "quoted_text": "a line",
+            })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "seeding {id}");
+    }
+
+    let (status, body) =
+        call(&app, "DELETE", "/api/mine/annotations", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["deleted"], 1);
+
+    let (_, mine) = call(&app, "GET", "/api/annotations", Some(&master), None).await;
+    assert!(mine.as_array().unwrap().is_empty());
+
+    let (_, theirs) = call(&app, "GET", "/api/annotations", Some(&other), None).await;
+    assert_eq!(
+        theirs.as_array().unwrap().len(),
+        1,
+        "un-publishing reached another account's highlights: {theirs}"
+    );
+}
+
+#[tokio::test]
+async fn un_publishing_something_that_is_not_a_resource_is_refused() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let (status, _) = call(&app, "DELETE", "/api/mine/books", Some(&master), None).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "books are the library itself; there is no 'un-publish my catalogue'"
+    );
+}

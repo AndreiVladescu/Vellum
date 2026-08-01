@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
+import '../snack_bars.dart';
 import 'connection_store.dart';
 import 'sync_scope.dart';
 
@@ -40,6 +41,67 @@ class _SyncScopePageState extends State<SyncScopePage> {
     await widget.settings.setSyncScope(next);
   }
 
+  /// Turning a switch off stops the resource syncing from now on — it says
+  /// nothing about what is already up there. Unticking a box about your lending
+  /// history and leaving that history on the server is not what anyone means,
+  /// so the offer is made at the moment it is relevant rather than left to be
+  /// found later.
+  ///
+  /// Asked, never assumed: someone may be switching a resource off *because*
+  /// the server's copy is the good one.
+  Future<void> _offerToForget(String resource, String label) async {
+    final client = widget.connection.client;
+    if (client == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Also remove $label from the server?'),
+        content: Text(
+          'Switching this off stops $label syncing from now on. What you have '
+          'already sent stays on the server unless you remove it here.\n\n'
+          'This removes only yours — nothing belonging to anyone you share the '
+          'library with — and it cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Leave it there'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove from server'),
+          ),
+        ],
+      ),
+    );
+    if (go != true) return;
+    try {
+      final removed = await client.forgetMine(resource);
+      messenger.showSnackBar(appSnackBar(
+        content: Text('Removed $removed from the server.'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(
+        appSnackBar(content: Text('Could not remove $label: $e')),
+      );
+    }
+  }
+
+  /// A switch that offers to un-publish when it goes off.
+  Future<void> _setAndOffer(
+    SyncScope next,
+    bool value, {
+    required String resource,
+    required String label,
+  }) async {
+    await _set(next);
+    if (!value && mounted) await _offerToForget(resource, label);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -69,19 +131,34 @@ class _SyncScopePageState extends State<SyncScopePage> {
             title: 'Physical copies',
             subtitle: 'Which books you own as objects, and where they live',
             value: _scope.copies,
-            onChanged: (v) => _set(_scope.copyWith(copies: v)),
+            onChanged: (v) => _setAndOffer(
+              _scope.copyWith(copies: v),
+              v,
+              resource: 'copies',
+              label: 'physical copies',
+            ),
           ),
           _row(
             title: 'Loans',
             subtitle: 'Who has what, and the history of who had it',
             value: _scope.loans,
-            onChanged: (v) => _set(_scope.copyWith(loans: v)),
+            onChanged: (v) => _setAndOffer(
+              _scope.copyWith(loans: v),
+              v,
+              resource: 'loans',
+              label: 'loans',
+            ),
           ),
           _row(
             title: 'Copy photos',
             subtitle: 'Pictures of your shelves — the heaviest thing here',
             value: _scope.copyPhotos,
-            onChanged: (v) => _set(_scope.copyWith(copyPhotos: v)),
+            onChanged: (v) => _setAndOffer(
+              _scope.copyWith(copyPhotos: v),
+              v,
+              resource: 'copy-photos',
+              label: 'copy photos',
+            ),
           ),
           const Divider(height: 24),
           Padding(
@@ -97,13 +174,23 @@ class _SyncScopePageState extends State<SyncScopePage> {
             title: 'Highlights, notes and bookmarks',
             subtitle: 'Everything you mark in a book, and your private notes',
             value: _scope.annotations,
-            onChanged: (v) => _set(_scope.copyWith(annotations: v)),
+            onChanged: (v) => _setAndOffer(
+              _scope.copyWith(annotations: v),
+              v,
+              resource: 'annotations',
+              label: 'highlights and notes',
+            ),
           ),
           _row(
             title: 'Reading sittings',
             subtitle: 'When you read, and for how long',
             value: _scope.sessions,
-            onChanged: (v) => _set(_scope.copyWith(sessions: v)),
+            onChanged: (v) => _setAndOffer(
+              _scope.copyWith(sessions: v),
+              v,
+              resource: 'sessions',
+              label: 'reading sittings',
+            ),
           ),
           SwitchListTile(
             title: const Text('Reading position'),
@@ -121,13 +208,12 @@ class _SyncScopePageState extends State<SyncScopePage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
             child: Text(
-              // Said rather than left to be discovered: switching something off
-              // stops it moving from now on, and does not reach back for what
-              // is already on the server. Un-publishing needs endpoints that
-              // only reading position has today.
-              'Switching something off stops it syncing from now on. Anything '
-              'already on the server stays there — the only one that can '
-              'un-publish itself is reading position.',
+              // Books are the exception, and it is deliberate: "un-publish my
+              // catalogue" is a different act from "stop syncing it", and it
+              // already has its own front door in the console.
+              'Switching something off offers to remove what you have already '
+              'sent. Your books are the exception — deleting those from the '
+              'server is done from the console, on purpose.',
               style: theme.textTheme.bodySmall,
             ),
           ),

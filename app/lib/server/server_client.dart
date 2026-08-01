@@ -339,6 +339,20 @@ class VellumServerClient {
     return ServerLayout.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Takes a resource back off the server (next features #8).
+  ///
+  /// `resource` is one of `copies`, `loans`, `copy-photos`, `annotations`,
+  /// `sessions`. Scoped to this account server-side — see `unpublish.rs` — so
+  /// it can never reach another member's rows. Returns how many were removed.
+  Future<int> forgetMine(String resource) async {
+    final res = await _http.delete(
+      _uri('/api/mine/$resource'),
+      headers: _headers,
+    );
+    final body = _body(res) as Map<String, dynamic>;
+    return (body['deleted'] as num?)?.toInt() ?? 0;
+  }
+
   /// Titles for the books a published room mentions (next features #9).
   ///
   /// The room document is geometry only — deliberately, so publishing a room
