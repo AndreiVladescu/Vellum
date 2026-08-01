@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../server/sync_scope.dart';
 import 'package:uuid/uuid.dart';
 
 import 'appearance.dart';
@@ -22,6 +24,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _autoPushKey = 'settings.autoPush';
   static const _importGenresKey = 'settings.importOpenLibraryGenres';
   static const _syncReadingPositionKey = 'settings.syncReadingPosition';
+  static const _syncScopeKey = 'settings.syncScope';
   static const _deviceIdKey = 'settings.deviceId';
   static const _deviceLabelKey = 'settings.deviceLabel';
   static const _watchedFolderKey = 'settings.watchedImportFolder';
@@ -227,6 +230,28 @@ class AppSettingsStore extends ChangeNotifier {
   /// `PreferencesPage`).
   bool get syncReadingPosition =>
       _prefs.getBool(_syncReadingPositionKey) ?? false;
+
+  /// Which resources a sync is allowed to touch (next features #8). Defaults
+  /// to everything, so a device that never opens the screen syncs exactly as it
+  /// did before.
+  SyncScope get syncScope => SyncScope(
+        books: _prefs.getBool('$_syncScopeKey.books') ?? true,
+        copies: _prefs.getBool('$_syncScopeKey.copies') ?? true,
+        loans: _prefs.getBool('$_syncScopeKey.loans') ?? true,
+        annotations: _prefs.getBool('$_syncScopeKey.annotations') ?? true,
+        sessions: _prefs.getBool('$_syncScopeKey.sessions') ?? true,
+        copyPhotos: _prefs.getBool('$_syncScopeKey.copyPhotos') ?? true,
+      );
+
+  Future<void> setSyncScope(SyncScope value) async {
+    await _prefs.setBool('$_syncScopeKey.books', value.books);
+    await _prefs.setBool('$_syncScopeKey.copies', value.copies);
+    await _prefs.setBool('$_syncScopeKey.loans', value.loans);
+    await _prefs.setBool('$_syncScopeKey.annotations', value.annotations);
+    await _prefs.setBool('$_syncScopeKey.sessions', value.sessions);
+    await _prefs.setBool('$_syncScopeKey.copyPhotos', value.copyPhotos);
+    notifyListeners();
+  }
 
   Future<void> setSyncReadingPosition(bool value) async {
     await _prefs.setBool(_syncReadingPositionKey, value);

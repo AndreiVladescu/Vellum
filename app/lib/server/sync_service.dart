@@ -9,6 +9,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shelf/spine_style.dart';
 import 'server_client.dart';
+import 'sync_scope.dart';
 
 /// Whether a server-supplied id/format is safe to embed in a local file path.
 /// A pull builds `covers/<id>.jpg` and `files/<id>.<format>` from values that
@@ -146,6 +147,7 @@ class SyncService {
     String? cursor,
     void Function(String serverNow)? onCursor,
     SyncProgress? onProgress,
+    SyncScope scope = SyncScope.everything,
   }) async {
     if (_running) {
       throw StateError('a sync is already in progress');
@@ -157,8 +159,9 @@ class SyncService {
         cursor: cursor,
         onCursor: onCursor,
         onProgress: onProgress,
+        scope: scope,
       );
-      final pushed = await _push(client, onProgress: onProgress);
+      final pushed = await _push(client, onProgress: onProgress, scope: scope);
       return SyncReport(
         pulled: pulled.pulled,
         pushed: pushed.pushed,
@@ -176,6 +179,7 @@ class SyncService {
     String? cursor,
     void Function(String serverNow)? onCursor,
     SyncProgress? onProgress,
+    SyncScope scope = SyncScope.everything,
   }) async {
     final db = _db;
     final issues = <SyncIssue>[];
@@ -462,13 +466,20 @@ class SyncService {
     // after books' metadata is applied above so a shelf/copy/loan naming a
     // book new this same pull finds it already present (see their FK-safety
     // filters). Loans run after copies for the same reason.
-    final shelfResult = await _pullShelves(client, cursor, issues);
-    final copyResult = await _pullCopies(client, cursor, issues);
-    final loanResult = await _pullLoans(client, cursor, issues);
+    const nothing = (pulled: 0, deletedLocally: 0);
+    final shelfResult = scope.books
+        ? await _pullShelves(client, cursor, issues)
+        : nothing;
+    final copyResult =
+        scope.copies ? await _pullCopies(client, cursor, issues) : nothing;
+    final loanResult =
+        scope.loans ? await _pullLoans(client, cursor, issues) : nothing;
     // Personal data last: an annotation or a sitting names a book, and its
     // foreign key needs that book already applied above.
-    final photoResult = await _pullCopyPhotos(client, cursor, issues);
-    final personalPulled = await _pullPersonal(client, cursor, issues);
+    final photoResult = scope.copyPhotos
+        ? await _pullCopyPhotos(client, cursor, issues)
+        : nothing;
+    final personalPulled = await _pullPersonal(client, cursor, issues, scope);
     await _syncProfile(client, issues);
 
     // Advance the cursor to the server's clock so the next pull is a delta.
@@ -803,6 +814,7 @@ class SyncService {
   Future<SyncReport> _push(
     VellumServerClient client, {
     SyncProgress? onProgress,
+    SyncScope scope = SyncScope.everything,
   }) async {
     final db = _db;
     final issues = <SyncIssue>[];
@@ -957,11 +969,15 @@ class SyncService {
     // already exist). Loans go last for the same reason, one level down:
     // a loan for a copy pushed for the first time just above needs that
     // copy already on the server.
-    final shelfResult = await _pushShelves(client, issues);
-    final copyResult = await _pushCopies(client, issues);
-    final loanResult = await _pushLoans(client, issues);
-    final photoPushed = await _pushCopyPhotos(client, issues);
-    final personalPushed = await _pushPersonal(client, issues);
+    const nothing = (pushed: 0, deletedRemotely: 0);
+    final shelfResult =
+        scope.books ? await _pushShelves(client, issues) : nothing;
+    final copyResult =
+        scope.copies ? await _pushCopies(client, issues) : nothing;
+    final loanResult = scope.loans ? await _pushLoans(client, issues) : nothing;
+    final photoPushed =
+        scope.copyPhotos ? await _pushCopyPhotos(client, issues) : 0;
+    final personalPushed = await _pushPersonal(client, issues, scope);
 
     return SyncReport(
       pushed: pushed +
@@ -1221,7 +1237,9 @@ class SyncService {
     VellumServerClient client,
     String? cursor,
     List<SyncIssue> issues,
+    SyncScope scope,
   ) async {
+    if (!scope.annotations && !scope.sessions) return 0;
     final db = _db;
     var pulled = 0;
     // Books this device actually has. An annotation whose book failed its own
@@ -1231,7 +1249,11 @@ class SyncService {
       for (final b in await db.select(db.books).get()) b.id,
     };
 
-    try {
+    // Annotations and reader notes travel together: a note *is* a
+    // `book_note` row on the same personal channel, and "sync my highlights but
+    // not my private note on the same book" is a distinction nobody asked for.
+    if (scope.annotations) {
+      try {
       final deletions = await client.listAnnotationDeletions(cursor: cursor);
       for (final tombstone in deletions.entries) {
         final removed = await (db.delete(db.annotations)
@@ -1277,8 +1299,10 @@ class SyncService {
         issues.add(_personalIssue('pull', 'Annotations could not be pulled: $e'));
       }
     }
+    }
 
-    try {
+    if (scope.sessions) {
+      try {
       final remote = await client.listSessions(cursor: cursor);
       for (final s in remote.entries) {
         if (!known.contains(s.bookId)) continue;
@@ -1303,8 +1327,10 @@ class SyncService {
             _personalIssue('pull', 'Reading sessions could not be pulled: $e'));
       }
     }
+    }
 
-    try {
+    if (scope.annotations) {
+      try {
       final notes = await client.listBookNotes(cursor: cursor);
       for (final n in notes.entries) {
         if (!known.contains(n.bookId)) continue;
@@ -1323,21 +1349,26 @@ class SyncService {
             _personalIssue('pull', 'Reader notes could not be pulled: $e'));
       }
     }
+    }
     return pulled;
   }
 
   Future<int> _pushPersonal(
     VellumServerClient client,
     List<SyncIssue> issues,
+    SyncScope scope,
   ) async {
+    if (!scope.annotations && !scope.sessions) return 0;
     final db = _db;
     var pushed = 0;
 
     // Deletions first, so a delete followed by a re-add in the same window
     // lands in that order rather than the reverse.
-    final tombstones = await (db.select(db.localDeletions)
-          ..where((d) => d.kind.equals('annotation')))
-        .get();
+    final tombstones = scope.annotations
+        ? await (db.select(db.localDeletions)
+              ..where((d) => d.kind.equals('annotation')))
+            .get()
+        : const <LocalDeletion>[];
     for (final t in tombstones) {
       try {
         await client.deleteAnnotation(t.bookId);
@@ -1358,9 +1389,10 @@ class SyncService {
       }
     }
 
-    final dirty = await (db.select(db.annotations)
-          ..where((a) => a.needsPush.equals(true)))
-        .get();
+    final dirty = scope.annotations
+        ? await (db.select(db.annotations)..where((a) => a.needsPush.equals(true)))
+            .get()
+        : const <Annotation>[];
     for (final a in dirty) {
       try {
         await client.pushAnnotation(
@@ -1387,9 +1419,11 @@ class SyncService {
       }
     }
 
-    final sessions = await (db.select(db.readingSessions)
-          ..where((s) => s.needsPush.equals(true)))
-        .get();
+    final sessions = scope.sessions
+        ? await (db.select(db.readingSessions)
+              ..where((s) => s.needsPush.equals(true)))
+            .get()
+        : const <ReadingSession>[];
     for (final s in sessions) {
       try {
         await client.pushSession(
@@ -1411,9 +1445,11 @@ class SyncService {
       }
     }
 
-    final notedBooks = await (db.select(db.books)
-          ..where((b) => b.readerNotesNeedsPush.equals(true)))
-        .get();
+    final notedBooks = scope.annotations
+        ? await (db.select(db.books)
+              ..where((b) => b.readerNotesNeedsPush.equals(true)))
+            .get()
+        : const <Book>[];
     for (final b in notedBooks) {
       try {
         await client.pushBookNote(

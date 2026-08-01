@@ -313,6 +313,7 @@ class _LibraryPageState extends State<LibraryPage> {
         client,
         cursor: conn.syncCursor,
         onCursor: conn.setSyncCursor,
+        scope: widget.settings.syncScope,
       );
       // Reading position rides its own pass, after the sync guard is free and
       // only when the user opted in (plan 5 #5). Its own try/catch: a failure
@@ -899,6 +900,7 @@ class _LibraryPageState extends State<LibraryPage> {
         client,
         cursor: conn.syncCursor,
         onCursor: conn.setSyncCursor,
+        scope: widget.settings.syncScope,
       );
       messenger.showSnackBar(SnackBar(
         content: Text(l10n.syncResult(report.pulled, report.pushed)),

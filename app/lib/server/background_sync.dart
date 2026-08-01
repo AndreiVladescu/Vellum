@@ -164,6 +164,7 @@ void backgroundSyncCallback() {
           client,
           cursor: connection.syncCursor,
           onCursor: connection.setSyncCursor,
+          scope: settings.syncScope,
         );
         await settings.setLastBackgroundSyncAt(DateTime.now());
         return true;

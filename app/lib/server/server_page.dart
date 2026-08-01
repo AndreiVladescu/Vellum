@@ -13,6 +13,7 @@ import 'cert_trust.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
 import 'sharing_page.dart';
+import 'sync_scope_page.dart';
 import 'sync_service.dart';
 
 /// Connect the app to a Vellum sync server: log in (or register the first,
@@ -392,6 +393,7 @@ class _ServerPageState extends State<ServerPage> {
           cursor: widget.connection.syncCursor,
           onCursor: widget.connection.setSyncCursor,
           onProgress: _onProgress,
+          scope: widget.settings.syncScope,
         );
         // Its own pass, after the guard is free, and only when opted in.
         // Failures here don't spoil an otherwise successful sync report.
@@ -732,19 +734,44 @@ class _ServerPageState extends State<ServerPage> {
             'pushes your local changes up to the server. It also runs '
             'automatically when the app starts.'),
         const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            onPressed: _busy ? null : _syncNow,
-            icon: _busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.sync),
-            label: const Text('Sync now'),
-          ),
+        Row(
+          children: [
+            FilledButton.icon(
+              onPressed: _busy ? null : _syncNow,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.sync),
+              label: const Text('Sync now'),
+            ),
+            const SizedBox(width: 12),
+            // What syncs is a decision, not a setting to hunt for: it belongs
+            // beside the button that acts on it (next features #8).
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SyncScopePage(
+                    settings: widget.settings,
+                    repository: widget.repository,
+                    connection: widget.connection,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.tune),
+              label: const Text('What syncs'),
+            ),
+          ],
         ),
+        if (!widget.settings.syncScope.isEverything)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Not syncing: ${widget.settings.syncScope.excluded.join(', ')}',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
           shape: const Border(),
