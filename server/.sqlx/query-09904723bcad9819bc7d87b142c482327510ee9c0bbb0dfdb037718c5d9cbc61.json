@@ -6,7 +6,8 @@
       {
         "name": "EXISTS(SELECT 1 FROM share s WHERE s.grantee_id = ? AND ( (s.scope = 'group' AND s.scope_id = ?) OR (s.scope = 'all'   AND s.owner_id = ?) ))",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": "Expression"
       }
     ],
     "parameters": {

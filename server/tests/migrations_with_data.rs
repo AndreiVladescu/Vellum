@@ -27,7 +27,7 @@ async fn migrate_partially(path: &str, through: i64) -> sqlx::SqlitePool {
         }
         // Mirrors what the real migrator does, including recording it, so the
         // remaining migrations run normally afterwards.
-        sqlx::query(&migration.sql)
+        sqlx::query(migration.sql.clone())
             .execute(&pool)
             .await
             .unwrap_or_else(|e| panic!("setup migration {}: {e}", migration.version));

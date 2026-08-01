@@ -75,7 +75,7 @@ async fn visible_shelves(
             {filter} \
          ORDER BY s.sort_order, s.name"
     );
-    let mut query = sqlx::query_as::<_, ShelfRow>(&sql)
+    let mut query = sqlx::query_as::<_, ShelfRow>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -110,7 +110,7 @@ async fn membership_by_shelf(
             "SELECT shelf_id, book_id FROM shelf_book \
              WHERE shelf_id IN ({placeholders}) ORDER BY shelf_id, position"
         );
-        let mut query = sqlx::query_as::<_, Row>(&sql);
+        let mut query = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(sql.as_str()));
         for id in chunk {
             query = query.bind(id);
         }
@@ -287,7 +287,7 @@ async fn existing_book_ids(state: &AppState, ids: &[String]) -> AppResult<Vec<St
         .collect::<Vec<_>>()
         .join(",");
     let sql = format!("SELECT id FROM book WHERE id IN ({placeholders})");
-    let mut query = sqlx::query_scalar::<_, String>(&sql);
+    let mut query = sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(sql.as_str()));
     for id in ids {
         query = query.bind(id);
     }

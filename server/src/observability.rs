@@ -176,9 +176,11 @@ pub async fn stats(State(state): State<AppState>, user: AuthUser) -> AppResult<J
     }
 
     async fn count(db: &sqlx::SqlitePool, table: &str) -> AppResult<i64> {
-        Ok(sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
-            .fetch_one(db)
-            .await?)
+        Ok(
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM {table}")))
+                .fetch_one(db)
+                .await?,
+        )
     }
 
     Ok(Json(ServerStats {

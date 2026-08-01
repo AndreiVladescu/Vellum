@@ -74,15 +74,15 @@ async fn forget_copies(state: &AppState, user: &AuthUser) -> AppResult<u64> {
     forget_copy_photos(state, user).await?;
     forget_loans(state, user).await?;
 
-    let ids: Vec<String> = sqlx::query_scalar(&format!(
+    let ids: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM physical_copy WHERE book_id IN ({MY_BOOKS})"
-    ))
+    )))
     .bind(&user.id)
     .fetch_all(&state.db)
     .await?;
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM physical_copy WHERE book_id IN ({MY_BOOKS})"
-    ))
+    )))
     .bind(&user.id)
     .execute(&state.db)
     .await?;
@@ -91,10 +91,10 @@ async fn forget_copies(state: &AppState, user: &AuthUser) -> AppResult<u64> {
 }
 
 async fn forget_loans(state: &AppState, user: &AuthUser) -> AppResult<u64> {
-    let ids: Vec<String> = sqlx::query_scalar(&format!(
+    let ids: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT l.id FROM loan l JOIN physical_copy pc ON pc.id = l.copy_id \
          WHERE pc.book_id IN ({MY_BOOKS})"
-    ))
+    )))
     .bind(&user.id)
     .fetch_all(&state.db)
     .await?;
@@ -109,11 +109,11 @@ async fn forget_loans(state: &AppState, user: &AuthUser) -> AppResult<u64> {
 }
 
 async fn forget_copy_photos(state: &AppState, user: &AuthUser) -> AppResult<u64> {
-    let ids: Vec<String> = sqlx::query_scalar(&format!(
+    let ids: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT cp.id FROM copy_photo cp \
          JOIN physical_copy pc ON pc.id = cp.copy_id \
          WHERE pc.book_id IN ({MY_BOOKS})"
-    ))
+    )))
     .bind(&user.id)
     .fetch_all(&state.db)
     .await?;

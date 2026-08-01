@@ -6,7 +6,13 @@
       {
         "name": "owner_id",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "book",
+            "name": "owner_id"
+          }
+        }
       }
     ],
     "parameters": {

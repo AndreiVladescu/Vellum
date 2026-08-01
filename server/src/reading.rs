@@ -79,7 +79,7 @@ async fn my_progress(
          ORDER BY rp.book_id, rp.device_id",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, ProgressDto>(&sql)
+    let mut query = sqlx::query_as::<_, ProgressDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(&user.id)
         .bind(user.is_master)

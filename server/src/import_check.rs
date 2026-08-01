@@ -98,15 +98,16 @@ pub async fn check(
     // Only books the caller can see: a collision they have no access to is not
     // information they are entitled to, and importing "again" is the right
     // outcome for a book that is not theirs.
-    let existing: Vec<(String, String, Option<String>)> = sqlx::query_as(&format!(
-        "SELECT b.id, b.title, b.isbn FROM book b WHERE {}",
-        crate::books::access_predicate()
-    ))
-    .bind(&user.id)
-    .bind(user.is_master)
-    .bind(&user.id)
-    .fetch_all(&state.db)
-    .await?;
+    let existing: Vec<(String, String, Option<String>)> =
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT b.id, b.title, b.isbn FROM book b WHERE {}",
+            crate::books::access_predicate()
+        )))
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .fetch_all(&state.db)
+        .await?;
 
     let ids: Vec<String> = existing.iter().map(|(id, _, _)| id.clone()).collect();
     let authors = crate::books::author_map_for(&state, &ids).await?;
@@ -198,7 +199,7 @@ async fn file_hashes_for(
             .join(","),
     );
     sql.push(')');
-    let mut query = sqlx::query_as::<_, (String, String)>(&sql);
+    let mut query = sqlx::query_as::<_, (String, String)>(sqlx::AssertSqlSafe(sql.as_str()));
     for id in ids {
         query = query.bind(id);
     }

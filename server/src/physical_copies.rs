@@ -62,7 +62,7 @@ async fn visible_copies(
          WHERE {} {filter} ORDER BY pc.id",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, CopyDto>(&sql)
+    let mut query = sqlx::query_as::<_, CopyDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -250,9 +250,9 @@ pub async fn delete(
 }
 
 async fn fetch_copy(state: &AppState, id: &str) -> AppResult<Json<CopyDto>> {
-    let copy = sqlx::query_as::<_, CopyDto>(&format!(
+    let copy = sqlx::query_as::<_, CopyDto>(sqlx::AssertSqlSafe(format!(
         "SELECT {COPY_COLUMNS} FROM physical_copy WHERE id = ?"
-    ))
+    )))
     .bind(id)
     .fetch_optional(&state.db)
     .await?
@@ -307,7 +307,7 @@ pub async fn list_photos(
          WHERE {} {filter} ORDER BY cp.id",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, CopyPhotoDto>(&sql)
+    let mut query = sqlx::query_as::<_, CopyPhotoDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);

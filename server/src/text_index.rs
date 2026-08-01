@@ -419,7 +419,7 @@ pub async fn search(
          ORDER BY rank LIMIT ?",
         access_predicate()
     );
-    let hits = sqlx::query_as::<_, SearchHit>(&sql)
+    let hits = sqlx::query_as::<_, SearchHit>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&expression)
         .bind(&user.id)
         .bind(user.is_master)

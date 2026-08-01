@@ -123,7 +123,7 @@ pub async fn list(
             ""
         }
     );
-    let items = sqlx::query_as::<_, NotificationDto>(&sql)
+    let items = sqlx::query_as::<_, NotificationDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(limit)
         .fetch_all(&state.db)

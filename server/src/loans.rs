@@ -90,7 +90,7 @@ async fn visible_loans(
          WHERE {} {filter} ORDER BY l.id",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, LoanDto>(&sql)
+    let mut query = sqlx::query_as::<_, LoanDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -181,7 +181,7 @@ pub async fn overview(
         access_predicate()
     );
     // Bind order follows the SQL text: the SELECT list is read before WHERE.
-    let rows = sqlx::query_as::<_, CopyLoanDto>(&sql)
+    let rows = sqlx::query_as::<_, CopyLoanDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id)
@@ -387,11 +387,12 @@ pub async fn delete(
 }
 
 async fn fetch_loan(state: &AppState, id: &str) -> AppResult<Json<LoanDto>> {
-    let loan =
-        sqlx::query_as::<_, LoanDto>(&format!("SELECT {LOAN_COLUMNS} FROM loan WHERE id = ?"))
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("loan not found".into()))?;
+    let loan = sqlx::query_as::<_, LoanDto>(sqlx::AssertSqlSafe(format!(
+        "SELECT {LOAN_COLUMNS} FROM loan WHERE id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("loan not found".into()))?;
     Ok(Json(loan))
 }
