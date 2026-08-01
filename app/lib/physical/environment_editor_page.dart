@@ -92,8 +92,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   String? _selectedId;
 
-  /// The bookcase whose segments are highlighted, if any (next features #11).
+  /// The selected bookcase, if any — one box is drawn round the whole of it.
   String? _selectedGroupId;
+
+  /// A selected loose segment, for the same box. Only one of these two is ever
+  /// set: selecting is "the thing under the click", and for a grouped segment
+  /// that thing is its bookcase.
+  String? _selectedShelfId;
 
   /// Segment ids picked while building a group by hand. Non-null means the
   /// "choose the parts" mode is on.
@@ -113,10 +118,17 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// The segments moving with the one being dragged (its bookcase, or just it).
   List<PhysicalShelf> _dragGroup = const [];
   Offset _shelfGrabWorld = Offset.zero;
+  /// Where the last gesture started, in local coordinates — a release has no
+  /// position of its own, and selecting needs to know what was under the click.
+  Offset _lastTapLocal = Offset.zero;
   Offset _shelfDelta = Offset.zero; // world offset applied while dragging
   // Placement ids of the books resting on the shelf being dragged, so they ride
   // along with it — live via [_shelfDeltaVN], then persisted on release.
   Set<String> _ridingIds = const {};
+  /// Props standing on the shelf being dragged. They ride it exactly as the
+  /// books do — an ornament that stayed put while the shelf slid out from
+  /// under it would be the one thing in the room ignoring gravity.
+  Set<String> _ridingPropIds = const {};
 
   // In-flight drag positions, published without a whole-canvas setState: the
   // dragged book's overlay listens to [_dragPosVN], and the room painter
@@ -287,6 +299,33 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             ),
       ];
 
+  /// The shelf under a screen point, topmost first — the same order the drag
+  /// and menu hit-tests use.
+  PhysicalShelf? _shelfUnder(Offset local) {
+    for (final s in _shelves.reversed) {
+      if (_shelfHitRect(s).contains(local)) return s;
+    }
+    return null;
+  }
+
+  /// The world-space box around whatever is selected — a whole bookcase, or a
+  /// single loose segment. Null when nothing is selected, which is the state
+  /// the room is in almost all the time.
+  Rect? _selectionBounds() {
+    final selected = [
+      for (final s in _shelves)
+        if (_selectedGroupId != null && s.groupId == _selectedGroupId ||
+            _selectedShelfId != null && s.id == _selectedShelfId)
+          s,
+    ];
+    if (selected.isEmpty) return null;
+    final left = selected.map((s) => math.min(s.x1, s.x2)).reduce(math.min);
+    final right = selected.map((s) => math.max(s.x1, s.x2)).reduce(math.max);
+    final bottom = selected.map((s) => math.min(s.y1, s.y2)).reduce(math.min);
+    final top = selected.map((s) => math.max(s.y1, s.y2)).reduce(math.max);
+    return Rect.fromLTRB(left, bottom, right, top);
+  }
+
   /// Every segment that moves with [s] — its whole bookcase when it is part of
   /// one, otherwise just itself.
   List<PhysicalShelf> _groupOf(PhysicalShelf s) {
@@ -295,6 +334,19 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     return [
       for (final other in _shelves)
         if (other.groupId == group) other,
+    ];
+  }
+
+  /// The props resting on shelf [s], by the same test the books use.
+  List<RoomProp> _propRidersOf(PhysicalShelf s) {
+    final seg = SettleSegment(x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2);
+    return [
+      for (final prop in _props)
+        if (restsOnShelf(
+          SettleBox(x: prop.x, y: prop.y, w: prop.widthM, h: prop.heightM),
+          seg,
+        ))
+          prop,
     ];
   }
 
@@ -359,6 +411,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     _dragPropId = null;
     _dragGroup = const [];
     _ridingIds = const {};
+    _ridingPropIds = const {};
 
     // A released prop settles like a book: onto the highest surface beneath it,
     // nudged clear of whatever is already there. Dropped in mid-air it goes
@@ -413,22 +466,31 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     if (_dragId == null && _dragPropId == null) {
       for (final s in _shelves.reversed) {
         if (_shelfHitRect(s).contains(focal)) {
+          // Anchored is the default, so a left-click on a shelf pans the room
+          // rather than dragging the furniture. Unanchor it from its menu
+          // first — see `PhysicalShelves.anchored`.
+          if (s.anchored) continue;
           _dragShelfId = s.id;
           _shelfStart = s;
           _shelfGrabWorld = _screenToWorld(focal);
           _shelfDelta = Offset.zero;
-          // A bookcase moves as one, and every book on any of its shelves rides
-          // along — dragging a side panel and leaving the shelves behind would
-          // be a very surprising way to take a bookcase apart.
+          // A bookcase moves as one, and everything standing on any of its
+          // shelves rides along — dragging a side panel and leaving the shelves
+          // behind would be a very surprising way to take a bookcase apart.
           _dragGroup = _groupOf(s);
           _ridingIds = {
             for (final part in _dragGroup)
               for (final pb in _ridersOf(part)) pb.placement.id,
           };
+          _ridingPropIds = {
+            for (final part in _dragGroup)
+              for (final prop in _propRidersOf(part)) prop.id,
+          };
           break;
         }
       }
     }
+    _lastTapLocal = focal;
     _camStartScale = _scale;
     _camWorldFocal = _screenToWorld(focal);
   }
@@ -498,6 +560,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
     final dragId = _dragId;
     final dragShelfId = _dragShelfId;
+    final propRiders = [
+      for (final prop in _props)
+        if (_ridingPropIds.contains(prop.id)) prop,
+    ];
     final riders = [
       for (final pb in _placed)
         if (_ridingIds.contains(pb.placement.id)) pb,
@@ -508,6 +574,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     _dragPropId = null;
     _dragGroup = const [];
     _ridingIds = const {};
+    _ridingPropIds = const {};
 
     // A released prop settles like a book: onto the highest surface beneath it,
     // nudged clear of whatever is already there. Dropped in mid-air it goes
@@ -550,26 +617,23 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           } else {
             // A loose shelf dropped inside a bookcase snaps to span it, so it
             // lines up with the sides instead of stopping a few millimetres
-            // short — which at this zoom is impossible to do by eye.
-            final moved = (
-              left: math.min(s.x1, s.x2) + delta.dx,
-              right: math.max(s.x1, s.x2) + delta.dx,
-              y: math.max(s.y1, s.y2) + delta.dy,
+            // short — which at this zoom is impossible to do by eye. The
+            // arithmetic is pure and tested; see `dragSegment`.
+            final moved = dragSegment(
+              x1: s.x1,
+              y1: s.y1,
+              x2: s.x2,
+              y2: s.y2,
+              delta: delta,
+              holdsBooks: ShelfKind.parse(s.kind).holdsBooks,
+              uprights: _uprights(exceptId: s.id),
             );
-            final snapped = ShelfKind.parse(s.kind).holdsBooks
-                ? snapBetweenUprights(
-                    left: moved.left,
-                    right: moved.right,
-                    y: moved.y,
-                    uprights: _uprights(exceptId: s.id),
-                  )
-                : null;
             await repo.layout.updateShelf(
               s.id,
-              x1: snapped?.left ?? s.x1 + delta.dx,
-              y1: moved.y,
-              x2: snapped?.right ?? s.x2 + delta.dx,
-              y2: moved.y,
+              x1: moved.x1,
+              y1: moved.y1,
+              x2: moved.x2,
+              y2: moved.y2,
             );
           }
 
@@ -578,6 +642,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
               pb.placement.id,
               x: pb.placement.x + delta.dx,
               y: pb.placement.y + delta.dy,
+            );
+          }
+          // Ornaments travel with the shelf too, by the same delta.
+          for (final prop in propRiders) {
+            await repo.layout.moveProp(
+              prop.id,
+              x: prop.x + delta.dx,
+              y: prop.y + delta.dy,
             );
           }
           await _applyGravity();
@@ -589,7 +661,25 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
 
     if (dragId == null) {
-      if (!_moved) setState(() => _selectedId = null);
+      if (!_moved) {
+        // A click on empty space clears everything; a click on a shelf selects
+        // it. Selecting is what a plain click *does* now — anchored shelves
+        // don't move, so there is nothing else for it to mean.
+        final hit = _shelfUnder(_lastTapLocal);
+        setState(() {
+          _selectedId = null;
+          if (hit == null) {
+            _selectedGroupId = null;
+            _selectedShelfId = null;
+          } else if (hit.groupId != null) {
+            _selectedGroupId = hit.groupId;
+            _selectedShelfId = null;
+          } else {
+            _selectedGroupId = null;
+            _selectedShelfId = hit.id;
+          }
+        });
+      }
       return;
     }
     if (!_moved) {
@@ -1259,6 +1349,17 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             value: 'fill',
             child: Text('Add books to this shelf…'),
           ),
+        // First, because it is the reason most people open this menu: nothing
+        // in the room can be dragged until it is unanchored.
+        PopupMenuItem(
+          value: 'anchor',
+          child: Text(
+            s.anchored
+                ? (s.groupId != null ? 'Unlock this bookcase' : 'Unlock')
+                : (s.groupId != null ? 'Lock this bookcase' : 'Lock'),
+          ),
+        ),
+        const PopupMenuDivider(),
         if (s.groupId != null) ...[
           const PopupMenuItem(
             value: 'edit-case',
@@ -1285,6 +1386,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     switch (choice) {
       case 'fill':
         await _addBooks(shelf: s);
+      case 'anchor':
+        final parts = _groupOf(s);
+        await repo.layout.setAnchored(
+          widget.environmentId,
+          [for (final part in parts) part.id],
+          anchored: !s.anchored,
+        );
+        if (mounted) {
+          _say(s.anchored
+              ? 'Unlocked — drag it to move it.'
+              : 'Locked in place.');
+        }
       case 'edit-case':
         await _editBookcase(s.groupId!);
       case 'ungroup':
@@ -2041,7 +2154,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   line: theme.colorScheme.outlineVariant,
                   plank: theme.colorScheme.primary,
                   label: theme.colorScheme.onSurfaceVariant,
-                  draggingShelfId: _dragShelfId,
+                  draggingIds: {for (final part in _dragGroup) part.id},
                   shelfDelta: _shelfDeltaVN,
                   backdrop: _backdrop,
                   backdropOpacity: _environment?.backdropOpacity ?? 0.5,
@@ -2062,13 +2175,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                       ? null
                       : Color(_environment!.floorColor!),
                   surfaces: _environment?.roomSurfaces ?? true,
-                  highlightIds: _grouping ??
-                      {
-                        for (final s in _shelves)
-                          if (s.groupId != null &&
-                              s.groupId == _selectedGroupId)
-                            s.id,
-                      },
+                  // Ticks are only for picking the parts of a new group. A
+                  // *selected* bookcase gets one box round the whole thing.
+                  highlightIds: _grouping ?? const {},
+                  selectionBounds: _selectionBounds(),
                 ),
                 size: Size.infinite,
               ),
@@ -2078,7 +2188,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         // Props sit behind the books: an ornament pushed to the back of a
         // shelf is the ordinary case, and a statuette in front of a spine you
         // are trying to read is not.
-        for (final prop in _props) _propWidget(prop),
+        for (final prop in _props)
+          _ridingPropIds.contains(prop.id)
+              ? _ridingPropWidget(prop)
+              : _propWidget(prop),
         // Books (each in its own RepaintBoundary; the one being dragged is
         // drawn as a live overlay instead of in this static list).
         for (final pb in _placed)
@@ -2279,6 +2392,37 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             color: Theme.of(context).colorScheme.tertiary,
           ),
         ),
+      ),
+    );
+  }
+
+  /// A prop standing on the shelf being dragged: follows [_shelfDeltaVN] live,
+  /// so it moves *with* the plank rather than catching up on release.
+  Widget _ridingPropWidget(RoomProp prop) {
+    final kind = PropKind.parse(prop.kind);
+    return Positioned.fill(
+      child: ValueListenableBuilder<Offset>(
+        valueListenable: _shelfDeltaVN,
+        child: PropArt(
+          kind: kind,
+          color: Theme.of(context).colorScheme.tertiary,
+        ),
+        builder: (context, delta, child) {
+          final topLeft = _worldToScreen(
+            Offset(prop.x + delta.dx, prop.y + delta.dy + prop.heightM),
+          );
+          return Stack(
+            children: [
+              Positioned(
+                left: topLeft.dx,
+                top: topLeft.dy,
+                width: prop.widthM * _scale,
+                height: prop.heightM * _scale,
+                child: IgnorePointer(child: child!),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

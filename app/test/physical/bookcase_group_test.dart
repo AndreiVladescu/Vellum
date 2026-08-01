@@ -111,4 +111,63 @@ void main() {
         .reduce((a, b) => a < b ? a : b);
     expect(lowest, closeTo(0.09, 1e-9));
   });
+
+  group('anchoring', () {
+    test('a new bookcase is anchored, and a new shelf is too', () async {
+      // Anchored by default: a room is arranged once and looked at hundreds of
+      // times, so a left-click that shifts furniture is a mistake you have to
+      // notice before you can undo it.
+      final group = await addCase();
+      expect(
+        (await repo.layout.shelvesInGroup(group)).every((s) => s.anchored),
+        isTrue,
+      );
+      await repo.layout.addShelf(envId, x1: 0, y1: 1, x2: 0.9, y2: 1);
+      final loose = (await repo.layout.watchShelves(envId).first)
+          .firstWhere((s) => s.groupId == null);
+      expect(loose.anchored, isTrue);
+    });
+
+    test('unlocking a bookcase unlocks all of it, and locking puts it back',
+        () async {
+      final group = await addCase();
+      final ids = (await repo.layout.shelvesInGroup(group)).map((s) => s.id);
+      await repo.layout.setAnchored(envId, ids, anchored: false);
+      expect(
+        (await repo.layout.shelvesInGroup(group)).every((s) => s.anchored),
+        isFalse,
+        reason: 'a bookcase moves as one, so it unlocks as one',
+      );
+
+      await repo.layout.setAnchored(envId, ids, anchored: true);
+      expect(
+        (await repo.layout.shelvesInGroup(group)).every((s) => s.anchored),
+        isTrue,
+      );
+    });
+  });
+
+  test('moving a bookcase keeps its uprights upright', () async {
+    // The regression: a drag used to write the resting height into *both* y
+    // values, which is a no-op for a flat shelf and collapses a side panel or
+    // divider to a single point.
+    final group = await addCase();
+    final before = (await repo.layout.shelvesInGroup(group))
+        .where((s) => (s.y2 - s.y1).abs() > 1e-9)
+        .toList();
+    expect(before, isNotEmpty, reason: 'the case should have side panels');
+
+    await repo.layout.moveGroup(group, const Offset(0.5, 0));
+    final after = {
+      for (final s in await repo.layout.shelvesInGroup(group)) s.id: s,
+    };
+    for (final upright in before) {
+      final moved = after[upright.id]!;
+      expect(
+        (moved.y2 - moved.y1).abs(),
+        closeTo((upright.y2 - upright.y1).abs(), 1e-9),
+        reason: 'the upright lost its height',
+      );
+    }
+  });
 }

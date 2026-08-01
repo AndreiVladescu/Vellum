@@ -24,7 +24,7 @@ class RoomPainter extends CustomPainter {
     required this.line,
     required this.plank,
     required this.label,
-    this.draggingShelfId,
+    this.draggingIds = const {},
     required this.shelfDelta,
     this.backdrop,
     this.backdropOpacity = 0.5,
@@ -37,6 +37,7 @@ class RoomPainter extends CustomPainter {
     this.floorColor,
     this.surfaces = true,
     this.highlightIds = const {},
+    this.selectionBounds,
   }) : super(repaint: shelfDelta);
 
   final List<PhysicalShelf> shelves;
@@ -80,12 +81,20 @@ class RoomPainter extends CustomPainter {
   /// the plain grid, for anyone who preferred it.
   final bool surfaces;
 
-  /// Segments to outline: the bookcase just added or selected, or the parts
-  /// being picked for a new group. Shown on the segments themselves rather than
-  /// as a box around them, because a bookcase is its parts.
+  /// Segments to tick individually. Used *only* while picking the parts of a
+  /// new group by hand, where the whole question is which parts are in.
   final Set<String> highlightIds;
-  final String? draggingShelfId;
-  // A live drag offset for [draggingShelfId]; drives repaints without rebuilding
+
+  /// The selected bookcase, as one rectangle in world metres around the whole
+  /// thing. A box per segment turned out to read as clutter rather than as a
+  /// selection — the point of selecting a bookcase is to see it as one object.
+  final Rect? selectionBounds;
+  /// Every segment moving with the drag — a whole bookcase, or the single
+  /// shelf that isn't part of one. It used to be a single id, so dragging a
+  /// bookcase showed one plank sliding away from the rest and the others only
+  /// caught up when the click was released.
+  final Set<String> draggingIds;
+  // A live drag offset for [draggingIds]; drives repaints without rebuilding
   // the widget while a shelf is dragged.
   final ValueListenable<Offset> shelfDelta;
 
@@ -128,7 +137,7 @@ class RoomPainter extends CustomPainter {
     final plankPaint = Paint()..color = plank.withValues(alpha: 0.85);
     final structurePaint = Paint()..color = plank.withValues(alpha: 0.45);
     for (final s in shelves) {
-      final d = s.id == draggingShelfId ? shelfDelta.value : Offset.zero;
+      final d = draggingIds.contains(s.id) ? shelfDelta.value : Offset.zero;
       final p1 = _w2s(Offset(s.x1 + d.dx, s.y1 + d.dy));
       final p2 = _w2s(Offset(s.x2 + d.dx, s.y2 + d.dy));
       final left = math.min(p1.dx, p2.dx);
@@ -184,7 +193,27 @@ class RoomPainter extends CustomPainter {
       }
     }
 
+    _paintSelection(canvas);
     _paintMeasure(canvas);
+  }
+
+  /// One rounded rectangle around the selected bookcase, offset a little so it
+  /// reads as a box *containing* the thing rather than as another shelf.
+  void _paintSelection(Canvas canvas) {
+    final bounds = selectionBounds;
+    if (bounds == null) return;
+    // World rect -> screen. World Y is up, so the top-left corner comes from
+    // the *maximum* y.
+    final topLeft = _w2s(Offset(bounds.left, bounds.bottom));
+    final bottomRight = _w2s(Offset(bounds.right, bounds.top));
+    final rect = Rect.fromPoints(topLeft, bottomRight).inflate(6);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = label,
+    );
   }
 
   /// Wall above the floor line, floor below it. Drawn before the backdrop, so a
@@ -232,7 +261,7 @@ class RoomPainter extends CustomPainter {
 
     for (final s in shelves) {
       if (!ShelfKind.parse(s.kind).holdsBooks) continue;
-      final d = s.id == draggingShelfId ? shelfDelta.value : Offset.zero;
+      final d = draggingIds.contains(s.id) ? shelfDelta.value : Offset.zero;
       final p1 = _w2s(Offset(s.x1 + d.dx, s.y1 + d.dy));
       final p2 = _w2s(Offset(s.x2 + d.dx, s.y2 + d.dy));
       final left = math.min(p1.dx, p2.dx);
@@ -311,10 +340,11 @@ class RoomPainter extends CustomPainter {
       old.floorColor != floorColor ||
       old.surfaces != surfaces ||
       !setEquals(old.highlightIds, highlightIds) ||
+      old.selectionBounds != selectionBounds ||
       old.shelves != shelves ||
       old.origin != origin ||
       old.scale != scale ||
-      old.draggingShelfId != draggingShelfId ||
+      !setEquals(old.draggingIds, draggingIds) ||
       old.backdrop != backdrop ||
       old.backdropOpacity != backdropOpacity ||
       old.backdropScale != backdropScale ||

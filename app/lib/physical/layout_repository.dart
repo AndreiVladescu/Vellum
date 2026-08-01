@@ -488,6 +488,19 @@ class LayoutRepository {
     return group;
   }
 
+  /// Locks or unlocks a segment against dragging. A whole bookcase moves
+  /// together, so its parts are set together too.
+  Future<void> setAnchored(String environmentId, Iterable<String> ids,
+      {required bool anchored}) async {
+    await db.transaction(() async {
+      for (final id in ids) {
+        await (db.update(db.physicalShelves)..where((s) => s.id.equals(id)))
+            .write(PhysicalShelvesCompanion(anchored: Value(anchored)));
+      }
+    });
+    await markDirty(environmentId);
+  }
+
   /// Every segment of one bookcase.
   Future<List<PhysicalShelf>> shelvesInGroup(String groupId) =>
       (db.select(db.physicalShelves)..where((s) => s.groupId.equals(groupId)))

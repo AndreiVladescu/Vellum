@@ -25,6 +25,7 @@ PhysicalShelf _shelf({
       x2: x2,
       y2: y,
       kind: kind,
+      anchored: true,
       createdAt: DateTime(2026),
     );
 

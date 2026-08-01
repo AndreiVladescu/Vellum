@@ -194,6 +194,7 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
                             y2: s.y2,
                             label: s.label,
                             kind: s.kind,
+            anchored: true,
                             createdAt: DateTime.now(),
                           ),
                       ],

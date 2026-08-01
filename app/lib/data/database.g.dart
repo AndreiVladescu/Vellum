@@ -6385,6 +6385,21 @@ class $PhysicalShelvesTable extends PhysicalShelves
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _anchoredMeta = const VerificationMeta(
+    'anchored',
+  );
+  @override
+  late final GeneratedColumn<bool> anchored = GeneratedColumn<bool>(
+    'anchored',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("anchored" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -6408,6 +6423,7 @@ class $PhysicalShelvesTable extends PhysicalShelves
     label,
     kind,
     groupId,
+    anchored,
     createdAt,
   ];
   @override
@@ -6476,6 +6492,12 @@ class $PhysicalShelvesTable extends PhysicalShelves
         groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
       );
     }
+    if (data.containsKey('anchored')) {
+      context.handle(
+        _anchoredMeta,
+        anchored.isAcceptableOrUnknown(data['anchored']!, _anchoredMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -6527,6 +6549,10 @@ class $PhysicalShelvesTable extends PhysicalShelves
         DriftSqlType.string,
         data['${effectivePrefix}group_id'],
       ),
+      anchored: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}anchored'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -6568,6 +6594,16 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
   /// bookcase". With a tag the answer is easy: it keeps the tag until you
   /// ungroup, and ungrouping is one UPDATE.
   final String? groupId;
+
+  /// Whether this segment refuses to be dragged.
+  ///
+  /// **Anchored by default, deliberately.** A room is arranged once and then
+  /// looked at hundreds of times, so the common gesture on a shelf is not
+  /// "move it" — and a left-click that shifts a bookcase you were only trying
+  /// to look at is a mistake you have to notice before you can undo it.
+  /// Unanchoring is a right-click (or long-press) away, and is remembered, so
+  /// rearranging stays a two-step act you opted into.
+  final bool anchored;
   final DateTime createdAt;
   const PhysicalShelf({
     required this.id,
@@ -6579,6 +6615,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     this.label,
     required this.kind,
     this.groupId,
+    required this.anchored,
     required this.createdAt,
   });
   @override
@@ -6597,6 +6634,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     if (!nullToAbsent || groupId != null) {
       map['group_id'] = Variable<String>(groupId);
     }
+    map['anchored'] = Variable<bool>(anchored);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -6616,6 +6654,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       groupId: groupId == null && nullToAbsent
           ? const Value.absent()
           : Value(groupId),
+      anchored: Value(anchored),
       createdAt: Value(createdAt),
     );
   }
@@ -6635,6 +6674,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       label: serializer.fromJson<String?>(json['label']),
       kind: serializer.fromJson<String>(json['kind']),
       groupId: serializer.fromJson<String?>(json['groupId']),
+      anchored: serializer.fromJson<bool>(json['anchored']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -6651,6 +6691,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       'label': serializer.toJson<String?>(label),
       'kind': serializer.toJson<String>(kind),
       'groupId': serializer.toJson<String?>(groupId),
+      'anchored': serializer.toJson<bool>(anchored),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -6665,6 +6706,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     Value<String?> label = const Value.absent(),
     String? kind,
     Value<String?> groupId = const Value.absent(),
+    bool? anchored,
     DateTime? createdAt,
   }) => PhysicalShelf(
     id: id ?? this.id,
@@ -6676,6 +6718,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     label: label.present ? label.value : this.label,
     kind: kind ?? this.kind,
     groupId: groupId.present ? groupId.value : this.groupId,
+    anchored: anchored ?? this.anchored,
     createdAt: createdAt ?? this.createdAt,
   );
   PhysicalShelf copyWithCompanion(PhysicalShelvesCompanion data) {
@@ -6691,6 +6734,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       label: data.label.present ? data.label.value : this.label,
       kind: data.kind.present ? data.kind.value : this.kind,
       groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      anchored: data.anchored.present ? data.anchored.value : this.anchored,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -6707,6 +6751,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
           ..write('label: $label, ')
           ..write('kind: $kind, ')
           ..write('groupId: $groupId, ')
+          ..write('anchored: $anchored, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -6723,6 +6768,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     label,
     kind,
     groupId,
+    anchored,
     createdAt,
   );
   @override
@@ -6738,6 +6784,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
           other.label == this.label &&
           other.kind == this.kind &&
           other.groupId == this.groupId &&
+          other.anchored == this.anchored &&
           other.createdAt == this.createdAt);
 }
 
@@ -6751,6 +6798,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
   final Value<String?> label;
   final Value<String> kind;
   final Value<String?> groupId;
+  final Value<bool> anchored;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const PhysicalShelvesCompanion({
@@ -6763,6 +6811,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     this.label = const Value.absent(),
     this.kind = const Value.absent(),
     this.groupId = const Value.absent(),
+    this.anchored = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6776,6 +6825,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     this.label = const Value.absent(),
     this.kind = const Value.absent(),
     this.groupId = const Value.absent(),
+    this.anchored = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -6794,6 +6844,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     Expression<String>? label,
     Expression<String>? kind,
     Expression<String>? groupId,
+    Expression<bool>? anchored,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -6807,6 +6858,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
       if (label != null) 'label': label,
       if (kind != null) 'kind': kind,
       if (groupId != null) 'group_id': groupId,
+      if (anchored != null) 'anchored': anchored,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6822,6 +6874,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     Value<String?>? label,
     Value<String>? kind,
     Value<String?>? groupId,
+    Value<bool>? anchored,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -6835,6 +6888,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
       label: label ?? this.label,
       kind: kind ?? this.kind,
       groupId: groupId ?? this.groupId,
+      anchored: anchored ?? this.anchored,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6870,6 +6924,9 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     if (groupId.present) {
       map['group_id'] = Variable<String>(groupId.value);
     }
+    if (anchored.present) {
+      map['anchored'] = Variable<bool>(anchored.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -6891,6 +6948,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
           ..write('label: $label, ')
           ..write('kind: $kind, ')
           ..write('groupId: $groupId, ')
+          ..write('anchored: $anchored, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -16200,6 +16258,7 @@ typedef $$PhysicalShelvesTableCreateCompanionBuilder =
       Value<String?> label,
       Value<String> kind,
       Value<String?> groupId,
+      Value<bool> anchored,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -16214,6 +16273,7 @@ typedef $$PhysicalShelvesTableUpdateCompanionBuilder =
       Value<String?> label,
       Value<String> kind,
       Value<String?> groupId,
+      Value<bool> anchored,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -16296,6 +16356,11 @@ class $$PhysicalShelvesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get anchored => $composableBuilder(
+    column: $table.anchored,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -16374,6 +16439,11 @@ class $$PhysicalShelvesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get anchored => $composableBuilder(
+    column: $table.anchored,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -16436,6 +16506,9 @@ class $$PhysicalShelvesTableAnnotationComposer
 
   GeneratedColumn<String> get groupId =>
       $composableBuilder(column: $table.groupId, builder: (column) => column);
+
+  GeneratedColumn<bool> get anchored =>
+      $composableBuilder(column: $table.anchored, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -16504,6 +16577,7 @@ class $$PhysicalShelvesTableTableManager
                 Value<String?> label = const Value.absent(),
                 Value<String> kind = const Value.absent(),
                 Value<String?> groupId = const Value.absent(),
+                Value<bool> anchored = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalShelvesCompanion(
@@ -16516,6 +16590,7 @@ class $$PhysicalShelvesTableTableManager
                 label: label,
                 kind: kind,
                 groupId: groupId,
+                anchored: anchored,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -16530,6 +16605,7 @@ class $$PhysicalShelvesTableTableManager
                 Value<String?> label = const Value.absent(),
                 Value<String> kind = const Value.absent(),
                 Value<String?> groupId = const Value.absent(),
+                Value<bool> anchored = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalShelvesCompanion.insert(
@@ -16542,6 +16618,7 @@ class $$PhysicalShelvesTableTableManager
                 label: label,
                 kind: kind,
                 groupId: groupId,
+                anchored: anchored,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

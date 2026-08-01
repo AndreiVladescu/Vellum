@@ -366,6 +366,16 @@ class PhysicalShelves extends Table {
   /// bookcase". With a tag the answer is easy: it keeps the tag until you
   /// ungroup, and ungrouping is one UPDATE.
   TextColumn get groupId => text().nullable()();
+
+  /// Whether this segment refuses to be dragged.
+  ///
+  /// **Anchored by default, deliberately.** A room is arranged once and then
+  /// looked at hundreds of times, so the common gesture on a shelf is not
+  /// "move it" — and a left-click that shifts a bookcase you were only trying
+  /// to look at is a mistake you have to notice before you can undo it.
+  /// Unanchoring is a right-click (or long-press) away, and is remembered, so
+  /// rearranging stays a two-step act you opted into.
+  BoolColumn get anchored => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -568,7 +578,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 27;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -867,6 +877,15 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 28) {
+            // Shelves become anchored by default (next features #11 follow-up).
+            // Existing shelves are anchored too: someone who has arranged a
+            // room already wants it to stay arranged.
+            final cols = await columnsOf('physical_shelves');
+            if (!cols.contains('anchored')) {
+              await m.addColumn(physicalShelves, physicalShelves.anchored);
             }
           }
           if (from < 27) {

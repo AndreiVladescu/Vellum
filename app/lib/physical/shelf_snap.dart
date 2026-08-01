@@ -10,6 +10,45 @@
 library;
 
 import 'dart:math' as math;
+import 'dart:ui' show Offset;
+
+/// Where a dragged segment ends up: its endpoints after the move, with the
+/// snap applied if one was found.
+typedef DraggedSegment = ({double x1, double y1, double x2, double y2});
+
+/// Moves a segment by [delta] and snaps it between uprights when it is a shelf
+/// that landed inside a bookcase.
+///
+/// **Both y's are shifted, never equalised.** Writing the resting height into
+/// y1 *and* y2 looks harmless — for a flat shelf they are equal already — and
+/// collapses an upright to a single point. That is exactly what dragging a
+/// divider used to do to it: placed by hand it had a height, dragged once it
+/// became a dot.
+DraggedSegment dragSegment({
+  required double x1,
+  required double y1,
+  required double x2,
+  required double y2,
+  required Offset delta,
+  required bool holdsBooks,
+  List<Upright> uprights = const [],
+}) {
+  final surface = math.max(y1, y2) + delta.dy;
+  final snapped = holdsBooks
+      ? snapBetweenUprights(
+          left: math.min(x1, x2) + delta.dx,
+          right: math.max(x1, x2) + delta.dx,
+          y: surface,
+          uprights: uprights,
+        )
+      : null;
+  return (
+    x1: snapped?.left ?? x1 + delta.dx,
+    y1: y1 + delta.dy,
+    x2: snapped?.right ?? x2 + delta.dx,
+    y2: y2 + delta.dy,
+  );
+}
 
 /// An upright the shelf could snap to: a side panel or a divider.
 typedef Upright = ({double x, double bottom, double top});

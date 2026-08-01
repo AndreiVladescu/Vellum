@@ -82,4 +82,72 @@ void main() {
       isNull,
     );
   });
+
+  group('dragSegment', () {
+    test('a dragged divider keeps its height', () {
+      // The regression, in one line: the old code wrote the resting height into
+      // y1 *and* y2, so a divider placed by hand with a real height became a
+      // single point the first time it was dragged.
+      final moved = dragSegment(
+        x1: 0.4,
+        y1: 0.1,
+        x2: 0.4,
+        y2: 1.5,
+        delta: const Offset(0.2, 0.3),
+        holdsBooks: false,
+      );
+      expect(moved.y1, closeTo(0.4, 1e-9));
+      expect(moved.y2, closeTo(1.8, 1e-9));
+      expect(moved.y2 - moved.y1, closeTo(1.4, 1e-9), reason: 'height lost');
+      expect(moved.x1, closeTo(0.6, 1e-9));
+      expect(moved.x2, closeTo(0.6, 1e-9));
+    });
+
+    test('an upright never snaps, however close the others are', () {
+      // Snapping is a shelf spanning a bay. A divider dragged next to a panel
+      // must not be stretched across to it.
+      final moved = dragSegment(
+        x1: 0.05,
+        y1: 0.1,
+        x2: 0.05,
+        y2: 2.0,
+        delta: Offset.zero,
+        holdsBooks: false,
+        uprights: sides,
+      );
+      expect(moved.x1, closeTo(0.05, 1e-9));
+      expect(moved.x2, closeTo(0.05, 1e-9));
+    });
+
+    test('a flat shelf still moves and still snaps', () {
+      final moved = dragSegment(
+        x1: 0.03,
+        y1: 1.0,
+        x2: 0.77,
+        y2: 1.0,
+        delta: const Offset(0, 0.2),
+        holdsBooks: true,
+        uprights: sides,
+      );
+      expect(moved.y1, closeTo(1.2, 1e-9));
+      expect(moved.y2, closeTo(1.2, 1e-9));
+      expect(moved.x1, closeTo(0.0, 1e-9), reason: 'should have snapped left');
+      expect(moved.x2, closeTo(0.8, 1e-9), reason: 'should have snapped right');
+    });
+
+    test('a shelf dragged well away from any bookcase just moves', () {
+      final moved = dragSegment(
+        x1: 3.0,
+        y1: 1.0,
+        x2: 3.9,
+        y2: 1.0,
+        delta: const Offset(0.1, -0.1),
+        holdsBooks: true,
+        uprights: sides,
+      );
+      expect(moved.x1, closeTo(3.1, 1e-9));
+      expect(moved.x2, closeTo(4.0, 1e-9));
+      expect(moved.y1, closeTo(0.9, 1e-9));
+    });
+  });
 }

@@ -23,6 +23,7 @@ PhysicalShelf shelf(
       y2: y,
       label: label,
       kind: 'shelf',
+      anchored: true,
       createdAt: DateTime(2026),
     );
 
