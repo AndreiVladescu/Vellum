@@ -18,6 +18,7 @@ import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
 import 'book_picker.dart';
+import 'bookcase_template.dart';
 import 'bulk_place.dart';
 import 'labels.dart';
 import 'locate.dart';
@@ -559,6 +560,40 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }
 
   // ---- actions ------------------------------------------------------------
+
+  /// A whole bookcase in one gesture (next features #11): pick a style, adjust
+  /// the numbers, and its shelves and side panels are written together.
+  ///
+  /// Dropped at the right-hand edge of what is already in the room, so a second
+  /// bookcase stands beside the first rather than inside it.
+  Future<void> _addBookcase() async {
+    final spec = await showDialog<BookcaseSpec>(
+      context: context,
+      builder: (_) => const BookcaseDialog(),
+    );
+    if (spec == null || !mounted) return;
+
+    final rightEdge = _shelves.isEmpty
+        ? 0.0
+        : _shelves
+                .map((s) => math.max(s.x1, s.x2))
+                .reduce(math.max) +
+            0.2;
+    final written = await repo.layout.addBookcase(
+      widget.environmentId,
+      bookcaseSegments(
+        style: spec.style,
+        x: rightEdge,
+        y: 0,
+        width: spec.width,
+        height: spec.height,
+        shelves: spec.shelves,
+        label: spec.label,
+      ),
+    );
+    if (!mounted) return;
+    _say('Added a bookcase — $written shelves and panels.');
+  }
 
   Future<void> _addShelf() async {
     // Default a new shelf a bit above whatever's already there.
@@ -1248,9 +1283,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             icon: Icon(_searchOpen ? Icons.close : Icons.search),
           ),
           IconButton(
-            tooltip: 'Add shelf',
-            onPressed: _addShelf,
+            tooltip: 'Add bookcase',
+            onPressed: _addBookcase,
             icon: const Icon(Icons.shelves),
+          ),
+          IconButton(
+            tooltip: 'Add one shelf',
+            onPressed: _addShelf,
+            icon: const Icon(Icons.horizontal_rule),
           ),
           IconButton(
             tooltip: 'Room contents',

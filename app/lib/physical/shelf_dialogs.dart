@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'bookcase_template.dart';
 import 'room_measure.dart';
 
 import '../data/database.dart';
@@ -389,6 +390,163 @@ class _SizeDialogState extends State<SizeDialog> {
             );
           },
           child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// What the bookcase dialog returns (next features #11).
+class BookcaseSpec {
+  BookcaseSpec({
+    required this.style,
+    required this.width,
+    required this.height,
+    required this.shelves,
+    this.label,
+  });
+
+  final BookcaseStyle style;
+  final double width;
+  final double height;
+  final int shelves;
+  final String? label;
+}
+
+/// Add a whole bookcase at once, instead of drawing six shelves and two panels
+/// by hand.
+///
+/// The style picker sets sensible real-world defaults and every one of them
+/// stays editable — the styles are a starting point, not a constraint, because
+/// the bookcase in your hallway is whatever size it is.
+class BookcaseDialog extends StatefulWidget {
+  const BookcaseDialog({super.key});
+
+  @override
+  State<BookcaseDialog> createState() => _BookcaseDialogState();
+}
+
+class _BookcaseDialogState extends State<BookcaseDialog> {
+  BookcaseStyle _style = BookcaseStyle.billy;
+  late final _width = TextEditingController(text: '${_style.width}');
+  late final _height = TextEditingController(text: '${_style.height}');
+  late final _shelves = TextEditingController(text: '${_style.shelves}');
+  final _label = TextEditingController();
+
+  @override
+  void dispose() {
+    _width.dispose();
+    _height.dispose();
+    _shelves.dispose();
+    _label.dispose();
+    super.dispose();
+  }
+
+  /// Switching style refills the numbers, because the numbers *are* the style.
+  void _applyStyle(BookcaseStyle style) => setState(() {
+        _style = style;
+        _width.text = '${style.width}';
+        _height.text = '${style.height}';
+        _shelves.text = '${style.shelves}';
+      });
+
+  BookcaseSpec? get _spec {
+    final w = double.tryParse(_width.text);
+    final h = double.tryParse(_height.text);
+    final n = int.tryParse(_shelves.text);
+    if (w == null || h == null || n == null) return null;
+    if (w < 0.1 || h < 0.1 || n < 1) return null;
+    return BookcaseSpec(
+      style: _style,
+      width: w,
+      height: h,
+      shelves: n,
+      label: _label.text.trim().isEmpty ? null : _label.text.trim(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget field(String label, TextEditingController c) => Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: TextField(
+            controller: c,
+            onChanged: (_) => setState(() {}),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        );
+    final spec = _spec;
+    return AlertDialog(
+      title: const Text('Add a bookcase'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Writes the shelves and side panels it is made of. They are '
+              'ordinary shelves afterwards — move or delete any of them.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<BookcaseStyle>(
+              initialValue: _style,
+              isDense: true,
+              decoration: const InputDecoration(
+                labelText: 'Style',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                for (final style in BookcaseStyle.values)
+                  DropdownMenuItem(value: style, child: Text(style.label)),
+              ],
+              onChanged: (value) => _applyStyle(value ?? BookcaseStyle.billy),
+            ),
+            Row(
+              children: [
+                Expanded(child: field('Width (m)', _width)),
+                const SizedBox(width: 8),
+                Expanded(child: field('Height (m)', _height)),
+              ],
+            ),
+            field('Shelves', _shelves),
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: TextField(
+                controller: _label,
+                decoration: const InputDecoration(
+                  labelText: 'Name (optional)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            if (spec != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  '${spec.shelves} shelves'
+                  '${_style.hasSides ? ' and 2 side panels' : ''}, '
+                  '${formatDistance(spec.height / spec.shelves)} apart.',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: spec == null ? null : () => Navigator.pop(context, spec),
+          child: const Text('Add'),
         ),
       ],
     );

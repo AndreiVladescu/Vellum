@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../data/database.dart';
 import '../data/physical_service.dart';
 import 'locate.dart';
+import 'bookcase_template.dart';
 import 'room_measure.dart';
 
 /// A placement joined with the book it shows, for rendering an environment.
@@ -421,6 +422,35 @@ class LayoutRepository {
           );
     });
     await markDirty(environmentId);
+  }
+
+  /// Writes a whole bookcase — its shelves and its side panels — in one
+  /// transaction (next features #11).
+  ///
+  /// A generator, not a container: what lands in the database is ordinary
+  /// segments, so fill, tidy, stocktake, labels and the published room document
+  /// keep working without knowing bookcases exist. Returns how many segments
+  /// were written.
+  Future<int> addBookcase(String environmentId, List<TemplateSegment> parts) async {
+    if (parts.isEmpty) return 0;
+    await db.transaction(() async {
+      for (final part in parts) {
+        await db.into(db.physicalShelves).insert(
+              PhysicalShelvesCompanion.insert(
+                id: _uuid.v4(),
+                environmentId: environmentId,
+                x1: part.x1,
+                y1: part.y1,
+                x2: part.x2,
+                y2: part.y2,
+                label: Value(part.label),
+                kind: Value(part.kind.key),
+              ),
+            );
+      }
+    });
+    await markDirty(environmentId);
+    return parts.length;
   }
 
   /// Places several books at once, each with its own position (the bulk-add
