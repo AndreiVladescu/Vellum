@@ -311,20 +311,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// The world-space box around whatever is selected — a whole bookcase, or a
   /// single loose segment. Null when nothing is selected, which is the state
   /// the room is in almost all the time.
-  Rect? _selectionBounds() {
-    final selected = [
-      for (final s in _shelves)
-        if (_selectedGroupId != null && s.groupId == _selectedGroupId ||
-            _selectedShelfId != null && s.id == _selectedShelfId)
-          s,
-    ];
-    if (selected.isEmpty) return null;
-    final left = selected.map((s) => math.min(s.x1, s.x2)).reduce(math.min);
-    final right = selected.map((s) => math.max(s.x1, s.x2)).reduce(math.max);
-    final bottom = selected.map((s) => math.min(s.y1, s.y2)).reduce(math.min);
-    final top = selected.map((s) => math.max(s.y1, s.y2)).reduce(math.max);
-    return Rect.fromLTRB(left, bottom, right, top);
-  }
+  WorldBox? _selectionBounds() => selectionBoundsOf([
+        for (final s in _shelves)
+          if (_selectedGroupId != null && s.groupId == _selectedGroupId ||
+              _selectedShelfId != null && s.id == _selectedShelfId)
+            s,
+      ]);
 
   /// Every segment that moves with [s] — its whole bookcase when it is part of
   /// one, otherwise just itself.

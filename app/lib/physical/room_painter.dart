@@ -85,10 +85,15 @@ class RoomPainter extends CustomPainter {
   /// new group by hand, where the whole question is which parts are in.
   final Set<String> highlightIds;
 
-  /// The selected bookcase, as one rectangle in world metres around the whole
-  /// thing. A box per segment turned out to read as clutter rather than as a
-  /// selection — the point of selecting a bookcase is to see it as one object.
-  final Rect? selectionBounds;
+  /// The selected *and unlocked* bookcase, as one rectangle in world metres
+  /// around the whole thing.
+  ///
+  /// Two decisions live in that sentence. One box rather than one per segment,
+  /// because the point of selecting a bookcase is to see it as a single object.
+  /// And only while unlocked, so the box means "this will move if you drag it"
+  /// — an anchored bookcase is not going anywhere, and outlining it would be
+  /// decoration.
+  final WorldBox? selectionBounds;
   /// Every segment moving with the drag — a whole bookcase, or the single
   /// shelf that isn't part of one. It used to be a single id, so dragging a
   /// bookcase showed one plank sliding away from the rest and the others only
@@ -202,10 +207,10 @@ class RoomPainter extends CustomPainter {
   void _paintSelection(Canvas canvas) {
     final bounds = selectionBounds;
     if (bounds == null) return;
-    // World rect -> screen. World Y is up, so the top-left corner comes from
-    // the *maximum* y.
-    final topLeft = _w2s(Offset(bounds.left, bounds.bottom));
-    final bottomRight = _w2s(Offset(bounds.right, bounds.top));
+    // World box -> screen. World Y is up, so the screen's top-left corner comes
+    // from the world's *top*.
+    final topLeft = _w2s(Offset(bounds.left, bounds.top));
+    final bottomRight = _w2s(Offset(bounds.right, bounds.bottom));
     final rect = Rect.fromPoints(topLeft, bottomRight).inflate(6);
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(6)),

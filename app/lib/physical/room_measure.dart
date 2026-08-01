@@ -122,6 +122,33 @@ class ShelfFill {
   }
 }
 
+/// A box in world metres, where **y grows upwards**.
+///
+/// Deliberately not a `Rect`: Flutter's assumes screen coordinates, so its
+/// `top` is the smaller y. Storing a world box in one puts the room's ceiling
+/// in `rect.bottom`, which reads as a bug every time anyone looks at it — and
+/// cost a test failure the first time this was written that way.
+typedef WorldBox = ({double left, double right, double bottom, double top});
+
+/// The box to outline around a selection, or null when there should be none.
+///
+/// Null in two cases, and the second is the interesting one:
+///
+/// - nothing is selected, or
+/// - everything selected is **anchored**. The outline means "this will move if
+///   you drag it", not "this is selected" — selection on its own does nothing,
+///   while unlocked is a state you can leave something in by accident and
+///   otherwise cannot see.
+WorldBox? selectionBoundsOf(List<PhysicalShelf> selected) {
+  if (selected.isEmpty || selected.every((s) => s.anchored)) return null;
+  return (
+    left: selected.map((s) => math.min(s.x1, s.x2)).reduce(math.min),
+    right: selected.map((s) => math.max(s.x1, s.x2)).reduce(math.max),
+    bottom: selected.map((s) => math.min(s.y1, s.y2)).reduce(math.min),
+    top: selected.map((s) => math.max(s.y1, s.y2)).reduce(math.max),
+  );
+}
+
 /// A shelf's name for a menu or a message.
 ///
 /// Its label when it has one. When it doesn't, the height it sits at — because

@@ -12,9 +12,11 @@ PhysicalShelf _shelf({
   double x1 = 0,
   double x2 = 0.9,
   double y = 1.0,
+  double? top,
   String kind = 'shelf',
   String id = 's1',
   String? label,
+  bool anchored = true,
 }) =>
     PhysicalShelf(
       id: id,
@@ -23,9 +25,9 @@ PhysicalShelf _shelf({
       x1: x1,
       y1: y,
       x2: x2,
-      y2: y,
+      y2: top ?? y,
       kind: kind,
-      anchored: true,
+      anchored: anchored,
       createdAt: DateTime(2026),
     );
 
@@ -258,6 +260,49 @@ void main() {
     test('a blank label counts as no label', () {
       final s = _shelf(label: '   ', y: 1.0);
       expect(shelfName(s, [s]), 'Shelf at 1.00 m');
+    });
+  });
+
+  group('selectionBoundsOf', () {
+    // A two-shelf bookcase with side panels, as the template writes it.
+    List<PhysicalShelf> unit({required bool anchored}) => [
+          _shelf(id: 'a', x1: 0, x2: 0.8, y: 0.1, anchored: anchored),
+          _shelf(id: 'b', x1: 0, x2: 0.8, y: 1.1, anchored: anchored),
+          _shelf(id: 'c', x1: 0, x2: 0, y: 0.1, top: 2.0, kind: 'panel',
+              anchored: anchored),
+          _shelf(id: 'd', x1: 0.8, x2: 0.8, y: 0.1, top: 2.0, kind: 'panel',
+              anchored: anchored),
+        ];
+
+    test('a locked bookcase gets no outline, however it is selected', () {
+      // The rule: the box means "this will move if you drag it". A locked
+      // bookcase is not going anywhere, so outlining it would be decoration.
+      expect(selectionBoundsOf(unit(anchored: true)), isNull);
+    });
+
+    test('an unlocked one is boxed round the whole unit', () {
+      final box = selectionBoundsOf(unit(anchored: false));
+      expect(box, isNotNull);
+      expect(box!.left, closeTo(0, 1e-9));
+      expect(box.right, closeTo(0.8, 1e-9));
+      expect(box.bottom, closeTo(0.1, 1e-9), reason: 'world Y is up');
+      expect(box.top, closeTo(2.0, 1e-9),
+          reason: 'the box must reach the top of the side panels');
+    });
+
+    test('nothing selected, no box', () {
+      expect(selectionBoundsOf(const []), isNull);
+    });
+
+    test('a part-unlocked selection is still boxed', () {
+      // Locking is applied to a whole bookcase at once, so this is a state the
+      // UI does not produce — but "every part locked" is the condition, and a
+      // half-locked unit still has something that moves.
+      final mixed = [
+        _shelf(id: 'a', x1: 0, x2: 0.8, y: 0.1, anchored: true),
+        _shelf(id: 'b', x1: 0, x2: 0.8, y: 1.1, anchored: false),
+      ];
+      expect(selectionBoundsOf(mixed), isNotNull);
     });
   });
 }
