@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show ValueListenable, setEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, listEquals, setEquals;
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
@@ -37,7 +37,7 @@ class RoomPainter extends CustomPainter {
     this.floorColor,
     this.surfaces = true,
     this.highlightIds = const {},
-    this.selectionBounds,
+    this.outlines = const [],
   }) : super(repaint: shelfDelta);
 
   final List<PhysicalShelf> shelves;
@@ -85,15 +85,14 @@ class RoomPainter extends CustomPainter {
   /// new group by hand, where the whole question is which parts are in.
   final Set<String> highlightIds;
 
-  /// The selected *and unlocked* bookcase, as one rectangle in world metres
-  /// around the whole thing.
+  /// A box around each **unlocked** bookcase, in world metres.
   ///
-  /// Two decisions live in that sentence. One box rather than one per segment,
-  /// because the point of selecting a bookcase is to see it as a single object.
-  /// And only while unlocked, so the box means "this will move if you drag it"
-  /// — an anchored bookcase is not going anywhere, and outlining it would be
-  /// decoration.
-  final WorldBox? selectionBounds;
+  /// Two decisions live in that sentence. One box per bookcase rather than one
+  /// per segment, because a bookcase moves as a single object. And the lock
+  /// rather than a selection, so the box always answers "this will move if you
+  /// drag it" — locked furniture is not going anywhere, and outlining it would
+  /// be decoration.
+  final List<WorldBox> outlines;
   /// Every segment moving with the drag — a whole bookcase, or the single
   /// shelf that isn't part of one. It used to be a single id, so dragging a
   /// bookcase showed one plank sliding away from the rest and the others only
@@ -202,23 +201,27 @@ class RoomPainter extends CustomPainter {
     _paintMeasure(canvas);
   }
 
-  /// One rounded rectangle around the selected bookcase, offset a little so it
+  /// A rounded rectangle around each unlocked bookcase, offset a little so it
   /// reads as a box *containing* the thing rather than as another shelf.
   void _paintSelection(Canvas canvas) {
-    final bounds = selectionBounds;
-    if (bounds == null) return;
-    // World box -> screen. World Y is up, so the screen's top-left corner comes
-    // from the world's *top*.
-    final topLeft = _w2s(Offset(bounds.left, bounds.top));
-    final bottomRight = _w2s(Offset(bounds.right, bounds.bottom));
-    final rect = Rect.fromPoints(topLeft, bottomRight).inflate(6);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = label,
-    );
+    if (outlines.isEmpty) return;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = label;
+    for (final box in outlines) {
+      // World box -> screen. World Y is up, so the screen's top-left corner
+      // comes from the world's *top*.
+      final topLeft = _w2s(Offset(box.left, box.top));
+      final bottomRight = _w2s(Offset(box.right, box.bottom));
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromPoints(topLeft, bottomRight).inflate(6),
+          const Radius.circular(6),
+        ),
+        paint,
+      );
+    }
   }
 
   /// Wall above the floor line, floor below it. Drawn before the backdrop, so a
@@ -345,7 +348,7 @@ class RoomPainter extends CustomPainter {
       old.floorColor != floorColor ||
       old.surfaces != surfaces ||
       !setEquals(old.highlightIds, highlightIds) ||
-      old.selectionBounds != selectionBounds ||
+      !listEquals(old.outlines, outlines) ||
       old.shelves != shelves ||
       old.origin != origin ||
       old.scale != scale ||

@@ -130,23 +130,33 @@ class ShelfFill {
 /// cost a test failure the first time this was written that way.
 typedef WorldBox = ({double left, double right, double bottom, double top});
 
-/// The box to outline around a selection, or null when there should be none.
+/// A box around everything currently **unlocked**, one per bookcase.
 ///
-/// Null in two cases, and the second is the interesting one:
+/// The outline answers one question — *what will move if I drag it?* — so it
+/// follows the lock, not a selection. Selecting was tried first and was the
+/// wrong hook: unlocking happens through a context menu, which doesn't select
+/// anything, so you unlocked a bookcase and nothing appeared.
 ///
-/// - nothing is selected, or
-/// - everything selected is **anchored**. The outline means "this will move if
-///   you drag it", not "this is selected" — selection on its own does nothing,
-///   while unlocked is a state you can leave something in by accident and
-///   otherwise cannot see.
-WorldBox? selectionBoundsOf(List<PhysicalShelf> selected) {
-  if (selected.isEmpty || selected.every((s) => s.anchored)) return null;
-  return (
-    left: selected.map((s) => math.min(s.x1, s.x2)).reduce(math.min),
-    right: selected.map((s) => math.max(s.x1, s.x2)).reduce(math.max),
-    bottom: selected.map((s) => math.min(s.y1, s.y2)).reduce(math.min),
-    top: selected.map((s) => math.max(s.y1, s.y2)).reduce(math.max),
-  );
+/// Locked furniture is drawn plain, which is what a finished room is made of
+/// almost entirely — so this is empty nearly all the time, which is the point.
+/// Loose segments each get their own box; a bookcase gets one for the whole
+/// unit, because that is what moves.
+List<WorldBox> unlockedBoxes(List<PhysicalShelf> shelves) {
+  final groups = <String, List<PhysicalShelf>>{};
+  for (final s in shelves) {
+    if (s.anchored) continue;
+    // Ungrouped segments are keyed by their own id, so each is its own box.
+    groups.putIfAbsent(s.groupId ?? 'loose:${s.id}', () => []).add(s);
+  }
+  return [
+    for (final parts in groups.values)
+      (
+        left: parts.map((s) => math.min(s.x1, s.x2)).reduce(math.min),
+        right: parts.map((s) => math.max(s.x1, s.x2)).reduce(math.max),
+        bottom: parts.map((s) => math.min(s.y1, s.y2)).reduce(math.min),
+        top: parts.map((s) => math.max(s.y1, s.y2)).reduce(math.max),
+      ),
+  ];
 }
 
 /// A shelf's name for a menu or a message.

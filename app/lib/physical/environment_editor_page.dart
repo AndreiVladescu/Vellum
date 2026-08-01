@@ -92,13 +92,6 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   String? _selectedId;
 
-  /// The selected bookcase, if any — one box is drawn round the whole of it.
-  String? _selectedGroupId;
-
-  /// A selected loose segment, for the same box. Only one of these two is ever
-  /// set: selecting is "the thing under the click", and for a grouped segment
-  /// that thing is its bookcase.
-  String? _selectedShelfId;
 
   /// Segment ids picked while building a group by hand. Non-null means the
   /// "choose the parts" mode is on.
@@ -118,9 +111,6 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// The segments moving with the one being dragged (its bookcase, or just it).
   List<PhysicalShelf> _dragGroup = const [];
   Offset _shelfGrabWorld = Offset.zero;
-  /// Where the last gesture started, in local coordinates — a release has no
-  /// position of its own, and selecting needs to know what was under the click.
-  Offset _lastTapLocal = Offset.zero;
   Offset _shelfDelta = Offset.zero; // world offset applied while dragging
   // Placement ids of the books resting on the shelf being dragged, so they ride
   // along with it — live via [_shelfDeltaVN], then persisted on release.
@@ -299,25 +289,6 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             ),
       ];
 
-  /// The shelf under a screen point, topmost first — the same order the drag
-  /// and menu hit-tests use.
-  PhysicalShelf? _shelfUnder(Offset local) {
-    for (final s in _shelves.reversed) {
-      if (_shelfHitRect(s).contains(local)) return s;
-    }
-    return null;
-  }
-
-  /// The world-space box around whatever is selected — a whole bookcase, or a
-  /// single loose segment. Null when nothing is selected, which is the state
-  /// the room is in almost all the time.
-  WorldBox? _selectionBounds() => selectionBoundsOf([
-        for (final s in _shelves)
-          if (_selectedGroupId != null && s.groupId == _selectedGroupId ||
-              _selectedShelfId != null && s.id == _selectedShelfId)
-            s,
-      ]);
-
   /// Every segment that moves with [s] — its whole bookcase when it is part of
   /// one, otherwise just itself.
   List<PhysicalShelf> _groupOf(PhysicalShelf s) {
@@ -482,7 +453,6 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         }
       }
     }
-    _lastTapLocal = focal;
     _camStartScale = _scale;
     _camWorldFocal = _screenToWorld(focal);
   }
@@ -653,25 +623,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
 
     if (dragId == null) {
-      if (!_moved) {
-        // A click on empty space clears everything; a click on a shelf selects
-        // it. Selecting is what a plain click *does* now — anchored shelves
-        // don't move, so there is nothing else for it to mean.
-        final hit = _shelfUnder(_lastTapLocal);
-        setState(() {
-          _selectedId = null;
-          if (hit == null) {
-            _selectedGroupId = null;
-            _selectedShelfId = null;
-          } else if (hit.groupId != null) {
-            _selectedGroupId = hit.groupId;
-            _selectedShelfId = null;
-          } else {
-            _selectedGroupId = null;
-            _selectedShelfId = hit.id;
-          }
-        });
-      }
+      if (!_moved) setState(() => _selectedId = null);
       return;
     }
     if (!_moved) {
@@ -898,7 +850,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     // Stood on the skirting rather than on the floor line: at y = 0 the bottom
     // shelf lands inside the skirting band and reads as a stripe across the
     // base of the case. Real bookcases have a plinth for the same reason.
-    final group = await repo.layout.addBookcase(
+    await repo.layout.addBookcase(
       widget.environmentId,
       bookcaseSegments(
         style: spec.style,
@@ -911,7 +863,6 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       ),
     );
     if (!mounted) return;
-    setState(() => _selectedGroupId = group);
     _say('Added a bookcase. Drag any part to move it all.');
   }
 
@@ -969,13 +920,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   Future<void> _finishGrouping() async {
     final picked = _grouping;
     if (picked == null || picked.length < 2) return;
-    final group =
-        await repo.layout.groupShelves(widget.environmentId, picked.toList());
+    await repo.layout.groupShelves(widget.environmentId, picked.toList());
     if (!mounted) return;
-    setState(() {
-      _grouping = null;
-      _selectedGroupId = group;
-    });
+    setState(() => _grouping = null);
     _say('Grouped ${picked.length} parts into one bookcase.');
   }
 
@@ -1004,7 +951,6 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     if (ok != true) return;
     await repo.layout.deleteGroup(groupId);
     await _applyGravity();
-    if (mounted) setState(() => _selectedGroupId = null);
   }
 
   Future<void> _addShelf() async {
@@ -1394,10 +1340,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         await _editBookcase(s.groupId!);
       case 'ungroup':
         await repo.layout.ungroup(s.groupId!);
-        if (mounted) {
-          setState(() => _selectedGroupId = null);
-          _say('Ungrouped — the shelves stay where they are.');
-        }
+        if (mounted) _say('Ungrouped — the shelves stay where they are.');
       case 'delete-case':
         await _deleteBookcase(s.groupId!);
       case 'group':
@@ -2170,7 +2113,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   // Ticks are only for picking the parts of a new group. A
                   // *selected* bookcase gets one box round the whole thing.
                   highlightIds: _grouping ?? const {},
-                  selectionBounds: _selectionBounds(),
+                  outlines: unlockedBoxes(_shelves),
                 ),
                 size: Size.infinite,
               ),
