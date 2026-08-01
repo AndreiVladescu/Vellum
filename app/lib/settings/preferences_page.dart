@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../widgets/page_insets.dart';
+import '../snack_bars.dart';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
@@ -146,6 +147,9 @@ class PreferencesPage extends StatelessWidget {
               sync: sync,
               settings: settings,
             ),
+            const Divider(height: 24),
+            _SectionHeader('Danger zone'),
+            _ClearLibraryTile(repository: repository),
           ],
         ),
       ),
@@ -1329,6 +1333,143 @@ class _WallpaperTile extends StatelessWidget {
       trailing: selected
           ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
           : null,
+    );
+  }
+}
+
+/// "Move every book to the trash" (next features #1).
+///
+/// **Scoped to this device on purpose.** It trashes locally and leaves the
+/// server alone: that reuses the 30-day grace period, cannot harm anyone the
+/// library is shared with, and stays recoverable. The books coming back on the
+/// next sync is the honest answer rather than a bug — pressing Sync means you
+/// want the library — and the confirmation says so rather than letting it be a
+/// surprise.
+///
+/// The confirmation is a typed word, not a Yes/No. For something that touches
+/// every book, a dialog you can dismiss by reflex is not a confirmation.
+class _ClearLibraryTile extends StatelessWidget {
+  const _ClearLibraryTile({required this.repository});
+
+  final LibraryRepository repository;
+
+  static const _word = 'DELETE';
+
+  Future<void> _run(BuildContext context) async {
+    final books = await repository.watchAllBooks().first;
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (books.isEmpty) {
+      messenger.showSnackBar(
+        appSnackBar(content: const Text('Your library is already empty.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => _ConfirmClearDialog(count: books.length),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    for (final book in books) {
+      await repository.trashBook(book.id);
+    }
+    if (!context.mounted) return;
+    messenger.showSnackBar(appSnackBar(
+      content: Text('Moved ${books.length} books to the trash'),
+      // Straight afterwards, because the disk space is the usual reason for
+      // doing this at all and a second trip to find it is a poor reward.
+      action: SnackBarAction(
+        label: 'Empty trash',
+        onPressed: () async {
+          final trashed = await repository.watchTrashedBooks().first;
+          for (final book in trashed) {
+            await repository.trash.deleteNow(book);
+          }
+        },
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: Icon(Icons.delete_forever, color: scheme.error),
+      title: Text('Remove every book from this device',
+          style: TextStyle(color: scheme.error)),
+      subtitle: const Text(
+        'Moves your whole library to the trash. The server keeps its copy.',
+      ),
+      onTap: () => _run(context),
+    );
+  }
+}
+
+class _ConfirmClearDialog extends StatefulWidget {
+  const _ConfirmClearDialog({required this.count});
+
+  final int count;
+
+  @override
+  State<_ConfirmClearDialog> createState() => _ConfirmClearDialogState();
+}
+
+class _ConfirmClearDialogState extends State<_ConfirmClearDialog> {
+  final _typed = TextEditingController();
+
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = _typed.text.trim().toUpperCase() == _ClearLibraryTile._word;
+    return AlertDialog(
+      title: Text('Remove all ${widget.count} books?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Every book goes to the trash on this device, where it stays for '
+            '${TrashService.graceperiod.inDays} days. Nothing is deleted on '
+            'your server — if you sync again, your library comes back.',
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Disk space is not freed until the trash is emptied, which you can '
+            'do from the Trash section above.',
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _typed,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Type ${_ClearLibraryTile._word} to confirm',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: ok ? () => Navigator.pop(context, true) : null,
+          child: const Text('Move all to trash'),
+        ),
+      ],
     );
   }
 }
