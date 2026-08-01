@@ -420,7 +420,20 @@ class BookcaseSpec {
 /// stays editable — the styles are a starting point, not a constraint, because
 /// the bookcase in your hallway is whatever size it is.
 class BookcaseDialog extends StatefulWidget {
-  const BookcaseDialog({super.key});
+  const BookcaseDialog({
+    super.key,
+    this.initialWidth,
+    this.initialHeight,
+    this.initialShelves,
+    this.initialLabel,
+  });
+
+  /// Set when re-shaping an existing bookcase, so the dialog opens on what is
+  /// actually there rather than on a style's defaults.
+  final double? initialWidth;
+  final double? initialHeight;
+  final int? initialShelves;
+  final String? initialLabel;
 
   @override
   State<BookcaseDialog> createState() => _BookcaseDialogState();
@@ -428,10 +441,13 @@ class BookcaseDialog extends StatefulWidget {
 
 class _BookcaseDialogState extends State<BookcaseDialog> {
   BookcaseStyle _style = BookcaseStyle.billy;
-  late final _width = TextEditingController(text: '${_style.width}');
-  late final _height = TextEditingController(text: '${_style.height}');
-  late final _shelves = TextEditingController(text: '${_style.shelves}');
-  final _label = TextEditingController();
+  late final _width = TextEditingController(
+      text: '${widget.initialWidth ?? _style.width}');
+  late final _height = TextEditingController(
+      text: '${widget.initialHeight ?? _style.height}');
+  late final _shelves = TextEditingController(
+      text: '${widget.initialShelves ?? _style.shelves}');
+  late final _label = TextEditingController(text: widget.initialLabel ?? '');
 
   @override
   void dispose() {
@@ -482,7 +498,9 @@ class _BookcaseDialogState extends State<BookcaseDialog> {
         );
     final spec = _spec;
     return AlertDialog(
-      title: const Text('Add a bookcase'),
+      title: Text(widget.initialWidth == null
+          ? 'Add a bookcase'
+          : 'Edit this bookcase'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -546,7 +564,7 @@ class _BookcaseDialogState extends State<BookcaseDialog> {
         ),
         FilledButton(
           onPressed: spec == null ? null : () => Navigator.pop(context, spec),
-          child: const Text('Add'),
+          child: Text(widget.initialWidth == null ? 'Add' : 'Save'),
         ),
       ],
     );

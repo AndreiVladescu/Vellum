@@ -1,3 +1,5 @@
+import 'dart:ui' show Offset;
+
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -450,8 +452,15 @@ class LayoutRepository {
   /// segments, so fill, tidy, stocktake, labels and the published room document
   /// keep working without knowing bookcases exist. Returns how many segments
   /// were written.
-  Future<int> addBookcase(String environmentId, List<TemplateSegment> parts) async {
-    if (parts.isEmpty) return 0;
+  /// Returns the group id the bookcase was written under, so the caller can
+  /// select it straight away.
+  Future<String> addBookcase(
+    String environmentId,
+    List<TemplateSegment> parts, {
+    String? groupId,
+  }) async {
+    final group = groupId ?? _uuid.v4();
+    if (parts.isEmpty) return group;
     await db.transaction(() async {
       for (final part in parts) {
         await db.into(db.physicalShelves).insert(
@@ -464,12 +473,72 @@ class LayoutRepository {
                 y2: part.y2,
                 label: Value(part.label),
                 kind: Value(part.kind.key),
+                groupId: Value(group),
               ),
             );
       }
     });
     await markDirty(environmentId);
-    return parts.length;
+    return group;
+  }
+
+  /// Every segment of one bookcase.
+  Future<List<PhysicalShelf>> shelvesInGroup(String groupId) =>
+      (db.select(db.physicalShelves)..where((s) => s.groupId.equals(groupId)))
+          .get();
+
+  /// Moves a whole bookcase by [delta] metres, in one transaction so it can
+  /// never end up half-moved.
+  Future<void> moveGroup(String groupId, Offset delta) async {
+    final parts = await shelvesInGroup(groupId);
+    if (parts.isEmpty) return;
+    await db.transaction(() async {
+      for (final part in parts) {
+        await (db.update(db.physicalShelves)..where((s) => s.id.equals(part.id)))
+            .write(PhysicalShelvesCompanion(
+          x1: Value(part.x1 + delta.dx),
+          y1: Value(part.y1 + delta.dy),
+          x2: Value(part.x2 + delta.dx),
+          y2: Value(part.y2 + delta.dy),
+        ));
+      }
+    });
+    await markDirty(parts.first.environmentId);
+  }
+
+  /// Breaks a bookcase back into loose segments. Nothing moves — the geometry
+  /// was never nested, only tagged — so this is genuinely just forgetting the
+  /// tag, and the shelves stay exactly where they are.
+  Future<void> ungroup(String groupId) async {
+    final parts = await shelvesInGroup(groupId);
+    if (parts.isEmpty) return;
+    await (db.update(db.physicalShelves)
+          ..where((s) => s.groupId.equals(groupId)))
+        .write(const PhysicalShelvesCompanion(groupId: Value(null)));
+    await markDirty(parts.first.environmentId);
+  }
+
+  /// Tags a hand-picked set of segments as one bookcase.
+  Future<String> groupShelves(String environmentId, Iterable<String> ids) async {
+    final group = _uuid.v4();
+    await db.transaction(() async {
+      for (final id in ids) {
+        await (db.update(db.physicalShelves)..where((s) => s.id.equals(id)))
+            .write(PhysicalShelvesCompanion(groupId: Value(group)));
+      }
+    });
+    await markDirty(environmentId);
+    return group;
+  }
+
+  /// Deletes a whole bookcase.
+  Future<void> deleteGroup(String groupId) async {
+    final parts = await shelvesInGroup(groupId);
+    if (parts.isEmpty) return;
+    await (db.delete(db.physicalShelves)
+          ..where((s) => s.groupId.equals(groupId)))
+        .go();
+    await markDirty(parts.first.environmentId);
   }
 
   /// Places several books at once, each with its own position (the bulk-add

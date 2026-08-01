@@ -6374,6 +6374,17 @@ class $PhysicalShelvesTable extends PhysicalShelves
     requiredDuringInsert: false,
     defaultValue: const Constant('shelf'),
   );
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
+    'group_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -6396,6 +6407,7 @@ class $PhysicalShelvesTable extends PhysicalShelves
     y2,
     label,
     kind,
+    groupId,
     createdAt,
   ];
   @override
@@ -6458,6 +6470,12 @@ class $PhysicalShelvesTable extends PhysicalShelves
         kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
       );
     }
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -6505,6 +6523,10 @@ class $PhysicalShelvesTable extends PhysicalShelves
         DriftSqlType.string,
         data['${effectivePrefix}kind'],
       )!,
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -6535,6 +6557,17 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
   /// geometrically a shelf that books don't sit on — the only difference is
   /// whether `settle` may land something on it, which is one predicate.
   final String kind;
+
+  /// Which bookcase this segment belongs to, or null when it stands alone.
+  ///
+  /// **A tag, not a hierarchy.** A bookcase is still just its segments — this
+  /// only says which ones move, resize and delete together. Making bookcases a
+  /// parent table would have broken every query that reasons about a flat list
+  /// of segments (fill, tidy, stocktake, labels, the published document), and
+  /// would have had to answer "what happens when I drag one shelf out of a
+  /// bookcase". With a tag the answer is easy: it keeps the tag until you
+  /// ungroup, and ungrouping is one UPDATE.
+  final String? groupId;
   final DateTime createdAt;
   const PhysicalShelf({
     required this.id,
@@ -6545,6 +6578,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     required this.y2,
     this.label,
     required this.kind,
+    this.groupId,
     required this.createdAt,
   });
   @override
@@ -6560,6 +6594,9 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       map['label'] = Variable<String>(label);
     }
     map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || groupId != null) {
+      map['group_id'] = Variable<String>(groupId);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -6576,6 +6613,9 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
           ? const Value.absent()
           : Value(label),
       kind: Value(kind),
+      groupId: groupId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(groupId),
       createdAt: Value(createdAt),
     );
   }
@@ -6594,6 +6634,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       y2: serializer.fromJson<double>(json['y2']),
       label: serializer.fromJson<String?>(json['label']),
       kind: serializer.fromJson<String>(json['kind']),
+      groupId: serializer.fromJson<String?>(json['groupId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -6609,6 +6650,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       'y2': serializer.toJson<double>(y2),
       'label': serializer.toJson<String?>(label),
       'kind': serializer.toJson<String>(kind),
+      'groupId': serializer.toJson<String?>(groupId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -6622,6 +6664,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     double? y2,
     Value<String?> label = const Value.absent(),
     String? kind,
+    Value<String?> groupId = const Value.absent(),
     DateTime? createdAt,
   }) => PhysicalShelf(
     id: id ?? this.id,
@@ -6632,6 +6675,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
     y2: y2 ?? this.y2,
     label: label.present ? label.value : this.label,
     kind: kind ?? this.kind,
+    groupId: groupId.present ? groupId.value : this.groupId,
     createdAt: createdAt ?? this.createdAt,
   );
   PhysicalShelf copyWithCompanion(PhysicalShelvesCompanion data) {
@@ -6646,6 +6690,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
       y2: data.y2.present ? data.y2.value : this.y2,
       label: data.label.present ? data.label.value : this.label,
       kind: data.kind.present ? data.kind.value : this.kind,
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -6661,14 +6706,25 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
           ..write('y2: $y2, ')
           ..write('label: $label, ')
           ..write('kind: $kind, ')
+          ..write('groupId: $groupId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, environmentId, x1, y1, x2, y2, label, kind, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    environmentId,
+    x1,
+    y1,
+    x2,
+    y2,
+    label,
+    kind,
+    groupId,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -6681,6 +6737,7 @@ class PhysicalShelf extends DataClass implements Insertable<PhysicalShelf> {
           other.y2 == this.y2 &&
           other.label == this.label &&
           other.kind == this.kind &&
+          other.groupId == this.groupId &&
           other.createdAt == this.createdAt);
 }
 
@@ -6693,6 +6750,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
   final Value<double> y2;
   final Value<String?> label;
   final Value<String> kind;
+  final Value<String?> groupId;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const PhysicalShelvesCompanion({
@@ -6704,6 +6762,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     this.y2 = const Value.absent(),
     this.label = const Value.absent(),
     this.kind = const Value.absent(),
+    this.groupId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6716,6 +6775,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     required double y2,
     this.label = const Value.absent(),
     this.kind = const Value.absent(),
+    this.groupId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -6733,6 +6793,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     Expression<double>? y2,
     Expression<String>? label,
     Expression<String>? kind,
+    Expression<String>? groupId,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -6745,6 +6806,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
       if (y2 != null) 'y2': y2,
       if (label != null) 'label': label,
       if (kind != null) 'kind': kind,
+      if (groupId != null) 'group_id': groupId,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6759,6 +6821,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     Value<double>? y2,
     Value<String?>? label,
     Value<String>? kind,
+    Value<String?>? groupId,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -6771,6 +6834,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
       y2: y2 ?? this.y2,
       label: label ?? this.label,
       kind: kind ?? this.kind,
+      groupId: groupId ?? this.groupId,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6803,6 +6867,9 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
     if (kind.present) {
       map['kind'] = Variable<String>(kind.value);
     }
+    if (groupId.present) {
+      map['group_id'] = Variable<String>(groupId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -6823,6 +6890,7 @@ class PhysicalShelvesCompanion extends UpdateCompanion<PhysicalShelf> {
           ..write('y2: $y2, ')
           ..write('label: $label, ')
           ..write('kind: $kind, ')
+          ..write('groupId: $groupId, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -15531,6 +15599,7 @@ typedef $$PhysicalShelvesTableCreateCompanionBuilder =
       required double y2,
       Value<String?> label,
       Value<String> kind,
+      Value<String?> groupId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -15544,6 +15613,7 @@ typedef $$PhysicalShelvesTableUpdateCompanionBuilder =
       Value<double> y2,
       Value<String?> label,
       Value<String> kind,
+      Value<String?> groupId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -15621,6 +15691,11 @@ class $$PhysicalShelvesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -15694,6 +15769,11 @@ class $$PhysicalShelvesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -15753,6 +15833,9 @@ class $$PhysicalShelvesTableAnnotationComposer
 
   GeneratedColumn<String> get kind =>
       $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get groupId =>
+      $composableBuilder(column: $table.groupId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -15820,6 +15903,7 @@ class $$PhysicalShelvesTableTableManager
                 Value<double> y2 = const Value.absent(),
                 Value<String?> label = const Value.absent(),
                 Value<String> kind = const Value.absent(),
+                Value<String?> groupId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalShelvesCompanion(
@@ -15831,6 +15915,7 @@ class $$PhysicalShelvesTableTableManager
                 y2: y2,
                 label: label,
                 kind: kind,
+                groupId: groupId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -15844,6 +15929,7 @@ class $$PhysicalShelvesTableTableManager
                 required double y2,
                 Value<String?> label = const Value.absent(),
                 Value<String> kind = const Value.absent(),
+                Value<String?> groupId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhysicalShelvesCompanion.insert(
@@ -15855,6 +15941,7 @@ class $$PhysicalShelvesTableTableManager
                 y2: y2,
                 label: label,
                 kind: kind,
+                groupId: groupId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

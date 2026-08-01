@@ -29,6 +29,7 @@ import 'room_measure.dart';
 import 'room_painter.dart';
 import 'room_semantics.dart';
 import 'settle.dart';
+import 'shelf_snap.dart';
 import 'stocktake_page.dart';
 import 'shelf_dialogs.dart';
 
@@ -83,6 +84,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   String? _selectedId;
 
+  /// The bookcase whose segments are highlighted, if any (next features #11).
+  String? _selectedGroupId;
+
+  /// Segment ids picked while building a group by hand. Non-null means the
+  /// "choose the parts" mode is on.
+  Set<String>? _grouping;
+
   // Gesture bookkeeping.
   String? _dragId; // placement being dragged (null = panning/zooming)
   Offset _dragPos = Offset.zero; // dragged book's world bottom-left
@@ -94,6 +102,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   // Shelf dragging.
   String? _dragShelfId;
   PhysicalShelf? _shelfStart;
+  /// The segments moving with the one being dragged (its bookcase, or just it).
+  List<PhysicalShelf> _dragGroup = const [];
   Offset _shelfGrabWorld = Offset.zero;
   Offset _shelfDelta = Offset.zero; // world offset applied while dragging
   // Placement ids of the books resting on the shelf being dragged, so they ride
@@ -232,13 +242,52 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }
 
   // A grab band around a shelf's plank, so the thin line is easy to hit.
+  /// A grab band around a segment, thin in whichever direction the segment is
+  /// thin.
+  ///
+  /// This used to assume every segment was horizontal — it built a band across
+  /// the top edge — so once uprights gained a real vertical extent, a side
+  /// panel or divider was only clickable in a 12×22 box at its very top. In
+  /// practice that meant they could not be selected or dragged at all.
   Rect _shelfHitRect(PhysicalShelf s) {
     final p1 = _worldToScreen(Offset(s.x1, s.y1));
     final p2 = _worldToScreen(Offset(s.x2, s.y2));
-    final left = math.min(p1.dx, p2.dx);
-    final right = math.max(p1.dx, p2.dx);
-    final top = math.min(p1.dy, p2.dy);
-    return Rect.fromLTRB(left - 6, top - 10, right + 6, top + 12);
+    final bounds = Rect.fromPoints(p1, p2);
+    // Inflate to a comfortable target in both axes: a 1px line is not something
+    // anyone can hit with a finger, and the bound is *at least* this thick
+    // rather than exactly it, so a wide shelf stays wide.
+    const grab = 11.0;
+    return Rect.fromLTRB(
+      bounds.left - grab,
+      bounds.top - grab,
+      bounds.right + grab,
+      bounds.bottom + grab,
+    );
+  }
+
+  /// The uprights books can be bracketed by — side panels and dividers with a
+  /// real vertical extent. [exceptId] leaves out the segment being moved.
+  List<Upright> _uprights({String? exceptId}) => [
+        for (final s in _shelves)
+          if (s.id != exceptId &&
+              !ShelfKind.parse(s.kind).holdsBooks &&
+              (s.y2 - s.y1).abs() > 1e-9)
+            (
+              x: (s.x1 + s.x2) / 2,
+              bottom: math.min(s.y1, s.y2),
+              top: math.max(s.y1, s.y2),
+            ),
+      ];
+
+  /// Every segment that moves with [s] — its whole bookcase when it is part of
+  /// one, otherwise just itself.
+  List<PhysicalShelf> _groupOf(PhysicalShelf s) {
+    final group = s.groupId;
+    if (group == null) return [s];
+    return [
+      for (final other in _shelves)
+        if (other.groupId == group) other,
+    ];
   }
 
   /// The placed books resting on shelf [s], so they can travel with it when it
@@ -298,6 +347,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     // Topmost book under the finger, if any.
     _dragId = null;
     _dragShelfId = null;
+    _dragGroup = const [];
     _ridingIds = const {};
     for (final pb in _placed.reversed) {
       if (_screenRectOf(pb).contains(focal)) {
@@ -317,7 +367,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           _shelfStart = s;
           _shelfGrabWorld = _screenToWorld(focal);
           _shelfDelta = Offset.zero;
-          _ridingIds = {for (final pb in _ridersOf(s)) pb.placement.id};
+          // A bookcase moves as one, and every book on any of its shelves rides
+          // along — dragging a side panel and leaving the shelves behind would
+          // be a very surprising way to take a bookcase apart.
+          _dragGroup = _groupOf(s);
+          _ridingIds = {
+            for (final part in _dragGroup)
+              for (final pb in _ridersOf(part)) pb.placement.id,
+          };
           break;
         }
       }
@@ -388,6 +445,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     ];
     _dragId = null;
     _dragShelfId = null;
+    _dragGroup = const [];
     _ridingIds = const {};
 
     // Finished dragging a shelf: persist the shifted endpoints and carry every
@@ -397,13 +455,35 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       final delta = _shelfDelta;
       if (_moved && s != null) {
         () async {
-          await repo.layout.updateShelf(
-            s.id,
-            x1: s.x1 + delta.dx,
-            y1: s.y1 + delta.dy,
-            x2: s.x2 + delta.dx,
-            y2: s.y2 + delta.dy,
-          );
+          final group = s.groupId;
+          if (group != null) {
+            await repo.layout.moveGroup(group, delta);
+          } else {
+            // A loose shelf dropped inside a bookcase snaps to span it, so it
+            // lines up with the sides instead of stopping a few millimetres
+            // short — which at this zoom is impossible to do by eye.
+            final moved = (
+              left: math.min(s.x1, s.x2) + delta.dx,
+              right: math.max(s.x1, s.x2) + delta.dx,
+              y: math.max(s.y1, s.y2) + delta.dy,
+            );
+            final snapped = ShelfKind.parse(s.kind).holdsBooks
+                ? snapBetweenUprights(
+                    left: moved.left,
+                    right: moved.right,
+                    y: moved.y,
+                    uprights: _uprights(exceptId: s.id),
+                  )
+                : null;
+            await repo.layout.updateShelf(
+              s.id,
+              x1: snapped?.left ?? s.x1 + delta.dx,
+              y1: moved.y,
+              x2: snapped?.right ?? s.x2 + delta.dx,
+              y2: moved.y,
+            );
+          }
+
           for (final pb in riders) {
             await repo.layout.updatePlacement(
               pb.placement.id,
@@ -579,12 +659,15 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                 .map((s) => math.max(s.x1, s.x2))
                 .reduce(math.max) +
             0.2;
-    final written = await repo.layout.addBookcase(
+    // Stood on the skirting rather than on the floor line: at y = 0 the bottom
+    // shelf lands inside the skirting band and reads as a stripe across the
+    // base of the case. Real bookcases have a plinth for the same reason.
+    final group = await repo.layout.addBookcase(
       widget.environmentId,
       bookcaseSegments(
         style: spec.style,
         x: rightEdge,
-        y: 0,
+        y: skirtingMetres,
         width: spec.width,
         height: spec.height,
         shelves: spec.shelves,
@@ -592,7 +675,100 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       ),
     );
     if (!mounted) return;
-    _say('Added a bookcase — $written shelves and panels.');
+    setState(() => _selectedGroupId = group);
+    _say('Added a bookcase. Drag any part to move it all.');
+  }
+
+  /// Re-shapes a bookcase in place: same corner, new numbers.
+  ///
+  /// The segments are rewritten rather than nudged, because changing the shelf
+  /// count changes how many there are — there is nothing to nudge. The books
+  /// stay where they are and the gravity pass catches whatever is left
+  /// unsupported, which is the same thing that happens when a shelf is moved by
+  /// hand.
+  Future<void> _editBookcase(String groupId) async {
+    final parts = _shelves.where((s) => s.groupId == groupId).toList();
+    if (parts.isEmpty) return;
+    final left = parts.map((s) => math.min(s.x1, s.x2)).reduce(math.min);
+    final right = parts.map((s) => math.max(s.x1, s.x2)).reduce(math.max);
+    final bottom = parts.map((s) => math.min(s.y1, s.y2)).reduce(math.min);
+    final top = parts.map((s) => math.max(s.y1, s.y2)).reduce(math.max);
+    final shelfCount =
+        parts.where((s) => ShelfKind.parse(s.kind).holdsBooks).length;
+    final label = parts.map((s) => s.label).firstWhere(
+          (l) => l != null && l.isNotEmpty,
+          orElse: () => null,
+        );
+
+    final spec = await showDialog<BookcaseSpec>(
+      context: context,
+      builder: (_) => BookcaseDialog(
+        initialWidth: right - left,
+        initialHeight: top - bottom,
+        initialShelves: shelfCount,
+        initialLabel: label,
+      ),
+    );
+    if (spec == null || !mounted) return;
+
+    await repo.layout.deleteGroup(groupId);
+    await repo.layout.addBookcase(
+      widget.environmentId,
+      bookcaseSegments(
+        style: spec.style,
+        x: left,
+        y: bottom,
+        width: spec.width,
+        height: spec.height,
+        shelves: spec.shelves,
+        label: spec.label,
+      ),
+      // The same id, so anything still pointing at this bookcase keeps doing so.
+      groupId: groupId,
+    );
+    await _applyGravity();
+    if (mounted) _say('Bookcase updated.');
+  }
+
+  Future<void> _finishGrouping() async {
+    final picked = _grouping;
+    if (picked == null || picked.length < 2) return;
+    final group =
+        await repo.layout.groupShelves(widget.environmentId, picked.toList());
+    if (!mounted) return;
+    setState(() {
+      _grouping = null;
+      _selectedGroupId = group;
+    });
+    _say('Grouped ${picked.length} parts into one bookcase.');
+  }
+
+  Future<void> _deleteBookcase(String groupId) async {
+    final parts = _shelves.where((s) => s.groupId == groupId).length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete the whole bookcase?'),
+        content: Text(
+          'Removes all $parts shelves and panels. Books standing on them drop '
+          'to whatever is beneath — nothing leaves your library.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await repo.layout.deleteGroup(groupId);
+    await _applyGravity();
+    if (mounted) setState(() => _selectedGroupId = null);
   }
 
   Future<void> _addShelf() async {
@@ -850,6 +1026,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
     for (final s in _shelves.reversed) {
       if (_shelfHitRect(s).contains(local)) {
+        final picking = _grouping;
+        if (picking != null) {
+          setState(() {
+            if (!picking.remove(s.id)) picking.add(s.id);
+          });
+          return;
+        }
         await _shelfMenu(s, global);
         return;
       }
@@ -898,15 +1081,45 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             value: 'fill',
             child: Text('Add books to this shelf…'),
           ),
-        const PopupMenuItem(value: 'edit', child: Text('Edit shelf…')),
-        const PopupMenuItem(value: 'tidy', child: Text('Tidy this shelf…')),
-        const PopupMenuItem(value: 'delete', child: Text('Delete shelf')),
+        if (s.groupId != null) ...[
+          const PopupMenuItem(
+            value: 'edit-case',
+            child: Text('Edit this bookcase…'),
+          ),
+          const PopupMenuItem(value: 'ungroup', child: Text('Ungroup')),
+          const PopupMenuItem(
+            value: 'delete-case',
+            child: Text('Delete the whole bookcase'),
+          ),
+          const PopupMenuDivider(),
+        ] else
+          const PopupMenuItem(
+            value: 'group',
+            child: Text('Group into a bookcase…'),
+          ),
+        const PopupMenuItem(value: 'edit', child: Text('Edit this segment…')),
+        if (ShelfKind.parse(s.kind).holdsBooks)
+          const PopupMenuItem(value: 'tidy', child: Text('Tidy this shelf…')),
+        const PopupMenuItem(value: 'delete', child: Text('Delete this segment')),
       ],
     );
     if (choice == null || !mounted) return;
     switch (choice) {
       case 'fill':
         await _addBooks(shelf: s);
+      case 'edit-case':
+        await _editBookcase(s.groupId!);
+      case 'ungroup':
+        await repo.layout.ungroup(s.groupId!);
+        if (mounted) {
+          setState(() => _selectedGroupId = null);
+          _say('Ungrouped — the shelves stay where they are.');
+        }
+      case 'delete-case':
+        await _deleteBookcase(s.groupId!);
+      case 'group':
+        setState(() => _grouping = {s.id});
+        _say('Tap the other shelves and panels, then press Done.');
       case 'delete':
         await repo.layout.deleteShelf(s.id);
         await _applyGravity();
@@ -1660,6 +1873,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                       ? null
                       : Color(_environment!.floorColor!),
                   surfaces: _environment?.roomSurfaces ?? true,
+                  highlightIds: _grouping ??
+                      {
+                        for (final s in _shelves)
+                          if (s.groupId != null &&
+                              s.groupId == _selectedGroupId)
+                            s.id,
+                      },
                 ),
                 size: Size.infinite,
               ),
@@ -1710,6 +1930,36 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           bottom: 12,
           child: ScaleBar(scale: _scale),
         ),
+        if (_grouping != null)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${_grouping!.length} selected — tap the shelves and '
+                        'panels that make up this bookcase',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _grouping = null),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: _grouping!.length < 2 ? null : _finishGrouping,
+                      child: const Text('Group'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         // Selected-book toolbar.
         if (selected != null)
           Positioned(

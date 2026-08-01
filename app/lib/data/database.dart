@@ -355,6 +355,17 @@ class PhysicalShelves extends Table {
   /// geometrically a shelf that books don't sit on — the only difference is
   /// whether `settle` may land something on it, which is one predicate.
   TextColumn get kind => text().withDefault(const Constant('shelf'))();
+
+  /// Which bookcase this segment belongs to, or null when it stands alone.
+  ///
+  /// **A tag, not a hierarchy.** A bookcase is still just its segments — this
+  /// only says which ones move, resize and delete together. Making bookcases a
+  /// parent table would have broken every query that reasons about a flat list
+  /// of segments (fill, tidy, stocktake, labels, the published document), and
+  /// would have had to answer "what happens when I drag one shelf out of a
+  /// bookcase". With a tag the answer is easy: it keeps the tag until you
+  /// ungroup, and ungrouping is one UPDATE.
+  TextColumn get groupId => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -527,7 +538,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 26;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -826,6 +837,15 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 26) {
+            // Bookcase grouping (next features #11). A tag on the existing
+            // segments; every row made before this stays ungrouped, which is
+            // exactly right — they were drawn one at a time.
+            final shelfCols = await columnsOf('physical_shelves');
+            if (!shelfCols.contains('group_id')) {
+              await m.addColumn(physicalShelves, physicalShelves.groupId);
             }
           }
           if (from < 25) {

@@ -1,11 +1,16 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart' show ValueListenable, setEquals;
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import 'room_measure.dart';
+
+/// How tall the skirting board is, in metres. Shared with the editor, which
+/// stands a new bookcase on top of it — a bookcase whose bottom shelf is buried
+/// in the skirting is the giveaway that the two were drawn by different people.
+const skirtingMetres = 0.09;
 
 /// Paints the room behind the placed books: an optional backdrop photo, a faint
 /// metre grid, the floor line, and every segment drawn according to its kind
@@ -31,6 +36,7 @@ class RoomPainter extends CustomPainter {
     this.wallColor,
     this.floorColor,
     this.surfaces = true,
+    this.highlightIds = const {},
   }) : super(repaint: shelfDelta);
 
   final List<PhysicalShelf> shelves;
@@ -73,6 +79,11 @@ class RoomPainter extends CustomPainter {
   /// Whether to draw the floor, skirting and shelf shadows at all. Off returns
   /// the plain grid, for anyone who preferred it.
   final bool surfaces;
+
+  /// Segments to outline: the bookcase just added or selected, or the parts
+  /// being picked for a new group. Shown on the segments themselves rather than
+  /// as a box around them, because a bookcase is its parts.
+  final Set<String> highlightIds;
   final String? draggingShelfId;
   // A live drag offset for [draggingShelfId]; drives repaints without rebuilding
   // the widget while a shelf is dragged.
@@ -143,6 +154,18 @@ class RoomPainter extends CustomPainter {
           break; // text only — see below
       }
 
+      if (highlightIds.contains(s.id)) {
+        canvas.drawRect(
+          Rect.fromLTRB(left - 3, top - 3, math.max(right, left + 3) + 3,
+                  math.max(bottom, top + 3) + 3)
+              .inflate(1),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..color = label,
+        );
+      }
+
       final name = s.label;
       if (name != null && name.isNotEmpty) {
         final tp = TextPainter(
@@ -192,8 +215,7 @@ class RoomPainter extends CustomPainter {
   /// That consistency does more for the picture than the shadow itself.
   void _paintSurfaces(Canvas canvas, Size size) {
     // Skirting: a band above the floor line, in metres so it scales with zoom.
-    const skirtingM = 0.09;
-    final skirtingPx = skirtingM * scale;
+    final skirtingPx = skirtingMetres * scale;
     if (skirtingPx > 2) {
       canvas.drawRect(
         Rect.fromLTRB(0, origin.dy - skirtingPx, size.width, origin.dy),
@@ -288,6 +310,7 @@ class RoomPainter extends CustomPainter {
       old.wallColor != wallColor ||
       old.floorColor != floorColor ||
       old.surfaces != surfaces ||
+      !setEquals(old.highlightIds, highlightIds) ||
       old.shelves != shelves ||
       old.origin != origin ||
       old.scale != scale ||
