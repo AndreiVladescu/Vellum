@@ -6,6 +6,8 @@ import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
 import 'environment_editor_page.dart';
 import 'publish_room.dart';
+import '../server/server_client.dart';
+import 'shared_room_page.dart';
 import 'shelf_scan_page.dart';
 
 /// The Physical tab body: lists physical environments ("libraries") and lets
@@ -145,6 +147,43 @@ class PhysicalLibrariesTab extends StatelessWidget {
       builder: (context, snapshot) {
         final envs = snapshot.data ?? const [];
         if (envs.isEmpty) {
+          return ListView(children: [
+            const SizedBox(height: 60),
+            _emptyState(context, theme),
+            _SharedRooms(connection: connection),
+          ]);
+        }
+        return ListView(
+          padding: const EdgeInsets.only(top: 8, bottom: 88),
+          children: [
+            // Scanning a printed shelf label (plan 5 #28) belongs where the
+            // rooms are listed, since what it does is open one of them.
+            ListTile(
+              leading: const Icon(Icons.qr_code_scanner),
+              title: const Text('Scan a shelf label'),
+              subtitle: const Text('Opens the room that shelf is in'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ShelfScanPage(
+                    repository: repository,
+                    settings: settings,
+                  ),
+                ),
+              ),
+            ),
+            for (final env in envs) ...[
+              const Divider(height: 1),
+              _roomTile(context, env),
+            ],
+            _SharedRooms(connection: connection),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _emptyState(BuildContext context, ThemeData theme) {
+        {
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -175,30 +214,9 @@ class PhysicalLibrariesTab extends StatelessWidget {
             ),
           );
         }
-        return ListView.separated(
-          padding: const EdgeInsets.only(top: 8, bottom: 88),
-          // One extra row at the top: scanning a printed shelf label
-          // (plan 5 #28) belongs where the rooms are listed, since what it does
-          // is open one of them.
-          itemCount: envs.length + 1,
-          separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (context, i) {
-            if (i == 0) {
-              return ListTile(
-                leading: const Icon(Icons.qr_code_scanner),
-                title: const Text('Scan a shelf label'),
-                subtitle: const Text('Opens the room that shelf is in'),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ShelfScanPage(
-                      repository: repository,
-                      settings: settings,
-                    ),
-                  ),
-                ),
-              );
-            }
-            final env = envs[i - 1];
+  }
+
+  Widget _roomTile(BuildContext context, PhysicalEnvironment env) {
             return ListTile(
               leading: const Icon(Icons.grid_view_rounded),
               title: Text(env.name),
@@ -236,10 +254,54 @@ class PhysicalLibrariesTab extends StatelessWidget {
                 ],
               ),
             );
-          },
-        );
-      },
-    );
+  }
+}
+
+/// Rooms other people have shared with this account (next features #9).
+///
+/// Fetched rather than stored: a shared room is a mirror, so there is nothing
+/// local to list. Absent entirely without a connection or against a server too
+/// old to have `/api/layouts`, which is the same rule the publish actions
+/// follow — a section that can only fail is worse than none.
+class _SharedRooms extends StatefulWidget {
+  const _SharedRooms({required this.connection});
+
+  final ServerConnection? connection;
+
+  @override
+  State<_SharedRooms> createState() => _SharedRoomsState();
+}
+
+class _SharedRoomsState extends State<_SharedRooms> {
+  List<ServerLayout> _rooms = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final client = widget.connection?.client;
+    if (client == null) return;
+    try {
+      final all = await client.listLayouts();
+      if (!mounted) return;
+      setState(() => _rooms = [
+            for (final l in all)
+              if (!l.mine) l,
+          ]);
+    } catch (_) {
+      // Offline, or a server without rooms. Nothing to show, nothing to say:
+      // your own rooms are all local and are listed above regardless.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final client = widget.connection?.client;
+    if (client == null || _rooms.isEmpty) return const SizedBox.shrink();
+    return SharedRoomsList(rooms: _rooms, client: client);
   }
 }
 

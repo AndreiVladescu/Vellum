@@ -80,4 +80,10 @@ class PhysicalMetrics {
 
   static Color textColor(Book book) =>
       SpineStyle.fromJson(book.spineStyle, title: book.title).textColor;
+
+  /// The same palette, for a book this device holds no row for — a spine in a
+  /// room someone shared (next features #9). Derived from the title, exactly as
+  /// a generated spine is, so the room looks the way its owner sees it.
+  static Color colorForTitle(String title) =>
+      SpineStyle.generate(title: title).color;
 }

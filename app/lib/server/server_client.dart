@@ -339,6 +339,26 @@ class VellumServerClient {
     return ServerLayout.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// Titles for the books a published room mentions (next features #9).
+  ///
+  /// The room document is geometry only — deliberately, so publishing a room
+  /// doesn't publish your catalogue — so a viewer that wants to label the
+  /// spines has to ask. Returns `{book_id: title}`; ids the caller can't see
+  /// are simply absent, which the viewer draws as an unnamed book rather than
+  /// a gap.
+  Future<Map<String, String>> fetchLayoutBookTitles(String id) async {
+    final res = await _http.get(
+      _uri('/api/layouts/$id/books'),
+      headers: _headers,
+    );
+    final body = _body(res) as List? ?? const [];
+    return {
+      for (final b in body)
+        if (b is Map && b['book_id'] is String)
+          b['book_id'] as String: (b['title'] as String?) ?? 'Untitled',
+    };
+  }
+
   /// Publishes a room whole.
   ///
   /// [baseRevision] is the revision this device last saw; the server answers
