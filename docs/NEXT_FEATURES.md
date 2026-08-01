@@ -1,8 +1,9 @@
 # Next features — requested 2026-07-28
 
-Eleven items. **Eight are now built** — each marked *Done* with its commit —
-leaving #5 (the console import wizard) and the two room items, #10 and #11.
-Items 8 to 11 came out of the discussion rather than the original list.
+Eleven items. **Ten are built** — each marked *Done* with its commit. What is
+left is one stage of #10 (placeable props) and the parts of #11 that were
+deliberately declined. Items 8 to 11 came out of the discussion rather than the
+original list.
 
 Each entry keeps what was asked for and what the code did at the time, because
 the reasoning is what makes the decisions checkable later. Where a decision was
@@ -131,6 +132,13 @@ delete plus one insert, and the target position goes at the end.
 
 ## 5. Upload books to the server the way the app does
 
+> **Done** — commit `d65f2fb`. A catalogue file (CSV or JSON, with the aliases a
+> Goodreads/StoryGraph export uses) and a folder of PDFs/EPUBs, both with a
+> dry-run review. The duplicate check is `POST /api/import/check`, server-side
+> so the console and the app cannot disagree. **Not done:** Calibre and OPDS as
+> console sources — the two most likely to be wanted least, per the staging note
+> below.
+
 **Asked for.** A way to upload books into the server, the same way it's done in
 the client app.
 
@@ -217,7 +225,10 @@ together.
 
 ## 8. A sync dialogue: choose what syncs
 
-> **Done** — commit `634510d` — `SyncScope` threaded through every pass. **Not done:** un-publishing what is already on the server, which needs endpoints only reading position has.
+> **Done** — commits `634510d` and `fc08ac3`. `SyncScope` threaded through every
+> pass, and `DELETE /api/mine/{resource}` for taking a resource back off the
+> server, offered at the moment a switch goes off. Books are deliberately
+> excluded from un-publishing: that is a different act, and the console has it.
 
 **Asked for.** Instead of "everything or nothing", a dialogue where you pick
 which resources sync — books, physical copies, loans, and so on.
@@ -296,6 +307,12 @@ viewer-only sharing already means everywhere else.
 
 ## 10. Cosmetics in a physical room
 
+> **Stage 1 done** — commit `992537a`. Schema v25 adds wall and floor colours
+> and a surfaces switch; the painter draws the floor, a skirting board and a
+> contact shadow under every plank. **Stage 2, the props themselves, is not
+> built** — the design below stands and was chosen (2026-08-01) over stopping at
+> stage 1.
+
 **Asked for.** A way to put decoration in a physical library — the room should
 look like a room, not only like shelf geometry.
 
@@ -349,6 +366,11 @@ a shelf, and it is worth deciding on purpose rather than by default.
 ---
 
 ## 11. Bookcase styles, and accessories you can bring your own art to
+
+> **Stage 1 done** — commit `66a5774`. Five bookcase styles with real
+> dimensions, all editable, emitting ordinary shelf and panel segments.
+> **Decided (2026-08-01): stop there.** Segment styles, vector props and
+> imported artwork are not being built for now.
 
 **Asked for.** User-modifiable styles of bookcase, plus accessories — book
 nooks, small decorations. The proposal: a transparent collider box carrying the
@@ -490,19 +512,19 @@ Three mitigations, designed in rather than bolted on:
 
 ## What is left
 
-The order below was followed: #2, #3, #7+#6, #4, #1, #8, #9 are all in. What
-remains:
+Everything in the original order is in. What remains, smallest first:
 
-- **#5 — the import wizard in the console.** Larger than everything else here
-  put together, and worth doing in the three stages above rather than as one
-  piece. The duplicate check should run server-side and be shared with the app's
-  importer, or the two will disagree about what counts as a duplicate.
-- **#8's un-publish half.** Switching a resource off stops it syncing from now
-  on; it does not reach back for what is already on the server. Doing that needs
-  a bulk forget endpoint per resource — reading position is the only one that
-  has one today (`forgetDevice`). The screen says so rather than leaving it to
-  be discovered.
-- **#10 and #11 — the room.** See below.
+- **#10 stage 2 — placeable props.** The one piece asked for and not yet built.
+  A props table (plant, lamp, frame, vase, clock, bookend, boxes, cat) drawn as
+  vector paths, settling onto shelves the way books do, with a bookend acting as
+  a barrier — the machinery dividers and bookcase sides already use. It rides
+  the room document, so no server migration. The three-layer artwork / collider
+  / anchor split in #11 is the shape it should take.
+- **#5's remaining sources** — Calibre and OPDS in the console. The two that
+  need the server to reach out or read a directory structure, and by the
+  document's own reckoning the two most likely to be wanted least.
+- **#11 stages 2–4** — segment styles, vector props and imported artwork.
+  Declined on 2026-08-01; the written-up design stands if that changes.
 
 **#10 and #11** sit outside this order. Their cheap first stages — the room's own
 wall, floor and shadows (#10), and bookcase templates (#11) — are small enough to
