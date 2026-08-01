@@ -308,6 +308,19 @@ class PhysicalEnvironments extends Table {
   // thing that must not ride a share link.
   //
   // Relative to the data dir, like every other blob path.
+  // ---- The room's own surfaces (next features #10) -------------------------
+  // Wall and floor colours, as ARGB ints. **App-local**, for the same reason
+  // the backdrop is: the published document is geometry, and how someone has
+  // decorated their study is not part of "where the books are". Null means the
+  // theme picks, which is what every existing room does.
+  IntColumn get wallColor => integer().nullable()();
+  IntColumn get floorColor => integer().nullable()();
+  /// Whether to draw the floor line, its skirting board, and a soft shadow
+  /// under each shelf. On by default — an empty room drawn without them looks
+  /// like graph paper.
+  BoolColumn get roomSurfaces =>
+      boolean().withDefault(const Constant(true))();
+
   TextColumn get backdropPath => text().nullable()();
   RealColumn get backdropOpacity =>
       real().withDefault(const Constant(0.5))();
@@ -514,7 +527,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -812,6 +825,22 @@ class VellumDatabase extends _$VellumDatabase {
             ]) {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
+              }
+            }
+          }
+          if (from < 25) {
+            // The room's own surfaces (next features #10). App-local, like the
+            // backdrop, so there is no matching server migration. Guarded like
+            // every other step: a database stuck partway through an older
+            // upgrade may already have them.
+            final envCols = await columnsOf('physical_environments');
+            for (final (name, column) in [
+              ('wall_color', physicalEnvironments.wallColor),
+              ('floor_color', physicalEnvironments.floorColor),
+              ('room_surfaces', physicalEnvironments.roomSurfaces),
+            ]) {
+              if (!envCols.contains(name)) {
+                await m.addColumn(physicalEnvironments, column);
               }
             }
           }

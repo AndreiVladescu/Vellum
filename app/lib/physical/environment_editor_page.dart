@@ -1061,6 +1061,130 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
   }
 
+  /// The room's own look (next features #10): a wall colour, a floor colour,
+  /// and whether the floor line, skirting and shelf shadows are drawn.
+  ///
+  /// A short list of picked colours rather than a colour wheel — the aim is a
+  /// room that looks like a room, and a free choice mostly produces one that
+  /// fights the spines. "Use the theme" stays available and is the default.
+  Future<void> _showRoomDecor() async {
+    const walls = <(String, int?)>[
+      ('Theme', null),
+      ('Warm white', 0xFFF2EDE4),
+      ('Clay', 0xFFD9C3B0),
+      ('Sage', 0xFFBFC9BA),
+      ('Ink', 0xFF2A2E33),
+    ];
+    const floors = <(String, int?)>[
+      ('Theme', null),
+      ('Oak', 0xFFC9A87C),
+      ('Walnut', 0xFF7A5A42),
+      ('Slate', 0xFF6E7278),
+      ('Rug red', 0xFF8C4A3F),
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheet) {
+          Widget swatches(
+            String title,
+            List<(String, int?)> options,
+            int? current,
+            Future<void> Function(int?) pick,
+          ) =>
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(sheetContext).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final (name, value) in options)
+                          InkWell(
+                            onTap: () async {
+                              await pick(value);
+                              setSheet(() {});
+                            },
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: value == null
+                                        ? Theme.of(sheetContext)
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                        : Color(value),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: current == value
+                                          ? Theme.of(sheetContext)
+                                              .colorScheme
+                                              .primary
+                                          : Theme.of(sheetContext)
+                                              .colorScheme
+                                              .outlineVariant,
+                                      width: current == value ? 3 : 1,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(name,
+                                    style: Theme.of(sheetContext)
+                                        .textTheme
+                                        .labelSmall),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+
+          return SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                swatches('Wall', walls, _environment?.wallColor, (v) async {
+                  await repo.layout
+                      .updateRoomLook(widget.environmentId, wallColor: Value(v));
+                  await _loadEnvironment();
+                }),
+                const SizedBox(height: 12),
+                swatches('Floor', floors, _environment?.floorColor, (v) async {
+                  await repo.layout.updateRoomLook(widget.environmentId,
+                      floorColor: Value(v));
+                  await _loadEnvironment();
+                }),
+                SwitchListTile(
+                  title: const Text('Floor line, skirting and shadows'),
+                  subtitle: const Text(
+                    'What stops an empty room looking like graph paper',
+                  ),
+                  value: _environment?.roomSurfaces ?? true,
+                  onChanged: (v) async {
+                    await repo.layout
+                        .updateRoomLook(widget.environmentId, surfaces: v);
+                    await _loadEnvironment();
+                    setSheet(() {});
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _showBackdropSettings() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1329,6 +1453,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                     _measureFrom = null;
                     _measureTo = null;
                   });
+                case 'decor':
+                  await _showRoomDecor();
                 case 'help':
                   _showHelp();
               }
@@ -1337,6 +1463,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
               PopupMenuItem(
                 value: 'measure',
                 child: Text(_measuring ? 'Stop measuring' : 'Measure…'),
+              ),
+              const PopupMenuItem(
+                value: 'decor',
+                child: Text('Wall and floor…'),
               ),
               PopupMenuItem(
                 value: 'backdrop',
@@ -1521,6 +1651,15 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   measureFrom: _measureFrom,
                   measureTo: _measureTo,
                   measureColor: theme.colorScheme.tertiary,
+                  // The room's own look (next features #10). Null falls back to
+                  // the theme, which is what a room made before this had.
+                  wallColor: _environment?.wallColor == null
+                      ? null
+                      : Color(_environment!.wallColor!),
+                  floorColor: _environment?.floorColor == null
+                      ? null
+                      : Color(_environment!.floorColor!),
+                  surfaces: _environment?.roomSurfaces ?? true,
                 ),
                 size: Size.infinite,
               ),

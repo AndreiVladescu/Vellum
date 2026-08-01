@@ -135,6 +135,25 @@ class LayoutRepository {
     // look like it has unpublished changes.
   }
 
+  /// The room's wall/floor colours and whether its surfaces are drawn
+  /// (next features #10). App-local, like the backdrop — so deliberately *not*
+  /// `markDirty`: how a room is decorated is not part of where the books are,
+  /// and it must not make a room look like it has unpublished changes.
+  Future<void> updateRoomLook(
+    String environmentId, {
+    Value<int?>? wallColor,
+    Value<int?>? floorColor,
+    bool? surfaces,
+  }) async {
+    await (db.update(db.physicalEnvironments)
+          ..where((e) => e.id.equals(environmentId)))
+        .write(PhysicalEnvironmentsCompanion(
+      wallColor: wallColor ?? const Value.absent(),
+      floorColor: floorColor ?? const Value.absent(),
+      roomSurfaces: surfaces == null ? const Value.absent() : Value(surfaces),
+    ));
+  }
+
   Future<PhysicalEnvironment?> environment(String id) =>
       (db.select(db.physicalEnvironments)..where((e) => e.id.equals(id)))
           .getSingleOrNull();

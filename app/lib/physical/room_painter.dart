@@ -28,6 +28,9 @@ class RoomPainter extends CustomPainter {
     this.measureFrom,
     this.measureTo,
     this.measureColor,
+    this.wallColor,
+    this.floorColor,
+    this.surfaces = true,
   }) : super(repaint: shelfDelta);
 
   final List<PhysicalShelf> shelves;
@@ -55,6 +58,21 @@ class RoomPainter extends CustomPainter {
   final Color line;
   final Color plank;
   final Color label;
+
+  // ---- the room's own surfaces (next features #10) ------------------------
+  //
+  // A room drawn as segments on a grid reads as a diagram. Wall, floor,
+  // skirting and a contact shadow under each plank are what make it read as a
+  // room instead — the cheapest third of the cosmetics work by a distance.
+  //
+  // Null colours mean "let the theme decide", which is what every room created
+  // before this had.
+  final Color? wallColor;
+  final Color? floorColor;
+
+  /// Whether to draw the floor, skirting and shelf shadows at all. Off returns
+  /// the plain grid, for anyone who preferred it.
+  final bool surfaces;
   final String? draggingShelfId;
   // A live drag offset for [draggingShelfId]; drives repaints without rebuilding
   // the widget while a shelf is dragged.
@@ -67,6 +85,7 @@ class RoomPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // The photo goes first, under everything: it is a tracing aid, and anything
     // drawn beneath the grid and the shelves would be hidden by them.
+    if (surfaces) _paintWallAndFloor(canvas, size);
     _paintBackdrop(canvas);
 
     // Faint metre grid.
@@ -91,6 +110,8 @@ class RoomPainter extends CustomPainter {
       ..color = line
       ..strokeWidth = 2;
     canvas.drawLine(Offset(0, origin.dy), Offset(size.width, origin.dy), floor);
+
+    if (surfaces) _paintSurfaces(canvas, size);
 
     // Segments, drawn by kind (the one being dragged is shifted live).
     final plankPaint = Paint()..color = plank.withValues(alpha: 0.85);
@@ -141,6 +162,76 @@ class RoomPainter extends CustomPainter {
     }
 
     _paintMeasure(canvas);
+  }
+
+  /// Wall above the floor line, floor below it. Drawn before the backdrop, so a
+  /// room with a photo of its actual wall still gets one over the top.
+  void _paintWallAndFloor(Canvas canvas, Size size) {
+    final wall = wallColor;
+    final ground = floorColor;
+    if (wall == null && ground == null) return;
+    final horizon = origin.dy.clamp(0.0, size.height);
+    if (wall != null) {
+      canvas.drawRect(
+        Rect.fromLTRB(0, 0, size.width, horizon),
+        Paint()..color = wall,
+      );
+    }
+    if (ground != null) {
+      canvas.drawRect(
+        Rect.fromLTRB(0, horizon, size.width, size.height),
+        Paint()..color = ground,
+      );
+    }
+  }
+
+  /// The skirting board, and a soft contact shadow under every plank.
+  ///
+  /// The shadow is drawn by the room rather than baked into anything, so every
+  /// object in it — a shelf now, a prop later — sits on the same imagined light.
+  /// That consistency does more for the picture than the shadow itself.
+  void _paintSurfaces(Canvas canvas, Size size) {
+    // Skirting: a band above the floor line, in metres so it scales with zoom.
+    const skirtingM = 0.09;
+    final skirtingPx = skirtingM * scale;
+    if (skirtingPx > 2) {
+      canvas.drawRect(
+        Rect.fromLTRB(0, origin.dy - skirtingPx, size.width, origin.dy),
+        Paint()..color = plank.withValues(alpha: 0.16),
+      );
+      canvas.drawLine(
+        Offset(0, origin.dy - skirtingPx),
+        Offset(size.width, origin.dy - skirtingPx),
+        Paint()
+          ..color = line.withValues(alpha: 0.6)
+          ..strokeWidth = 1,
+      );
+    }
+
+    for (final s in shelves) {
+      if (!ShelfKind.parse(s.kind).holdsBooks) continue;
+      final d = s.id == draggingShelfId ? shelfDelta.value : Offset.zero;
+      final p1 = _w2s(Offset(s.x1 + d.dx, s.y1 + d.dy));
+      final p2 = _w2s(Offset(s.x2 + d.dx, s.y2 + d.dy));
+      final left = math.min(p1.dx, p2.dx);
+      final right = math.max(p1.dx, p2.dx);
+      final top = math.max(p1.dy, p2.dy);
+      // Under the plank, fading down — the contact shadow of a board with a
+      // wall behind it.
+      final rect = Rect.fromLTRB(left, top, right, top + math.max(3, 0.04 * scale));
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            rect.topLeft,
+            rect.bottomLeft,
+            [
+              const Color(0x33000000),
+              const Color(0x00000000),
+            ],
+          ),
+      );
+    }
   }
 
   void _paintBackdrop(Canvas canvas) {
@@ -194,6 +285,9 @@ class RoomPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant RoomPainter old) =>
+      old.wallColor != wallColor ||
+      old.floorColor != floorColor ||
+      old.surfaces != surfaces ||
       old.shelves != shelves ||
       old.origin != origin ||
       old.scale != scale ||

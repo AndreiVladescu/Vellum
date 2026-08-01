@@ -5512,6 +5512,43 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _wallColorMeta = const VerificationMeta(
+    'wallColor',
+  );
+  @override
+  late final GeneratedColumn<int> wallColor = GeneratedColumn<int>(
+    'wall_color',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _floorColorMeta = const VerificationMeta(
+    'floorColor',
+  );
+  @override
+  late final GeneratedColumn<int> floorColor = GeneratedColumn<int>(
+    'floor_color',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _roomSurfacesMeta = const VerificationMeta(
+    'roomSurfaces',
+  );
+  @override
+  late final GeneratedColumn<bool> roomSurfaces = GeneratedColumn<bool>(
+    'room_surfaces',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("room_surfaces" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _backdropPathMeta = const VerificationMeta(
     'backdropPath',
   );
@@ -5578,6 +5615,9 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
     createdAt,
     serverRevision,
     needsPublish,
+    wallColor,
+    floorColor,
+    roomSurfaces,
     backdropPath,
     backdropOpacity,
     backdropScale,
@@ -5636,6 +5676,27 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
         needsPublish.isAcceptableOrUnknown(
           data['needs_publish']!,
           _needsPublishMeta,
+        ),
+      );
+    }
+    if (data.containsKey('wall_color')) {
+      context.handle(
+        _wallColorMeta,
+        wallColor.isAcceptableOrUnknown(data['wall_color']!, _wallColorMeta),
+      );
+    }
+    if (data.containsKey('floor_color')) {
+      context.handle(
+        _floorColorMeta,
+        floorColor.isAcceptableOrUnknown(data['floor_color']!, _floorColorMeta),
+      );
+    }
+    if (data.containsKey('room_surfaces')) {
+      context.handle(
+        _roomSurfacesMeta,
+        roomSurfaces.isAcceptableOrUnknown(
+          data['room_surfaces']!,
+          _roomSurfacesMeta,
         ),
       );
     }
@@ -5717,6 +5778,18 @@ class $PhysicalEnvironmentsTable extends PhysicalEnvironments
         DriftSqlType.bool,
         data['${effectivePrefix}needs_publish'],
       )!,
+      wallColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}wall_color'],
+      ),
+      floorColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}floor_color'],
+      ),
+      roomSurfaces: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}room_surfaces'],
+      )!,
       backdropPath: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}backdrop_path'],
@@ -5754,6 +5827,13 @@ class PhysicalEnvironment extends DataClass
   final DateTime createdAt;
   final int? serverRevision;
   final bool needsPublish;
+  final int? wallColor;
+  final int? floorColor;
+
+  /// Whether to draw the floor line, its skirting board, and a soft shadow
+  /// under each shelf. On by default — an empty room drawn without them looks
+  /// like graph paper.
+  final bool roomSurfaces;
   final String? backdropPath;
   final double backdropOpacity;
 
@@ -5771,6 +5851,9 @@ class PhysicalEnvironment extends DataClass
     required this.createdAt,
     this.serverRevision,
     required this.needsPublish,
+    this.wallColor,
+    this.floorColor,
+    required this.roomSurfaces,
     this.backdropPath,
     required this.backdropOpacity,
     this.backdropScale,
@@ -5788,6 +5871,13 @@ class PhysicalEnvironment extends DataClass
       map['server_revision'] = Variable<int>(serverRevision);
     }
     map['needs_publish'] = Variable<bool>(needsPublish);
+    if (!nullToAbsent || wallColor != null) {
+      map['wall_color'] = Variable<int>(wallColor);
+    }
+    if (!nullToAbsent || floorColor != null) {
+      map['floor_color'] = Variable<int>(floorColor);
+    }
+    map['room_surfaces'] = Variable<bool>(roomSurfaces);
     if (!nullToAbsent || backdropPath != null) {
       map['backdrop_path'] = Variable<String>(backdropPath);
     }
@@ -5810,6 +5900,13 @@ class PhysicalEnvironment extends DataClass
           ? const Value.absent()
           : Value(serverRevision),
       needsPublish: Value(needsPublish),
+      wallColor: wallColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(wallColor),
+      floorColor: floorColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(floorColor),
+      roomSurfaces: Value(roomSurfaces),
       backdropPath: backdropPath == null && nullToAbsent
           ? const Value.absent()
           : Value(backdropPath),
@@ -5834,6 +5931,9 @@ class PhysicalEnvironment extends DataClass
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       serverRevision: serializer.fromJson<int?>(json['serverRevision']),
       needsPublish: serializer.fromJson<bool>(json['needsPublish']),
+      wallColor: serializer.fromJson<int?>(json['wallColor']),
+      floorColor: serializer.fromJson<int?>(json['floorColor']),
+      roomSurfaces: serializer.fromJson<bool>(json['roomSurfaces']),
       backdropPath: serializer.fromJson<String?>(json['backdropPath']),
       backdropOpacity: serializer.fromJson<double>(json['backdropOpacity']),
       backdropScale: serializer.fromJson<double?>(json['backdropScale']),
@@ -5851,6 +5951,9 @@ class PhysicalEnvironment extends DataClass
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'serverRevision': serializer.toJson<int?>(serverRevision),
       'needsPublish': serializer.toJson<bool>(needsPublish),
+      'wallColor': serializer.toJson<int?>(wallColor),
+      'floorColor': serializer.toJson<int?>(floorColor),
+      'roomSurfaces': serializer.toJson<bool>(roomSurfaces),
       'backdropPath': serializer.toJson<String?>(backdropPath),
       'backdropOpacity': serializer.toJson<double>(backdropOpacity),
       'backdropScale': serializer.toJson<double?>(backdropScale),
@@ -5866,6 +5969,9 @@ class PhysicalEnvironment extends DataClass
     DateTime? createdAt,
     Value<int?> serverRevision = const Value.absent(),
     bool? needsPublish,
+    Value<int?> wallColor = const Value.absent(),
+    Value<int?> floorColor = const Value.absent(),
+    bool? roomSurfaces,
     Value<String?> backdropPath = const Value.absent(),
     double? backdropOpacity,
     Value<double?> backdropScale = const Value.absent(),
@@ -5880,6 +5986,9 @@ class PhysicalEnvironment extends DataClass
         ? serverRevision.value
         : this.serverRevision,
     needsPublish: needsPublish ?? this.needsPublish,
+    wallColor: wallColor.present ? wallColor.value : this.wallColor,
+    floorColor: floorColor.present ? floorColor.value : this.floorColor,
+    roomSurfaces: roomSurfaces ?? this.roomSurfaces,
     backdropPath: backdropPath.present ? backdropPath.value : this.backdropPath,
     backdropOpacity: backdropOpacity ?? this.backdropOpacity,
     backdropScale: backdropScale.present
@@ -5900,6 +6009,13 @@ class PhysicalEnvironment extends DataClass
       needsPublish: data.needsPublish.present
           ? data.needsPublish.value
           : this.needsPublish,
+      wallColor: data.wallColor.present ? data.wallColor.value : this.wallColor,
+      floorColor: data.floorColor.present
+          ? data.floorColor.value
+          : this.floorColor,
+      roomSurfaces: data.roomSurfaces.present
+          ? data.roomSurfaces.value
+          : this.roomSurfaces,
       backdropPath: data.backdropPath.present
           ? data.backdropPath.value
           : this.backdropPath,
@@ -5927,6 +6043,9 @@ class PhysicalEnvironment extends DataClass
           ..write('createdAt: $createdAt, ')
           ..write('serverRevision: $serverRevision, ')
           ..write('needsPublish: $needsPublish, ')
+          ..write('wallColor: $wallColor, ')
+          ..write('floorColor: $floorColor, ')
+          ..write('roomSurfaces: $roomSurfaces, ')
           ..write('backdropPath: $backdropPath, ')
           ..write('backdropOpacity: $backdropOpacity, ')
           ..write('backdropScale: $backdropScale, ')
@@ -5944,6 +6063,9 @@ class PhysicalEnvironment extends DataClass
     createdAt,
     serverRevision,
     needsPublish,
+    wallColor,
+    floorColor,
+    roomSurfaces,
     backdropPath,
     backdropOpacity,
     backdropScale,
@@ -5960,6 +6082,9 @@ class PhysicalEnvironment extends DataClass
           other.createdAt == this.createdAt &&
           other.serverRevision == this.serverRevision &&
           other.needsPublish == this.needsPublish &&
+          other.wallColor == this.wallColor &&
+          other.floorColor == this.floorColor &&
+          other.roomSurfaces == this.roomSurfaces &&
           other.backdropPath == this.backdropPath &&
           other.backdropOpacity == this.backdropOpacity &&
           other.backdropScale == this.backdropScale &&
@@ -5975,6 +6100,9 @@ class PhysicalEnvironmentsCompanion
   final Value<DateTime> createdAt;
   final Value<int?> serverRevision;
   final Value<bool> needsPublish;
+  final Value<int?> wallColor;
+  final Value<int?> floorColor;
+  final Value<bool> roomSurfaces;
   final Value<String?> backdropPath;
   final Value<double> backdropOpacity;
   final Value<double?> backdropScale;
@@ -5988,6 +6116,9 @@ class PhysicalEnvironmentsCompanion
     this.createdAt = const Value.absent(),
     this.serverRevision = const Value.absent(),
     this.needsPublish = const Value.absent(),
+    this.wallColor = const Value.absent(),
+    this.floorColor = const Value.absent(),
+    this.roomSurfaces = const Value.absent(),
     this.backdropPath = const Value.absent(),
     this.backdropOpacity = const Value.absent(),
     this.backdropScale = const Value.absent(),
@@ -6002,6 +6133,9 @@ class PhysicalEnvironmentsCompanion
     this.createdAt = const Value.absent(),
     this.serverRevision = const Value.absent(),
     this.needsPublish = const Value.absent(),
+    this.wallColor = const Value.absent(),
+    this.floorColor = const Value.absent(),
+    this.roomSurfaces = const Value.absent(),
     this.backdropPath = const Value.absent(),
     this.backdropOpacity = const Value.absent(),
     this.backdropScale = const Value.absent(),
@@ -6017,6 +6151,9 @@ class PhysicalEnvironmentsCompanion
     Expression<DateTime>? createdAt,
     Expression<int>? serverRevision,
     Expression<bool>? needsPublish,
+    Expression<int>? wallColor,
+    Expression<int>? floorColor,
+    Expression<bool>? roomSurfaces,
     Expression<String>? backdropPath,
     Expression<double>? backdropOpacity,
     Expression<double>? backdropScale,
@@ -6031,6 +6168,9 @@ class PhysicalEnvironmentsCompanion
       if (createdAt != null) 'created_at': createdAt,
       if (serverRevision != null) 'server_revision': serverRevision,
       if (needsPublish != null) 'needs_publish': needsPublish,
+      if (wallColor != null) 'wall_color': wallColor,
+      if (floorColor != null) 'floor_color': floorColor,
+      if (roomSurfaces != null) 'room_surfaces': roomSurfaces,
       if (backdropPath != null) 'backdrop_path': backdropPath,
       if (backdropOpacity != null) 'backdrop_opacity': backdropOpacity,
       if (backdropScale != null) 'backdrop_scale': backdropScale,
@@ -6047,6 +6187,9 @@ class PhysicalEnvironmentsCompanion
     Value<DateTime>? createdAt,
     Value<int?>? serverRevision,
     Value<bool>? needsPublish,
+    Value<int?>? wallColor,
+    Value<int?>? floorColor,
+    Value<bool>? roomSurfaces,
     Value<String?>? backdropPath,
     Value<double>? backdropOpacity,
     Value<double?>? backdropScale,
@@ -6061,6 +6204,9 @@ class PhysicalEnvironmentsCompanion
       createdAt: createdAt ?? this.createdAt,
       serverRevision: serverRevision ?? this.serverRevision,
       needsPublish: needsPublish ?? this.needsPublish,
+      wallColor: wallColor ?? this.wallColor,
+      floorColor: floorColor ?? this.floorColor,
+      roomSurfaces: roomSurfaces ?? this.roomSurfaces,
       backdropPath: backdropPath ?? this.backdropPath,
       backdropOpacity: backdropOpacity ?? this.backdropOpacity,
       backdropScale: backdropScale ?? this.backdropScale,
@@ -6090,6 +6236,15 @@ class PhysicalEnvironmentsCompanion
     }
     if (needsPublish.present) {
       map['needs_publish'] = Variable<bool>(needsPublish.value);
+    }
+    if (wallColor.present) {
+      map['wall_color'] = Variable<int>(wallColor.value);
+    }
+    if (floorColor.present) {
+      map['floor_color'] = Variable<int>(floorColor.value);
+    }
+    if (roomSurfaces.present) {
+      map['room_surfaces'] = Variable<bool>(roomSurfaces.value);
     }
     if (backdropPath.present) {
       map['backdrop_path'] = Variable<String>(backdropPath.value);
@@ -6121,6 +6276,9 @@ class PhysicalEnvironmentsCompanion
           ..write('createdAt: $createdAt, ')
           ..write('serverRevision: $serverRevision, ')
           ..write('needsPublish: $needsPublish, ')
+          ..write('wallColor: $wallColor, ')
+          ..write('floorColor: $floorColor, ')
+          ..write('roomSurfaces: $roomSurfaces, ')
           ..write('backdropPath: $backdropPath, ')
           ..write('backdropOpacity: $backdropOpacity, ')
           ..write('backdropScale: $backdropScale, ')
@@ -14758,6 +14916,9 @@ typedef $$PhysicalEnvironmentsTableCreateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<int?> serverRevision,
       Value<bool> needsPublish,
+      Value<int?> wallColor,
+      Value<int?> floorColor,
+      Value<bool> roomSurfaces,
       Value<String?> backdropPath,
       Value<double> backdropOpacity,
       Value<double?> backdropScale,
@@ -14773,6 +14934,9 @@ typedef $$PhysicalEnvironmentsTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<int?> serverRevision,
       Value<bool> needsPublish,
+      Value<int?> wallColor,
+      Value<int?> floorColor,
+      Value<bool> roomSurfaces,
       Value<String?> backdropPath,
       Value<double> backdropOpacity,
       Value<double?> backdropScale,
@@ -14872,6 +15036,21 @@ class $$PhysicalEnvironmentsTableFilterComposer
 
   ColumnFilters<bool> get needsPublish => $composableBuilder(
     column: $table.needsPublish,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get wallColor => $composableBuilder(
+    column: $table.wallColor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get floorColor => $composableBuilder(
+    column: $table.floorColor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get roomSurfaces => $composableBuilder(
+    column: $table.roomSurfaces,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14990,6 +15169,21 @@ class $$PhysicalEnvironmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get wallColor => $composableBuilder(
+    column: $table.wallColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get floorColor => $composableBuilder(
+    column: $table.floorColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get roomSurfaces => $composableBuilder(
+    column: $table.roomSurfaces,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get backdropPath => $composableBuilder(
     column: $table.backdropPath,
     builder: (column) => ColumnOrderings(column),
@@ -15044,6 +15238,19 @@ class $$PhysicalEnvironmentsTableAnnotationComposer
 
   GeneratedColumn<bool> get needsPublish => $composableBuilder(
     column: $table.needsPublish,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get wallColor =>
+      $composableBuilder(column: $table.wallColor, builder: (column) => column);
+
+  GeneratedColumn<int> get floorColor => $composableBuilder(
+    column: $table.floorColor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get roomSurfaces => $composableBuilder(
+    column: $table.roomSurfaces,
     builder: (column) => column,
   );
 
@@ -15168,6 +15375,9 @@ class $$PhysicalEnvironmentsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int?> serverRevision = const Value.absent(),
                 Value<bool> needsPublish = const Value.absent(),
+                Value<int?> wallColor = const Value.absent(),
+                Value<int?> floorColor = const Value.absent(),
+                Value<bool> roomSurfaces = const Value.absent(),
                 Value<String?> backdropPath = const Value.absent(),
                 Value<double> backdropOpacity = const Value.absent(),
                 Value<double?> backdropScale = const Value.absent(),
@@ -15181,6 +15391,9 @@ class $$PhysicalEnvironmentsTableTableManager
                 createdAt: createdAt,
                 serverRevision: serverRevision,
                 needsPublish: needsPublish,
+                wallColor: wallColor,
+                floorColor: floorColor,
+                roomSurfaces: roomSurfaces,
                 backdropPath: backdropPath,
                 backdropOpacity: backdropOpacity,
                 backdropScale: backdropScale,
@@ -15196,6 +15409,9 @@ class $$PhysicalEnvironmentsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int?> serverRevision = const Value.absent(),
                 Value<bool> needsPublish = const Value.absent(),
+                Value<int?> wallColor = const Value.absent(),
+                Value<int?> floorColor = const Value.absent(),
+                Value<bool> roomSurfaces = const Value.absent(),
                 Value<String?> backdropPath = const Value.absent(),
                 Value<double> backdropOpacity = const Value.absent(),
                 Value<double?> backdropScale = const Value.absent(),
@@ -15209,6 +15425,9 @@ class $$PhysicalEnvironmentsTableTableManager
                 createdAt: createdAt,
                 serverRevision: serverRevision,
                 needsPublish: needsPublish,
+                wallColor: wallColor,
+                floorColor: floorColor,
+                roomSurfaces: roomSurfaces,
                 backdropPath: backdropPath,
                 backdropOpacity: backdropOpacity,
                 backdropScale: backdropScale,
