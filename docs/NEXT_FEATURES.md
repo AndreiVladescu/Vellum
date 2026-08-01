@@ -13,7 +13,7 @@ made, it says so with its date.
 
 ## 1. Delete every book, from Settings
 
-> **Done** — commit `aacf5d4` — Preferences → *Danger zone*. Typed-word confirmation, trashes locally, offers *Empty trash* straight after.
+> **Done** — commit `4cafcae` — Preferences → *Danger zone*. Typed-word confirmation, trashes locally, offers *Empty trash* straight after.
 
 **Asked for.** An option hidden inside Settings that deletes all books, local
 *and* remote, behind a confirmation dialog so it can't be hit by mistake.
@@ -50,7 +50,7 @@ copies too" is properly answered.
 
 ## 2. The "Move to trash" button sits under Android's navigation bar
 
-> **Done** — commit `f95f569` — `pageInsets()` applied to all 16 page-level scroll views.
+> **Done** — commit `cd69376` — `pageInsets()` applied to all 16 page-level scroll views.
 
 **Asked for.** On Android the button is behind the system navigation buttons.
 Move it up, or make the page taller so it fits.
@@ -75,7 +75,7 @@ Grepping for `EdgeInsets.all(` on a page-level `ListView` would find them.
 
 ## 3. Make the message after deleting a book dismissible by tapping
 
-> **Done** — commit `592d413` — the gesture wraps the message, not the bar, so *Undo* still undoes.
+> **Done** — commit `bcf346f` — the gesture wraps the message, not the bar, so *Undo* still undoes.
 
 **Asked for.** The bar shown after deleting a book (and similar) should be
 tappable to dismiss, so it can be got rid of faster.
@@ -97,7 +97,7 @@ has to undo, not merely dismiss.
 
 ## 4. Select several books and act on them at once (Android especially)
 
-> **Done** — commit `fbd3675` — long-press or right-click to start; trash and move/add-to-shelf.
+> **Done** — commit `2f89dde` — long-press or right-click to start; trash and move/add-to-shelf.
 
 **Asked for.** A way to select books in the library and then do a batch job —
 delete, or move them to another library inside the app.
@@ -132,7 +132,7 @@ delete plus one insert, and the target position goes at the end.
 
 ## 5. Upload books to the server the way the app does
 
-> **Done** — commit `d65f2fb`. A catalogue file (CSV or JSON, with the aliases a
+> **Done** — commit `bd37ef0`. A catalogue file (CSV or JSON, with the aliases a
 > Goodreads/StoryGraph export uses) and a folder of PDFs/EPUBs, both with a
 > dry-run review. The duplicate check is `POST /api/import/check`, server-side
 > so the console and the app cannot disagree. **Not done:** Calibre and OPDS as
@@ -225,7 +225,7 @@ together.
 
 ## 8. A sync dialogue: choose what syncs
 
-> **Done** — commits `634510d` and `fc08ac3`. `SyncScope` threaded through every
+> **Done** — commits `777a7e6` and `d743b1b`. `SyncScope` threaded through every
 > pass, and `DELETE /api/mine/{resource}` for taking a resource back off the
 > server, offered at the moment a switch goes off. Books are deliberately
 > excluded from un-publishing: that is a different act, and the console has it.
@@ -274,7 +274,7 @@ reaches the server become separate, explicit choices.
 
 ## 9. Rooms shared with you are invisible in the app
 
-> **Done** — commit `c79c0cb` — read-only mirror, answering the open question in favour of mirroring rather than copying.
+> **Done** — commit `9e2a24e` — read-only mirror, answering the open question in favour of mirroring rather than copying.
 
 **Found while answering "how does the rooms feature work?"** — not asked for, but
 it is a gap rather than a preference.
@@ -307,7 +307,7 @@ viewer-only sharing already means everywhere else.
 
 ## 10. Cosmetics in a physical room
 
-> **Done.** Stage 1 in `992537a`: schema v25 adds wall and floor colours and a
+> **Done.** Stage 1 in `9649c67`: schema v25 adds wall and floor colours and a
 > surfaces switch, and the painter draws the floor, a skirting board and a
 > contact shadow under every plank. Stage 2 followed: schema v27 adds a
 > `room_props` table and six drawn props — statuette, plant, vase, clock, boxes,
@@ -370,7 +370,7 @@ a shelf, and it is worth deciding on purpose rather than by default.
 
 ## 11. Bookcase styles, and accessories you can bring your own art to
 
-> **Stage 1 done** — commit `66a5774`. Five bookcase styles with real
+> **Stage 1 done** — commit `29fc7ee`. Five bookcase styles with real
 > dimensions, all editable, emitting ordinary shelf and panel segments.
 > **Decided (2026-08-01): stop there.** Segment styles, vector props and
 > imported artwork are not being built for now.

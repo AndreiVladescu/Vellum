@@ -9,6 +9,16 @@ server/target/
 # Server blob store (created at runtime)
 server/data/
 
+# TLS material. `VELLUM_TLS=1` generates a self-signed pair beside the binary;
+# a private key was committed once and had to be filtered back out of history.
+*.pem
+
+# Build artefacts. Releases carry these (see .github/workflows/release.yml);
+# the repository should not — a 17 MB tarball was tracked, and every clone paid
+# for it forever.
+app/dist/
+app/build/
+
 # Editor/OS noise
 .vscode/
 .idea/

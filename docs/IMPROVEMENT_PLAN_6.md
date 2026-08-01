@@ -1,7 +1,7 @@
 # Improvement plan 6 — what stands between this and a v1
 
 Follow-up to [`IMPROVEMENT_PLAN_5.md`](IMPROVEMENT_PLAN_5.md). Written 2026-07-28
-against `main` @ `521f95e`, after plan 5 landed in full and personal-data sync
+against `main` @ `ad8536d`, after plan 5 landed in full and personal-data sync
 (annotations, sittings, private notes, profile) went in.
 
 Plan 5 was forward-looking: structure first, then features. This one is short
@@ -15,7 +15,7 @@ plan 5 #38 stay as they are; English-only is a deliberate v1 position, not an
 oversight.
 
 **Removed after checking:** "split `LibraryRepository`" appeared in earlier
-notes as an open item. It isn't — plan 5 #10 did it (`7ca1f90`, `cf7c695`) and
+notes as an open item. It isn't — plan 5 #10 did it (`894ae7d`, `940b5ce`) and
 the file is 382 lines of facade over thirteen services. The stale text lives in
 plan 5's problem statement, which describes the code as it was in July.
 
@@ -26,12 +26,12 @@ from `git log`.
 
 | # | Item | Why it blocked v1 | Commit |
 |---|---|---|---|
-| 1 | **The People screen** | You cannot add a second user without `curl` | `ba5bedc` |
-| 2 | **Desktop release artifacts** | Every desktop user must install a C++ toolchain first | `2fb63f4` |
-| 3 | **Audit the personal-data endpoints** | New attack surface, reviewed only by its author | `878d71b` |
-| 4 | **Copy photos sync** | The last personal thing stranded on one device | `461a7cc` |
-| 5 | **Reconcile the local profile with the account** | Two identities, no relationship, silent resolution | `0b59470` |
-| 6 | **Last-write-wins leaves no trace** | An overwritten edit is invisible | `0b59470` |
+| 1 | **The People screen** | You cannot add a second user without `curl` | `da286fc` |
+| 2 | **Desktop release artifacts** | Every desktop user must install a C++ toolchain first | `d899602` |
+| 3 | **Audit the personal-data endpoints** | New attack surface, reviewed only by its author | `f728189` |
+| 4 | **Copy photos sync** | The last personal thing stranded on one device | `d4910a3` |
+| 5 | **Reconcile the local profile with the account** | Two identities, no relationship, silent resolution | `f2b939c` |
+| 6 | **Last-write-wins leaves no trace** | An overwritten edit is invisible | `f2b939c` |
 
 Two findings came out of #3, both fixed and both reproduced against a running
 server before the fix: annotation tombstones were readable by every account
@@ -93,7 +93,7 @@ that cost money and belong to a person, not a repository.
 
 ## 3. Audit the personal-data endpoints
 
-**The problem.** `docs/SECURITY_AUDIT.md` reflects commit `b4fa85f`. Since then
+**The problem.** `docs/SECURITY_AUDIT.md` reflects commit `bc68bea`. Since then
 `server/src/personal.rs` added eight endpoints, three user-scoped tables and a
 new file-write path (avatar upload). It was written to the same rules as
 `reading.rs` and its isolation between accounts is tested — but "the author
