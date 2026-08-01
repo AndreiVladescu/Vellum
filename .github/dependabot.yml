@@ -1,0 +1,55 @@
+# Dependency updates, one ecosystem per directory.
+#
+# CI already fails on a known RustSec advisory (`cargo audit`), but that is a
+# *security* signal for one of the four dependency sets here and says nothing
+# about the other three. This watches all of them.
+#
+# Grouped and monthly on purpose. Ungrouped weekly updates on a project this
+# size open a dozen pull requests nobody reads, and a dependency bot people
+# ignore is worse than none — it trains you to ignore the security ones too.
+version: 2
+
+updates:
+  # The Flutter app. `pub` covers pubspec.yaml; the native toolchains (Gradle,
+  # CocoaPods) are pinned by Flutter itself and are not listed here.
+  - package-ecosystem: pub
+    directory: /app
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      dart-minor-and-patch:
+        update-types: [minor, patch]
+    # A major bump of either of these is a schema or codegen change and wants a
+    # human deciding when — see CLAUDE.md on regenerating drift output.
+    ignore:
+      - dependency-name: drift
+        update-types: [version-update:semver-major]
+      - dependency-name: drift_dev
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: cargo
+    directory: /server
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      rust-minor-and-patch:
+        update-types: [minor, patch]
+
+  # The actions the workflows pin. These go stale silently and are a supply
+  # chain of their own.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The server image's base (`rust:1-bookworm`, `debian:bookworm-slim`), which
+  # is where most of a container's CVEs actually live.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

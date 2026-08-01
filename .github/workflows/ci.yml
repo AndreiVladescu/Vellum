@@ -135,6 +135,26 @@ jobs:
       #    parsing; a maintenance warning, not a vulnerability, unfixable here.
       - run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0192
 
+  # `cargo audit` covers one of the four dependency sets. This covers all of
+  # them from one advisory database (OSV): `app/pubspec.lock` for the Flutter
+  # side, `server/Cargo.lock` for the server, and the images the Dockerfile
+  # pulls. Dependabot proposes *upgrades*; this is the check that fails when
+  # something shipped is known-vulnerable, and unlike Dependabot it can be run
+  # locally with the same binary.
+  #
+  # The two long-standing Rust exceptions are carried over from `cargo audit`
+  # above with the same reasoning; see osv-scanner.toml for why.
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.2.4
+        with:
+          scan-args: |-
+            --config=osv-scanner.toml
+            --recursive
+            ./
+
   # The console's importer parses catalogues in the browser, and a parser is
   # exactly the kind of code that breaks quietly. No framework: it runs the real
   # console.js in a `vm` context with a DOM stub.

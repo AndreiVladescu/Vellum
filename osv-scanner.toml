@@ -1,0 +1,21 @@
+# Advisories that are known, understood, and cannot be acted on. Everything
+# else — in any of the four ecosystems — fails CI.
+#
+# Kept in step with the two `--ignore` flags on `cargo audit` in ci.yml; if one
+# list changes, change both.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = """
+`rsa` "Marvin" timing attack. No fixed release exists, and it is a lockfile-only
+artifact here: `cargo tree -i rsa` is empty, nothing in the compiled tree pulls
+it, and Vellum performs no RSA. Not reachable, so not exploitable.
+"""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0192"
+reason = """
+`ttf-parser` is unmaintained — a maintenance warning rather than a
+vulnerability. Pulled in by `lopdf` for PDF parsing, so it cannot be dropped
+without dropping PDF support.
+"""

@@ -1,5 +1,8 @@
 # Vellum
 
+[![CI](https://github.com/AndreiVladescu/Vellum/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreiVladescu/Vellum/actions/workflows/ci.yml)
+[![Licence: AGPL v3](https://img.shields.io/badge/licence-AGPL--3.0-blue.svg)](LICENSE)
+
 A personal library manager for digital **and** physical books, shown as a visual
 bookshelf — you browse your books spine-out, the way they look on a real shelf,
 instead of scrolling a grid of covers.
@@ -399,3 +402,19 @@ deletions propagate instead of resurrecting.
 
 See the build order and the sync roadmap in
 [DESIGN.md](DESIGN.md#build-order--status).
+
+---
+
+## Licence
+
+Vellum is free software under the **GNU Affero General Public License v3.0** —
+see [LICENSE](LICENSE).
+
+In plain terms: use it for anything, change it, share it. The one condition is
+that anything you pass on stays under the same licence, source included. The
+"Affero" part extends that to running it as a service: if you host a modified
+Vellum server for other people, those people are entitled to your changes, even
+though you never handed them a copy of the program.
+
+That is the trade this project is making deliberately — take it and build on it,
+but improvements come back rather than disappearing into a closed fork.
