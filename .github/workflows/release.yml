@@ -37,7 +37,7 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -72,7 +72,7 @@ jobs:
           cp ../packaging/vellum-server.service "dist/$name/" || true
           (cd dist && tar czf "$name.tar.gz" "$name")
           (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: server-${{ matrix.target }}
           path: server/dist/*.tar.gz*
@@ -94,7 +94,7 @@ jobs:
           - platform: macos
             os: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -142,7 +142,7 @@ jobs:
             build/macos/Build/Products/Release/vellum.app \
             dist/vellum-macos.zip
           (cd dist && shasum -a 256 * > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: app-${{ matrix.platform }}
           path: app/dist/*
@@ -150,8 +150,8 @@ jobs:
   android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
           java-version: "17"
@@ -174,7 +174,7 @@ jobs:
           cp build/app/outputs/bundle/release/*.aab dist/ || true
           cp build/app/outputs/flutter-apk/*.apk dist/ || true
           (cd dist && sha256sum * > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: android
           path: app/dist/*
@@ -184,11 +184,11 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Attach to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: artifacts/**/*
           generate_release_notes: true
