@@ -232,7 +232,10 @@ async fn a_fresh_row_collides_with_nothing() {
     )
     .await;
     assert!(body[0]["reason"].is_null());
-    assert_eq!(body[0]["key"], "new", "the key is echoed back for lining up");
+    assert_eq!(
+        body[0]["key"], "new",
+        "the key is echoed back for lining up"
+    );
 }
 
 #[tokio::test]

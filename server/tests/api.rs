@@ -4403,7 +4403,6 @@ async fn responses_carry_baseline_security_headers() {
     );
 }
 
-
 /// A browser must never be handed an HTTP Basic challenge.
 ///
 /// The bug this pins: every 401 carried `WWW-Authenticate: Basic realm="Vellum"`

@@ -189,11 +189,12 @@ pub async fn upsert(
     // No-op guard, same reasoning as physical_copies::upsert.
     if is_update {
         let current = fetch_loan(&state, &id).await?.0;
-        let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'loan')")
-                .bind(&id)
-                .fetch_one(&state.db)
-                .await?;
+        let tombstoned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'loan')",
+        )
+        .bind(&id)
+        .fetch_one(&state.db)
+        .await?;
         // The guard has to know about every editable field, or a push that only
         // moves the due date would be silently dropped (the same trap #17's
         // series edit hit).
@@ -282,11 +283,13 @@ pub async fn delete(
     }
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'loan')")
-        .bind(&id)
-        .bind(&owner_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'loan')",
+    )
+    .bind(&id)
+    .bind(&owner_id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("DELETE FROM loan WHERE id = ?")
         .bind(&id)
         .execute(&mut *tx)

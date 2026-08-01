@@ -94,7 +94,10 @@ async fn call_bytes(
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 async fn register(app: &axum::Router, email: &str) -> String {
@@ -357,10 +360,20 @@ async fn annotation_tombstones_stay_out_of_the_shared_deletions_list() {
     );
 
     // Book tombstones still travel, which is what the list is for.
-    call(&app, "DELETE", &format!("/api/books/{book}"), Some(&master), None).await;
+    call(
+        &app,
+        "DELETE",
+        &format!("/api/books/{book}"),
+        Some(&master),
+        None,
+    )
+    .await;
     let (_, body) = call(&app, "GET", "/api/deletions", Some(&stranger), None).await;
     assert!(
-        body.as_array().unwrap().iter().any(|d| d["book_id"] == book),
+        body.as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["book_id"] == book),
         "book deletions must still propagate: {body}"
     );
 }
@@ -377,7 +390,11 @@ async fn an_oversized_avatar_is_refused_in_words() {
     let mut big = png();
     big.resize(3 * 1024 * 1024, 0);
     let (status, body) = call_bytes(&app, "PUT", "/api/profile/avatar", &token, big).await;
-    assert_eq!(status, StatusCode::OK, "3 MB is under the stated cap: {body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "3 MB is under the stated cap: {body}"
+    );
 
     let mut too_big = png();
     too_big.resize(5 * 1024 * 1024, 0);
@@ -466,7 +483,11 @@ async fn an_annotation_needs_a_book_the_caller_can_see() {
         Some(json!({ "book_id": book, "kind": "highlight" })),
     )
     .await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "and not FORBIDDEN, which would confirm the id exists");
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "and not FORBIDDEN, which would confirm the id exists"
+    );
 }
 
 // ---- sessions -------------------------------------------------------------
@@ -897,8 +918,19 @@ async fn removing_an_account_takes_its_personal_data_but_leaves_the_books() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 
     // The book they annotated is still in the library.
-    let (status, _) = call(&app, "GET", &format!("/api/books/{book}"), Some(&master), None).await;
-    assert_eq!(status, StatusCode::OK, "removing a person is not removing books");
+    let (status, _) = call(
+        &app,
+        "GET",
+        &format!("/api/books/{book}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "removing a person is not removing books"
+    );
 }
 
 #[tokio::test]
@@ -908,7 +940,14 @@ async fn you_cannot_remove_your_own_account() {
     let (_, me) = call(&app, "GET", "/api/auth/me", Some(&master), None).await;
     let id = me["id"].as_str().unwrap();
 
-    let (status, _) = call(&app, "DELETE", &format!("/api/users/{id}"), Some(&master), None).await;
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/users/{id}"),
+        Some(&master),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -1029,7 +1068,14 @@ async fn a_photo_is_visible_to_whoever_can_see_the_book() {
     // Before the share: invisible.
     let (_, list) = call(&app, "GET", "/api/copy-photos?cursor=", Some(&friend), None).await;
     assert!(list["photos"].as_array().unwrap().is_empty());
-    let (status, _) = call(&app, "GET", "/api/copy-photos/p1/image", Some(&friend), None).await;
+    let (status, _) = call(
+        &app,
+        "GET",
+        "/api/copy-photos/p1/image",
+        Some(&friend),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     call(
@@ -1047,7 +1093,14 @@ async fn a_photo_is_visible_to_whoever_can_see_the_book() {
     // After: visible, because the book is.
     let (_, list) = call(&app, "GET", "/api/copy-photos?cursor=", Some(&friend), None).await;
     assert_eq!(list["photos"].as_array().unwrap().len(), 1);
-    let (status, _) = call(&app, "GET", "/api/copy-photos/p1/image", Some(&friend), None).await;
+    let (status, _) = call(
+        &app,
+        "GET",
+        "/api/copy-photos/p1/image",
+        Some(&friend),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "a viewer may look at it");
 }
 
@@ -1104,9 +1157,19 @@ async fn deleting_a_photo_tombstones_it_and_removes_the_file() {
     let (status, _) = call(&app, "GET", "/api/copy-photos/p1/image", Some(&token), None).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "the bytes go with the row");
 
-    let (_, body) = call(&app, "GET", "/api/deletions?kind=copy_photo", Some(&token), None).await;
+    let (_, body) = call(
+        &app,
+        "GET",
+        "/api/deletions?kind=copy_photo",
+        Some(&token),
+        None,
+    )
+    .await;
     assert!(
-        body.as_array().unwrap().iter().any(|d| d["book_id"] == "p1"),
+        body.as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["book_id"] == "p1"),
         "the other device has to learn it went: {body}"
     );
 }
@@ -1179,8 +1242,7 @@ async fn un_publishing_removes_my_rows_and_leaves_everyone_else_alone() {
         assert_eq!(status, StatusCode::OK, "seeding {book}");
     }
 
-    let (status, body) =
-        call(&app, "DELETE", "/api/mine/loans", Some(&master), None).await;
+    let (status, body) = call(&app, "DELETE", "/api/mine/loans", Some(&master), None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["deleted"], 1, "should have forgotten exactly one loan");
 
@@ -1209,8 +1271,7 @@ async fn un_publishing_removes_my_rows_and_leaves_everyone_else_alone() {
 
     // A tombstone went out, so this account's other devices drop it too rather
     // than pushing it straight back.
-    let (_, deletions) =
-        call(&app, "GET", "/api/deletions?kind=loan", Some(&master), None).await;
+    let (_, deletions) = call(&app, "GET", "/api/deletions?kind=loan", Some(&master), None).await;
     assert!(
         deletions
             .as_array()
@@ -1256,8 +1317,7 @@ async fn un_publishing_my_marks_leaves_another_account_s_alone() {
         assert_eq!(status, StatusCode::OK, "seeding {id}");
     }
 
-    let (status, body) =
-        call(&app, "DELETE", "/api/mine/annotations", Some(&master), None).await;
+    let (status, body) = call(&app, "DELETE", "/api/mine/annotations", Some(&master), None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["deleted"], 1);
 

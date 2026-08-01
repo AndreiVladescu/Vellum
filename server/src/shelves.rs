@@ -198,11 +198,12 @@ pub async fn upsert(
     // "book set unchanged" check would miss.
     if is_update {
         let current = fetch_shelf(&state, &id).await?.0;
-        let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'shelf')")
-                .bind(&id)
-                .fetch_one(&state.db)
-                .await?;
+        let tombstoned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'shelf')",
+        )
+        .bind(&id)
+        .fetch_one(&state.db)
+        .await?;
         if current.shelf.name == input.name.trim()
             && current.shelf.sort_order == input.sort_order
             && current.book_ids == input.book_ids
@@ -300,11 +301,13 @@ pub async fn delete(
     }
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'shelf')")
-        .bind(&id)
-        .bind(&owner_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'shelf')",
+    )
+    .bind(&id)
+    .bind(&owner_id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("DELETE FROM shelf WHERE id = ?")
         .bind(&id)
         .execute(&mut *tx)

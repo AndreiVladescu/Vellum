@@ -1,7 +1,7 @@
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use axum::Json;
-use axum::extract::{FromRequestParts, State, Path};
+use axum::extract::{FromRequestParts, Path, State};
 use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -507,12 +507,11 @@ pub async fn set_user_role(
     let target = target.ok_or_else(|| AppError::NotFound("no such user".into()))?;
 
     if target.is_master && !input.is_master {
-        let others: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM app_user WHERE is_master = 1 AND id != ?",
-        )
-        .bind(&id)
-        .fetch_one(&state.db)
-        .await?;
+        let others: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM app_user WHERE is_master = 1 AND id != ?")
+                .bind(&id)
+                .fetch_one(&state.db)
+                .await?;
         if others == 0 {
             return Err(AppError::BadRequest(
                 "that is the only master — promote someone else first".into(),

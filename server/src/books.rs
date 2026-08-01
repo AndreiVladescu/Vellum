@@ -688,11 +688,12 @@ async fn upsert_one(
         };
         // A live tombstone for this id (a crashed delete) must still be cleared,
         // so it isn't a no-op even when the data matches — fall through to write.
-        let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'book')")
-                .bind(id)
-                .fetch_one(&state.db)
-                .await?;
+        let tombstoned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'book')",
+        )
+        .bind(id)
+        .fetch_one(&state.db)
+        .await?;
         if meta_same && authors_same && genres_same && series_same && !tombstoned {
             crate::events::publish(state, "book", id, "upsert");
             return Ok(UpsertOutcome::Applied(current));

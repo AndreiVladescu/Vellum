@@ -553,10 +553,11 @@ pub async fn put_avatar(
 }
 
 pub async fn get_avatar(State(state): State<AppState>, user: AuthUser) -> AppResult<Response> {
-    let stored: Option<String> = sqlx::query_scalar("SELECT avatar_path FROM app_user WHERE id = ?")
-        .bind(&user.id)
-        .fetch_one(&state.db)
-        .await?;
+    let stored: Option<String> =
+        sqlx::query_scalar("SELECT avatar_path FROM app_user WHERE id = ?")
+            .bind(&user.id)
+            .fetch_one(&state.db)
+            .await?;
     let rel = stored.ok_or_else(|| AppError::NotFound("no avatar".into()))?;
     let bytes = tokio::fs::read(state.data_dir.join(&rel))
         .await
@@ -579,10 +580,11 @@ pub async fn delete_avatar(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<ProfileDto>> {
-    let stored: Option<String> = sqlx::query_scalar("SELECT avatar_path FROM app_user WHERE id = ?")
-        .bind(&user.id)
-        .fetch_one(&state.db)
-        .await?;
+    let stored: Option<String> =
+        sqlx::query_scalar("SELECT avatar_path FROM app_user WHERE id = ?")
+            .bind(&user.id)
+            .fetch_one(&state.db)
+            .await?;
     if let Some(rel) = stored {
         let _ = tokio::fs::remove_file(state.data_dir.join(&rel)).await;
     }

@@ -29,11 +29,11 @@ mod ids;
 mod import_check;
 mod layouts;
 mod loans;
-mod personal;
 mod mail;
 mod metadata;
 mod observability;
 mod opds;
+mod personal;
 mod physical_copies;
 mod reader;
 mod reading;
@@ -42,8 +42,8 @@ mod shares;
 mod shelves;
 mod text_index;
 mod throttle;
-mod unpublish;
 pub mod tls;
+mod unpublish;
 mod web;
 
 pub use throttle::RateLimiter;
@@ -262,10 +262,7 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Loan history (plan 5 #4, last of the trio) — same shape again.
         // Personal data (annotations, sittings, private notes, profile) —
         // scoped to the caller, never to the library. See personal.rs.
-        .route(
-            "/annotations",
-            get(personal::list_annotations),
-        )
+        .route("/annotations", get(personal::list_annotations))
         .route(
             "/annotations/{id}",
             put(personal::upsert_annotation).delete(personal::delete_annotation),
@@ -304,8 +301,7 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route(
             "/copy-photos/{id}/image",
             get(physical_copies::get_photo_image).put(
-                physical_copies::put_photo_image
-                    .layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
+                physical_copies::put_photo_image.layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
             ),
         )
         .route("/loans", get(loans::list))
@@ -343,7 +339,10 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             "/invites",
             get(shares::list_invites).post(shares::create_invite),
         )
-        .route("/invites/{id}", axum::routing::delete(shares::revoke_invite))
+        .route(
+            "/invites/{id}",
+            axum::routing::delete(shares::revoke_invite),
+        )
         .route("/invites/redeem", post(shares::redeem_invite))
         // Public per-book links (no account required to read).
         .route(

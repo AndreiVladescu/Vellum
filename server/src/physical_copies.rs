@@ -154,11 +154,12 @@ pub async fn upsert(
     // write (and the updated_at churn) when the push wouldn't change anything.
     if is_update {
         let current = fetch_copy(&state, &id).await?.0;
-        let tombstoned: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'copy')")
-                .bind(&id)
-                .fetch_one(&state.db)
-                .await?;
+        let tombstoned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'copy')",
+        )
+        .bind(&id)
+        .fetch_one(&state.db)
+        .await?;
         if current.location == input.location
             && current.condition == input.condition
             && current.notes == input.notes
@@ -231,11 +232,13 @@ pub async fn delete(
     }
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'copy')")
-        .bind(&id)
-        .bind(&owner_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'copy')",
+    )
+    .bind(&id)
+    .bind(&owner_id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("DELETE FROM physical_copy WHERE id = ?")
         .bind(&id)
         .execute(&mut *tx)
@@ -256,7 +259,6 @@ async fn fetch_copy(state: &AppState, id: &str) -> AppResult<Json<CopyDto>> {
     .ok_or_else(|| AppError::NotFound("physical copy not found".into()))?;
     Ok(Json(copy))
 }
-
 
 // ---- copy photos (plan 6 #4) ----------------------------------------------
 //

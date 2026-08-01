@@ -106,13 +106,17 @@ pub async fn check(
                 && have.contains(want)
             {
                 Some(Reason::SameFile)
-            } else if let (Some(a), Some(b)) =
-                (normalize_isbn(c.isbn.as_deref()), normalize_isbn(isbn.as_deref()))
-                && a == b
+            } else if let (Some(a), Some(b)) = (
+                normalize_isbn(c.isbn.as_deref()),
+                normalize_isbn(isbn.as_deref()),
+            ) && a == b
             {
                 Some(Reason::SameIsbn)
             } else if titles_match(&c.title, title)
-                && authors_agree(&c.authors, authors.get(id).map(|v| v.as_slice()).unwrap_or(&[]))
+                && authors_agree(
+                    &c.authors,
+                    authors.get(id).map(|v| v.as_slice()).unwrap_or(&[]),
+                )
             {
                 Some(Reason::SimilarTitle)
             } else {
@@ -273,7 +277,10 @@ mod tests {
 
     #[test]
     fn titles_ignore_case_punctuation_articles_and_word_order() {
-        assert!(titles_match("The Left Hand of Darkness", "left hand of darkness"));
+        assert!(titles_match(
+            "The Left Hand of Darkness",
+            "left hand of darkness"
+        ));
         assert!(titles_match("Dune, Frank Herbert", "Frank Herbert Dune"));
         assert!(titles_match("Piranesi", "Piranesi."));
     }

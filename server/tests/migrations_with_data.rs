@@ -79,10 +79,12 @@ async fn a_populated_database_upgrades_to_the_latest_schema() {
         .execute(&pool)
         .await
         .unwrap();
-        sqlx::query("INSERT INTO book (id, title, updated_at) VALUES ('b1', 'Dune', datetime('now'))")
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO book (id, title, updated_at) VALUES ('b1', 'Dune', datetime('now'))",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         sqlx::query(
             "INSERT INTO physical_copy (id, book_id, updated_at) \
              VALUES ('c1', 'b1', datetime('now'))",
@@ -139,12 +141,11 @@ async fn a_populated_database_upgrades_to_the_latest_schema() {
 
     // 0025 rebuilds `deletion` around a (kind, entity_id) key. A rebuild that
     // loses rows would silently resurrect everything anyone had deleted.
-    let kept: Vec<(String, String, Option<String>)> = sqlx::query_as(
-        "SELECT entity_id, kind, owner_id FROM deletion ORDER BY entity_id",
-    )
-    .fetch_all(&db)
-    .await
-    .unwrap();
+    let kept: Vec<(String, String, Option<String>)> =
+        sqlx::query_as("SELECT entity_id, kind, owner_id FROM deletion ORDER BY entity_id")
+            .fetch_all(&db)
+            .await
+            .unwrap();
     assert_eq!(
         kept,
         vec![

@@ -823,7 +823,9 @@ pub async fn list_invites(
     user: AuthUser,
 ) -> AppResult<Json<Vec<InviteSummary>>> {
     if !user.is_master {
-        return Err(AppError::Forbidden("only the master may see invites".into()));
+        return Err(AppError::Forbidden(
+            "only the master may see invites".into(),
+        ));
     }
     let rows = sqlx::query_as::<_, InviteSummary>(
         "SELECT token_hash AS id, email, scope, permission, expires_at, created_at \
