@@ -150,7 +150,13 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  // Opens maximised — "fullscreen windowed": the whole work area, with the
+  // title bar and taskbar still there. Done here rather than at the Create call
+  // in main.cpp because this runs on the first frame, so the window appears
+  // already at its final size instead of flashing at 1280x720 first.
+  //
+  // The origin and size passed to Create are still the restore-down geometry.
+  return ShowWindow(window_handle_, SW_SHOWMAXIMIZED);
 }
 
 // static

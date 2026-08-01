@@ -52,7 +52,14 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "Vellum");
   }
 
+  // Opens maximised — "fullscreen windowed": the whole work area, but with the
+  // title bar and the taskbar still there, unlike `gtk_window_fullscreen`.
+  //
+  // The default size below is what the window restores *down* to, so it still
+  // matters: unmaximising a window that was never given a size drops it to
+  // whatever GTK guesses from the content.
   gtk_window_set_default_size(window, 1280, 720);
+  gtk_window_maximize(window);
 
   // Window / taskbar icon. Prefer the themed icon named after the application
   // ID: when it's installed in the icon theme (see linux/install-dev.sh, or a
