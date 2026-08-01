@@ -493,6 +493,32 @@ rm -f prepare.db*
 
 ---
 
+## Changing the app icon
+
+One image feeds every launcher slot on every platform:
+
+```sh
+python3 design/prepare_source.py path/to/artwork.png   # once per new artwork
+python3 design/generate_icons.py                        # writes every slot
+```
+
+`prepare_source.py` finds the tile in the artwork, crops it square and makes the
+rounded corners transparent, writing `design/logo-source.png` — the single
+source of truth. `generate_icons.py` fans that out: Android's legacy and
+adaptive icons (including the Android 13+ monochrome layer), the macOS icon set,
+the Windows `.ico`, the in-app asset, the Linux hicolor theme, and the server
+console's favicon. Needs Pillow and NumPy.
+
+On Linux the *window* icon is resolved from the icon theme, not the bundle, so
+after regenerating:
+
+```sh
+cd app && sh linux/install-dev.sh debug
+```
+
+Without that the desktop keeps showing whatever was installed last, and the app
+looks unchanged however many times you rebuild it.
+
 ## Cutting a release
 
 Push a `v*` tag. [`release.yml`](.github/workflows/release.yml) builds
