@@ -15,13 +15,25 @@ import 'package:flutter/material.dart';
 /// also on the import screen, and none of these is the last chance to act. So
 /// they time out, and get [actionSnackDuration] rather than the usual four
 /// seconds — long enough to notice a button and reach it.
+/// Tapping the bar also dismisses it (plan: next features #3). The message is
+/// wrapped rather than the whole `SnackBar` because the action button lives
+/// *outside* the content: covering it with a dismiss gesture would mean a tap
+/// on "Undo" threw the undo away, which is the one thing this must not do.
 SnackBar appSnackBar({
   required Widget content,
   SnackBarAction? action,
   Duration? duration,
 }) =>
     SnackBar(
-      content: content,
+      content: Builder(
+        builder: (context) => GestureDetector(
+          // Opaque so the gesture covers the whole message strip, including the
+          // gaps between words — a dismiss you have to aim at is not one.
+          behavior: HitTestBehavior.opaque,
+          onTap: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+          child: content,
+        ),
+      ),
       action: action,
       // The whole point of this wrapper. Never remove without reading above.
       persist: false,

@@ -57,6 +57,51 @@ void main() {
     expect(find.text('Saved'), findsNothing);
   });
 
+  testWidgets('tapping the message dismisses it', (tester) async {
+    late BuildContext ctx;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: Builder(builder: (context) {
+        ctx = context;
+        return const SizedBox();
+      })),
+    ));
+
+    ScaffoldMessenger.of(ctx)
+        .showSnackBar(appSnackBar(content: const Text('Moved to the trash')));
+    await tester.pumpAndSettle();
+    expect(find.text('Moved to the trash'), findsOneWidget);
+
+    await tester.tap(find.text('Moved to the trash'));
+    await tester.pumpAndSettle();
+    expect(find.text('Moved to the trash'), findsNothing,
+        reason: 'a tap on the message should get rid of it');
+  });
+
+  testWidgets('tapping the action does the action, and does not just dismiss',
+      (tester) async {
+    // The one thing this must not break: the dismiss gesture wraps the
+    // *message*, not the bar, so "Undo" still undoes.
+    late BuildContext ctx;
+    var undone = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: Builder(builder: (context) {
+        ctx = context;
+        return const SizedBox();
+      })),
+    ));
+
+    ScaffoldMessenger.of(ctx).showSnackBar(appSnackBar(
+      content: const Text('Moved to the trash'),
+      action: SnackBarAction(label: 'Undo', onPressed: () => undone = true),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(undone, isTrue, reason: 'the tap swallowed the action');
+    expect(find.text('Moved to the trash'), findsNothing);
+  });
+
   test('nothing builds a SnackBar with an action directly', () {
     // The trap is silent — a bare `SnackBar(action: ...)` looks perfectly
     // ordinary and simply never goes away — so it is worth catching in the
