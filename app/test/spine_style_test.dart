@@ -25,4 +25,25 @@ void main() {
     final fallback = SpineStyle.fromJson('{broken', title: 'Dune');
     expect(fallback.toJson(), SpineStyle.generate(title: 'Dune').toJson());
   });
+
+  test('the fallback is per-title, not memoised under the bad JSON', () {
+    // `fromJson` caches decoded styles keyed by the JSON string. The failure
+    // path must stay out of that cache: it falls back to `generate(title:)`,
+    // which depends on the title, so caching it would give every book with the
+    // same corrupt style the first one's colours.
+    final dune = SpineStyle.fromJson('{broken', title: 'Dune');
+    final solaris = SpineStyle.fromJson('{broken', title: 'Solaris');
+    expect(solaris.toJson(), SpineStyle.generate(title: 'Solaris').toJson());
+    expect(solaris.toJson(), isNot(dune.toJson()));
+  });
+
+  test('a memoised style equals a freshly decoded one', () {
+    final json = SpineStyle.generate(title: 'Piranesi', pageCount: 272).toJson();
+    final first = SpineStyle.fromJson(json, title: 'Piranesi');
+    final second = SpineStyle.fromJson(json, title: 'Piranesi');
+    expect(identical(first, second), isTrue, reason: 'served from the cache');
+    SpineStyle.clearCache();
+    final afterClear = SpineStyle.fromJson(json, title: 'Piranesi');
+    expect(afterClear.toJson(), first.toJson());
+  });
 }

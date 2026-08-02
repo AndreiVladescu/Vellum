@@ -146,3 +146,83 @@ one at a time will each pay this per-row trigger cost. If that turns out to
 matter in practice, batch the author/genre link inserts per book inside one
 transaction (already how `seedLibrary` and the repository's write paths
 work) rather than reaching for a wholesale index-maintenance redesign first.
+
+## 2026-08-02 round: three candidates measured, one kept
+
+Prompted by "make the application run faster", with no particular slowness
+reported. The first finding is the one worth leading with: **at the size a real
+library actually reaches, the app is already fast**, and the profile says so.
+Measured on the development machine, Linux desktop, `--profile`:
+
+| | |
+|---|---|
+| Cold start to first frame | **146–183 ms** (five runs; that spread *is* the noise floor) |
+| The four `main()` loads before `runApp` | 42–50 ms of it |
+| `watchLibrary()`, 1,000 books, 20 fresh subscriptions | 148 ms (≈7 ms each) |
+| The development library it was measured against | 87 books |
+
+So there was no hot spot to remove, and the honest result of the round is three
+candidate optimisations, of which **two were reverted for showing no measurable
+gain**. They are written down because each one is plausible enough that someone
+will suggest it again.
+
+### Kept: memoised `SpineStyle.fromJson`
+
+`fromJson` does a `jsonDecode` plus six hex parses, and is called from three
+paths that re-decode the same unchanged strings every build: `ShelfView`'s row
+packing (inside a `LayoutBuilder`, so every rebuild, over *every* book), each
+visible spine drawing itself, and the physical room drawing every placed book
+through `SpineFace`. It is now memoised on the stored JSON string — which is
+also the cache key, so an edited book rewrites the string and misses the cache
+by itself, and no invalidation is needed.
+
+In isolation this is a large win: at 2,000 books a cold pass costs **8.8 ms**
+and a warm rebuild **0.34 ms** — 7.6× cheaper than the 2.6 ms measured before
+(`test/benchmark/spine_style_bench.dart`).
+
+End to end on the shelf it is worth **1–3%** (`shelf_scroll_bench.dart`, 3,000
+books: 735→713 ms first build, 85.2→84.1 ms per scroll step), because decoding
+was never the dominant cost — building thirty-odd spine widgets per row is. It
+was kept for being a strict improvement with a clear mechanism on a path the
+physical room hits per frame, not because it transformed anything.
+
+*One correctness trap, in case the cache is ever reworked:* the failure path
+falls back to `generate(title:)`, whose result depends on the **title** rather
+than on the string being decoded. Caching that under the JSON key hands every
+book with the same corrupt style the first book's colours. Only successful
+decodes go in the cache; `spine_style_test.dart` pins this.
+
+### Reverted: parallelising the four `main()` loads
+
+`LibraryRepository.open` (23 ms) and `ServerConnection.load` (13 ms, an OS
+keychain read over D-Bus) look independent, so starting all three futures
+together and awaiting them afterwards should have saved ~13 ms of a ~150 ms
+start. It saves nothing:
+
+| | |
+|---|---|
+| Sequential | 47, 50, 42 ms |
+| Parallel | 50, 47, 48 ms |
+
+They are platform-channel calls, and the platform thread services those
+serially — Dart-level concurrency does not overlap work that is queued behind a
+single channel. A first run *did* read 37 ms against a sequential 48 ms, which
+looked like a win until it was repeated; one sample was noise.
+
+### Reverted: `itemExtent` on the shelf's `ListView`
+
+Every shelf row is exactly `175 + 14 + 26` px, so the list can take a fixed
+`itemExtent` and compute scroll geometry arithmetically instead of measuring
+rows. Measured at 3,000 books: 785→794 ms first build, 86.4→88.3 ms per scroll
+step — no difference either way. `ListView.builder` already builds only the
+visible rows, so the extent arithmetic it saves was never a meaningful share of
+the frame, and the change adds a constant that silently clips the shelves if it
+ever stops matching the row it describes.
+
+### A benchmark that measures nothing looks exactly like a fast one
+
+`shelf_scroll_bench.dart` first reported the spine cache as worth 0%. The books
+it built had `spineStyle == null`, which takes `fromJson`'s null early-return —
+the decode path under test never ran. Any benchmark over `Book` fixtures has to
+set the fields whose handling it is timing; a flat result is a reason to check
+the fixture before believing it.

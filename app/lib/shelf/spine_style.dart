@@ -79,9 +79,55 @@ class SpineStyle {
     );
   }
 
+  /// Decoded styles, keyed by the exact stored JSON.
+  ///
+  /// [fromJson] is called from three hot paths, all of which re-decode the same
+  /// unchanged strings on every build: the shelf packs rows by asking every
+  /// book for its width (`ShelfView._widthOf`, inside a `LayoutBuilder`, so it
+  /// runs on every rebuild), each visible spine decodes again to draw itself,
+  /// and the physical room draws every placed book through `SpineFace`. A
+  /// `jsonDecode` plus six hex parses per book per frame is pure repeat work —
+  /// the styles only change when a book is edited, which rewrites the string
+  /// and so misses the cache by itself. No invalidation is needed: the key *is*
+  /// the value it was decoded from.
+  ///
+  /// A `LinkedHashMap` gives insertion-order iteration, so evicting the oldest
+  /// key is O(1) and the cache degrades to plain LRU-ish behaviour on a library
+  /// larger than the cap rather than growing without bound.
+  static final _cache = <String, SpineStyle>{};
+
+  /// Comfortably past any realistic personal library, so in practice the cache
+  /// fills once and never evicts; the cap only exists so a pathological import
+  /// cannot grow it forever.
+  static const _cacheCap = 8192;
+
+  /// Drops the memoised styles. Only needed by tests that assert on decode
+  /// behaviour — normal use never has to invalidate, see [_cache].
+  @visibleForTesting
+  static void clearCache() => _cache.clear();
+
   /// Parses the stored JSON, falling back to [generate] on missing/bad data.
+  ///
+  /// Memoised — see [_cache]. [SpineStyle] is immutable, so handing the same
+  /// instance to several callers is safe.
   static SpineStyle fromJson(String? json, {required String title}) {
     if (json == null || json.isEmpty) return generate(title: title);
+    final hit = _cache[json];
+    if (hit != null) return hit;
+    final style = _decode(json);
+    // Only successful decodes are cached. The failure path falls back to
+    // `generate(title:)`, whose result depends on the *title* and not on the
+    // string being decoded — caching it under the JSON key would hand a second
+    // book with the same malformed style the first book's colours.
+    if (style == null) return generate(title: title);
+    if (_cache.length >= _cacheCap) {
+      _cache.remove(_cache.keys.first);
+    }
+    _cache[json] = style;
+    return style;
+  }
+
+  static SpineStyle? _decode(String json) {
     try {
       final m = jsonDecode(json) as Map<String, dynamic>;
       final cover = m['coverColor'] as String?;
@@ -94,7 +140,7 @@ class SpineStyle {
         coverColor: cover == null ? null : _parseHex(cover),
       );
     } catch (_) {
-      return generate(title: title);
+      return null;
     }
   }
 
