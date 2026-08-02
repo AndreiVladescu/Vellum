@@ -87,14 +87,19 @@ single book.
 
 | You want | File |
 |---|---|
-| The app on Linux | `vellum-linux-x64.tar.gz` |
+| The app on Linux, no installation | `Vellum-1.0.0-x86_64.AppImage` — `chmod +x` and run |
+| The app on Debian/Ubuntu/Mint | `vellum_1.0.0_amd64.deb` — `sudo apt install ./vellum_*.deb` |
+| The app on any other Linux | `vellum-linux-x64.tar.gz` — extract, then `./install.sh` |
 | The app on Windows | `vellum-windows-x64.zip` |
 | The app on macOS (Apple Silicon) | `vellum-macos.zip` |
 | The app on Android | the `.apk` matching your phone, usually `arm64-v8a` |
 | The optional server | `vellum-server-<your platform>.tar.gz` |
 
-On Linux, keep the extracted folder together — the executable needs `lib/` and
-`data/` beside it. Every archive ships a `SHA256SUMS` or `.sha256` beside it.
+On Linux the `.deb` and the tarball's `install.sh` both put the app out of the
+way and leave one `vellum` command on your PATH, plus a menu entry — you never
+move `lib/` or `data/` by hand. Reverse either with `sudo apt remove vellum` or
+`./install.sh --uninstall`; both leave your library alone. Every archive ships a
+`SHA256SUMS` or `.sha256` beside it.
 
 ### Requirements
 

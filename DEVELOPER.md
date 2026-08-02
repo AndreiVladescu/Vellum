@@ -128,8 +128,33 @@ flutter build linux --release
 **Output:** `app/build/linux/x64/release/bundle/` — run `./vellum` inside it.
 
 **Keep the bundle whole.** The executable needs the `lib/` and `data/` folders
-beside it; shipping the binary alone ships something that cannot start. Move the
-whole folder wherever you like and make a shortcut to the binary inside it.
+beside it; shipping the binary alone ships something that cannot start.
+
+**Packaging it.** Three scripts in `app/linux/packaging/` turn that bundle into
+something installable. Run them after `flutter build linux --release`; all three
+write to `app/dist/`.
+
+```sh
+linux/packaging/build-appimage.sh   # Vellum-1.0.0-x86_64.AppImage
+linux/packaging/build-deb.sh        # vellum_1.0.0_amd64.deb  (needs dpkg-deb)
+linux/packaging/install.sh          # install this build for the current user
+```
+
+`install.sh` also ships inside the release tarball, which is how end users
+install it: `--system` or `--prefix=DIR` to place it elsewhere, `--uninstall`
+to reverse it.
+
+All three rely on the same property, which is worth knowing before you change
+them: the executable is linked with `RUNPATH=$ORIGIN/lib`, and the engine finds
+`data/` relative to `/proc/self/exe`. Both resolve through a **symlink** to the
+real file, so a link in `~/.local/bin` or `/usr/bin` is enough — no wrapper
+script and no `LD_LIBRARY_PATH`. That is why the bundle can live in
+`/usr/lib/vellum` and still be launched as plain `vellum`.
+
+The AppImage additionally bundles `libsecret` next to the engine, where that
+same `RUNPATH` picks it up: `flutter_secure_storage` links it hard, and not
+every distribution installs it. The `.deb` declares it as a dependency instead,
+so apt refuses to install onto a machine that cannot run it.
 
 <a name="app-windows"></a>
 ### Windows

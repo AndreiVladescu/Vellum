@@ -24,3 +24,6 @@ app/build/
 .idea/
 *.swp
 .DS_Store
+
+# Local packaging staging (linux/packaging/*.sh)
+app/vellum-[0-9]*/

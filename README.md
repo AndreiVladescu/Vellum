@@ -41,11 +41,23 @@ is uploaded anywhere, unless you deliberately set up the optional server.
 ## Getting it running
 
 **If there is a [release](https://github.com/AndreiVladescu/Vellum/releases)**,
-download the build for your system — Linux, Windows, macOS or Android — and skip
-this section. On Linux, keep the extracted folder together: the executable needs
-`lib/` and `data/` beside it. The desktop builds are unsigned, so macOS wants
-right-click → Open on the first launch and Windows SmartScreen wants
-*More info → Run anyway*.
+download the build for your system and skip this section.
+
+On **Linux**, take whichever suits you:
+
+| | |
+|---|---|
+| `Vellum-*.AppImage` | One file. `chmod +x` it and run it — no installation. |
+| `vellum_*_amd64.deb` | Debian, Ubuntu, Mint: `sudo apt install ./vellum_*.deb` |
+| `vellum-linux-x64.tar.gz` | Anything else: extract, then `./install.sh` |
+
+The `.deb` and `install.sh` both tuck the app out of the way and leave a single
+`vellum` command on your PATH plus a menu entry — you never move `lib/` and
+`data/` yourself. Undo either with `sudo apt remove vellum` or
+`./install.sh --uninstall`; both leave your library alone.
+
+**Windows** and **macOS** builds are unsigned, so macOS wants right-click → Open
+on the first launch and Windows SmartScreen wants *More info → Run anyway*.
 
 To build it yourself instead — or if there is no release yet — it takes about
 ten minutes, most of which is the toolchain downloading. What follows is the

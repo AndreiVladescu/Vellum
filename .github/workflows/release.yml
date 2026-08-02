@@ -115,13 +115,30 @@ jobs:
       # bundle in particular must stay whole: the executable needs `lib/` and
       # `data/` beside it, so shipping the binary alone would ship something
       # that cannot start.
+      # Three Linux artefacts, because "keep the folder together" is not an
+      # install story:
+      #   .AppImage — one file, no install, no root, any distribution
+      #   .deb      — apt-managed, menu entry, declared dependencies
+      #   .tar.gz   — the bundle plus install.sh, for everything else
       - name: Package (Linux)
         if: matrix.platform == 'linux'
         working-directory: app
         run: |
           mkdir -p dist
-          tar -czf dist/vellum-linux-x64.tar.gz \
-            -C build/linux/x64/release/bundle .
+          linux/packaging/build-appimage.sh
+          linux/packaging/build-deb.sh
+          # Staged under a versioned directory: extracting straight into `.`
+          # sprays `vellum`, `lib/` and `data/` loose over whatever directory
+          # the user happened to be in.
+          VERSION=$(sed -n 's/^version: *\([0-9][^+ ]*\).*/\1/p' pubspec.yaml)
+          STAGE="vellum-$VERSION"
+          mkdir -p "$STAGE/share"
+          cp -r build/linux/x64/release/bundle/. "$STAGE/"
+          cp linux/packaging/install.sh "$STAGE/"
+          cp -r linux/packaging/icons "$STAGE/share/"
+          cp ../README.md "$STAGE/README.txt"
+          tar -czf "dist/vellum-linux-x64.tar.gz" "$STAGE"
+          rm -f dist/.appimagetool
           (cd dist && sha256sum * > SHA256SUMS)
       - name: Package (Windows)
         if: matrix.platform == 'windows'
@@ -200,12 +217,18 @@ jobs:
 
             | | |
             |---|---|
-            | **Desktop app** | `vellum-linux-x64.tar.gz`, `vellum-windows-x64.zip`, `vellum-macos.zip` |
+            | **Linux** | `Vellum-*-x86_64.AppImage` — download, `chmod +x`, run |
+            | **Linux (Debian/Ubuntu)** | `vellum_*_amd64.deb` — `sudo apt install ./vellum_*.deb` |
+            | **Linux (other)** | `vellum-linux-x64.tar.gz` — extract, then `./install.sh` |
+            | **Windows** | `vellum-windows-x64.zip` |
+            | **macOS** | `vellum-macos.zip` (Apple Silicon) |
             | **Android** | `app-release.aab` (Play), or the per-ABI `.apk` to sideload |
             | **Server** | `vellum-server-<target>` for four targets, or `docker build .` |
 
-            On Linux, keep the extracted folder together — the executable needs
-            `lib/` and `data/` beside it.
+            The AppImage is a single file and needs no installation. The `.deb`
+            and the tarball's `install.sh` both put the app out of the way and
+            leave one `vellum` command on your PATH — you never move `lib/` or
+            `data/` yourself. `./install.sh --uninstall` reverses it.
 
             **The desktop builds are unsigned.** macOS will refuse the first
             launch: right-click the app and choose Open, or
