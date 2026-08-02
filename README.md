@@ -70,8 +70,12 @@ Flutter builds a real native app, so it needs your platform's C++ toolchain.
 **Linux (Debian/Ubuntu):**
 
 ```sh
-sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+                 libsecret-1-dev
 ```
+
+`libsecret-1-dev` is where the server token is stored; leaving it out fails the
+build at the CMake step rather than at runtime.
 
 **macOS:** install Xcode from the App Store, then:
 

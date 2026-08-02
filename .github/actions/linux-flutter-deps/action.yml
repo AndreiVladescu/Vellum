@@ -1,0 +1,28 @@
+# The system packages a Flutter *Linux desktop* build needs.
+#
+# One list, used by both workflows. They used to carry their own copies, which
+# drifted: `ci.yml` installed libsecret and `release.yml` did not, so `flutter
+# build linux` passed on every pull request and failed on the release run with
+#
+#   The following required packages were not found:
+#    - libsecret-1>=0.18.4
+#
+# A list duplicated across two files is a list that will differ eventually, and
+# the copy that breaks is the one that runs least often.
+name: Linux Flutter build dependencies
+description: Installs the GTK/CMake toolchain and libsecret for a Linux desktop build.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          clang cmake ninja-build pkg-config \
+          libgtk-3-dev liblzma-dev \
+          libsecret-1-dev
+        # ^ libsecret is flutter_secure_storage_linux's hard requirement: its
+        #   CMakeLists does `pkg_check_modules(... REQUIRED ... libsecret-1)`,
+        #   so it fails configuration rather than degrading. That plugin is
+        #   where the server token is kept.
