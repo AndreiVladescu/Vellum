@@ -28,10 +28,22 @@ VERSION="$(sed -n 's/^version: *\([0-9][^+ ]*\).*/\1/p' "$APP/pubspec.yaml")"
 
 APPDIR="$(mktemp -d)/Vellum.AppDir"
 trap 'rm -rf "$(dirname "$APPDIR")"' EXIT
-mkdir -p "$APPDIR/usr/lib/vellum" "$APPDIR/usr/share"
+# usr/share/icons has to exist *before* the copy below. `cp -r hicolor dst/`
+# nests into dst when dst exists, but renames hicolor to dst when it does not —
+# which quietly produced usr/share/icons/48x48/..., a tree with no theme name
+# in it, so GTK could never resolve the icon however XDG_DATA_DIRS was set.
+mkdir -p "$APPDIR/usr/lib/vellum" "$APPDIR/usr/share/icons"
 
 cp -r "$BUNDLE/." "$APPDIR/usr/lib/vellum/"
 cp -r "$ICONS" "$APPDIR/usr/share/icons/"
+# Asserted rather than assumed: a misplaced icon theme fails at runtime, in
+# silence, on someone else's machine — the build is the only place it is cheap
+# to notice.
+THEMED_ICON="$APPDIR/usr/share/icons/hicolor/256x256/apps/$APP_ID.png"
+[ -f "$THEMED_ICON" ] || {
+  echo "error: icon theme is not laid out as expected — no $THEMED_ICON" >&2
+  exit 1
+}
 
 # libsecret is not installed by default on every distribution, and
 # flutter_secure_storage links it hard — a missing one is a failure to start,
