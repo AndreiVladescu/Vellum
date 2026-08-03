@@ -56,6 +56,12 @@ spine-style JSON, and backfilled at startup. A **spine artwork** preference
 (spine mode only) switches covered books between the cover-slice spine (the
 default) and a generated spine in that dominant colour.
 
+### ✅ 8. Books riding shelves
+Done (August 2026): dragging a bookcase carries its contents. The editor tracks
+`_ridingIds` for books and `_ridingPropIds` for ornaments, so both travel with
+the shelf and settle against it on release rather than staying behind at their
+old world positions. Confirmed by hand.
+
 ---
 
 ## Manual device checks (CI can't do these)
@@ -128,10 +134,6 @@ in the same pass. None of them block the rest of the item.
 
 ## Open / possible follow-ups
 
-- **Books riding shelves.** Moving a shelf still leaves its books behind; they
-  keep their positions rather than travelling with the shelf. (An occupied
-  shelf is currently pinned against dragging, so this is only reachable via
-  shelf *edit*.)
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.
 - **EPUB reader polish.** Partly resolved by plan 5 #23: in-chapter scroll
