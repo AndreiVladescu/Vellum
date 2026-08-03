@@ -534,15 +534,24 @@ adaptive icons (including the Android 13+ monochrome layer), the macOS icon set,
 the Windows `.ico`, the in-app asset, the Linux hicolor theme, and the server
 console's favicon. Needs Pillow and NumPy.
 
-On Linux the *window* icon is resolved from the icon theme, not the bundle, so
-after regenerating:
+On Linux the *window* icon prefers the icon theme, so after regenerating:
 
 ```sh
 cd app && sh linux/install-dev.sh debug
 ```
 
 Without that the desktop keeps showing whatever was installed last, and the app
-looks unchanged however many times you rebuild it.
+looks unchanged however many times you rebuild it. An uninstalled build falls
+back to the bundled `assets/logo.png`, scaled to 48/64/128 first: GDK packs the
+icon list into `_NET_WM_ICON`, which is capped by the X maximum request size,
+and anything from 256×256 up is dropped without a word — hand it the 512×512
+asset unscaled and the window ends up with no icon at all. The same cap is why
+the themed path wins where it's available: a theme offers small sizes too.
+
+The `.deb` and `install.sh` put the theme somewhere GTK already searches. The
+AppImage cannot, so its `AppRun` prepends the image's own `usr/share` to
+`XDG_DATA_DIRS` — without that line the icons travel inside the image and are
+never looked at.
 
 ## Cutting a release
 

@@ -58,9 +58,16 @@ done
 
 # AppRun is what the image runs. exec, so the app is PID 1 of the payload and
 # signals reach it; $APPDIR is set by the runtime.
+#
+# XDG_DATA_DIRS has to name the image's own share/ or the icon theme copied in
+# above is one nothing ever reads: GTK resolves the window icon by name out of
+# the theme search path (see runner/my_application.cc), and inside an AppImage
+# that path is still the *host's*. The default is the one XDG specifies, for a
+# host that leaves the variable unset.
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
+export XDG_DATA_DIRS="$HERE/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 exec "$HERE/usr/lib/vellum/vellum" "$@"
 EOF
 chmod +x "$APPDIR/AppRun"
