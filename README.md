@@ -3,12 +3,16 @@
 [![CI](https://github.com/AndreiVladescu/Vellum/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreiVladescu/Vellum/actions/workflows/ci.yml)
 [![Licence: AGPL v3](https://img.shields.io/badge/licence-AGPL--3.0-blue.svg)](LICENSE)
 
+![Vellum](img/banner.png)
+
 A personal library manager for digital **and** physical books, shown as a visual
 bookshelf — you browse your books spine-out, the way they look on a real shelf,
 instead of scrolling a grid of covers.
 
 It runs entirely on your own machine. There is no account to create and nothing
 is uploaded anywhere, unless you deliberately set up the optional server.
+
+![The shelf, spine-out, with Continue reading above it](img/main_view.png)
 
 ---
 
@@ -170,6 +174,12 @@ the number.
 **Fix anything it got wrong.** Open a book and edit any field. If you make a
 mess, *Revert to library defaults* puts back what was originally imported.
 
+![A book's page: metadata, digital formats, physical copies, notes](img/rtfm_book.png)
+
+A book's own page is where its files, its paper copies, your rating and your
+private notes all live — the one above has no file attached yet, which is why
+*Read* is greyed out.
+
 **Keep a wishlist.** Books you want but don't own live in ☰ → *Wishlist*, off
 the shelf until you attach a file or record a copy — which moves them into the
 library by itself. Handy for filling gaps in a series, or scanning something in
@@ -239,6 +249,11 @@ continuous with a scrollbar down the right-hand side.
 The second tab is for books as objects. Create a **library** (a room), add
 **shelves** to it, and record which copy sits where — including a photo of the
 shelf as a backdrop, so you can place books on the picture of your actual room.
+
+![A room with two shelves, books stood and stacked, and a statuette](img/physical_view.png)
+
+Books stand, stack or lie flat, and a shelf takes ornaments as well — the point
+is that it ends up looking like the shelf you actually own.
 
 When you lend a book, record who has it. Loans are kept as history, so returning
 a book doesn't erase the fact it was lent — you keep the record of who has

@@ -4,6 +4,8 @@ The Flutter client — a visual bookshelf for digital and physical books that
 works fully offline and can optionally sync with a self-hosted Vellum server.
 See the repo root [`DESIGN.md`](../DESIGN.md) for architecture and data model.
 
+![The shelf, spine-out, with Continue reading above it](../img/main_view.png)
+
 ## Run
 
 ```sh
