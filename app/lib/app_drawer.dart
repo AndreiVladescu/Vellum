@@ -124,13 +124,18 @@ class AppDrawer extends StatelessWidget {
               currentAccountPicture: ProfileAvatar(profile: profile, radius: 30),
               accountName:
                   Text(profile.isSet ? profile.name : 'Set up your profile'),
-              // The identity you sync as, visible without opening a screen:
-              // the local profile's email is not the account's, and until this
-              // was shown the two could differ with nothing saying so.
+              // Your own email — the one the Account page edits. Connecting
+              // used to replace it with the account's, which left the profile
+              // email edited on one screen and shown nowhere; the account you
+              // sync as is on the *Library server* tile below, so both are
+              // still readable at once. Falls back to the account's when the
+              // profile has no email, rather than leaving the line blank.
               accountEmail: Text(
-                connection.isConnected
-                    ? connection.email
-                    : (profile.email.isEmpty ? 'Local library' : profile.email),
+                profile.email.isNotEmpty
+                    ? profile.email
+                    : (connection.isConnected
+                        ? connection.email
+                        : 'Local library'),
               ),
               onDetailsPressed: () => _openAccount(context),
             ),
