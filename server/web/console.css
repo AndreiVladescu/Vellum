@@ -196,17 +196,64 @@ td .celledit { width:100%; }
 .fchip:hover { border-color:var(--accent); color:var(--fg); }
 .fchip.on { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
 
-/* ---- login ---- */
-#login {
-  max-width:340px; margin:14vh auto; padding:32px 28px;
-  background:var(--surface); border:1px solid var(--line);
-  border-radius:12px;
+/* ---- login / first run ----------------------------------------------------
+   Both cards are one thing: a bookplate — the ex-libris label pasted inside a
+   cover to say whose book it is, which is precisely what these two screens do
+   (prove you're the owner, or become one). Hence the centred column, the
+   hairline under the heading, and the ribbon tab at the top edge: the same
+   maroon ribbon that hangs out of the logo's open book. That ribbon is the only
+   ornament here; everything else is spacing.
+
+   Shared by #login and #register so the first-run form can't drift into
+   looking like a different product than the login it replaces. */
+.auth {
+  min-height:100dvh;
+  display:grid; place-items:center;
+  padding:24px;
 }
-#login .logo-lg { display:block; margin:0 auto 12px; }
-#login h1 { font-size:1.25rem; font-weight:600; margin:0 0 2px; text-align:center; }
-#login > .muted { text-align:center; display:block; }
-#login input { width:100%; margin:6px 0 10px; }
-#login .btn.primary { margin-top:4px; }
+.auth-card {
+  position:relative;
+  width:min(400px, 100%);
+  padding:40px 34px 28px;
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:14px;
+  box-shadow:0 12px 40px rgba(20,16,10,.07);
+  text-align:center;
+}
+@media (prefers-color-scheme: dark) {
+  .auth-card { box-shadow:0 12px 40px rgba(0,0,0,.35); }
+}
+/* The ribbon: a bookmark tab notched into the card's top edge. */
+.auth-card::before {
+  content:''; position:absolute; top:0; left:34px;
+  width:9px; height:30px; background:var(--red-ink);
+  border-radius:0 0 1px 1px;
+  clip-path:polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+}
+.auth-card .logo-xl { display:block; margin:0 auto 18px; }
+.auth-eyebrow {
+  margin:0 0 6px;
+  font-size:.66rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--accent);
+}
+.auth-card h1 {
+  font-size:1.35rem; font-weight:600; letter-spacing:-.01em;
+  margin:0 0 6px; line-height:1.25;
+  text-wrap:balance;
+}
+.auth-sub {
+  margin:0 0 22px; padding-bottom:20px;
+  font-size:.875rem; color:var(--muted);
+  text-wrap:balance;
+  border-bottom:1px solid var(--line-soft);
+}
+.auth-form { display:flex; flex-direction:column; gap:10px; }
+.auth-form input { width:100%; padding:10px 13px; font-size:.95rem; }
+.auth-go { width:100%; padding:10px 12px; font-weight:600; margin-top:2px; }
+.auth-switch {
+  margin:6px 0 0; font-size:.85rem; color:var(--muted); line-height:1.7;
+}
+#login .err, #register .err { margin:10px 0 0; font-size:.85rem; }
 
 .err { color:var(--red-ink); min-height:1.2em; }
 

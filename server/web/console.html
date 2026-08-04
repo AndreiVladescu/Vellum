@@ -10,38 +10,54 @@
 <body>
 
 <!-- Login -->
-<div id="login">
-  <img class="logo logo-lg" src="/assets/logo.svg" alt="" width="64" height="64">
-  <h1>Vellum console</h1>
-  <p class="muted">Sign in to manage the library.</p>
-  <input id="l-email" type="text" placeholder="Email" autocomplete="username">
-  <input id="l-pass" type="password" placeholder="Password" autocomplete="current-password">
-  <button class="btn primary" style="width:100%" onclick="login()">Log in</button>
-  <p class="err" id="l-err"></p>
-  <!-- Shown only on a server that has no accounts yet; see checkRegistration(). -->
-  <p class="muted hidden" id="l-to-register">
-    Nobody has an account on this server yet.
-    <button class="btn sm quiet" onclick="showRegister()">Create the master account</button>
-  </p>
+<div id="login" class="auth">
+  <div class="auth-card">
+    <img class="logo logo-xl" src="/assets/logo.svg" alt="" width="88" height="88">
+    <h1>Vellum console</h1>
+    <p class="auth-sub">Sign in to manage the library.</p>
+    <form class="auth-form" onsubmit="event.preventDefault(); login()">
+      <input id="l-email" type="text" placeholder="Email" aria-label="Email"
+             autocomplete="username">
+      <input id="l-pass" type="password" placeholder="Password" aria-label="Password"
+             autocomplete="current-password">
+      <button class="btn primary auth-go" type="submit">Log in</button>
+    </form>
+    <p class="err" id="l-err"></p>
+    <!-- Shown only on a server that has no accounts yet; see checkRegistration(). -->
+    <p class="auth-switch hidden" id="l-to-register">
+      Nobody has an account here yet.
+      <button class="btn sm quiet" onclick="showRegister()">Create the master account</button>
+    </p>
+  </div>
 </div>
 
 <!-- First run: the server has no master, so the only useful form is this one. -->
-<div id="register" class="hidden">
-  <img class="logo logo-lg" src="/assets/logo.svg" alt="" width="64" height="64">
-  <h1>Vellum console</h1>
-  <p class="muted">The first account becomes the library's master (owner).</p>
-  <input id="r-email" type="text" placeholder="Email" autocomplete="username">
-  <input id="r-name" type="text" placeholder="Display name" autocomplete="name">
-  <input id="r-pass" type="password" placeholder="Password (8 characters or more)"
-         autocomplete="new-password">
-  <!-- Only when the operator set VELLUM_BOOTSTRAP_TOKEN. -->
-  <input id="r-token" class="hidden" type="password" placeholder="Bootstrap token"
-         autocomplete="off">
-  <button class="btn primary" style="width:100%" onclick="register()">Create account</button>
-  <p class="err" id="r-err"></p>
-  <p class="muted">
-    <button class="btn sm quiet" onclick="showLogin()">Have an account? Log in</button>
-  </p>
+<div id="register" class="auth hidden">
+  <div class="auth-card">
+    <img class="logo logo-xl" src="/assets/logo.svg" alt="" width="88" height="88">
+    <!-- An eyebrow that earns its place: this screen exists exactly once in a
+         server's life, and saying so is the difference between "which form is
+         this?" and "ah, I'm setting the library up". -->
+    <p class="auth-eyebrow">First run</p>
+    <h1>Create the master account</h1>
+    <p class="auth-sub">It owns the library. You can add people later.</p>
+    <form class="auth-form" onsubmit="event.preventDefault(); register()">
+      <input id="r-email" type="text" placeholder="Email" aria-label="Email"
+             autocomplete="username">
+      <input id="r-name" type="text" placeholder="Display name" aria-label="Display name"
+             autocomplete="name">
+      <input id="r-pass" type="password" placeholder="Password, 8 characters or more"
+             aria-label="Password" autocomplete="new-password">
+      <!-- Only when the operator set VELLUM_BOOTSTRAP_TOKEN. -->
+      <input id="r-token" class="hidden" type="password" placeholder="Bootstrap token"
+             aria-label="Bootstrap token" autocomplete="off">
+      <button class="btn primary auth-go" type="submit">Create account</button>
+    </form>
+    <p class="err" id="r-err"></p>
+    <p class="auth-switch">
+      <button class="btn sm quiet" onclick="showLogin()">Have an account? Log in</button>
+    </p>
+  </div>
 </div>
 
 <!-- App -->
