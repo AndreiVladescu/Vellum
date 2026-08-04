@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../server/connection_store.dart';
+import '../snack_bars.dart';
 import '../settings/app_settings.dart';
 import 'environment_editor_page.dart';
 import 'publish_room.dart';
@@ -150,7 +151,11 @@ class PhysicalLibrariesTab extends StatelessWidget {
           return ListView(children: [
             const SizedBox(height: 60),
             _emptyState(context, theme),
-            _SharedRooms(connection: connection),
+            _SharedRooms(
+              connection: connection,
+              repository: repository,
+              localIds: const {},
+            ),
           ]);
         }
         return ListView(
@@ -175,7 +180,11 @@ class PhysicalLibrariesTab extends StatelessWidget {
               const Divider(height: 1),
               _roomTile(context, env),
             ],
-            _SharedRooms(connection: connection),
+            _SharedRooms(
+              connection: connection,
+              repository: repository,
+              localIds: {for (final e in envs) e.id},
+            ),
           ],
         );
       },
@@ -263,8 +272,35 @@ class PhysicalLibrariesTab extends StatelessWidget {
 /// local to list. Absent entirely without a connection or against a server too
 /// old to have `/api/layouts`, which is the same rule the publish actions
 /// follow — a section that can only fail is worse than none.
+/// Rooms this account published from another device that this one has never
+/// seen.
+///
+/// A room is a *document* on the server, not a synced table (plan 5 #47), so
+/// nothing pulls one down by itself. Without this they were invisible on a
+/// second device — your own published rooms were filtered out of "shared with
+/// you" for being yours, and "Update from server" only works on a room that is
+/// already here. The effect was that rooms looked like the one thing that did
+/// not sync.
+List<ServerLayout> roomsPublishedElsewhere(
+  List<ServerLayout> all,
+  Set<String> localIds,
+) =>
+    [
+      for (final layout in all)
+        if (layout.mine && !localIds.contains(layout.id)) layout,
+    ];
+
 class _SharedRooms extends StatefulWidget {
-  const _SharedRooms({required this.connection});
+  const _SharedRooms({
+    required this.connection,
+    required this.repository,
+    required this.localIds,
+  });
+
+  /// The rooms this device already has, so a published room of your own is
+  /// only offered when it is missing here.
+  final Set<String> localIds;
+  final LibraryRepository repository;
 
   final ServerConnection? connection;
 
@@ -275,11 +311,27 @@ class _SharedRooms extends StatefulWidget {
 class _SharedRoomsState extends State<_SharedRooms> {
   List<ServerLayout> _rooms = const [];
 
+  /// Rooms this account published from another device and that this one has
+  /// never seen. A room is a *document* on the server rather than a synced
+  /// table, so nothing brings it down on its own — before this they were
+  /// invisible here, which looked like rooms not syncing at all.
+  List<ServerLayout> _mineElsewhere = const [];
+  String? _busyId;
+
   @override
   void initState() {
     super.initState();
     _load();
   }
+
+  @override
+  void didUpdateWidget(_SharedRooms old) {
+    super.didUpdateWidget(old);
+    // A room brought down (or created, or deleted) changes what is missing.
+    if (old.localIds.length != widget.localIds.length) _recompute(_all);
+  }
+
+  List<ServerLayout> _all = const [];
 
   Future<void> _load() async {
     final client = widget.connection?.client;
@@ -287,21 +339,82 @@ class _SharedRoomsState extends State<_SharedRooms> {
     try {
       final all = await client.listLayouts();
       if (!mounted) return;
-      setState(() => _rooms = [
-            for (final l in all)
-              if (!l.mine) l,
-          ]);
+      _recompute(all);
     } catch (_) {
-      // Offline, or a server without rooms. Nothing to show, nothing to say:
-      // your own rooms are all local and are listed above regardless.
+      // Offline, or a server without rooms. Nothing to show, nothing to say.
     }
+  }
+
+  void _recompute(List<ServerLayout> all) {
+    setState(() {
+      _all = all;
+      _rooms = [
+        for (final l in all)
+          if (!l.mine) l,
+      ];
+      _mineElsewhere = roomsPublishedElsewhere(all, widget.localIds);
+    });
+  }
+
+  Future<void> _bringHere(ServerLayout room) async {
+    final c = widget.connection;
+    if (c == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busyId = room.id);
+    final message = await RoomPublisher(
+      repository: widget.repository,
+      connection: c,
+    ).fetch(room.id, name: room.name);
+    if (!mounted) return;
+    setState(() => _busyId = null);
+    messenger.showSnackBar(appSnackBar(content: Text(message)));
+    // The stream of local rooms repaints the list above; this section learns
+    // the room is here through didUpdateWidget.
   }
 
   @override
   Widget build(BuildContext context) {
     final client = widget.connection?.client;
-    if (client == null || _rooms.isEmpty) return const SizedBox.shrink();
-    return SharedRoomsList(rooms: _rooms, client: client);
+    if (client == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_mineElsewhere.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Text('Your rooms, published elsewhere',
+                style: theme.textTheme.titleSmall),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+            child: Text(
+              'Published from another device. Bring one here to arrange it on '
+              'this one too.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          for (final room in _mineElsewhere)
+            ListTile(
+              leading: const Icon(Icons.cloud_download_outlined),
+              title: Text(room.name),
+              subtitle: Text('Revision ${room.revision}'),
+              trailing: _busyId == room.id
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : TextButton(
+                      onPressed: () => _bringHere(room),
+                      child: const Text('Bring here'),
+                    ),
+            ),
+        ],
+        SharedRoomsList(rooms: _rooms, client: client),
+      ],
+    );
   }
 }
 
