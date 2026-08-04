@@ -66,6 +66,8 @@ const ACTIONS = {
   deletebook: el => deleteBook(el.dataset.book),
   enrichdetail: el => enrichFromDetail(el.dataset.book),
   savedetail: el => saveDetail(el.dataset.book),
+  canceldetail: () => cancelDetail(),
+  pickdetail: el => pickDetailCandidate(Number(el.dataset.i)),
   createlink: el => createLink(el.dataset.book),
   copyurl: el => copyUrl(el.dataset.url),
   decide: el => decideRequest(el.dataset.id, el.dataset.decision),
@@ -1306,10 +1308,18 @@ async function deleteSelected(){
 
 function fmtSize(b){ return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
 
+// One open detail panel's unsaved state. `pending` holds the fields a fetched
+// match proposes that the panel has nowhere to type — publisher, ISBN, page
+// count — so Save can write them and Cancel can drop them. `results` is the
+// last search, so clicking a candidate can find it again.
+let DETAIL = { id: null, pending: null, results: [] };
+
 async function openDetail(id){
   let d;
   try { d = await api('GET','/api/books/'+id+'/detail'); }
   catch(e){ toast(e.message); return; }
+  // A freshly opened panel has nothing unsaved, whatever the last one left.
+  DETAIL = { id, pending: null, results: [], authors: (d.authors||[]).join(', ') };
   const authors = (d.authors||[]).join(', ');
   const genres = (d.genres||[]);
   const list = (d.files||[]).map(f =>
@@ -1321,7 +1331,7 @@ async function openDetail(id){
     ? list + '<div style="text-align:right; margin-top:6px">'+upBtn+'</div>'
     : '<div style="display:flex; align-items:center; gap:10px"><span class="muted">No files uploaded.</span>'+upBtn+'</div>';
   document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+   <div class="modal-bg" onclick="if(event.target===this)cancelDetail()">
     <div class="modal" style="width:min(720px,95vw); max-height:90vh; overflow:auto">
       <div style="display:flex; gap:16px">
         <div class="cover-box" data-act="detailpick" data-book="${esc(id)}" data-accept="image/*">
@@ -1341,6 +1351,8 @@ async function openDetail(id){
       </div>
       <label>Description</label>
       <textarea id="d-desc" rows="5">${esc(d.description||'')}</textarea>
+      <p class="muted" id="d-status" style="margin:8px 0 0; font-size:.85rem"></p>
+      <div id="d-results" style="margin-top:8px"></div>
       <label>Files</label>
       ${files}
       <div class="row" style="justify-content:space-between; margin-top:16px">
@@ -1349,7 +1361,7 @@ async function openDetail(id){
           <button class="btn" data-act="enrichdetail" data-book="${esc(id)}">Fetch metadata</button>
         </div>
         <div>
-          <button class="btn" onclick="closeModal()">Close</button>
+          <button class="btn" data-act="canceldetail">Cancel</button>
           <button class="btn primary" data-act="savedetail" data-book="${esc(id)}">Save</button>
         </div>
       </div>
@@ -1372,17 +1384,31 @@ function detailPick(id, accept){
   input.click();
 }
 
+/// Save writes what the panel shows — the typed edits plus whatever a fetched
+/// match proposed — and nothing else. Only *changed* fields go in the body: an
+/// unchanged one would still bump `updated_at`, which is the clock every other
+/// device pulls on.
 async function saveDetail(id){
-  const body = {
-    title: document.getElementById('d-title').value.trim(),
-    subtitle: document.getElementById('d-subtitle').value,
-    description: document.getElementById('d-desc').value,
-  };
-  const y = document.getElementById('d-year').value.trim();
-  if (y && !isNaN(parseInt(y,10))) body.published_year = parseInt(y,10);
-  if (!body.title){ toast('Title cannot be empty'); return; }
+  const body = { ...(pendingDetailEdits() || {}), ...(DETAIL.pending || {}) };
+  if ('title' in body && !body.title){ toast('Title cannot be empty'); return; }
+  if (!Object.keys(body).length){ closeModal(); return; }
   try { await api('PATCH','/api/books/'+id, body); closeModal(); await loadAll(); toast('Saved'); }
   catch(e){ toast(e.message); }
+}
+
+/// True while the panel holds anything that pressing Cancel would throw away.
+function detailIsDirty(){
+  try { return !!(pendingDetailEdits() || DETAIL.pending); }
+  catch(_){ return false; }          // panel already gone
+}
+
+/// Cancel is the way out that keeps nothing: the edits, and any fetched match
+/// sitting in the form, are dropped. Confirmed only when there is something to
+/// lose, so the ordinary "I just looked at it" close stays one click.
+function cancelDetail(){
+  if (detailIsDirty() && !confirm('Discard your changes to this book?')) return;
+  DETAIL = { id: null, pending: null, results: [] };
+  closeModal();
 }
 
 /// The fields edited in the detail panel but not yet saved, or null if none
@@ -1408,30 +1434,72 @@ function pendingDetailEdits(){
   return Object.keys(body).length ? body : null;
 }
 
-// Fetch metadata looks the book up by the title *stored on the server*
-// (`discover::enrich` builds its query from the row), so a title edited on
-// screen and not yet saved was searched for under its old name — you had to
-// save, reopen, and fetch again. Write what is on screen first: that is what
-// the person pressing this button already meant, and what they were doing by
-// hand.
+// Fetch metadata proposes, it does not decide. It searches with the title as
+// typed — not the one stored on the server, which is what made a rename
+// invisible until you saved — and shows what it found; picking a candidate
+// fills the form and *only* the form. Nothing reaches the database until Save,
+// so a wrong match costs one press of Cancel rather than an edit you have to
+// undo by hand.
 async function enrichFromDetail(id){
-  let edits;
-  try { edits = pendingDetailEdits(); }
-  catch(_){ edits = null; }          // panel closed underneath us
-  if (edits && 'title' in edits && !edits.title){
-    toast('Title cannot be empty');
+  const status = document.getElementById('d-status');
+  const box = document.getElementById('d-results');
+  const q = [document.getElementById('d-title').value.trim(), DETAIL.authors || '']
+    .filter(Boolean).join(' ');
+  if (!q){ status.textContent = 'Type a title to look up.'; return; }
+  status.textContent = 'Searching…'; box.innerHTML = '';
+  let list;
+  try { list = await api('GET','/api/metadata/search?q='+encodeURIComponent(q)); }
+  catch(e){ status.textContent = e.message; return; }
+  DETAIL.results = list || [];
+  if (!DETAIL.results.length){
+    status.textContent = 'No online match. What is in the form is unchanged.';
     return;
   }
-  showProgress('Fetching metadata…');
-  if (edits){
-    try { await api('PATCH','/api/books/'+id, edits); }
-    catch(e){ hideProgress(); toast(e.message); return; }
-  }
-  await enrichBook(id);
-  hideProgress();
-  await loadAll();
-  toast(edits ? 'Saved your edits, then fetched metadata' : 'Fetched metadata');
-  openDetail(id);
+  status.textContent = DETAIL.results.length + ' match' +
+    (DETAIL.results.length > 1 ? 'es' : '') + ' — click one to fill the form. ' +
+    'Nothing is saved until you press Save.';
+  box.innerHTML = DETAIL.results.map((r,i) => {
+    const cover = r.cover_id
+      ? 'https://covers.openlibrary.org/b/id/'+r.cover_id+'-S.jpg'
+      : (r.cover_url || '');
+    const meta = [(r.authors||[]).join(', '), r.first_publish_year||'', r.publisher||'']
+      .filter(Boolean).join(' · ');
+    return '<div class="ab-item" data-act="pickdetail" data-i="'+i+'">'+
+      (cover ? '<img src="'+esc(cover)+'" alt="" onerror="this.remove()">'
+             : '<div class="ab-noimg"></div>')+
+      '<div><div>'+esc(r.title)+'</div><div class="muted">'+esc(meta)+'</div></div></div>';
+  }).join('');
+}
+
+/// Puts a chosen match into the form. Overwrites what is there, title included
+/// — the point of picking a match is that it describes the book better than
+/// what you have. Publisher, ISBN and page count have nowhere to be typed, so
+/// they wait in `DETAIL.pending` for Save.
+function pickDetailCandidate(i){
+  const m = DETAIL.results[i];
+  if (!m) return;
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && value != null && value !== '') el.value = value;
+  };
+  set('d-title', m.title);
+  set('d-subtitle', m.subtitle);
+  set('d-year', m.first_publish_year);
+  set('d-desc', m.description);
+
+  DETAIL.pending = {};
+  if (m.publisher) DETAIL.pending.publisher = m.publisher;
+  if (m.isbn) DETAIL.pending.isbn = m.isbn;
+  if (m.page_count) DETAIL.pending.page_count = m.page_count;
+  if (!Object.keys(DETAIL.pending).length) DETAIL.pending = null;
+
+  const extras = DETAIL.pending
+    ? ' Also ready to save: ' + Object.entries(DETAIL.pending)
+        .map(([k,v]) => k.replace('_',' ') + ' ' + v).join(', ') + '.'
+    : '';
+  document.getElementById('d-results').innerHTML = '';
+  document.getElementById('d-status').textContent =
+    'Filled from “' + m.title + '”. Press Save to keep it, Cancel to drop it.' + extras;
 }
 
 async function deleteBook(id){

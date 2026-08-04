@@ -24,8 +24,15 @@ function field(initial) {
   return { defaultValue: initial, value: initial };
 }
 
-function load(fields) {
+/// [searchResults] is what `/api/metadata/search` answers with. `DETAIL` is a
+/// `let` inside console.js, so a test cannot reach in and seed it — which is
+/// right: the candidates have to arrive the way they do in the browser, through
+/// the search this drives.
+function load(fields, searchResults) {
   const els = new Map(Object.entries(fields));
+  // The panel writes its status and candidate list into these two.
+  els.set('d-status', { textContent: '' });
+  els.set('d-results', { innerHTML: '' });
   const sandbox = {
     document: {
       getElementById: (id) => els.get(id) ?? null,
@@ -36,7 +43,12 @@ function load(fields) {
     window: { addEventListener: () => {}, matchMedia: () => ({ matches: false, addEventListener: () => {} }) },
     localStorage: { getItem: () => null, setItem: () => {} },
     sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-    fetch: () => Promise.reject(new Error('no network in this test')),
+    fetch: async (path) => {
+      if (searchResults && path.startsWith('/api/metadata/search')) {
+        return { status: 200, ok: true, json: async () => searchResults };
+      }
+      throw new Error('unexpected request: ' + path);
+    },
     crypto: {},
     console,
     setTimeout,
@@ -120,8 +132,78 @@ check('a title emptied is reported, so the caller can refuse it', () => {
   assert.deepEqual(s.pendingDetailEdits(), { title: '' });
 });
 
-if (failures) {
-  console.log(`\n${failures} failing`);
-  process.exit(1);
+async function checkAsync(name, fn) {
+  try {
+    await fn();
+    console.log('  ok   ' + name);
+  } catch (e) {
+    failures++;
+    console.log('  FAIL ' + name + '\n       ' + e.message);
+  }
 }
-console.log('\nall passed');
+
+/// Search, then pick the first candidate — the two presses a person makes.
+async function fetchAndPick(fields, results) {
+  const s = load(fields, results);
+  await s.enrichFromDetail('b1');
+  s.pickDetailCandidate(0);
+  return s;
+}
+
+async function main() {
+  console.log('\nfetch, then pick a candidate');
+
+  await checkAsync('a chosen match overwrites the form, title included', async () => {
+    const fields = panel();
+    await fetchAndPick(fields, [{
+      title: 'Dune',
+      subtitle: 'The Chronicles',
+      first_publish_year: 1965,
+      description: 'A desert planet, at length.',
+    }]);
+    assert.strictEqual(fields['d-title'].value, 'Dune', 'the title is overwritten too');
+    assert.strictEqual(fields['d-subtitle'].value, 'The Chronicles');
+    assert.strictEqual(fields['d-year'].value, 1965);
+    assert.strictEqual(fields['d-desc'].value, 'A desert planet, at length.');
+  });
+
+  await checkAsync('fields the match has nothing for are left alone', async () => {
+    const fields = panel({ subtitle: 'Mine' });
+    await fetchAndPick(fields, [{ title: 'Dune' }]);
+    assert.strictEqual(fields['d-subtitle'].value, 'Mine');
+  });
+
+  await checkAsync('publisher, ISBN and pages wait for Save rather than the form', async () => {
+    const fields = panel();
+    const s = await fetchAndPick(fields, [{
+      title: 'Dune', publisher: 'Chilton', isbn: '9780441013593', page_count: 412,
+    }]);
+    // Read back through the code under test: what Save would send.
+    assert.deepEqual(s.pendingDetailEdits(), { title: 'Dune' });
+    assert.ok(
+      s.detailIsDirty(),
+      'the panel knows it is holding something Cancel would discard',
+    );
+  });
+
+  await checkAsync('a search that finds nothing changes no field', async () => {
+    const fields = panel();
+    const s = load(fields, []);
+    await s.enrichFromDetail('b1');
+    assert.strictEqual(fields['d-title'].value, 'Dune: Deluxe Anniversary Edition');
+    assert.strictEqual(s.pendingDetailEdits(), null, 'and leaves nothing to save');
+  });
+
+  await checkAsync('a fresh panel is not dirty, so Cancel asks nothing', async () => {
+    const s = load(panel(), []);
+    assert.strictEqual(s.detailIsDirty(), false);
+  });
+
+  if (failures) {
+    console.log(`\n${failures} failing`);
+    process.exit(1);
+  }
+  console.log('\nall passed');
+}
+
+main();
