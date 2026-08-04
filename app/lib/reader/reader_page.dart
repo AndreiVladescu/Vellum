@@ -111,6 +111,16 @@ class _ReaderPageState extends State<ReaderPage> {
   @override
   void initState() {
     super.initState();
+    // Hand the shelf's memory back before asking PDFium for page bitmaps. The
+    // covers behind this page are worth hundreds of megabytes on a phone and
+    // none of them are on screen now; the shelf re-decodes what it needs when
+    // you come back, which is a moment of work against a reader that cannot
+    // allocate a page at all.
+    if (Platform.isAndroid || Platform.isIOS) {
+      PaintingBinding.instance.imageCache
+        ..clear()
+        ..clearLiveImages();
+    }
     _hotkeys.attach();
     _annotationsSub =
         _annotations.watchForBook(widget.book.id).listen((annotations) {

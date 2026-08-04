@@ -53,6 +53,19 @@ Future<void> main() async {
   // Material scaffolding (AppBar, NavigationBar, FAB, bottom sheets) already
   // insets itself; custom bottom bars use SafeArea (see the EPUB reader).
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // A phone's image budget. Flutter's default is 100 MB of *decoded* images,
+  // which a shelf of covers reaches easily — a library of 88 books was
+  // measured holding 300 MB of graphics memory and a 900 MB resident set on
+  // Android before anything else asked for memory. The reader then wants
+  // page bitmaps from PDFium on top of that, and a phone that cannot allocate
+  // them renders nothing rather than complaining.
+  //
+  // Desktops keep the default: there the covers are the point of the window
+  // and the memory is there.
+  if (Platform.isAndroid || Platform.isIOS) {
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 48 << 20; // 48 MB
+    PaintingBinding.instance.imageCache.maximumSize = 200;
+  }
   final repository = await LibraryRepository.open(VellumDatabase());
   final profile = await UserProfileStore.load(dataDir: repository.dataDir);
   final settings = await AppSettingsStore.load();
