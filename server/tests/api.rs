@@ -378,6 +378,48 @@ async fn a_password_protected_link_opens_only_after_the_password() {
 }
 
 /// The password is a second gate, never a way around the first.
+
+/// A link's address has to survive the dialog that created it: the Shares
+/// screen lists live links, and a live link you cannot read is one you cannot
+/// send to anyone.
+#[tokio::test]
+async fn a_links_url_can_be_read_back_and_its_token_is_not_shipped() {
+    let (app, db) = test_app_with_db().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let (_, created) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    let url = created["url"].as_str().unwrap().to_string();
+
+    let (status, links) = call(&app, "GET", "/api/share-links", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        links[0]["url"].as_str().unwrap(),
+        url,
+        "the same address the creator was shown"
+    );
+    assert!(
+        links[0].get("token").is_none(),
+        "the URL is the useful form; the bare token is not also shipped: {links}"
+    );
+
+    // A link made before migration 0027 has no token to rebuild from, and says
+    // so with null rather than inventing an address that would not open.
+    sqlx::query("UPDATE share_link SET token = NULL")
+        .execute(&db)
+        .await
+        .unwrap();
+    let (_, links) = call(&app, "GET", "/api/share-links", Some(&master), None).await;
+    assert!(links[0]["url"].is_null());
+}
+
 #[tokio::test]
 async fn unlocking_a_revoked_link_fails() {
     let app = test_app().await;

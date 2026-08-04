@@ -204,6 +204,15 @@ pub struct LinkDto {
     /// Whether a password is needed to open it. The hash itself never leaves
     /// the server, and there is no endpoint that returns it.
     pub has_password: bool,
+    /// The link itself, so it can be copied again from the Shares screen.
+    /// Null for links made before migration 0027, whose token was only ever
+    /// stored hashed and cannot be rebuilt.
+    #[sqlx(default)]
+    pub url: Option<String>,
+    /// Read from the row to build [`url`], never sent: the URL is the useful
+    /// form, and shipping both would put the same secret on the wire twice.
+    #[serde(skip)]
+    pub token: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -249,18 +258,30 @@ pub struct LinkCreated {
     pub expires_at: Option<String>,
 }
 
+/// The address a token is reached at: `/p/` for a book, `/pr/` for a room.
+fn public_url_for(state: &AppState, kind: &str, token: &str) -> String {
+    let base = state.public_base_url.trim_end_matches('/');
+    if kind == "layout" {
+        format!("{base}/pr/{token}")
+    } else {
+        format!("{base}/p/{token}")
+    }
+}
+
 pub async fn list_links(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<Vec<LinkDto>>> {
     // LEFT JOINs, not inner: a room link has no book, and an inner join would
     // quietly drop it from the list — leaving a live link nobody can revoke.
-    let links = sqlx::query_as::<_, LinkDto>(
+    let rows = sqlx::query_as::<_, LinkDto>(
         "SELECT l.id, l.kind, l.book_id, l.layout_id, \
             COALESCE(b.title, r.name, '(deleted)') AS book_title, \
             l.permission, l.created_at, \
             l.expires_at, l.max_uses, l.use_count, l.revoked, \
-            (l.password_hash IS NOT NULL) AS has_password \
+            (l.password_hash IS NOT NULL) AS has_password, \
+            NULL AS url, \
+            l.token \
          FROM share_link l \
          LEFT JOIN book b ON b.id = l.book_id \
          LEFT JOIN layout r ON r.id = l.layout_id \
@@ -271,6 +292,20 @@ pub async fn list_links(
     .bind(&user.id)
     .fetch_all(&state.db)
     .await?;
+
+    // The URL is rebuilt rather than stored whole: VELLUM_PUBLIC_URL can change
+    // (a domain, a move behind a proxy), and a link that still works should not
+    // be displayed with the address it was minted under.
+    let links: Vec<LinkDto> = rows
+        .into_iter()
+        .map(|mut link| {
+            link.url = link
+                .token
+                .take()
+                .map(|t| public_url_for(&state, &link.kind, &t));
+            link
+        })
+        .collect();
     Ok(Json(links))
 }
 
@@ -367,8 +402,8 @@ pub async fn create_link(
     sqlx::query(
         "INSERT INTO share_link \
             (id, owner_id, kind, book_id, layout_id, token_hash, permission, \
-             expires_at, max_uses, show_books, password_hash) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             expires_at, max_uses, show_books, password_hash, token) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&user.id)
@@ -381,6 +416,7 @@ pub async fn create_link(
     .bind(max_uses)
     .bind(kind == "layout" && input.show_books.unwrap_or(false))
     .bind(&password_hash)
+    .bind(&token)
     .execute(&state.db)
     .await?;
 
@@ -391,11 +427,7 @@ pub async fn create_link(
         // A friendly landing page rather than the raw API endpoint. A room link
         // lands on /r-room/ so the page knows what it is showing without a
         // round trip that might 404.
-        url: if kind == "layout" {
-            format!("{}/pr/{}", state.public_base_url, token)
-        } else {
-            format!("{}/p/{}", state.public_base_url, token)
-        },
+        url: public_url_for(&state, kind, &token),
         expires_at,
     }))
 }

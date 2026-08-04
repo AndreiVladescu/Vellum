@@ -1,0 +1,22 @@
+-- Keep a share link's URL so it can be shown again.
+--
+-- Until now only `token_hash` was stored, so the URL existed exactly once — in
+-- the dialog that created it. Lose that window and the link was unrecoverable:
+-- still working for whoever you sent it to, and unreadable to you. The Shares
+-- screen could list a live link it could not show you.
+--
+-- **This is a deliberate reduction in defence-in-depth, and a small one.** The
+-- hash meant a stolen database yielded no working links. But a share link's
+-- entire protection is possession of the URL, and it points at a book whose row
+-- and whose file are in that same database and data directory — so a reader of
+-- the database already has the book. The hash was protecting the *route*, not
+-- the content, and only against someone who already had the content.
+--
+-- What it is emphatically NOT is a precedent for `session.token_hash` or
+-- `password_reset.token_hash`, which guard *accounts* rather than one book, and
+-- stay hashed.
+--
+-- Nullable, with no default: every link made before this has no recoverable
+-- token, and says so rather than pretending. Password-protected links are
+-- unaffected — the password is still Argon2 and still separate.
+ALTER TABLE share_link ADD COLUMN token TEXT;

@@ -263,6 +263,12 @@ td .celledit { width:100%; }
   padding:8px 0; border-bottom:1px solid var(--line-soft);
 }
 .sharesub { font-size:12px; margin-top:2px; }
+/* The link itself. Monospace because it is a string to be copied exactly, and
+   selectable because copying by hand has to stay possible. */
+.shareurl {
+  margin-top:4px; font-family:var(--mono); font-size:12px;
+  color:var(--accent); word-break:break-all; user-select:all;
+}
 .sharehead { font-weight:600; margin:0 0 2px; }
 /* A state, not a decoration: "Live" is the only one that still lets anyone in,
    so it is the only one that gets the accent. */

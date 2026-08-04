@@ -1840,6 +1840,15 @@ function linkRow(l){
     uses,
     l.expires_at ? 'expires ' + esc(l.expires_at.slice(0,10)) : 'no expiry',
   ];
+  // The URL, on the links that still work. Kept out of the closed ones on
+  // purpose: a revoked link's address is a thing that no longer opens, and
+  // showing it invites sending it to someone.
+  const url = st.label === 'Live' && l.url
+    ? `<div class="shareurl" title="${esc(l.url)}">${esc(l.url)}</div>`
+    : (st.label === 'Live'
+        ? '<div class="muted sharesub">Made before Vellum kept link addresses — ' +
+          'revoke it and make a new one to see the URL here.</div>'
+        : '');
   return `
     <div class="row shareline">
       <span>
@@ -1847,9 +1856,13 @@ function linkRow(l){
         ${l.has_password ? '<span class="pill">password</span>' : ''}
         <span class="pill ${st.cls}">${st.label}</span>
         <div class="muted sharesub">${bits.join(' · ')}</div>
+        ${url}
       </span>
       ${st.label === 'Live'
-        ? `<button class="btn sm danger" data-act="revokelink" data-id="${esc(l.id)}">Revoke</button>`
+        ? `<span class="row" style="gap:6px">
+             ${l.url ? `<button class="btn sm" data-act="copyurl" data-url="${esc(l.url)}">Copy link</button>` : ''}
+             <button class="btn sm danger" data-act="revokelink" data-id="${esc(l.id)}">Revoke</button>
+           </span>`
         : '<span class="muted sharesub">closed</span>'}
     </div>`;
 }
