@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import 'catalog_entry.dart';
+import 'free_catalogues.dart';
 import 'opds_client.dart';
 
 /// Browse an OPDS catalogue and pick books to import (plan 5 #21c).
@@ -209,7 +210,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
             ),
           Expanded(
             child: feed == null
-                ? const _OpdsIntro()
+                ? _OpdsIntro(onPick: _busy ? null : _open)
                 : ListView(
                     children: [
                       Padding(
@@ -278,36 +279,58 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
 }
 
 class _OpdsIntro extends StatelessWidget {
-  const _OpdsIntro();
+  const _OpdsIntro({this.onPick});
+
+  /// Opens a catalogue the user tapped, or null while a fetch is in flight.
+  final void Function(String url)? onPick;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.rss_feed,
-              size: 56,
-              color: theme.colorScheme.primary.withValues(alpha: 0.7),
-            ),
-            const SizedBox(height: 16),
-            Text('Browse an OPDS catalogue',
-                style: theme.textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text(
-              'Paste the address of any OPDS server — Calibre-Web, Kavita, '
-              'Standard Ebooks, or another Vellum. Pick the books you want and '
-              'they go through the same review as any other import.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ],
+    // A list rather than a centred block: the whole point of this screen is now
+    // that it offers somewhere to go, and a hint that reads "paste an address"
+    // over an empty box is the state this replaces.
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      children: [
+        Icon(
+          Icons.rss_feed,
+          size: 48,
+          color: theme.colorScheme.primary.withValues(alpha: 0.7),
         ),
-      ),
+        const SizedBox(height: 12),
+        Center(
+          child: Text('Browse an OPDS catalogue',
+              style: theme.textTheme.titleMedium),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Paste the address of any OPDS server — Calibre-Web, Kavita, or '
+          'another Vellum. Pick the books you want and they go through the '
+          'same review as any other import.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 24),
+        Text('Or start with a free one', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Text(
+          'Public-domain books you can download and keep.',
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        for (final catalogue in freeCatalogues)
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.auto_stories_outlined),
+              title: Text(catalogue.name),
+              subtitle: Text(catalogue.description),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: onPick == null ? null : () => onPick!(catalogue.url),
+            ),
+          ),
+      ],
     );
   }
 }
