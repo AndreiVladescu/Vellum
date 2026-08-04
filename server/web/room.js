@@ -28,6 +28,32 @@ async function getJson(path){
   return res.json();
 }
 
+// A password-protected room link answers 401 until the unlock cookie exists.
+// This page is the entry point for such a link — there is no earlier screen to
+// have typed it on — so it asks here.
+function askPassword(message){
+  const stage = document.getElementById('stage');
+  stage.innerHTML =
+    '<form id="lock" class="lock">' +
+      '<p>This link has a password.</p>' +
+      '<input id="pw" type="password" placeholder="Password" aria-label="Password" ' +
+             'autocomplete="current-password">' +
+      '<button class="btn" type="submit">Open</button>' +
+      (message ? '<p class="err">' + esc(message) + '</p>' : '') +
+    '</form>';
+  document.getElementById('pw').focus();
+  document.getElementById('lock').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const res = await fetch('/api/public/' + encodeURIComponent(KEY) + '/unlock', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ password: document.getElementById('pw').value }),
+    });
+    if (res.ok) { start(); return; }
+    const body = await res.json().catch(() => ({}));
+    askPassword(body.error || 'That did not work.');
+  });
+}
+
 function fail(message){
   document.getElementById('stage').innerHTML = `<p class="err">${message}</p>`;
   document.getElementById('title').textContent = 'Room';
@@ -50,6 +76,7 @@ async function start(){
       for (const b of books) S.books.set(b.book_id, b);
     }
   } catch(e){
+    if (MODE === 'link' && /\b401\b/.test(e.message)) { askPassword(); return; }
     fail(MODE === 'link'
       ? 'This link is no longer available.'
       : 'Could not open that room — sign in to the console first.');

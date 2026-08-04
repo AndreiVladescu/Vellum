@@ -264,6 +264,195 @@ async fn registration_state_reports_the_window_and_then_closes() {
     );
 }
 
+/// A password turns the URL into one of two things the visitor needs. The gate
+/// has to hold on every public entry point, and the unlock has to survive to
+/// the download — which is an ordinary navigation, hence a cookie.
+#[tokio::test]
+async fn a_password_protected_link_opens_only_after_the_password() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let (status, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book, "password": "correct horse" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{link}");
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    // Holding the URL is no longer enough.
+    let (status, _) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "the link is locked");
+
+    // Nor is the wrong password.
+    let (status, _) = call(
+        &app,
+        "POST",
+        &format!("/api/public/{token}/unlock"),
+        None,
+        Some(json!({ "password": "battery staple" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    // The right one mints a cookie.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/{token}/unlock"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({ "password": "correct horse" }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let set_cookie = response
+        .headers()
+        .get("set-cookie")
+        .expect("unlock hands back a cookie")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        set_cookie.contains("HttpOnly"),
+        "not readable from script: {set_cookie}"
+    );
+    assert!(set_cookie.contains("SameSite=Lax"), "{set_cookie}");
+    let cookie = set_cookie.split(';').next().unwrap().to_string();
+
+    // …which opens the metadata,
+    let with_cookie = |uri: String| {
+        let app = app.clone();
+        let cookie = cookie.clone();
+        async move {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .method("GET")
+                        .uri(uri)
+                        .header("cookie", cookie)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            response.status()
+        }
+    };
+    assert_eq!(
+        with_cookie(format!("/api/public/{token}")).await,
+        StatusCode::OK
+    );
+
+    // …and the download, which never sees a header of its own. (This book has
+    // no file, so the gate passing looks like 404 rather than 401 — the point
+    // is which of the two.)
+    assert_eq!(
+        with_cookie(format!("/api/public/{token}/file")).await,
+        StatusCode::NOT_FOUND,
+        "past the password, and refused for the honest reason"
+    );
+
+    // The owner can see that it is protected, and never the password itself.
+    let (_, links) = call(&app, "GET", "/api/share-links", Some(&master), None).await;
+    assert_eq!(links[0]["has_password"], json!(true));
+    assert!(
+        !links.to_string().contains("argon2"),
+        "no hash leaves the server: {links}"
+    );
+}
+
+/// The password is a second gate, never a way around the first.
+#[tokio::test]
+async fn unlocking_a_revoked_link_fails() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    let (_, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book, "password": "correct horse" })),
+    )
+    .await;
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+    let id = link["id"].as_str().unwrap().to_string();
+
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/share-links/{id}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        &format!("/api/public/{token}/unlock"),
+        None,
+        Some(json!({ "password": "correct horse" })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNAUTHORIZED,
+        "a revoked link has nothing left to unlock"
+    );
+}
+
+/// The old shape still works: no password, no prompt.
+#[tokio::test]
+async fn a_link_without_a_password_opens_as_before() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    let (_, link) = call(
+        &app,
+        "POST",
+        "/api/share-links",
+        Some(&master),
+        Some(json!({ "book_id": book })),
+    )
+    .await;
+    let token = link["url"]
+        .as_str()
+        .unwrap()
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string();
+
+    let (status, body) = call(&app, "GET", &format!("/api/public/{token}"), None, None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (_, links) = call(&app, "GET", "/api/share-links", Some(&master), None).await;
+    assert_eq!(links[0]["has_password"], json!(false));
+}
+
 #[tokio::test]
 async fn session_expiry_slides_forward_on_use() {
     let id = uuid::Uuid::new_v4();

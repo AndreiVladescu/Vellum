@@ -52,6 +52,12 @@
   .btn[disabled] { opacity:.5; pointer-events:none; }
   .note { margin-top:14px; font-size:.85rem; color:var(--muted); }
   .err { color:#b3261e; }
+  .lock input {
+    width:100%; margin:14px 0 0; padding:11px 13px; font:inherit;
+    border:1px solid var(--line); border-radius:9px;
+    background:var(--bg); color:var(--fg);
+  }
+  .lock input:focus { outline:none; border-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -67,9 +73,39 @@
       ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  // A locked link answers 401 until the unlock cookie is in hand. The password
+  // is exchanged for that cookie once and then every later request — metadata,
+  // the reader, the download navigation — carries it without asking again.
+  function askPassword(message) {
+    card.innerHTML =
+      '<img src="/assets/logo.svg" alt="" width="44" height="44" ' +
+        'style="display:block;margin:0 0 10px">' +
+      '<p class="eyebrow">Shared from a Vellum library</p>' +
+      '<h1>This link has a password</h1>' +
+      '<p class="note" style="margin-top:6px">Ask whoever sent it to you.</p>' +
+      '<form class="lock" id="lock">' +
+        '<input id="pw" type="password" placeholder="Password" ' +
+               'aria-label="Password" autocomplete="current-password" autofocus>' +
+        '<button class="btn" type="submit">Open</button>' +
+        (message ? '<p class="note err">' + esc(message) + '</p>' : '') +
+      '</form>';
+    document.getElementById('lock').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = document.getElementById('pw').value;
+      const res = await fetch(
+        '/api/public/' + encodeURIComponent(token) + '/unlock',
+        { method:'POST', headers:{'content-type':'application/json'},
+          body: JSON.stringify({ password }) });
+      if (res.ok) { load(); return; }
+      const body = await res.json().catch(() => ({}));
+      askPassword(body.error || 'That did not work.');
+    });
+  }
+
   async function load() {
     try {
       const res = await fetch('/api/public/' + encodeURIComponent(token));
+      if (res.status === 401) { askPassword(); return; }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         card.innerHTML = '<p class="err">' +

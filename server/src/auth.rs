@@ -279,7 +279,7 @@ pub fn hash_password(password: &str) -> AppResult<String> {
         .map_err(|e| AppError::Internal(e.to_string()))
 }
 
-fn verify_password(password: &str, hash: &str) -> bool {
+pub(crate) fn verify_password(password: &str, hash: &str) -> bool {
     PasswordHash::new(hash)
         .map(|parsed| {
             Argon2::default()
@@ -296,7 +296,7 @@ pub fn new_token_for_invite() -> String {
     new_token()
 }
 
-fn new_token() -> String {
+pub(crate) fn new_token() -> String {
     let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
     hex::encode(bytes)
@@ -641,7 +641,7 @@ const MAX_PASSWORD_LEN: usize = 128;
 /// Reject an over-long password before it reaches Argon2. Kept separate from
 /// [`validate_credentials`] so the verify paths can call it without the
 /// registration-time minimum-length / email checks.
-fn check_password_length(password: &str) -> AppResult<()> {
+pub(crate) fn check_password_length(password: &str) -> AppResult<()> {
     if password.len() > MAX_PASSWORD_LEN {
         return Err(AppError::BadRequest(format!(
             "password must be at most {MAX_PASSWORD_LEN} bytes"

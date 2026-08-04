@@ -257,10 +257,12 @@ pub async fn public_manifest(
     State(state): State<AppState>,
     client: crate::auth::ClientKey,
     AxPath(token): AxPath<String>,
+    headers: axum::http::HeaderMap,
 ) -> AppResult<Json<ReadManifest>> {
     if !state.public_limiter.check(&client.0) {
         return Err(AppError::TooManyRequests("too many requests".into()));
     }
+    crate::shares::ensure_unlocked(&state, &token, &headers).await?;
     let book_id = book_of_link(&state, &token).await?;
     // Not downloadable: a public reader may read the book, not take the file.
     // That distinction is the reason this endpoint exists.
@@ -271,10 +273,12 @@ pub async fn public_unit(
     State(state): State<AppState>,
     client: crate::auth::ClientKey,
     AxPath((token, index)): AxPath<(String, usize)>,
+    headers: axum::http::HeaderMap,
 ) -> AppResult<Response> {
     if !state.public_limiter.check(&client.0) {
         return Err(AppError::TooManyRequests("too many requests".into()));
     }
+    crate::shares::ensure_unlocked(&state, &token, &headers).await?;
     let book_id = book_of_link(&state, &token).await?;
     unit_for(&state, &book_id, index).await
 }
@@ -283,10 +287,12 @@ pub async fn public_asset(
     State(state): State<AppState>,
     client: crate::auth::ClientKey,
     AxPath((token, name)): AxPath<(String, String)>,
+    headers: axum::http::HeaderMap,
 ) -> AppResult<Response> {
     if !state.public_limiter.check(&client.0) {
         return Err(AppError::TooManyRequests("too many requests".into()));
     }
+    crate::shares::ensure_unlocked(&state, &token, &headers).await?;
     let book_id = book_of_link(&state, &token).await?;
     asset_for(&state, &book_id, &name).await
 }

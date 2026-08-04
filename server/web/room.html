@@ -50,6 +50,14 @@
     font-size:.85rem;
   }
   .err { padding:32px; text-align:center; }
+  /* The password prompt a locked room link lands on (migration 0026). */
+  .lock { padding:48px 24px; text-align:center; max-width:320px; margin:0 auto; }
+  .lock input {
+    width:100%; margin:14px 0; padding:11px 13px; font:inherit;
+    border:1px solid var(--line); border-radius:9px;
+    background:var(--bg); color:var(--fg);
+  }
+  .lock .err { padding:12px 0 0; }
 </style>
 </head>
 <body>

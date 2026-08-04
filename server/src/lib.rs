@@ -364,6 +364,10 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             "/public/{token}/read/asset/{*name}",
             get(reader::public_asset),
         )
+        // Trade a link's password for a short-lived unlock cookie. The one
+        // public endpoint where guessing pays, so it is throttled per link and
+        // per IP like login.
+        .route("/public/{token}/unlock", post(shares::unlock))
         .route("/public/{token}", get(shares::public_book))
         .route("/public/{token}/file", get(shares::public_file))
         // Book detail (metadata + authors + genres + files) for the console.

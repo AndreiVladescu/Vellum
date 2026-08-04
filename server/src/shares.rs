@@ -201,6 +201,9 @@ pub struct LinkDto {
     pub max_uses: Option<i64>,
     pub use_count: i64,
     pub revoked: bool,
+    /// Whether a password is needed to open it. The hash itself never leaves
+    /// the server, and there is no endpoint that returns it.
+    pub has_password: bool,
 }
 
 #[derive(Deserialize)]
@@ -228,6 +231,11 @@ pub struct LinkInput {
     /// in migration 0019.
     #[serde(default)]
     pub show_books: Option<bool>,
+    /// Optional password. With one set, holding the URL is no longer enough:
+    /// the visitor types this before the link shows anything. Omit or leave
+    /// empty for a link that opens on its own, which is the old behaviour.
+    #[serde(default)]
+    pub password: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -251,7 +259,8 @@ pub async fn list_links(
         "SELECT l.id, l.kind, l.book_id, l.layout_id, \
             COALESCE(b.title, r.name, '(deleted)') AS book_title, \
             l.permission, l.created_at, \
-            l.expires_at, l.max_uses, l.use_count, l.revoked \
+            l.expires_at, l.max_uses, l.use_count, l.revoked, \
+            (l.password_hash IS NOT NULL) AS has_password \
          FROM share_link l \
          LEFT JOIN book b ON b.id = l.book_id \
          LEFT JOIN layout r ON r.id = l.layout_id \
@@ -345,11 +354,21 @@ pub async fn create_link(
         input.max_uses
     };
 
+    // Blank is not a password. Trimming here rather than at the edge means a
+    // link created with "   " is an open link, not one nobody can open.
+    let password_hash = match input.password.as_deref().map(str::trim) {
+        Some(p) if !p.is_empty() => {
+            crate::auth::check_password_length(p)?;
+            Some(crate::auth::hash_password(p)?)
+        }
+        _ => None,
+    };
+
     sqlx::query(
         "INSERT INTO share_link \
             (id, owner_id, kind, book_id, layout_id, token_hash, permission, \
-             expires_at, max_uses, show_books) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             expires_at, max_uses, show_books, password_hash) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&user.id)
@@ -361,6 +380,7 @@ pub async fn create_link(
     .bind(&expires_at)
     .bind(max_uses)
     .bind(kind == "layout" && input.show_books.unwrap_or(false))
+    .bind(&password_hash)
     .execute(&state.db)
     .await?;
 
@@ -403,6 +423,163 @@ pub async fn delete_link(
     Ok(Json(serde_json::json!({ "revoked": id })))
 }
 
+// ---- the password gate ----------------------------------------------------
+
+/// How long typing the password buys before it has to be typed again. Long
+/// enough to read a book in one sitting, short enough that a borrowed laptop
+/// doesn't stay unlocked for a week.
+const UNLOCK_TTL_HOURS: i64 = 12;
+
+/// Cookie name prefix; the link's id (not its token) completes it, so several
+/// password-protected links can be open in one browser without evicting each
+/// other. The id is not a secret — it appears in the owner's own console.
+const UNLOCK_COOKIE: &str = "vellum_unlock_";
+
+fn cookie_value<'h>(headers: &'h axum::http::HeaderMap, name: &str) -> Option<&'h str> {
+    headers
+        .get(axum::http::header::COOKIE)?
+        .to_str()
+        .ok()?
+        .split(';')
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(k, _)| k.trim() == name)
+        .map(|(_, v)| v.trim())
+}
+
+/// Enforces the password on a public link.
+///
+/// Ok for a link with no password, and for a token that matches nothing at all
+/// — the caller's own lookup has the better error for that ("invalid or
+/// expired"), and answering "wrong password" for a link that doesn't exist
+/// would turn this into an existence oracle.
+///
+/// The 401 is the signal the public pages turn into a password prompt.
+pub(crate) async fn ensure_unlocked(
+    state: &AppState,
+    token: &str,
+    headers: &axum::http::HeaderMap,
+) -> AppResult<()> {
+    let row: Option<(String, Option<String>)> =
+        sqlx::query_as("SELECT id, password_hash FROM share_link WHERE token_hash = ?")
+            .bind(sha256_hex(token))
+            .fetch_optional(&state.db)
+            .await?;
+    let Some((link_id, Some(_))) = row else {
+        return Ok(());
+    };
+
+    let presented = cookie_value(headers, &format!("{UNLOCK_COOKIE}{link_id}"))
+        .ok_or_else(|| AppError::Unauthorized("this link needs a password".into()))?;
+
+    let ok: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM share_link_unlock \
+         WHERE token_hash = ? AND link_id = ? AND expires_at > datetime('now'))",
+    )
+    .bind(sha256_hex(presented))
+    .bind(&link_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if ok {
+        Ok(())
+    } else {
+        Err(AppError::Unauthorized("this link needs a password".into()))
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UnlockInput {
+    pub password: String,
+}
+
+/// `POST /api/public/{token}/unlock` — trade the password for a cookie.
+///
+/// Throttled per link *and* per IP on the same limiter as login, because this
+/// is the one endpoint on a public link where guessing pays.
+pub async fn unlock(
+    State(state): State<AppState>,
+    client: crate::auth::ClientKey,
+    Path(token): Path<String>,
+    headers: axum::http::HeaderMap,
+    Json(input): Json<UnlockInput>,
+) -> AppResult<axum::response::Response> {
+    use axum::response::IntoResponse;
+
+    let _ = headers;
+    let hash = sha256_hex(&token);
+    let ip_key = format!("ip:{}", client.0);
+    let link_key = format!("link:{hash}");
+    if !state.throttle.allowed(&link_key) || !state.throttle.allowed(&ip_key) {
+        return Err(AppError::TooManyRequests(
+            "too many attempts; try again later".into(),
+        ));
+    }
+
+    // An expired, revoked or used-up link cannot be unlocked: the password is a
+    // second gate, never a way around the first.
+    let row: Option<(String, Option<String>)> = sqlx::query_as(&format!(
+        "SELECT id, password_hash FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
+    ))
+    .bind(&hash)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let wrong = || {
+        state.throttle.record_failure(&link_key);
+        state.throttle.record_failure(&ip_key);
+        AppError::Unauthorized("wrong password".into())
+    };
+
+    let Some((link_id, stored)) = row else {
+        return Err(wrong());
+    };
+    let Some(stored) = stored else {
+        // No password on this link: nothing to unlock, and saying so is safe —
+        // the caller already holds the token, which is all this link ever
+        // needed.
+        return Ok(Json(serde_json::json!({ "unlocked": true })).into_response());
+    };
+    crate::auth::check_password_length(&input.password)?;
+    if !crate::auth::verify_password(&input.password, &stored) {
+        return Err(wrong());
+    }
+
+    // Old unlocks for expired links are dead weight; clear them out on the way
+    // past rather than running a sweeper for a table this small.
+    sqlx::query("DELETE FROM share_link_unlock WHERE expires_at <= datetime('now')")
+        .execute(&state.db)
+        .await?;
+
+    let unlock_token = crate::auth::new_token();
+    sqlx::query(
+        "INSERT INTO share_link_unlock (token_hash, link_id, expires_at) \
+         VALUES (?, ?, datetime('now', ?))",
+    )
+    .bind(sha256_hex(&unlock_token))
+    .bind(&link_id)
+    .bind(format!("+{UNLOCK_TTL_HOURS} hours"))
+    .execute(&state.db)
+    .await?;
+
+    // Secure keyed off the *public* URL, not off whether this process holds a
+    // certificate: behind Caddy the site is https and the server is not.
+    let secure = if state.public_base_url.starts_with("https") {
+        "; Secure"
+    } else {
+        ""
+    };
+    let cookie = format!(
+        "{UNLOCK_COOKIE}{link_id}={unlock_token}; Path=/; Max-Age={}; HttpOnly; SameSite=Lax{secure}",
+        UNLOCK_TTL_HOURS * 3600
+    );
+
+    Ok((
+        [(axum::http::header::SET_COOKIE, cookie)],
+        Json(serde_json::json!({ "unlocked": true })),
+    )
+        .into_response())
+}
+
 #[derive(Serialize)]
 pub struct PublicBook {
     #[serde(flatten)]
@@ -425,10 +602,12 @@ pub async fn public_book(
     State(state): State<AppState>,
     client: crate::auth::ClientKey,
     Path(token): Path<String>,
+    headers: axum::http::HeaderMap,
 ) -> AppResult<Json<PublicBook>> {
     if !state.public_limiter.check(&client.0) {
         return Err(AppError::TooManyRequests("too many requests".into()));
     }
+    ensure_unlocked(&state, &token, &headers).await?;
     let row: Option<(String, Option<i64>)> = sqlx::query_as(&format!(
         "SELECT book_id, max_uses FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
     ))
@@ -492,10 +671,12 @@ pub async fn public_room(
     State(state): State<AppState>,
     client: crate::auth::ClientKey,
     Path(token): Path<String>,
+    headers: axum::http::HeaderMap,
 ) -> AppResult<Json<serde_json::Value>> {
     if !state.public_limiter.check(&client.0) {
         return Err(AppError::TooManyRequests("too many requests".into()));
     }
+    ensure_unlocked(&state, &token, &headers).await?;
     let (layout_id, show_books) = layout_for_link(&state, &token)
         .await?
         .ok_or_else(|| AppError::NotFound("link is invalid or expired".into()))?;
@@ -597,6 +778,7 @@ pub async fn public_file(
     State(state): State<AppState>,
     client: crate::auth::ClientKey,
     Path(token): Path<String>,
+    headers: axum::http::HeaderMap,
 ) -> AppResult<axum::response::Response> {
     use axum::http::header;
     use axum::response::IntoResponse;
@@ -604,6 +786,7 @@ pub async fn public_file(
     if !state.public_limiter.check(&client.0) {
         return Err(AppError::TooManyRequests("too many requests".into()));
     }
+    ensure_unlocked(&state, &token, &headers).await?;
     let hash = sha256_hex(&token);
 
     // Which book, and does it have a file? (No consume yet.)
