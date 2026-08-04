@@ -76,6 +76,8 @@ const ACTIONS = {
   resetfor: el => resetFor(el.dataset.email),
   removeperson: el => removePerson(el.dataset.id, el.dataset.email),
   revokeinvite: el => revokeInvite(el.dataset.id),
+  revokelink: el => revokeLink(el.dataset.id),
+  revokeshare: el => revokeShare(el.dataset.id),
   applyview: el => applyView(el.dataset.name),
   deleteview: el => deleteView(el.dataset.name),
 };
@@ -1407,6 +1409,11 @@ function openLink(bookId){
       <div class="checkline"><input type="checkbox" id="m-onetime"><label for="m-onetime">One-time download</label></div>
       <label>Expires on (optional)</label>
       <input type="date" id="m-exp">
+      <label>Password (optional)</label>
+      <input type="text" id="m-pw" autocomplete="off" placeholder="Leave empty for a link that just opens">
+      <p class="muted" style="margin:4px 0 0; font-size:.82rem">With a password
+        set, the URL alone is not enough — useful for a link you send through a
+        group chat. Send the password some other way.</p>
       <div id="m-out"></div>
       <div class="row">
         <button class="btn" onclick="closeModal()">Close</button>
@@ -1478,14 +1485,22 @@ function downloadCert(){
 async function createLink(bookId){
   const oneTime = document.getElementById('m-onetime').checked;
   const exp = document.getElementById('m-exp').value;
+  // Shown in the clear rather than as a password field: whoever creates the
+  // link has to read it back to pass it on, and hiding it from them protects
+  // nobody.
+  const pw = document.getElementById('m-pw').value.trim();
   try {
     const r = await api('POST','/api/share-links', {
       book_id: bookId, one_time: oneTime, ...(exp?{expires_at:exp}:{}),
+      ...(pw?{password:pw}:{}),
     });
     const out = document.getElementById('m-out');
     out.innerHTML = `<label>Share this link</label>
       <div class="linkout" id="m-url">${esc(r.url)}</div>
-      <div class="row"><button class="btn" data-act="copyurl" data-url="${esc(r.url)}">Copy</button></div>`;
+      <div class="row"><button class="btn" data-act="copyurl" data-url="${esc(r.url)}">Copy</button></div>
+      ${pw ? '<p class="muted" style="margin:8px 0 0; font-size:.82rem">Opening it ' +
+             'needs the password you set. It is stored hashed — nothing here can show ' +
+             'it again.</p>' : ''}`;
     document.getElementById('m-create').disabled = true;
   } catch(e){ toast(e.message); }
 }
@@ -1666,6 +1681,123 @@ async function shareRoom(id, name){
         <button class="btn" onclick="closeModal()">Done</button>
       </div>
     </div></div>`;
+}
+
+
+// ---- shares: everything this library has let out --------------------------
+//
+// One screen for both kinds, because "who can see my books" is one question:
+// account shares (a person with a login) and public links (a URL). Links are
+// listed whatever state they are in — live, expired, used up, revoked — since
+// the useful question is usually "what did I share, and is it still open?",
+// which a list of only-live links cannot answer.
+//
+// Account shares have no past tense to show: revoking one deletes the row, so
+// what you see is what is current. The note in the screen says so rather than
+// letting an empty section imply nobody was ever shared with.
+
+function linkState(l){
+  if (l.revoked) return { label:'Revoked', cls:'off' };
+  if (l.expires_at && new Date(l.expires_at.replace(' ','T') + 'Z') <= new Date())
+    return { label:'Expired', cls:'off' };
+  if (l.max_uses !== null && l.use_count >= l.max_uses)
+    return { label:'Used up', cls:'off' };
+  return { label:'Live', cls:'on' };
+}
+
+function shareRow(s){
+  const target = s.scope_label || s.scope;
+  return `
+    <div class="row shareline">
+      <span>
+        <strong>${esc(s.grantee_email)}</strong>
+        <span class="muted"> · ${esc(s.permission)}</span>
+        <div class="muted sharesub">${esc(target)} · shared by ${esc(s.owner_email)}
+          · ${esc((s.created_at||'').slice(0,10))}</div>
+      </span>
+      <button class="btn sm danger" data-act="revokeshare" data-id="${esc(s.id)}">Revoke</button>
+    </div>`;
+}
+
+function linkRow(l){
+  const st = linkState(l);
+  const uses = l.max_uses === null ? `${l.use_count} download${l.use_count===1?'':'s'}`
+                                   : `${l.use_count} of ${l.max_uses} used`;
+  const bits = [
+    l.kind === 'layout' ? 'room' : 'book',
+    esc((l.created_at||'').slice(0,10)),
+    uses,
+    l.expires_at ? 'expires ' + esc(l.expires_at.slice(0,10)) : 'no expiry',
+  ];
+  return `
+    <div class="row shareline">
+      <span>
+        <strong>${esc(l.book_title)}</strong>
+        ${l.has_password ? '<span class="pill">password</span>' : ''}
+        <span class="pill ${st.cls}">${st.label}</span>
+        <div class="muted sharesub">${bits.join(' · ')}</div>
+      </span>
+      ${st.label === 'Live'
+        ? `<button class="btn sm danger" data-act="revokelink" data-id="${esc(l.id)}">Revoke</button>`
+        : '<span class="muted sharesub">closed</span>'}
+    </div>`;
+}
+
+async function showShares(){
+  let shares = [], links = [];
+  try {
+    [shares, links] = await Promise.all([
+      api('GET','/api/shares'),
+      api('GET','/api/share-links'),
+    ]);
+  } catch(e){ toast(e.message); return; }
+
+  const live = links.filter(l => linkState(l).label === 'Live').length;
+  const linkList = links.length
+    ? links.map(linkRow).join('')
+    : '<p class="muted">No public links have been made.</p>';
+  const shareList = shares.length
+    ? shares.map(shareRow).join('')
+    : '<p class="muted">Nobody with an account has been given access.</p>';
+
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(720px,95vw)">
+      <h2 style="margin:0 0 4px">Shares</h2>
+      <p class="muted" style="margin:0 0 14px">Everything this library has let
+        out: ${live} live link${live===1?'':'s'} of ${links.length}, and
+        ${shares.length} account share${shares.length===1?'':'s'}.</p>
+
+      <p class="sharehead">Public links</p>
+      <p class="muted sharesub" style="margin:0 0 8px">Anyone holding the URL,
+        no account needed. Kept after they close so you can see what was shared.</p>
+      <div style="max-height:34vh; overflow:auto">${linkList}</div>
+
+      <p class="sharehead" style="margin-top:16px">People with accounts</p>
+      <p class="muted sharesub" style="margin:0 0 8px">Current only — revoking
+        one removes the record with it.</p>
+      <div style="max-height:26vh; overflow:auto">${shareList}</div>
+
+      <div class="row" style="justify-content:flex-end; margin-top:14px">
+        <button class="btn" onclick="closeModal()">Close</button>
+      </div>
+    </div></div>`;
+}
+
+async function revokeLink(id){
+  if (!confirm('Revoke this link? Anyone holding the URL loses access at once.')) return;
+  try { await api('DELETE','/api/share-links/' + encodeURIComponent(id)); }
+  catch(e){ toast(e.message); return; }
+  toast('Link revoked');
+  showShares();
+}
+
+async function revokeShare(id){
+  if (!confirm('Revoke this share? They lose access to what it covered.')) return;
+  try { await api('DELETE','/api/shares/' + encodeURIComponent(id)); }
+  catch(e){ toast(e.message); return; }
+  toast('Share revoked');
+  showShares();
 }
 
 // ---- saved views (plan 5 #35) -------------------------------------------

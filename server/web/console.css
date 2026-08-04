@@ -257,6 +257,22 @@ td .celledit { width:100%; }
 
 .err { color:var(--red-ink); min-height:1.2em; }
 
+/* ---- shares ---- */
+.shareline {
+  justify-content:space-between; gap:12px; align-items:flex-start;
+  padding:8px 0; border-bottom:1px solid var(--line-soft);
+}
+.sharesub { font-size:12px; margin-top:2px; }
+.sharehead { font-weight:600; margin:0 0 2px; }
+/* A state, not a decoration: "Live" is the only one that still lets anyone in,
+   so it is the only one that gets the accent. */
+.pill {
+  display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px;
+  font-size:.72rem; background:var(--chip); color:var(--muted);
+}
+.pill.on { background:color-mix(in srgb, var(--ok) 22%, transparent); color:var(--fg); }
+.pill.off { background:var(--chip); color:var(--muted); }
+
 /* ---- modals ---- */
 .modal-bg {
   position:fixed; inset:0; background:rgba(20,16,10,.45);
