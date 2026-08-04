@@ -13,6 +13,13 @@ server/data/
 # a private key was committed once and had to be filtered back out of history.
 *.pem
 
+# Local environment files. The server is configured entirely by environment, so
+# the obvious way to run it is a file holding VELLUM_SMTP_PASS — which is a real
+# credential and must never be a commit away from being published.
+.env
+.env.*
+!.env.example
+
 # Build artefacts. Releases carry these (see .github/workflows/release.yml);
 # the repository should not — a 17 MB tarball was tracked, and every clone paid
 # for it forever.
