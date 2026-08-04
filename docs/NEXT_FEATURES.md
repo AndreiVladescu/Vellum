@@ -1,9 +1,10 @@
 # Next features — requested 2026-07-28
 
-Eleven items. **All eleven have shipped at least their agreed scope** — each
-marked *Done* with its commit. What is left is the parts of #5 and #11 that were
-deliberately declined, and the richer half of #10's prop vocabulary. Items 8 to
-11 came out of the discussion rather than the original list.
+Twelve items. **The first eleven have shipped at least their agreed scope** —
+each marked *Done* with its commit. What is left is the parts of #5 and #11 that
+were deliberately declined, the richer half of #10's prop vocabulary, and #12,
+which was asked for later and is not built. Items 8 to 11 came out of the
+discussion rather than the original list.
 
 Each entry keeps what was asked for and what the code did at the time, because
 the reasoning is what makes the decisions checkable later. Where a decision was
@@ -513,6 +514,71 @@ Three mitigations, designed in rather than bolted on:
 
 ---
 
+## 12. Translate the passage you have selected
+
+> **Requested 2026-08-04.** Not built. The design below is a proposal, not a
+> decision.
+
+**Asked for.** Selecting text in a book offers to translate it. The language it
+is *from* is detected automatically, and can be corrected when the guess is
+wrong; the language it goes *to* is yours to choose.
+
+**Today.** Both readers already know what you have selected and already put
+actions beside it. The PDF reader keeps a snapshot of the selected ranges
+(`reader_page.dart`, `onTextSelectionChange` → `_selectedRanges`) and shows three
+buttons while a selection is live: highlight in the current colour, change that
+colour, and note-on-selection. The EPUB reader shows the same three from
+`_selectionRange`. Nothing copies, and nothing leaves the device — the selected
+text has never been sent anywhere.
+
+**Shape.** A fourth button in the same bar, in both readers, so the two keep
+behaving alike. It opens a sheet with the passage at the top, then:
+
+- **From**, pre-filled with the detected language and presented as a picker
+  rather than a label — the guess is a starting point, and a short passage of
+  a language the detector rarely sees will be wrong sometimes.
+- **To**, remembered between uses (a reader translating out of German today will
+  be translating out of German tomorrow), defaulting to the app's own locale.
+- The translation, once it arrives, with a copy button — and, worth considering,
+  *save as a note on this passage*, which is the thing the reader already knows
+  how to do and would make a translation outlive the sheet.
+
+**The decision this needs first is where the translation comes from**, because it
+is the one part that cannot be built local-first:
+
+| | What it costs | What it means for the reader |
+|---|---|---|
+| A cloud API (DeepL, Google) | An API key per user, and a settings field to put it in | The passage leaves the device, to a company, per lookup |
+| A self-hosted LibreTranslate | An address to point at, like the sync server | The passage leaves the device to a machine you run |
+| On-device ML Kit | A model download per language pair; **Android/iOS only** | Nothing leaves the device |
+| Hand off to the system translator | Almost nothing — an intent on Android | The OS decides; no *From*/*To* control, so it answers a different request |
+
+**None of these is free of the thing this app is careful about.** Vellum's whole
+posture is that nothing leaves the machine unless you say so, and what you are
+reading — the exact sentence you stopped on — is more personal than the
+catalogue. So whichever backend is chosen, the feature has to be **off until
+configured**, gated the way the sync server is: a server that isn't set up means
+the button isn't shown, rather than a button that fails.
+
+The shape that fits this project best is probably **two of them together**:
+on-device ML Kit where the platform has it (a phone, which is where reading
+happens), and an optional LibreTranslate address for the desktop — the same
+"bring your own server" bargain the library sync already makes. That leaves the
+cloud APIs out, and with them the "paste your DeepL key here" field.
+
+**Files.** `app/lib/reader/reader_page.dart` and
+`app/lib/reader/epub_reader_page.dart` (the button, in both bars),
+a new `app/lib/reader/translate/` for the sheet and the backend behind an
+interface, `app/lib/settings/` for the destination language and the backend's
+configuration, and `app/lib/l10n/` for the new strings.
+
+**Tests.** The language list and its defaults; that the *From* guess is a
+default and not a lock; that a passage with no backend configured never reaches
+the network; that the sheet's save-as-note writes the same annotation shape the
+note button already writes.
+
+---
+
 ## What is left
 
 Everything in the original order is in. What remains, smallest first:
@@ -527,6 +593,10 @@ Everything in the original order is in. What remains, smallest first:
   document's own reckoning the two most likely to be wanted least.
 - **#11 stages 2–4** — segment styles, vector props and imported artwork.
   Declined on 2026-08-01; the written-up design stands if that changes.
+- **#12, translating a selected passage** — asked for on 2026-08-04, nothing
+  built. Unlike everything above it, it cannot be done without deciding what
+  the app is allowed to send off the device, which is the first thing to settle
+  rather than the last.
 
 **#10 and #11** sit outside this order. Their cheap first stages — the room's own
 wall, floor and shadows (#10), and bookcase templates (#11) — are small enough to
