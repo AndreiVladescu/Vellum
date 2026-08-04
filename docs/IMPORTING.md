@@ -104,10 +104,34 @@ may be real JSON arrays, or the same joined strings the CSV uses.
 - **The Vellum console** (`/api/books`, or its CSV export) round-trips: export
   from one library, import into another, and you get the same books.
 - **Goodreads** — export from *My Books → Import and export*. Its `Title`,
-  `Author`, `ISBN13`, `Number of Pages`, `Year Published`, `Publisher`,
-  `Bookshelves` and `My Review` columns all land in the right place.
+  `Author`, `ISBN13`, `Number of Pages`, `Year Published`, `Publisher` and
+  `Bookshelves` columns all land in the right place.
 - **StoryGraph** and **LibraryThing** exports use the same common names and
   need no editing either.
+
+**Your ratings and shelves come too.** An export from a reading tracker is
+mostly not catalogue data — it is years of what you thought — so these are read
+as well:
+
+| Goodreads | StoryGraph | Becomes |
+|---|---|---|
+| `Exclusive Shelf` | `Read Status` | The book's status |
+| `My Rating` | `Star Rating` | Your rating, 1–5 |
+| `Date Read` | `Last Date Read` | When you finished it |
+| `Read Count` | `Read Count` | Times read |
+| `My Review`, `Private Notes` | `Review` | Your private notes |
+| `Additional Authors` | `Contributors` | Extra authors |
+
+Two rules worth knowing:
+
+- **`to-read` becomes a wishlist entry, not a shelf book.** A want-to-read pile
+  is books you don't own; four hundred of them on the shelf would bury the ones
+  you do.
+- **A review is yours.** It is stored as a private note on the per-user channel,
+  so sharing a library does not hand your reviews to everyone in it.
+
+A rating of `0` means "unrated" in both exports and is read that way, not as
+zero stars.
 
 If an export uses a column name Vellum doesn't know, renaming that one header
 is usually the whole job.

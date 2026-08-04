@@ -28,6 +28,11 @@ class CatalogEntry {
     this.filePath,
     this.coverPath,
     this.sourceId,
+    this.status,
+    this.rating,
+    this.finishedAt,
+    this.readCount,
+    this.review,
   });
 
   final String title;
@@ -41,6 +46,33 @@ class CatalogEntry {
   final int? year;
   final int? pageCount;
   final List<String> genres;
+
+  // ---- What *you* made of the book -----------------------------------------
+  //
+  // A Goodreads or StoryGraph export is mostly not catalogue data: it is years
+  // of your ratings, your shelves and your reviews. Dropping those on import
+  // and keeping only the titles throws away the part that took the time to
+  // accumulate. Null throughout means "the export did not say", which is not
+  // the same as zero — an unrated book is not a book rated nought.
+
+  /// The exporter's shelf mapped onto our own vocabulary, e.g. Goodreads'
+  /// `to-read` becomes [ReadingStatus.wishlist].
+  final String? status;
+
+  /// 1–5. Half stars are rounded: StoryGraph allows 4.5, this column does not.
+  final int? rating;
+
+  final DateTime? finishedAt;
+
+  /// How many times it has been read, for re-reads.
+  final int? readCount;
+
+  /// Your review or private note.
+  ///
+  /// Goes to `readerNotes` and its own personal channel, never onto the book
+  /// row — a shared library must not publish what you thought of a book to
+  /// everyone it is shared with.
+  final String? review;
 
   /// A readable file this entry brings with it, or null for metadata only.
   final String? filePath;

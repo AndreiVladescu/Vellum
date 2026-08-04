@@ -334,8 +334,49 @@ class FolderImportService {
         await repository.seriesService
             .setSeries(bookId, series, entry.seriesIndex);
       }
+      await _applyPersonal(bookId, entry);
     }
     return bookId;
+  }
+
+  /// Carries across what a reading tracker's export says *you* thought.
+  ///
+  /// Written straight to the row rather than through the edit paths because
+  /// this is an import: there is no prior value to conflict with, and marking
+  /// four hundred freshly created books as needing a push for a rating they
+  /// were born with would be noise. The review is the exception — see below.
+  Future<void> _applyPersonal(String bookId, CatalogEntry entry) async {
+    final db = repository.db;
+    final hasAny = entry.status != null ||
+        entry.rating != null ||
+        entry.finishedAt != null ||
+        entry.readCount != null;
+    if (hasAny) {
+      await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+        BooksCompanion(
+          status: entry.status == null ? const Value.absent() : Value(entry.status!),
+          rating: Value(entry.rating),
+          finishedAt: Value(entry.finishedAt),
+          readCount: entry.readCount == null
+              ? const Value.absent()
+              : Value(entry.readCount!),
+          // A book the export says you finished, with no progress recorded
+          // here, is at the end of it — otherwise "finished" and a progress
+          // bar at 0% would contradict each other on the book's own page.
+          readingProgress:
+              entry.status == 'finished' ? const Value(1.0) : const Value.absent(),
+        ),
+      );
+    }
+    final review = entry.review?.trim();
+    if (review != null && review.isNotEmpty) {
+      // Through `setReaderNotes`, not the companion above: a review belongs to
+      // the *person*, and that path is what sets `readerNotesUpdatedAt` and
+      // `readerNotesNeedsPush` so it travels on the per-user channel instead of
+      // the shared book row. Importing straight onto the row would publish your
+      // reviews to everyone the library is shared with.
+      await repository.setReaderNotes(bookId, review);
+    }
   }
 
   /// Fills in online metadata for books imported from file names, one at a time

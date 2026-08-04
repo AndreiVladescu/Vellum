@@ -110,13 +110,30 @@ class CsvImport {
   static const _descriptionKeys = {'description', 'comments', 'summary'};
   static const _seriesKeys = {'series'};
   static const _seriesIndexKeys = {'series_index', 'volume'};
+  // ---- The personal columns a reading-tracker export actually carries ------
+  //
+  // These are what makes a Goodreads or StoryGraph export worth more than a
+  // list of titles. `exclusive shelf` is Goodreads' one-of-three shelf;
+  // `read status` is StoryGraph's equivalent.
+  static const _statusKeys = {
+    'exclusive shelf',
+    'read status',
+    'status',
+  };
+  static const _ratingKeys = {'my rating', 'star rating', 'rating'};
+  static const _dateReadKeys = {'date read', 'last date read', 'date_read'};
+  static const _readCountKeys = {'read count', 'times read'};
+  // Goodreads splits the public review from the private note; either is yours.
+  static const _reviewKeys = {'my review', 'review', 'private notes'};
+  // Goodreads' `Additional Authors`, StoryGraph's `Contributors`.
+  static const _extraAuthorKeys = {'additional authors', 'contributors'};
 
   static CatalogEntry? _fromMap(Map<String, Object?> row) {
     final title = _string(row, _titleKeys)?.trim();
     if (title == null || title.isEmpty) return null;
     return CatalogEntry(
       title: title,
-      authors: _list(row, _authorKeys),
+      authors: [..._list(row, _authorKeys), ..._list(row, _extraAuthorKeys)],
       subtitle: _string(row, _subtitleKeys),
       isbn: _cleanIsbn(_string(row, _isbnKeys)),
       publisher: _string(row, _publisherKeys),
@@ -126,6 +143,11 @@ class CsvImport {
       year: _int(row, _yearKeys),
       pageCount: _int(row, _pagesKeys),
       genres: _list(row, _tagKeys),
+      status: readingStatusFromExport(_string(row, _statusKeys)),
+      rating: ratingFromExport(_double(row, _ratingKeys)),
+      finishedAt: dateFromExport(_string(row, _dateReadKeys)),
+      readCount: _int(row, _readCountKeys),
+      review: _string(row, _reviewKeys),
     );
   }
 
@@ -255,4 +277,64 @@ class CsvImportException implements Exception {
 
   @override
   String toString() => message;
+}
+
+// ---------------------------------------------------------------------------
+// Turning a reading tracker's vocabulary into ours.
+//
+// Top-level so they can be tested directly, and so the mapping lives in one
+// readable place rather than being spread through the row parser.
+// ---------------------------------------------------------------------------
+
+/// Maps an exporter's shelf onto a [ReadingStatus] name, or null when it says
+/// nothing we understand.
+///
+/// The one worth arguing about is **`to-read` becoming `wishlist`** rather than
+/// `unread`. A Goodreads want-to-read pile is books you do not own; dropping
+/// four hundred of them onto the shelf as "unread" would bury the books you
+/// actually have, which is exactly what the wishlist exists to prevent.
+String? readingStatusFromExport(String? raw) {
+  final v = raw?.trim().toLowerCase().replaceAll('_', '-');
+  if (v == null || v.isEmpty) return null;
+  return switch (v) {
+    'read' || 'finished' || 'completed' => 'finished',
+    'currently-reading' || 'currently reading' || 'reading' => 'reading',
+    'to-read' || 'to read' || 'want to read' || 'wishlist' => 'wishlist',
+    'did-not-finish' || 'did not finish' || 'dnf' || 'abandoned' => 'abandoned',
+    'reference' => 'reference',
+    _ => null,
+  };
+}
+
+/// A 1–5 rating, or null for unrated.
+///
+/// Goodreads writes `0` for "not rated", which is not a rating of nought.
+/// StoryGraph allows halves, and this column is an integer, so 4.5 rounds to 5
+/// — rounding rather than truncating, because a 4.5 is much closer to the
+/// person's meaning at 5 than at 4.
+int? ratingFromExport(double? raw) {
+  if (raw == null || raw <= 0) return null;
+  return raw.round().clamp(1, 5);
+}
+
+/// A date from an export, or null.
+///
+/// Goodreads writes `2019/03/14`, StoryGraph writes `2019-03-14`; neither
+/// carries a time, so these land at local midnight. Anything unparseable is
+/// null rather than a guess — a wrong date in reading insights is worse than
+/// no date.
+DateTime? dateFromExport(String? raw) {
+  final v = raw?.trim();
+  if (v == null || v.isEmpty) return null;
+  final m = RegExp(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})').firstMatch(v);
+  if (m == null) return null;
+  final year = int.parse(m.group(1)!);
+  final month = int.parse(m.group(2)!);
+  final day = int.parse(m.group(3)!);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  final parsed = DateTime(year, month, day);
+  // DateTime rolls 31 February over into March; reject rather than accept a
+  // date the export did not contain.
+  if (parsed.month != month || parsed.day != day) return null;
+  return parsed;
 }

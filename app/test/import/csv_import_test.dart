@@ -146,4 +146,88 @@ void main() {
           isNull);
     });
   });
+  group('personal columns from a reading tracker', () {
+    // A Goodreads or StoryGraph export is mostly not catalogue data — it is
+    // years of ratings, shelves and reviews. Dropping those silently is the
+    // failure that looks like success.
+
+    test('a Goodreads row keeps rating, shelf, date and review', () {
+      // The real header, in Goodreads' own order and spelling.
+      const csv = 'Book Id,Title,Author,Additional Authors,ISBN13,'
+          'My Rating,Number of Pages,Original Publication Year,Date Read,'
+          'Bookshelves,Exclusive Shelf,My Review,Read Count\n'
+          '1,Dune,Frank Herbert,Brian Herbert,9780441013593,'
+          '5,412,1965,2019/03/14,'
+          'sci-fi,read,"Still the best of them.",2';
+      final entry = CsvImport.read(csv).single;
+
+      expect(entry.title, 'Dune');
+      expect(entry.authors, ['Frank Herbert', 'Brian Herbert']);
+      expect(entry.rating, 5);
+      expect(entry.status, 'finished');
+      expect(entry.finishedAt, DateTime(2019, 3, 14));
+      expect(entry.readCount, 2);
+      expect(entry.review, 'Still the best of them.');
+    });
+
+    test('a StoryGraph row is read the same way', () {
+      const csv = 'Title,Authors,Contributors,ISBN/UID,Read Status,'
+          'Star Rating,Last Date Read,Read Count,Review,Tags\n'
+          'Piranesi,Susanna Clarke,,9781526622426,read,'
+          '4.5,2021-07-02,1,"Odd and lovely.",fantasy';
+      final entry = CsvImport.read(csv).single;
+
+      expect(entry.status, 'finished');
+      // Half stars round up: 4.5 is nearer the person's meaning at 5 than 4.
+      expect(entry.rating, 5);
+      expect(entry.finishedAt, DateTime(2021, 7, 2));
+      expect(entry.review, 'Odd and lovely.');
+    });
+
+    test('to-read becomes the wishlist, not an unread shelf book', () {
+      const csv = 'Title,Exclusive Shelf\nThe Dispossessed,to-read';
+      // The point of the whole mapping: a want-to-read pile is books you do
+      // not own, and four hundred of them on the shelf would bury the ones
+      // you do.
+      expect(CsvImport.read(csv).single.status, 'wishlist');
+    });
+
+    test('every shelf name either maps or is left alone', () {
+      expect(readingStatusFromExport('currently-reading'), 'reading');
+      expect(readingStatusFromExport('did-not-finish'), 'abandoned');
+      expect(readingStatusFromExport('dnf'), 'abandoned');
+      expect(readingStatusFromExport('Read'), 'finished');
+      // Not a guess: an unknown shelf leaves the status alone.
+      expect(readingStatusFromExport('borrowed-from-mum'), isNull);
+      expect(readingStatusFromExport(''), isNull);
+      expect(readingStatusFromExport(null), isNull);
+    });
+
+    test('an unrated book is null, not zero stars', () {
+      // Goodreads writes 0 for "not rated", which is not a rating of nought.
+      expect(ratingFromExport(0), isNull);
+      expect(ratingFromExport(null), isNull);
+      expect(ratingFromExport(3), 3);
+      expect(ratingFromExport(4.5), 5);
+      expect(ratingFromExport(9), 5, reason: 'clamped, not trusted');
+    });
+
+    test('a date that is not a date is null rather than a guess', () {
+      expect(dateFromExport('2019/03/14'), DateTime(2019, 3, 14));
+      expect(dateFromExport('2019-03-14'), DateTime(2019, 3, 14));
+      expect(dateFromExport('not a date'), isNull);
+      expect(dateFromExport(''), isNull);
+      // DateTime would roll this into March; the export never said March.
+      expect(dateFromExport('2019-02-31'), isNull);
+    });
+
+    test('a plain catalogue with none of these columns is unaffected', () {
+      const csv = 'title,authors,year\nSolaris,Stanislaw Lem,1961';
+      final entry = CsvImport.read(csv).single;
+      expect(entry.title, 'Solaris');
+      expect(entry.status, isNull);
+      expect(entry.rating, isNull);
+      expect(entry.review, isNull);
+    });
+  });
 }

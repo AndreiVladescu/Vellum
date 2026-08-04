@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/import/csv_import.dart';
 import 'package:vellum/import/folder_import_service.dart';
 import 'package:vellum/import/import_plan.dart';
 
@@ -208,5 +209,37 @@ void main() {
 
     final book = (await repo.db.select(repo.db.books).get()).single;
     expect(book.needsPush, true);
+  });
+  test('a reading tracker export brings your ratings and shelves with it',
+      () async {
+    // The whole point of #17: importing a Goodreads library used to keep the
+    // titles and throw away the years of judgement attached to them.
+    final repo = await _repo(dataDir);
+    final service = FolderImportService(repo);
+    const csv = 'Title,Author,Exclusive Shelf,My Rating,Date Read,'
+        'My Review,Read Count\n'
+        'Dune,Frank Herbert,read,5,2019/03/14,"The best of them.",2\n'
+        'The Dispossessed,Ursula K. Le Guin,to-read,0,,,0';
+
+    final plan = await service.scanEntries(CsvImport.read(csv));
+    await service.import(plan);
+
+    final books = await repo.db.select(repo.db.books).get();
+    final dune = books.firstWhere((b) => b.title == 'Dune');
+    expect(dune.status, 'finished');
+    expect(dune.rating, 5);
+    expect(dune.finishedAt, DateTime(2019, 3, 14));
+    expect(dune.readCount, 2);
+    // Finished with no progress recorded would contradict itself on the page.
+    expect(dune.readingProgress, 1.0);
+    // The review goes to the personal channel, not the shared book row.
+    expect(dune.readerNotes, 'The best of them.');
+    expect(dune.readerNotesNeedsPush, true,
+        reason: 'a review travels per-user, never on the book everyone sees');
+
+    final wanted = books.firstWhere((b) => b.title == 'The Dispossessed');
+    expect(wanted.status, 'wishlist');
+    // 0 stars in an export means unrated, and must not become a 0 rating.
+    expect(wanted.rating, isNull);
   });
 }
