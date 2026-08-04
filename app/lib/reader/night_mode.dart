@@ -112,14 +112,33 @@ final _colourAttribute = RegExp(
   caseSensitive: false,
 );
 
+/// The 5x4 matrix that changes nothing — night mode off, expressed as a filter
+/// rather than as the absence of one. See [nightModeWrap].
+const identityMatrix = <double>[
+  1, 0, 0, 0, 0, //
+  0, 1, 0, 0, 0, //
+  0, 0, 1, 0, 0, //
+  0, 0, 0, 1, 0, //
+];
+
 /// Applies [nightModeMatrix] to [child] when [enabled].
 ///
 /// One wrap around the viewer rather than a per-page paint: the pages are
 /// rasters, so filtering the pixels is the only way to darken them, and doing it
 /// once keeps every page — and the gaps between them — consistent.
-Widget nightModeWrap({required bool enabled, required Widget child}) => enabled
-    ? ColorFiltered(
-        colorFilter: const ColorFilter.matrix(nightModeMatrix),
-        child: child,
-      )
-    : child;
+///
+/// **The wrapper is always there**, carrying an identity matrix when night mode
+/// is off, and that is not a stylistic choice. Returning `child` unwrapped
+/// changes the *shape* of the widget tree, so turning night mode on or off
+/// replaces the element below it: Flutter unmounts the viewer and builds a new
+/// one, which reopens the document and loses your place. That is what made a
+/// book open blank the first time — the reader's settings arrive
+/// asynchronously, so the viewer was built once without them and then thrown
+/// away and rebuilt when they landed. Same matrix, same tree, no rebuild.
+Widget nightModeWrap({required bool enabled, required Widget child}) =>
+    ColorFiltered(
+      colorFilter: ColorFilter.matrix(
+        enabled ? nightModeMatrix : identityMatrix,
+      ),
+      child: child,
+    );
