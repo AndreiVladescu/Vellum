@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../reader_settings.dart';
-import '../reader_settings_sheet.dart';
 import 'language_packs_sheet.dart';
+import 'local_engine_backend.dart';
 import 'on_device_backend.dart';
 import 'translation_backend.dart';
 
@@ -38,16 +38,10 @@ class TranslateSheet extends StatefulWidget {
 }
 
 class _TranslateSheetState extends State<TranslateSheet> {
-  /// Re-read after the server sheet closes, so naming one starts working
-  /// immediately rather than on the next selection.
-  TranslationBackend? get _backend =>
-      widget.backend ??
-      backendFor(
-        onDeviceAvailable: OnDeviceBackend.available,
-        onDevice: OnDeviceBackend.new,
-        libreUrl: widget.settings.translateUrl,
-        libreApiKey: widget.settings.translateApiKey,
-      );
+  /// Resolved once, on open: the device's own translator where there is one,
+  /// otherwise a translator installed on this machine. Both keep the passage
+  /// here; there is deliberately no option that sends it away.
+  TranslationBackend? _backend;
 
   late TranslationLanguage _from = TranslationLanguage.auto;
   late TranslationLanguage _to = widget.settings.translateTo;
@@ -69,6 +63,16 @@ class _TranslateSheetState extends State<TranslateSheet> {
   @override
   void initState() {
     super.initState();
+    _resolveBackend();
+  }
+
+  Future<void> _resolveBackend() async {
+    final resolved = widget.backend ??
+        (OnDeviceBackend.available
+            ? OnDeviceBackend()
+            : await LocalEngineBackend.detect());
+    if (!mounted) return;
+    setState(() => _backend = resolved);
     _run();
   }
 
@@ -123,20 +127,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
     if (!mounted) return;
     // A pack downloaded while the error was on screen is exactly the thing that
     // fixes it, so try again rather than leaving the message up.
-    if (_error != null) _run();
-  }
-
-  /// The desktop's version of *Languages*: this platform has no on-device
-  /// engine yet, so the thing to configure is the server it borrows one from.
-  Future<void> _openServerSettings() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => TranslateServerSheet(settings: widget.settings),
-    );
-    if (!mounted) return;
-    if (_error != null) _run();
+    if (_error != null || _needsSetup) _resolveBackend();
   }
 
   Future<void> _save() async {
@@ -229,9 +220,9 @@ class _TranslateSheetState extends State<TranslateSheet> {
                     OnDeviceBackend.available
                         ? 'Download the two languages under Languages and this '
                             'translates on the device, with nothing sent anywhere.'
-                        : 'This desktop has no translator of its own yet. Point '
-                            'Server at a LibreTranslate you run and it will '
-                            'translate through that.',
+                        : 'No translator is installed on this machine. '
+                            'Languages says what to install — it runs here, and '
+                            'nothing is sent anywhere.',
                   ),
                 ),
               ],
@@ -262,7 +253,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
             children: [
               Text(
                 _backend == null
-                    ? 'not set up yet'
+                    ? 'nothing to translate with'
                     : 'via ${_backend!.name}',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -272,18 +263,11 @@ class _TranslateSheetState extends State<TranslateSheet> {
               // pressed to get here, including the packs: a language you are
               // missing is discovered *while translating*, so the way to fix it
               // belongs on this sheet rather than three screens away.
-              if (OnDeviceBackend.available)
-                TextButton.icon(
-                  onPressed: _openLanguages,
-                  icon: const Icon(Icons.download_outlined, size: 18),
-                  label: const Text('Languages'),
-                )
-              else
-                TextButton.icon(
-                  onPressed: _openServerSettings,
-                  icon: const Icon(Icons.dns_outlined, size: 18),
-                  label: const Text('Server'),
-                ),
+              TextButton.icon(
+                onPressed: _openLanguages,
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Languages'),
+              ),
               if (_error != null)
                 TextButton(onPressed: _busy ? null : _run, child: const Text('Try again')),
               if (_result != null) ...[

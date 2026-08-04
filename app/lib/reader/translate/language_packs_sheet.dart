@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter/services.dart';
+
+import 'local_engine_backend.dart';
 import 'on_device_backend.dart';
 import 'translation_backend.dart';
 
@@ -68,6 +71,11 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // A desktop has no packs to toggle: it has an engine, or it does not. Say
+    // which, and say exactly what to type — a half-remembered instruction is
+    // worse than none.
+    if (!OnDeviceBackend.available) return const _LocalEngineHelp();
+
     final theme = Theme.of(context);
     final here = _installed.values.where((v) => v).length;
     return Padding(
@@ -140,6 +148,156 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// What a desktop sees under *Languages*: whether a translator is installed on
+/// this machine, and how to get one if not.
+///
+/// No server appears here on purpose. A passage you are reading should not have
+/// to travel to be translated, so the only options offered are ones that run on
+/// the machine you are reading on.
+class _LocalEngineHelp extends StatefulWidget {
+  const _LocalEngineHelp();
+
+  @override
+  State<_LocalEngineHelp> createState() => _LocalEngineHelpState();
+}
+
+class _LocalEngineHelpState extends State<_LocalEngineHelp> {
+  LocalEngineBackend? _found;
+  bool _looking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _look();
+  }
+
+  Future<void> _look() async {
+    setState(() => _looking = true);
+    final found = await LocalEngineBackend.detect();
+    if (!mounted) return;
+    setState(() {
+      _found = found;
+      _looking = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Languages', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(
+            'Translation happens on this machine. Nothing is sent anywhere, so '
+            'it needs a translator installed here.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
+          if (_looking)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_found != null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.check_circle_outline,
+                  color: theme.colorScheme.primary),
+              title: Text(_found!.engine.label),
+              subtitle: const Text('Installed — translations run here'),
+            )
+          else ...[
+            Text(
+              'Nothing found. Either of these works, and both keep the passage '
+              'on this machine:',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            for (final engine in LocalEngine.values)
+              _InstallCard(engine: engine),
+            const SizedBox(height: 4),
+            Text(
+              'Argos is the neural one — the same engine LibreTranslate runs, '
+              'without the server around it. Apertium is older and rule-based, '
+              'but it is one apt away.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: _looking ? null : _look,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Look again'),
+              ),
+              const Spacer(),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InstallCard extends StatelessWidget {
+  const _InstallCard({required this.engine});
+
+  final LocalEngine engine;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(engine.label, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 6),
+            SelectableText(
+              engine.installHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(
+                      ClipboardData(text: engine.installHint));
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Command copied')),
+                  );
+                },
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('Copy'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

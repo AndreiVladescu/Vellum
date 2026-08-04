@@ -6,6 +6,7 @@
 // is why `from` is a value the caller passes rather than something the backend
 // decides on its own.
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/reader/reader_settings.dart';
+import 'package:vellum/reader/translate/local_engine_backend.dart';
 import 'package:vellum/reader/translate/on_device_backend.dart';
 import 'package:vellum/reader/translate/translate_sheet.dart';
 import 'package:vellum/reader/translate/translation_backend.dart';
@@ -262,6 +264,115 @@ void main() {
           reason: '"Detect" is not something you download');
     });
   });
+
+  group('a translator installed on this machine', () {
+    ProcessResult ok(String out) => ProcessResult(1, 0, out, '');
+
+    test('the first engine that answers is the one used', () async {
+      final tried = <String>[];
+      final backend = await LocalEngineBackend.detect(
+        runner: (exe, args, {input}) async {
+          tried.add(exe);
+          return exe == 'apertium'
+              ? ok('usage')
+              : throw ProcessException(exe, args, 'not found');
+        },
+      );
+      expect(backend?.engine, LocalEngine.apertium);
+      expect(tried.first, 'argos-translate',
+          reason: 'the neural one is asked for first');
+    });
+
+    test('nothing installed is null, not an exception', () async {
+      final backend = await LocalEngineBackend.detect(
+        runner: (exe, args, {input}) async =>
+            throw ProcessException(exe, args, 'not found'),
+      );
+      expect(backend, isNull);
+    });
+
+    test('argos is handed the passage on stdin with both languages', () async {
+      String? sent;
+      List<String>? args;
+      final backend = LocalEngineBackend(
+        LocalEngine.argos,
+        runner: (exe, a, {input}) async {
+          sent = input;
+          args = a;
+          return ok('Guten Morgen\n');
+        },
+      );
+
+      final result = await backend.translate(
+        'Good morning',
+        from: TranslationLanguage.byCode('en')!,
+        to: TranslationLanguage.byCode('de')!,
+      );
+
+      expect(result.text, 'Guten Morgen');
+      expect(sent, 'Good morning');
+      expect(args, ['--from-lang', 'en', '--to-lang', 'de']);
+    });
+
+    test('apertium is asked for its pair in ISO 639-3', () async {
+      List<String>? args;
+      final backend = LocalEngineBackend(
+        LocalEngine.apertium,
+        runner: (exe, a, {input}) async {
+          args = a;
+          return ok('Buenos dias');
+        },
+      );
+      await backend.translate('Good morning',
+          from: TranslationLanguage.byCode('en')!,
+          to: TranslationLanguage.byCode('es')!);
+      expect(args, ['-u', 'eng-spa']);
+    });
+
+    test('Detect is refused rather than guessed at', () async {
+      final backend = LocalEngineBackend(
+        LocalEngine.argos,
+        runner: (exe, a, {input}) async => throw StateError('ran anyway'),
+      );
+      await expectLater(
+        backend.translate('Guten Morgen',
+            from: TranslationLanguage.auto,
+            to: TranslationLanguage.byCode('en')!),
+        throwsA(isA<TranslationException>().having((e) => e.message, 'message',
+            contains('coming'))),
+      );
+    });
+
+    test("what the engine said is what the reader is told", () async {
+      final backend = LocalEngineBackend(
+        LocalEngine.argos,
+        runner: (exe, a, {input}) async =>
+            ProcessResult(1, 1, '', 'no package installed for en -> ro'),
+      );
+      await expectLater(
+        backend.translate('hi',
+            from: TranslationLanguage.byCode('en')!,
+            to: TranslationLanguage.byCode('ro')!),
+        throwsA(isA<TranslationException>().having((e) => e.message, 'message',
+            contains('no package installed'))),
+      );
+    });
+
+    test('a silent failure still names the pair', () async {
+      final backend = LocalEngineBackend(
+        LocalEngine.apertium,
+        runner: (exe, a, {input}) async => ProcessResult(1, 1, '', ''),
+      );
+      await expectLater(
+        backend.translate('hi',
+            from: TranslationLanguage.byCode('en')!,
+            to: TranslationLanguage.byCode('ro')!),
+        throwsA(isA<TranslationException>().having((e) => e.message, 'message',
+            allOf(contains('English'), contains('Romanian')))),
+      );
+    });
+  });
+
   group('the sheet', () {
     testWidgets('translates on open and offers to keep it as a note',
         (tester) async {
@@ -313,10 +424,10 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('no translator of its own'), findsOneWidget);
-      expect(find.text('Server'), findsOneWidget,
+      expect(find.textContaining('No translator is installed'), findsOneWidget);
+      expect(find.text('Languages'), findsOneWidget,
           reason: 'the way out of this state is on the sheet itself');
-      expect(find.text('not set up yet'), findsOneWidget);
+      expect(find.text('nothing to translate with'), findsOneWidget);
     });
 
     testWidgets('a refusal is shown in the sheet, not swallowed',
