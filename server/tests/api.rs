@@ -377,8 +377,6 @@ async fn a_password_protected_link_opens_only_after_the_password() {
     );
 }
 
-/// The password is a second gate, never a way around the first.
-
 /// A link's address has to survive the dialog that created it: the Shares
 /// screen lists live links, and a live link you cannot read is one you cannot
 /// send to anyone.
