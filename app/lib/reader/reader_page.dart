@@ -134,6 +134,18 @@ class _ReaderPageState extends State<ReaderPage> {
         _chromeHidden = settings.immersive;
       });
       settings.addListener(_onSettingsChanged);
+      // Re-anchor now that the real mode and fit are known.
+      //
+      // These settings arrive asynchronously, and the viewer is built before
+      // they do — with the *defaults* (scroll mode, fit width). If the saved
+      // mode or fit differs, the page was framed for one arrangement and then
+      // laid out under another, and the viewport could end up off the page:
+      // the reader opened blank. Opening it a second time hid the bug, because
+      // by then the settings were already in memory and the first build had
+      // them. `_applyFit` is a no-op until the document is ready, and
+      // `onViewerReady` calls it too, so whichever of the two happens last is
+      // the one that frames the page.
+      _applyFit();
     });
   }
 
