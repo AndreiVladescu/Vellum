@@ -298,6 +298,27 @@ void main() {
       expect(find.text('Saved'), findsOneWidget);
     });
 
+    testWidgets('with nothing set up it explains, and offers the way to set it up',
+        (tester) async {
+      // The state every desktop starts in, and the one that used to be
+      // unreachable: the button was hidden until a server was named, and the
+      // only place to name one was behind that button.
+      SharedPreferences.setMockInitialValues({});
+      final settings = await ReaderSettings.load();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: TranslateSheet(passage: 'Guten Morgen', settings: settings),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('no translator of its own'), findsOneWidget);
+      expect(find.text('Server'), findsOneWidget,
+          reason: 'the way out of this state is on the sheet itself');
+      expect(find.text('not set up yet'), findsOneWidget);
+    });
+
     testWidgets('a refusal is shown in the sheet, not swallowed',
         (tester) async {
       SharedPreferences.setMockInitialValues({});

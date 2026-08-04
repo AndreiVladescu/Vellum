@@ -18,13 +18,16 @@ class TranslateSheet extends StatefulWidget {
     super.key,
     required this.passage,
     required this.settings,
-    required this.backend,
+    this.backend,
     this.onSaveAsNote,
   });
 
   final String passage;
   final ReaderSettings settings;
-  final TranslationBackend backend;
+
+  /// Normally worked out from [settings] — passed in only by tests, which have
+  /// no phone to translate on and no server to call.
+  final TranslationBackend? backend;
 
   /// Keeps the translation with the passage it came from, as a note on the
   /// book. Null where the caller has no annotation to hang it on.
@@ -35,11 +38,26 @@ class TranslateSheet extends StatefulWidget {
 }
 
 class _TranslateSheetState extends State<TranslateSheet> {
+  /// Re-read after the server sheet closes, so naming one starts working
+  /// immediately rather than on the next selection.
+  TranslationBackend? get _backend =>
+      widget.backend ??
+      backendFor(
+        onDeviceAvailable: OnDeviceBackend.available,
+        onDevice: OnDeviceBackend.new,
+        libreUrl: widget.settings.translateUrl,
+        libreApiKey: widget.settings.translateApiKey,
+      );
+
   late TranslationLanguage _from = TranslationLanguage.auto;
   late TranslationLanguage _to = widget.settings.translateTo;
 
   String? _result;
   String? _error;
+
+  /// True when there is no backend yet: a desktop with no server named, which
+  /// is the state every desktop starts in.
+  bool _needsSetup = false;
   bool _busy = false;
   bool _saved = false;
 
@@ -55,13 +73,27 @@ class _TranslateSheetState extends State<TranslateSheet> {
   }
 
   Future<void> _run() async {
+    final backend = _backend;
+    if (backend == null) {
+      // Not a failure — it has not been set up yet, and the button that sets it
+      // up is on this sheet. Saying so beats an error about a server nobody
+      // named.
+      setState(() {
+        _busy = false;
+        _result = null;
+        _error = null;
+        _needsSetup = true;
+      });
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
+      _needsSetup = false;
       _saved = false;
     });
     try {
-      final translation = await widget.backend.translate(
+      final translation = await backend.translate(
         widget.passage,
         from: _from,
         to: _to,
@@ -186,6 +218,24 @@ class _TranslateSheetState extends State<TranslateSheet> {
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Center(child: CircularProgressIndicator()),
             )
+          else if (_needsSetup)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    OnDeviceBackend.available
+                        ? 'Download the two languages under Languages and this '
+                            'translates on the device, with nothing sent anywhere.'
+                        : 'This desktop has no translator of its own yet. Point '
+                            'Server at a LibreTranslate you run and it will '
+                            'translate through that.',
+                  ),
+                ),
+              ],
+            )
           else if (_error != null)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,7 +261,9 @@ class _TranslateSheetState extends State<TranslateSheet> {
           Row(
             children: [
               Text(
-                'via ${widget.backend.name}',
+                _backend == null
+                    ? 'not set up yet'
+                    : 'via ${_backend!.name}',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),

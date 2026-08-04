@@ -17,9 +17,7 @@ import 'epub_book.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
 import 'reader_settings.dart';
-import 'translate/on_device_backend.dart';
 import 'translate/translate_sheet.dart';
-import 'translate/translation_backend.dart';
 import 'reader_settings_sheet.dart';
 
 /// Where in a book a saved position points: a chapter and how far down it.
@@ -272,7 +270,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   Future<void> _translateSelection(EpubBook epub) async {
     final settings = _settings;
     final range = _selectionRange;
-    if (settings == null || !settings.canTranslate || range == null) return;
+    if (settings == null || range == null) return;
     final plain = epub.chapters[_chapter].plainText;
     final start = range.start.clamp(0, plain.length);
     final end = range.end.clamp(start, plain.length);
@@ -289,12 +287,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
       builder: (_) => TranslateSheet(
         passage: quote,
         settings: settings,
-        backend: backendFor(
-          onDeviceAvailable: OnDeviceBackend.available,
-          onDevice: OnDeviceBackend.new,
-          libreUrl: settings.translateUrl,
-          libreApiKey: settings.translateApiKey,
-        )!,
+
         onSaveAsNote: (translation) => _annotations.add(
           bookId: widget.book.id,
           kind: AnnotationKind.note,
@@ -716,8 +709,9 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                   icon: const Icon(Icons.sticky_note_2_outlined),
                   onPressed: () => _highlightSelection(epub, withNote: true),
                 ),
-                // Same rule as the PDF reader: no server, no button.
-                if (settings?.canTranslate ?? false)
+                // Same as the PDF reader: always offered, because the sheet is
+                // where it gets set up.
+                if (settings != null)
                   IconButton(
                     tooltip: 'Translate selection',
                     icon: const Icon(Icons.translate),
