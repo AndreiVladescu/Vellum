@@ -14,6 +14,7 @@ import 'server/server_page.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/preferences_page.dart';
+import 'loans/due_dates.dart';
 import 'shelf/series_page.dart';
 import 'wishlist/wishlist_page.dart';
 
@@ -157,6 +158,24 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.swap_horiz),
             title: const Text('Loans'),
+            // The count of loans wanting attention, so an overdue book is
+            // visible without opening the page. Everything else on this
+            // screen you go looking for; an overdue loan is the one thing
+            // that should come and find you.
+            trailing: StreamBuilder<List<LoanEntry>>(
+              stream: repository.watchAllLoans(),
+              builder: (context, snapshot) {
+                final needing = [
+                  for (final e in snapshot.data ?? const <LoanEntry>[])
+                    if (LoanDue.urgencyOf(e.loan).needsAttention) e,
+                ].length;
+                if (needing == 0) return const SizedBox.shrink();
+                return Text(
+                  '$needing',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                );
+              },
+            ),
             onTap: () => _openLoans(context),
           ),
           ListTile(

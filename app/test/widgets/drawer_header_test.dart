@@ -6,6 +6,7 @@
 // one screen and shown on none.
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +56,10 @@ void main() {
 
   /// Builds the drawer over [prefs], and hands back the profile so a test can
   /// edit it the way the Account page does.
+  /// The repository the last [buildDrawer] built, for tests that need to seed
+  /// rows the drawer then counts.
+  late LibraryRepository builtRepository;
+
   Future<(Widget, UserProfileStore)> buildDrawer(
     WidgetTester tester,
     Map<String, Object> prefs,
@@ -64,6 +69,7 @@ void main() {
       VellumDatabase(NativeDatabase.memory()),
       dir,
     );
+    builtRepository = repository;
     final profile = await UserProfileStore.load(dataDir: dir);
     final settings = await AppSettingsStore.load();
     final connection = await ServerConnection.load();
@@ -164,6 +170,73 @@ void main() {
 
     expect(find.text('Local library'), findsOneWidget);
 
+    await disposeTree(tester);
+  });
+  testWidgets('an overdue loan is counted in the drawer', (tester) async {
+    // The one thing on this screen that should come and find you: everything
+    // else you go looking for, but a book someone has kept too long is only
+    // discoverable today by opening the Loans page and noticing.
+    late Widget drawer;
+    await tester.runAsync(() async {
+      final built = await buildDrawer(tester, {});
+      drawer = built.$1;
+      final repo = builtRepository;
+      final db = repo.db;
+      await db.into(db.books).insert(
+          BooksCompanion.insert(id: 'b1', title: 'Dune'));
+      await db.into(db.physicalCopies).insert(
+          PhysicalCopiesCompanion.insert(id: 'c1', bookId: 'b1'));
+      // Due a week ago, never returned.
+      await db.into(db.loans).insert(LoansCompanion.insert(
+            id: 'l1',
+            copyId: 'c1',
+            borrower: 'Ana',
+            dueAt: Value(DateTime.now().subtract(const Duration(days: 7))),
+          ));
+    });
+
+    await tester.pumpWidget(drawer);
+    for (var i = 0; i < 6; i++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      });
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+
+    expect(find.text('Loans'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    await disposeTree(tester);
+  });
+
+  testWidgets('nothing overdue shows no number at all', (tester) async {
+    late Widget drawer;
+    await tester.runAsync(() async {
+      final built = await buildDrawer(tester, {});
+      drawer = built.$1;
+      final db = builtRepository.db;
+      await db.into(db.books).insert(
+          BooksCompanion.insert(id: 'b1', title: 'Dune'));
+      await db.into(db.physicalCopies).insert(
+          PhysicalCopiesCompanion.insert(id: 'c1', bookId: 'b1'));
+      // Due in a fortnight: lent out, but nothing is wrong.
+      await db.into(db.loans).insert(LoansCompanion.insert(
+            id: 'l1',
+            copyId: 'c1',
+            borrower: 'Ana',
+            dueAt: Value(DateTime.now().add(const Duration(days: 14))),
+          ));
+    });
+
+    await tester.pumpWidget(drawer);
+    for (var i = 0; i < 6; i++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      });
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+
+    // A badge that is always there stops meaning anything.
+    expect(find.text('1'), findsNothing);
     await disposeTree(tester);
   });
 }
