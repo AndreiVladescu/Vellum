@@ -260,4 +260,116 @@ void main() {
     expect(DefectKind.missingCover.isDestructive, false);
     expect(DefectKind.missingFile.repairLabel, isNotEmpty);
   });
+  // ---- advisory findings -------------------------------------------------
+  //
+  // These three are judgements rather than damage, so the contract is
+  // different: they are reported, they never offer a repair, and they must not
+  // make a structurally sound library look broken.
+
+  Future<void> addAuthor(
+    VellumDatabase db,
+    String bookId,
+    String authorId,
+    String name,
+  ) async {
+    await db.into(db.authors).insert(
+        AuthorsCompanion.insert(id: authorId, name: name),
+        mode: InsertMode.insertOrIgnore);
+    await db.into(db.bookAuthors).insert(
+        BookAuthorsCompanion.insert(bookId: bookId, authorId: authorId));
+  }
+
+  test('advice does not make a sound library unhealthy', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    // No author, no year, no cover: three pieces of advice, zero damage.
+    await addBook(db, 'b1', 'Dune');
+
+    final report = await LibraryDoctor(repo).scan();
+    expect(report.isHealthy, true,
+        reason: 'integrity is what "healthy" means; a missing year is not damage');
+    expect(report.adviceCounts[DefectKind.noCover], 1);
+    expect(report.adviceCounts[DefectKind.incompleteMetadata], 1);
+    expect(report.repairableCounts, isEmpty);
+  });
+
+  test('two books with the same ISBN are flagged as one book twice', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(
+        id: 'b1', title: 'Dune', isbn: const Value('978-0-441-01359-3')));
+    await db.into(db.books).insert(BooksCompanion.insert(
+        id: 'b2', title: 'Dune (paperback)', isbn: const Value('9780441013593')));
+
+    final report = await LibraryDoctor(repo).scan();
+    // Hyphenation must not hide it — the importer normalises ISBNs and so does
+    // this, from the same helper.
+    expect(report.adviceCounts[DefectKind.duplicateBook], 1);
+  });
+
+  test('same title and author, no ISBN, is still a probable duplicate', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await addBook(db, 'b1', 'The Dispossessed');
+    await addBook(db, 'b2', 'Dispossessed');
+    await addAuthor(db, 'b1', 'a1', 'Ursula K. Le Guin');
+    await addAuthor(db, 'b2', 'a1', 'Ursula K. Le Guin');
+
+    final report = await LibraryDoctor(repo).scan();
+    // "The" is a stop word in `normalizeForMatch`, so the two titles agree.
+    expect(report.adviceCounts[DefectKind.duplicateBook], 1);
+  });
+
+  test('same title by different authors is not a duplicate', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await addBook(db, 'b1', 'Selected Poems');
+    await addBook(db, 'b2', 'Selected Poems');
+    await addAuthor(db, 'b1', 'a1', 'Elizabeth Bishop');
+    await addAuthor(db, 'b2', 'a2', 'Robert Frost');
+
+    final report = await LibraryDoctor(repo).scan();
+    expect(report.adviceCounts[DefectKind.duplicateBook], isNull,
+        reason: 'a shared title is not a shared book');
+  });
+
+  test('untitled-ish books with no author are not all one duplicate', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    // Two authorless books with different titles must not collapse together
+    // just because neither has anything to match on.
+    await addBook(db, 'b1', 'scan001');
+    await addBook(db, 'b2', 'scan002');
+
+    final report = await LibraryDoctor(repo).scan();
+    expect(report.adviceCounts[DefectKind.duplicateBook], isNull);
+  });
+
+  test('trashed and wishlist books are left out of the advice', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(
+        id: 'b1', title: 'On the way out',
+        deletedAt: Value(DateTime.now())));
+    await db.into(db.books).insert(BooksCompanion.insert(
+        id: 'b2', title: 'Want to read', status: const Value('wishlist')));
+
+    final report = await LibraryDoctor(repo).scan();
+    // A wishlist entry is a book you do not own; a trashed one is leaving.
+    // Neither is missing a cover in any sense worth reporting.
+    expect(report.adviceCounts, isEmpty);
+  });
+
+  test('advisory kinds offer no repair, and repairing one is a no-op', () async {
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await addBook(db, 'b1', 'Dune');
+
+    final report = await LibraryDoctor(repo).scan();
+    final advice = report.of(DefectKind.noCover).single;
+    expect(DefectKind.noCover.isRepairable, false);
+    expect(await LibraryDoctor(repo).repair(advice), false);
+    // And it changed nothing.
+    expect(await db.select(db.books).get(), hasLength(1));
+  });
 }

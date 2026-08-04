@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 
+import '../import/import_plan.dart';
 import 'database.dart';
 import 'library_repository.dart';
 
@@ -13,7 +14,11 @@ enum DefectKind {
   orphanBlob,
   danglingPlacement,
   duplicateFileRow,
-  staleTombstone;
+  staleTombstone,
+  // ---- Advisory (see `isRepairable`) ---------------------------------------
+  duplicateBook,
+  noCover,
+  incompleteMetadata;
 
   String get label => switch (this) {
         DefectKind.missingFile => 'Books whose file is gone',
@@ -22,6 +27,25 @@ enum DefectKind {
         DefectKind.danglingPlacement => 'Placements of copies that no longer exist',
         DefectKind.duplicateFileRow => 'The same file attached twice to one book',
         DefectKind.staleTombstone => 'Old delete markers with no server to tell',
+        DefectKind.duplicateBook => 'Books that look like the same book',
+        DefectKind.noCover => 'Books with no cover at all',
+        DefectKind.incompleteMetadata => 'Books missing an author or a year',
+      };
+
+  /// Whether the app can fix this on its own.
+  ///
+  /// The original six are *inconsistencies*: the database and the file tree
+  /// disagree, there is one correct answer, and the app can apply it. The three
+  /// below are **judgements** — which of two near-identical books to keep, what
+  /// the missing author's name is — and guessing at them would quietly destroy
+  /// something a person meant. They are reported and left alone; the scan is
+  /// worth having for them precisely because nothing else surfaces them.
+  bool get isRepairable => switch (this) {
+        DefectKind.duplicateBook ||
+        DefectKind.noCover ||
+        DefectKind.incompleteMetadata =>
+          false,
+        _ => true,
       };
 
   /// What the repair does — shown before it runs, because several are
@@ -33,6 +57,10 @@ enum DefectKind {
         DefectKind.danglingPlacement => 'Remove the placement',
         DefectKind.duplicateFileRow => 'Keep one record, drop the duplicates',
         DefectKind.staleTombstone => 'Forget the marker',
+        // Advisory: what to do about it, since there is no button.
+        DefectKind.duplicateBook => 'Open them and merge or trash one yourself',
+        DefectKind.noCover => 'Set one from the book’s page',
+        DefectKind.incompleteMetadata => 'Fill it in on the book’s page',
       };
 
   bool get isDestructive =>
@@ -75,7 +103,15 @@ class DoctorReport {
   final List<Defect> defects;
   final int checkedBlobs;
 
-  bool get isHealthy => defects.isEmpty;
+  /// Whether the library's *integrity* is sound: the database and the file
+  /// tree agree.
+  ///
+  /// Deliberately blind to the advisory findings. Most real libraries always
+  /// have some — a book with no year, two editions of the same title kept on
+  /// purpose — and folding those in would mean the check never once said
+  /// "everything checks out", which would train you to ignore it. A missing
+  /// year is not damage.
+  bool get isHealthy => defects.every((d) => !d.kind.isRepairable);
 
   List<Defect> of(DefectKind kind) =>
       [for (final d in defects) if (d.kind == kind) d];
@@ -87,6 +123,18 @@ class DoctorReport {
     }
     return out;
   }
+
+  /// The counts, split the way the screen shows them: things to fix, and
+  /// things merely worth knowing.
+  Map<DefectKind, int> get repairableCounts => {
+        for (final e in counts.entries)
+          if (e.key.isRepairable) e.key: e.value,
+      };
+
+  Map<DefectKind, int> get adviceCounts => {
+        for (final e in counts.entries)
+          if (!e.key.isRepairable) e.key: e.value,
+      };
 
   /// Bytes recoverable by deleting every orphan blob.
   int get reclaimableBytes => of(DefectKind.orphanBlob)
@@ -190,6 +238,78 @@ class LibraryDoctor {
           description: '${book.title} — $rel',
           bookId: book.id,
           path: rel,
+        ));
+      }
+    }
+
+    // ---- advisory: things only a person can decide ----
+    //
+    // Trashed books are on their way out, and a wishlist entry is a book you do
+    // not own yet — neither is missing a cover or an author in any sense worth
+    // reporting. Filtering here rather than in the checks below keeps the three
+    // of them agreeing about what counts as a book.
+    final live = [
+      for (final b in books)
+        if (b.deletedAt == null && b.status != 'wishlist') b,
+    ];
+
+    final authorsByBook = <String, List<String>>{};
+    for (final row in await (_db.select(_db.bookAuthors).join([
+      innerJoin(_db.authors, _db.authors.id.equalsExp(_db.bookAuthors.authorId)),
+    ])
+          ..orderBy([OrderingTerm.asc(_db.bookAuthors.position)]))
+        .get()) {
+      (authorsByBook[row.readTable(_db.bookAuthors).bookId] ??= [])
+          .add(row.readTable(_db.authors).name);
+    }
+
+    // Books that look like the same book. The rules are `import_plan`'s, on
+    // purpose: the importer already decides what "probably the same book" means
+    // when it warns you before an import, and a health check that disagreed
+    // with it would be telling you two different stories about one library.
+    final byKey = <String, List<Book>>{};
+    for (final book in live) {
+      final isbn = normalizeIsbn(book.isbn);
+      final key = isbn != null
+          ? 'isbn:$isbn'
+          // No ISBN: title plus first author, both normalised. Title alone is
+          // too eager — "Selected Poems" is a dozen different books.
+          : 'ta:${normalizeForMatch(book.title)}|'
+              '${normalizeForMatch((authorsByBook[book.id] ?? const []).firstOrNull ?? '')}';
+      // A book with neither an ISBN nor an author has nothing to match on;
+      // grouping those by bare title would flag every untitled import.
+      if (key == 'ta:${normalizeForMatch(book.title)}|' &&
+          (authorsByBook[book.id] ?? const []).isEmpty) {
+        continue;
+      }
+      (byKey[key] ??= []).add(book);
+    }
+    for (final group in byKey.values) {
+      if (group.length < 2) continue;
+      defects.add(Defect(
+        kind: DefectKind.duplicateBook,
+        description: '${group.first.title} — ${group.length} entries',
+        bookId: group.first.id,
+      ));
+    }
+
+    for (final book in live) {
+      if (book.coverPath == null || book.coverPath!.isEmpty) {
+        defects.add(Defect(
+          kind: DefectKind.noCover,
+          description: book.title,
+          bookId: book.id,
+        ));
+      }
+      final missing = [
+        if ((authorsByBook[book.id] ?? const []).isEmpty) 'author',
+        if (book.publishedYear == null) 'year',
+      ];
+      if (missing.isNotEmpty) {
+        defects.add(Defect(
+          kind: DefectKind.incompleteMetadata,
+          description: '${book.title} — no ${missing.join(', no ')}',
+          bookId: book.id,
         ));
       }
     }
@@ -317,6 +437,13 @@ class LibraryDoctor {
                   ..where((t) => t.bookId.equals(id)))
                 .go() >
             0;
+      case DefectKind.duplicateBook:
+      case DefectKind.noCover:
+      case DefectKind.incompleteMetadata:
+        // Advisory — see `DefectKind.isRepairable`. Listed rather than left to
+        // a `default:` so that adding a kind is a compile error here, which is
+        // how the other six stay honest about having a repair.
+        return false;
     }
   }
 

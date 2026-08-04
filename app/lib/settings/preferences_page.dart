@@ -408,8 +408,8 @@ class _HealthSectionState extends State<_HealthSection> {
               ],
             ),
           ),
-        if (report != null && !report.isHealthy)
-          for (final entry in report.counts.entries)
+        if (report != null)
+          for (final entry in report.repairableCounts.entries)
             ListTile(
               dense: true,
               title: Text(entry.key.label),
@@ -423,6 +423,24 @@ class _HealthSectionState extends State<_HealthSection> {
                 child: const Text('Repair'),
               ),
             ),
+        // Kept below, and under its own heading, because these are not damage:
+        // a book with no year is untidy, not broken, and mixing the two would
+        // make a perfectly sound library look faulty every time it is scanned.
+        if (report != null && report.adviceCounts.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Text('Worth tidying'),
+          ),
+          for (final entry in report.adviceCounts.entries)
+            ListTile(
+              dense: true,
+              title: Text(entry.key.label),
+              // No button: which of two near-identical books to keep, or what
+              // the missing author is called, is not something the app can
+              // answer, and an inert "Repair" is worse than none.
+              subtitle: Text('${entry.value} · ${entry.key.repairLabel}'),
+            ),
+        ],
       ],
     );
   }
