@@ -1385,10 +1385,53 @@ async function saveDetail(id){
   catch(e){ toast(e.message); }
 }
 
+/// The fields edited in the detail panel but not yet saved, or null if none
+/// are. `defaultValue` is what the input was rendered with, so this is a plain
+/// comparison against the row as it was loaded — no separate copy to keep in
+/// step.
+function pendingDetailEdits(){
+  const el = id => document.getElementById(id);
+  const dirty = (node, value) => node.defaultValue.trim() !== value;
+  const title = el('d-title').value.trim();
+  const subtitle = el('d-subtitle').value.trim();
+  const desc = el('d-desc').value;
+  const year = el('d-year').value.trim();
+
+  const body = {};
+  if (dirty(el('d-title'), title)) body.title = title;
+  if (dirty(el('d-subtitle'), subtitle)) body.subtitle = subtitle;
+  if (el('d-desc').defaultValue !== desc) body.description = desc;
+  if (dirty(el('d-year'), year)) {
+    const n = parseInt(year, 10);
+    if (year && !isNaN(n)) body.published_year = n;
+  }
+  return Object.keys(body).length ? body : null;
+}
+
+// Fetch metadata looks the book up by the title *stored on the server*
+// (`discover::enrich` builds its query from the row), so a title edited on
+// screen and not yet saved was searched for under its old name — you had to
+// save, reopen, and fetch again. Write what is on screen first: that is what
+// the person pressing this button already meant, and what they were doing by
+// hand.
 async function enrichFromDetail(id){
+  let edits;
+  try { edits = pendingDetailEdits(); }
+  catch(_){ edits = null; }          // panel closed underneath us
+  if (edits && 'title' in edits && !edits.title){
+    toast('Title cannot be empty');
+    return;
+  }
   showProgress('Fetching metadata…');
+  if (edits){
+    try { await api('PATCH','/api/books/'+id, edits); }
+    catch(e){ hideProgress(); toast(e.message); return; }
+  }
   await enrichBook(id);
-  hideProgress(); await loadAll(); toast('Fetched metadata'); openDetail(id);
+  hideProgress();
+  await loadAll();
+  toast(edits ? 'Saved your edits, then fetched metadata' : 'Fetched metadata');
+  openDetail(id);
 }
 
 async function deleteBook(id){
