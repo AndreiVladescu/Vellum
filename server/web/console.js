@@ -1622,7 +1622,12 @@ function copyUrl(url){ navigator.clipboard.writeText(url).then(()=>toast('Copied
 document.addEventListener('keydown', e=>{
   if (!document.getElementById('login').classList.contains('hidden')) return;   // logged out
   const modalOpen = document.getElementById('modal-root').innerHTML !== '';
-  if (e.key === 'Escape'){ if (modalOpen) closeModal(); return; }
+  if (pageOpen() && !modalOpen && e.key !== 'Escape') return;
+  if (e.key === 'Escape'){
+    if (modalOpen) closeModal();
+    else if (pageOpen()) closePage();
+    return;
+  }
   if (modalOpen) return;
   const t = e.target, tag = (t.tagName||'').toLowerCase();
   if (tag==='input' || tag==='textarea' || tag==='select' || t.isContentEditable) return;
@@ -1699,17 +1704,12 @@ async function showRequests(){
       <span class="muted">${esc(r.status)}</span>
     </div>`).join('') : '';
 
-  document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:min(620px,95vw)">
-      <h2 style="margin:0 0 4px">Borrow requests</h2>
-      <p class="muted" style="margin:0 0 12px">Approving creates the loan —
-        it appears under the book's copies with the due date you pick.</p>
-      <div style="max-height:55vh; overflow:auto">${rows}${history}</div>
-      <div class="row" style="justify-content:flex-end; margin-top:12px">
-        <button class="btn" onclick="closeModal()">Close</button>
-      </div>
-    </div></div>`;
+  openPage(
+    'Borrow requests',
+    "Approving creates the loan — it appears under the book's copies with the "
+      + 'due date you pick.',
+    `${rows}${history}`,
+  );
 }
 
 async function decideRequest(id, status){
@@ -1884,28 +1884,19 @@ async function showShares(){
     ? shares.map(shareRow).join('')
     : '<p class="muted">Nobody with an account has been given access.</p>';
 
-  document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:min(720px,95vw)">
-      <h2 style="margin:0 0 4px">Shares</h2>
-      <p class="muted" style="margin:0 0 14px">Everything this library has let
-        out: ${live} live link${live===1?'':'s'} of ${links.length}, and
-        ${shares.length} account share${shares.length===1?'':'s'}.</p>
-
-      <p class="sharehead">Public links</p>
-      <p class="muted sharesub" style="margin:0 0 8px">Anyone holding the URL,
-        no account needed. Kept after they close so you can see what was shared.</p>
-      <div style="max-height:34vh; overflow:auto">${linkList}</div>
-
-      <p class="sharehead" style="margin-top:16px">People with accounts</p>
-      <p class="muted sharesub" style="margin:0 0 8px">Current only — revoking
-        one removes the record with it.</p>
-      <div style="max-height:26vh; overflow:auto">${shareList}</div>
-
-      <div class="row" style="justify-content:flex-end; margin-top:14px">
-        <button class="btn" onclick="closeModal()">Close</button>
-      </div>
-    </div></div>`;
+  openPage(
+    'Shares',
+    `Everything this library has let out: ${live} live link${live===1?'':'s'} ` +
+    `of ${links.length}, and ${shares.length} account share${shares.length===1?'':'s'}.`,
+    `<p class="sharehead">Public links</p>
+     <p class="muted sharesub" style="margin:0 0 8px">Anyone holding the URL,
+       no account needed. Kept after they close so you can see what was shared.</p>
+     ${linkList}
+     <p class="sharehead" style="margin-top:22px">People with accounts</p>
+     <p class="muted sharesub" style="margin:0 0 8px">Current only — revoking
+       one removes the record with it.</p>
+     ${shareList}`,
+  );
 }
 
 async function revokeLink(id){
@@ -1922,6 +1913,60 @@ async function revokeShare(id){
   catch(e){ toast(e.message); return; }
   toast('Share revoked');
   showShares();
+}
+
+
+// ---- pages (as opposed to boxes on top) ----------------------------------
+//
+// Shares, borrow requests, people, rooms and the activity log are *lists you
+// read*, not questions you answer, and a modal is the wrong container for one:
+// it is small, it floats over the thing you were doing, and it cannot be
+// scrolled or linked to comfortably. They open as pages now, in the same place
+// the library table sits and with the same shape — a heading, a line saying
+// what you are looking at, and rows.
+//
+// Modals are kept for what they are good at: an action with a decision in it
+// (create this link, choose these columns, add this book).
+
+/// Shows [html] as a page, hiding the library beneath it.
+function openPage(title, subtitle, html){
+  closeModal();
+  const page = document.getElementById('page');
+  page.innerHTML = `
+    <div class="pagehead">
+      <button class="btn sm quiet" onclick="closePage()">← Library</button>
+      <h2>${esc(title)}</h2>
+      ${subtitle ? `<p class="muted">${esc(subtitle)}</p>` : ''}
+    </div>
+    <div class="pagebody">${html}</div>`;
+  page.classList.remove('hidden');
+  document.getElementById('tbl').classList.add('hidden');
+  document.getElementById('loadmore').classList.add('hidden');
+  // The library's own controls — search, filters, selection — belong to the
+  // table that is no longer on screen.
+  for (const bar of document.querySelectorAll('#topbar .toolbar')) {
+    bar.classList.add('hidden');
+  }
+  window.scrollTo(0, 0);
+}
+
+function closePage(){
+  const page = document.getElementById('page');
+  page.classList.add('hidden');
+  page.innerHTML = '';
+  document.getElementById('tbl').classList.remove('hidden');
+  for (const bar of document.querySelectorAll('#topbar .toolbar')) {
+    bar.classList.remove('hidden');
+  }
+  // The selection bar is only on screen while rows are selected; render()
+  // decides that, not this.
+  renderSelectionBar();
+  render();
+}
+
+/// True while a page is open, so Escape closes the page rather than nothing.
+function pageOpen(){
+  return !document.getElementById('page').classList.contains('hidden');
 }
 
 // ---- saved views (plan 5 #35) -------------------------------------------
@@ -2181,32 +2226,26 @@ async function showPeople(){
       <button class="btn sm" data-act="revokeinvite" data-id="${esc(i.id)}">Withdraw</button>
     </div>`).join('') : '';
 
-  document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:min(680px,95vw)">
-      <h2 style="margin:0 0 4px">People</h2>
-      <p class="muted" style="margin:0 0 12px">Everyone with an account on this
-        server. An owner can manage people and see the whole library; a member
-        sees only what has been shared with them.</p>
-      <div style="max-height:50vh; overflow:auto">${rows}${pending}</div>
-      <div class="row" style="gap:8px; margin-top:14px; align-items:flex-end">
-        <div class="group" style="flex:1">
-          <input id="inv-email" type="text" placeholder="Email to invite"
-                 style="width:100%" autocomplete="off">
-        </div>
-        <select id="inv-perm">
-          <option value="viewer">Can read</option>
-          <option value="editor">Can edit</option>
-        </select>
-        <button class="btn primary" onclick="invitePerson()">Invite</button>
-      </div>
-      <p class="muted" style="font-size:12px; margin:8px 0 0">
-        They choose their own password. Without SMTP configured the link is
-        shown here to pass along yourself.</p>
-      <div class="row" style="justify-content:flex-end; margin-top:12px">
-        <button class="btn" onclick="closeModal()">Close</button>
-      </div>
-    </div></div>`;
+  openPage(
+    'People',
+    'Everyone with an account on this server. An owner can manage people and '
+      + 'see the whole library; a member sees only what has been shared with them.',
+    `${rows}${pending}
+     <div class="row" style="gap:8px; margin-top:18px; align-items:flex-end">
+       <div class="group" style="flex:1">
+         <input id="inv-email" type="text" placeholder="Email to invite"
+                style="width:100%" autocomplete="off">
+       </div>
+       <select id="inv-perm">
+         <option value="viewer">Can read</option>
+         <option value="editor">Can edit</option>
+       </select>
+       <button class="btn primary" onclick="invitePerson()">Invite</button>
+     </div>
+     <p class="muted" style="font-size:12px; margin:8px 0 0">
+       They choose their own password. Without SMTP configured the link is
+       shown here to pass along yourself.</p>`,
+  );
 }
 
 async function setRole(id, isMaster){

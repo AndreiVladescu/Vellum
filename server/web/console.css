@@ -257,6 +257,14 @@ td .celledit { width:100%; }
 
 .err { color:var(--red-ink); min-height:1.2em; }
 
+/* ---- pages ---- */
+#page { padding:18px 18px 60px; max-width:920px; }
+.pagehead { margin-bottom:18px; }
+.pagehead h2 { margin:10px 0 2px; font-size:1.3rem; font-weight:600; }
+.pagehead p { margin:0; max-width:70ch; }
+.pagehead .btn { margin-left:-9px; }
+.pagebody { display:block; }
+
 /* ---- shares ---- */
 .shareline {
   justify-content:space-between; gap:12px; align-items:flex-start;
