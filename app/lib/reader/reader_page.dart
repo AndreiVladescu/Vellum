@@ -599,6 +599,13 @@ class _ReaderPageState extends State<ReaderPage> {
         controller: _controller,
         initialPageNumber: widget.initialPage ?? widget.book.lastReadPage ?? 1,
         params: PdfViewerParams(
+          // pdfrx keeps 100 MB of rendered pages by default. That is a
+          // desktop's budget: on a phone it lands on top of the shelf's covers
+          // and the engine's own textures, and a reader only ever shows a page
+          // or two at once. Measured on a 340-page PDF, the pages either side
+          // of the one you are on cost a few megabytes.
+          maxImageBytesCachedOnMemory:
+              (Platform.isAndroid || Platform.isIOS) ? 32 << 20 : 100 << 20,
           // Inside the filter, so it has to be the colour that *inverts* to
           // the one we want: a dark background here would come out white.
           backgroundColor:
