@@ -89,6 +89,20 @@ class Books extends Table {
   /// [LibraryQueries] does it centrally for the shelf, and the push side
   /// skips trashed rows so a book on its way out never reaches the server.
   DateTimeColumn get deletedAt => dateTime().nullable()();
+  // ---- Per-book sync opt-out ------------------------------------------------
+  /// Keep this book on this device only: no push, no pull, no covers or files
+  /// either way.
+  ///
+  /// **App-local, and deliberately so** — like [deletedAt] above. It is a
+  /// statement about *this* device's appetite, not about the book: mirroring it
+  /// would let one device decide what another one is allowed to see, and a
+  /// shared library would inherit one person's shyness about a title.
+  ///
+  /// Excluding a book that was already pushed does **not** take it off the
+  /// server. Deleting it there removes it for everyone the library is shared
+  /// with, which is a different intent with its own button; this one only stops
+  /// the traffic from here.
+  BoolColumn get syncExcluded => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -578,7 +592,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -877,6 +891,14 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 29) {
+            // Per-book sync opt-out. Defaulted to false, so every existing book
+            // keeps syncing exactly as it did — the switch is something you go
+            // and flip, never something an upgrade flips for you.
+            if (!(await columnsOf('books')).contains('sync_excluded')) {
+              await m.addColumn(books, books.syncExcluded);
             }
           }
           if (from < 28) {

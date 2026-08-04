@@ -5,7 +5,9 @@
 //! for the tables that sync over REST.
 //!
 //! App-local-only columns/tables (reading state, source_metadata, deleted_at —
-//! the trash's grace period, plan 5 #52 — the physical-layout tables,
+//! the trash's grace period, plan 5 #52 — sync_excluded, the per-book "keep
+//! this on this device" switch, which is a statement about one device's
+//! appetite rather than about the book — the physical-layout tables,
 //! local_deletions) are intentionally NOT part of the server schema, so they
 //! don't appear here. `book.owner_id` is the mirror image: a server-only
 //! column, present here but not in the app.

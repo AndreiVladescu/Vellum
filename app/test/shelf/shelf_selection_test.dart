@@ -13,7 +13,7 @@ Book _book(String id, String title) => Book(
       title: title,
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
-      needsPush: false,
+      needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',

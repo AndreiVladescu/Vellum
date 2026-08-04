@@ -20,7 +20,7 @@ Book _book(int i) => Book(
       spineStyle: SpineStyle.generate(title: 'Book number $i').toJson(),
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
-      needsPush: false,
+      needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -289,6 +290,17 @@ class LibraryRepository {
   /// from my library" should go through [trashBook] instead (plan 5 #52).
   Future<void> deleteBook(Book book, {bool recordTombstone = true}) =>
       writes.deleteBook(book, recordTombstone: recordTombstone);
+
+  /// Keep this book on this device only, or let it sync again.
+  ///
+  /// App-local: it changes what *this* device sends and accepts, and nothing
+  /// about the book, so it deliberately does not touch `updatedAt` or
+  /// `needsPush` — a sync clock bumped here would push the very row the user
+  /// just asked to stop pushing.
+  Future<void> setSyncExcluded(String bookId, bool excluded) =>
+      (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+        BooksCompanion(syncExcluded: Value(excluded)),
+      );
 
   // ---- Trash (plan 5 #52) -------------------------------------------------
   Future<void> trashBook(String bookId) => trash.trash(bookId);

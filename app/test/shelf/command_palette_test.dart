@@ -14,7 +14,7 @@ void main() {
     Book(
       id: 'b1',
       title: 'Dune',
-      needsPush: true,
+      needsPush: true, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',
@@ -25,7 +25,7 @@ void main() {
     Book(
       id: 'b2',
       title: 'Neuromancer',
-      needsPush: true,
+      needsPush: true, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',

@@ -24,7 +24,7 @@ Book _book(
       lastReadAt: lastRead,
       createdAt: created ?? DateTime(2024),
       updatedAt: DateTime(2024),
-      needsPush: false,
+      needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',

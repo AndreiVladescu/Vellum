@@ -549,6 +549,21 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _syncExcludedMeta = const VerificationMeta(
+    'syncExcluded',
+  );
+  @override
+  late final GeneratedColumn<bool> syncExcluded = GeneratedColumn<bool>(
+    'sync_excluded',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_excluded" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -581,6 +596,7 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     finishedAt,
     readCount,
     deletedAt,
+    syncExcluded,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -808,6 +824,15 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('sync_excluded')) {
+      context.handle(
+        _syncExcludedMeta,
+        syncExcluded.isAcceptableOrUnknown(
+          data['sync_excluded']!,
+          _syncExcludedMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -937,6 +962,10 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      syncExcluded: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_excluded'],
+      )!,
     );
   }
 
@@ -1000,6 +1029,20 @@ class Book extends DataClass implements Insertable<Book> {
   /// [LibraryQueries] does it centrally for the shelf, and the push side
   /// skips trashed rows so a book on its way out never reaches the server.
   final DateTime? deletedAt;
+
+  /// Keep this book on this device only: no push, no pull, no covers or files
+  /// either way.
+  ///
+  /// **App-local, and deliberately so** — like [deletedAt] above. It is a
+  /// statement about *this* device's appetite, not about the book: mirroring it
+  /// would let one device decide what another one is allowed to see, and a
+  /// shared library would inherit one person's shyness about a title.
+  ///
+  /// Excluding a book that was already pushed does **not** take it off the
+  /// server. Deleting it there removes it for everyone the library is shared
+  /// with, which is a different intent with its own button; this one only stops
+  /// the traffic from here.
+  final bool syncExcluded;
   const Book({
     required this.id,
     required this.title,
@@ -1031,6 +1074,7 @@ class Book extends DataClass implements Insertable<Book> {
     this.finishedAt,
     required this.readCount,
     this.deletedAt,
+    required this.syncExcluded,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1107,6 +1151,7 @@ class Book extends DataClass implements Insertable<Book> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
+    map['sync_excluded'] = Variable<bool>(syncExcluded);
     return map;
   }
 
@@ -1182,6 +1227,7 @@ class Book extends DataClass implements Insertable<Book> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      syncExcluded: Value(syncExcluded),
     );
   }
 
@@ -1225,6 +1271,7 @@ class Book extends DataClass implements Insertable<Book> {
       finishedAt: serializer.fromJson<DateTime?>(json['finishedAt']),
       readCount: serializer.fromJson<int>(json['readCount']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      syncExcluded: serializer.fromJson<bool>(json['syncExcluded']),
     );
   }
   @override
@@ -1263,6 +1310,7 @@ class Book extends DataClass implements Insertable<Book> {
       'finishedAt': serializer.toJson<DateTime?>(finishedAt),
       'readCount': serializer.toJson<int>(readCount),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'syncExcluded': serializer.toJson<bool>(syncExcluded),
     };
   }
 
@@ -1297,6 +1345,7 @@ class Book extends DataClass implements Insertable<Book> {
     Value<DateTime?> finishedAt = const Value.absent(),
     int? readCount,
     Value<DateTime?> deletedAt = const Value.absent(),
+    bool? syncExcluded,
   }) => Book(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -1336,6 +1385,7 @@ class Book extends DataClass implements Insertable<Book> {
     finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
     readCount: readCount ?? this.readCount,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    syncExcluded: syncExcluded ?? this.syncExcluded,
   );
   Book copyWithCompanion(BooksCompanion data) {
     return Book(
@@ -1395,6 +1445,9 @@ class Book extends DataClass implements Insertable<Book> {
           : this.finishedAt,
       readCount: data.readCount.present ? data.readCount.value : this.readCount,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      syncExcluded: data.syncExcluded.present
+          ? data.syncExcluded.value
+          : this.syncExcluded,
     );
   }
 
@@ -1430,7 +1483,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
           ..write('readCount: $readCount, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('syncExcluded: $syncExcluded')
           ..write(')'))
         .toString();
   }
@@ -1467,6 +1521,7 @@ class Book extends DataClass implements Insertable<Book> {
     finishedAt,
     readCount,
     deletedAt,
+    syncExcluded,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1501,7 +1556,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.startedAt == this.startedAt &&
           other.finishedAt == this.finishedAt &&
           other.readCount == this.readCount &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.syncExcluded == this.syncExcluded);
 }
 
 class BooksCompanion extends UpdateCompanion<Book> {
@@ -1535,6 +1591,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<DateTime?> finishedAt;
   final Value<int> readCount;
   final Value<DateTime?> deletedAt;
+  final Value<bool> syncExcluded;
   final Value<int> rowid;
   const BooksCompanion({
     this.id = const Value.absent(),
@@ -1567,6 +1624,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.finishedAt = const Value.absent(),
     this.readCount = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.syncExcluded = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BooksCompanion.insert({
@@ -1600,6 +1658,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.finishedAt = const Value.absent(),
     this.readCount = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.syncExcluded = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -1634,6 +1693,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<DateTime>? finishedAt,
     Expression<int>? readCount,
     Expression<DateTime>? deletedAt,
+    Expression<bool>? syncExcluded,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1669,6 +1729,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (finishedAt != null) 'finished_at': finishedAt,
       if (readCount != null) 'read_count': readCount,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (syncExcluded != null) 'sync_excluded': syncExcluded,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1704,6 +1765,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<DateTime?>? finishedAt,
     Value<int>? readCount,
     Value<DateTime?>? deletedAt,
+    Value<bool>? syncExcluded,
     Value<int>? rowid,
   }) {
     return BooksCompanion(
@@ -1737,6 +1799,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
       finishedAt: finishedAt ?? this.finishedAt,
       readCount: readCount ?? this.readCount,
       deletedAt: deletedAt ?? this.deletedAt,
+      syncExcluded: syncExcluded ?? this.syncExcluded,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1838,6 +1901,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
+    if (syncExcluded.present) {
+      map['sync_excluded'] = Variable<bool>(syncExcluded.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1877,6 +1943,7 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('finishedAt: $finishedAt, ')
           ..write('readCount: $readCount, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('syncExcluded: $syncExcluded, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10469,6 +10536,7 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<DateTime?> finishedAt,
       Value<int> readCount,
       Value<DateTime?> deletedAt,
+      Value<bool> syncExcluded,
       Value<int> rowid,
     });
 typedef $$BooksTableUpdateCompanionBuilder =
@@ -10503,6 +10571,7 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<DateTime?> finishedAt,
       Value<int> readCount,
       Value<DateTime?> deletedAt,
+      Value<bool> syncExcluded,
       Value<int> rowid,
     });
 
@@ -10809,6 +10878,11 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get syncExcluded => $composableBuilder(
+    column: $table.syncExcluded,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11165,6 +11239,11 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get syncExcluded => $composableBuilder(
+    column: $table.syncExcluded,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$SeriesTableOrderingComposer get seriesId {
     final $$SeriesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -11310,6 +11389,11 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get syncExcluded => $composableBuilder(
+    column: $table.syncExcluded,
+    builder: (column) => column,
+  );
 
   $$SeriesTableAnnotationComposer get seriesId {
     final $$SeriesTableAnnotationComposer composer = $composerBuilder(
@@ -11577,6 +11661,7 @@ class $$BooksTableTableManager
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<int> readCount = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> syncExcluded = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion(
                 id: id,
@@ -11609,6 +11694,7 @@ class $$BooksTableTableManager
                 finishedAt: finishedAt,
                 readCount: readCount,
                 deletedAt: deletedAt,
+                syncExcluded: syncExcluded,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11643,6 +11729,7 @@ class $$BooksTableTableManager
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<int> readCount = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> syncExcluded = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion.insert(
                 id: id,
@@ -11675,6 +11762,7 @@ class $$BooksTableTableManager
                 finishedAt: finishedAt,
                 readCount: readCount,
                 deletedAt: deletedAt,
+                syncExcluded: syncExcluded,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

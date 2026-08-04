@@ -38,7 +38,7 @@ Book _book({String id = 'b1', int pages = 220}) => Book(
       pageCount: pages,
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
-      needsPush: false,
+      needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',

@@ -665,6 +665,64 @@ void main() {
     expect((await repo.watchBook('dirty').first)?.needsPush, false);
   });
 
+
+  test('a book excluded from sync neither pushes nor accepts the server\'s copy',
+      () async {
+    // The per-book opt-out is the same rule SyncScope follows: off means off in
+    // both directions. A book that stopped pushing but kept pulling would be
+    // overwritten by the very server the user asked it to ignore.
+    final repo = await _repo(dir);
+    final db = repo.db;
+    await db.into(db.books).insert(
+      BooksCompanion.insert(
+        id: 'kept',
+        title: 'Mine alone',
+        updatedAt: Value(DateTime.utc(2024, 1, 1)),
+      ),
+    );
+    await db.into(db.books).insert(
+      BooksCompanion.insert(id: 'shared', title: 'Shared'),
+    );
+    await repo.setSyncExcluded('kept', true);
+
+    final pushed = <String>[];
+    final client = _client((req) async {
+      final path = req.url.path;
+      if (req.method == 'PUT' &&
+          path.startsWith('/api/books/') &&
+          !path.endsWith('/cover')) {
+        pushed.add(path.split('/').last);
+        return http.Response('{}', 200);
+      }
+      if (req.method == 'GET' && path == '/api/deletions') {
+        return http.Response('[]', 200);
+      }
+      if (req.method == 'GET' && path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && path == '/api/loans') return _noLoans();
+      return http.Response('[]', 200);
+    });
+
+    await SyncService(repo).push(client);
+    expect(pushed, ['shared'], reason: 'the excluded book stays on the device');
+
+    // And a newer server copy of it is not applied either.
+    final puller = _client(
+      _server(books: [_serverBook('kept', 'Server title', '2026-01-01 00:00:00')]),
+    );
+    await SyncService(repo).pull(puller);
+    expect(
+      (await repo.watchBook('kept').first)?.title,
+      'Mine alone',
+      reason: 'off means off in both directions',
+    );
+
+    // Turning it back on lets it move again.
+    await repo.setSyncExcluded('kept', false);
+    await SyncService(repo).pull(puller);
+    expect((await repo.watchBook('kept').first)?.title, 'Server title');
+  });
+
   test('a trashed book never pushes, and pushes as a deletion once swept',
       () async {
     // Plan 5 #52's sync interplay: during the grace period the book is neither

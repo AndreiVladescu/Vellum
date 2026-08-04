@@ -213,6 +213,16 @@ class SyncService {
       for (final d in await db.select(db.localDeletions).get()) d.bookId,
     };
 
+    // Books this device has opted out of. Off means off in *both* directions —
+    // the rule SyncScope already follows — so a book excluded here is not
+    // overwritten by whatever the server holds for it either.
+    final syncExcluded = {
+      for (final row in await (db.select(db.books)
+            ..where((b) => b.syncExcluded.equals(true)))
+          .get())
+        row.id,
+    };
+
     // Local timestamps (to avoid clobbering edits made on this device) and the
     // cover ETag we last stored per book (to revalidate covers cheaply below).
     final localRows = await db.select(db.books).get();
@@ -235,6 +245,7 @@ class SyncService {
     await db.transaction(() async {
       for (final b in books) {
         if (localTombstoned.contains(b.id)) continue;
+        if (syncExcluded.contains(b.id)) continue;
 
         // Skip when we already hold a copy at least as new as the server's
         // (local edits win until pushed). Overwrite when the server is strictly
@@ -847,8 +858,16 @@ class SyncService {
     // the grace period expires — at which point the real delete writes a
     // tombstone and the loop above pushes *that*. Pushing them meanwhile would
     // send edits the user has already taken back.
+    // Books kept on this device only are skipped for the same reason trashed
+    // ones are: the server is not owed them. An excluded book that was pushed
+    // before stays on the server — stopping the traffic is not the same as
+    // recalling what already went, and taking it back would remove it from
+    // everyone the library is shared with.
     final books = await (db.select(db.books)
-          ..where((b) => b.needsPush.equals(true) & b.deletedAt.isNull()))
+          ..where((b) =>
+              b.needsPush.equals(true) &
+              b.deletedAt.isNull() &
+              b.syncExcluded.equals(false)))
         .get();
 
     // One list fetch gives the server's existing file hashes per book, so we

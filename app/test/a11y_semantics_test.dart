@@ -81,7 +81,7 @@ void main() {
 Book _book(String title) => Book(
       id: 'b1',
       title: title,
-      needsPush: true,
+      needsPush: true, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',

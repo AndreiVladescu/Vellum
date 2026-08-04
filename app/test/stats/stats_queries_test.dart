@@ -36,7 +36,7 @@ Book _book({DateTime? finishedAt, String id = 'b1'}) => Book(
       readCount: finishedAt == null ? 0 : 1,
       createdAt: DateTime(2024),
       updatedAt: DateTime(2024),
-      needsPush: false,
+      needsPush: false, syncExcluded: false,
       needsProgressPush: false,
     );
 

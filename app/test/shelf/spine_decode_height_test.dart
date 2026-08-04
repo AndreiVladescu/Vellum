@@ -61,7 +61,7 @@ void main() {
       title: 'Dune',
       createdAt: DateTime(2026),
       updatedAt: DateTime(2026),
-      needsPush: false,
+      needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',

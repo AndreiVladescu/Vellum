@@ -41,7 +41,7 @@ PlacedBook placed(String id, String title, {required double x, double y = 1.0}) 
       book: Book(
         id: 'b$id',
         title: title,
-        needsPush: true,
+        needsPush: true, syncExcluded: false,
         readerNotesNeedsPush: false,
         needsProgressPush: false,
         status: 'unread',

@@ -89,7 +89,7 @@ void main() {
           readCount: 0,
           createdAt: DateTime(2024),
           updatedAt: DateTime(2024),
-          needsPush: false,
+          needsPush: false, syncExcluded: false,
           readerNotesNeedsPush: false,
           needsProgressPush: false,
         );

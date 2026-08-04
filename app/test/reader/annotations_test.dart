@@ -266,7 +266,7 @@ void main() {
           readerNotesNeedsPush: false,
           createdAt: DateTime(2024),
           updatedAt: DateTime(2024),
-          needsPush: false,
+          needsPush: false, syncExcluded: false,
           needsProgressPush: false,
           status: 'unread',
           readCount: 0,

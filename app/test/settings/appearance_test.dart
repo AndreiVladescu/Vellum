@@ -175,7 +175,7 @@ void main() {
     Book book(String id, String title) => Book(
           id: id,
           title: title,
-          needsPush: true,
+          needsPush: true, syncExcluded: false,
           readerNotesNeedsPush: false,
           needsProgressPush: false,
           status: 'unread',

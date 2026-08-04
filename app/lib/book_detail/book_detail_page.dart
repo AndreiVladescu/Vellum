@@ -180,6 +180,24 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     }
   }
 
+  /// Flips the per-book sync opt-out, and says what that means — including the
+  /// part people get wrong: excluding a book that has already been pushed does
+  /// not recall it, because taking it off the server would remove it for
+  /// everyone the library is shared with.
+  Future<void> _toggleSync(Book book) async {
+    final excluded = !book.syncExcluded;
+    final messenger = ScaffoldMessenger.of(context);
+    await repository.setSyncExcluded(book.id, excluded);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      appSnackBar(
+        content: Text(excluded
+            ? 'Kept on this device. Anything already on the server stays there.'
+            : 'Syncing again with the next sync.'),
+      ),
+    );
+  }
+
   void _openEditSheet() => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -371,6 +389,19 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
             icon: const Icon(Icons.bookmark_add_outlined),
             tooltip: 'Add to shelf',
             onPressed: _openShelfPicker,
+          ),
+          // Whether this book travels to the server, and the switch for it.
+          // Shown whatever the connection state: it is a standing decision
+          // about the book, and hiding it until you happen to be connected
+          // would make it undiscoverable on the device you set up offline.
+          IconButton(
+            icon: Icon(book.syncExcluded
+                ? Icons.cloud_off_outlined
+                : Icons.cloud_done_outlined),
+            tooltip: book.syncExcluded
+                ? 'Not syncing — this device only'
+                : 'Syncing with the server',
+            onPressed: () => _toggleSync(book),
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
