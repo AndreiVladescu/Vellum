@@ -17,6 +17,8 @@ import 'epub_book.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
 import 'reader_settings.dart';
+import 'translate/translate_sheet.dart';
+import 'translate/translation_backend.dart';
 import 'reader_settings_sheet.dart';
 
 /// Where in a book a saved position points: a chapter and how far down it.
@@ -260,6 +262,46 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(withNote ? 'Note saved' : 'Highlighted')),
+    );
+  }
+
+  /// Translates the selected passage. Mirrors the PDF reader's version, down
+  /// to keeping the result as a note on the passage — the two readers do the
+  /// same things in the same order, and this is one of them.
+  Future<void> _translateSelection(EpubBook epub) async {
+    final settings = _settings;
+    final range = _selectionRange;
+    if (settings == null || !settings.canTranslate || range == null) return;
+    final plain = epub.chapters[_chapter].plainText;
+    final start = range.start.clamp(0, plain.length);
+    final end = range.end.clamp(start, plain.length);
+    final quote = plain.substring(start, end).trim();
+    if (quote.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => TranslateSheet(
+        passage: quote,
+        settings: settings,
+        backend: LibreTranslateBackend(
+          baseUrl: settings.translateUrl,
+          apiKey: settings.translateApiKey,
+        ),
+        onSaveAsNote: (translation) => _annotations.add(
+          bookId: widget.book.id,
+          kind: AnnotationKind.note,
+          chapter: _chapter,
+          locator: EpubTextLocator(chapter: _chapter, start: start, end: end),
+          quotedText: quote,
+          note: translation,
+          color: _highlightColour.argb,
+        ),
+      ),
     );
   }
 
@@ -671,6 +713,13 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                   icon: const Icon(Icons.sticky_note_2_outlined),
                   onPressed: () => _highlightSelection(epub, withNote: true),
                 ),
+                // Same rule as the PDF reader: no server, no button.
+                if (settings?.canTranslate ?? false)
+                  IconButton(
+                    tooltip: 'Translate selection',
+                    icon: const Icon(Icons.translate),
+                    onPressed: () => _translateSelection(epub),
+                  ),
               ],
               IconButton(
                 tooltip: _bookmarkOnChapter == null

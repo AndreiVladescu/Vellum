@@ -156,10 +156,128 @@ class ReaderSettingsSheet extends StatelessWidget {
                   value: settings.immersive,
                   onChanged: settings.setImmersive,
                 ),
+                const Divider(height: 24),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.translate),
+                  title: const Text('Translation'),
+                  subtitle: Text(
+                    settings.canTranslate
+                        ? 'Selected text can be translated · '
+                            '${settings.translateUrl}'
+                        : 'Off — needs a translation server',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    showDragHandle: true,
+                    builder: (_) => TranslateServerSheet(settings: settings),
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Where the translation server is named — the one thing that decides whether
+/// the reader has a Translate button at all.
+///
+/// A field rather than a picker of providers, because there is one backend
+/// today and the plan (docs/NEXT_FEATURES.md #12) is to replace it with an
+/// engine packed into the app rather than to collect more addresses.
+class TranslateServerSheet extends StatefulWidget {
+  const TranslateServerSheet({super.key, required this.settings});
+
+  final ReaderSettings settings;
+
+  @override
+  State<TranslateServerSheet> createState() => _TranslateServerSheetState();
+}
+
+class _TranslateServerSheetState extends State<TranslateServerSheet> {
+  late final _url = TextEditingController(text: widget.settings.translateUrl);
+  late final _key = TextEditingController(text: widget.settings.translateApiKey);
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _key.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 8,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Translation server', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            'Vellum sends nothing anywhere until you name a server here. A '
+            'passage you translate is sent to it — so a LibreTranslate you run '
+            'yourself keeps your reading on machines you own, the same bargain '
+            'as the sync server.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _url,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'LibreTranslate address',
+              hintText: 'http://192.168.1.20:5000',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _key,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'API key (only if it asks for one)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () async {
+                  await widget.settings.setTranslateServer(url: '', apiKey: '');
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+                child: const Text('Turn off'),
+              ),
+              const Spacer(),
+              FilledButton(
+                onPressed: () async {
+                  await widget.settings.setTranslateServer(
+                    url: _url.text,
+                    apiKey: _key.text,
+                  );
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -17,6 +17,8 @@ import 'reader_hotkeys.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
+import 'translate/translate_sheet.dart';
+import 'translate/translation_backend.dart';
 
 /// The integrated PDF reader. Persists the current page as the user reads,
 /// which drives the "Resume reading" state on the book's detail page, and lets
@@ -343,6 +345,48 @@ class _ReaderPageState extends State<ReaderPage> {
   /// app's parsing. A selection spanning pages yields one annotation per page,
   /// because that is what the ranges describe and a single annotation would have
   /// to lie about where it is.
+  /// Translates what is selected, and offers to keep the result as a note on
+  /// the passage — which is the annotation the note button already writes, so a
+  /// translation ends up in the same list as everything else you marked.
+  Future<void> _translateSelection() async {
+    final settings = _settings;
+    final ranges = _selectedRanges;
+    if (settings == null || !settings.canTranslate) return;
+    if (ranges.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+      return;
+    }
+    final passage = ranges.map((r) => r.text).join(' ').trim();
+    final first = ranges.first;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => TranslateSheet(
+        passage: passage,
+        settings: settings,
+        backend: LibreTranslateBackend(
+          baseUrl: settings.translateUrl,
+          apiKey: settings.translateApiKey,
+        ),
+        onSaveAsNote: (translation) => _annotations.add(
+          bookId: widget.book.id,
+          kind: AnnotationKind.note,
+          page: first.pageNumber,
+          locator: PdfTextLocator(
+            page: first.pageNumber,
+            start: first.start,
+            end: first.end,
+          ),
+          quotedText: passage,
+          note: translation,
+          color: _highlightColour.argb,
+        ),
+      ),
+    );
+  }
+
   Future<void> _highlightSelection({bool withNote = false}) async {
     final ranges = _selectedRanges;
     if (ranges.isEmpty) {
@@ -533,6 +577,15 @@ class _ReaderPageState extends State<ReaderPage> {
               tooltip: 'Note on selection',
               onPressed: () => _highlightSelection(withNote: true),
             ),
+            // Only with a translation server configured: a button that can
+            // only fail is worse than no button, the same rule the app follows
+            // for "Forgot password?" and "Send to a device".
+            if (settings?.canTranslate ?? false)
+              IconButton(
+                icon: const Icon(Icons.translate),
+                tooltip: 'Translate selection',
+                onPressed: _translateSelection,
+              ),
           ],
           if (settings != null)
             IconButton(

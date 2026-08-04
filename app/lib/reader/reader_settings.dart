@@ -1,5 +1,9 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'translate/translation_backend.dart';
 
 /// Page background and text colour while reading (plan 5 #23).
 ///
@@ -121,6 +125,12 @@ class ReaderSettings extends ChangeNotifier {
   static const _immersiveKey = 'reader.immersive';
   static const _pdfModeKey = 'reader.pdfMode';
   static const _highlightColorKey = 'reader.highlightColor';
+  // Translation (next features #12). The URL is what decides whether the
+  // feature exists at all: no server, no button — the same rule the sync
+  // server's own features follow.
+  static const _translateUrlKey = 'reader.translate.url';
+  static const _translateKeyKey = 'reader.translate.apiKey';
+  static const _translateToKey = 'reader.translate.to';
 
   ReaderTheme get theme {
     final stored = _prefs.getString(_themeKey);
@@ -240,6 +250,36 @@ class ReaderSettings extends ChangeNotifier {
   }
 
   /// Hide the app bar and controls until tapped.
+  /// The LibreTranslate address, or empty when none is set.
+  String get translateUrl => _prefs.getString(_translateUrlKey) ?? '';
+
+  /// Whether translating is possible at all. Everything user-facing hangs off
+  /// this: the reader shows no translate button until it is true.
+  bool get canTranslate => translateUrl.trim().isNotEmpty;
+
+  String get translateApiKey => _prefs.getString(_translateKeyKey) ?? '';
+
+  /// Where translations go, remembered between uses — someone reading out of
+  /// German today will be reading out of German tomorrow. Defaults to the
+  /// device's own language, falling back to English when it isn't one this app
+  /// offers.
+  TranslationLanguage get translateTo =>
+      TranslationLanguage.byCode(_prefs.getString(_translateToKey)) ??
+      TranslationLanguage.byCode(
+          PlatformDispatcher.instance.locale.languageCode) ??
+      const TranslationLanguage('en', 'English');
+
+  Future<void> setTranslateServer({required String url, String? apiKey}) async {
+    await _prefs.setString(_translateUrlKey, url.trim());
+    await _prefs.setString(_translateKeyKey, (apiKey ?? '').trim());
+    notifyListeners();
+  }
+
+  Future<void> setTranslateTo(TranslationLanguage value) async {
+    await _prefs.setString(_translateToKey, value.code);
+    notifyListeners();
+  }
+
   bool get immersive => _prefs.getBool(_immersiveKey) ?? false;
 
   Future<void> setImmersive(bool value) async {

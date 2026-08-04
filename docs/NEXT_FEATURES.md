@@ -516,8 +516,11 @@ Three mitigations, designed in rather than bolted on:
 
 ## 12. Translate the passage you have selected
 
-> **Requested 2026-08-04.** Not built. The design below is a proposal, not a
-> decision.
+> **Partly done 2026-08-04** — steps 1 and 2 of the sequence below. The
+> selection button, the sheet, the *From*/*To* pickers, save-as-note and the
+> server field are built in both readers, against a `TranslationBackend`
+> interface with one implementation: LibreTranslate. **The packed engine and its
+> language packs are not built** — that is step 3, and it is the whole job.
 
 **Asked for.** Selecting text in a book offers to translate it. The language it
 is *from* is detected automatically, and can be corrected when the guess is
