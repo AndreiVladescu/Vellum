@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../data/book_file_validation.dart';
 import '../data/database.dart';
+import '../shelf/author_page.dart';
 import '../data/library_repository.dart';
 import '../loans/borrow_requests.dart';
 import '../physical/find_copy.dart';
@@ -453,11 +454,43 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Authors are their own row so each name can
+                                // be tapped through to everything else of
+                                // theirs; the rest stays one plain line.
+                                if (details != null &&
+                                    details.authors.isNotEmpty)
+                                  Wrap(
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      for (final (i, name)
+                                          in details.authors.indexed) ...[
+                                        if (i > 0)
+                                          Text(', ',
+                                              style: theme.textTheme.bodyMedium),
+                                        InkWell(
+                                          onTap: () => Navigator.of(context)
+                                              .push(MaterialPageRoute<void>(
+                                            builder: (_) => AuthorPage(
+                                              author: name,
+                                              repository: repository,
+                                              settings: widget.settings,
+                                              connection: widget.connection,
+                                            ),
+                                          )),
+                                          child: Text(
+                                            name,
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 Text(
                                   [
-                                    if (details != null &&
-                                        details.authors.isNotEmpty)
-                                      details.authors.join(', '),
                                     if (book.publishedYear != null)
                                       '${book.publishedYear}',
                                     if (book.pageCount != null)

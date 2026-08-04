@@ -103,6 +103,28 @@ class LibraryQueries {
   Stream<Map<String, List<String>>> watchAuthorsByBook() =>
       _authorsByBook.stream;
 
+  /// Every book by one author, by title.
+  ///
+  /// Keyed by **name** rather than by author id, because that is what the
+  /// caller has: a book's page shows names, and the tap has to work from the
+  /// string the reader just looked at. `authors.name` is unique, so this is
+  /// still one author's books and not a fuzzy match.
+  ///
+  /// Trashed books are excluded, as everywhere else that lists the library.
+  /// Wishlist entries are **kept**: "what else of theirs do I want" is part of
+  /// the question this screen exists to answer.
+  Stream<List<Book>> watchBooksByAuthor(String name) {
+    final query = db.select(db.books).join([
+      innerJoin(db.bookAuthors, db.bookAuthors.bookId.equalsExp(db.books.id)),
+      innerJoin(db.authors, db.authors.id.equalsExp(db.bookAuthors.authorId)),
+    ])
+      ..where(db.authors.name.equals(name) & db.books.deletedAt.isNull())
+      ..orderBy([OrderingTerm.asc(db.books.title)]);
+    return query
+        .watch()
+        .map((rows) => [for (final r in rows) r.readTable(db.books)]);
+  }
+
   static Stream<Map<String, List<String>>> _rawAuthorsByBook(
     VellumDatabase db,
   ) {
