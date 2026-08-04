@@ -43,6 +43,7 @@ Map<String, dynamic> buildLayoutDoc({
   required PhysicalEnvironment environment,
   required List<PhysicalShelf> shelves,
   required List<PlacedBook> placed,
+  List<RoomProp> props = const [],
 }) =>
     {
       'doc': layoutDocKind,
@@ -83,6 +84,25 @@ Map<String, dynamic> buildLayoutDoc({
             if (pb.placement.format != null) 'format': pb.placement.format,
           },
       ],
+      // Ornaments (next features #10). Until this they were app-local, so a
+      // room you shared arrived with its shelves and books but none of the
+      // things standing between them — which reads as a bug rather than as a
+      // deliberate omission, because the publishing device shows them.
+      //
+      // Defaulted to empty above and read as empty below, so a document from
+      // before this still parses: an older room simply has no props, which is
+      // exactly what it had.
+      'props': [
+        for (final prop in props)
+          {
+            'id': prop.id,
+            'kind': prop.kind,
+            'x': prop.x,
+            'y': prop.y,
+            'width_m': prop.widthM,
+            'height_m': prop.heightM,
+          },
+      ],
     };
 
 double _thicknessOf(PlacedBook pb) => PhysicalMetrics.thickness(
@@ -104,12 +124,35 @@ class ParsedLayout {
     required this.name,
     required this.shelves,
     required this.placements,
+    this.props = const [],
   });
 
   final String environmentId;
   final String name;
   final List<ParsedShelf> shelves;
   final List<ParsedPlacement> placements;
+
+  /// Empty for a document published before props were part of one.
+  final List<ParsedProp> props;
+}
+
+class ParsedProp {
+  const ParsedProp({
+    required this.id,
+    required this.kind,
+    required this.x,
+    required this.y,
+    required this.widthM,
+    required this.heightM,
+  });
+
+  final String id;
+
+  /// A [PropKind] name. Kept as text so an unknown kind from a newer publisher
+  /// still occupies its space rather than vanishing — `PropKind.parse` decides
+  /// what to draw.
+  final String kind;
+  final double x, y, widthM, heightM;
 }
 
 class ParsedShelf {
@@ -206,6 +249,18 @@ ParsedLayout parseLayoutDoc(Map<String, dynamic> doc) {
             format: raw['format']?.toString(),
           ),
     ],
+    props: [
+      for (final raw in (doc['props'] as List? ?? const []))
+        if (raw is Map && raw['id'] != null)
+          ParsedProp(
+            id: raw['id'].toString(),
+            kind: raw['kind']?.toString() ?? 'boxes',
+            x: _num(raw['x']),
+            y: _num(raw['y']),
+            widthM: _num(raw['width_m']),
+            heightM: _num(raw['height_m']),
+          ),
+    ],
   );
 }
 
@@ -263,6 +318,29 @@ Future<int> applyLayoutDoc(
           ..where((s) =>
               s.environmentId.equals(layout.environmentId) &
               s.id.isNotIn(keepShelves)))
+        .go();
+
+    // Props: upsert, then drop the ones the document no longer lists — the
+    // same shape as shelves above, and for the same reason. An ornament moved
+    // away on the publishing device must not linger here.
+    for (final prop in layout.props) {
+      await db.into(db.roomProps).insertOnConflictUpdate(
+            RoomPropsCompanion.insert(
+              id: prop.id,
+              environmentId: layout.environmentId,
+              kind: prop.kind,
+              x: prop.x,
+              y: prop.y,
+              widthM: prop.widthM,
+              heightM: prop.heightM,
+            ),
+          );
+    }
+    final keepProps = {for (final p in layout.props) p.id};
+    await (db.delete(db.roomProps)
+          ..where((p) =>
+              p.environmentId.equals(layout.environmentId) &
+              p.id.isNotIn(keepProps)))
         .go();
 
     final knownBooks = {

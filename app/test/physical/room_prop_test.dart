@@ -150,4 +150,44 @@ void main() {
       expect(tester.takeException(), isNull, reason: '${kind.name} threw');
     }
   });
+  group('the solid part is not the drawn part', () {
+    // Until this split existed a prop's **artwork was its collider**: the box
+    // it was painted in was the box books were pushed out of, so nothing could
+    // overhang its own footprint. A book tucked under a plant's leaves is what
+    // a real shelf looks like, and refusing it left a gap that read as a bug.
+
+    test('a plant is narrower to books than it is drawn', () {
+      const drawn = 0.16;
+      final span = PropKind.plant.solidSpan(1.0, drawn);
+      expect(span.w, lessThan(drawn));
+      // Centred on the artwork, because these are drawn about their own axis.
+      expect(span.x + span.w / 2, closeTo(1.0 + drawn / 2, 1e-9));
+    });
+
+    test('a solid prop keeps its whole footprint', () {
+      const drawn = 0.22;
+      final span = PropKind.boxes.solidSpan(2.0, drawn);
+      // A stack of boxes has no overhang to allow for; changing this would
+      // start letting books sit inside it.
+      expect(span.w, closeTo(drawn, 1e-9));
+      expect(span.x, closeTo(2.0, 1e-9));
+    });
+
+    test('the fraction survives a resize', () {
+      // Stored as a fraction rather than a second size precisely so that
+      // resizing a prop does not need the collider migrating too.
+      final small = PropKind.plant.solidSpan(0, 0.10);
+      final large = PropKind.plant.solidSpan(0, 0.20);
+      expect(large.w / small.w, closeTo(2.0, 1e-9));
+    });
+
+    test('every kind keeps its collider inside its artwork', () {
+      // A collider wider than the art would push books away from empty space.
+      for (final kind in PropKind.values) {
+        expect(kind.solidWidthFraction, greaterThan(0));
+        expect(kind.solidWidthFraction, lessThanOrEqualTo(1.0),
+            reason: '${kind.name} would block more than it draws');
+      }
+    });
+  });
 }

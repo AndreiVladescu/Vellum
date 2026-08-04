@@ -15,15 +15,22 @@ import 'package:flutter/material.dart';
 /// read at a glance at 300 px/m and then stop asking for attention.
 enum PropKind {
   statuette('Statuette', width: 0.08, height: 0.18),
-  plant('Small plant', width: 0.16, height: 0.24),
-  vase('Vase', width: 0.11, height: 0.22),
+  // Leaves overhang the pot, so what books must avoid is much narrower than
+  // what is drawn — see `solidWidthFraction`.
+  plant('Small plant', width: 0.16, height: 0.24, solidWidthFraction: 0.55),
+  vase('Vase', width: 0.11, height: 0.22, solidWidthFraction: 0.8),
   clock('Clock', width: 0.13, height: 0.13),
   boxes('Stack of boxes', width: 0.22, height: 0.14),
 
   /// The one with a job as well as a look: books stop at it, like a divider.
   bookend('Bookend', width: 0.02, height: 0.15);
 
-  const PropKind(this.label, {required this.width, required this.height});
+  const PropKind(
+    this.label, {
+    required this.width,
+    required this.height,
+    this.solidWidthFraction = 1.0,
+  });
 
   final String label;
 
@@ -31,6 +38,29 @@ enum PropKind {
   /// roughly the wrong size next to a paperback is immediately obvious.
   final double width;
   final double height;
+
+  /// How much of the drawn width books actually have to keep clear.
+  ///
+  /// Until this existed a prop's **artwork was its collider**: the box it was
+  /// painted in was the box books were pushed out of, so nothing could
+  /// overhang its own footprint. A plant's leaves and a vase's shoulder are
+  /// exactly the cases where that reads wrong — a book tucked under the leaves
+  /// is what a real shelf looks like, and refusing it left a suspicious gap.
+  ///
+  /// A fraction rather than a second stored size, so it holds when a prop is
+  /// resized, and needs no migration: the *drawn* footprint is still what the
+  /// database keeps.
+  final double solidWidthFraction;
+
+  /// The part of a prop at [x] of [drawnWidth] that books must avoid,
+  /// horizontally centred within the artwork.
+  ///
+  /// Centred because every prop here is drawn about its own vertical axis; a
+  /// prop whose mass sat off-centre would want its own offset.
+  ({double x, double w}) solidSpan(double x, double drawnWidth) {
+    final w = drawnWidth * solidWidthFraction;
+    return (x: x + (drawnWidth - w) / 2, w: w);
+  }
 
   /// Whether books have to make room for it. Everything here is solid — a prop
   /// standing on a shelf takes up shelf — but naming it says why `settle` is

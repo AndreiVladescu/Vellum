@@ -13,6 +13,7 @@ import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/physical/layout_doc.dart';
 import 'package:vellum/physical/room_measure.dart';
+import 'package:vellum/physical/room_prop.dart';
 
 void main() {
   late Directory dir;
@@ -52,6 +53,7 @@ void main() {
       environment: env!,
       shelves: await repo.layout.watchShelves(envId).first,
       placed: await repo.layout.watchPlacedBooks(envId).first,
+      props: await repo.layout.watchProps(envId).first,
     );
   }
 
@@ -378,5 +380,59 @@ void main() {
       expect(env!.needsPublish, isFalse);
       expect(env.serverRevision, isNull);
     });
+  });
+  test('a room shares its ornaments, not just its shelves', () async {
+    // Props were app-local, so a shared room arrived with shelves and books but
+    // nothing standing between them — which reads as a bug, because the
+    // publishing device shows them.
+    final envId = await seedRoom();
+    await repo.layout.addProp(envId, kind: PropKind.plant, x: 0.5, y: 1.0);
+    final doc = await docFor(envId);
+
+    final props = doc['props'] as List;
+    expect(props, hasLength(1));
+    expect((props.single as Map)['kind'], 'plant');
+
+    // Onto a blank device.
+    final other = Directory.systemTemp.createTempSync('vellum_layout_doc_b');
+    final otherRepo = await LibraryRepository.forTesting(
+      VellumDatabase(NativeDatabase.memory()),
+      other,
+    );
+    await applyLayoutDoc(
+      otherRepo.db,
+      parseLayoutDoc(jsonDecode(jsonEncode(doc)) as Map<String, dynamic>),
+      revision: 1,
+    );
+    final landed = await otherRepo.layout.watchProps(envId).first;
+    expect(landed, hasLength(1));
+    expect(landed.single.kind, 'plant');
+    await otherRepo.db.close();
+    other.deleteSync(recursive: true);
+  });
+
+  test('a prop taken away disappears on the next fetch', () async {
+    final envId = await seedRoom();
+    final propId = await repo.layout.addProp(envId, kind: PropKind.vase, x: 0.5, y: 1.0);
+    await applyLayoutDoc(repo.db, parseLayoutDoc(await docFor(envId)),
+        revision: 1);
+    expect(await repo.layout.watchProps(envId).first, hasLength(1));
+
+    await repo.layout.deleteProp(propId);
+    // Subtractive, like shelves and placements: an ornament moved away on the
+    // publishing device must not linger here.
+    await applyLayoutDoc(repo.db, parseLayoutDoc(await docFor(envId)),
+        revision: 2);
+    expect(await repo.layout.watchProps(envId).first, isEmpty);
+  });
+
+  test('a document written before props still parses', () async {
+    final envId = await seedRoom();
+    final doc = await docFor(envId);
+    doc.remove('props');
+    // An older room simply has no ornaments, which is exactly what it had.
+    final parsed = parseLayoutDoc(doc);
+    expect(parsed.props, isEmpty);
+    expect(parsed.shelves, isNotEmpty);
   });
 }

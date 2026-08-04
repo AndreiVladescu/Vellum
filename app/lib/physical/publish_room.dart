@@ -28,10 +28,12 @@ class RoomPublisher {
   Future<Map<String, dynamic>> _docFor(PhysicalEnvironment environment) async {
     final shelves = await repository.layout.watchShelves(environment.id).first;
     final placed = await repository.layout.watchPlacedBooks(environment.id).first;
+    final props = await repository.layout.watchProps(environment.id).first;
     return buildLayoutDoc(
       environment: environment,
       shelves: shelves,
       placed: placed,
+      props: props,
     );
   }
 

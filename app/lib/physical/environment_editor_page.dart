@@ -693,7 +693,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     final propBoxes = [
       for (final prop in _props)
         if (prop.id != draggedId)
-          SettleBox(x: prop.x, y: prop.y, w: prop.widthM, h: prop.heightM),
+          // The *solid* part, not the drawn one. A plant's leaves overhang its
+          // pot, and a book tucked under them is what a real shelf looks like;
+          // colliding with the artwork left a gap that looked like a bug.
+          () {
+            final span = PropKind.parse(prop.kind).solidSpan(prop.x, prop.widthM);
+            return SettleBox(
+              x: span.x,
+              y: prop.y,
+              w: span.w,
+              h: prop.heightM,
+            );
+          }(),
     ];
     final others = _placed
         .where((p) => p.placement.id != draggedId)

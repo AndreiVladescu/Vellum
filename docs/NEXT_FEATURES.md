@@ -651,11 +651,13 @@ already follows.
 
 Everything in the original order is in. What remains, smallest first:
 
-- **#10's richer props.** Six exist as a demo. What is designed but not built is
-  the three-layer artwork / collider / anchor split from #11 — today a prop's
-  artwork *is* its collider, so nothing can overhang its footprint (a plant's
-  leaves, a lamp's shade). Props are also app-local rather than in the room
-  document, so a shared room does not show them.
+- **#10's richer props.** Six exist as a demo. Two of the three gaps are now
+  closed (2026-08-04): props ride the room document, so a shared room arrives
+  with its ornaments and loses them when the publisher moves them away; and a
+  prop's artwork is no longer its collider — `PropKind.solidWidthFraction`
+  gives the drawn shape a narrower solid part, so a book can sit under a
+  plant's leaves. What remains is the *anchor* third of the split from #11 (a
+  prop pinned to a shelf rather than to the room) and the wider prop set.
 - **#5's remaining sources** — Calibre and OPDS in the console. The two that
   need the server to reach out or read a directory structure, and by the
   document's own reckoning the two most likely to be wanted least.
