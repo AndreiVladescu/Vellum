@@ -88,7 +88,7 @@ class _SheetBody extends StatelessWidget {
         content: Text('Saved to ${location.path}'),
         action: SnackBarAction(
           label: 'Open',
-          onPressed: () => openExternally(file, mimeType: 'text/csv'),
+          onPressed: () => openOrShare(file, mimeType: 'text/csv'),
         ),
       ),
     );

@@ -1718,7 +1718,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       labels: labels,
       title: '${widget.environmentName} — shelf labels',
     ));
-    final opened = await openExternally(file, mimeType: 'text/html');
+    final opened = await openOrShare(file, mimeType: 'text/html');
     if (!mounted) return;
     _say(opened
         ? 'Labels opened — print them with Ctrl+P.'
@@ -1753,7 +1753,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       'vellum-$safeName-${DateTime.now().millisecondsSinceEpoch}.png',
     ));
     await file.writeAsBytes(bytes.buffer.asUint8List());
-    final opened = await openExternally(file, mimeType: 'image/png');
+    final opened = await openOrShare(file, mimeType: 'image/png');
     if (!mounted) return;
     _say(opened ? 'Picture saved and opened.' : 'Saved to ${file.path}');
   }
