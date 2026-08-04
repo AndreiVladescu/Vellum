@@ -318,9 +318,23 @@ cargo run          # needs Rust: https://rustup.rs
 ```
 
 That starts the API on <http://localhost:3000> and creates its database beside
-itself. Open that address in a browser for the admin console; the first account
-you register becomes the master account. In the app, ☰ → *Library server*, enter
-the address, and log in.
+itself. Open that address in a browser for the admin console — on a server with
+no accounts it opens on *Create the master account*, and the account you make
+there owns the library. In the app, ☰ → *Library server*, enter the address, and
+log in.
+
+Everything else is configured by environment variables, and
+**[`server/.env.example`](server/.env.example)** lists all of them with their
+defaults — the port and database path, TLS for a LAN server, SMTP so password
+resets can be emailed, and the bootstrap token that stops a stranger claiming
+the master account on a server you've exposed. Copy it and edit:
+
+```sh
+cd server
+cp .env.example .env         # .env is gitignored; chmod 600 it, it holds a password
+set -a; . ./.env; set +a
+cargo run
+```
 
 Over a network — especially to a phone — you need HTTPS, and there are real
 decisions to make about certificates, backups and running it as a service.

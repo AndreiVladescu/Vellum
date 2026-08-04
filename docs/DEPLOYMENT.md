@@ -109,7 +109,9 @@ Environment=VELLUM_PUBLIC_URL=https://books.example.com
 ## Configuration
 
 `vellum-server --help` prints this list too, so the binary is always the
-authority if this table drifts.
+authority if this table drifts. To configure a server by editing a file rather
+than by exporting variables one at a time, copy **`server/.env.example`** — the
+same list, commented out at its defaults — to `server/.env` and source it.
 
 | Variable | Default | Meaning |
 |---|---|---|
