@@ -566,16 +566,74 @@ happens), and an optional LibreTranslate address for the desktop — the same
 "bring your own server" bargain the library sync already makes. That leaves the
 cloud APIs out, and with them the "paste your DeepL key here" field.
 
+
+### Packing the engine and fetching the languages (asked 2026-08-04)
+
+The follow-up question was the right one: **put the engine in the app, and pull
+language packs from an open location.** That is not a workaround — it is what
+Firefox ships. Firefox 118 translates pages locally with
+[bergamot-translator](https://github.com/browsermt/bergamot-translator) (Marian
+underneath), against models Mozilla publishes openly.
+
+What was checked on 2026-08-04:
+
+- **The models are genuinely open and indexed.** There is a public JSON index at
+  `storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/db/models.json`,
+  listing **100+ pair directions**. Each model is three files — lexical
+  shortlist, weights, vocabulary — and the whole thing is **~17 MB for a `tiny`
+  model and ~31.5 MB for `base-memory`** (en→fr's weights are 31,561,787 bytes).
+  A reader who wants German→English and English→German pays about 35 MB, once.
+  The training repo is MPL-2.0; **the licence on the model files themselves has
+  to be confirmed before shipping them**, which is a ten-minute job for whoever
+  builds this, not a design question.
+- **The engine has no Dart binding.** Nothing on pub.dev wraps bergamot, Marian
+  or CTranslate2. The one package claiming offline translation on all five
+  platforms, `argos_translator_offline`, **requires the user to install Python
+  and pip-install argos-translate** — impossible on Android, unreasonable
+  everywhere else, and it is on 5 likes, 174 downloads and fifteen months
+  without a release. It is not an option.
+
+So the split is: **the language packs are the easy half, the engine is the whole
+job.** Downloading three files, checking their hashes, storing them beside
+`covers/` and `files/` in the data directory, listing them in Preferences with
+their sizes and a *Remove*, is machinery this app already has in every other
+form. Compiling bergamot-translator for android-arm64, android-x64, linux-x64,
+windows-x64 and macOS (arm64 + x64), binding it through Dart FFI, and keeping
+that building in CI, is a native-toolchain project of its own — the app ships
+one native engine today (PDFium), but it arrives prebuilt inside `pdfrx` rather
+than being something this repository builds.
+
+**Recommended sequence, if this is wanted:**
+
+1. **Build the shape first, with one backend behind an interface** — the
+   selection button, the sheet, the *From*/*To* pickers, the language-pack
+   screen. All of it is testable without an engine, and none of it changes when
+   the engine does.
+2. **Ship the pack manager against Mozilla's index.** Downloading, verifying and
+   deleting models is useful and finished work whichever engine consumes them.
+3. **Then the engine.** Bergamot through FFI is the honest answer to "in the
+   app, from an open location". ML Kit would be a week rather than a month, but
+   its models come from Google's servers and it exists only on Android and iOS —
+   which answers a different request than the one asked.
+
+An optional LibreTranslate address stays worth having as the desktop escape
+hatch while step 3 is unbuilt: it is a text field, and it makes the feature
+work for anyone willing to run the server they already run for sync.
+
 **Files.** `app/lib/reader/reader_page.dart` and
 `app/lib/reader/epub_reader_page.dart` (the button, in both bars),
 a new `app/lib/reader/translate/` for the sheet and the backend behind an
-interface, `app/lib/settings/` for the destination language and the backend's
-configuration, and `app/lib/l10n/` for the new strings.
+interface, a `app/lib/data/language_packs.dart` beside the other blob services
+for downloading and removing models, `app/lib/settings/` for the destination
+language, the backend's configuration and the installed-packs screen, and
+`app/lib/l10n/` for the new strings.
 
 **Tests.** The language list and its defaults; that the *From* guess is a
 default and not a lock; that a passage with no backend configured never reaches
 the network; that the sheet's save-as-note writes the same annotation shape the
-note button already writes.
+note button already writes; and, for the pack manager, that a model whose hash
+does not match is discarded rather than stored, the same rule the blob store
+already follows.
 
 ---
 
@@ -594,9 +652,11 @@ Everything in the original order is in. What remains, smallest first:
 - **#11 stages 2–4** — segment styles, vector props and imported artwork.
   Declined on 2026-08-01; the written-up design stands if that changes.
 - **#12, translating a selected passage** — asked for on 2026-08-04, nothing
-  built. Unlike everything above it, it cannot be done without deciding what
-  the app is allowed to send off the device, which is the first thing to settle
-  rather than the last.
+  built. The answer to "what may leave the device" is now decided in principle:
+  **nothing**, by packing the engine and fetching open language packs, the way
+  Firefox does. That makes it the largest item on this list, because the engine
+  is a native build for five platforms and no Dart binding exists. The two
+  halves are separable, and the pack manager is worth building first.
 
 **#10 and #11** sit outside this order. Their cheap first stages — the room's own
 wall, floor and shadows (#10), and bookcase templates (#11) — are small enough to
