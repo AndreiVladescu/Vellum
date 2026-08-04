@@ -14,6 +14,7 @@ import 'server/server_page.dart';
 import 'server/sync_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/preferences_page.dart';
+import 'shelf/series_page.dart';
 import 'wishlist/wishlist_page.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -82,6 +83,13 @@ class AppDrawer extends StatelessWidget {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => DuplicatesPage(repository: repository),
+    ));
+  }
+
+  void _openSeries(BuildContext context) {
+    Navigator.of(context).pop();
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => SeriesPage(repository: repository),
     ));
   }
 
@@ -167,6 +175,11 @@ class AppDrawer extends StatelessWidget {
                 onTap: () => _openWishlist(context),
               );
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.format_list_numbered),
+            title: const Text('Series'),
+            onTap: () => _openSeries(context),
           ),
           ListTile(
             leading: const Icon(Icons.content_copy_outlined),

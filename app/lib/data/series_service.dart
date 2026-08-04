@@ -149,6 +149,59 @@ class SeriesService {
     );
   }
 
+  /// Every series in the library, with its gaps — the same answer [placeOf]
+  /// gives for one book, for all of them at once.
+  ///
+  /// Exists because gaps were only ever visible from inside a book: to learn
+  /// you were missing volume 3 of something, you had to already be looking at
+  /// volume 2 of it. A reader wants the question the other way round — "what am
+  /// I missing?" — and that cannot be asked one book at a time.
+  Stream<List<SeriesPlace>> watchAll() {
+    // Driven off both tables, so adding a book to a series or trashing one
+    // updates the list without a manual refresh.
+    return (db.select(db.books)..where((b) => b.seriesId.isNotNull() & b.deletedAt.isNull()))
+        .watch()
+        .asyncMap((books) async {
+      final names = {
+        for (final row in await db.select(db.series).get()) row.id: row.name,
+      };
+      final byId = <String, List<Book>>{};
+      for (final b in books) {
+        (byId[b.seriesId!] ??= []).add(b);
+      }
+      final out = <SeriesPlace>[];
+      for (final entry in byId.entries) {
+        final name = names[entry.key];
+        if (name == null) continue;
+        final owned = [
+          for (final b in entry.value)
+            if (b.seriesIndex != null && !WishlistService.isWanted(b))
+              b.seriesIndex!,
+        ]..sort();
+        final wanted = [
+          for (final b in entry.value)
+            if (b.seriesIndex != null && WishlistService.isWanted(b))
+              b.seriesIndex!,
+        ]..sort();
+        out.add(SeriesPlace(
+          name: name,
+          // No "this book" here: the list is about the series itself.
+          index: null,
+          owned: owned,
+          wanted: wanted,
+          gaps: gapsIn(owned),
+        ));
+      }
+      // Series with something missing first — that is the question the screen
+      // exists to answer — then alphabetically.
+      out.sort((a, b) {
+        if (a.hasGaps != b.hasGaps) return a.hasGaps ? -1 : 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+      return out;
+    });
+  }
+
   /// The whole numbers missing between the lowest and highest owned volume.
   static List<int> gapsIn(List<double> owned) {
     if (owned.length < 2) return const [];
