@@ -80,6 +80,100 @@ written under the data dir and **persists across restarts**, so the fingerprint
 the app pinned stays valid; delete `cert.pem`/`key.pem` to rotate. The app's
 server screen shows the fingerprint and offers to import the certificate.
 
+#### Making the certificate yourself, with openssl
+
+`VELLUM_TLS=1` already generates one, and that is the easy path. Do this instead
+when the certificate has to outlive the data directory, cover names the server
+was never told about, or be signed by a CA your devices already trust. An
+existing `cert.pem`/`key.pem` pair is always preferred over generating one, so
+putting your own in place is the whole installation step.
+
+```sh
+openssl req -x509 -newkey rsa:2048 -sha256 -days 397 -nodes \
+  -keyout key.pem -out cert.pem \
+  -subj "/CN=vellum.lan" \
+  -addext "subjectAltName=DNS:vellum.lan,DNS:localhost,IP:127.0.0.1,IP:192.168.1.50" \
+  -addext "basicConstraints=critical,CA:FALSE" \
+  -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+  -addext "extendedKeyUsage=serverAuth"
+```
+
+- **`subjectAltName` is the part that matters.** Every current client ignores the
+  common name entirely and matches only against the SANs, so a certificate
+  without them fails everywhere for reasons that look like nothing at all. List
+  every address you will actually type — the LAN IP, the hostname, `localhost`
+  — because adding one later means issuing a new certificate.
+- **`-days 397`** rather than something comfortable: Apple platforms reject a
+  server certificate whose lifetime exceeds 398 days, and they reject it at
+  connection time, months after you made it.
+- **`-nodes`** leaves the key without a passphrase, which is what lets the server
+  start unattended.
+- Elliptic curve works too — `-newkey ec -pkeyopt ec_paramgen_curve:P-256`.
+  PKCS#8 (`BEGIN PRIVATE KEY`), PKCS#1 (`BEGIN RSA PRIVATE KEY`) and SEC1 keys
+  all load, so no conversion step is needed whichever way you generated it.
+
+Point the server at the pair:
+
+```sh
+VELLUM_TLS=1 \
+VELLUM_TLS_CERT=/var/lib/vellum/cert.pem \
+VELLUM_TLS_KEY=/var/lib/vellum/key.pem \
+vellum-server
+```
+
+The key must be readable by the user the server runs as, and by nobody else —
+under systemd that is `vellum`:
+
+```sh
+sudo install -o vellum -g vellum -m 600 key.pem  /var/lib/vellum/key.pem
+sudo install -o vellum -g vellum -m 644 cert.pem /var/lib/vellum/cert.pem
+```
+
+Check what you made, and what the app is about to be asked to trust:
+
+```sh
+openssl x509 -in cert.pem -noout -subject -dates -ext subjectAltName
+openssl x509 -in cert.pem -noout -fingerprint -sha256
+```
+
+That fingerprint is the one the server prints at startup and the one the app's
+server screen shows before you import — three places that must agree. Replacing
+the certificate changes it, so every app that pinned the old one asks again.
+
+**A private CA** is worth the extra step once more than one device is involved:
+trust `ca.pem` once per device and every certificate you sign with it is
+accepted, including future ones.
+
+```sh
+# 1. The CA. Once, and keep ca-key.pem somewhere safe — it can sign anything.
+openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+  -keyout ca-key.pem -out ca.pem -subj "/CN=Vellum home CA" \
+  -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign"
+
+# 2. A key and a signing request for the server.
+openssl req -newkey rsa:2048 -sha256 -nodes \
+  -keyout key.pem -out server.csr -subj "/CN=vellum.lan"
+
+# 3. Sign it. The extensions go here, not in the request: openssl drops a CSR's
+#    own extensions unless told otherwise, which is how CA-signed certificates
+#    end up with no SANs.
+cat > ext.cnf <<'EOF'
+subjectAltName=DNS:vellum.lan,DNS:localhost,IP:127.0.0.1,IP:192.168.1.50
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth
+EOF
+openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
+  -sha256 -days 397 -out cert.pem -extfile ext.cnf
+
+openssl verify -CAfile ca.pem cert.pem      # says: cert.pem: OK
+```
+
+Serve `cert.pem`/`key.pem` as above and install `ca.pem` on each device — the
+system trust store on a desktop, *Settings → Security → Install a certificate →
+CA certificate* on Android. `ca-key.pem` never leaves your machine.
+
 ---
 
 ## systemd
