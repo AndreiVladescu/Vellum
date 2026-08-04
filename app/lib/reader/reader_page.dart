@@ -124,6 +124,7 @@ class _ReaderPageState extends State<ReaderPage> {
         ..clearLiveImages();
     }
     _hotkeys.attach();
+    _watchForASlowOpen();
     _annotationsSub =
         _annotations.watchForBook(widget.book.id).listen((annotations) {
       _highlights.update(annotations);
@@ -151,8 +152,29 @@ class _ReaderPageState extends State<ReaderPage> {
     });
   }
 
+  void _watchForASlowOpen() {
+    _openTimer?.cancel();
+    _openTimer = Timer(_openTimeout, () {
+      if (mounted && _page == null) setState(() => _slowToOpen = true);
+    });
+  }
+
+  /// Builds the viewer again from scratch.
+  ///
+  /// pdfrx keys its document cache by path, so a second attempt is usually
+  /// instant — which is exactly why closing the book and opening it again has
+  /// been the workaround for a page that never arrives.
+  void _retryOpen() {
+    setState(() {
+      _viewerAttempt++;
+      _slowToOpen = false;
+    });
+    _watchForASlowOpen();
+  }
+
   @override
   void dispose() {
+    _openTimer?.cancel();
     _hotkeys.detach();
     // Closing the session is fire-and-forget: the widget is going away, and a
     // dropped write costs one session row, not correctness.
@@ -230,7 +252,10 @@ class _ReaderPageState extends State<ReaderPage> {
 
   void _onPageChanged(int? page) {
     if (page == null || !_controller.isReady) return;
+    // The document is up: whatever the clock was waiting for has happened.
+    _openTimer?.cancel();
     setState(() {
+      _slowToOpen = false;
       _page = page;
       _pageCount = _controller.pageCount;
     });
@@ -250,6 +275,19 @@ class _ReaderPageState extends State<ReaderPage> {
 
   /// The mode in force, before the settings have finished loading.
   PdfPageMode get _mode => _settings?.pdfMode ?? PdfPageMode.scroll;
+
+  /// Bumped to build a fresh viewer, which is what *Try again* does — the same
+  /// thing closing the book and opening it again does, without the trip.
+  int _viewerAttempt = 0;
+
+  /// Set when the document has taken long enough that something is wrong.
+  bool _slowToOpen = false;
+  Timer? _openTimer;
+
+  /// How long a document may take before the reader stops pretending it is
+  /// about to appear. Measured against a 46 MB PDF opening in 150 ms on a
+  /// phone; anything past this is not slow, it is stuck.
+  static const _openTimeout = Duration(seconds: 8);
 
   /// True while a jump is animating, which suspends [_clamp].
   ///
@@ -661,6 +699,7 @@ class _ReaderPageState extends State<ReaderPage> {
               enabled: dark,
               child: PdfViewer.file(
         widget.file.path,
+        key: ValueKey(_viewerAttempt),
         controller: _controller,
         initialPageNumber: widget.initialPage ?? widget.book.lastReadPage ?? 1,
         params: PdfViewerParams(
@@ -737,6 +776,45 @@ class _ReaderPageState extends State<ReaderPage> {
       ),
             ),
           ),
+          // Until the document reports in there is nothing to look at but the
+          // background, and a blank page is indistinguishable from a broken
+          // one. Say which it is.
+          if (_page == null)
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: !_slowToOpen,
+                child: ColoredBox(
+                  color: readerTheme.background,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!_slowToOpen) ...[
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text('Opening…',
+                              style: TextStyle(color: readerTheme.foreground)),
+                        ] else ...[
+                          Icon(Icons.hourglass_disabled,
+                              size: 40, color: readerTheme.foreground),
+                          const SizedBox(height: 12),
+                          Text(
+                            'This book is taking longer than it should.',
+                            style: TextStyle(color: readerTheme.foreground),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: _retryOpen,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Try again'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // The same edge controls as the EPUB reader, so the two readers turn
           // the same way — but only where turning is the way you move. In
           // scrolling mode they would be a second, worse scrollbar, and the
