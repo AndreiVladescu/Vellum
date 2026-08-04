@@ -14,6 +14,7 @@ import '../data/backup_schedule.dart';
 import '../data/backup_service.dart';
 import '../data/library_doctor.dart';
 import '../data/library_repository.dart';
+import '../data/local_text_index.dart';
 import '../server/background_sync.dart';
 import '../server/connection_store.dart';
 import '../server/sync_service.dart';
@@ -117,6 +118,14 @@ class PreferencesPage extends StatelessWidget {
               value: settings.importOpenLibraryGenres,
               onChanged: settings.setImportOpenLibraryGenres,
             ),
+            if (textIndexSupportedHere) ...[
+              const Divider(height: 24),
+              _SectionHeader('Search inside books'),
+              _ContentIndexSection(
+                repository: repository,
+                settings: settings,
+              ),
+            ],
             const Divider(height: 24),
             _SectionHeader('Sync'),
             SwitchListTile(
@@ -153,6 +162,126 @@ class PreferencesPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The on-device index of book *text*, so search can look inside books and not
+/// only at their catalogue entry.
+///
+/// Opt-in, and shown only where it can run — see `local_text_index.dart`. The
+/// counts are the honest state of the queue rather than a progress bar: some
+/// files legitimately never index (a scanned PDF has no text), and a bar that
+/// never reaches the end would misrepresent that as a stall.
+class _ContentIndexSection extends StatefulWidget {
+  const _ContentIndexSection({
+    required this.repository,
+    required this.settings,
+  });
+
+  final LibraryRepository repository;
+  final AppSettingsStore settings;
+
+  @override
+  State<_ContentIndexSection> createState() => _ContentIndexSectionState();
+}
+
+class _ContentIndexSectionState extends State<_ContentIndexSection> {
+  Map<String, int> _counts = const {};
+  bool _busy = false;
+
+  LocalTextIndex get _index => LocalTextIndex(
+        widget.repository.db,
+        dataDir: widget.repository.dataDir,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final counts = await _index.statusCounts();
+    if (mounted) setState(() => _counts = counts);
+  }
+
+  /// Works through the queue in bounded batches, reporting after each, so a
+  /// library that takes minutes shows progress instead of freezing.
+  Future<void> _indexNow() async {
+    setState(() => _busy = true);
+    final index = _index;
+    await index.enqueueMissing();
+    while (mounted) {
+      final done = await index.processPending(limit: 5);
+      await _refresh();
+      if (done == 0) break;
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final pending = _counts['pending'] ?? 0;
+    final ok = _counts['ok'] ?? 0;
+    final noText = _counts['no_text'] ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.manage_search_outlined),
+          title: const Text('Index the text of my books'),
+          subtitle: const Text(
+              'Lets search look inside books, not just at titles and authors. '
+              'Off by default: the index is about as big as the text it holds'),
+          value: widget.settings.indexBookText,
+          onChanged: (on) async {
+            await widget.settings.setIndexBookText(on);
+            if (on) await _indexNow();
+            if (mounted) setState(() {});
+          },
+        ),
+        if (widget.settings.indexBookText)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  // Named rather than hidden: a scanned book is not a failure,
+                  // and someone wondering why it never turns up in results
+                  // deserves to see that it has no text to search.
+                  [
+                    '$ok indexed',
+                    if (pending > 0) '$pending waiting',
+                    if (noText > 0) '$noText with no text (scanned)',
+                  ].join(', '),
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: _busy ? null : _indexNow,
+                      child: Text(_busy ? 'Indexing…' : 'Index now'),
+                    ),
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              await _index.reindexAll();
+                              await _indexNow();
+                            },
+                      child: const Text('Rebuild'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

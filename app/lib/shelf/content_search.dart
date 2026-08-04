@@ -3,28 +3,41 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
+import '../data/local_text_index.dart';
 import '../reader/reader_page.dart';
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
 
-/// Searching inside book contents (plan 5 #32) — the connected half of search.
+/// Searching inside book contents (plan 5 #32).
 ///
-/// The local FTS5 index (#2) searches titles, authors and genres and is the
-/// default, because it works offline and always will. This searches the *text*
-/// of the books, which is the one thing a server can do that a phone genuinely
-/// cannot, and it appears only when the server says it has an index. With no
-/// server, or an older one, this tab simply isn't offered.
+/// `book_search` covers titles, authors and genres and is the default, because
+/// it works offline and always will. This searches the *text* of the books,
+/// from whichever index is available:
+///
+/// - **[localIndex] when there is one.** On desktop, with the setting on, the
+///   text of the local files is indexed here — see `local_text_index.dart` for
+///   why the "only a server can do this" reasoning stops at a phone. Preferred
+///   when present because it works offline *and* because every hit is in a file
+///   this device actually holds, so "open at the page" always has something to
+///   open.
+/// - **The server otherwise**, when it advertises `content_search`.
+///
+/// With neither, the tab isn't offered at all.
 class ContentSearchResults extends StatefulWidget {
   const ContentSearchResults({
     super.key,
     required this.query,
     required this.connection,
     required this.repository,
+    this.localIndex,
   });
 
   final String query;
   final ServerConnection connection;
   final LibraryRepository repository;
+
+  /// The on-device index, or null to search the server instead.
+  final LocalTextIndex? localIndex;
 
   @override
   State<ContentSearchResults> createState() => _ContentSearchResultsState();
@@ -60,9 +73,13 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
 
   void _schedule() {
     _debounce?.cancel();
-    // Longer than the local search's 150 ms: every keystroke here is a network
-    // round trip and an FTS query on someone else's machine.
-    _debounce = Timer(const Duration(milliseconds: 350), _run);
+    // A local index is one SQLite query, so it can keep up with typing; the
+    // server path is a network round trip and an FTS query on someone else's
+    // machine, and earns the longer wait.
+    _debounce = Timer(
+      Duration(milliseconds: widget.localIndex == null ? 350 : 150),
+      _run,
+    );
   }
 
   Future<void> _run() async {
@@ -71,6 +88,32 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
       setState(() {
         _hits = const [];
         _error = null;
+      });
+      return;
+    }
+    final local = widget.localIndex;
+    if (local != null) {
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      _inFlight = query;
+      final found = await local.search(query);
+      if (!mounted || _inFlight != query) return;
+      setState(() {
+        // `fileId` is only used by the server path's own bookkeeping; a local
+        // hit is resolved through the book's files on disk instead.
+        _hits = [
+          for (final h in found)
+            ContentHit(
+              bookId: h.bookId,
+              title: h.title,
+              fileId: '',
+              page: h.page,
+              snippet: h.snippet,
+            ),
+        ];
+        _busy = false;
       });
       return;
     }
@@ -155,7 +198,9 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
     if (hits.isEmpty) {
       return _Message(
         icon: Icons.search_off,
-        text: 'No book on the server contains “${widget.query.trim()}”.',
+        text: widget.localIndex == null
+            ? 'No book on the server contains “${widget.query.trim()}”.'
+            : 'No indexed book contains “${widget.query.trim()}”.',
       );
     }
     return ListView.separated(

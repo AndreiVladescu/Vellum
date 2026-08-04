@@ -12,6 +12,7 @@ import 'add_book/scan_page.dart';
 import 'app_drawer.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
+import 'data/local_text_index.dart';
 import 'data/library_queries.dart';
 import 'data/backup_schedule.dart';
 import 'data/library_repository.dart';
@@ -88,6 +89,18 @@ Future<void> main() async {
   // first frame depends on the sweep having run. It swallows its own errors —
   // a file the OS won't release just waits for the next launch.
   unawaited(repository.trash.sweep());
+  // Index a few books' text, if the user asked for local content search.
+  // Not awaited, and bounded per launch rather than draining the queue: the
+  // first pass over a large library is minutes of extraction, and the shelf
+  // must not wait on it. A killed app resumes from the same queue next time.
+  if (settings.indexBookText && textIndexSupportedHere) {
+    unawaited(() async {
+      final index = LocalTextIndex(repository.db, dataDir: repository.dataDir);
+      await index.enqueueMissing();
+      await index.processPending(limit: 8);
+    }()
+        .catchError((_) {}));
+  }
   runApp(VellumApp(
     repository: repository,
     profile: profile,
@@ -623,8 +636,20 @@ class _LibraryPageState extends State<LibraryPage> {
   /// the capability handshake rather than probing: a tab that 400s on every
   /// keystroke is worse than no tab.
   bool get _contentSearchAvailable =>
-      widget.connection.isConnected &&
-      (widget.connection.capabilities?.hasFeature('content_search') ?? false);
+      _localTextIndex != null ||
+      (widget.connection.isConnected &&
+          (widget.connection.capabilities?.hasFeature('content_search') ??
+              false));
+
+  /// The on-device content index, or null when it can't or shouldn't be used —
+  /// off Android, and off unless the setting is on. Built per read rather than
+  /// held: it is a thin wrapper over the database with no state of its own
+  /// beyond the extraction guard, so a stale one cannot linger after the
+  /// setting is switched off.
+  LocalTextIndex? get _localTextIndex =>
+      widget.settings.indexBookText && textIndexSupportedHere
+          ? LocalTextIndex(repository.db, dataDir: repository.dataDir)
+          : null;
 
   /// Sets the dedicated filter (shown as a removable chip near the search)
   /// rather than the search box, so any text search you had stays put.
@@ -1253,6 +1278,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       query: _query,
                       connection: widget.connection,
                       repository: repository,
+                      localIndex: _localTextIndex,
                     ),
                   )
                 else

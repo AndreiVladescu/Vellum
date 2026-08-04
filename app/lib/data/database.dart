@@ -565,6 +565,41 @@ class ReadingSessions extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Extraction state for one book file's text, for the local content index.
+///
+/// **App-local by design, like `sourceMetadata` and `deletedAt`** — do *not*
+/// add this to the server schema or to any sync payload. The server has its own
+/// `book_text` (migration 0016) built the same way for the same purpose; the
+/// two indexes are independent, each derived from files their own side holds,
+/// and neither is ever pushed. Everything here can be dropped and rebuilt from
+/// the files on disk, so it carries no `updatedAt`/`needsPush` pair.
+///
+/// **The queue is the table**, copied from the server's design: a row with
+/// `status = 'pending'` *is* the work item, so an app killed mid-extraction
+/// resumes exactly where it stopped with no job state held in memory.
+@DataClassName('BookText')
+class BookTexts extends Table {
+  @override
+  String get tableName => 'book_text';
+
+  TextColumn get fileId => text().references(BookFiles, #id)();
+  TextColumn get bookId => text().references(Books, #id)();
+
+  /// How many page/section rows were indexed, or null until extraction runs.
+  IntColumn get pages => integer().nullable()();
+  DateTimeColumn get extractedAt =>
+      dateTime().withDefault(currentDateAndTime)();
+
+  /// 'pending' | 'ok' | 'no_text' | 'failed' | 'skipped'.
+  ///
+  /// `no_text` is a scanned PDF — a real outcome rather than a failure, and
+  /// the same position the server takes: there is no OCR here either.
+  TextColumn get status => text()();
+
+  @override
+  Set<Column> get primaryKey => {fileId};
+}
+
 @DriftDatabase(tables: [
   Books,
   Series,
@@ -586,13 +621,14 @@ class ReadingSessions extends Table {
   RemoteReadingPositions,
   Annotations,
   ReadingSessions,
+  BookTexts,
 ])
 class VellumDatabase extends _$VellumDatabase {
   VellumDatabase([QueryExecutor? executor])
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 29;
+  int get schemaVersion => 30;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -893,6 +929,15 @@ class VellumDatabase extends _$VellumDatabase {
               }
             }
           }
+          if (from < 30) {
+            // The local content index. App-local and fully derivable from the
+            // files on disk, so there is no server migration and nothing to
+            // backfill — every existing file is simply unindexed until the
+            // extractor reaches it, which is what an empty table already means.
+            if (!(await tableNames()).contains('book_text')) {
+              await m.createTable(bookTexts);
+            }
+          }
           if (from < 29) {
             // Per-book sync opt-out. Defaulted to false, so every existing book
             // keeps syncing exactly as it did — the switch is something you go
@@ -977,6 +1022,19 @@ class VellumDatabase extends _$VellumDatabase {
       // Only on first creation — an existing table already has its rows
       // (kept current by the triggers above).
       await customStatement(backfillBookSearch);
+    }
+
+    // The content index's virtual table and sweeper. No backfill: its source is
+    // files on disk rather than a table, so it fills as the extractor runs.
+    // Guarded on `book_text` existing because this runs from `beforeOpen`, and
+    // a database still mid-upgrade may not have reached v29 yet.
+    if (names.contains('book_text')) {
+      if (!names.contains('book_text_fts')) {
+        await customStatement(createBookTextFtsTable);
+      }
+      for (final entry in bookTextTriggers.entries) {
+        if (!names.contains(entry.key)) await customStatement(entry.value);
+      }
     }
   }
 

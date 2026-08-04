@@ -29,6 +29,8 @@ class AppSettingsStore extends ChangeNotifier {
   static const _deviceLabelKey = 'settings.deviceLabel';
   static const _watchedFolderKey = 'settings.watchedImportFolder';
   static const _seenFirstRunKey = 'settings.hasSeenFirstRun';
+  // Local content index (search inside books, desktop only).
+  static const _indexBookTextKey = 'settings.indexBookText';
   static const _backupFrequencyKey = 'settings.backupFrequency';
   static const _backupFolderKey = 'settings.backupFolder';
   static const _backupKeepKey = 'settings.backupKeep';
@@ -295,6 +297,19 @@ class AppSettingsStore extends ChangeNotifier {
   String? get watchedImportFolder {
     final stored = _prefs.getString(_watchedFolderKey);
     return (stored == null || stored.isEmpty) ? null : stored;
+  }
+
+  /// Whether to build a local index of the *text inside* books, so search can
+  /// look through them and not just at their catalogue entry.
+  ///
+  /// **Off by default, and desktop-only** — see `local_text_index.dart`. The
+  /// index is roughly the size of the text it holds, so it is opt-in for the
+  /// same reason the server's `VELLUM_INDEX_TEXT` is: nobody should find a
+  /// search engine on their disk they did not ask for.
+  bool get indexBookText => _prefs.getBool(_indexBookTextKey) ?? false;
+
+  Future<void> setIndexBookText(bool value) async {
+    await _prefs.setBool(_indexBookTextKey, value);
   }
 
   Future<void> setWatchedImportFolder(String? path) async {

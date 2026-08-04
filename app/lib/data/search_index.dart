@@ -145,3 +145,37 @@ String? ftsMatchQuery(String text, {String? column}) {
       .map((t) => '$prefix"${t.replaceAll('"', '""')}"*')
       .join(' AND ');
 }
+
+// ---------------------------------------------------------------------------
+// Content index: the text *inside* books, not their catalogue entry.
+// ---------------------------------------------------------------------------
+
+/// FTS5 table holding one row per page (PDF) or spine section (EPUB).
+///
+/// Separate from `book_search` rather than another column on it, because the
+/// grain is different: `book_search` is one row per book, this is thousands of
+/// rows per book, and a search here has to report *where* the hit was to be
+/// worth anything.
+///
+/// Unlike `book_search` there are **no triggers**: the source is a file on
+/// disk, not a table, so nothing SQLite can observe tells it the text changed.
+/// `book_text.status` is the queue instead, and `book_text_after_delete` sweeps
+/// the rows when a file's row goes — a virtual table has no foreign keys, so
+/// the cascade cannot do it.
+const createBookTextFtsTable = '''
+CREATE VIRTUAL TABLE book_text_fts USING fts5(
+  body,
+  page UNINDEXED,
+  file_id UNINDEXED,
+  book_id UNINDEXED,
+  tokenize = 'unicode61 remove_diacritics 2'
+)
+''';
+
+final Map<String, String> bookTextTriggers = {
+  'book_text_after_delete': '''
+CREATE TRIGGER book_text_after_delete AFTER DELETE ON book_text BEGIN
+  DELETE FROM book_text_fts WHERE file_id = old.file_id;
+END
+''',
+};
