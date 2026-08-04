@@ -268,6 +268,27 @@ the one-time `keytool` command. Without it, release builds fall back to the debu
 key, so a fresh checkout still produces something installable; it just isn't
 distributable.
 
+**Why this matters more than it sounds.** A debug-signed install can never be
+upgraded in place by a properly signed build — Android refuses an update whose
+signature changed. Anyone who installs a debug-signed APK has to uninstall it to
+move to a real one, losing their local library with it. So the keystore wants
+creating *before* the first public Android build, not after.
+
+**Signing in CI.** `release.yml` rebuilds `key.properties` from four repository
+secrets, and falls back to the debug key when they are absent — saying which of
+the two happened in the job log rather than leaving it to be discovered later.
+Set them under *Settings → Secrets and variables → Actions*:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 ~/vellum-upload.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | the `storePassword` you chose |
+| `ANDROID_KEY_PASSWORD` | the `keyPassword` you chose |
+| `ANDROID_KEY_ALIAS` | the alias, e.g. `vellum` |
+
+Keep the `.jks` backed up somewhere other than the repository and the runner: if
+it is lost, the app can never be updated on Play under the same identity again.
+
 ```sh
 cd app
 flutter build appbundle --release             # for Play, delivers per-ABI (~30 MB)
