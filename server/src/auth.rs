@@ -333,7 +333,43 @@ pub struct AuthResponse {
     pub user: AuthUser,
 }
 
+#[derive(Serialize)]
+pub struct RegistrationState {
+    /// True only while the server has no master — the window in which
+    /// [`register`] can succeed.
+    pub open: bool,
+    /// Whether that first registration must also present the operator's
+    /// `VELLUM_BOOTSTRAP_TOKEN`, so a form can ask for it up front instead of
+    /// being refused after the fact. Reported only while registration is open:
+    /// a closed server says nothing about how its operator configured it.
+    pub bootstrap_token_required: bool,
+}
+
 // ---- handlers -------------------------------------------------------------
+
+/// `GET /api/auth/registration` — can a first account still be created here?
+///
+/// Exists so a client that has never had an account can *offer* the right form
+/// instead of guessing: the console showed a login box on a server with nobody
+/// to log in as, which is a dead end for anyone who doesn't know the app or
+/// `curl` is the way in.
+///
+/// Unauthenticated, and deliberately unrevealing: it answers "open" only in the
+/// state anyone can already detect by POSTing to [`register`] and reading the
+/// error, and once a master exists the answer is a permanent "closed" that says
+/// nothing about who the accounts belong to or how many there are.
+pub async fn registration_state(
+    State(state): State<AppState>,
+) -> AppResult<Json<RegistrationState>> {
+    let master_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM app_user WHERE is_master = 1)")
+            .fetch_one(&state.db)
+            .await?;
+    Ok(Json(RegistrationState {
+        open: !master_exists,
+        bootstrap_token_required: !master_exists && BOOTSTRAP_TOKEN.is_some(),
+    }))
+}
 
 /// Bootstraps the library: the first account created becomes the master. Once a
 /// master exists this is closed and the master provisions further accounts.

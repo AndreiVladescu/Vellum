@@ -239,8 +239,11 @@ server first gets it.
 
 1. Start the server.
 2. Open `http://<host>:<port>/` — the web console.
-3. Register. **The first account is the master**; afterwards registration is
-   closed and the master provisions member accounts.
+3. Register. A server with no accounts opens on the *Create the master account*
+   form rather than a login box (and asks for the bootstrap token when one is
+   set). **The first account is the master**; afterwards registration is closed,
+   the console goes back to logging in, and the master provisions member
+   accounts.
 4. In the app: *Library server* → the same URL → sign in. On a self-signed
    setup, import the certificate when prompted.
 

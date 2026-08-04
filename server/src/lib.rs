@@ -178,6 +178,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/cert", get(web::server_cert))
         // Accounts & sessions.
         .route("/auth/register", post(auth::register))
+        // Whether a first account can still be made here. Unauthenticated by
+        // necessity: its only caller has no account yet.
+        .route("/auth/registration", get(auth::registration_state))
         .route("/auth/login", post(auth::login))
         .route("/auth/logout", post(auth::logout))
         // Password reset by email (plan 5 #31). Both are unauthenticated by

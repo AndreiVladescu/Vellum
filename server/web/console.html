@@ -18,6 +18,30 @@
   <input id="l-pass" type="password" placeholder="Password" autocomplete="current-password">
   <button class="btn primary" style="width:100%" onclick="login()">Log in</button>
   <p class="err" id="l-err"></p>
+  <!-- Shown only on a server that has no accounts yet; see checkRegistration(). -->
+  <p class="muted hidden" id="l-to-register">
+    Nobody has an account on this server yet.
+    <button class="btn sm quiet" onclick="showRegister()">Create the master account</button>
+  </p>
+</div>
+
+<!-- First run: the server has no master, so the only useful form is this one. -->
+<div id="register" class="hidden">
+  <img class="logo logo-lg" src="/assets/logo.svg" alt="" width="64" height="64">
+  <h1>Vellum console</h1>
+  <p class="muted">The first account becomes the library's master (owner).</p>
+  <input id="r-email" type="text" placeholder="Email" autocomplete="username">
+  <input id="r-name" type="text" placeholder="Display name" autocomplete="name">
+  <input id="r-pass" type="password" placeholder="Password (8 characters or more)"
+         autocomplete="new-password">
+  <!-- Only when the operator set VELLUM_BOOTSTRAP_TOKEN. -->
+  <input id="r-token" class="hidden" type="password" placeholder="Bootstrap token"
+         autocomplete="off">
+  <button class="btn primary" style="width:100%" onclick="register()">Create account</button>
+  <p class="err" id="r-err"></p>
+  <p class="muted">
+    <button class="btn sm quiet" onclick="showLogin()">Have an account? Log in</button>
+  </p>
 </div>
 
 <!-- App -->

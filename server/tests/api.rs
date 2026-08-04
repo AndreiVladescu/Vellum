@@ -232,6 +232,38 @@ async fn first_user_is_master_and_registration_then_closes() {
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
+/// What the console's first-run form is gated on: it must say "open" exactly
+/// while `POST /auth/register` would succeed, and never afterwards.
+#[tokio::test]
+async fn registration_state_reports_the_window_and_then_closes() {
+    let app = test_app().await;
+
+    let (status, body) = call(&app, "GET", "/api/auth/registration", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["open"],
+        json!(true),
+        "a fresh server takes a first account"
+    );
+    // VELLUM_BOOTSTRAP_TOKEN is unset in the test process.
+    assert_eq!(body["bootstrap_token_required"], json!(false));
+
+    register_master(&app).await;
+
+    let (status, body) = call(&app, "GET", "/api/auth/registration", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["open"],
+        json!(false),
+        "the window shuts with the master, matching register's own 403"
+    );
+    assert_eq!(
+        body["bootstrap_token_required"],
+        json!(false),
+        "a closed server discloses nothing about its bootstrap configuration"
+    );
+}
+
 #[tokio::test]
 async fn session_expiry_slides_forward_on_use() {
     let id = uuid::Uuid::new_v4();

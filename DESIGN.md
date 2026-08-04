@@ -69,6 +69,12 @@ single-user and offline. These tables are **server-only** (migration
 - **app_user** — email, display name, Argon2 password hash, `is_master` flag.
   The **first** account created becomes the master (library owner/admin);
   afterwards registration is closed and the master provisions member accounts.
+  `GET /api/auth/registration` reports whether that window is still open (and
+  whether `VELLUM_BOOTSTRAP_TOKEN` guards it), so a client with no account can
+  offer the right form instead of guessing — the console showed a login box on a
+  server with nobody to log in as. It discloses nothing that POSTing to
+  `/auth/register` wouldn't, and answers a permanent "closed" once a master
+  exists.
 - **session** — opaque bearer tokens (only their SHA-256 is stored), 30-day
   expiry. Sent as `Authorization: Bearer <token>`.
 - **book.owner_id** — every book belongs to the account that added it.
