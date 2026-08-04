@@ -113,6 +113,26 @@ abstract class TranslationBackend {
   });
 }
 
+/// The backend a reader should use, or null when translation is not possible
+/// here at all.
+///
+/// On-device wins wherever it exists: it is free, it works on a train, and the
+/// passage stays on the machine. A LibreTranslate address is the desktop's
+/// answer until the packed engine of docs/NEXT_FEATURES.md #12 exists, and the
+/// fallback for a phone whose language pair ML Kit does not have.
+TranslationBackend? backendFor({
+  required bool onDeviceAvailable,
+  required String libreUrl,
+  String? libreApiKey,
+  TranslationBackend Function()? onDevice,
+}) {
+  if (onDeviceAvailable && onDevice != null) return onDevice();
+  if (libreUrl.trim().isNotEmpty) {
+    return LibreTranslateBackend(baseUrl: libreUrl, apiKey: libreApiKey);
+  }
+  return null;
+}
+
 /// A [LibreTranslate](https://libretranslate.com) server.
 ///
 /// The one backend that can exist today without shipping a native engine, and

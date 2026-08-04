@@ -3,6 +3,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'translate/on_device_backend.dart';
 import 'translate/translation_backend.dart';
 
 /// Page background and text colour while reading (plan 5 #23).
@@ -253,9 +254,11 @@ class ReaderSettings extends ChangeNotifier {
   /// The LibreTranslate address, or empty when none is set.
   String get translateUrl => _prefs.getString(_translateUrlKey) ?? '';
 
-  /// Whether translating is possible at all. Everything user-facing hangs off
-  /// this: the reader shows no translate button until it is true.
-  bool get canTranslate => translateUrl.trim().isNotEmpty;
+  /// Whether translating is possible at all — a server named here, or a device
+  /// that can do it itself. The reader shows no translate button until it is
+  /// true, because a button that can only fail is worse than none.
+  bool get canTranslate =>
+      OnDeviceBackend.available || translateUrl.trim().isNotEmpty;
 
   String get translateApiKey => _prefs.getString(_translateKeyKey) ?? '';
 

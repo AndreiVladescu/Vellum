@@ -17,6 +17,7 @@ import 'reader_hotkeys.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
+import 'translate/on_device_backend.dart';
 import 'translate/translate_sheet.dart';
 import 'translate/translation_backend.dart';
 
@@ -404,10 +405,12 @@ class _ReaderPageState extends State<ReaderPage> {
       builder: (_) => TranslateSheet(
         passage: passage,
         settings: settings,
-        backend: LibreTranslateBackend(
-          baseUrl: settings.translateUrl,
-          apiKey: settings.translateApiKey,
-        ),
+        backend: backendFor(
+          onDeviceAvailable: OnDeviceBackend.available,
+          onDevice: OnDeviceBackend.new,
+          libreUrl: settings.translateUrl,
+          libreApiKey: settings.translateApiKey,
+        )!,
         onSaveAsNote: (translation) => _annotations.add(
           bookId: widget.book.id,
           kind: AnnotationKind.note,

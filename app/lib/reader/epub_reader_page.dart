@@ -17,6 +17,7 @@ import 'epub_book.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
 import 'reader_settings.dart';
+import 'translate/on_device_backend.dart';
 import 'translate/translate_sheet.dart';
 import 'translate/translation_backend.dart';
 import 'reader_settings_sheet.dart';
@@ -288,10 +289,12 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
       builder: (_) => TranslateSheet(
         passage: quote,
         settings: settings,
-        backend: LibreTranslateBackend(
-          baseUrl: settings.translateUrl,
-          apiKey: settings.translateApiKey,
-        ),
+        backend: backendFor(
+          onDeviceAvailable: OnDeviceBackend.available,
+          onDevice: OnDeviceBackend.new,
+          libreUrl: settings.translateUrl,
+          libreApiKey: settings.translateApiKey,
+        )!,
         onSaveAsNote: (translation) => _annotations.add(
           bookId: widget.book.id,
           kind: AnnotationKind.note,

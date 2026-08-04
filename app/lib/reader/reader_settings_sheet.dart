@@ -156,25 +156,6 @@ class ReaderSettingsSheet extends StatelessWidget {
                   value: settings.immersive,
                   onChanged: settings.setImmersive,
                 ),
-                const Divider(height: 24),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.translate),
-                  title: const Text('Translation'),
-                  subtitle: Text(
-                    settings.canTranslate
-                        ? 'Selected text can be translated · '
-                            '${settings.translateUrl}'
-                        : 'Off — needs a translation server',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    showDragHandle: true,
-                    builder: (_) => TranslateServerSheet(settings: settings),
-                  ),
-                ),
               ],
             ),
           ),

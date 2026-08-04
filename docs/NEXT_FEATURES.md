@@ -516,7 +516,14 @@ Three mitigations, designed in rather than bolted on:
 
 ## 12. Translate the passage you have selected
 
-> **Partly done 2026-08-04** — steps 1 and 2 of the sequence below. The
+> **Translating offline 2026-08-04** — on Android and iOS it now happens on
+> the device, with language packs you download and delete yourself
+> (`on_device_backend.dart`); nothing is sent anywhere. The desktop still
+> borrows a LibreTranslate address until the packed engine below exists. Both
+> live behind one interface, and all of it is reached from the Translate button
+> that appears when you select text.
+>
+> **Steps 1 and 2 of the sequence below.** The
 > selection button, the sheet, the *From*/*To* pickers, save-as-note and the
 > server field are built in both readers, against a `TranslationBackend`
 > interface with one implementation: LibreTranslate. **The packed engine and its

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../reader_settings.dart';
+import '../reader_settings_sheet.dart';
+import 'language_packs_sheet.dart';
+import 'on_device_backend.dart';
 import 'translation_backend.dart';
 
 /// The passage, what it was translated from and to, and the result.
@@ -76,6 +79,32 @@ class _TranslateSheetState extends State<TranslateSheet> {
         _busy = false;
       });
     }
+  }
+
+  Future<void> _openLanguages() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const LanguagePacksSheet(),
+    );
+    if (!mounted) return;
+    // A pack downloaded while the error was on screen is exactly the thing that
+    // fixes it, so try again rather than leaving the message up.
+    if (_error != null) _run();
+  }
+
+  /// The desktop's version of *Languages*: this platform has no on-device
+  /// engine yet, so the thing to configure is the server it borrows one from.
+  Future<void> _openServerSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => TranslateServerSheet(settings: widget.settings),
+    );
+    if (!mounted) return;
+    if (_error != null) _run();
   }
 
   Future<void> _save() async {
@@ -187,6 +216,22 @@ class _TranslateSheetState extends State<TranslateSheet> {
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
               const Spacer(),
+              // Everything about translation lives behind the button you
+              // pressed to get here, including the packs: a language you are
+              // missing is discovered *while translating*, so the way to fix it
+              // belongs on this sheet rather than three screens away.
+              if (OnDeviceBackend.available)
+                TextButton.icon(
+                  onPressed: _openLanguages,
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: const Text('Languages'),
+                )
+              else
+                TextButton.icon(
+                  onPressed: _openServerSettings,
+                  icon: const Icon(Icons.dns_outlined, size: 18),
+                  label: const Text('Server'),
+                ),
               if (_error != null)
                 TextButton(onPressed: _busy ? null : _run, child: const Text('Try again')),
               if (_result != null) ...[

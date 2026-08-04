@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/reader/reader_settings.dart';
+import 'package:vellum/reader/translate/on_device_backend.dart';
 import 'package:vellum/reader/translate/translate_sheet.dart';
 import 'package:vellum/reader/translate/translation_backend.dart';
 
@@ -219,6 +220,48 @@ void main() {
     });
   });
 
+
+  group('choosing a backend', () {
+    test('on-device wins wherever it exists', () {
+      final backend = backendFor(
+        onDeviceAvailable: true,
+        onDevice: () => _FakeBackend(),
+        libreUrl: 'http://libre.test:5000',
+      );
+      expect(backend, isA<_FakeBackend>(),
+          reason: 'free, offline, and the passage stays on the machine');
+    });
+
+    test('a server is the answer where there is no on-device engine', () {
+      final backend = backendFor(
+        onDeviceAvailable: false,
+        onDevice: () => _FakeBackend(),
+        libreUrl: 'http://libre.test:5000',
+      );
+      expect(backend, isA<LibreTranslateBackend>());
+    });
+
+    test('neither means the reader offers nothing at all', () {
+      expect(
+        backendFor(onDeviceAvailable: false, libreUrl: '  '),
+        isNull,
+        reason: 'a button that can only fail is worse than no button',
+      );
+    });
+  });
+
+  group('language packs', () {
+    test('only languages the device can actually translate are offered', () {
+      // Every offered language must map to a model; the list is the app's own
+      // narrowed to what ML Kit has, so nothing is shown that fails on press.
+      for (final language in LanguagePacks.offered) {
+        expect(TranslationLanguage.byCode(language.code), isNotNull);
+      }
+      expect(LanguagePacks.offered, isNotEmpty);
+      expect(LanguagePacks.offered.contains(TranslationLanguage.auto), false,
+          reason: '"Detect" is not something you download');
+    });
+  });
   group('the sheet', () {
     testWidgets('translates on open and offers to keep it as a note',
         (tester) async {
@@ -278,6 +321,17 @@ void main() {
       expect(find.text('Try again'), findsOneWidget);
     });
   });
+}
+
+class _FakeBackend implements TranslationBackend {
+  @override
+  String get name => 'fake';
+
+  @override
+  Future<Translation> translate(String text,
+          {required TranslationLanguage from,
+          required TranslationLanguage to}) async =>
+      const Translation(text: 'x');
 }
 
 /// Stands in for a socket failure without depending on `dart:io` in a test that
