@@ -195,6 +195,17 @@ jobs:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE" ]; then
+            # A *tag* is a publish. v1.1.0 went out debug-signed because this
+            # only warned, and a warning in a job log is not something anyone
+            # reads before people start downloading. Refuse instead: the
+            # artefact it would produce cannot be upgraded in place later, so
+            # shipping it is worse than shipping nothing.
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              echo "::error::No ANDROID_KEYSTORE_BASE64 secret. A tagged"\
+                   "release must not ship debug-signed Android artefacts —"\
+                   "they can never be upgraded in place. See DEVELOPER.md."
+              exit 1
+            fi
             echo "signed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -212,14 +223,25 @@ jobs:
           flutter pub get
           flutter build appbundle --release
           flutter build apk --release --split-per-abi
-      - name: How this build is signed
+      # Checks the artefact rather than the inputs. The secret being present
+      # proves a keystore was written, not that Gradle used it — a typo in the
+      # alias, or a `key.properties` the build could not read, both end in a
+      # silent fall back to the debug key, which is precisely the failure this
+      # is here to catch. A debug certificate's subject is `CN=Android Debug`,
+      # and it appears verbatim in the APK signing block.
+      - name: Check what actually signed the APK
+        working-directory: app
         run: |
-          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
-            echo "::notice::Signed with the release keystore."
+          apk=$(ls build/app/outputs/flutter-apk/*-release.apk | head -1)
+          if grep -qa 'Android Debug' "$apk"; then
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              echo "::error::$apk is DEBUG-SIGNED despite a keystore being"\
+                   "configured. Not publishing it."
+              exit 1
+            fi
+            echo "::warning::$apk is debug-signed (no keystore on this run)."
           else
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — this build is"\
-                 "DEBUG-SIGNED. It installs, but it cannot go to Play and can"\
-                 "never be upgraded in place by a properly signed build."
+            echo "::notice::Android artefacts are signed with the release key."
           fi
       # The keystore is written into the workspace, which is discarded with the
       # runner — but an artefact upload globs the tree, so remove it explicitly
