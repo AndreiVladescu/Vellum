@@ -586,9 +586,19 @@ everything and attaches it to a GitHub Release with checksums:
 | `android` | `app-release.aab` and per-ABI APKs |
 
 ```sh
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
+
+**Write the changelog first.** `publish` slices the release notes out of
+`CHANGELOG.md` by heading, so a tag with no matching `## vX.Y.Z` section
+**fails the build** rather than publishing a release with only an
+auto-generated commit list. The fixed downloads table lives in
+`.github/release-downloads.md` and is appended to whatever that section says.
+
+Bump both versions in the same commit: `app/pubspec.yaml` (`version:`, and its
+`+build` number, which Play requires to increase) and `server/Cargo.toml`
+(reported by `GET /api/capabilities` and shown in the console).
 
 `workflow_dispatch` is kept on the same workflow so a release can be rehearsed
 without tagging. Desktop artefacts are unsigned; the release notes say so.

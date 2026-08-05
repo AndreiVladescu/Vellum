@@ -6,6 +6,128 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.0 — unreleased
+
+Everything here is additive: your library, its files and its database carry over
+untouched. The app's schema moves 28 → 30 and the server gains two migrations,
+both applied on first start.
+
+The theme of this release is **things that used to need a server, and no longer
+do** — searching inside your books, and translating a passage — plus a Linux
+release that installs like a normal program.
+
+### Reading
+
+- **Translate the passage you have selected.** The Translate button appears
+  beside the highlighter when you select text: pick the languages, read the
+  translation, and keep it as a note on the passage if it is worth keeping.
+  **Nothing is sent anywhere.** On Android and iOS it runs on the device, with
+  language packs you download and delete under *Languages*; on a desktop it uses
+  a translator installed on the machine (Argos Translate or Apertium) and says
+  exactly what to install if there is none. Where both engines are present, the
+  one that actually has your language pair answers.
+- **Search inside your books, offline.** A local full-text index over book
+  *contents*, so the search box finds a phrase that appears in the body of a
+  book and not in its catalogue entry. Desktop only and off by default — the
+  index is roughly the size of the text it holds, and it should not appear on
+  your disk unasked.
+- The reader no longer reopens the document when night mode is toggled, which
+  used to lose your place.
+- A book that will not open now says so, and offers to try again, instead of
+  showing a blank page.
+- The reader spends far less memory on a phone: the shelf's covers are handed
+  back when a book opens, and both the image cache and the page cache are
+  bounded.
+
+### Your library
+
+- **A page for your series**, showing what you have and which volumes are
+  missing from a run.
+- **Tap an author** to see the rest of their books.
+- **An overdue book comes and finds you** — the drawer's Loans row carries a
+  count of loans wanting attention. Everything else on that screen you go
+  looking for; an overdue loan is the one thing that should arrive on its own.
+- **Keep a book on this device only.** A cloud button on the book's page stops
+  it syncing in either direction, without hiding it from you.
+- Imports keep your **ratings, shelves and reviews** — the columns a Goodreads
+  or StoryGraph export actually carries.
+- The OPDS browser offers somewhere to go rather than an empty address bar.
+- *Open in another app* opens the book in another app on Android, instead of
+  handing it to the share sheet.
+- The health check reports the things only you can decide about.
+
+### Physical books
+
+- A room you published from one device can be **brought down onto another** —
+  before this your own rooms were invisible everywhere else.
+- A shared room arrives **with its ornaments**, and a prop's artwork is no
+  longer its collider, so a book can sit under a plant's leaves.
+
+### Sharing
+
+- **A share link can carry a password.** The URL alone stops being enough,
+  which is what a link posted into a group chat needs. Argon2-hashed, throttled
+  per link and per address, and a revoked or expired link cannot be unlocked.
+- **A link's address can be read again.** It used to exist only in the dialog
+  that created it — see *Security* below for the trade that makes this possible.
+- **A Shares screen**: every public link in every state (live, expired, used up,
+  revoked) and every account share, on one page, with the URL and a Revoke.
+
+### The console
+
+- **The master account can be created from the console.** A fresh server used to
+  show a login box with nothing to log in as; it now opens on a *Create the
+  master account* form, and asks for the bootstrap token when one is set.
+- Shares, People and Borrow requests are **pages** now rather than boxes
+  floating over the library.
+- *Fetch metadata* looks the book up under the title you just typed, and
+  **nothing in the detail panel is written until you press Save** — a wrong
+  match costs a Cancel instead of an edit to undo.
+- The sign-in and first-run forms were redrawn.
+
+### Linux
+
+- **An AppImage, a `.deb` and an installer.** The AppImage is one file; the
+  `.deb` and `install.sh` put the app out of the way and leave a single `vellum`
+  command on your PATH.
+- The window and launcher **icon now appears** — including on a build you have
+  not installed, which is what `flutter run` produces.
+
+### For operators
+
+- `server/.env.example` lists every setting with its default, and
+  `docs/DEPLOYMENT.md` gained a section on generating a TLS certificate with
+  openssl, including the `subjectAltName` without which every client refuses it.
+- The Android release is signed properly **when a keystore is configured** —
+  see DEVELOPER.md. Without one it still falls back to a debug key.
+
+### Security
+
+- Share-link passwords are Argon2, never stored or returned in the clear, and
+  the unlock rides an HttpOnly cookie rather than a query string.
+- **`share_link` now stores its token.** Only the hash was kept before, which
+  meant a link's URL existed exactly once and could never be shown again. The
+  hash protected the *route* to a book whose row and file sit in the same
+  database and data directory, so a reader of that database already had the
+  book. Session and password-reset tokens are unaffected and stay hashed.
+- `GET /api/auth/registration` reports whether a first account can still be
+  made. It answers "open" only in the state anyone can detect by POSTing to
+  `/auth/register`, and permanently "closed" once a master exists.
+
+### Known limitations
+
+Carried over from v1.0.0, with one addition:
+
+- **A book sometimes opens blank the first time**, and shows correctly when
+  reopened. The cause is not yet found; the reader now shows a spinner and,
+  after a few seconds, an explanation with a *Try again* that rebuilds the
+  viewer — which is what closing and reopening the book does by hand.
+- The code was written by an LLM with a human directing and reviewing it. 1,351
+  automated tests run against it (1,054 app, 297 server).
+- Desktop builds are unsigned; macOS is Apple Silicon only.
+
+---
+
 ## v1.0.0 — 2026-08-02
 
 The first release. Vellum is a personal library manager for digital **and**

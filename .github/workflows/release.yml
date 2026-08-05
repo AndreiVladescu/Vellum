@@ -240,6 +240,26 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      # The tag's own notes come from CHANGELOG.md rather than being written
+      # twice: a release whose notes disagree with the changelog is a release
+      # nobody can check afterwards. The section is sliced out by heading, so
+      # the only thing a tag has to get right is matching a `## vX.Y.Z` line.
+      - uses: actions/checkout@v4
+      - name: This version's notes
+        run: |
+          version="${GITHUB_REF_NAME}"
+          awk -v v="## $version" '
+            $0 ~ "^"v" " || $0 == v {found=1; next}
+            found && /^## v/ {exit}
+            found {print}
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no '## $version' section — write it before tagging."
+            exit 1
+          fi
+          # The downloads table is the same every time and belongs to the
+          # release page rather than to the changelog.
+          cat .github/release-downloads.md >> notes.md
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -247,30 +267,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
+          body_path: notes.md
           generate_release_notes: true
-          # Said here rather than left for people to discover at launch: the
-          # desktop builds are unsigned, because signing needs certificates
-          # that cost money and belong to a person, not a repository.
-          body: |
-            ## Downloads
-
-            | | |
-            |---|---|
-            | **Linux** | `Vellum-*-x86_64.AppImage` — download, `chmod +x`, run |
-            | **Linux (Debian/Ubuntu)** | `vellum_*_amd64.deb` — `sudo apt install ./vellum_*.deb` |
-            | **Linux (other)** | `vellum-linux-x64.tar.gz` — extract, then `./install.sh` |
-            | **Windows** | `vellum-windows-x64.zip` |
-            | **macOS** | `vellum-macos.zip` (Apple Silicon) |
-            | **Android** | `app-release.aab` (Play), or the per-ABI `.apk` to sideload |
-            | **Server** | `vellum-server-<target>` for four targets, or `docker build .` |
-
-            The AppImage is a single file and needs no installation. The `.deb`
-            and the tarball's `install.sh` both put the app out of the way and
-            leave one `vellum` command on your PATH — you never move `lib/` or
-            `data/` yourself. `./install.sh --uninstall` reverses it.
-
-            **The desktop builds are unsigned.** macOS will refuse the first
-            launch: right-click the app and choose Open, or
-            `xattr -d com.apple.quarantine vellum.app`. Windows SmartScreen will
-            warn; choose *More info → Run anyway*. Check the `SHA256SUMS` beside
-            each artefact if you want to verify what you downloaded.
