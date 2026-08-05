@@ -6,7 +6,7 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
-## v1.1.0 — unreleased
+## v1.1.0 — 2026-08-05
 
 Everything here is additive: your library, its files and its database carry over
 untouched. The app's schema moves 28 → 30 and the server gains two migrations,
