@@ -21,5 +21,6 @@ command on your PATH — you never move `lib/` or `data/` yourself.
 **The desktop builds are unsigned.** macOS will refuse the first launch:
 right-click the app and choose Open, or
 `xattr -d com.apple.quarantine vellum.app`. Windows SmartScreen will warn;
-choose *More info → Run anyway*. Check the `SHA256SUMS` beside each artefact if
-you want to verify what you downloaded.
+choose *More info → Run anyway*. To verify what you downloaded, each platform
+has its own list — `SHA256SUMS-linux`, `-windows`, `-macos`, `-android` — and
+the server builds carry a `.sha256` beside each archive.

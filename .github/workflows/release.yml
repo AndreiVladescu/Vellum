@@ -139,7 +139,12 @@ jobs:
           cp ../README.md "$STAGE/README.txt"
           tar -czf "dist/vellum-linux-x64.tar.gz" "$STAGE"
           rm -f dist/.appimagetool
-          (cd dist && sha256sum * > SHA256SUMS)
+          # Named per platform. Every job used to write plain `SHA256SUMS`, and
+          # a release's asset names have to be unique — so the four collided and
+          # exactly one survived (v1.1.0 shipped with only the macOS one, which
+          # left the AppImage, .deb, tarball, Windows zip and every APK with no
+          # checksum at all while the notes said to check them).
+          (cd dist && sha256sum * > SHA256SUMS-linux)
       - name: Package (Windows)
         if: matrix.platform == 'windows'
         working-directory: app
@@ -149,7 +154,7 @@ jobs:
           Compress-Archive -Path build/windows/x64/runner/Release/* `
             -DestinationPath dist/vellum-windows-x64.zip
           (Get-FileHash dist/vellum-windows-x64.zip -Algorithm SHA256).Hash `
-            | Out-File dist/SHA256SUMS
+            | Out-File dist/SHA256SUMS-windows
       - name: Package (macOS)
         if: matrix.platform == 'macos'
         working-directory: app
@@ -158,7 +163,7 @@ jobs:
           ditto -c -k --keepParent \
             build/macos/Build/Products/Release/vellum.app \
             dist/vellum-macos.zip
-          (cd dist && shasum -a 256 * > SHA256SUMS)
+          (cd dist && shasum -a 256 * > SHA256SUMS-macos)
       - uses: actions/upload-artifact@v7
         with:
           name: app-${{ matrix.platform }}
@@ -229,7 +234,7 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/bundle/release/*.aab dist/ || true
           cp build/app/outputs/flutter-apk/*.apk dist/ || true
-          (cd dist && sha256sum * > SHA256SUMS)
+          (cd dist && sha256sum * > SHA256SUMS-android)
       - uses: actions/upload-artifact@v7
         with:
           name: android
