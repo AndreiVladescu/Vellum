@@ -168,7 +168,8 @@ class _LocalEngineHelp extends StatefulWidget {
 }
 
 class _LocalEngineHelpState extends State<_LocalEngineHelp> {
-  LocalEngineBackend? _found;
+  List<LocalEngineBackend> _found = const [];
+  Map<LocalEngine, List<String>> _pairs = const {};
   bool _looking = true;
 
   @override
@@ -179,10 +180,15 @@ class _LocalEngineHelpState extends State<_LocalEngineHelp> {
 
   Future<void> _look() async {
     setState(() => _looking = true);
-    final found = await LocalEngineBackend.detect();
+    final found = await LocalEngineBackend.detectAll();
+    final pairs = <LocalEngine, List<String>>{};
+    for (final engine in found) {
+      pairs[engine.engine] = await engine.installedPairs();
+    }
     if (!mounted) return;
     setState(() {
       _found = found;
+      _pairs = pairs;
       _looking = false;
     });
   }
@@ -210,14 +216,50 @@ class _LocalEngineHelpState extends State<_LocalEngineHelp> {
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_found != null)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.check_circle_outline,
-                  color: theme.colorScheme.primary),
-              title: Text(_found!.engine.label),
-              subtitle: const Text('Installed — translations run here'),
-            )
+          else if (_found.isNotEmpty) ...[
+            // Every engine, with the pairs it actually has. An engine arrives
+            // long before its packs do, and two engines rarely cover the same
+            // languages — which is why a translation tries each of them.
+            for (final backend in _found) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.check_circle_outline,
+                    color: theme.colorScheme.primary),
+                title: Text(backend.engine.label),
+                subtitle: Text(
+                  (_pairs[backend.engine] ?? const []).isEmpty
+                      ? 'Installed, but with no language pairs yet'
+                      : 'Installed — translations run here',
+                ),
+              ),
+              if ((_pairs[backend.engine] ?? const []).isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: SelectableText(
+                    backend.engine.installHint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final pair in _pairs[backend.engine]!)
+                        Chip(
+                          label: Text(pair),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ]
           else ...[
             Text(
               'Nothing found. Either of these works, and both keep the passage '

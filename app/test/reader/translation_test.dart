@@ -274,13 +274,72 @@ void main() {
         runner: (exe, args, {input}) async {
           tried.add(exe);
           return exe == 'apertium'
-              ? ok('usage')
+              ? ok('  eng-spa')
               : throw ProcessException(exe, args, 'not found');
         },
       );
       expect(backend?.engine, LocalEngine.apertium);
       expect(tried.first, 'argos-translate',
           reason: 'the neural one is asked for first');
+    });
+
+    test('an engine that exits non-zero is still installed', () async {
+      // apertium answers `--help` with "ERROR: Unknown option -" and exit 1,
+      // which is why an apt-installed one was invisible. Starting is the
+      // evidence; the exit code is the command's opinion of the arguments.
+      final backend = await LocalEngineBackend.detect(
+        runner: (exe, args, {input}) async => exe == 'apertium'
+            ? ProcessResult(1, 1, '', 'ERROR: Unknown option -')
+            : throw ProcessException(exe, args, 'not found'),
+      );
+      expect(backend?.engine, LocalEngine.apertium);
+    });
+
+    test('apertium is probed with -l, not --help', () async {
+      List<String>? args;
+      await LocalEngineBackend.detect(
+        runner: (exe, a, {input}) async {
+          if (exe == 'argos-translate') {
+            throw ProcessException(exe, a, 'not found');
+          }
+          args = a;
+          return ok('  eng-spa');
+        },
+      );
+      expect(args, ['-l'], reason: 'the option it actually answers');
+    });
+
+    test('the pairs it has are read from the engine itself', () async {
+      final backend = LocalEngineBackend(
+        LocalEngine.apertium,
+        runner: (exe, a, {input}) async => ok('  eng-spa\n  spa-eng\n\n'),
+      );
+      expect(await backend.installedPairs(), ['eng-spa', 'spa-eng'],
+          reason: 'blank lines dropped, indentation trimmed');
+    });
+
+    test('argos pairs come from argospm, which is a different binary',
+        () async {
+      String? asked;
+      final backend = LocalEngineBackend(
+        LocalEngine.argos,
+        runner: (exe, a, {input}) async {
+          asked = exe;
+          return ok('translate-en_ro\n');
+        },
+      );
+      expect(await backend.installedPairs(), ['translate-en_ro']);
+      expect(asked, 'argospm');
+    });
+
+    test('an engine with no pack listing says nothing rather than failing',
+        () async {
+      final backend = LocalEngineBackend(
+        LocalEngine.argos,
+        runner: (exe, a, {input}) async =>
+            throw ProcessException(exe, a, 'not found'),
+      );
+      expect(await backend.installedPairs(), isEmpty);
     });
 
     test('nothing installed is null, not an exception', () async {
@@ -373,6 +432,74 @@ void main() {
     });
   });
 
+  group('more than one translator installed', () {
+    ProcessResult ok(String out) => ProcessResult(1, 0, out, '');
+
+    test('a pair the best engine lacks is asked of the next one', () async {
+      // The real shape of this machine: Argos has en_ro, Apertium has eng-spa.
+      // Asking only the first means Spanish fails with Apertium sitting there.
+      final pool = await LocalTranslators.detect(
+        runner: (exe, args, {input}) async {
+          if (exe == 'argos-translate' && input != null) {
+            return ProcessResult(1, 1, '', 'no package installed for en -> es');
+          }
+          if (exe == 'apertium' && input != null) return ok('Buenos días');
+          return ok('');
+        },
+      );
+
+      final result = await pool!.translate(
+        'Good morning',
+        from: TranslationLanguage.byCode('en')!,
+        to: TranslationLanguage.byCode('es')!,
+      );
+      expect(result.text, 'Buenos días');
+    });
+
+    test('when every engine refuses, the last complaint is the one shown',
+        () async {
+      final pool = await LocalTranslators.detect(
+        runner: (exe, args, {input}) async => input == null
+            ? ok('')
+            : ProcessResult(1, 1, '', 'no pack for $exe'),
+      );
+      await expectLater(
+        pool!.translate('hi',
+            from: TranslationLanguage.byCode('en')!,
+            to: TranslationLanguage.byCode('ro')!),
+        throwsA(isA<TranslationException>()
+            .having((e) => e.message, 'message', contains('no pack for'))),
+      );
+    });
+
+    test('Detect is not retried against every engine', () async {
+      var runs = 0;
+      final pool = await LocalTranslators.detect(
+        runner: (exe, args, {input}) async {
+          if (input != null) runs++;
+          return ok('');
+        },
+      );
+      await expectLater(
+        pool!.translate('hi',
+            from: TranslationLanguage.auto,
+            to: TranslationLanguage.byCode('ro')!),
+        throwsA(isA<TranslationException>()),
+      );
+      expect(runs, 0, reason: 'it is the request that cannot be answered');
+    });
+
+    test('nothing installed is null, so the sheet can say so', () async {
+      expect(
+        await LocalTranslators.detect(
+          runner: (exe, args, {input}) async =>
+              throw ProcessException(exe, args, 'not found'),
+        ),
+        isNull,
+      );
+    });
+  });
+
   group('the sheet', () {
     testWidgets('translates on open and offers to keep it as a note',
         (tester) async {
@@ -419,7 +546,13 @@ void main() {
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
-          body: TranslateSheet(passage: 'Guten Morgen', settings: settings),
+          body: TranslateSheet(
+            passage: 'Guten Morgen',
+            settings: settings,
+            // Nothing installed — asserted, not inherited from whatever this
+            // machine happens to have.
+            resolve: () async => null,
+          ),
         ),
       ));
       await tester.pumpAndSettle();

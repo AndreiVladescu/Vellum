@@ -19,15 +19,21 @@ class TranslateSheet extends StatefulWidget {
     required this.passage,
     required this.settings,
     this.backend,
+    this.resolve,
     this.onSaveAsNote,
   });
 
   final String passage;
   final ReaderSettings settings;
 
-  /// Normally worked out from [settings] — passed in only by tests, which have
-  /// no phone to translate on and no server to call.
+  /// Normally worked out from the platform — passed in only by tests, which
+  /// have no phone to translate on.
   final TranslationBackend? backend;
+
+  /// How the backend is found. Overridden by tests so they never shell out to
+  /// whatever happens to be installed on the machine running them: the "nothing
+  /// set up" state is a state to assert, not a property of the test runner.
+  final Future<TranslationBackend?> Function()? resolve;
 
   /// Keeps the translation with the passage it came from, as a note on the
   /// book. Null where the caller has no annotation to hang it on.
@@ -68,9 +74,10 @@ class _TranslateSheetState extends State<TranslateSheet> {
 
   Future<void> _resolveBackend() async {
     final resolved = widget.backend ??
-        (OnDeviceBackend.available
-            ? OnDeviceBackend()
-            : await LocalEngineBackend.detect());
+        await (widget.resolve ??
+            () async => OnDeviceBackend.available
+                ? OnDeviceBackend()
+                : await LocalTranslators.detect())();
     if (!mounted) return;
     setState(() => _backend = resolved);
     _run();

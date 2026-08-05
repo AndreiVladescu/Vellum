@@ -53,6 +53,31 @@ enum LocalEngine {
   final String label;
   final String executable;
 
+  /// What to run to find out whether it is here.
+  ///
+  /// Not `--help` for both: **apertium exits 1 on an unknown option**, and
+  /// `--help` is one — it prints `ERROR: Unknown option -` and returns a
+  /// failure, which is why an apt-installed apertium was invisible to this
+  /// until now. `-l` is a real command it answers with a zero exit, and the
+  /// answer is the list of pairs it has.
+  List<String> get probe => switch (this) {
+        LocalEngine.argos => const ['--help'],
+        LocalEngine.apertium => const ['-l'],
+      };
+
+  /// The command that lists the language pairs this engine can do.
+  List<String> get listCommand => switch (this) {
+        // `argospm` is a separate binary that ships with argostranslate.
+        LocalEngine.argos => const ['list'],
+        LocalEngine.apertium => const ['-l'],
+      };
+
+  /// The binary that answers [listCommand].
+  String get listExecutable => switch (this) {
+        LocalEngine.argos => 'argospm',
+        LocalEngine.apertium => executable,
+      };
+
   /// What to type to get it. Shown verbatim, because a half-remembered
   /// instruction is worse than none.
   String get installHint => switch (this) {
@@ -74,19 +99,45 @@ class LocalEngineBackend implements TranslationBackend {
   @override
   String get name => '${engine.label}, on this machine';
 
+  /// Every engine installed here, best first.
+  ///
+  /// More than one is normal — Argos from pip and Apertium from apt do not
+  /// know about each other — and they rarely have the same pairs. Asking only
+  /// the first is how a machine with `apertium eng-spa` fails to translate
+  /// Spanish because Argos, which is better but has only `en_ro`, answered the
+  /// door.
+  static Future<List<LocalEngineBackend>> detectAll({ProcessRunner? runner}) async {
+    final run = runner ?? _run;
+    final found = <LocalEngineBackend>[];
+    for (final engine in LocalEngine.values) {
+      try {
+        await run(engine.executable, engine.probe);
+        found.add(LocalEngineBackend(engine, runner: runner));
+      } on ProcessException {
+        // Not installed.
+      } catch (_) {
+        // Present but unusable.
+      }
+    }
+    return found;
+  }
+
   /// The first engine that answers, or null when none is installed.
   ///
   /// Asked by running the thing rather than by looking for a file: a translator
   /// on the PATH is the question, and `which` answers a different one on a
   /// machine with shell aliases or a pipx shim.
+  ///
+  /// **Starting is the evidence, not the exit code.** A command that runs and
+  /// then complains is installed; only a `ProcessException` — no such binary —
+  /// means it is not. Requiring a zero exit is what hid an apt-installed
+  /// apertium, which fails `--help` by design.
   static Future<LocalEngineBackend?> detect({ProcessRunner? runner}) async {
     final run = runner ?? _run;
     for (final engine in LocalEngine.values) {
       try {
-        final result = await run(engine.executable, const ['--help']);
-        if (result.exitCode == 0) {
-          return LocalEngineBackend(engine, runner: runner);
-        }
+        await run(engine.executable, engine.probe);
+        return LocalEngineBackend(engine, runner: runner);
       } on ProcessException {
         // Not installed. Try the next one.
       } catch (_) {
@@ -94,6 +145,27 @@ class LocalEngineBackend implements TranslationBackend {
       }
     }
     return null;
+  }
+
+  /// The language pairs this engine can actually do, as it reports them.
+  ///
+  /// Worth asking rather than assuming: an engine is installed long before its
+  /// packs are, and "Apertium is here" while German→English silently fails is
+  /// the confusing half of the story. Returns an empty list when the listing
+  /// command is missing or says nothing.
+  Future<List<String>> installedPairs() async {
+    try {
+      final result = await _runner(engine.listExecutable, engine.listCommand);
+      if (result.exitCode != 0) return const [];
+      return [
+        for (final line in (result.stdout as String).split('\n'))
+          if (line.trim().isNotEmpty) line.trim(),
+      ];
+    } on ProcessException {
+      return const [];
+    } catch (_) {
+      return const [];
+    }
   }
 
   @override
@@ -161,4 +233,52 @@ class LocalEngineBackend implements TranslationBackend {
         'tr': 'tur', 'uk': 'ukr', 'zh': 'zho',
       }[code] ??
       code;
+}
+
+
+/// Every local translator on the machine, tried in turn.
+///
+/// The pairs an engine has are not the pairs you want, and the two engines are
+/// installed by different package managers with different coverage. So a
+/// failure from the best one is a reason to ask the next, not a reason to stop:
+/// what the reader wants is the passage translated, not a particular program
+/// run.
+class LocalTranslators implements TranslationBackend {
+  const LocalTranslators(this.engines);
+
+  final List<LocalEngineBackend> engines;
+
+  /// Null when nothing is installed, so the caller can say so rather than
+  /// holding an object that can only fail.
+  static Future<LocalTranslators?> detect({ProcessRunner? runner}) async {
+    final engines = await LocalEngineBackend.detectAll(runner: runner);
+    return engines.isEmpty ? null : LocalTranslators(engines);
+  }
+
+  @override
+  String get name => engines.length == 1
+      ? engines.single.name
+      : '${engines.first.engine.label} and ${engines.length - 1} other'
+          '${engines.length == 2 ? '' : 's'}, on this machine';
+
+  @override
+  Future<Translation> translate(
+    String text, {
+    required TranslationLanguage from,
+    required TranslationLanguage to,
+  }) async {
+    TranslationException? last;
+    for (final engine in engines) {
+      try {
+        return await engine.translate(text, from: from, to: to);
+      } on TranslationException catch (e) {
+        // "Pick the language it is coming from" is about the request, not this
+        // engine — asking another one would produce the same answer.
+        if (from == TranslationLanguage.auto) rethrow;
+        last = e;
+      }
+    }
+    throw last ??
+        const TranslationException('No translator is installed on this machine.');
+  }
 }
