@@ -20,8 +20,8 @@
         android:shortcutLongLabel="@string/shortcut_scan_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.avladescu.vellum"
-            android:targetClass="com.avladescu.vellum.MainActivity">
+            android:targetPackage="app.vellum.Vellum"
+            android:targetClass="app.vellum.Vellum.MainActivity">
             <extra
                 android:name="vellum_shortcut"
                 android:value="scan" />
@@ -37,8 +37,8 @@
         android:shortcutLongLabel="@string/shortcut_continue_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.avladescu.vellum"
-            android:targetClass="com.avladescu.vellum.MainActivity">
+            android:targetPackage="app.vellum.Vellum"
+            android:targetClass="app.vellum.Vellum.MainActivity">
             <extra
                 android:name="vellum_shortcut"
                 android:value="continue" />
@@ -54,8 +54,8 @@
         android:shortcutLongLabel="@string/shortcut_add_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.avladescu.vellum"
-            android:targetClass="com.avladescu.vellum.MainActivity">
+            android:targetPackage="app.vellum.Vellum"
+            android:targetClass="app.vellum.Vellum.MainActivity">
             <extra
                 android:name="vellum_shortcut"
                 android:value="add" />

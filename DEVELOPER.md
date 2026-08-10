@@ -225,16 +225,16 @@ Everything else — the readers, importers, sync, backups, physical rooms — is
 same code as on Linux.
 
 **Where Windows keeps your data** (derived from `windows/runner/Runner.rc`, whose
-`CompanyName` is `com.avladescu` and `ProductName` is `Vellum`, and from how
+`CompanyName` is `app.vellum` and `ProductName` is `Vellum`, and from how
 `path_provider_windows` builds the support directory):
 
 | What | Where |
 |---|---|
 | Database | `%USERPROFILE%\Documents\vellum.sqlite` |
-| Books, covers, settings | `%APPDATA%\com.avladescu\Vellum\` |
+| Books, covers, settings | `%APPDATA%\app.vellum\Vellum\` |
 
 Note that this is *not* the same shape as Linux and macOS, which both use
-`com.avladescu.vellum` as a single directory name.
+`app.vellum.Vellum` as a single directory name.
 
 **Unsigned builds.** Nothing here signs the executable — that needs a code
 signing certificate, which costs money and belongs to a person rather than a

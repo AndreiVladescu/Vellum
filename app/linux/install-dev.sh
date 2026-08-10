@@ -12,7 +12,7 @@
 set -eu
 
 MODE="${1:-debug}"
-APP_ID="com.avladescu.vellum"
+APP_ID="app.vellum.Vellum"
 
 # Resolve paths relative to this script (linux/ -> app/).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

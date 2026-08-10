@@ -1,4 +1,4 @@
-package com.avladescu.vellum
+package app.vellum.Vellum
 
 import android.content.Intent
 import android.net.Uri
@@ -23,7 +23,7 @@ import java.io.File
  * Dart imports from there.
  */
 class MainActivity : FlutterActivity() {
-    private val channelName = "com.avladescu.vellum/incoming_share"
+    private val channelName = "app.vellum.Vellum/incoming_share"
     private var channel: MethodChannel? = null
 
     /** Files from the intent that launched a cold start, awaiting Dart's first ask. */

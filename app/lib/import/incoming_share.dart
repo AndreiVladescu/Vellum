@@ -55,7 +55,7 @@ class IncomingShare {
     });
   }
 
-  static const channelName = 'com.avladescu.vellum/incoming_share';
+  static const channelName = 'app.vellum.Vellum/incoming_share';
 
   final MethodChannel _channel;
   final _controller = StreamController<List<String>>.broadcast();

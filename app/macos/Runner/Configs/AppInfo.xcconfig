@@ -8,7 +8,7 @@
 PRODUCT_NAME = vellum
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.avladescu.vellum
+PRODUCT_BUNDLE_IDENTIFIER = app.vellum.Vellum
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.avladescu. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 app.vellum. All rights reserved.

@@ -80,7 +80,7 @@ Kotlin, the manifest, the shortcut XML and the widget layout all compile in
    Then finish the book and confirm the widget falls back to the empty state
    rather than keeping it.
 3. **Background sync.** Set it to *Every 6 hours* in Preferences, then use
-   `adb shell cmd jobscheduler run -f com.avladescu.vellum <id>` to force the
+   `adb shell cmd jobscheduler run -f app.vellum.Vellum <id>` to force the
    job. Expect a sync with no UI and no notification. The headless isolate opens
    its own database — watch for a lock conflict if the app is in the foreground
    at the same time, which is the one failure this design could still have.

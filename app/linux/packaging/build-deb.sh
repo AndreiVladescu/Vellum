@@ -16,7 +16,7 @@
 # it hard.
 set -euo pipefail
 
-APP_ID="com.avladescu.vellum"
+APP_ID="app.vellum.Vellum"
 APP="$(cd "$(dirname "$0")/../.." && pwd)"      # -> app/
 BUNDLE="$APP/build/linux/x64/release/bundle"
 ICONS="$APP/linux/packaging/icons/hicolor"

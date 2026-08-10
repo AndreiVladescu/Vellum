@@ -187,7 +187,7 @@ def main():
 
     # Linux icon theme — named after the application ID so GTK can resolve it as
     # a themed window icon (see linux/install-dev.sh).
-    app_id = "com.avladescu.vellum"
+    app_id = "app.vellum.Vellum"
     theme = APP / "linux/packaging/icons/hicolor"
     write_text(svg_wrapper(master), theme / f"scalable/apps/{app_id}.svg")
     for px in (48, 64, 128, 256):

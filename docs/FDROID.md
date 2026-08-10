@@ -129,7 +129,7 @@ The order of work, hardest first:
    worth doing until it has an answer.
 2. **Drop ML Kit** on that build: a flavour without on-device translation, and
    a ZXing-based scanner.
-3. Submit `metadata/com.avladescu.vellum.yml` to
+3. Submit `metadata/app.vellum.Vellum.yml` to
    [fdroiddata](https://gitlab.com/fdroid/fdroiddata) with the build recipe.
 
 Steps 2 and 3 are ordinary work. Step 1 is a project.

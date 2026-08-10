@@ -268,7 +268,7 @@ Your library is on your own disk, in two places:
 | What | Linux | macOS | Windows |
 |---|---|---|---|
 | Database | `~/Documents/vellum.sqlite` | `~/Documents/vellum.sqlite` | `Documents\vellum.sqlite` |
-| Books, covers, settings | `~/.local/share/com.avladescu.vellum/` | `~/Library/Application Support/com.avladescu.vellum/` | `%APPDATA%\com.avladescu\Vellum\` |
+| Books, covers, settings | `~/.local/share/app.vellum.Vellum/` | `~/Library/Application Support/app.vellum.Vellum/` | `%APPDATA%\app.vellum\Vellum\` |
 
 **Back it up from inside the app**: ☰ → *Preferences* → *Backup* writes the
 database, covers and book files into a single archive, optionally encrypted with

@@ -17,7 +17,7 @@
 #   ./install.sh --uninstall     remove it again (same flags as you installed)
 set -eu
 
-APP_ID="com.avladescu.vellum"
+APP_ID="app.vellum.Vellum"
 SRC="$(cd "$(dirname "$0")" && pwd)"
 
 PREFIX="$HOME/.local"

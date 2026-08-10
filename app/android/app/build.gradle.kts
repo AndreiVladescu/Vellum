@@ -17,7 +17,7 @@ val keystoreProperties = Properties().apply {
 val hasReleaseKeystore = keystoreProperties.getProperty("storeFile") != null
 
 android {
-    namespace = "com.avladescu.vellum"
+    namespace = "app.vellum.Vellum"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.avladescu.vellum"
+        applicationId = "app.vellum.Vellum"
         // Pinned rather than inherited for reproducibility. 24 is Flutter's
         // current floor and clears the plugin minimums (flutter_secure_storage's
         // EncryptedSharedPreferences needs 23, pdfrx needs 21).

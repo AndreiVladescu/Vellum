@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.avladescu" "\0"
+            VALUE "CompanyName", "app.vellum" "\0"
             VALUE "FileDescription", "Vellum" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "vellum" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.avladescu. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 app.vellum. All rights reserved." "\0"
             VALUE "OriginalFilename", "vellum.exe" "\0"
             VALUE "ProductName", "Vellum" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
