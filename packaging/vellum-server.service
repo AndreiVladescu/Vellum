@@ -11,7 +11,7 @@
 
 [Unit]
 Description=Vellum sync server
-Documentation=https://github.com/avladescu/Vellum
+Documentation=https://github.com/AndreiVladescu/Vellum
 After=network-online.target
 Wants=network-online.target
 
