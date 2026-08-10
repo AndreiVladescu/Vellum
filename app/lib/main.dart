@@ -39,6 +39,7 @@ import 'settings/preferences_page.dart';
 import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
 import 'shelf/shelf_target_sheet.dart';
+import 'shelf/book_list_view.dart';
 import 'shelf/command_palette.dart';
 import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
@@ -730,10 +731,12 @@ class _LibraryPageState extends State<LibraryPage> {
           label: l10n.cmdToggleFace,
           icon: Icons.flip_to_front,
           key: LogicalKeyboardKey.keyB,
+          // Cycles rather than flips: there are three views now, and a
+          // shortcut that could only reach two of them would leave the list
+          // only settable from Preferences.
           run: () => widget.settings.setBookFace(
-            widget.settings.bookFace == BookFace.spine
-                ? BookFace.cover
-                : BookFace.spine,
+            BookFace.values[
+                (widget.settings.bookFace.index + 1) % BookFace.values.length],
           ),
         ),
         LibraryCommand(
@@ -1405,6 +1408,25 @@ class _LibraryPageState extends State<LibraryPage> {
               ),
             ],
           ],
+        ),
+      );
+    }
+    // The list is a different widget rather than a mode inside ShelfView: it
+    // needs the whole entry (author, whether there is a file) where the shelf
+    // needs only the book, and a shelf that drew no shelves would be a shelf
+    // in name only.
+    if (widget.settings.bookFace == BookFace.list) {
+      return BookListView(
+        entries: entries,
+        selected: _selection,
+        onToggleSelected: _toggleSelected,
+        selectionMode: _selection.isNotEmpty,
+        detailBuilder: (book) => BookDetailPage(
+          book: book,
+          repository: repository,
+          settings: widget.settings,
+          connection: widget.connection,
+          onGenreTap: _applyGenreFilter,
         ),
       );
     }

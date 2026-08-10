@@ -63,9 +63,7 @@ class PreferencesPage extends StatelessWidget {
                     ButtonSegment(
                       value: face,
                       label: Text(face.label),
-                      icon: Icon(face == BookFace.cover
-                          ? Icons.image_outlined
-                          : Icons.menu_book_outlined),
+                      icon: Icon(face.icon),
                     ),
                 ],
                 selected: {settings.bookFace},
