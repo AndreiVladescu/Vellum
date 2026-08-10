@@ -288,6 +288,8 @@ Set them under *Settings → Secrets and variables → Actions*:
 
 Keep the `.jks` backed up somewhere other than the repository and the runner: if
 it is lost, the app can never be updated on Play under the same identity again.
+The same is true of an F-Droid-style repository, which pins the certificate of
+the first APK it accepts — see [docs/FDROID.md](docs/FDROID.md).
 
 ```sh
 cd app

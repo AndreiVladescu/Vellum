@@ -427,6 +427,7 @@ The architecture, data model and build order are in
 | [DEVELOPER.md](DEVELOPER.md) | Building, testing and releasing, on every platform |
 | [docs/IMPORTING.md](docs/IMPORTING.md) | Catalogue file formats and filename rules |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Running the server properly |
+| [docs/FDROID.md](docs/FDROID.md) | Publishing to F-Droid, and what blocks it |
 | [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) | Screen readers, contrast, text scaling |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Where the time goes, and the budgets |
 | [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) | What has been reviewed, and what hasn't |

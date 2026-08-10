@@ -1,0 +1,35 @@
+Vellum is a personal library manager for digital <i>and</i> physical books. It shows your library as a visual bookshelf — you browse your books spine-out, the way they look on a real shelf, instead of scrolling a grid of covers.
+
+It runs entirely on your own device. There is no account to create and nothing is uploaded anywhere, unless you deliberately set up the optional server.
+
+<b>Your library</b>
+
+* Add books by searching Open Library and Google Books — cover, author, publisher and description fill themselves in.
+* Scan an ISBN barcode with the camera, or type the number.
+* Books with no file are records of physical copies, so a library can be part digital and part paper without keeping two systems.
+* A wishlist for books you want but do not own, kept off the shelf until you get them.
+* Ratings, reading status, re-read counts and private notes.
+
+<b>Reading</b>
+
+* A built-in reader for PDF and EPUB that remembers where you stopped.
+* Highlights in four colours, notes and bookmarks, all listed on the book's page.
+* Search inside a book, jump to a page, and read in night mode.
+* For EPUBs: typeface, text size, line spacing and line width.
+* Translate a selected passage on the device, with language packs you download and delete yourself.
+
+<b>Bringing in a library you already have</b>
+
+Imports a folder of files, a Calibre library, a CSV or JSON catalogue (Goodreads and StoryGraph exports work unedited, and keep your ratings, shelves and reviews), or an OPDS catalogue. Every import shows you what it found and what it thinks you already have before writing anything.
+
+<b>Physical books</b>
+
+Build a room, put bookcases in it, and record which copy sits where — on a photo of your actual shelves if you like. Loans are kept as history, so returning a book does not erase the fact it was lent.
+
+<b>Optional: a server</b>
+
+You do not need one. Run the companion server only if you want the same library on a desktop and a phone, other people with their own accounts, an OPDS feed for an e-reader, or public links to share a single book.
+
+<b>Being honest about what this is</b>
+
+The code was written by an LLM, with a human directing and reviewing it. It is tested — over a thousand automated tests — but that is not the same as years of use by many people. Keep your book files backed up somewhere Vellum is not the only copy.

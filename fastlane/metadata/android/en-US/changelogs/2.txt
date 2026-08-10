@@ -1,0 +1,9 @@
+Search inside your books without a server, on desktop.
+
+* Translate a selected passage on the device, with packs you keep.
+* Goodreads and StoryGraph imports keep your ratings, shelves, read
+  dates and reviews — not just the titles.
+* A Series page showing which volumes you are missing.
+* Tap an author to see the rest of their books.
+* Overdue loans are counted where you can see them.
+* Free catalogues (Gutenberg, Wikisource) in the OPDS browser.
