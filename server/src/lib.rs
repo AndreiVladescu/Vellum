@@ -350,6 +350,7 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
                 .delete(layouts::delete),
         )
         .route("/shares", get(shares::list).post(shares::create))
+        .route("/shares/request", post(shares::request_access))
         .route("/shares/{id}", delete(shares::delete))
         // Emailed member invites (plan 5 #31, stage 3). Minting is master-only;
         // redeeming is necessarily unauthenticated — the invitee has no account.

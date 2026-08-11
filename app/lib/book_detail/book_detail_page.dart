@@ -11,6 +11,7 @@ import '../loans/borrow_requests.dart';
 import '../physical/find_copy.dart';
 import '../reader/annotations/annotations_panel.dart';
 import '../server/connection_store.dart';
+import '../server/write_access_request.dart';
 import '../settings/app_settings.dart';
 import '../snack_bars.dart';
 import 'cover_thumb.dart';
@@ -359,6 +360,21 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               icon: const Icon(Icons.pan_tool_alt_outlined),
               tooltip: 'Ask to borrow',
               onPressed: () => promptBorrowRequest(
+                context,
+                widget.connection!,
+                book.id,
+                book.title,
+              ),
+            ),
+          // Offered on a synced library only — `addedBy` is set by a pull, so
+          // it is the app's one signal that this book came from a server with
+          // an owner to ask. Whether *this* account can already edit it is the
+          // server's to answer, and it does, in a sentence.
+          if (widget.connection?.isConnected == true && book.addedBy != null)
+            IconButton(
+              icon: const Icon(Icons.edit_note_outlined),
+              tooltip: 'Ask to edit',
+              onPressed: () => promptWriteAccessRequest(
                 context,
                 widget.connection!,
                 book.id,

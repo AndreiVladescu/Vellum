@@ -320,6 +320,24 @@ to know something it was only told. A pull that says *nothing* leaves the
 cached name alone, since an older server and "nobody" are not the same thing.
 The console has it as an optional *Added by* column, off by default.
 
+**Granting access, and asking for it** (both). The share API has always been
+per-book, per-tag or whole-library at viewer/editor; what was missing was a way
+to *use* that. The console could only revoke, so the one way to give somebody
+write access was an invitation — all-or-nothing — which is how a "read/write
+member" ended up able to see everything and change nothing in particular. The
+Shares page now grants: a person, a scope (whole library, a tag, or the books
+ticked in the table), and read or read-and-write. A tick-list becomes one share
+per book, because the API's `book` scope is a single id and a partial failure
+is then reportable as partial rather than hidden behind a bulk endpoint.
+
+The other direction is `POST /api/shares/request`: a reader asks the owner for
+write access to one book, which grants nothing and simply notifies them —
+permissions still appear exactly one way. It is book-scoped on purpose ("let me
+fix this one book" is the request people actually have), and the app offers the
+action wherever a book came from a server, because whether *this* account can
+already edit *that* book is not something the app syncs. The server answers
+that in a sentence: 400 "you can already edit this book".
+
 **Notifications** (both, migration 0030). Lending is a conversation, and the
 server only ever held its *state*: a request was pending, then it was approved.
 Whoever pressed the button knew; the other person found out by opening the right

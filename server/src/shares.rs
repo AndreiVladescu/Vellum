@@ -965,6 +965,90 @@ async fn lookup_user_by_email(state: &AppState, email: &str) -> AppResult<String
 }
 
 /// A book may only be shared by its owner or the master.
+/// `POST /api/shares/request` — asking the owner for write access to a book.
+///
+/// The gap this closes: a shared library is read-only for everyone but its
+/// owner, and someone who has a better scan of a book, or a file for one that
+/// has none, had no way to say so except outside the app entirely. Nothing here
+/// grants anything — it is a message, and the owner answers it by making a
+/// share in the usual way.
+///
+/// Deliberately book-scoped. "Let me contribute to your library" is a much
+/// larger request than "let me fix this one book", and the small one is the one
+/// people actually have; the owner can always widen it to the whole library
+/// when they grant it.
+#[derive(Deserialize)]
+pub struct AccessRequestInput {
+    pub book_id: String,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+pub async fn request_access(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(input): Json<AccessRequestInput>,
+) -> AppResult<Json<serde_json::Value>> {
+    // Visibility is the gate, and 404 for everything else — the same rule as
+    // borrow requests, so this cannot be used to learn which books exist.
+    let access = crate::access::book_access(&state, &user, &input.book_id).await?;
+    if !access.can_view() {
+        return Err(AppError::NotFound("book not found".into()));
+    }
+    if access.can_edit() {
+        return Err(AppError::BadRequest(
+            "you can already edit this book".into(),
+        ));
+    }
+    let row: Option<(Option<String>, String)> =
+        sqlx::query_as("SELECT owner_id, title FROM book WHERE id = ?")
+            .bind(&input.book_id)
+            .fetch_optional(&state.db)
+            .await?;
+    let Some((Some(owner), title)) = row else {
+        // A book with no owner belongs to nobody there is to ask.
+        return Err(AppError::NotFound("book not found".into()));
+    };
+
+    // Per requester, like borrow requests: one person pressing the button
+    // repeatedly cannot fill an owner's list.
+    if !state.search_limiter.check(&format!("access:{}", user.id)) {
+        return Err(AppError::TooManyRequests(
+            "too many requests; try again later".into(),
+        ));
+    }
+
+    let note = input
+        .note
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty());
+    crate::notifications::notify(
+        &state,
+        &owner,
+        crate::notifications::Message {
+            kind: "access.requested",
+            title: format!("{} would like to edit “{title}”", user.email),
+            body: Some(match note {
+                Some(n) => format!("They said: “{n}”\n\nGrant it under Shares."),
+                None => "Grant it under Shares.".to_string(),
+            }),
+            book_id: Some(&input.book_id),
+        },
+    )
+    .await;
+    crate::audit::record(
+        &state,
+        Some(&user),
+        "access.request",
+        "book",
+        &input.book_id,
+        note,
+    )
+    .await;
+    Ok(Json(serde_json::json!({ "asked": owner })))
+}
+
 async fn require_owns_book(state: &AppState, user: &AuthUser, book_id: &str) -> AppResult<()> {
     let owner: Option<Option<String>> =
         sqlx::query_scalar("SELECT owner_id FROM book WHERE id = ?")

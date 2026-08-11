@@ -317,6 +317,23 @@ class VellumServerClient {
     ));
   }
 
+  /// Asks a book's owner for permission to edit it.
+  ///
+  /// Grants nothing: it puts a message in the owner's notifications, and they
+  /// answer it by making a share. Throws [ServerException] with a 400 when this
+  /// account can already edit the book — which is the honest answer to a button
+  /// the app offers without knowing the answer in advance.
+  Future<void> requestWriteAccess(String bookId, {String? note}) async {
+    _body(await _http.post(
+      _uri('/api/shares/request'),
+      headers: _headers,
+      body: jsonEncode({
+        'book_id': bookId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      }),
+    ));
+  }
+
   /// Borrow requests (plan 5 #49). [direction] is 'incoming' (to answer) or
   /// 'outgoing' (asked for).
   Future<List<BorrowRequest>> listBorrowRequests({

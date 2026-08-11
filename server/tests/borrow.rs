@@ -700,3 +700,87 @@ async fn notifications_are_private_and_can_be_marked_read() {
     .await;
     assert!(unread["notifications"].as_array().unwrap().is_empty());
 }
+
+/// Asking for write access on a shared library.
+///
+/// Everything is read-only unless the owner says otherwise, and someone with a
+/// better scan of a book had no way to offer it except leaving the app. This
+/// grants nothing — it is a message the owner answers by making a share, so
+/// there is still exactly one way permissions appear.
+#[tokio::test]
+async fn a_reader_can_ask_the_owner_for_write_access() {
+    let (app, _db) = app().await;
+    let owner = register(&app).await;
+    let reader = member(&app, &owner, "reader@lib.test").await;
+    let (book, _copy) = shared_book(&app, &owner, "Dune", Some("reader@lib.test")).await;
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/shares/request",
+        Some(&reader),
+        Some(serde_json::json!({ "book_id": book, "note": "I have a better scan" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, mine) = call(&app, "GET", "/api/notifications", Some(&owner), None).await;
+    assert_eq!(mine["unread"], 1);
+    assert_eq!(mine["notifications"][0]["kind"], "access.requested");
+    let title = mine["notifications"][0]["title"].as_str().unwrap();
+    assert!(title.contains("reader@lib.test") && title.contains("Dune"), "{title}");
+    assert!(
+        mine["notifications"][0]["body"]
+            .as_str()
+            .unwrap()
+            .contains("better scan"),
+        "the note is the part that persuades"
+    );
+
+    // And nothing was granted: the reader still cannot edit the book.
+    let (status, _) = call(
+        &app,
+        "PATCH",
+        &format!("/api/books/{book}"),
+        Some(&reader),
+        Some(serde_json::json!({ "title": "Not yours to rename" })),
+    )
+    .await;
+    assert_ne!(status, StatusCode::OK, "asking is not receiving");
+}
+
+#[tokio::test]
+async fn asking_for_access_you_have_says_so_and_asking_about_nothing_404s() {
+    let (app, _db) = app().await;
+    let owner = register(&app).await;
+    let stranger = member(&app, &owner, "stranger@lib.test").await;
+    let (book, _copy) = shared_book(&app, &owner, "Dune", None).await;
+
+    // The owner already has it. The app offers this button without knowing, so
+    // the answer has to be a sentence rather than a 500.
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/shares/request",
+        Some(&owner),
+        Some(serde_json::json!({ "book_id": book })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        body["error"].as_str().unwrap().contains("already"),
+        "got: {body}"
+    );
+
+    // Someone who cannot see the book is told it does not exist, not that they
+    // lack permission — the same rule as everywhere else.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/shares/request",
+        Some(&stranger),
+        Some(serde_json::json!({ "book_id": book })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

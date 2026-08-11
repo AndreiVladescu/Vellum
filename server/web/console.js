@@ -86,6 +86,7 @@ const ACTIONS = {
   revokeinvite: el => revokeInvite(el.dataset.id),
   revokelink: el => revokeLink(el.dataset.id),
   revokeshare: el => revokeShare(el.dataset.id),
+  grantaccess: () => grantAccess(),
   applyview: el => applyView(el.dataset.name),
   deleteview: el => deleteView(el.dataset.name),
 };
@@ -2006,6 +2007,12 @@ async function showShares(){
     ]);
   } catch(e){ toast(e.message); return; }
 
+  // Who there is to share with, and what there is to share. Best-effort: the
+  // people list is the master's to read, so a non-master gets the same form
+  // with no suggestions rather than no form.
+  let people = [];
+  try { people = await api('GET','/api/users'); } catch(e){ people = []; }
+
   const live = links.filter(l => linkState(l).label === 'Live').length;
   const linkList = links.length
     ? links.map(linkRow).join('')
@@ -2014,11 +2021,48 @@ async function showShares(){
     ? shares.map(shareRow).join('')
     : '<p class="muted">Nobody with an account has been given access.</p>';
 
+  // The grant form. Access has always been per-book, per-tag or whole-library
+  // in the API; the console could only ever *revoke*, so the only way to give
+  // someone write access was an invitation, which is all-or-nothing.
+  const selected = S.selected.size;
+  const grant = `
+    <p class="sharehead">Give someone access</p>
+    <p class="muted sharesub" style="margin:0 0 8px">Read lets them see and
+      sync; read &amp; write also lets them edit and upload. Revoking is on the
+      list below.</p>
+    <div class="row" style="gap:8px; flex-wrap:wrap; align-items:flex-end">
+      <span>
+        <label for="g-email">Person</label>
+        <input id="g-email" type="email" list="g-people" placeholder="their email"
+               style="min-width:220px">
+        <datalist id="g-people">
+          ${people.map(u => `<option value="${esc(u.email)}"></option>`).join('')}
+        </datalist>
+      </span>
+      <span>
+        <label for="g-scope">What</label>
+        <select id="g-scope">
+          <option value="all">The whole library</option>
+          ${selected ? `<option value="selected">The ${selected} book${selected===1?'':'s'} you ticked</option>` : ''}
+          ${S.groups.map(g => `<option value="group:${esc(g.id)}">Tag: ${esc(g.name)}</option>`).join('')}
+        </select>
+      </span>
+      <span>
+        <label for="g-perm">Access</label>
+        <select id="g-perm">
+          <option value="viewer">Read</option>
+          <option value="editor">Read &amp; write</option>
+        </select>
+      </span>
+      <button class="btn primary" data-act="grantaccess">Grant</button>
+    </div>`;
+
   openPage(
     'Shares',
     `Everything this library has let out: ${live} live link${live===1?'':'s'} ` +
     `of ${links.length}, and ${shares.length} account share${shares.length===1?'':'s'}.`,
-    `<p class="sharehead">Public links</p>
+    grant +
+    `<p class="sharehead" style="margin-top:22px">Public links</p>
      <p class="muted sharesub" style="margin:0 0 8px">Anyone holding the URL,
        no account needed. Kept after they close so you can see what was shared.</p>
      ${linkList}
@@ -2027,6 +2071,45 @@ async function showShares(){
        one removes the record with it.</p>
      ${shareList}`,
   );
+}
+
+/// Grants what the form on the Shares page describes.
+///
+/// A tick-list of books becomes one share each — the API's `book` scope is a
+/// single id, and looping here keeps that honest rather than inventing a bulk
+/// endpoint whose failure mode ("four of nine worked") the server would then
+/// have to describe.
+async function grantAccess(){
+  const email = document.getElementById('g-email').value.trim();
+  if (!email){ toast('Who should get access?'); return; }
+  const what = document.getElementById('g-scope').value;
+  const permission = document.getElementById('g-perm').value;
+
+  const targets = what === 'selected'
+    ? [...S.selected].map(id => ({ scope:'book', scope_id:id }))
+    : what.startsWith('group:')
+      ? [{ scope:'group', scope_id: what.slice(6) }]
+      : [{ scope:'all' }];
+
+  let done = 0;
+  const failures = [];
+  for (const t of targets){
+    try {
+      await api('POST','/api/shares', { grantee_email: email, permission, ...t });
+      done++;
+    } catch(e){ failures.push(e.message); }
+  }
+  // Partial success is reported as partial, not as success: with a tick-list
+  // of books, "granted" when two of nine failed is the sort of thing nobody
+  // notices until someone cannot open a book.
+  if (failures.length){
+    toast(done
+      ? `Granted ${done} of ${targets.length} — ${failures[0]}`
+      : failures[0]);
+  } else {
+    toast(targets.length > 1 ? `Granted on ${done} books` : 'Access granted');
+  }
+  showShares();
 }
 
 async function revokeLink(id){
