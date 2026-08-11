@@ -150,6 +150,11 @@ class _ShelfRow extends StatelessWidget {
   final File? Function(Book)? coverFileOf;
 
   void _openBook(BuildContext bookContext, Book book, Widget face) {
+    // Drop the search field's focus before leaving. Flutter restores focus to
+    // whatever held it when a route pops, so opening a book while the keyboard
+    // was up brought the keyboard back on the way home — as if the shelf were
+    // asking you to type something.
+    FocusScope.of(bookContext).unfocus();
     final box = bookContext.findRenderObject()! as RenderBox;
     final rect = box.localToGlobal(Offset.zero) & box.size;
     Navigator.of(bookContext).push(

@@ -128,9 +128,15 @@ class _BookRow extends StatelessWidget {
       ),
       onTap: selectionMode && toggle != null
           ? () => toggle(book)
-          : () => Navigator.of(context).push(MaterialPageRoute<void>(
+          : () {
+              // Same reason as `ShelfView._openBook`: focus is restored when a
+              // route pops, so leaving with the keyboard up brings it back on
+              // return. This view is where searching is most likely.
+              FocusScope.of(context).unfocus();
+              Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => detailBuilder(book),
-              )),
+              ));
+            },
       onLongPress: toggle == null ? null : () => toggle(book),
     );
   }
