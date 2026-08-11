@@ -4735,3 +4735,53 @@ async fn opds_401s_still_challenge_for_e_readers() {
         "an e-reader needs this to know to ask for credentials"
     );
 }
+
+/// Who added a book, by name.
+///
+/// A shared library holds several people's books side by side, and until now
+/// nothing on a book said whose it was — `owner_id` crossed the wire, but a
+/// uuid is not an answer anyone can read. `owner_name` is the readable form,
+/// derived like `series` rather than stored, so it follows a rename.
+#[tokio::test]
+async fn a_book_says_who_added_it() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let member = add_member(&app, &master, "ana@lib.test").await;
+
+    let (_, mine) = call(
+        &app,
+        "POST",
+        "/api/books",
+        Some(&master),
+        Some(json!({ "title": "Dune" })),
+    )
+    .await;
+    assert_eq!(
+        mine["owner_name"], "Owner",
+        "the display name, not the id"
+    );
+
+    // A member's own book, read back by the member. `add_member` sets the
+    // display name to the email, so this also pins that a name is preferred
+    // whenever there is one.
+    let (_, theirs) = call(
+        &app,
+        "POST",
+        "/api/books",
+        Some(&member),
+        Some(json!({ "title": "Solaris" })),
+    )
+    .await;
+    assert_eq!(theirs["owner_name"], "ana@lib.test");
+
+    // And it survives the list route, which is what the app actually pulls.
+    let (status, list) = call(&app, "GET", "/api/books", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let dune = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["title"] == "Dune")
+        .expect("the master's own book");
+    assert_eq!(dune["owner_name"], "Owner");
+}

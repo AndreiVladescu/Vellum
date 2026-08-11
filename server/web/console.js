@@ -26,7 +26,10 @@ const IMP = { items: [] };
 // Columns the user can show or hide (the checkbox, title, tags and actions
 // columns are always present).
 const OPT_COLS = [['cover','Cover thumbnail'],['author','Author'],['year','Year'],
-                  ['pages','Pages'],['status','Files'],['added','Date added']];
+                  ['pages','Pages'],['status','Files'],['added','Date added'],
+                  // Off unless asked for: on a library of one it is the same
+                  // name on every row.
+                  ['owner','Added by']];
 
 function esc(s){ return (s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
@@ -365,6 +368,7 @@ function headHtml(){
   if (S.cols.has('status')) h += th('status','Files','90px');
   h += '<th>Tags</th>';
   if (S.cols.has('added'))  h += th('added','Added','110px');
+  if (S.cols.has('owner'))  h += '<th style="width:130px">Added by</th>';
   h += '<th style="width:120px">Actions</th></tr>';
   return h;
 }
@@ -413,6 +417,7 @@ function render(){
       if (S.cols.has('status')) r += `<td>${statusCell(b)}</td>`;
       r += `<td>${chips}<button class="addtag" data-act="quickadd" data-book="${esc(b.id)}">＋ tag</button></td>`;
       if (S.cols.has('added'))  r += `<td class="muted">${esc((b.created_at||'').slice(0,10))}</td>`;
+      if (S.cols.has('owner'))  r += `<td class="muted">${b.owner_name?esc(b.owner_name):'<span class="dim">—</span>'}</td>`;
       r += `<td class="actions">
         <button class="btn sm" data-act="openreader" data-book="${esc(b.id)}">Read</button>
         <button class="btn sm" data-act="pickupload" data-book="${esc(b.id)}">Upload</button>

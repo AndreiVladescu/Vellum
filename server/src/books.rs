@@ -29,6 +29,11 @@ pub struct BookDto {
     pub series: Option<String>,
     /// REAL so novellas can be 1.5.
     pub series_index: Option<f64>,
+    /// Who added the book, as a person rather than an id — their display name,
+    /// or their email if they never set one. Derived, like `series`: a shared
+    /// library shows several people's books side by side, and "added by" is
+    /// only useful if it says a name the reader recognises.
+    pub owner_name: Option<String>,
 }
 
 /// The book DTO's select list, aliased on `book b`.
@@ -39,7 +44,9 @@ pub struct BookDto {
 pub(crate) const BOOK_COLUMNS: &str = "b.id, b.title, b.subtitle, b.description, b.isbn, b.publisher, \
     b.published_year, b.page_count, b.cover_path, b.spine_style, b.owner_id, b.created_at, \
     b.updated_at, (SELECT s.name FROM series s WHERE s.id = b.series_id) AS series, \
-    b.series_index";
+    b.series_index, \
+    (SELECT COALESCE(NULLIF(u.display_name, ''), u.email) FROM app_user u \
+        WHERE u.id = b.owner_id) AS owner_name";
 
 #[derive(Deserialize)]
 pub struct BookInput {

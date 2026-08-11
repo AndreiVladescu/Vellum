@@ -309,6 +309,17 @@ a URL is unencrypted.
   `app/lib/data/shelf_service.dart` is the one place that rule lives;
   Preferences → *Shelves from others* is where it is exercised.
 
+**Who added a book** (both). `book.owner_id` has always been server-side; what
+was missing was a readable form of it, so a shared library's books all looked
+alike. `BookDto.owner_name` is derived in SQL from `app_user` (display name,
+falling back to email) exactly like `series` — so it follows a rename rather
+than going stale — and the app caches it in the **app-local** `books.added_by`
+at pull time, for a label on the book's page without a lookup per book. Never
+pushed: it is the server's answer, and a client asserting it would be claiming
+to know something it was only told. A pull that says *nothing* leaves the
+cached name alone, since an older server and "nobody" are not the same thing.
+The console has it as an optional *Added by* column, off by default.
+
 **Library health** (app, plan 5 #11) is Preferences → *Check library*: the database
 and the file tree can diverge — a file deleted by hand, a partial restore, bytes
 left by a failed import — and nothing detected any of it, while the shelf hid the

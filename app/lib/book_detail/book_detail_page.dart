@@ -516,6 +516,20 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                                     'ISBN ${book.isbn}',
                                     style: theme.textTheme.bodySmall,
                                   ),
+                                // Known only once a server has said so, so
+                                // this is absent on a library that has never
+                                // synced — where the answer would be "you" for
+                                // every book anyway.
+                                if (book.addedBy != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      'Added by ${book.addedBy}',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
                                 const SizedBox(height: 10),
                                 GenresSection(
                                   repository: repository,

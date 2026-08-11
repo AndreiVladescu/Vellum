@@ -59,6 +59,7 @@ class ServerBook {
     this.genres,
     this.series,
     this.seriesIndex,
+    this.ownerName,
     this.files = const [],
   });
 
@@ -94,6 +95,10 @@ class ServerBook {
   final String? series;
   final double? seriesIndex;
 
+  /// Who added the book, as a name rather than an id. Null on a server older
+  /// than this field, or where the owning account has since been removed.
+  final String? ownerName;
+
   bool get hasCover => coverPath != null && coverPath!.isNotEmpty;
 
   /// Server timestamps are `datetime('now')` UTC strings ("YYYY-MM-DD HH:MM:SS").
@@ -115,6 +120,7 @@ class ServerBook {
     updatedAt: _parseServerTime(j['updated_at'] as String?),
     series: j['series'] as String?,
     seriesIndex: (j['series_index'] as num?)?.toDouble(),
+    ownerName: j['owner_name'] as String?,
     authors: _stringList(j['authors']),
     genres: _stringList(j['genres']),
     files: j['files'] is List

@@ -290,6 +290,13 @@ class SyncService {
                 publishedYear: Value(b.publishedYear),
                 pageCount: Value(b.pageCount),
                 spineStyle: Value(spine),
+                // Who added it, cached for display. Absent — not null — when
+                // the server didn't say: an older server has no answer, and
+                // overwriting a name we already have with nothing would make
+                // the label flicker away on every pull.
+                addedBy: b.ownerName == null
+                    ? const Value.absent()
+                    : Value(b.ownerName),
                 // Adopt the server's timestamp so this row isn't re-pulled every
                 // time, but a later server edit (newer) still wins. Absent when
                 // the server sent none, so the local default (now) applies.

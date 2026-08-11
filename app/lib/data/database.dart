@@ -109,6 +109,17 @@ class Books extends Table {
   /// the traffic from here.
   BoolColumn get syncExcluded => boolean().withDefault(const Constant(false))();
 
+  /// Who added this book, as the server names them — their display name, or
+  /// their email if they never set one.
+  ///
+  /// **App-local, and derived rather than owned.** The server holds the truth
+  /// (`book.owner_id`); this is the readable form of it, cached at pull time so
+  /// a book's page can say "Added by Ana" without a lookup per book. Never
+  /// pushed: it is the server's answer, and a client asserting it would be
+  /// claiming to know something it was told. Null for a book added here, on a
+  /// library with no server, or by an account since removed.
+  TextColumn get addedBy => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -653,7 +664,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -952,6 +963,14 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 32) {
+            // Who added a book, cached from the server for display. Nothing to
+            // backfill: it arrives with the next pull of each book, and until
+            // then "unknown" is the honest answer rather than a guess.
+            if (!(await columnsOf('books')).contains('added_by')) {
+              await m.addColumn(books, books.addedBy);
             }
           }
           if (from < 31) {

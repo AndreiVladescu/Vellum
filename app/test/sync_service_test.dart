@@ -261,6 +261,25 @@ void main() {
   setUp(() => dir = Directory.systemTemp.createTempSync('vellum_sync_test'));
   tearDown(() => dir.deleteSync(recursive: true));
 
+  test('a pull caches who added the book, and keeps it when told nothing',
+      () async {
+    // The name is the server's answer, cached for display. The second half is
+    // the one that would go wrong quietly: a server that predates the field
+    // (or an account since removed) sends nothing, and overwriting the cached
+    // name with null would make "Added by Ana" vanish on the next pull.
+    final repo = await _repo(dir);
+    final withOwner = _serverBook('b1', 'Dune', '2024-01-01 00:00:00')
+      ..['owner_name'] = 'Ana';
+    await SyncService(repo).pull(_client(_server(books: [withOwner])));
+    expect((await repo.watchBook('b1').first)?.addedBy, 'Ana');
+
+    final silent = _serverBook('b1', 'Dune', '2024-02-01 00:00:00');
+    await SyncService(repo).pull(_client(_server(books: [silent])));
+    final book = await repo.watchBook('b1').first;
+    expect(book?.title, 'Dune');
+    expect(book?.addedBy, 'Ana', reason: 'saying nothing is not saying nobody');
+  });
+
   test('pull inserts a book the device does not have', () async {
     final repo = await _repo(dir);
     final client = _client(_server(books: [_serverBook('b1', 'Dune', '2024-01-01 00:00:00')]));
