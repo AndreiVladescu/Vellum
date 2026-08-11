@@ -1,0 +1,6 @@
+A list view: one line per book, no artwork, so a screenful is dozens of
+books rather than a dozen. It shows what a spine cannot — the author,
+whether there is a file to open, how far in you are, your rating.
+
+The application id changed to app.vellum.Vellum, so this installs as a
+separate app rather than updating v1.1.0.

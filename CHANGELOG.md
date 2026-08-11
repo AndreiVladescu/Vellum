@@ -6,6 +6,73 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.1 — 2026-08-06
+
+A small release: one new way to look at your library, and the release
+machinery made harder to get wrong.
+
+**If you are upgrading on Linux, read the last section first.** The
+application id changed, and on Linux that is where the app keeps its files.
+
+### Added
+
+- **A list view.** A third choice beside spine-out and cover-out, in
+  *Preferences → Books on the shelf*: one line per book and no artwork, so a
+  screenful is dozens of books rather than a dozen. It shows the things a spine
+  cannot — the author, whether there is a file to open at all, how far into a
+  book you are, your rating and its status. The *B* shortcut now cycles all
+  three views instead of flipping between two.
+
+### Changed
+
+- **The application id is now `app.vellum.Vellum`**, replacing
+  `com.avladescu.vellum` — a name that belongs to the project rather than to a
+  person. See below for what that means if you already have Vellum installed.
+- Store metadata for F-Droid and other listings lives in `fastlane/`, and
+  [docs/FDROID.md](docs/FDROID.md) is honest about what currently stops
+  f-droid.org building Vellum: PDFium arrives as a prebuilt binary, and ML Kit
+  is proprietary.
+
+### Fixed
+
+- **A tagged release can no longer ship debug-signed Android artefacts.** v1.1.0
+  did, because a missing signing key only produced a warning in a build log.
+  Tagging now fails instead, and the check reads the built APK rather than
+  trusting that a key was configured — a wrong alias falls back to the debug key
+  just as silently. A debug-signed install can never be upgraded in place, so
+  publishing one is worse than publishing nothing.
+- **Each platform's checksums have their own name.** All four build jobs wrote a
+  file called `SHA256SUMS`, and release assets must be uniquely named, so three
+  of the four were dropped. They are now `SHA256SUMS-linux`, `-windows`,
+  `-macos` and `-android`. (GitHub also shows a SHA-256 for every asset itself,
+  so nothing was ever unverifiable.)
+- The server's systemd unit points its `Documentation=` at the real repository.
+
+### Upgrading
+
+**Linux.** The app keeps covers, book files and preferences in a directory named
+after the application id, so a fresh v1.1.1 will look in
+`~/.local/share/app.vellum.Vellum` and find nothing, while your files sit in
+`~/.local/share/com.avladescu.vellum`. Your *catalogue* is unaffected — the
+database lives in `~/Documents/vellum.sqlite` and is not named after the id — so
+the symptom is a library that still lists every book but has lost their covers,
+files and your settings. Move the directory before first launch:
+
+```sh
+mv ~/.local/share/com.avladescu.vellum ~/.local/share/app.vellum.Vellum
+```
+
+**Android.** The id *is* the package name, so v1.1.1 installs as a separate app
+rather than updating v1.1.0. Uninstall the old one once you have moved anything
+you want to keep. (v1.1.0's Android builds were debug-signed and could never
+have been updated in place regardless — see above.)
+
+**macOS and Windows** store per-application data under the same renamed
+identifier; the same "looks empty" symptom applies, and the same fix — move the
+old directory to the new name.
+
+---
+
 ## v1.1.0 — 2026-08-05
 
 Everything here is additive: your library, its files and its database carry over
