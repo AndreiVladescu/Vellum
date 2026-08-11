@@ -1,14 +1,26 @@
-# Vellum sync server behind Caddy, which obtains and renews TLS automatically
-# (plan 5 #36). This is the deployment DESIGN.md recommends, made
-# copy-pasteable: Vellum speaks plain HTTP on an internal network and never sees
-# a certificate, while Caddy terminates TLS on 443.
+# Vellum sync server, in two shapes from one file.
 #
-#   1. Point a DNS A/AAAA record at this host.
-#   2. Set DOMAIN and ACME_EMAIL below (or in a .env file next to this one).
-#   3. docker compose up -d
+# ── Just the server (the default) ──────────────────────────────────────────
 #
-# For a LAN-only server with no domain, skip Caddy and use the server's own
-# VELLUM_TLS instead — see docs/DEPLOYMENT.md.
+#     docker compose up -d
+#
+# Listens on 127.0.0.1:3000 and nothing else. Put whatever reverse proxy you
+# already run — nginx, HAProxy, Traefik, a Caddy you manage yourself — in front
+# of it and terminate TLS there. See docs/DEPLOYMENT.md for an nginx server
+# block that gets the two details right (upload size and X-Forwarded-For).
+#
+# ── With Caddy, for automatic TLS ──────────────────────────────────────────
+#
+#     docker compose --profile caddy up -d
+#
+# Caddy obtains and renews a Let's Encrypt certificate for $DOMAIN by itself.
+# Use this if you have a public domain and no existing proxy.
+#
+# ── Either way ─────────────────────────────────────────────────────────────
+#
+#   1. Copy server/.env.example to .env beside this file and edit it.
+#   2. Set VELLUM_PUBLIC_URL (or DOMAIN, from which it is derived).
+#   3. Point a DNS record at this host, if it is reachable from outside.
 
 services:
   vellum:
@@ -18,20 +30,31 @@ services:
     image: vellum-server:latest
     restart: unless-stopped
     environment:
-      # Public links embed this, so it must be the address users actually reach.
-      VELLUM_PUBLIC_URL: "https://${DOMAIN:?set DOMAIN in .env}"
-      VELLUM_MAX_UPLOAD_MB: "2048"
-      RUST_LOG: "info"
-      # No VELLUM_TLS here on purpose: Caddy terminates TLS, and running two
-      # certificate stories at once is how you end up debugging both.
+      # The address people actually reach, because public share links embed it.
+      # Set VELLUM_PUBLIC_URL directly when your proxy is not simply
+      # `https://<domain>` — a subpath, a non-standard port, or plain http on a
+      # LAN. Otherwise DOMAIN is enough. One of the two must be set: a server
+      # that guesses this hands out links that go nowhere.
+      VELLUM_PUBLIC_URL: "${VELLUM_PUBLIC_URL:-https://${DOMAIN:?set DOMAIN or VELLUM_PUBLIC_URL in .env}}"
+      VELLUM_MAX_UPLOAD_MB: "${VELLUM_MAX_UPLOAD_MB:-2048}"
+      RUST_LOG: "${RUST_LOG:-info}"
+      # No VELLUM_TLS here on purpose: whatever sits in front terminates TLS,
+      # and running two certificate stories at once is how you end up debugging
+      # both. For a server with *no* proxy at all, drop the ports mapping below
+      # and set VELLUM_TLS — see docs/DEPLOYMENT.md.
     volumes:
       - vellum-data:/var/lib/vellum
-    # Not published to the host: only Caddy needs to reach it.
-    expose:
-      - "3000"
+    # Loopback only. Your proxy reaches it here; the internet cannot, whichever
+    # profile you use. Change the left-hand side to 0.0.0.0 only if you mean to
+    # expose an unencrypted port to your network.
+    ports:
+      - "${VELLUM_BIND:-127.0.0.1:3000}:3000"
 
+  # Only started by `--profile caddy`. Without the flag this service does not
+  # exist as far as compose is concerned, so the default `up` is server-only.
   caddy:
     image: caddy:2-alpine
+    profiles: ["caddy"]
     restart: unless-stopped
     depends_on:
       - vellum
@@ -39,7 +62,13 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      DOMAIN: "${DOMAIN:?set DOMAIN in .env}"
+      # Not `${DOMAIN:?...}`: compose interpolates the whole file *before* it
+      # applies profiles, so a required-variable guard here fires even for
+      # someone running the default server-only setup with their own proxy —
+      # the exact case this profile exists to stay out of the way of. Caddy
+      # refuses to start on an empty site address, which is the right error
+      # from the right component.
+      DOMAIN: "${DOMAIN:-}"
       ACME_EMAIL: "${ACME_EMAIL:-}"
     volumes:
       - ./packaging/Caddyfile:/etc/caddy/Caddyfile:ro

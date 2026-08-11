@@ -1,0 +1,57 @@
+# Vellum behind nginx.
+#
+# For the `docker compose up -d` (no Caddy) setup: the container listens on
+# 127.0.0.1:3000, nginx terminates TLS and proxies to it.
+#
+# Two settings here are load-bearing rather than boilerplate. Both are silent
+# when wrong: uploads fail at a size you did not choose, and rate limiting
+# blames one address for everybody.
+#
+#   cp packaging/nginx.conf.example /etc/nginx/sites-available/vellum
+#   ln -s /etc/nginx/sites-available/vellum /etc/nginx/sites-enabled/
+#   nginx -t && systemctl reload nginx
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name books.example.com;          # ← your domain
+
+    # Certificates: certbot writes these, or point at your own.
+    ssl_certificate     /etc/letsencrypt/live/books.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/books.example.com/privkey.pem;
+
+    # A book can be gigabytes. nginx's default is 1 MB, and it rejects the
+    # upload itself — Vellum's own VELLUM_MAX_UPLOAD_MB never gets a say, so
+    # raising one without the other just moves which limit bites.
+    client_max_body_size 2048M;
+
+    # Large uploads over a slow line otherwise time out mid-transfer.
+    proxy_request_buffering off;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+
+        # Vellum reads X-Forwarded-For for its per-IP rate limits and its
+        # activity log (see server/src/auth.rs). Without it every request looks
+        # like it came from the proxy, so one impatient client throttles all of
+        # them and the log records nothing useful.
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $host;
+
+        # The console's live updates are server-sent events; buffering them
+        # makes the page look frozen rather than broken, which is worse.
+        proxy_buffering off;
+    }
+}
+
+# Plain HTTP exists only to send people to HTTPS.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name books.example.com;
+    return 301 https://$host$request_uri;
+}

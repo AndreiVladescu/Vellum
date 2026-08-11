@@ -195,18 +195,21 @@ jobs:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE" ]; then
-            # A *tag* is a publish. v1.1.0 went out debug-signed because this
-            # only warned, and a warning in a job log is not something anyone
-            # reads before people start downloading. Refuse instead: the
-            # artefact it would produce cannot be upgraded in place later, so
-            # shipping it is worse than shipping nothing.
-            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-              echo "::error::No ANDROID_KEYSTORE_BASE64 secret. A tagged"\
-                   "release must not ship debug-signed Android artefacts —"\
-                   "they can never be upgraded in place. See DEVELOPER.md."
-              exit 1
-            fi
+            # v1.1.0 went out debug-signed because this only warned, and a
+            # warning in a job log is not read before people start downloading.
+            # But *failing* is the wrong correction: it blocked the Linux,
+            # Windows, macOS and server artefacts too, because `publish` needs
+            # this job. The thing that must not happen is publishing an
+            # unusable APK, not building one — so a tag without a keystore
+            # simply ships no Android artefacts and says so loudly.
             echo "signed=false" >> "$GITHUB_OUTPUT"
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — this"\
+                   "release will have NO Android artefacts. A debug-signed"\
+                   "APK can never be upgraded in place, so none is better"\
+                   "than one. Set the secrets (DEVELOPER.md) and re-tag to"\
+                   "include Android."
+            fi
             exit 0
           fi
           echo "$KEYSTORE" | base64 -d > upload.jks
@@ -217,7 +220,11 @@ jobs:
           storeFile=upload.jks
           PROPS
           echo "signed=true" >> "$GITHUB_OUTPUT"
+      # Skipped on a tag with no keystore: there is nothing publishable to
+      # build, and a rehearsal (workflow_dispatch) still builds so the Android
+      # path stays exercised.
       - name: Build app bundle and per-ABI APKs
+        if: steps.signing.outputs.signed == 'true' || github.ref_type != 'tag'
         working-directory: app
         run: |
           flutter pub get
@@ -230,6 +237,7 @@ jobs:
       # is here to catch. A debug certificate's subject is `CN=Android Debug`,
       # and it appears verbatim in the APK signing block.
       - name: Check what actually signed the APK
+        if: steps.signing.outputs.signed == 'true' || github.ref_type != 'tag'
         working-directory: app
         run: |
           apk=$(ls build/app/outputs/flutter-apk/*-release.apk | head -1)
@@ -251,6 +259,7 @@ jobs:
         working-directory: app/android
         run: rm -f upload.jks key.properties
       - name: Checksums
+        if: steps.signing.outputs.signed == 'true' || github.ref_type != 'tag'
         working-directory: app
         run: |
           mkdir -p dist
@@ -258,6 +267,7 @@ jobs:
           cp build/app/outputs/flutter-apk/*.apk dist/ || true
           (cd dist && sha256sum * > SHA256SUMS-android)
       - uses: actions/upload-artifact@v7
+        if: steps.signing.outputs.signed == 'true' || github.ref_type != 'tag'
         with:
           name: android
           path: app/dist/*

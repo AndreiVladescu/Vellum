@@ -45,22 +45,51 @@ silently lose that. `poppler-utils` is installed for exactly that reason.
 
 `/health` is unauthenticated and cheap; the image's `HEALTHCHECK` uses it.
 
-### Docker Compose with automatic TLS
+### Docker Compose
 
-`docker-compose.yml` runs Vellum behind Caddy, which obtains and renews a
-certificate for you.
+One `docker-compose.yml`, two shapes. Which you want depends on whether you
+already run a reverse proxy.
+
+**Just the server, behind your own proxy** — nginx, HAProxy, Traefik, a Caddy
+you manage yourself:
 
 ```sh
-printf 'DOMAIN=books.example.com\nACME_EMAIL=you@example.com\n' > .env
+printf 'VELLUM_PUBLIC_URL=https://books.example.com\n' > .env
 docker compose up -d
 ```
 
-Vellum itself never sees a certificate here — Caddy terminates TLS and forwards
-plain HTTP on an internal network. Don't also set `VELLUM_TLS`; running two
-certificate stories at once means debugging both.
+That publishes **127.0.0.1:3000 and nothing else**, so only something on the
+same host can reach it. Point your proxy there.
+`packaging/nginx.conf.example` is a working server block; the two settings in it
+that are not boilerplate are `client_max_body_size` (nginx rejects a large book
+long before `VELLUM_MAX_UPLOAD_MB` is consulted) and `X-Forwarded-For` (without
+it every request looks like it came from the proxy, so one impatient client
+throttles everybody).
 
-Caddy's config (`packaging/Caddyfile`) raises the request body limit to 2 GB and
-forwards `X-Forwarded-For`, which the server's per-IP rate limiting reads.
+To listen on something other than loopback — a proxy on another machine — set
+`VELLUM_BIND=0.0.0.0:3000`. Only do that on a network you trust: it is
+unencrypted.
+
+**With Caddy, for automatic TLS** — a public domain and no existing proxy:
+
+```sh
+printf 'DOMAIN=books.example.com\nACME_EMAIL=you@example.com\n' > .env
+docker compose --profile caddy up -d
+```
+
+Caddy obtains and renews a Let's Encrypt certificate by itself. Its config
+(`packaging/Caddyfile`) gets the same two details right.
+
+Either way Vellum never sees a certificate — whatever is in front terminates
+TLS. Don't also set `VELLUM_TLS`; running two certificate stories at once means
+debugging both.
+
+`VELLUM_PUBLIC_URL` is what public share links embed, so it has to be the
+address people actually reach. Setting `DOMAIN` derives it as
+`https://$DOMAIN`; set `VELLUM_PUBLIC_URL` directly for anything else — a
+non-standard port, a subpath, or plain http on a LAN. Compose refuses to start
+without one of them rather than guessing and handing out links that go
+nowhere.
 
 ### LAN-only, self-signed TLS
 
