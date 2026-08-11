@@ -173,6 +173,7 @@ async fn main() -> anyhow::Result<()> {
         max_upload_bytes: max_upload_mb * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
             60,

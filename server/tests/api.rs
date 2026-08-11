@@ -23,6 +23,7 @@ async fn test_app_with_dir() -> (axum::Router, std::path::PathBuf) {
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
             60,
@@ -69,6 +70,7 @@ async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
             60,
@@ -507,6 +509,7 @@ async fn session_expiry_slides_forward_on_use() {
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
             60,
@@ -1410,6 +1413,7 @@ async fn mail_is_advertised_once_a_mailer_exists() {
         max_upload_bytes: 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
             60,
@@ -1460,6 +1464,7 @@ async fn test_app_with_mail() -> (axum::Router, sqlx::SqlitePool) {
         max_upload_bytes: 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
             1000,
@@ -3884,6 +3889,7 @@ async fn upsert_clears_a_stale_tombstone_for_a_live_book() {
         max_upload_bytes: 512 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(vellum_server::RateLimiter::new(
             60,

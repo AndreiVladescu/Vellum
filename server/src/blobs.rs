@@ -393,6 +393,17 @@ pub async fn upload_file(
     let is_pdf = ext == "pdf";
     let is_epub = ext == "epub";
     tokio::spawn(async move {
+        // One book enriched at a time. The reply is sent before this runs, so
+        // a client importing a folder starts the next upload immediately and
+        // these tasks accumulate — 87 books meant 87 detached parses, each
+        // `lopdf::Document::load` holding a whole PDF in memory. On a small
+        // machine that is an out-of-memory kill, and the symptom is the *next*
+        // upload failing with a dropped connection rather than anything the
+        // log blames on the parse.
+        //
+        // Held across the whole task, not just the render: the page count is
+        // the memory-hungry half.
+        let _enrich = bg.enrich_semaphore.acquire().await;
         if is_pdf {
             // A PDF's page count is ground truth for the digital copy; parse it
             // off the async runtime (CPU-bound), reading the file back from disk.

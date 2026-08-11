@@ -169,10 +169,21 @@ in the same pass. None of them block the rest of the item.
   keys does call Open Library twice per book, which is why the missing HTTP
   timeout was fixed alongside this — but it cannot be this failure.)
 
-  *Needed to go further:* the server log around the failure, and whether the
-  process restarted. Disk exhaustion on the data volume is the untested
-  candidate — 87 books of PDFs is many gigabytes, and the cover write ignores
-  its result (`let _ =`), so a full disk would surface late and oddly.
+  **Cause found (2026-08-11), and fixed.** The reporter's Raspberry Pi locked
+  up entirely, which pointed at memory. Uploads themselves stream to disk and
+  hold nothing — but the *enrichment* spawned after each upload calls
+  `lopdf::Document::load`, which reads a whole PDF into memory, and those tasks
+  were detached and unbounded. The HTTP reply is sent before enrichment runs
+  (on purpose, so a large upload is not held open), so the console starts the
+  next book immediately and the parses accumulate: 87 books, 87 concurrent
+  whole-PDF loads. On a small machine that is an out-of-memory kill, and it
+  surfaces as the *next* request failing with a dropped connection rather than
+  as anything the log attributes to the parse.
+
+  Enrichment now takes a one-permit `enrich_semaphore`, held across the whole
+  task rather than just the render — the page count is the memory-hungry half.
+  Kept separate from `render_semaphore` so a bulk import cannot make reading a
+  book slow, and vice versa.
 
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.

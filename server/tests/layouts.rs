@@ -22,6 +22,7 @@ async fn app() -> axum::Router {
         max_upload_bytes: 8 * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
+        enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),
         public_limiter: std::sync::Arc::new(RateLimiter::new(
             1000,

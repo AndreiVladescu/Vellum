@@ -79,6 +79,16 @@ pub struct AppState {
     /// Bounds concurrent PDF-cover shell-outs so many parallel uploads can't
     /// fork many `gs`/`mutool` processes at once.
     pub render_semaphore: std::sync::Arc<tokio::sync::Semaphore>,
+    /// Caps how many uploaded books are being *enriched* at once — page count
+    /// parsed, cover rendered.
+    ///
+    /// Separate from `render_semaphore`, which protects the reader's own
+    /// rendering: a bulk import must not make reading a book slow, and reading
+    /// must not stall an import. One permit, because the expensive half is
+    /// `lopdf::Document::load`, which holds an entire PDF in memory — and this
+    /// is background work nobody is waiting on, so serialising it costs
+    /// nothing anyone can perceive.
+    pub enrich_semaphore: std::sync::Arc<tokio::sync::Semaphore>,
     /// Short-lived cache of successful Basic-auth verifications, so per-request
     /// OPDS Basic auth doesn't cost an Argon2 verify every time.
     pub basic_cache: std::sync::Arc<auth::BasicAuthCache>,
