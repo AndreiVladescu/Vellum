@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../widgets/page_insets.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/database.dart';
@@ -83,6 +85,9 @@ class AnnotationsPanel extends StatelessWidget {
             else
               Expanded(
                 child: ListView.separated(
+                  // The panel is a bottom sheet, so its last row would
+                  // otherwise come to rest under the gesture bar.
+                  padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
                   itemCount: annotations.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, i) => _AnnotationTile(

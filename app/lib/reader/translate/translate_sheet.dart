@@ -6,6 +6,7 @@ import 'language_packs_sheet.dart';
 import 'local_engine_backend.dart';
 import 'on_device_backend.dart';
 import 'translation_backend.dart';
+import '../../widgets/page_insets.dart';
 
 /// The passage, what it was translated from and to, and the result.
 ///
@@ -154,7 +155,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
         left: 20,
         right: 20,
         top: 8,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+        bottom: sheetBottomInset(context) + 20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

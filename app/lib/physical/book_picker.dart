@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/page_insets.dart';
+
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import 'physical_metrics.dart';
@@ -169,7 +171,9 @@ class _BookPickerState extends State<BookPicker> {
                   16,
                   8,
                   16,
-                  8 + MediaQuery.viewPaddingOf(context).bottom,
+                  // Not `viewPadding`: this sheet has a search field, and
+                  // the footer has to clear the keyboard too.
+                  8 + sheetBottomInset(context),
                 ),
                 child: Row(
                   children: [

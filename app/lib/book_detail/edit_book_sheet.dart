@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../widgets/page_insets.dart';
 
 /// Bottom sheet to edit a book's core details and change its cover.
 class EditBookSheet extends StatefulWidget {
@@ -92,7 +93,7 @@ class EditBookSheetState extends State<EditBookSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final bottom = sheetBottomInset(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       child: SingleChildScrollView(

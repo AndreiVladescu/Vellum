@@ -4,6 +4,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
+import '../widgets/page_insets.dart';
 
 /// Email a book to an e-reader (plan 5 #53).
 ///
@@ -149,7 +150,7 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
           20,
           12,
           20,
-          MediaQuery.viewInsetsOf(context).bottom + 20,
+          sheetBottomInset(context) + 20,
         ),
         child: _loading
             ? const Padding(

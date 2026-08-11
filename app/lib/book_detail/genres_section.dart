@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
+import '../widgets/page_insets.dart';
 
 /// Editable genre ("tag") chips for a book. Each genre is removable (the ✕),
 /// tapping one filters the shelf by it, and the trailing "＋ Add" chip opens a
@@ -100,7 +101,7 @@ class _AddGenreSheetState extends State<_AddGenreSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final bottom = sheetBottomInset(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + bottom),
       child: Column(

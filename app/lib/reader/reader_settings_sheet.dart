@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'reader_settings.dart';
+import '../widgets/page_insets.dart';
 
 /// The reader's appearance controls (plan 5 #23).
 ///
@@ -199,7 +200,7 @@ class _TranslateServerSheetState extends State<TranslateServerSheet> {
         left: 20,
         right: 20,
         top: 8,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+        bottom: sheetBottomInset(context) + 20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

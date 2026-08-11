@@ -18,3 +18,19 @@ import 'package:flutter/material.dart';
 /// hardware buttons — so this is a no-op everywhere it isn't needed.
 EdgeInsets pageInsets(BuildContext context, EdgeInsets base) =>
     base + EdgeInsets.only(bottom: MediaQuery.viewPaddingOf(context).bottom);
+
+/// How much room a bottom sheet must leave under its content: the keyboard,
+/// plus the system navigation bar.
+///
+/// Sheets used to count only the keyboard, which is the half you notice while
+/// developing — type in a field, watch the sheet rise. The other half only
+/// shows up on a phone with a gesture bar and nothing focused, and it is what
+/// put the buttons at the foot of a book's edit sheet underneath it.
+///
+/// [MediaQuery.paddingOf], not `viewPaddingOf`: `padding` is what is left of
+/// the system inset *after* the keyboard has covered part of it, so it falls to
+/// zero exactly when the keyboard is up and the gesture bar is drawn over the
+/// keyboard instead of the sheet. Adding `viewPadding` would count that strip
+/// twice and leave a gap above the keyboard.
+double sheetBottomInset(BuildContext context) =>
+    MediaQuery.viewInsetsOf(context).bottom + MediaQuery.paddingOf(context).bottom;
