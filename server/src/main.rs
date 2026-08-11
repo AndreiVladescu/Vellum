@@ -159,7 +159,17 @@ async fn main() -> anyhow::Result<()> {
         db,
         public_base_url,
         data_dir: data_dir.into(),
-        http: reqwest::Client::new(),
+        // `Client::new()` has **no request timeout**: an upstream that accepts
+        // the connection and then stops talking holds the handler open for as
+        // long as it likes, and the browser waiting on it eventually reports a
+        // network error with nothing in the log to explain it. Open Library is
+        // reached once per book during a metadata import, so a bulk import is
+        // where that would first be felt.
+        http: reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(20))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new()),
         max_upload_bytes: max_upload_mb * 1024 * 1024,
         throttle: std::sync::Arc::default(),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),

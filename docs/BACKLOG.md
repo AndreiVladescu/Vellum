@@ -150,6 +150,30 @@ in the same pass. None of them block the rest of the item.
   no top bar to clear. Worth checking the other dialogs with tables at the same
   time, since they share the rule.
 
+- **A bulk console import stopped partway with a network error.** Reported
+  2026-08-11: importing 87 books from a folder, it stalled around the 68th with
+  *"Last error: NetworkError when attempting to fetch resource"* and went no
+  further.
+
+  *What is known:* that wording is the browser's `fetch()` failure, so the call
+  that failed is `POST /api/books/from-search` — **not** the file upload, which
+  is XHR and reports "Network error during upload". A NetworkError means the
+  connection failed rather than the server answering with an error status, so
+  the server either died, was restarted, or something between the two dropped
+  the connection. The import loop is sequential, so it is not a flood of
+  parallel requests.
+
+  *Ruled out:* for a *folder* import the handler makes no outbound calls —
+  `fetch_description` returns early on an empty `work_key` and `download_cover`
+  needs a cover URL the console does not send. (A *catalogue* import with work
+  keys does call Open Library twice per book, which is why the missing HTTP
+  timeout was fixed alongside this — but it cannot be this failure.)
+
+  *Needed to go further:* the server log around the failure, and whether the
+  process restarted. Disk exhaustion on the data volume is the untested
+  candidate — 87 books of PDFs is many gigabytes, and the cover write ignores
+  its result (`let _ =`), so a full disk would surface late and oddly.
+
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.
 - **EPUB reader polish.** Partly resolved by plan 5 #23: in-chapter scroll
