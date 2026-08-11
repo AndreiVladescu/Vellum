@@ -23,6 +23,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _shelfSortKey = 'settings.shelfSort';
   static const _autoPushKey = 'settings.autoPush';
   static const _importGenresKey = 'settings.importOpenLibraryGenres';
+  static const _acceptShelvesKey = 'settings.acceptSharedShelves';
   static const _syncReadingPositionKey = 'settings.syncReadingPosition';
   static const _syncScopeKey = 'settings.syncScope';
   static const _deviceIdKey = 'settings.deviceId';
@@ -208,6 +209,23 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setAutoPush(bool value) async {
     await _prefs.setBool(_autoPushKey, value);
+    notifyListeners();
+  }
+
+  /// Whether a shelf somebody else made shows up here when it arrives.
+  ///
+  /// On by default — a shared library that hides its shelves is missing the
+  /// point of sharing — but a shelf is somebody else's opinion about how books
+  /// should be grouped, and on a server with several people that opinion
+  /// arrives uninvited. Turning this off doesn't refuse the shelf (it still
+  /// syncs, and the server is unchanged); it decides what *new* arrivals start
+  /// as. Shelves already here keep whatever you chose for them, one by one, on
+  /// the Shelves screen — otherwise flipping this once would undo every
+  /// individual decision you had made.
+  bool get acceptSharedShelves => _prefs.getBool(_acceptShelvesKey) ?? true;
+
+  Future<void> setAcceptSharedShelves(bool value) async {
+    await _prefs.setBool(_acceptShelvesKey, value);
     notifyListeners();
   }
 

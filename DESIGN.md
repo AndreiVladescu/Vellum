@@ -290,6 +290,25 @@ a URL is unencrypted.
   membership rather than failing (`server/src/shelves.rs::existing_book_ids`
   does the same server-side, since `shelf_book.book_id` has a foreign key).
 
+  **Personal vs shared** (migration 0029 / app `shelves.is_personal`). A shelf
+  is an opinion about how books group together, and on a shared library that
+  opinion used to reach everyone. `personal = 1` keeps a shelf to its owner: it
+  still syncs — theirs on every device they use — but `visible_shelves` refuses
+  it to the share branch, so nobody else ever receives it. Every shelf that
+  existed before this is public, and the app only asks the question when there
+  is a server to share with.
+
+  Whether *someone else's* shelf shows is the other half, and it is **app-local
+  only** (`shelves.accepted`, alongside `shelves.owner_id` so the app can tell
+  whose is whose). It says what one reader wants to see, so pushing it would
+  let one person's "no thanks" hide a shelf for everyone. It is *nullable* on
+  purpose: null means undecided and follows the `acceptSharedShelves`
+  preference, while true/false is a per-shelf answer that survives later
+  changes to that preference — with only two states, flipping the default back
+  on would wipe out every individual no. `shelfIsShown` in
+  `app/lib/data/shelf_service.dart` is the one place that rule lives;
+  Preferences → *Shelves from others* is where it is exercised.
+
 **Library health** (app, plan 5 #11) is Preferences → *Check library*: the database
 and the file tree can diverge — a file deleted by hand, a partial restore, bytes
 left by a failed import — and nothing detected any of it, while the shelf hid the

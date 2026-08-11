@@ -22,6 +22,7 @@ import 'physical_copies_section.dart';
 import 'read_button.dart';
 import 'reader_notes_section.dart';
 import 'send_to_device_sheet.dart';
+import '../data/shelf_service.dart';
 
 /// Full-page book view: metadata, digital formats, physical copies, and the
 /// Read / Resume reading action.
@@ -227,7 +228,18 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       child: StreamBuilder<List<Shelf>>(
         stream: repository.watchShelves(),
         builder: (context, shelvesSnap) {
-          final shelves = shelvesSnap.data ?? const [];
+          // Same rule as the library's chip row: a shelf you declined is not
+          // one you can add a book to.
+          final settings = widget.settings;
+          final shelves = [
+            for (final s in shelvesSnap.data ?? const <Shelf>[])
+              if (shelfIsShown(
+                s,
+                myUserId: widget.connection?.userId ?? '',
+                acceptByDefault: settings?.acceptSharedShelves ?? true,
+              ))
+                s,
+          ];
           return StreamBuilder<Set<String>>(
             stream: repository.watchShelfIdsFor(book.id),
             builder: (context, memberSnap) {

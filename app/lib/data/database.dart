@@ -272,6 +272,26 @@ class Shelves extends Table {
   TextColumn get name => text()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  /// A shelf its owner keeps to themselves. Synced — it is theirs on every
+  /// device they use — but the server withholds it from shares (migration
+  /// 0029), so it never appears in anyone else's chip row.
+  BoolColumn get isPersonal => boolean().withDefault(const Constant(false))();
+  /// Who made it, as the server knows them. Null for a shelf made on this
+  /// device, or on a library with no server: "mine" is the useful reading of
+  /// null, and it is what the shelf was before any of this existed.
+  TextColumn get ownerId => text().nullable()();
+  /// Whether this device shows a shelf somebody else made. **App-local only**,
+  /// and deliberately: it says what this reader wants to see, not anything
+  /// about the shelf, so pushing it would let one person's "no thanks" hide a
+  /// shelf for everyone.
+  ///
+  /// Null means undecided, which is not the same as yes: an undecided shelf
+  /// follows the `acceptSharedShelves` preference, and a decided one keeps the
+  /// answer you gave it even if you later flip that preference. Without the
+  /// third state, "accept new shelves by default: off" and "I declined this
+  /// one" would be the same value, and turning the default back on would undo
+  /// every individual no.
+  BoolColumn get accepted => boolean().nullable()();
   // Sync bookkeeping, same convention as Books.needsPush: set on every write
   // (rename, reorder, or a membership change via ShelfBooks), cleared once a
   // push succeeds. Membership itself dirties the parent shelf; ShelfBooks
@@ -633,7 +653,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 30;
+  int get schemaVersion => 31;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -932,6 +952,23 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 31) {
+            // Personal shelves, and whether this device shows other people's.
+            // Every existing shelf stays public and accepted: they were made
+            // when public was the only kind, and an upgrade that quietly hid
+            // shelves from the people who can already see them would be a
+            // change nobody asked for.
+            final cols = await columnsOf('shelves');
+            if (!cols.contains('is_personal')) {
+              await m.addColumn(shelves, shelves.isPersonal);
+            }
+            if (!cols.contains('owner_id')) {
+              await m.addColumn(shelves, shelves.ownerId);
+            }
+            if (!cols.contains('accepted')) {
+              await m.addColumn(shelves, shelves.accepted);
             }
           }
           if (from < 30) {

@@ -813,6 +813,7 @@ class VellumServerClient {
     required int sortOrder,
     required List<String> bookIds,
     DateTime? updatedAt,
+    bool personal = false,
   }) async {
     final res = await _http.put(
       _uri('/api/shelves/$id'),
@@ -822,6 +823,9 @@ class VellumServerClient {
         'sort_order': sortOrder,
         'book_ids': bookIds,
         'updated_at': ?formatServerTime(updatedAt),
+        // A server older than migration 0029 ignores this and keeps the shelf
+        // public, which is the only thing it can do.
+        'personal': personal,
       }),
     );
     _body(res);
@@ -1395,6 +1399,8 @@ class ServerShelf {
     required this.sortOrder,
     required this.bookIds,
     this.updatedAt,
+    this.ownerId,
+    this.personal = false,
   });
 
   final String id;
@@ -1403,12 +1409,24 @@ class ServerShelf {
   final List<String> bookIds;
   final DateTime? updatedAt;
 
+  /// Who made it. A server older than migration 0029 sends this already; it is
+  /// what lets the app tell "someone else's shelf" from its own.
+  final String? ownerId;
+
+  /// The owner keeps this one to themselves. Only ever true for shelves this
+  /// account owns — the server does not send other people's personal shelves
+  /// at all — but it round-trips so the flag survives a pull and a push back.
+  final bool personal;
+
   factory ServerShelf.fromJson(Map<String, dynamic> j) => ServerShelf(
     id: j['id'] as String,
     name: j['name'] as String? ?? '',
     sortOrder: j['sort_order'] as int? ?? 0,
     bookIds: [for (final id in (j['book_ids'] as List? ?? const [])) id as String],
     updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
+    ownerId: j['owner_id'] as String?,
+    // Absent on a server older than 0029, where every shelf is public.
+    personal: j['personal'] as bool? ?? false,
   );
 }
 

@@ -592,6 +592,11 @@ class SyncService {
         }
         adopted.add(s.id);
 
+        // `accepted` is this device's own answer about someone else's shelf,
+        // so a pull must never write it: an upsert that set it would reset a
+        // decision every time the shelf's name changed. A shelf arriving for
+        // the first time simply has no answer yet (null), which the library
+        // reads as "follow the preference".
         await db.into(db.shelves).insertOnConflictUpdate(
               ShelvesCompanion.insert(
                 id: s.id,
@@ -599,6 +604,8 @@ class SyncService {
                 sortOrder: Value(s.sortOrder),
                 updatedAt:
                     server == null ? const Value.absent() : Value(server),
+                isPersonal: Value(s.personal),
+                ownerId: Value(s.ownerId),
               ),
             );
 
@@ -1546,6 +1553,7 @@ class SyncService {
           sortOrder: s.sortOrder,
           bookIds: [for (final m in members) m.bookId],
           updatedAt: s.updatedAt,
+          personal: s.isPersonal,
         );
         await (db.update(db.shelves)..where((x) => x.id.equals(s.id))).write(
           const ShelvesCompanion(needsPush: Value(false)),

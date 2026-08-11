@@ -22,6 +22,7 @@ import 'app_settings.dart';
 import 'appearance.dart';
 import 'book_face.dart';
 import 'spine_art.dart';
+import 'shared_shelves_page.dart';
 import 'trash_page.dart';
 import 'wallpaper.dart';
 
@@ -140,6 +141,25 @@ class PreferencesPage extends StatelessWidget {
               connection: connection,
             ),
             _BackgroundSyncTile(settings: settings),
+            // Only meaningful on a shared library: with no server there is
+            // nobody else whose shelves could arrive.
+            if (connection.isConnected)
+              ListTile(
+                leading: const Icon(Icons.shelves),
+                title: const Text('Shelves from others'),
+                subtitle: const Text(
+                    'Choose which shared shelves show in your library'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SharedShelvesPage(
+                      repository: repository,
+                      settings: settings,
+                      connection: connection,
+                    ),
+                  ),
+                ),
+              ),
             const Divider(height: 24),
             _SectionHeader('Trash'),
             _TrashTile(repository: repository),

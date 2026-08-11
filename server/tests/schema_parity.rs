@@ -92,7 +92,20 @@ async fn synced_tables_have_the_expected_columns() {
         // 0001_init.sql but never synced or touched by any client.
         (
             "shelf",
-            &["id", "owner_id", "name", "sort_order", "updated_at"],
+            &[
+                "id",
+                "owner_id",
+                "name",
+                "sort_order",
+                "updated_at",
+                // Personal shelves (migration 0029): synced, because the shelf
+                // is its owner's on every device they use — only *sharing* is
+                // what the flag withholds. The app's matching column is
+                // `shelves.is_personal`; its `accepted` column is app-local, a
+                // statement about one device's willingness to show someone
+                // else's shelf, so it does not appear here.
+                "personal",
+            ],
         ),
         ("shelf_book", &["shelf_id", "book_id", "position"]),
         // Synced since migration 0009 (plan 5 #4, second of three) -- no

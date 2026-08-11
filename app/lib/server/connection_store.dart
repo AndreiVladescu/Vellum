@@ -20,6 +20,7 @@ class ServerConnection extends ChangeNotifier {
   static const _tokenKey = 'server.token';
   static const _emailKey = 'server.email';
   static const _masterKey = 'server.isMaster';
+  static const _userIdKey = 'server.userId';
   static const _certPrefix = 'server.cert.';
   static const _insecureAckKey = 'server.insecureTokenAck';
 
@@ -79,6 +80,15 @@ class ServerConnection extends ChangeNotifier {
   String? get token => _token;
   String get email => _prefs.getString(_emailKey) ?? '';
   bool get isMaster => _prefs.getBool(_masterKey) ?? false;
+
+  /// This account's id on the server, as the server knows it. Empty when not
+  /// signed in — and also on a session saved before this was recorded, so
+  /// callers must treat empty as "unknown", never as "nobody".
+  ///
+  /// It is what lets the library tell its own rows from other people's: a shelf
+  /// carries the id of whoever made it, and "someone else's shelf" is a
+  /// comparison that needs both halves.
+  String get userId => _prefs.getString(_userIdKey) ?? '';
 
   bool get isConnected => (_token?.isNotEmpty ?? false) && baseUrl.isNotEmpty;
 
@@ -208,6 +218,7 @@ class ServerConnection extends ChangeNotifier {
     await _prefs.setString(_urlKey, normalized);
     await _prefs.setString(_emailKey, auth.user.email);
     await _prefs.setBool(_masterKey, auth.user.isMaster);
+    await _prefs.setString(_userIdKey, auth.user.id);
     // A fresh session starts with a full pull: the delta cursor can't tell that
     // a book was newly *shared* with this account (sharing doesn't bump a book's
     // updated_at), so clearing it here guarantees newly-visible books arrive.
@@ -248,6 +259,7 @@ class ServerConnection extends ChangeNotifier {
     await _prefs.remove(_tokenKey);
     await _prefs.remove(_emailKey);
     await _prefs.remove(_masterKey);
+    await _prefs.remove(_userIdKey);
     await _prefs.remove(_insecureAckKey);
     if (baseUrl.isNotEmpty) {
       await _prefs.remove(_cursorKey(baseUrl));

@@ -1,0 +1,14 @@
+-- A shelf can be your own arrangement rather than the library's.
+--
+-- Shelves sync, and everything that syncs is visible to whoever the library is
+-- shared with — so "books I mean to reread" appeared on other people's shelves
+-- alongside the collections the library actually shares. Those are two
+-- different things wearing one name.
+--
+-- `personal = 1` means the shelf belongs to its owner alone: it still syncs (it
+-- is theirs on every device they use) but no share can see it. Constant
+-- default, per the rule in CLAUDE.md, and 0 is right for every shelf that
+-- already exists — they were made when public was the only kind, and silently
+-- hiding them from the people who can see them today would be a change nobody
+-- asked for.
+ALTER TABLE shelf ADD COLUMN personal INTEGER NOT NULL DEFAULT 0;

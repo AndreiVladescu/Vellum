@@ -207,7 +207,14 @@ class LibraryRepository {
 
   // ---- Shelves ----------------------------------------------------------
   Stream<List<Shelf>> watchShelves() => shelves.watchShelves();
-  Future<String> createShelf(String name) => shelves.createShelf(name);
+  Future<String> createShelf(String name, {bool personal = false}) =>
+      shelves.createShelf(name, personal: personal);
+  Future<void> setShelfPersonal(String id, bool personal) =>
+      shelves.setShelfPersonal(id, personal);
+  Future<void> setShelfAccepted(String id, bool? accepted) =>
+      shelves.setShelfAccepted(id, accepted);
+  Future<void> setAllShelvesAccepted(Iterable<String> ids, bool? accepted) =>
+      shelves.setAllAccepted(ids, accepted);
   Future<void> renameShelf(String id, String name) =>
       shelves.renameShelf(id, name);
   Future<void> deleteShelf(String id, {bool recordTombstone = true}) =>

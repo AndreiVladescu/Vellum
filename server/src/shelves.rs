@@ -19,6 +19,10 @@ pub struct ShelfRow {
     pub name: String,
     pub sort_order: i64,
     pub updated_at: String,
+    /// A shelf its owner keeps to themselves (migration 0029). It still syncs
+    /// — it is theirs on every device they use — but no share can see it, so
+    /// "books I mean to reread" stays out of other people's chip rows.
+    pub personal: bool,
 }
 
 /// A shelf plus its membership in explicit order — the app's push sends the
@@ -41,6 +45,10 @@ pub struct ShelfInput {
     /// The pushing client's sync clock, same LWW convention as `BookInput`.
     #[serde(default)]
     pub updated_at: Option<String>,
+    /// Defaults to public: a client that predates 0029 sends nothing, and its
+    /// shelves are the shared kind, which is what they already were.
+    #[serde(default)]
+    pub personal: bool,
 }
 
 /// Shelves owned by the caller, plus every shelf shared with them via an
@@ -57,10 +65,13 @@ async fn visible_shelves(
         ""
     };
     let sql = format!(
-        "SELECT s.id, s.owner_id, s.name, s.sort_order, s.updated_at FROM shelf s \
-         WHERE ( s.owner_id = ? OR ? = 1 OR EXISTS ( \
+        // A personal shelf is reachable by its owner (and the master, who
+        // administers the server) but never through a share — that is the whole
+        // distinction the flag exists to draw.
+        "SELECT s.id, s.owner_id, s.name, s.sort_order, s.updated_at, s.personal FROM shelf s \
+         WHERE ( s.owner_id = ? OR ? = 1 OR ( s.personal = 0 AND EXISTS ( \
             SELECT 1 FROM share sh WHERE sh.grantee_id = ? AND sh.scope = 'all' \
-                AND sh.owner_id = s.owner_id) ) \
+                AND sh.owner_id = s.owner_id) ) ) \
             {filter} \
          ORDER BY s.sort_order, s.name"
     );
@@ -207,6 +218,7 @@ pub async fn upsert(
         if current.shelf.name == input.name.trim()
             && current.shelf.sort_order == input.sort_order
             && current.book_ids == input.book_ids
+            && current.shelf.personal == input.personal
             && !tombstoned
         {
             return Ok(Json(current));
@@ -218,20 +230,26 @@ pub async fn upsert(
     let mut tx = state.db.begin().await?;
     if is_update {
         sqlx::query(
-            "UPDATE shelf SET name = ?, sort_order = ?, updated_at = datetime('now') \
+            "UPDATE shelf SET name = ?, sort_order = ?, personal = ?, \
+                updated_at = datetime('now') \
              WHERE id = ?",
         )
         .bind(input.name.trim())
         .bind(input.sort_order)
+        .bind(input.personal)
         .bind(&id)
         .execute(&mut *tx)
         .await?;
     } else {
-        sqlx::query("INSERT INTO shelf (id, owner_id, name, sort_order) VALUES (?, ?, ?, ?)")
-            .bind(&id)
-            .bind(&user.id)
-            .bind(input.name.trim())
-            .bind(input.sort_order)
+        sqlx::query(
+            "INSERT INTO shelf (id, owner_id, name, sort_order, personal) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(&user.id)
+        .bind(input.name.trim())
+        .bind(input.sort_order)
+        .bind(input.personal)
             .execute(&mut *tx)
             .await?;
     }
@@ -320,7 +338,7 @@ pub async fn delete(
 
 async fn fetch_shelf(state: &AppState, id: &str) -> AppResult<Json<ShelfDto>> {
     let shelf = sqlx::query_as::<_, ShelfRow>(
-        "SELECT id, owner_id, name, sort_order, updated_at FROM shelf WHERE id = ?",
+        "SELECT id, owner_id, name, sort_order, updated_at, personal FROM shelf WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(&state.db)

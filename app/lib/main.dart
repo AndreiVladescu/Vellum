@@ -47,6 +47,8 @@ import 'shelf/shelf_view.dart';
 import 'shortcuts.dart';
 import 'snack_bars.dart';
 import 'wishlist/wishlist_page.dart';
+import 'data/shelf_service.dart';
+import 'shelf/new_shelf_dialog.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -861,7 +863,7 @@ class _LibraryPageState extends State<LibraryPage> {
   Future<void> _moveSelectionToShelf() async {
     final l10n = L10n.of(context);
     final fromShelfId = widget.settings.selectedShelfId;
-    final shelves = await repository.watchShelves().first;
+    final shelves = _shown(await repository.watchShelves().first);
     if (!mounted) return;
     if (shelves.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(appSnackBar(
@@ -1266,7 +1268,7 @@ class _LibraryPageState extends State<LibraryPage> {
         child: StreamBuilder<List<Shelf>>(
           stream: repository.watchShelves(),
           builder: (context, shelvesSnap) {
-            final shelves = shelvesSnap.data ?? const [];
+            final shelves = _shown(shelvesSnap.data ?? const []);
             // The stored selection may point at a deleted shelf: fall back to
             // "All" when it no longer exists.
             final storedId = widget.settings.selectedShelfId;
@@ -1527,10 +1529,25 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
+  /// The shelves this device shows: yours, plus the ones you have taken from
+  /// other people on the server. See `shelfIsShown` for the rule.
+  List<Shelf> _shown(List<Shelf> all) => [
+        for (final s in all)
+          if (shelfIsShown(
+            s,
+            myUserId: widget.connection.userId,
+            acceptByDefault: widget.settings.acceptSharedShelves,
+          ))
+            s,
+      ];
+
   Future<void> _promptNewShelf() async {
-    final name = await _promptShelfName('New shelf');
-    if (name == null || name.isEmpty) return;
-    final id = await repository.createShelf(name);
+    final made = await showNewShelfDialog(
+      context,
+      hasServer: widget.connection.isConnected,
+    );
+    if (made == null) return;
+    final id = await repository.createShelf(made.name, personal: made.personal);
     await widget.settings.setSelectedShelfId(id);
   }
 
@@ -1546,6 +1563,21 @@ class _LibraryPageState extends State<LibraryPage> {
               title: Text(L10n.of(context).renameShelf),
               onTap: () => Navigator.pop(context, 'rename'),
             ),
+            // Only on a shared library, and only for a shelf that is yours:
+            // there is nothing to withhold from nobody, and someone else's
+            // shelf is not yours to reclassify.
+            if (widget.connection.isConnected &&
+                !shelfMadeByAnother(shelf, widget.connection.userId))
+              ListTile(
+                leading: Icon(shelf.isPersonal
+                    ? Icons.group_outlined
+                    : Icons.lock_outline),
+                title: Text(shelf.isPersonal ? 'Share this shelf' : 'Make personal'),
+                subtitle: Text(shelf.isPersonal
+                    ? 'Everyone the library is shared with will see it'
+                    : 'Only you — it still syncs to your own devices'),
+                onTap: () => Navigator.pop(context, 'visibility'),
+              ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: Text(L10n.of(context).deleteShelf),
@@ -1561,6 +1593,8 @@ class _LibraryPageState extends State<LibraryPage> {
       if (name != null && name.isNotEmpty) {
         await repository.renameShelf(shelf.id, name);
       }
+    } else if (action == 'visibility') {
+      await repository.setShelfPersonal(shelf.id, !shelf.isPersonal);
     } else if (action == 'delete') {
       if (widget.settings.selectedShelfId == shelf.id) {
         await widget.settings.setSelectedShelfId(null);

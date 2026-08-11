@@ -4928,6 +4928,46 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _isPersonalMeta = const VerificationMeta(
+    'isPersonal',
+  );
+  @override
+  late final GeneratedColumn<bool> isPersonal = GeneratedColumn<bool>(
+    'is_personal',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_personal" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _acceptedMeta = const VerificationMeta(
+    'accepted',
+  );
+  @override
+  late final GeneratedColumn<bool> accepted = GeneratedColumn<bool>(
+    'accepted',
+    aliasedName,
+    true,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("accepted" IN (0, 1))',
+    ),
+  );
   static const VerificationMeta _needsPushMeta = const VerificationMeta(
     'needsPush',
   );
@@ -4949,6 +4989,9 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
     name,
     sortOrder,
     updatedAt,
+    isPersonal,
+    ownerId,
+    accepted,
     needsPush,
   ];
   @override
@@ -4988,6 +5031,24 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('is_personal')) {
+      context.handle(
+        _isPersonalMeta,
+        isPersonal.isAcceptableOrUnknown(data['is_personal']!, _isPersonalMeta),
+      );
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    }
+    if (data.containsKey('accepted')) {
+      context.handle(
+        _acceptedMeta,
+        accepted.isAcceptableOrUnknown(data['accepted']!, _acceptedMeta),
+      );
+    }
     if (data.containsKey('needs_push')) {
       context.handle(
         _needsPushMeta,
@@ -5019,6 +5080,18 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      isPersonal: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_personal'],
+      )!,
+      ownerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_id'],
+      ),
+      accepted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}accepted'],
+      ),
       needsPush: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}needs_push'],
@@ -5037,12 +5110,38 @@ class Shelf extends DataClass implements Insertable<Shelf> {
   final String name;
   final int sortOrder;
   final DateTime updatedAt;
+
+  /// A shelf its owner keeps to themselves. Synced — it is theirs on every
+  /// device they use — but the server withholds it from shares (migration
+  /// 0029), so it never appears in anyone else's chip row.
+  final bool isPersonal;
+
+  /// Who made it, as the server knows them. Null for a shelf made on this
+  /// device, or on a library with no server: "mine" is the useful reading of
+  /// null, and it is what the shelf was before any of this existed.
+  final String? ownerId;
+
+  /// Whether this device shows a shelf somebody else made. **App-local only**,
+  /// and deliberately: it says what this reader wants to see, not anything
+  /// about the shelf, so pushing it would let one person's "no thanks" hide a
+  /// shelf for everyone.
+  ///
+  /// Null means undecided, which is not the same as yes: an undecided shelf
+  /// follows the `acceptSharedShelves` preference, and a decided one keeps the
+  /// answer you gave it even if you later flip that preference. Without the
+  /// third state, "accept new shelves by default: off" and "I declined this
+  /// one" would be the same value, and turning the default back on would undo
+  /// every individual no.
+  final bool? accepted;
   final bool needsPush;
   const Shelf({
     required this.id,
     required this.name,
     required this.sortOrder,
     required this.updatedAt,
+    required this.isPersonal,
+    this.ownerId,
+    this.accepted,
     required this.needsPush,
   });
   @override
@@ -5052,6 +5151,13 @@ class Shelf extends DataClass implements Insertable<Shelf> {
     map['name'] = Variable<String>(name);
     map['sort_order'] = Variable<int>(sortOrder);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['is_personal'] = Variable<bool>(isPersonal);
+    if (!nullToAbsent || ownerId != null) {
+      map['owner_id'] = Variable<String>(ownerId);
+    }
+    if (!nullToAbsent || accepted != null) {
+      map['accepted'] = Variable<bool>(accepted);
+    }
     map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
@@ -5062,6 +5168,13 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       name: Value(name),
       sortOrder: Value(sortOrder),
       updatedAt: Value(updatedAt),
+      isPersonal: Value(isPersonal),
+      ownerId: ownerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerId),
+      accepted: accepted == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accepted),
       needsPush: Value(needsPush),
     );
   }
@@ -5076,6 +5189,9 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       name: serializer.fromJson<String>(json['name']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      isPersonal: serializer.fromJson<bool>(json['isPersonal']),
+      ownerId: serializer.fromJson<String?>(json['ownerId']),
+      accepted: serializer.fromJson<bool?>(json['accepted']),
       needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
@@ -5087,6 +5203,9 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       'name': serializer.toJson<String>(name),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'isPersonal': serializer.toJson<bool>(isPersonal),
+      'ownerId': serializer.toJson<String?>(ownerId),
+      'accepted': serializer.toJson<bool?>(accepted),
       'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
@@ -5096,12 +5215,18 @@ class Shelf extends DataClass implements Insertable<Shelf> {
     String? name,
     int? sortOrder,
     DateTime? updatedAt,
+    bool? isPersonal,
+    Value<String?> ownerId = const Value.absent(),
+    Value<bool?> accepted = const Value.absent(),
     bool? needsPush,
   }) => Shelf(
     id: id ?? this.id,
     name: name ?? this.name,
     sortOrder: sortOrder ?? this.sortOrder,
     updatedAt: updatedAt ?? this.updatedAt,
+    isPersonal: isPersonal ?? this.isPersonal,
+    ownerId: ownerId.present ? ownerId.value : this.ownerId,
+    accepted: accepted.present ? accepted.value : this.accepted,
     needsPush: needsPush ?? this.needsPush,
   );
   Shelf copyWithCompanion(ShelvesCompanion data) {
@@ -5110,6 +5235,11 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       name: data.name.present ? data.name.value : this.name,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      isPersonal: data.isPersonal.present
+          ? data.isPersonal.value
+          : this.isPersonal,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
+      accepted: data.accepted.present ? data.accepted.value : this.accepted,
       needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
@@ -5121,13 +5251,25 @@ class Shelf extends DataClass implements Insertable<Shelf> {
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('isPersonal: $isPersonal, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('accepted: $accepted, ')
           ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, sortOrder, updatedAt, needsPush);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    sortOrder,
+    updatedAt,
+    isPersonal,
+    ownerId,
+    accepted,
+    needsPush,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5136,6 +5278,9 @@ class Shelf extends DataClass implements Insertable<Shelf> {
           other.name == this.name &&
           other.sortOrder == this.sortOrder &&
           other.updatedAt == this.updatedAt &&
+          other.isPersonal == this.isPersonal &&
+          other.ownerId == this.ownerId &&
+          other.accepted == this.accepted &&
           other.needsPush == this.needsPush);
 }
 
@@ -5144,6 +5289,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
   final Value<String> name;
   final Value<int> sortOrder;
   final Value<DateTime> updatedAt;
+  final Value<bool> isPersonal;
+  final Value<String?> ownerId;
+  final Value<bool?> accepted;
   final Value<bool> needsPush;
   final Value<int> rowid;
   const ShelvesCompanion({
@@ -5151,6 +5299,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     this.name = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.isPersonal = const Value.absent(),
+    this.ownerId = const Value.absent(),
+    this.accepted = const Value.absent(),
     this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -5159,6 +5310,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     required String name,
     this.sortOrder = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.isPersonal = const Value.absent(),
+    this.ownerId = const Value.absent(),
+    this.accepted = const Value.absent(),
     this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -5168,6 +5322,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     Expression<String>? name,
     Expression<int>? sortOrder,
     Expression<DateTime>? updatedAt,
+    Expression<bool>? isPersonal,
+    Expression<String>? ownerId,
+    Expression<bool>? accepted,
     Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
@@ -5176,6 +5333,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
       if (name != null) 'name': name,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (isPersonal != null) 'is_personal': isPersonal,
+      if (ownerId != null) 'owner_id': ownerId,
+      if (accepted != null) 'accepted': accepted,
       if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
@@ -5186,6 +5346,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     Value<String>? name,
     Value<int>? sortOrder,
     Value<DateTime>? updatedAt,
+    Value<bool>? isPersonal,
+    Value<String?>? ownerId,
+    Value<bool?>? accepted,
     Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
@@ -5194,6 +5357,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
       name: name ?? this.name,
       sortOrder: sortOrder ?? this.sortOrder,
       updatedAt: updatedAt ?? this.updatedAt,
+      isPersonal: isPersonal ?? this.isPersonal,
+      ownerId: ownerId ?? this.ownerId,
+      accepted: accepted ?? this.accepted,
       needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
@@ -5214,6 +5380,15 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (isPersonal.present) {
+      map['is_personal'] = Variable<bool>(isPersonal.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
+    }
+    if (accepted.present) {
+      map['accepted'] = Variable<bool>(accepted.value);
+    }
     if (needsPush.present) {
       map['needs_push'] = Variable<bool>(needsPush.value);
     }
@@ -5230,6 +5405,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
           ..write('name: $name, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('isPersonal: $isPersonal, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('accepted: $accepted, ')
           ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -15526,6 +15704,9 @@ typedef $$ShelvesTableCreateCompanionBuilder =
       required String name,
       Value<int> sortOrder,
       Value<DateTime> updatedAt,
+      Value<bool> isPersonal,
+      Value<String?> ownerId,
+      Value<bool?> accepted,
       Value<bool> needsPush,
       Value<int> rowid,
     });
@@ -15535,6 +15716,9 @@ typedef $$ShelvesTableUpdateCompanionBuilder =
       Value<String> name,
       Value<int> sortOrder,
       Value<DateTime> updatedAt,
+      Value<bool> isPersonal,
+      Value<String?> ownerId,
+      Value<bool?> accepted,
       Value<bool> needsPush,
       Value<int> rowid,
     });
@@ -15588,6 +15772,21 @@ class $$ShelvesTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPersonal => $composableBuilder(
+    column: $table.isPersonal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get accepted => $composableBuilder(
+    column: $table.accepted,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15651,6 +15850,21 @@ class $$ShelvesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isPersonal => $composableBuilder(
+    column: $table.isPersonal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get accepted => $composableBuilder(
+    column: $table.accepted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get needsPush => $composableBuilder(
     column: $table.needsPush,
     builder: (column) => ColumnOrderings(column),
@@ -15677,6 +15891,17 @@ class $$ShelvesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPersonal => $composableBuilder(
+    column: $table.isPersonal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
+
+  GeneratedColumn<bool> get accepted =>
+      $composableBuilder(column: $table.accepted, builder: (column) => column);
 
   GeneratedColumn<bool> get needsPush =>
       $composableBuilder(column: $table.needsPush, builder: (column) => column);
@@ -15739,6 +15964,9 @@ class $$ShelvesTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> isPersonal = const Value.absent(),
+                Value<String?> ownerId = const Value.absent(),
+                Value<bool?> accepted = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShelvesCompanion(
@@ -15746,6 +15974,9 @@ class $$ShelvesTableTableManager
                 name: name,
                 sortOrder: sortOrder,
                 updatedAt: updatedAt,
+                isPersonal: isPersonal,
+                ownerId: ownerId,
+                accepted: accepted,
                 needsPush: needsPush,
                 rowid: rowid,
               ),
@@ -15755,6 +15986,9 @@ class $$ShelvesTableTableManager
                 required String name,
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> isPersonal = const Value.absent(),
+                Value<String?> ownerId = const Value.absent(),
+                Value<bool?> accepted = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShelvesCompanion.insert(
@@ -15762,6 +15996,9 @@ class $$ShelvesTableTableManager
                 name: name,
                 sortOrder: sortOrder,
                 updatedAt: updatedAt,
+                isPersonal: isPersonal,
+                ownerId: ownerId,
+                accepted: accepted,
                 needsPush: needsPush,
                 rowid: rowid,
               ),

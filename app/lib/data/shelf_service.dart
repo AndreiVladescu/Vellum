@@ -8,6 +8,32 @@ import 'database.dart';
 /// the books they hold. Synced since plan 5 #4 (LWW on `updatedAt`, full
 /// ordered-membership replace on push — see `SyncService`); split out of
 /// `LibraryRepository` (plan 5 §A10).
+/// Whether [shelf] was made by somebody else on the server.
+///
+/// [myUserId] empty means this device doesn't know who it is signed in as — an
+/// offline library, or a session saved before the id was recorded. Then every
+/// shelf counts as your own, because the alternative is hiding shelves on a
+/// guess.
+bool shelfMadeByAnother(Shelf shelf, String myUserId) =>
+    shelf.ownerId != null &&
+    myUserId.isNotEmpty &&
+    shelf.ownerId != myUserId;
+
+/// Whether this device shows [shelf].
+///
+/// Your own shelves always show — including the personal ones, which are
+/// personal to *other people*, not to you. Someone else's shelf shows if you
+/// said so; if you never said, [acceptByDefault] (the `acceptSharedShelves`
+/// preference) answers for it.
+bool shelfIsShown(
+  Shelf shelf, {
+  required String myUserId,
+  required bool acceptByDefault,
+}) {
+  if (!shelfMadeByAnother(shelf, myUserId)) return true;
+  return shelf.accepted ?? acceptByDefault;
+}
+
 class ShelfService {
   ShelfService(this.db);
 
@@ -32,15 +58,42 @@ class ShelfService {
     );
   }
 
-  Future<String> createShelf(String name) async {
+  /// Creates a shelf. [personal] keeps it to its owner: it still syncs (it is
+  /// yours on every device you use) but the server withholds it from shares,
+  /// so it never appears in anyone else's chip row.
+  Future<String> createShelf(String name, {bool personal = false}) async {
     final id = _uuid.v4();
     final existing = await db.select(db.shelves).get();
     await db.into(db.shelves).insert(ShelvesCompanion.insert(
           id: id,
           name: name.trim(),
           sortOrder: Value(existing.length),
+          isPersonal: Value(personal),
         ));
     return id;
+  }
+
+  /// Moves a shelf between personal and shared. Dirties it, so the server
+  /// hears about it on the next push — until then the shelf is still visible
+  /// to whoever it was already visible to.
+  Future<void> setShelfPersonal(String id, bool personal) async {
+    await (db.update(db.shelves)..where((s) => s.id.equals(id)))
+        .write(ShelvesCompanion(isPersonal: Value(personal)));
+    await _touch(id);
+  }
+
+  /// This device's answer about a shelf somebody else made. Local only — see
+  /// `Shelves.accepted` — so it deliberately does *not* dirty the shelf.
+  /// Passing null puts it back to undecided, which follows the preference.
+  Future<void> setShelfAccepted(String id, bool? accepted) =>
+      (db.update(db.shelves)..where((s) => s.id.equals(id)))
+          .write(ShelvesCompanion(accepted: Value(accepted)));
+
+  /// Bulk form of [setShelfAccepted] for the "accept/decline all" buttons.
+  Future<void> setAllAccepted(Iterable<String> ids, bool? accepted) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.shelves)..where((s) => s.id.isIn(ids.toList())))
+        .write(ShelvesCompanion(accepted: Value(accepted)));
   }
 
   Future<void> renameShelf(String id, String name) async {
