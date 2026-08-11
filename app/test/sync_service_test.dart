@@ -1465,4 +1465,66 @@ void main() {
     expect(probes, hasLength(1));
     expect(puts, ['b0', 'b1', 'b0', 'b1'], reason: 'both pushes used per-book PUTs');
   });
+  test('a book skipped by the upsert does not get its file written', () async {
+    // The pull deliberately skips books that are trashed here, excluded from
+    // sync, or older on the server than the local copy — so the server's list
+    // is not the set of books this device holds. Writing a `book_files` row
+    // anyway hits `FOREIGN KEY constraint failed`, which is what a real pull
+    // reported: the parent row had been skipped and the file was fetched and
+    // recorded regardless.
+    final repo = await _repo(dir);
+    final db = repo.db;
+    // Trashed locally, then swept: a tombstone with no book row left.
+    await db.into(db.localDeletions).insert(
+          LocalDeletionsCompanion.insert(bookId: 'b1'),
+        );
+
+    var fileFetched = false;
+    final client = _client((req) async {
+      final path = req.url.path;
+      if (req.method == 'GET' && path == '/api/books') {
+        return http.Response(
+          jsonEncode({
+            'server_now': '2024-06-01 00:00:00',
+            'books': [
+              {
+                'id': 'b1',
+                'title': 'Dune',
+                'updated_at': '2024-01-01 00:00:00',
+                'files': [
+                  {
+                    'id': 'f1',
+                    'book_id': 'b1',
+                    'format': 'pdf',
+                    'size_bytes': 5,
+                    'sha256': 'abc',
+                  },
+                ],
+              },
+            ],
+          }),
+          200,
+        );
+      }
+      if (req.method == 'GET' && path == '/api/files/f1') {
+        fileFetched = true;
+        return http.Response('hello', 200);
+      }
+      if (req.method == 'GET' && path == '/api/shelves') return _noShelves();
+      if (req.method == 'GET' && path == '/api/copies') return _noCopies();
+      if (req.method == 'GET' && path == '/api/loans') return _noLoans();
+      return http.Response('[]', 200);
+    });
+
+    // The whole pull must survive; before the fix this threw out of the file
+    // loop and took the rest of the sync with it.
+    await SyncService(repo).pull(client);
+
+    expect(await db.select(db.books).get(), isEmpty,
+        reason: 'the tombstoned book stays deleted');
+    expect(await db.select(db.bookFiles).get(), isEmpty,
+        reason: 'no orphan file row, and so no foreign-key failure');
+    expect(fileFetched, false,
+        reason: 'downloading a skipped book\'s file is wasted bandwidth too');
+  });
 }

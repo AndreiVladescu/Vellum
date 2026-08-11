@@ -320,9 +320,29 @@ class SyncService {
       if (b.genres != null) await repository.setGenres(b.id, b.genres!);
     }
 
+    // Everything below writes *against* a local book row — a cover path onto
+    // it, a `book_files` row referencing it. The upsert above deliberately
+    // skips books that are trashed here, excluded from sync, or older on the
+    // server than the copy we hold, so the server's list is not the set of
+    // books this device actually has.
+    //
+    // Working from the full list anyway is how a pull ended with
+    // `FOREIGN KEY constraint failed` inserting `book_files`: the parent row
+    // had been skipped (a trashed book leaves a tombstone and no row), and the
+    // file was fetched and recorded regardless. Ask the database which ids are
+    // really here instead of assuming.
+    final presentIds = {
+      for (final row in await (db.selectOnly(db.books)
+                ..addColumns([db.books.id])
+                ..where(db.books.id.isIn([for (final b in books) b.id])))
+              .get())
+        row.read(db.books.id)!,
+    };
+    final local = books.where((b) => presentIds.contains(b.id)).toList();
+
     // Fetch cover art outside the transaction; a failed cover never fails the
     // whole pull.
-    final coverBooks = books.where((b) => b.hasCover).toList();
+    final coverBooks = local.where((b) => b.hasCover).toList();
     var coverDone = 0;
     await _forEachBounded(coverBooks, (b) async {
       if (!_isSafeSegment(b.id)) {
@@ -367,7 +387,7 @@ class SyncService {
     // Books run concurrently; a book's own files stay ordered (each row is
     // recorded only after its .part is renamed into place).
     var fileDone = 0;
-    await _forEachBounded(books, (b) async {
+    await _forEachBounded(local, (b) async {
       try {
         // Files come from the books-list enrichment, so no per-book round-trip.
         for (final f in b.files) {
@@ -416,7 +436,7 @@ class SyncService {
           message: '$e',
         ));
       } finally {
-        onProgress?.call(++fileDone, books.length, 'Downloading files');
+        onProgress?.call(++fileDone, local.length, 'Downloading files');
       }
     });
 
