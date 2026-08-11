@@ -141,6 +141,12 @@ thead th {
   font-size:.72rem; font-weight:600; color:var(--muted);
   border-bottom:1px solid var(--line);
 }
+/* Inside a dialog the offset above is wrong, and visibly so: `--thead-top` is
+   the *page* top bar's height, but a dialog's table scrolls in its own box
+   (`#imp-review` is `max-height:44vh; overflow:auto`) and has no top bar to
+   clear. The header stuck a third of the way down the list and covered two
+   rows of an 87-book import. A dialog's header belongs at its box's top. */
+.modal thead th { top:0; }
 th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
 th.sortable:hover { color:var(--fg); }
 tbody tr { transition:background .12s; }

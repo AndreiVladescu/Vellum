@@ -176,6 +176,25 @@ check('no on*= handler interpolates a value', () => {
     'use data-* attributes and the delegated ACTIONS table:\n' + offenders.join('\n'));
 });
 
+// ---- a dialog's table header sticks to the dialog, not to the page --------
+//
+// `thead th` is sticky at `top: var(--thead-top)`, which is the page top bar's
+// height. A dialog's table scrolls in its own box and has no top bar to clear,
+// so without an override the header parks a third of the way down the list and
+// covers rows — which is what an 87-book import review looked like. A source
+// check because the symptom only appears with enough rows to scroll, which no
+// unit test renders.
+console.log('dialog table headers');
+check('a modal overrides the page-level sticky offset', () => {
+  const css = fs.readFileSync(
+    path.join(__dirname, '..', 'console.css'), 'utf8');
+  assert.match(
+    css,
+    /\.modal\s+thead\s+th\s*\{[^}]*top\s*:\s*0/,
+    'console.css needs `.modal thead th { top:0 }` — see the comment beside it',
+  );
+});
+
 if (failures) {
   console.log('\n' + failures + ' failure(s)');
   process.exit(1);
