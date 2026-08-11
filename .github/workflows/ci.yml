@@ -6,6 +6,24 @@ on:
   pull_request:
 
 jobs:
+  # Nothing secret may be tracked, whatever .gitignore says — `git add -f`
+  # overrides it, and a key pushed once is a key to replace, not to delete.
+  # Checks what git *has*, not what is on disk, so it is unaffected by whether
+  # a contributor happens to hold these files locally.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: No secrets are tracked
+        run: |
+          bad=$(git ls-files | grep -E '^\.vault/|\.jks$|\.keystore$|(^|/)key\.properties$|\.p12$|\.pem$|(^|/)\.env$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::These are tracked and must not be:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "No keystores, key.properties or .vault files are tracked."
+
   server:
     runs-on: ubuntu-latest
     defaults:

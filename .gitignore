@@ -34,3 +34,7 @@ app/build/
 
 # Local packaging staging (linux/packaging/*.sh)
 app/vellum-[0-9]*/
+
+# Local secrets: signing keystores, passwords, anything that must never
+# reach GitHub. Ignored, and CI fails if a file under it is ever tracked.
+.vault/
