@@ -134,6 +134,22 @@ in the same pass. None of them block the rest of the item.
 
 ## Open / possible follow-ups
 
+- **The console's import list has a header stranded in the middle of it.**
+  Reported 2026-08-11 with a screenshot: reviewing an 87-book folder import,
+  the `Title` header sits as a dark band a third of the way down the list,
+  covering two rows.
+
+  *Cause, already traced:* `console.css` makes **every** `thead th` sticky at
+  `top: var(--thead-top, 104px)`, and `--thead-top` is set from the page's top
+  bar height. That is right for tables that scroll with the page and wrong
+  inside a dialog: `#imp-review` is its own scroll container
+  (`max-height:44vh; overflow:auto`) inside `.modal`, so the header sticks
+  104px down from *that* box's top rather than at its top edge.
+
+  *Fix:* scope the offset, e.g. `.modal thead th { top: 0 }` — the dialog has
+  no top bar to clear. Worth checking the other dialogs with tables at the same
+  time, since they share the rule.
+
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.
 - **EPUB reader polish.** Partly resolved by plan 5 #23: in-chapter scroll
