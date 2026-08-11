@@ -272,7 +272,7 @@ Your library is on your own disk, all of it in one directory:
 The catalogue (`vellum.sqlite`), your book files, covers and settings all live
 there together, so copying that one folder copies your whole library.
 
-*Before v1.1.2 the database sat in your Documents folder instead. It is moved
+*Before v1.1.1 the database sat in your Documents folder instead. It is moved
 there automatically the first time a newer version starts.*
 
 **Back it up from inside the app**: ☰ → *Preferences* → *Backup* writes the

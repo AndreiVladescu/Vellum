@@ -25,6 +25,19 @@ application id changed, and on Linux that is where the app keeps its files.
 
 ### Changed
 
+- **Your whole library is in one directory now.** The catalogue used to sit in
+  your Documents folder while the covers, book files and settings it describes
+  lived under the application-support directory — so backing Vellum up by hand
+  meant knowing about two places. The database moves in beside them on first
+  start, with its write-ahead log, and copying that one folder now copies
+  everything. An existing database at the destination is never overwritten, and
+  a move that cannot complete leaves the original where it is.
+- **Docker Compose no longer insists on Caddy.** `docker compose up -d` now
+  starts the server alone on `127.0.0.1:3000`, for anyone who already runs
+  nginx, HAProxy or Traefik — `packaging/nginx.conf.example` is a working server
+  block. `docker compose --profile caddy up -d` keeps the automatic-TLS setup.
+  `VELLUM_PUBLIC_URL` can be set directly for a proxy that is not simply
+  `https://<domain>`.
 - **The application id is now `app.vellum.Vellum`**, replacing
   `com.avladescu.vellum` — a name that belongs to the project rather than to a
   person. See below for what that means if you already have Vellum installed.
@@ -36,11 +49,12 @@ application id changed, and on Linux that is where the app keeps its files.
 ### Fixed
 
 - **A tagged release can no longer ship debug-signed Android artefacts.** v1.1.0
-  did, because a missing signing key only produced a warning in a build log.
-  Tagging now fails instead, and the check reads the built APK rather than
-  trusting that a key was configured — a wrong alias falls back to the debug key
-  just as silently. A debug-signed install can never be upgraded in place, so
-  publishing one is worse than publishing nothing.
+  did, because a missing signing key only produced a warning in a build log. A
+  release without signing secrets now simply has **no Android artefacts** — the
+  rest still ships — and the check reads the built APK rather than trusting that
+  a key was configured, since a wrong alias falls back to the debug key just as
+  silently. A debug-signed install can never be upgraded in place, so publishing
+  one is worse than publishing none.
 - **Each platform's checksums have their own name.** All four build jobs wrote a
   file called `SHA256SUMS`, and release assets must be uniquely named, so three
   of the four were dropped. They are now `SHA256SUMS-linux`, `-windows`,
@@ -50,16 +64,29 @@ application id changed, and on Linux that is where the app keeps its files.
 
 ### Upgrading
 
-**Linux.** The app keeps covers, book files and preferences in a directory named
-after the application id, so a fresh v1.1.1 will look in
-`~/.local/share/app.vellum.Vellum` and find nothing, while your files sit in
-`~/.local/share/com.avladescu.vellum`. Your *catalogue* is unaffected — the
-database lives in `~/Documents/vellum.sqlite` and is not named after the id — so
-the symptom is a library that still lists every book but has lost their covers,
-files and your settings. Move the directory before first launch:
+**Linux.** Two things move in this release, and only one of them moves itself.
+
+The **database** relocates on its own, out of `~/Documents/vellum.sqlite` and
+into the application-support directory. Nothing to do.
+
+Your **covers, book files and settings** do not, because the directory holding
+them is named after the application id — which changed. A fresh v1.1.1 looks in
+`~/.local/share/app.vellum.Vellum` while they sit in
+`~/.local/share/com.avladescu.vellum`, so the symptom is a library that still
+lists every book but has lost their covers, their files and your settings. Move
+the directory **before first launch**:
 
 ```sh
 mv ~/.local/share/com.avladescu.vellum ~/.local/share/app.vellum.Vellum
+```
+
+If you have already started v1.1.1 once, it will have created the new directory
+and moved the database into it. Close Vellum and copy the rest in on top —
+there is no `vellum.sqlite` in the old directory to clash with, because before
+this release the database was never kept there:
+
+```sh
+cp -r ~/.local/share/com.avladescu.vellum/. ~/.local/share/app.vellum.Vellum/
 ```
 
 **Android.** The id *is* the package name, so v1.1.1 installs as a separate app
@@ -68,8 +95,8 @@ you want to keep. (v1.1.0's Android builds were debug-signed and could never
 have been updated in place regardless — see above.)
 
 **macOS and Windows** store per-application data under the same renamed
-identifier; the same "looks empty" symptom applies, and the same fix — move the
-old directory to the new name.
+identifier; the same "lost its covers and files" symptom applies, and the same
+fix — move the old directory to the new name before first launch.
 
 ---
 
