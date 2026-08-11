@@ -4,6 +4,41 @@ import 'package:vellum/data/database.dart';
 import 'package:vellum/data/physical_service.dart';
 
 void main() {
+
+  test('a copy that is out cannot be lent to someone else', () async {
+    // A loan is bookkeeping for a physical object: you can lend as many books
+    // as you have copies, and no more. The UI only offers Lend on a free copy,
+    // but the UI is not the only way in — a sync can land someone else's loan
+    // between the tap and the borrower being typed — and the server enforces
+    // the same rule (migration 0028), so a second loan recorded here would only
+    // reach the next push before being refused.
+    final db = VellumDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final physical = PhysicalService(db);
+
+    await db
+        .into(db.books)
+        .insert(BooksCompanion.insert(id: 'b1', title: 'Dune'));
+    await db
+        .into(db.physicalCopies)
+        .insert(PhysicalCopiesCompanion.insert(id: 'c1', bookId: 'b1'));
+
+    await physical.lendCopy('c1', 'Alice');
+    await expectLater(
+      physical.lendCopy('c1', 'Bob'),
+      throwsA(isA<StateError>().having(
+        (e) => e.message, 'message', contains('Alice'))),
+    );
+
+    final loans = await physical.watchAllLoans().first;
+    expect(loans, hasLength(1), reason: 'Bob\'s loan was never recorded');
+
+    // And returning it puts the copy back within reach.
+    await physical.returnLoan(loans.first.loan.id);
+    await physical.lendCopy('c1', 'Bob');
+    expect(await physical.watchAllLoans().first, hasLength(2),
+        reason: 'the first loan stays as history');
+  });
   test('watchAllLoans joins the book and reflects active then returned',
       () async {
     final db = VellumDatabase(NativeDatabase.memory());

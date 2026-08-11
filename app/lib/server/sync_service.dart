@@ -1640,8 +1640,16 @@ class SyncService {
       deletedRemotely++;
     }
 
-    final dirty =
-        await (db.select(db.loans)..where((l) => l.needsPush.equals(true))).get();
+    // Returns before lends. The server allows one open loan per copy, so
+    // lend → return → lend to someone else pushes a conflict if the new loan
+    // arrives before the old one is known to be closed. Sorting by
+    // `returnedAt` puts every closure first, which is the order the events
+    // actually happened in. (A refused push keeps `needsPush`, so this is
+    // about not making noise rather than about correctness.)
+    final dirty = await (db.select(db.loans)
+          ..where((l) => l.needsPush.equals(true))
+          ..orderBy([(l) => OrderingTerm(expression: l.returnedAt.isNull())]))
+        .get();
     var pushed = 0;
     for (final l in dirty) {
       try {

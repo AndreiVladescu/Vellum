@@ -284,12 +284,23 @@ class PhysicalCopyTile extends StatelessWidget {
   Future<void> _lend(BuildContext context) async {
     final details = await promptBorrower(context);
     if (details == null) return;
-    await repository.lendCopy(
-      copy.id,
-      details.borrower,
-      dueAt: details.dueAt,
-      contact: details.contact,
-    );
+    try {
+      await repository.lendCopy(
+        copy.id,
+        details.borrower,
+        dueAt: details.dueAt,
+        contact: details.contact,
+      );
+    } on StateError catch (e) {
+      // The button is only shown for a free copy, so this means a sync landed
+      // someone else's loan while the borrower was being typed in. Say so
+      // rather than crashing into a red screen.
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+      return;
+    }
     // The photo is attached after the loan exists, and its caption names the
     // borrower — that is what makes a shot from June mean anything in October.
     if (details.photograph && context.mounted) {

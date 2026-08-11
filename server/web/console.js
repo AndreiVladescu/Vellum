@@ -71,6 +71,9 @@ const ACTIONS = {
   createlink: el => createLink(el.dataset.book),
   copyurl: el => copyUrl(el.dataset.url),
   decide: el => decideRequest(el.dataset.id, el.dataset.decision),
+  lendcopy: el => lendCopyFromConsole(el.dataset.copy),
+  returncopy: el => returnCopyFromConsole(el.dataset.loan, el.dataset.copy,
+    el.dataset.borrower, el.dataset.since),
   viewroom: el => window.open('/room/' + encodeURIComponent(el.dataset.id), '_blank', 'noopener'),
   shareroom: el => shareRoom(el.dataset.id, el.dataset.name),
   activity: el => showActivity(el.dataset.before === '' ? null : Number(el.dataset.before)),
@@ -1674,25 +1677,46 @@ function openReader(id){ window.open('/read/' + encodeURIComponent(id), '_blank'
 // ---- borrow requests (plan 5 #49) ---------------------------------------
 
 async function showRequests(){
-  let incoming;
+  let incoming, copies;
   try {
-    incoming = await api('GET','/api/borrow-requests?direction=incoming');
+    // The copies come too, because whether a request *can* be approved depends
+    // on there being a copy free. Offering "Lend it" on a book whose only copy
+    // is already in someone else's hands is a button that can only fail.
+    [incoming, copies] = await Promise.all([
+      api('GET','/api/borrow-requests?direction=incoming'),
+      api('GET','/api/loans/overview'),
+    ]);
   } catch(e){ toast(e.message); return; }
 
+  const free = new Set(copies.filter(c => !c.loan_id).map(c => c.book_id));
+  const held = {};
+  for (const c of copies){
+    if (c.loan_id && !free.has(c.book_id)) held[c.book_id] = c.borrower;
+  }
+
   const pending = incoming.filter(r => r.status === 'pending');
-  const rows = pending.length ? pending.map(r => `
+  const rows = pending.length ? pending.map(r => {
+    const canLend = free.has(r.book_id);
+    const why = held[r.book_id]
+      ? `every copy is with ${esc(held[r.book_id])}`
+      : 'no physical copy is on record';
+    return `
     <div class="row" style="justify-content:space-between; gap:12px;
         padding:8px 0; border-bottom:1px solid var(--line)">
       <span>
         <strong>${esc(r.book_title)}</strong>
         <span class="muted">· ${esc(r.requester_email)}</span>
         ${r.note ? `<div class="muted" style="font-size:12px">“${esc(r.note)}”</div>` : ''}
+        ${canLend ? '' : `<div class="muted" style="font-size:12px">Can’t lend — ${why}.</div>`}
       </span>
       <span class="row" style="gap:6px">
         <button class="btn sm" data-act="decide" data-id="${esc(r.id)}" data-decision="declined">Decline</button>
-        <button class="btn sm primary" data-act="decide" data-id="${esc(r.id)}" data-decision="approved">Lend it</button>
+        ${canLend
+          ? `<button class="btn sm primary" data-act="decide" data-id="${esc(r.id)}" data-decision="approved">Lend it</button>`
+          : ''}
       </span>
-    </div>`).join('')
+    </div>`;
+  }).join('')
     : '<p class="muted">Nobody is waiting on you.</p>';
 
   const answered = incoming.filter(r => r.status !== 'pending');
@@ -1707,7 +1731,8 @@ async function showRequests(){
   openPage(
     'Borrow requests',
     "Approving creates the loan — it appears under the book's copies with the "
-      + 'due date you pick.',
+      + 'due date you pick. A request for a book that is already out can only be '
+      + 'declined; mark it returned under Loans first.',
     `${rows}${history}`,
   );
 }
@@ -1730,6 +1755,106 @@ async function decideRequest(id, status){
   } catch(e){ toast(e.message); return; }
   toast(status === 'approved' ? 'Lent — the loan is recorded' : 'Answered');
   showRequests();
+}
+
+// ---- loans: who has which copy ------------------------------------------
+//
+// A loan is bookkeeping for a physical object, so the question this page
+// answers is "where are my books?" — which is a question about *copies*,
+// including the ones sitting on the shelf. Borrow requests are the other half:
+// there you answer someone who asked, here you record a book you handed over
+// across a kitchen table, and you take one back.
+
+/// Server timestamps are 'YYYY-MM-DD HH:MM:SS' in UTC, and mixing formats here
+/// would sort wrongly against rows the app wrote.
+function stamp(d){ return d.toISOString().slice(0, 19).replace('T', ' '); }
+
+function loanId(){
+  // Ids are client-chosen everywhere in this API; a v4 uuid is what every other
+  // client generates.
+  return (crypto.randomUUID && crypto.randomUUID()) ||
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
+async function showLoans(){
+  let rows;
+  try { rows = await api('GET','/api/loans/overview'); }
+  catch(e){ toast(e.message); return; }
+
+  const out = rows.filter(r => r.loan_id);
+  const body = rows.length ? rows.map(r => {
+    const where = r.location ? ` <span class="muted">· ${esc(r.location)}</span>` : '';
+    const status = r.loan_id
+      ? `<div class="muted" style="font-size:12px">With ${esc(r.borrower)}`
+        + ` since ${esc((r.loaned_at||'').slice(0,10))}`
+        + (r.due_at ? ` · due ${esc(r.due_at.slice(0,10))}` : ' · no date agreed')
+        + '</div>'
+      : '<div class="muted" style="font-size:12px">On the shelf</div>';
+    // A reader can see where a book is but cannot move it, so they get the
+    // state and no buttons rather than buttons that would answer 403.
+    const action = !r.can_edit ? ''
+      : r.loan_id
+        ? `<button class="btn sm" data-act="returncopy" data-loan="${esc(r.loan_id)}"
+             data-copy="${esc(r.copy_id)}" data-borrower="${esc(r.borrower)}"
+             data-since="${esc(r.loaned_at)}">Mark returned</button>`
+        : `<button class="btn sm primary" data-act="lendcopy"
+             data-copy="${esc(r.copy_id)}">Lend</button>`;
+    return `
+    <div class="row" style="justify-content:space-between; gap:12px;
+        padding:8px 0; border-bottom:1px solid var(--line)">
+      <span><strong>${esc(r.book_title)}</strong>${where}${status}</span>
+      <span class="row" style="gap:6px">${action}</span>
+    </div>`;
+  }).join('')
+    : '<p class="muted">No physical copies are recorded yet. Add one to a book '
+      + 'in the app, and it can be lent from here.</p>';
+
+  openPage(
+    'Loans',
+    rows.length
+      ? `${out.length} of ${rows.length} ${rows.length === 1 ? 'copy is' : 'copies are'} out.`
+        + ' A copy can only be in one person’s hands at a time.'
+      : '',
+    body,
+  );
+}
+
+async function lendCopyFromConsole(copyId){
+  const borrower = prompt('Lend to (a name, or an email):', '');
+  if (borrower === null || !borrower.trim()) return;
+  // A date or nothing, same as approving a request: "keep it as long as you
+  // like" is a real arrangement.
+  const due = prompt('Due back on (YYYY-MM-DD), or leave blank for no date:', '');
+  if (due === null) return;
+  const body = {
+    copy_id: copyId,
+    borrower: borrower.trim(),
+    loaned_at: stamp(new Date()),
+  };
+  if (due.trim()) body.due_at = due.trim() + ' 00:00:00';
+  try { await api('PUT','/api/loans/' + loanId(), body); }
+  catch(e){ toast(e.message); return; }
+  toast('Lent to ' + borrower.trim());
+  showLoans();
+}
+
+async function returnCopyFromConsole(id, copyId, borrower, since){
+  // A return is an edit of the loan, not a delete: the history is the point.
+  // The immutable fields have to be sent back unchanged or the server refuses
+  // the push.
+  try {
+    await api('PUT','/api/loans/' + id, {
+      copy_id: copyId,
+      borrower: borrower,
+      loaned_at: since,
+      returned_at: stamp(new Date()),
+    });
+  } catch(e){ toast(e.message); return; }
+  toast('Back on the shelf');
+  showLoans();
 }
 
 // ---- published rooms (plan 5 #47/#48) -----------------------------------

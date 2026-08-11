@@ -318,6 +318,7 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             ),
         )
         .route("/loans", get(loans::list))
+        .route("/loans/overview", get(loans::overview))
         .route("/loans/{id}", put(loans::upsert).delete(loans::delete))
         // Optional cross-device reading position (plan 5 #5). Per-(book, user,
         // device) rows, so there is nothing to merge; DELETE un-publishes one

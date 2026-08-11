@@ -127,6 +127,72 @@ pub async fn list(
     }
 }
 
+/// One row per physical copy the caller can see, with whoever currently has it.
+///
+/// The sync endpoints are shaped for sync: [`list`] returns bare loans, and a
+/// loan says only which *copy* it is for. The console needs the question a
+/// person actually asks — "who has my books, and what is free to lend?" — which
+/// is a copy-shaped question, including copies nobody has borrowed. Hence a
+/// left join, and hence a view of its own rather than making the app's sync
+/// payload carry titles it already knows.
+#[derive(Serialize, sqlx::FromRow)]
+pub struct CopyLoanDto {
+    pub copy_id: String,
+    pub book_id: String,
+    pub book_title: String,
+    pub location: Option<String>,
+    /// Null when the copy is on the shelf — the free copies are the point of
+    /// the view, not an absence to filter out.
+    pub loan_id: Option<String>,
+    pub borrower: Option<String>,
+    pub loaned_at: Option<String>,
+    pub due_at: Option<String>,
+    /// Whether this caller may lend or return this copy, so the console can
+    /// show a reader the state without offering buttons that would 403.
+    pub can_edit: bool,
+}
+
+/// `GET /api/loans/overview`
+pub async fn overview(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Vec<CopyLoanDto>>> {
+    // `can_edit` says the same thing as `access::book_access` returning
+    // `Editor` — owner, master, or a share whose permission is 'editor' — but
+    // as SQL, because calling it per row would be a query per copy.
+    let can_edit = "( b.owner_id = ? \
+        OR ? = 1 \
+        OR EXISTS ( \
+            SELECT 1 FROM share s WHERE s.grantee_id = ? AND s.permission = 'editor' AND ( \
+                (s.scope = 'all'   AND s.owner_id = b.owner_id) OR \
+                (s.scope = 'book'  AND s.scope_id = b.id) OR \
+                (s.scope = 'group' AND EXISTS ( \
+                    SELECT 1 FROM book_group_item gi \
+                    WHERE gi.group_id = s.scope_id AND gi.book_id = b.id)) )) )";
+    let sql = format!(
+        "SELECT pc.id AS copy_id, pc.book_id, b.title AS book_title, pc.location, \
+                l.id AS loan_id, l.borrower, l.loaned_at, l.due_at, \
+                {can_edit} AS can_edit \
+         FROM physical_copy pc \
+         JOIN book b ON b.id = pc.book_id \
+         LEFT JOIN loan l ON l.copy_id = pc.id AND l.returned_at IS NULL \
+         WHERE {} \
+         ORDER BY b.title, pc.id",
+        access_predicate()
+    );
+    // Bind order follows the SQL text: the SELECT list is read before WHERE.
+    let rows = sqlx::query_as::<_, CopyLoanDto>(&sql)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .fetch_all(&state.db)
+        .await?;
+    Ok(Json(rows))
+}
+
 /// Upsert a loan at a caller-chosen id: creates it (requires editor access to
 /// `copy_id`'s book) if absent, otherwise updates it (requires editor access
 /// to the loan, i.e. to its copy's book — see `access::loan_access`).
@@ -185,6 +251,26 @@ pub async fn upsert(
             false
         }
     };
+
+    // One copy, one borrower (migration 0028). The unique index is the actual
+    // rule; this check exists so the answer is "that copy is already lent out"
+    // rather than a 500 with a constraint name in it. A returning loan is
+    // always allowed — closing one is how the copy becomes free again.
+    if input.returned_at.is_none() {
+        let clash: Option<String> = sqlx::query_scalar(
+            "SELECT borrower FROM loan \
+             WHERE copy_id = ? AND returned_at IS NULL AND id <> ?",
+        )
+        .bind(&input.copy_id)
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?;
+        if let Some(borrower) = clash {
+            return Err(AppError::Conflict(format!(
+                "that copy is already lent to {borrower} — mark it returned first"
+            )));
+        }
+    }
 
     // No-op guard, same reasoning as physical_copies::upsert.
     if is_update {

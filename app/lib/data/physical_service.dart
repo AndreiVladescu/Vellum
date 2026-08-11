@@ -107,9 +107,15 @@ class PhysicalService {
         );
   }
 
-  /// Lends a copy to [borrower]. Callers only offer this when the copy has no
-  /// active loan, so no additional check is needed here. `needsPush` defaults
-  /// true (an insert), so the next push sends it.
+  /// Lends a copy to [borrower]. `needsPush` defaults true (an insert), so the
+  /// next push sends it.
+  ///
+  /// A copy can only be in one person's hands at a time, so lending one that is
+  /// already out throws rather than recording a second holder. The UI does not
+  /// offer the action in that state, but the UI is not the only caller — a
+  /// borrow request approved on the server lends too — and the server enforces
+  /// the same rule (migration 0028), so a copy lent twice here would only get
+  /// as far as the next sync before being refused.
   Future<void> lendCopy(
     String copyId,
     String borrower, {
@@ -117,6 +123,13 @@ class PhysicalService {
     String? contact,
     String? notes,
   }) async {
+    final out = await (db.select(db.loans)
+          ..where((l) => l.copyId.equals(copyId) & l.returnedAt.isNull())
+          ..limit(1))
+        .getSingleOrNull();
+    if (out != null) {
+      throw StateError('that copy is already lent to ${out.borrower}');
+    }
     await db.into(db.loans).insert(
           LoansCompanion.insert(
             id: _uuid.v4(),

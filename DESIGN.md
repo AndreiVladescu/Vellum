@@ -269,7 +269,18 @@ a URL is unencrypted.
   and, like `copy_id`, can't change on a later push. A loan is deleted only
   via its copy's `ON DELETE CASCADE` — no per-loan tombstone is emitted for
   that path; `DELETE /api/loans/{id}` exists for completeness but nothing
-  in the app calls it today.
+  in the app calls it today. **One open loan per copy** (migration 0028: a
+  unique partial index on `copy_id WHERE returned_at IS NULL`). A loan
+  describes a physical object changing hands, so the number of books that can
+  be out is the number of copies that exist; before this the borrow-request
+  path checked it but a push or a direct `PUT` could open a second loan on an
+  already-lent copy. `loans::upsert` checks first so the answer names who has
+  it rather than being a constraint violation, the app refuses the same thing
+  locally (`PhysicalService.lendCopy`), and pushes send returns before new
+  lends so lend → return → lend doesn't race its own history.
+  `GET /api/loans/overview` is the console's copy-shaped view of the same data
+  — one row per copy including the free ones, since "what can I lend?" is the
+  question the sync-shaped `GET /api/loans` cannot answer.
 - **shelf** + **shelf_book** — manual collections/panes with explicit book
   ordering, independent of genres. **Synced** (plan 5 #4): LWW on
   `shelf.updated_at`, membership replaced wholesale on push (the app always

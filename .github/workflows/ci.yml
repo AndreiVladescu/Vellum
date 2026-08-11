@@ -187,6 +187,7 @@ jobs:
       - run: node server/web/tests/share_state.test.js
       - run: node server/web/tests/detail_edits.test.js
       - run: node server/web/tests/pages.test.js
+      - run: node server/web/tests/loans_page.test.js
 
   # The Docker image is part of the product (plan 5 #36), so a change that breaks
   # it should fail here rather than at someone's `docker compose up`. The image
