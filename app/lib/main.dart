@@ -273,6 +273,10 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void initState() {
     super.initState();
+    // `PopScope.canPop` reads `_searchFocus.hasFocus`, and a focus change is
+    // not a rebuild — without this the flag is whatever it was when the frame
+    // was built, and Back would leave the page anyway.
+    _searchFocus.addListener(_onSearchFocusChanged);
     final history = widget.history;
     if (history != null) {
       history.applySection = (section) => setState(() => _tab = section);
@@ -535,6 +539,7 @@ class _LibraryPageState extends State<LibraryPage> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _searchFocus.removeListener(_onSearchFocusChanged);
     _searchFocus.dispose();
     _autoPusher.dispose();
     _live.dispose();
@@ -977,18 +982,35 @@ class _LibraryPageState extends State<LibraryPage> {
       bindings: shortcutsFor(_commands()),
       child: Focus(
         autofocus: true,
-        // Android's Back leaves selection mode rather than leaving the app —
-        // the standard behaviour for a contextual bar, and the only way out on
-        // a phone, where there is no Escape key.
+        // Android's Back unwinds what is on top of the shelf before leaving
+        // it: a selection first, then the keyboard. Both are the only way out
+        // on a phone, where there is no Escape key.
+        //
+        // The keyboard rung is the one that bites: searching the library fills
+        // the screen with a keyboard you want gone to see more books, and Back
+        // is what everyone reaches for. Without this it left the page instead
+        // — losing the search along with it.
         child: PopScope(
-          canPop: _selection.isEmpty,
+          canPop: _selection.isEmpty && !_searchFocus.hasFocus,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) setState(_selection.clear);
+            if (didPop) return;
+            if (_selection.isNotEmpty) {
+              setState(_selection.clear);
+              return;
+            }
+            // Keeps the query — only the keyboard goes.
+            _searchFocus.unfocus();
           },
           child: _scaffold(context),
         ),
       ),
     );
+  }
+
+  /// Rebuilds so `PopScope` sees the current focus. Guarded on `mounted`
+  /// because unfocusing during a pop can fire this after the state is gone.
+  void _onSearchFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   Widget _scaffold(BuildContext context) {
