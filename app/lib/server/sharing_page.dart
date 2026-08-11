@@ -9,16 +9,20 @@ import 'server_client.dart';
 /// over the server's sharing endpoints. Available when connected; the server
 /// still enforces who may share what.
 class SharingPage extends StatefulWidget {
-  const SharingPage({super.key, required this.connection});
+  const SharingPage({super.key, required this.connection, this.client});
 
   final ServerConnection connection;
+
+  /// Injectable for tests, as `OpdsBrowserPage` does it; the connection's own
+  /// client is used otherwise.
+  final VellumServerClient? client;
 
   @override
   State<SharingPage> createState() => _SharingPageState();
 }
 
 class _SharingPageState extends State<SharingPage> {
-  VellumServerClient get _client => widget.connection.client!;
+  VellumServerClient get _client => widget.client ?? widget.connection.client!;
 
   List<ServerGroup> _groups = const [];
   List<ServerShare> _shares = const [];
@@ -39,18 +43,31 @@ class _SharingPageState extends State<SharingPage> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        _client.listGroups(),
-        _client.listShares(),
-        _client.listLinks(),
-        _client.listBooks(),
-      ]);
+      // Started together, awaited individually — still four concurrent
+      // requests, but each result keeps its static type.
+      //
+      // These used to go through `Future.wait`, which erases a heterogeneous
+      // list to `List<dynamic>`: every `results[n] as T` then compiled without
+      // the compiler being able to check it. `listBooks` returns a record
+      // carrying `server_now` alongside the books, so `as List<ServerBook>`
+      // was wrong from the day that field was added and threw on every visit
+      // to this screen — a mistake a typed await could not have expressed.
+      final groups = _client.listGroups();
+      final shares = _client.listShares();
+      final links = _client.listLinks();
+      final books = _client.listBooks();
+      final loaded = (
+        groups: await groups,
+        shares: await shares,
+        links: await links,
+        books: (await books).books,
+      );
       if (!mounted) return;
       setState(() {
-        _groups = results[0] as List<ServerGroup>;
-        _shares = results[1] as List<ServerShare>;
-        _links = results[2] as List<ServerLink>;
-        _books = results[3] as List<ServerBook>;
+        _groups = loaded.groups;
+        _shares = loaded.shares;
+        _links = loaded.links;
+        _books = loaded.books;
         _loading = false;
       });
     } catch (e) {

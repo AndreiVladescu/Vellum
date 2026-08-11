@@ -1,0 +1,24 @@
+On android, when the keyboard is active, the ferns go up, to match the bottom margin - the ferns shouldn't be visible only when the keyboard is down.
+
+On android when searching for books, I need to have more space to see all the books, and I press the back button to close the keyboard, but it goes to the previous page instead of minimizing the keyboard.
+
+In the digital library section, how do I move books from shelf "All books" to appear in another shelf? Or from one custom shelf to another custom shelf?
+
+When I press "share" button on Android i get the photo 1.png.
+
+When I go in a book then press back, on Android the keyboard pops up, as if waiting to write something. I want the keyboard not to pop-up.
+
+Android buttons sit above the Android ui inside a book menu, on the main menu it's ok, but see if this happens in any other menu.
+
+Borrows should only happen if a book is physical, and it's just a bookkeeping note to see who has the physical copy.
+In server console if a lend already happened, someone can also ask for a lend - that is fine, but I cannot lend it, just revoke it
+
+I am starting to think if it's a better way to have digital shelves separated in two categories: personal, meaning only you will see the books arranged in that shelf and public, meaning the shelf can get shared automatically through the sync server
+
+Feature: i want to see who added a book, for example have a category somewhere saying added by
+
+When borrowing a book, there should be 2 mechanisms in place for the lender and the borrower to be notified: first, through his account (the owner is the one who added the book, but can be changed from the server console) will have a notification screen, where he can see borrowings and lendings or whatever should be notified about, and if SMTP is configured, an email saying which book was or not lent
+
+Even though it's a server with multiple users, how can I mark some books as being accessible only by certain people?
+
+There is a bug that when I gave a user read write rights, they had problems like in the photo 2.png
