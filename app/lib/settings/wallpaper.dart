@@ -68,8 +68,13 @@ class WallpaperBackground extends StatelessWidget {
         children: [
           Positioned.fill(
             child: CustomPaint(
-              painter: _FernPainter(
+              painter: FernPainter(
                 color: dark ? const Color(0x3D6E9960) : const Color(0x2E4C7A3F),
+                // How far the keyboard has eaten into the window. The fronds
+                // are anchored to the *screen's* bottom, not to the shrunken
+                // body's, so opening the keyboard hides them behind it instead
+                // of dragging them up the page.
+                bottomInset: MediaQuery.viewInsetsOf(context).bottom,
               ),
             ),
           ),
@@ -81,16 +86,27 @@ class WallpaperBackground extends StatelessWidget {
 }
 
 /// A few soft fern fronds growing out of the bottom-left corner.
-class _FernPainter extends CustomPainter {
-  const _FernPainter({required this.color});
+///
+/// Public so a test can assert the widget hands it the keyboard inset; there
+/// is nothing else to configure.
+class FernPainter extends CustomPainter {
+  const FernPainter({required this.color, this.bottomInset = 0});
 
   final Color color;
+
+  /// The keyboard's height, when one is open.
+  ///
+  /// The canvas is the Scaffold body, which shrinks to sit above the keyboard.
+  /// Anchoring to that edge made the fronds climb the page every time someone
+  /// typed — the wall behind a shelf does not move when a keyboard appears.
+  /// Adding it back puts the anchor where the bottom of the screen still is.
+  final double bottomInset;
 
   @override
   void paint(Canvas canvas, Size size) {
     // Anchored to the bottom-left corner with fixed pixel offsets and lengths,
     // so the fronds don't slide or scale as the window is resized.
-    final h = size.height;
+    final h = size.height + bottomInset;
     _frond(canvas, Offset(26, h + 8), -1.35, 300);
     _frond(canvas, Offset(-4, h + 2), -0.95, 235);
     _frond(canvas, Offset(58, h + 8), -1.72, 210);
@@ -144,5 +160,6 @@ class _FernPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FernPainter oldDelegate) => color != oldDelegate.color;
+  bool shouldRepaint(FernPainter oldDelegate) =>
+      color != oldDelegate.color || bottomInset != oldDelegate.bottomInset;
 }
