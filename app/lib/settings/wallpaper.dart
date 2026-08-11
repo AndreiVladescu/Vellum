@@ -27,6 +27,7 @@ class WallpaperBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final view = View.of(context);
     final decoration = BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topCenter,
@@ -70,11 +71,16 @@ class WallpaperBackground extends StatelessWidget {
             child: CustomPaint(
               painter: FernPainter(
                 color: dark ? const Color(0x3D6E9960) : const Color(0x2E4C7A3F),
-                // How far the keyboard has eaten into the window. The fronds
-                // are anchored to the *screen's* bottom, not to the shrunken
-                // body's, so opening the keyboard hides them behind it instead
-                // of dragging them up the page.
-                bottomInset: MediaQuery.viewInsetsOf(context).bottom,
+                // How far the keyboard has eaten into the window, taken from
+                // the *view* rather than the MediaQuery.
+                //
+                // A Scaffold with `resizeToAvoidBottomInset` applies the inset
+                // by shrinking its body and then zeroes it in the MediaQuery it
+                // hands down — so `MediaQuery.viewInsetsOf` here always reads
+                // 0, and a fix built on it does nothing at all. Confirmed on a
+                // device: the fronds still climbed. The view's own insets are
+                // in physical pixels, hence the ratio.
+                bottomInset: view.viewInsets.bottom / view.devicePixelRatio,
               ),
             ),
           ),
