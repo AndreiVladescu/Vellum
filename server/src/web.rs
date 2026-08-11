@@ -18,16 +18,34 @@ pub async fn console() -> Html<&'static str> {
     Html(include_str!("../web/console.html"))
 }
 
+/// The console's stylesheet and script are compiled into the binary, so they
+/// change with every upgrade — and always at the same two URLs, with no hash in
+/// the name to distinguish one version from the next.
+///
+/// Without a cache header the browser applies its own heuristic and may keep
+/// serving the previous copy indefinitely. The symptom is upgrading the server,
+/// seeing nothing change, and reasonably concluding the fix did not ship — a CSS
+/// fix for the import dialog was reported that way. `no-cache` still allows
+/// caching; it requires revalidation first, so an unchanged asset costs a 304
+/// rather than a re-download.
+const REVALIDATE: (header::HeaderName, &str) = (header::CACHE_CONTROL, "no-cache");
+
 pub async fn console_css() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            REVALIDATE,
+        ],
         include_str!("../web/console.css"),
     )
 }
 
 pub async fn console_js() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "text/javascript; charset=utf-8"),
+            REVALIDATE,
+        ],
         include_str!("../web/console.js"),
     )
 }
