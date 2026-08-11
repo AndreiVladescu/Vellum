@@ -320,6 +320,21 @@ to know something it was only told. A pull that says *nothing* leaves the
 cached name alone, since an older server and "nobody" are not the same thing.
 The console has it as an optional *Added by* column, off by default.
 
+**Notifications** (both, migration 0030). Lending is a conversation, and the
+server only ever held its *state*: a request was pending, then it was approved.
+Whoever pressed the button knew; the other person found out by opening the right
+screen and noticing. `notification` is addressed to an account, so it is
+per-user data in the same sense as `reading_progress` — keyed by `user_id`,
+never on the book row — and **fetched rather than synced**, like borrow
+requests, since a message to an account means nothing on a disconnected device.
+`notifications::notify` is best-effort by design (it logs and returns rather
+than failing its caller: an approved loan that could not be announced is still
+an approved loan) and sends a second copy by email when, and only when, a
+mailer is configured. In the app it is a bell in the library's app bar that
+renders **nothing at all** unless something is waiting — including on a server
+too old to have the endpoint, which answers 404 and is treated as "nothing
+here".
+
 **Library health** (app, plan 5 #11) is Preferences → *Check library*: the database
 and the file tree can diverge — a file deleted by hand, a partial restore, bytes
 left by a failed import — and nothing detected any of it, while the shelf hid the

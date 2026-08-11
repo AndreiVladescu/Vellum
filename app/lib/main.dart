@@ -48,6 +48,7 @@ import 'shortcuts.dart';
 import 'snack_bars.dart';
 import 'wishlist/wishlist_page.dart';
 import 'data/shelf_service.dart';
+import 'notifications/notifications_button.dart';
 import 'shelf/new_shelf_dialog.dart';
 
 Future<void> main() async {
@@ -1040,6 +1041,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
               ),
               actions: [
+                NotificationsButton(connection: widget.connection),
                 _paletteButton(),
                 _statusMenu(),
                 _genreMenu(),

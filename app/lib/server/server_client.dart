@@ -276,6 +276,47 @@ class VellumServerClient {
     return Capabilities.fromJson(_body(res) as Map<String, dynamic>);
   }
 
+  /// What has happened that this account should know about (server migration
+  /// 0030): a request to answer, an answer to a request.
+  ///
+  /// Fetched rather than synced, like borrow requests — a notification is a
+  /// message to an account on a server, and has no meaning on a device that
+  /// isn't connected. Throws [ServerException] with a 404 on a server that
+  /// predates this; callers treat that as "no notifications here", not an
+  /// error, the same way `_serverLacksPersonal` does.
+  Future<({int unread, List<AppNotification> items})> listNotifications({
+    bool unreadOnly = false,
+    int limit = 50,
+  }) async {
+    final uri = _uri('/api/notifications').replace(queryParameters: {
+      if (unreadOnly) 'unread': '1',
+      'limit': '$limit',
+    });
+    final map = _body(await _http.get(uri, headers: _headers))
+        as Map<String, dynamic>;
+    return (
+      unread: (map['unread'] as num?)?.toInt() ?? 0,
+      items: [
+        for (final n in (map['notifications'] as List? ?? const []))
+          AppNotification.fromJson(n as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    _body(await _http.post(
+      _uri('/api/notifications/$id/read'),
+      headers: _headers,
+    ));
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    _body(await _http.post(
+      _uri('/api/notifications/read-all'),
+      headers: _headers,
+    ));
+  }
+
   /// Borrow requests (plan 5 #49). [direction] is 'incoming' (to answer) or
   /// 'outgoing' (asked for).
   Future<List<BorrowRequest>> listBorrowRequests({
@@ -1434,6 +1475,46 @@ class ServerShelf {
     // Absent on a server older than 0029, where every shelf is public.
     personal: j['personal'] as bool? ?? false,
   );
+}
+
+/// One thing that happened, addressed to this account.
+class AppNotification {
+  AppNotification({
+    required this.id,
+    required this.kind,
+    required this.title,
+    this.body,
+    this.bookId,
+    this.createdAt,
+    this.readAt,
+  });
+
+  final String id;
+
+  /// 'borrow.requested', 'borrow.approved', … An unrecognised kind is not an
+  /// error: the server sends a title and body that already read as sentences,
+  /// so a client that has never heard of a kind can still show it.
+  final String kind;
+  final String title;
+  final String? body;
+
+  /// The book it is about, when there is one — a way to get there from the
+  /// message. Null once that book is deleted; the sentence outlives the link.
+  final String? bookId;
+  final DateTime? createdAt;
+  final DateTime? readAt;
+
+  bool get isRead => readAt != null;
+
+  factory AppNotification.fromJson(Map<String, dynamic> j) => AppNotification(
+        id: j['id'] as String,
+        kind: j['kind'] as String? ?? '',
+        title: j['title'] as String? ?? '',
+        body: j['body'] as String?,
+        bookId: j['book_id'] as String?,
+        createdAt: ServerBook._parseServerTime(j['created_at'] as String?),
+        readAt: ServerBook._parseServerTime(j['read_at'] as String?),
+      );
 }
 
 /// One device's reading position in one book (plan 5 #5). Always this

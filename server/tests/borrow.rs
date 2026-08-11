@@ -565,3 +565,138 @@ async fn borrow_requests_are_advertised_as_a_capability() {
             .any(|f| f == "borrow_requests")
     );
 }
+
+/// Being told, rather than having to look (migration 0030).
+///
+/// The state was always on the server; what was missing was anything that
+/// reached the person who did not press the button. The owner is told when a
+/// request arrives, and the requester when it is answered — those two are the
+/// whole conversation.
+#[tokio::test]
+async fn both_sides_of_a_request_get_told() {
+    let (app, _db) = app().await;
+    let owner = register(&app).await;
+    let other = member(&app, &owner, "reader@lib.test").await;
+    let (book, _copy) = shared_book(&app, &owner, "Dune", Some("reader@lib.test")).await;
+
+    // Nothing has happened yet.
+    let (status, mine) = call(&app, "GET", "/api/notifications", Some(&owner), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(mine["unread"], 0);
+
+    let (_, request) = call(
+        &app,
+        "POST",
+        "/api/borrow-requests",
+        Some(&other),
+        Some(serde_json::json!({ "book_id": book, "note": "for the weekend" })),
+    )
+    .await;
+    let request_id = request["id"].as_str().unwrap().to_string();
+
+    // The owner has something to answer.
+    let (_, mine) = call(&app, "GET", "/api/notifications", Some(&owner), None).await;
+    assert_eq!(mine["unread"], 1);
+    let first = &mine["notifications"][0];
+    assert_eq!(first["kind"], "borrow.requested");
+    let title = first["title"].as_str().unwrap();
+    assert!(title.contains("reader@lib.test"), "who asked: {title}");
+    assert!(title.contains("Dune"), "and for what: {title}");
+    assert_eq!(first["book_id"], serde_json::json!(book), "a way there");
+    assert!(
+        first["body"].as_str().unwrap().contains("for the weekend"),
+        "the note they wrote is the useful part"
+    );
+
+    // The requester has not been told anything — it was their own doing.
+    let (_, theirs) = call(&app, "GET", "/api/notifications", Some(&other), None).await;
+    assert_eq!(theirs["unread"], 0, "nobody is told about their own action");
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        &format!("/api/borrow-requests/{request_id}/decide"),
+        Some(&owner),
+        Some(serde_json::json!({ "status": "approved" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, theirs) = call(&app, "GET", "/api/notifications", Some(&other), None).await;
+    assert_eq!(theirs["unread"], 1);
+    assert_eq!(theirs["notifications"][0]["kind"], "borrow.approved");
+    assert!(
+        theirs["notifications"][0]["title"]
+            .as_str()
+            .unwrap()
+            .contains("Dune")
+    );
+}
+
+#[tokio::test]
+async fn notifications_are_private_and_can_be_marked_read() {
+    let (app, _db) = app().await;
+    let owner = register(&app).await;
+    let other = member(&app, &owner, "reader@lib.test").await;
+    let (book, _copy) = shared_book(&app, &owner, "Dune", Some("reader@lib.test")).await;
+    call(
+        &app,
+        "POST",
+        "/api/borrow-requests",
+        Some(&other),
+        Some(serde_json::json!({ "book_id": book })),
+    )
+    .await;
+
+    let (_, mine) = call(&app, "GET", "/api/notifications", Some(&owner), None).await;
+    let id = mine["notifications"][0]["id"].as_str().unwrap().to_string();
+
+    // Somebody else's notification does not exist, as far as they can tell.
+    let (status, _) = call(
+        &app,
+        "POST",
+        &format!("/api/notifications/{id}/read"),
+        Some(&other),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        &format!("/api/notifications/{id}/read"),
+        Some(&owner),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, mine) = call(&app, "GET", "/api/notifications", Some(&owner), None).await;
+    assert_eq!(mine["unread"], 0);
+    assert!(
+        mine["notifications"][0]["read_at"].is_string(),
+        "still listed, just no longer new"
+    );
+
+    // Reading it again is not an error, and does not move the timestamp.
+    let (status, _) = call(
+        &app,
+        "POST",
+        &format!("/api/notifications/{id}/read"),
+        Some(&owner),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // And unread=1 is the badge's query.
+    let (_, unread) = call(
+        &app,
+        "GET",
+        "/api/notifications?unread=1",
+        Some(&owner),
+        None,
+    )
+    .await;
+    assert!(unread["notifications"].as_array().unwrap().is_empty());
+}

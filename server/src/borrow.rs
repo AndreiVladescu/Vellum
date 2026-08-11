@@ -148,6 +148,26 @@ pub async fn create(
         note,
     )
     .await;
+
+    // The owner is the one who has to do something about this, and until now
+    // nothing told them: the request sat in a screen they had no reason to
+    // open.
+    let title: String = sqlx::query_scalar("SELECT title FROM book WHERE id = ?")
+        .bind(&input.book_id)
+        .fetch_optional(&state.db)
+        .await?
+        .unwrap_or_else(|| "a book".to_string());
+    crate::notifications::notify(
+        &state,
+        &owner,
+        crate::notifications::Message {
+            kind: "borrow.requested",
+            title: format!("{} would like to borrow “{title}”", user.email),
+            body: note.map(|n| format!("They said: “{n}”")),
+            book_id: Some(&input.book_id),
+        },
+    )
+    .await;
     fetch(&state, &id).await
 }
 
@@ -318,6 +338,41 @@ pub async fn decide(
         "book",
         &book_id,
         reply,
+    )
+    .await;
+
+    // Whoever did *not* press the button is the one who needs telling: the
+    // requester when the owner answers, the owner when the requester gives up.
+    let title: String = sqlx::query_scalar("SELECT title FROM book WHERE id = ?")
+        .bind(&book_id)
+        .fetch_optional(&state.db)
+        .await?
+        .unwrap_or_else(|| "a book".to_string());
+    let (recipient, headline) = match decision {
+        "approved" => (
+            &requester_id,
+            format!("“{title}” is yours to borrow"),
+        ),
+        "declined" => (
+            &requester_id,
+            format!("Your request for “{title}” was declined"),
+        ),
+        // cancelled: the requester withdrew, so it is the owner who has one
+        // fewer thing to answer.
+        _ => (
+            &owner_id,
+            format!("{} no longer needs “{title}”", user.email),
+        ),
+    };
+    crate::notifications::notify(
+        &state,
+        recipient,
+        crate::notifications::Message {
+            kind: &format!("borrow.{decision}"),
+            title: headline,
+            body: reply.map(|r| format!("They said: “{r}”")),
+            book_id: Some(&book_id),
+        },
     )
     .await;
     fetch(&state, &id).await

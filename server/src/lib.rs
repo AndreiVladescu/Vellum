@@ -29,6 +29,7 @@ mod ids;
 mod import_check;
 mod layouts;
 mod loans;
+pub mod notifications;
 mod mail;
 mod metadata;
 mod observability;
@@ -317,6 +318,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
                 physical_copies::put_photo_image.layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
             ),
         )
+        .route("/notifications", get(notifications::list))
+        .route("/notifications/read-all", post(notifications::mark_all_read))
+        .route("/notifications/{id}/read", post(notifications::mark_read))
         .route("/loans", get(loans::list))
         .route("/loans/overview", get(loans::overview))
         .route("/loans/{id}", put(loans::upsert).delete(loans::delete))
