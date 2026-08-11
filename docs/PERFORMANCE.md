@@ -61,8 +61,8 @@ database, then copy the seeded file over it. The default location is
 `driftDatabase(name: 'vellum')`) — **not** the app-support directory covers
 and files live under (`LibraryRepository.open` uses a different
 `path_provider` call for those). On Linux desktop, `getApplicationDocumentsDirectory`
-resolves to the XDG `DOCUMENTS` user directory, typically `~/Documents`, so
-the file is usually `~/Documents/vellum.sqlite` — but XDG config can move
+resolves to the application-support directory, so the file is
+`~/.local/share/app.vellum.Vellum/vellum.sqlite` — but XDG config can move
 that, so if it's not there: `find ~ -maxdepth 3 -name vellum.sqlite`. Run the
 app once first if the file doesn't exist yet. Restore your backup afterwards.
 

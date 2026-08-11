@@ -102,13 +102,18 @@ class BackupService {
   };
 
   /// Test seam: the live database file to replace on restore. Defaults to
-  /// where `driftDatabase(name: 'vellum')` puts it (documents dir).
+  /// where `VellumDatabase._openConnection` puts it — the application-support
+  /// directory, beside the covers and book files it describes.
+  ///
+  /// **This has to track that.** A restore writes the file the app will open;
+  /// pointing it anywhere else replaces a database nobody reads and reports
+  /// success, which is the worst possible outcome for a restore.
   final File? _databaseFileOverride;
 
   Future<File> _databaseFile() async {
     if (_databaseFileOverride != null) return _databaseFileOverride;
-    final docs = await getApplicationDocumentsDirectory();
-    return File(p.join(docs.path, 'vellum.sqlite'));
+    final dir = await getApplicationSupportDirectory();
+    return File(p.join(dir.path, 'vellum.sqlite'));
   }
 
   /// The manifest format this version writes. Bumped when the *shape* changes,

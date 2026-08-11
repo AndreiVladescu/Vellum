@@ -1,5 +1,10 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'search_index.dart';
 
@@ -1098,7 +1103,70 @@ class VellumDatabase extends _$VellumDatabase {
         ..orderBy([(b) => OrderingTerm.asc(b.title)]))
       .watch();
 
+  /// The database lives beside the covers, book files and settings, in the
+  /// application-support directory.
+  ///
+  /// `driftDatabase` defaults to the *documents* directory, which on Linux is
+  /// the user's own `~/Documents` — so the catalogue used to sit among their
+  /// papers while everything else it describes lived in `~/.local/share`. One
+  /// library in one place is easier to back up, easier to move between
+  /// machines, and easier to reason about than a catalogue and its contents
+  /// kept apart.
   static QueryExecutor _openConnection() {
-    return driftDatabase(name: 'vellum');
+    return driftDatabase(
+      name: 'vellum',
+      native: DriftNativeOptions(
+        databaseDirectory: () async {
+          final dir = await getApplicationSupportDirectory();
+          await _relocateLegacyDatabase(dir);
+          return dir;
+        },
+      ),
+    );
+  }
+
+  /// Moves a database left in the documents directory by an earlier version.
+  ///
+  /// Without this, changing the directory would present every existing
+  /// installation with an empty library while its real one sat untouched a
+  /// directory away — the catalogue is the one thing whose loss is not
+  /// recoverable from the files on disk.
+  ///
+  /// Runs before the file is opened, and only when the destination does not
+  /// exist, so it cannot overwrite a newer database with an older one. The
+  /// `-wal` and `-shm` companions move too: leaving a stale write-ahead log
+  /// beside a moved database is how a "successful" move loses the last
+  /// transactions committed before it.
+  @visibleForTesting
+  static Future<void> relocateLegacyDatabaseForTesting(Directory target) =>
+      _relocateLegacyDatabase(target);
+
+  static Future<void> _relocateLegacyDatabase(Directory target) async {
+    final destination = File(p.join(target.path, 'vellum.sqlite'));
+    if (destination.existsSync()) return;
+    final Directory documents;
+    try {
+      documents = await getApplicationDocumentsDirectory();
+    } catch (_) {
+      return; // No documents directory on this platform; nothing to move.
+    }
+    if (p.equals(documents.path, target.path)) return;
+
+    final legacy = File(p.join(documents.path, 'vellum.sqlite'));
+    if (!legacy.existsSync()) return;
+    try {
+      await target.create(recursive: true);
+      for (final suffix in ['', '-wal', '-shm']) {
+        final from = File('${legacy.path}$suffix');
+        if (from.existsSync()) {
+          await from.rename('${destination.path}$suffix');
+        }
+      }
+    } catch (_) {
+      // A rename across filesystems, or a locked file: leave the original
+      // where it is rather than half-move it. The app then opens an empty
+      // database, which is visibly wrong and recoverable, instead of a
+      // partially copied one, which is neither.
+    }
   }
 }

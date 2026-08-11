@@ -263,12 +263,17 @@ borrowed what over the years.
 
 ## Where your data lives, and backing it up
 
-Your library is on your own disk, in two places:
+Your library is on your own disk, all of it in one directory:
 
-| What | Linux | macOS | Windows |
-|---|---|---|---|
-| Database | `~/Documents/vellum.sqlite` | `~/Documents/vellum.sqlite` | `Documents\vellum.sqlite` |
-| Books, covers, settings | `~/.local/share/app.vellum.Vellum/` | `~/Library/Application Support/app.vellum.Vellum/` | `%APPDATA%\app.vellum\Vellum\` |
+| Linux | macOS | Windows |
+|---|---|---|
+| `~/.local/share/app.vellum.Vellum/` | `~/Library/Application Support/app.vellum.Vellum/` | `%APPDATA%\app.vellum\Vellum\` |
+
+The catalogue (`vellum.sqlite`), your book files, covers and settings all live
+there together, so copying that one folder copies your whole library.
+
+*Before v1.1.2 the database sat in your Documents folder instead. It is moved
+there automatically the first time a newer version starts.*
 
 **Back it up from inside the app**: ☰ → *Preferences* → *Backup* writes the
 database, covers and book files into a single archive, optionally encrypted with
