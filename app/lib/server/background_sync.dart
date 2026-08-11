@@ -18,7 +18,9 @@ import 'package:workmanager/workmanager.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
+import '../notifications/tray.dart';
 import 'connection_store.dart';
+import 'server_client.dart';
 import 'sync_service.dart';
 
 /// How often background sync runs, when it runs at all.
@@ -167,6 +169,10 @@ void backgroundSyncCallback() {
           scope: settings.syncScope,
         );
         await settings.setLastBackgroundSyncAt(DateTime.now());
+        // The status bar, if this device asked for it. After the sync, because
+        // the sync is the thing worth waking up for and a failed notification
+        // must not cost it a backoff.
+        await _postTrayNotification(settings, client);
         return true;
       } finally {
         // Always closed: a background isolate that leaves the database open
@@ -238,3 +244,37 @@ BackgroundSyncPolicy policyFrom(
       isAndroid: isAndroid ?? Platform.isAndroid,
       lastRunAt: settings.lastBackgroundSyncAt,
     );
+
+/// Puts the newest unread notification in the Android status bar, if this
+/// device has asked for that.
+///
+/// Swallows everything: it runs after a sync that already succeeded, and the
+/// return value of the task decides whether WorkManager backs off. A server
+/// too old for the endpoint (404) and a network that dropped between the two
+/// calls look the same from here, and neither is worth punishing the sync for.
+Future<void> _postTrayNotification(
+  AppSettingsStore settings,
+  VellumServerClient client,
+) async {
+  if (!settings.trayNotifications || !Platform.isAndroid) return;
+  try {
+    final result = await client.listNotifications(unreadOnly: true, limit: 1);
+    final newest = result.items.isEmpty ? null : result.items.first;
+    final decision = TrayDecision.forUnread(
+      unread: result.unread,
+      newest: newest?.title,
+      newestAt: newest?.createdAt,
+      lastShownAt: settings.lastTrayShownAt,
+    );
+    final tray = NotificationTray();
+    if (decision.silent) {
+      // Nothing unread means nothing to point at, so take the old one away.
+      if (result.unread == 0) await tray.clear();
+      return;
+    }
+    await tray.show(title: decision.title, body: decision.body);
+    await settings.setLastTrayShownAt(newest?.createdAt ?? DateTime.now());
+  } catch (_) {
+    // See above.
+  }
+}

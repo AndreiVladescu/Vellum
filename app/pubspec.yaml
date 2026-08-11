@@ -64,6 +64,7 @@ dependencies:
   open_filex: ^4.7.0
   google_mlkit_translation: ^0.14.0
   google_mlkit_language_id: ^0.14.0
+  flutter_local_notifications: ^22.3.0
 
 dev_dependencies:
   flutter_test:

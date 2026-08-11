@@ -22,6 +22,7 @@ import 'app_settings.dart';
 import 'appearance.dart';
 import 'book_face.dart';
 import 'spine_art.dart';
+import '../notifications/tray.dart';
 import 'shared_shelves_page.dart';
 import 'trash_page.dart';
 import 'wallpaper.dart';
@@ -141,6 +142,7 @@ class PreferencesPage extends StatelessWidget {
               connection: connection,
             ),
             _BackgroundSyncTile(settings: settings),
+            _TrayNotificationsTile(settings: settings),
             // Only meaningful on a shared library: with no server there is
             // nobody else whose shelves could arrive.
             if (connection.isConnected)
@@ -944,6 +946,90 @@ class _BackupSectionState extends State<_BackupSection> {
 /// Android there is no folder to write to without a picker and no moment to run
 /// in, so promising a schedule there would be promising something that doesn't
 /// happen.
+/// Borrowing news in the Android status bar.
+///
+/// Off by default and shown as unavailable elsewhere, same as background sync
+/// and for the same reason: a switch that silently does nothing on your
+/// platform is worse than one that says so.
+///
+/// **Turning it on asks Android for permission, and stays off if refused.** A
+/// switch that reads "on" while the system is dropping every notification is a
+/// lie the app tells itself; and the check rides the background sync, so
+/// enabling it without a schedule sets a daily one rather than quietly never
+/// running.
+class _TrayNotificationsTile extends StatefulWidget {
+  const _TrayNotificationsTile({required this.settings});
+
+  final AppSettingsStore settings;
+
+  @override
+  State<_TrayNotificationsTile> createState() => _TrayNotificationsTileState();
+}
+
+class _TrayNotificationsTileState extends State<_TrayNotificationsTile> {
+  bool _busy = false;
+
+  bool get _supported => defaultTargetPlatform == TargetPlatform.android;
+
+  Future<void> _toggle(bool wanted) async {
+    if (!wanted) {
+      await widget.settings.setTrayNotifications(false);
+      await NotificationTray().clear();
+      return;
+    }
+    setState(() => _busy = true);
+    final granted = await NotificationTray().requestPermission();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!granted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+          'Android refused permission to post notifications. You can grant it '
+          'in the system settings for Vellum.',
+        ),
+      ));
+      return;
+    }
+    await widget.settings.setTrayNotifications(true);
+
+    // The check runs inside the background sync, so without a schedule there
+    // would be nothing to run it. Daily is the gentlest one on offer.
+    if (BackgroundSyncInterval.parse(widget.settings.backgroundSyncInterval) ==
+        BackgroundSyncInterval.off) {
+      await widget.settings
+          .setBackgroundSyncInterval(BackgroundSyncInterval.daily.key);
+      await applySchedule(BackgroundSyncPolicy(
+        interval: BackgroundSyncInterval.daily,
+        hasServer: true,
+        isAndroid: true,
+      ));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Background sync set to daily, so there is something '
+            'to check with.'),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: _busy
+          ? const SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.notifications_active_outlined),
+      title: const Text('Borrowing notifications'),
+      subtitle: Text(_supported
+          ? 'Put requests and answers in the status bar, checked when '
+              'background sync runs'
+          : 'Android only — a desktop window is already in front of you'),
+      value: _supported && widget.settings.trayNotifications,
+      onChanged: _supported && !_busy ? _toggle : null,
+    );
+  }
+}
+
 /// Background sync on Android (plan 5 #40).
 ///
 /// Off by default, Wi-Fi and charging only, and shown as unavailable elsewhere

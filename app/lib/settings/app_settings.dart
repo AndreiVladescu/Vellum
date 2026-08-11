@@ -24,6 +24,8 @@ class AppSettingsStore extends ChangeNotifier {
   static const _autoPushKey = 'settings.autoPush';
   static const _importGenresKey = 'settings.importOpenLibraryGenres';
   static const _acceptShelvesKey = 'settings.acceptSharedShelves';
+  static const _trayNotificationsKey = 'settings.trayNotifications';
+  static const _lastTrayShownKey = 'settings.lastTrayShownAt';
   static const _syncReadingPositionKey = 'settings.syncReadingPosition';
   static const _syncScopeKey = 'settings.syncScope';
   static const _deviceIdKey = 'settings.deviceId';
@@ -209,6 +211,35 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setAutoPush(bool value) async {
     await _prefs.setBool(_autoPushKey, value);
+    notifyListeners();
+  }
+
+  /// Whether this device puts borrowing news in the Android status bar.
+  ///
+  /// **Off by default and Android-only.** The bell in the app bar already
+  /// covers the person who has the app open; this is for the phone in a
+  /// pocket, and it costs a permission and a background wake-up, so it is
+  /// something to ask for rather than something to be given.
+  ///
+  /// The check rides the background sync that already runs — one wake-up
+  /// serving both — so turning this on without a sync schedule gets a daily
+  /// one. See `PreferencesPage`, which says so where it is switched on.
+  bool get trayNotifications => _prefs.getBool(_trayNotificationsKey) ?? false;
+
+  Future<void> setTrayNotifications(bool value) async {
+    await _prefs.setBool(_trayNotificationsKey, value);
+    notifyListeners();
+  }
+
+  /// When the status bar was last told something, so the same unanswered
+  /// request isn't announced again on every run.
+  DateTime? get lastTrayShownAt {
+    final stored = _prefs.getString(_lastTrayShownKey);
+    return stored == null ? null : DateTime.tryParse(stored);
+  }
+
+  Future<void> setLastTrayShownAt(DateTime value) async {
+    await _prefs.setString(_lastTrayShownKey, value.toIso8601String());
     notifyListeners();
   }
 

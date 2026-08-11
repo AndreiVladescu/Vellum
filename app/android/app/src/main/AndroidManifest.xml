@@ -6,6 +6,10 @@
          denied, so the camera stays optional. `required="false"` keeps the app
          installable on a device without one. -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Borrowing news in the status bar, opt-in in Preferences. Android 13+
+         also requires this at runtime; see NotificationTray.requestPermission,
+         which is why the preference cannot be switched on without asking. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <application
