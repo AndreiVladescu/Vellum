@@ -4756,10 +4756,7 @@ async fn a_book_says_who_added_it() {
         Some(json!({ "title": "Dune" })),
     )
     .await;
-    assert_eq!(
-        mine["owner_name"], "Owner",
-        "the display name, not the id"
-    );
+    assert_eq!(mine["owner_name"], "Owner", "the display name, not the id");
 
     // A member's own book, read back by the member. `add_member` sets the
     // display name to the email, so this also pins that a name is preferred

@@ -117,7 +117,11 @@ pub async fn list(
         "SELECT id, kind, title, body, book_id, created_at, read_at \
          FROM notification WHERE user_id = ? {} \
          ORDER BY created_at DESC, id DESC LIMIT ?",
-        if unread_only { "AND read_at IS NULL" } else { "" }
+        if unread_only {
+            "AND read_at IS NULL"
+        } else {
+            ""
+        }
     );
     let items = sqlx::query_as::<_, NotificationDto>(&sql)
         .bind(&user.id)

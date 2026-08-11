@@ -172,7 +172,14 @@ async fn a_personal_shelf_is_the_owners_alone() {
     let (owner, friend) = two_people(&app).await;
 
     put_shelf(&app, &owner, "s-public", "Cookbooks", json!({})).await;
-    put_shelf(&app, &owner, "s-mine", "Reread", json!({ "personal": true })).await;
+    put_shelf(
+        &app,
+        &owner,
+        "s-mine",
+        "Reread",
+        json!({ "personal": true }),
+    )
+    .await;
 
     let mine = shelf_names(&app, &owner).await;
     assert!(mine.contains(&"Cookbooks".to_string()));
@@ -198,7 +205,9 @@ async fn a_shelf_with_no_flag_is_public() {
     let (owner, friend) = two_people(&app).await;
     put_shelf(&app, &owner, "s-old", "From an old client", json!({})).await;
 
-    let created = call(&app, "GET", "/api/shelves", Some(&owner), None).await.1;
+    let created = call(&app, "GET", "/api/shelves", Some(&owner), None)
+        .await
+        .1;
     assert_eq!(created[0]["personal"], false, "the flag is reported");
     assert_eq!(shelf_names(&app, &friend).await.len(), 1);
 }
@@ -217,9 +226,20 @@ async fn a_shelf_can_be_made_personal_later_and_public_again() {
         shelf_names(&app, &friend).await.is_empty(),
         "withdrawn from the share"
     );
-    assert_eq!(shelf_names(&app, &owner).await.len(), 1, "still the owner's");
+    assert_eq!(
+        shelf_names(&app, &owner).await.len(),
+        1,
+        "still the owner's"
+    );
 
-    put_shelf(&app, &owner, "s1", "Cookbooks", json!({ "personal": false })).await;
+    put_shelf(
+        &app,
+        &owner,
+        "s1",
+        "Cookbooks",
+        json!({ "personal": false }),
+    )
+    .await;
     assert_eq!(
         shelf_names(&app, &friend).await.len(),
         1,

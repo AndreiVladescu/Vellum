@@ -29,9 +29,9 @@ mod ids;
 mod import_check;
 mod layouts;
 mod loans;
-pub mod notifications;
 mod mail;
 mod metadata;
+pub mod notifications;
 mod observability;
 mod opds;
 mod personal;
@@ -319,7 +319,10 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             ),
         )
         .route("/notifications", get(notifications::list))
-        .route("/notifications/read-all", post(notifications::mark_all_read))
+        .route(
+            "/notifications/read-all",
+            post(notifications::mark_all_read),
+        )
         .route("/notifications/{id}/read", post(notifications::mark_read))
         .route("/loans", get(loans::list))
         .route("/loans/overview", get(loans::overview))

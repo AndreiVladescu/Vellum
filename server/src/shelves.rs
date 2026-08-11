@@ -250,8 +250,8 @@ pub async fn upsert(
         .bind(input.name.trim())
         .bind(input.sort_order)
         .bind(input.personal)
-            .execute(&mut *tx)
-            .await?;
+        .execute(&mut *tx)
+        .await?;
     }
     // Re-creating a shelf at a tombstoned id revives it, same as books::upsert.
     sqlx::query("DELETE FROM deletion WHERE entity_id = ? AND kind = 'shelf'")

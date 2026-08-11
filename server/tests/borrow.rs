@@ -728,7 +728,10 @@ async fn a_reader_can_ask_the_owner_for_write_access() {
     assert_eq!(mine["unread"], 1);
     assert_eq!(mine["notifications"][0]["kind"], "access.requested");
     let title = mine["notifications"][0]["title"].as_str().unwrap();
-    assert!(title.contains("reader@lib.test") && title.contains("Dune"), "{title}");
+    assert!(
+        title.contains("reader@lib.test") && title.contains("Dune"),
+        "{title}"
+    );
     assert!(
         mine["notifications"][0]["body"]
             .as_str()

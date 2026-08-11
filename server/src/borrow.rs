@@ -349,10 +349,7 @@ pub async fn decide(
         .await?
         .unwrap_or_else(|| "a book".to_string());
     let (recipient, headline) = match decision {
-        "approved" => (
-            &requester_id,
-            format!("“{title}” is yours to borrow"),
-        ),
+        "approved" => (&requester_id, format!("“{title}” is yours to borrow")),
         "declined" => (
             &requester_id,
             format!("Your request for “{title}” was declined"),
