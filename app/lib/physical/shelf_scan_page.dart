@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../add_book/barcode_camera.dart';
 import '../data/library_repository.dart';
 import '../settings/app_settings.dart';
 import 'locate.dart';
@@ -112,25 +112,13 @@ class _ShelfScanPageState extends State<ShelfScanPage> {
         children: [
           if (_useCamera)
             Expanded(
-              child: MobileScanner(
-                controller: MobileScannerController(
-                  formats: const [BarcodeFormat.qrCode],
-                  detectionSpeed: DetectionSpeed.normal,
-                ),
-                onDetect: (capture) {
-                  for (final barcode in capture.barcodes) {
-                    final value = barcode.rawValue;
-                    if (value != null) _onCode(value);
-                  }
-                },
-                errorBuilder: (context, error) => Center(
+              child: BarcodeCamera(
+                formats: shelfLabelFormats,
+                onCode: _onCode,
+                onError: (message) => Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text(
-                      error.errorDetails?.message ??
-                          'The camera could not be started.',
-                      textAlign: TextAlign.center,
-                    ),
+                    child: Text(message, textAlign: TextAlign.center),
                   ),
                 ),
               ),

@@ -15,7 +15,6 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/reader/reader_settings.dart';
 import 'package:vellum/reader/translate/local_engine_backend.dart';
-import 'package:vellum/reader/translate/on_device_backend.dart';
 import 'package:vellum/reader/translate/translate_sheet.dart';
 import 'package:vellum/reader/translate/translation_backend.dart';
 
@@ -249,19 +248,6 @@ void main() {
         isNull,
         reason: 'a button that can only fail is worse than no button',
       );
-    });
-  });
-
-  group('language packs', () {
-    test('only languages the device can actually translate are offered', () {
-      // Every offered language must map to a model; the list is the app's own
-      // narrowed to what ML Kit has, so nothing is shown that fails on press.
-      for (final language in LanguagePacks.offered) {
-        expect(TranslationLanguage.byCode(language.code), isNotNull);
-      }
-      expect(LanguagePacks.offered, isNotEmpty);
-      expect(LanguagePacks.offered.contains(TranslationLanguage.auto), false,
-          reason: '"Detect" is not something you download');
     });
   });
 

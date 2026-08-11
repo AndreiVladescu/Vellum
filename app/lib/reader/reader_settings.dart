@@ -3,7 +3,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'translate/on_device_backend.dart';
+import 'translate/on_device.dart';
 import 'translate/translation_backend.dart';
 
 /// Page background and text colour while reading (plan 5 #23).
@@ -130,6 +130,7 @@ class ReaderSettings extends ChangeNotifier {
   // feature exists at all: no server, no button — the same rule the sync
   // server's own features follow.
   static const _translateUrlKey = 'reader.translate.url';
+  static const _onDeviceTranslateKey = 'reader.translate.onDevice';
   static const _translateKeyKey = 'reader.translate.apiKey';
   static const _translateToKey = 'reader.translate.to';
 
@@ -254,11 +255,33 @@ class ReaderSettings extends ChangeNotifier {
   /// The LibreTranslate address, or empty when none is set.
   String get translateUrl => _prefs.getString(_translateUrlKey) ?? '';
 
-  /// Whether translating is possible at all — a server named here, or a device
-  /// that can do it itself. The reader shows no translate button until it is
-  /// true, because a button that can only fail is worse than none.
+  /// Whether translating is possible at all — a server named here, or a
+  /// device translator this build has *and* the reader has turned on. No
+  /// translate button appears until it is true, because a button that can only
+  /// fail is worse than none.
+  ///
+  /// A translator installed on the machine deliberately does not count. Finding
+  /// one means running a command, which is async and this is read while
+  /// building; the old code drew the same line, and moving it would put a
+  /// button on every desktop whether or not anything is installed.
   bool get canTranslate =>
-      OnDeviceBackend.available || translateUrl.trim().isNotEmpty;
+      (onDeviceTranslationAvailable && useOnDeviceTranslation) ||
+      translateUrl.trim().isNotEmpty;
+
+  /// Whether to use the device's own translator, where this build has one.
+  ///
+  /// **Off by default, and only ever visible in the full build.** ML Kit is a
+  /// closed Google library; shipping it is one decision (the flavour, see
+  /// `translate/on_device.dart`) and running it is another, and this is the
+  /// second. The free build has no such translator, so this stays false there
+  /// and nothing reads it.
+  bool get useOnDeviceTranslation =>
+      _prefs.getBool(_onDeviceTranslateKey) ?? false;
+
+  Future<void> setUseOnDeviceTranslation(bool value) async {
+    await _prefs.setBool(_onDeviceTranslateKey, value);
+    notifyListeners();
+  }
 
   String get translateApiKey => _prefs.getString(_translateKeyKey) ?? '';
 

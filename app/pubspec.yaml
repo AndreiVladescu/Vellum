@@ -51,7 +51,6 @@ dependencies:
   xml: ^7.0.1
   flutter_widget_from_html_core: ^0.17.2
   share_plus: ^12.0.2
-  mobile_scanner: ^7.4.0
   image_picker: ^1.2.3
   qr: ^4.0.0
   cryptography: ^2.9.0
@@ -62,9 +61,8 @@ dependencies:
   home_widget: ^0.9.3
   workmanager: ^0.9.0+3
   open_filex: ^4.7.0
-  google_mlkit_translation: ^0.14.0
-  google_mlkit_language_id: ^0.14.0
   flutter_local_notifications: ^22.3.0
+  flutter_zxing: ^2.3.0
 
 dev_dependencies:
   flutter_test:

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../reader_settings.dart';
-import 'language_packs_sheet.dart';
 import 'local_engine_backend.dart';
-import 'on_device_backend.dart';
+import 'on_device.dart';
 import 'translation_backend.dart';
+import 'translator_setup_sheet.dart';
 import '../../widgets/page_insets.dart';
 
 /// The passage, what it was translated from and to, and the result.
@@ -45,9 +45,11 @@ class TranslateSheet extends StatefulWidget {
 }
 
 class _TranslateSheetState extends State<TranslateSheet> {
-  /// Resolved once, on open: the device's own translator where there is one,
-  /// otherwise a translator installed on this machine. Both keep the passage
-  /// here; there is deliberately no option that sends it away.
+  /// Resolved once, on open, in privacy order: the device's own translator if
+  /// this build has one *and* the reader has turned it on, then a translator
+  /// installed on the machine, and only then the LibreTranslate address they
+  /// named. The first two keep the passage here; the third is a server, so it
+  /// is never reached for on its own.
   TranslationBackend? _backend;
 
   late TranslationLanguage _from = TranslationLanguage.auto;
@@ -76,9 +78,16 @@ class _TranslateSheetState extends State<TranslateSheet> {
   Future<void> _resolveBackend() async {
     final resolved = widget.backend ??
         await (widget.resolve ??
-            () async => OnDeviceBackend.available
-                ? OnDeviceBackend()
-                : await LocalTranslators.detect())();
+            () async =>
+                (onDeviceTranslationAvailable &&
+                        widget.settings.useOnDeviceTranslation)
+                    ? createOnDeviceBackend()
+                    : await LocalTranslators.detect() ??
+                        backendFor(
+                          onDeviceAvailable: false,
+                          libreUrl: widget.settings.translateUrl,
+                          libreApiKey: widget.settings.translateApiKey,
+                        ))();
     if (!mounted) return;
     setState(() => _backend = resolved);
     _run();
@@ -130,7 +139,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => const LanguagePacksSheet(),
+      builder: (_) => onDeviceLanguagesSheet() ?? const TranslatorSetupSheet(),
     );
     if (!mounted) return;
     // A pack downloaded while the error was on screen is exactly the thing that
@@ -225,12 +234,18 @@ class _TranslateSheetState extends State<TranslateSheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    OnDeviceBackend.available
-                        ? 'Download the two languages under Languages and this '
-                            'translates on the device, with nothing sent anywhere.'
-                        : 'No translator is installed on this machine. '
+                    onDeviceTranslationAvailable &&
+                            !widget.settings.useOnDeviceTranslation
+                        ? 'This build can translate on the device using Google '
+                            'ML Kit. It is proprietary, so it stays off until '
+                            'you turn it on in the reader’s settings.'
+                        : localEngineSupportedHere
+                        ? 'No translator is installed on this machine. '
                             'Languages says what to install — it runs here, and '
-                            'nothing is sent anywhere.',
+                            'nothing is sent anywhere.'
+                        : 'No translator here yet. Set a LibreTranslate address '
+                            'in the reader’s settings, and passages go to that '
+                            'server — yours, if you run one.',
                   ),
                 ),
               ],

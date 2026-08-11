@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'reader_settings.dart';
 import '../widgets/page_insets.dart';
+import 'translate/on_device.dart';
 
 /// The reader's appearance controls (plan 5 #23).
 ///
@@ -206,6 +207,25 @@ class _TranslateServerSheetState extends State<TranslateServerSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Only in the full build. The free one has no such translator, so
+          // this would be a switch for a thing that isn't there.
+          if (onDeviceTranslationAvailable) ...[
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: widget.settings.useOnDeviceTranslation,
+              onChanged: (v) async {
+                await widget.settings.setUseOnDeviceTranslation(v);
+                if (context.mounted) setState(() {});
+              },
+              title: const Text('Translate on this device'),
+              subtitle: const Text(
+                'Uses Google ML Kit — closed-source, and part of this build '
+                'only. Nothing is sent anywhere; languages download once, '
+                'about 30 MB each.',
+              ),
+            ),
+            const Divider(height: 24),
+          ],
           Text('Translation server', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(

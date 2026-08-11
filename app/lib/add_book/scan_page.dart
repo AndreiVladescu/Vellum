@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data/library_repository.dart';
 import '../import/import_plan.dart';
+import 'barcode_camera.dart';
 import 'isbn.dart';
 
 /// One book added during a scanning session, for the running strip and undo.
@@ -253,23 +253,12 @@ class _ScanPageState extends State<ScanPage> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  MobileScanner(
-                    // Only the symbologies books actually use, so the decoder
-                    // isn't also hunting QR codes on the same frames.
-                    controller: MobileScannerController(
-                      formats: const [BarcodeFormat.ean13, BarcodeFormat.ean8],
-                      detectionSpeed: DetectionSpeed.normal,
-                    ),
-                    onDetect: (capture) {
-                      for (final barcode in capture.barcodes) {
-                        final value = barcode.rawValue;
-                        if (value != null) _onBarcode(value);
-                      }
-                    },
-                    errorBuilder: (context, error) => _CameraUnavailable(
-                      detail: error.errorDetails?.message ??
-                          'The camera could not be started.',
-                    ),
+                  // Only the symbologies books actually use, so the decoder
+                  // isn't also hunting QR codes on the same frames.
+                  BarcodeCamera(
+                    formats: isbnFormats,
+                    onCode: _onBarcode,
+                    onError: (message) => _CameraUnavailable(detail: message),
                   ),
                   if (_busy)
                     const Align(

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:google_mlkit_language_id/google_mlkit_language_id.dart';
 import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 
-import 'translation_backend.dart';
+import '../translation_backend.dart';
 
 /// Translation that happens on the device, with no server anywhere.
 ///

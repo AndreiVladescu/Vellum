@@ -9,6 +9,18 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# The proprietary flavour's code, excluded in the free flavour — which is what
+# this tree is set to. `tool/flavour.sh` comments this block in and out.
+#
+# The files are still here and still in git; they just import
+# `google_mlkit_*`, which the free flavour does not depend on, so analysing
+# them here would be analysing code this build cannot compile. Nothing
+# references them either, so the compiler never reaches them.
+analyzer:
+  exclude:
+    - lib/reader/translate/proprietary/**
+
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

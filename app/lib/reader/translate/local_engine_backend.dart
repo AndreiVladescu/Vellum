@@ -3,6 +3,16 @@ import 'dart:io';
 
 import 'translation_backend.dart';
 
+/// Whether a translator *could* be installed on this platform at all.
+///
+/// These engines are command-line programs, which a phone has no way to run —
+/// so this is the desktop half of "can this device translate without a
+/// server?". It used to be the other way round: ML Kit answered for phones and
+/// this answered for desktops. ML Kit is gone, so a phone's answer is a
+/// LibreTranslate address or nothing.
+bool get localEngineSupportedHere =>
+    Platform.isLinux || Platform.isMacOS || Platform.isWindows;
+
 /// Runs a command and hands back what it said. Injectable so the tests can
 /// drive every branch without installing a translator.
 typedef ProcessRunner = Future<ProcessResult> Function(
