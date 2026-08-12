@@ -404,11 +404,23 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       setState(() {});
       return;
     }
+    // A prop drawn in front of the books is grabbed before them, so the
+    // hit-test matches what is on top — the same order the painter uses.
+    for (final prop in _props.reversed) {
+      if (prop.inFront && _propRect(prop).contains(focal)) {
+        _dragPropId = prop.id;
+        _propDragPos = Offset(prop.x, prop.y);
+        _grabWorld = _screenToWorld(focal) - _propDragPos;
+        break;
+      }
+    }
+
     // Whether the press landed on a book at all, selected or not — see
     // `bookAcceptsDrag`. A book that refuses the drag still swallows it, so
     // the press pans the room instead of reaching the prop behind the book.
     var onABook = false;
     for (final pb in _placed.reversed) {
+      if (_dragPropId != null) break;
       if (_screenRectOf(pb).contains(focal)) {
         onABook = true;
         if (bookAcceptsDrag(
@@ -425,7 +437,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
     // A prop, before the shelf it is standing on — it is drawn on top, so it
     // should be grabbed first.
-    if (_dragId == null && !onABook) {
+    if (_dragId == null && _dragPropId == null && !onABook) {
       for (final prop in _props.reversed) {
         if (_propRect(prop).contains(focal)) {
           _dragPropId = prop.id;
@@ -1300,11 +1312,22 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       position: _menuPosition(global),
       items: [
         PopupMenuItem(
+          value: 'depth',
+          child: Text(prop.inFront
+              ? 'Send behind the books'
+              : 'Bring in front of the books'),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
           value: 'remove',
           child: Text('Remove the ${kind.label.toLowerCase()}'),
         ),
       ],
     );
+    if (choice == 'depth') {
+      await repo.layout.setPropInFront(prop.id, !prop.inFront);
+      return;
+    }
     if (choice != 'remove') return;
     await repo.layout.deleteProp(prop.id);
     // Books that were pushed aside by it can spread back out.
@@ -2167,13 +2190,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             ),
           ),
         ),
-        // Props sit behind the books: an ornament pushed to the back of a
-        // shelf is the ordinary case, and a statuette in front of a spine you
-        // are trying to read is not.
+        // Props are drawn in two passes, either side of the books, because
+        // which side a prop belongs on is a property of the prop (issue #10
+        // item 4). Behind is the default and the ordinary case — an ornament
+        // pushed to the back of a shelf, with the spines readable in front of
+        // it. In front is for the things that really do stand at the edge.
         for (final prop in _props)
-          _ridingPropIds.contains(prop.id)
-              ? _ridingPropWidget(prop)
-              : _propWidget(prop),
+          if (!prop.inFront)
+            _ridingPropIds.contains(prop.id)
+                ? _ridingPropWidget(prop)
+                : _propWidget(prop),
         // Books (each in its own RepaintBoundary; the one being dragged is
         // drawn as a live overlay instead of in this static list).
         for (final pb in _placed)
@@ -2181,6 +2207,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             (_dragShelfId != null && _ridingIds.contains(pb.placement.id))
                 ? _ridingBookWidget(pb)
                 : _bookWidget(pb),
+        // The other pass. Before the dragged book, not after: whatever is
+        // under your finger stays visible, or dragging a book behind a plant
+        // would mean dragging something you cannot see.
+        for (final prop in _props)
+          if (prop.inFront)
+            _ridingPropIds.contains(prop.id)
+                ? _ridingPropWidget(prop)
+                : _propWidget(prop),
         if (_dragId != null) _draggedBookOverlay(),
         // Empty-state hint.
         if (_placed.isEmpty && _shelves.isEmpty)

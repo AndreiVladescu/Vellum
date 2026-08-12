@@ -7954,6 +7954,21 @@ class $RoomPropsTable extends RoomProps
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _inFrontMeta = const VerificationMeta(
+    'inFront',
+  );
+  @override
+  late final GeneratedColumn<bool> inFront = GeneratedColumn<bool>(
+    'in_front',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("in_front" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -7975,6 +7990,7 @@ class $RoomPropsTable extends RoomProps
     y,
     widthM,
     heightM,
+    inFront,
     createdAt,
   ];
   @override
@@ -8039,6 +8055,12 @@ class $RoomPropsTable extends RoomProps
     } else if (isInserting) {
       context.missing(_heightMMeta);
     }
+    if (data.containsKey('in_front')) {
+      context.handle(
+        _inFrontMeta,
+        inFront.isAcceptableOrUnknown(data['in_front']!, _inFrontMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -8082,6 +8104,10 @@ class $RoomPropsTable extends RoomProps
         DriftSqlType.double,
         data['${effectivePrefix}height_m'],
       )!,
+      inFront: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}in_front'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -8109,6 +8135,14 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
   /// so one can be made bigger or smaller without every other one changing.
   final double widthM;
   final double heightM;
+
+  /// Whether this prop is drawn in front of the books rather than behind them.
+  ///
+  /// Behind is the default and the ordinary case — an ornament pushed to the
+  /// back of a shelf, with the spines readable in front of it. In front is for
+  /// the things that really do stand at the edge: a photo frame, a plant whose
+  /// leaves fall across the books. Per prop, because a room usually wants both.
+  final bool inFront;
   final DateTime createdAt;
   const RoomProp({
     required this.id,
@@ -8118,6 +8152,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
     required this.y,
     required this.widthM,
     required this.heightM,
+    required this.inFront,
     required this.createdAt,
   });
   @override
@@ -8130,6 +8165,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
     map['y'] = Variable<double>(y);
     map['width_m'] = Variable<double>(widthM);
     map['height_m'] = Variable<double>(heightM);
+    map['in_front'] = Variable<bool>(inFront);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -8143,6 +8179,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
       y: Value(y),
       widthM: Value(widthM),
       heightM: Value(heightM),
+      inFront: Value(inFront),
       createdAt: Value(createdAt),
     );
   }
@@ -8160,6 +8197,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
       y: serializer.fromJson<double>(json['y']),
       widthM: serializer.fromJson<double>(json['widthM']),
       heightM: serializer.fromJson<double>(json['heightM']),
+      inFront: serializer.fromJson<bool>(json['inFront']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -8174,6 +8212,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
       'y': serializer.toJson<double>(y),
       'widthM': serializer.toJson<double>(widthM),
       'heightM': serializer.toJson<double>(heightM),
+      'inFront': serializer.toJson<bool>(inFront),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -8186,6 +8225,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
     double? y,
     double? widthM,
     double? heightM,
+    bool? inFront,
     DateTime? createdAt,
   }) => RoomProp(
     id: id ?? this.id,
@@ -8195,6 +8235,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
     y: y ?? this.y,
     widthM: widthM ?? this.widthM,
     heightM: heightM ?? this.heightM,
+    inFront: inFront ?? this.inFront,
     createdAt: createdAt ?? this.createdAt,
   );
   RoomProp copyWithCompanion(RoomPropsCompanion data) {
@@ -8208,6 +8249,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
       y: data.y.present ? data.y.value : this.y,
       widthM: data.widthM.present ? data.widthM.value : this.widthM,
       heightM: data.heightM.present ? data.heightM.value : this.heightM,
+      inFront: data.inFront.present ? data.inFront.value : this.inFront,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -8222,14 +8264,24 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
           ..write('y: $y, ')
           ..write('widthM: $widthM, ')
           ..write('heightM: $heightM, ')
+          ..write('inFront: $inFront, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, environmentId, kind, x, y, widthM, heightM, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    environmentId,
+    kind,
+    x,
+    y,
+    widthM,
+    heightM,
+    inFront,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -8241,6 +8293,7 @@ class RoomProp extends DataClass implements Insertable<RoomProp> {
           other.y == this.y &&
           other.widthM == this.widthM &&
           other.heightM == this.heightM &&
+          other.inFront == this.inFront &&
           other.createdAt == this.createdAt);
 }
 
@@ -8252,6 +8305,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
   final Value<double> y;
   final Value<double> widthM;
   final Value<double> heightM;
+  final Value<bool> inFront;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const RoomPropsCompanion({
@@ -8262,6 +8316,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
     this.y = const Value.absent(),
     this.widthM = const Value.absent(),
     this.heightM = const Value.absent(),
+    this.inFront = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -8273,6 +8328,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
     required double y,
     required double widthM,
     required double heightM,
+    this.inFront = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -8290,6 +8346,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
     Expression<double>? y,
     Expression<double>? widthM,
     Expression<double>? heightM,
+    Expression<bool>? inFront,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -8301,6 +8358,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
       if (y != null) 'y': y,
       if (widthM != null) 'width_m': widthM,
       if (heightM != null) 'height_m': heightM,
+      if (inFront != null) 'in_front': inFront,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -8314,6 +8372,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
     Value<double>? y,
     Value<double>? widthM,
     Value<double>? heightM,
+    Value<bool>? inFront,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -8325,6 +8384,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
       y: y ?? this.y,
       widthM: widthM ?? this.widthM,
       heightM: heightM ?? this.heightM,
+      inFront: inFront ?? this.inFront,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -8354,6 +8414,9 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
     if (heightM.present) {
       map['height_m'] = Variable<double>(heightM.value);
     }
+    if (inFront.present) {
+      map['in_front'] = Variable<bool>(inFront.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -8373,6 +8436,7 @@ class RoomPropsCompanion extends UpdateCompanion<RoomProp> {
           ..write('y: $y, ')
           ..write('widthM: $widthM, ')
           ..write('heightM: $heightM, ')
+          ..write('inFront: $inFront, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -18174,6 +18238,7 @@ typedef $$RoomPropsTableCreateCompanionBuilder =
       required double y,
       required double widthM,
       required double heightM,
+      Value<bool> inFront,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -18186,6 +18251,7 @@ typedef $$RoomPropsTableUpdateCompanionBuilder =
       Value<double> y,
       Value<double> widthM,
       Value<double> heightM,
+      Value<bool> inFront,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -18250,6 +18316,11 @@ class $$RoomPropsTableFilterComposer
 
   ColumnFilters<double> get heightM => $composableBuilder(
     column: $table.heightM,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get inFront => $composableBuilder(
+    column: $table.inFront,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -18321,6 +18392,11 @@ class $$RoomPropsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get inFront => $composableBuilder(
+    column: $table.inFront,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -18377,6 +18453,9 @@ class $$RoomPropsTableAnnotationComposer
 
   GeneratedColumn<double> get heightM =>
       $composableBuilder(column: $table.heightM, builder: (column) => column);
+
+  GeneratedColumn<bool> get inFront =>
+      $composableBuilder(column: $table.inFront, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -18441,6 +18520,7 @@ class $$RoomPropsTableTableManager
                 Value<double> y = const Value.absent(),
                 Value<double> widthM = const Value.absent(),
                 Value<double> heightM = const Value.absent(),
+                Value<bool> inFront = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomPropsCompanion(
@@ -18451,6 +18531,7 @@ class $$RoomPropsTableTableManager
                 y: y,
                 widthM: widthM,
                 heightM: heightM,
+                inFront: inFront,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -18463,6 +18544,7 @@ class $$RoomPropsTableTableManager
                 required double y,
                 required double widthM,
                 required double heightM,
+                Value<bool> inFront = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomPropsCompanion.insert(
@@ -18473,6 +18555,7 @@ class $$RoomPropsTableTableManager
                 y: y,
                 widthM: widthM,
                 heightM: heightM,
+                inFront: inFront,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

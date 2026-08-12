@@ -636,6 +636,17 @@ class LayoutRepository {
     );
   }
 
+  /// Moves a prop in front of the books, or back behind them.
+  Future<void> setPropInFront(String id, bool inFront) async {
+    await (db.update(db.roomProps)..where((p) => p.id.equals(id)))
+        .write(RoomPropsCompanion(inFront: Value(inFront)));
+    await db.customStatement(
+      'UPDATE physical_environments SET needs_publish = 1 WHERE id = '
+      '(SELECT environment_id FROM room_props WHERE id = ?)',
+      [id],
+    );
+  }
+
   Future<void> deleteProp(String id) async {
     await db.customStatement(
       'UPDATE physical_environments SET needs_publish = 1 WHERE id = '

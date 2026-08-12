@@ -455,6 +455,14 @@ class RoomProps extends Table {
   /// so one can be made bigger or smaller without every other one changing.
   RealColumn get widthM => real()();
   RealColumn get heightM => real()();
+
+  /// Whether this prop is drawn in front of the books rather than behind them.
+  ///
+  /// Behind is the default and the ordinary case — an ornament pushed to the
+  /// back of a shelf, with the spines readable in front of it. In front is for
+  /// the things that really do stand at the edge: a photo frame, a plant whose
+  /// leaves fall across the books. Per prop, because a room usually wants both.
+  BoolColumn get inFront => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -664,7 +672,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 32;
+  int get schemaVersion => 33;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -963,6 +971,21 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 33) {
+            // Props can stand in front of the books (issue #10 item 4).
+            // Defaulted to false, which is where every existing prop already
+            // is — the choice is something you go and make, never something an
+            // upgrade makes for you. App-local, like the rest of the room, so
+            // there is no server migration.
+            // `room_props` itself only arrived at v27, and these steps run
+            // newest-first — so on an older database the table does not exist
+            // yet when this runs. The v27 step below creates it from the
+            // *current* schema, which already has the column.
+            if ((await tableNames()).contains('room_props') &&
+                !(await columnsOf('room_props')).contains('in_front')) {
+              await m.addColumn(roomProps, roomProps.inFront);
             }
           }
           if (from < 32) {
