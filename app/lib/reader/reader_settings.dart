@@ -270,13 +270,15 @@ class ReaderSettings extends ChangeNotifier {
 
   /// Whether to use the device's own translator, where this build has one.
   ///
-  /// **Off by default, and only ever visible in the full build.** ML Kit is a
-  /// closed Google library; shipping it is one decision (the flavour, see
-  /// `translate/on_device.dart`) and running it is another, and this is the
-  /// second. The free build has no such translator, so this stays false there
-  /// and nothing reads it.
+  /// **Defaults to using it where the build has it**, which is what a build
+  /// carrying ML Kit is for — a phone that has already paid the 17 MB should
+  /// not also have to be told to use it. The switch is there for anyone who
+  /// would rather it didn't run.
+  ///
+  /// In the free build there is no such translator, so this reads false
+  /// whatever is stored and nothing acts on it.
   bool get useOnDeviceTranslation =>
-      _prefs.getBool(_onDeviceTranslateKey) ?? false;
+      _prefs.getBool(_onDeviceTranslateKey) ?? onDeviceTranslationAvailable;
 
   Future<void> setUseOnDeviceTranslation(bool value) async {
     await _prefs.setBool(_onDeviceTranslateKey, value);

@@ -10,4 +10,4 @@
 /// `on_device.dart` and never the two sides directly.
 library;
 
-export 'on_device_stub.dart';
+export 'proprietary/on_device.dart';

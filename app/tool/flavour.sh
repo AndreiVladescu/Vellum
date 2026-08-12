@@ -101,8 +101,28 @@ case "${1:-status}" in
     echo "note: it still does nothing until the reader's settings turn it on."
     ;;
 
+  check)
+    # Used by CI. Asserts the four switched things agree with each other,
+    # rather than asserting a particular flavour — either flavour is a valid
+    # thing to commit, but a half-switched tree is not, and it fails in ways
+    # (an unresolved import, a test that will not compile) that are much
+    # easier to read here than in a build log.
+    fail=0
+    if grep -q '^  google_mlkit' pubspec.yaml; then
+      grep -qF "$REAL_LINE" "$SWITCH" || { echo "pubspec has ML Kit but $SWITCH exports the stub"; fail=1; }
+      grep -q '^analyzer:' analysis_options.yaml && { echo "pubspec has ML Kit but proprietary/ is excluded from analysis"; fail=1; }
+      [ -f "$FULL_TEST" ] || { echo "pubspec has ML Kit but its test is parked"; fail=1; }
+    else
+      grep -qF "$STUB_LINE" "$SWITCH" || { echo "no ML Kit in pubspec but $SWITCH exports it"; fail=1; }
+      grep -q '^analyzer:' analysis_options.yaml || { echo "no ML Kit in pubspec but proprietary/ would be analysed"; fail=1; }
+      [ -f "$PARKED_TEST" ] || { echo "no ML Kit in pubspec but its test would be collected"; fail=1; }
+    fi
+    if [ "$fail" -eq 0 ]; then echo "flavour: $(current), consistently"; fi
+    exit "$fail"
+    ;;
+
   *)
-    echo "usage: $0 [free|full|status]" >&2
+    echo "usage: $0 [free|full|status|check]" >&2
     exit 2
     ;;
 esac

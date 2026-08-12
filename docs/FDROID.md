@@ -1,11 +1,17 @@
 # Publishing to F-Droid
 
+> **Parked (2026-08-11).** Vellum is not being submitted anywhere for now. The
+> repository is committed as the **full** flavour, which carries Google ML Kit,
+> so it is *not* in a submittable state — `tool/flavour.sh free` is one command
+> away when that changes. Everything below is kept because it is the map of
+> what the work would be, and it stays accurate about what is and isn't
+> possible.
+
 Where Vellum stands with the F-Droid ecosystem, what is ready, and what is in
-the way. The short version: **the app is now free software in the build it
-ships by default**, which is the requirement both stores care about;
-**IzzyOnDroid can list it as it is**, and **f-droid.org still cannot build it**
-— for one reason, PDFium, which is unchanged and is a project rather than a
-task.
+the way. The short version: the app **can** be built as free software with one
+command; **IzzyOnDroid could list that build as it is**; and **f-droid.org
+cannot build it at all** — for one reason, PDFium, which is a project rather
+than a task.
 
 ---
 
@@ -20,8 +26,10 @@ tool/flavour.sh free     # the default, and what is committed
 tool/flavour.sh full     # adds Google ML Kit for on-device translation
 ```
 
-**`free` is the committed state**, so a fresh clone — including F-Droid's or
-IzzyOnDroid's — builds the free flavour without being told to.
+**`full` is the committed state today** (see the note at the top), so a fresh
+clone builds with ML Kit. Submitting anywhere means committing `free` first;
+CI's `tool/flavour.sh check` only asserts that the tree is *consistently* one
+or the other, since either is a legitimate thing to commit.
 
 | | free | full |
 |---|---|---|
@@ -113,9 +121,31 @@ from-source build needs `depot_tools`, `gn` and `ninja` and takes hours. It is
 also load-bearing here: the PDF reader, text extraction and content search all
 sit on it.
 
-**This is the only thing between Vellum and f-droid.org.** Solving it means
-building PDFium in the recipe, or replacing the PDF stack with something
-F-Droid can build (MuPDF is the usual answer, and is a rewrite of the reader).
+**This is the only thing between Vellum and f-droid.org.** There are four ways
+out, in ascending order of work:
+
+1. **Ask F-Droid whether a Maven-hosted PDFium AAR counts.** They accept Maven
+   dependencies of free-licensed libraries (they do not rebuild AndroidX
+   either), and `io.legere:pdfiumandroid` is Apache-2.0 with the `.so` inside
+   the AAR. Whether their reviewers read that as "prebuilt binary" or "ordinary
+   dependency" is their judgement call — one forum post, and a yes makes this a
+   dependency swap.
+2. **A `nopdf` flavour.** The flavour machinery already exists, and the reader
+   is already forked at `read_button.dart` — EPUB goes to `EpubReaderPage`,
+   which is pure Dart. A build without `pdfrx` keeps the library, sync, loans
+   and EPUB reading, and hands PDFs to whatever viewer the phone has. It loses
+   in-app PDF reading, PDF covers and PDF content indexing.
+3. **Replace the engine with MuPDF.** AGPL-3.0, so compatible with this
+   project, and it builds with a plain makefile rather than a Chromium
+   toolchain — but nothing binds it to Flutter, so it means writing FFI for
+   rendering, text extraction, search and highlight coordinates. Weeks.
+4. **Build PDFium from source in the recipe.** Mechanically possible — the hook
+   skips its download when the file is already there — but it needs `gn`,
+   `ninja` and every DEP as F-Droid `srclibs`, and their maintainers would
+   likely decline first.
+
+Android's platform `PdfRenderer` is not a substitute: it renders pages to
+bitmaps and gives no text at all until API 35.
 
 ---
 
@@ -164,9 +194,8 @@ APK is the **free** flavour, so no anti-features apply.
    answer.
 2. Submit `metadata/app.vellum.Vellum.yml` to
    [fdroiddata](https://gitlab.com/fdroid/fdroiddata) with the build recipe.
-   The recipe needs no flavour argument — the committed tree is already free —
-   but it should assert it, e.g. by running `tool/flavour.sh status` in a
-   `prebuild` step so a tree accidentally committed as `full` fails loudly
-   rather than shipping ML Kit.
+   The recipe must run `tool/flavour.sh free` in a `prebuild` step, or the
+   tree's committed flavour must be switched to free first — otherwise it
+   would build ML Kit into an F-Droid release.
 
 Step 2 is ordinary work. Step 1 is a project.

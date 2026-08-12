@@ -79,11 +79,11 @@ jobs:
       - run: git diff --exit-code -- lib/l10n/
       # No new hardcoded user-facing strings in the files already migrated.
       - run: ./tool/check_l10n.sh
-      # The committed tree must be the free flavour: it is what F-Droid and
-      # IzzyOnDroid build, and a tree left on `full` would put Google ML Kit —
-      # proprietary, ~17 MB of blobs — into a release nobody meant to make
-      # proprietary. See docs/FDROID.md.
-      - run: tool/flavour.sh status | grep -q 'no proprietary dependencies'
+      # Either flavour is a valid thing to commit; a half-switched one is not.
+      # `check` asserts the four things tool/flavour.sh toggles agree with each
+      # other, which fails here legibly instead of as an unresolved import in a
+      # build log. See docs/FDROID.md.
+      - run: tool/flavour.sh check
       - run: flutter analyze
       - run: flutter test
       # Already covered by `flutter test` above; run it again verbosely so its

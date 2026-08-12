@@ -16,9 +16,9 @@ include: package:flutter_lints/flutter.yaml
 # `google_mlkit_*`, which the free flavour does not depend on, so analysing
 # them here would be analysing code this build cannot compile. Nothing
 # references them either, so the compiler never reaches them.
-analyzer:
-  exclude:
-    - lib/reader/translate/proprietary/**
+# analyzer:
+#   exclude:
+#     - lib/reader/translate/proprietary/**
 
 
 linter:
