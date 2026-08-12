@@ -16,10 +16,17 @@ class AddBookPage extends StatefulWidget {
     required this.repository,
     required this.settings,
     this.initialFilePath,
+    this.shelfId,
   });
 
   final LibraryRepository repository;
   final AppSettingsStore settings;
+
+  /// The shelf that was open when this was reached, if any. A book added from
+  /// a shelf joins it — the whole point of having walked to that shelf first.
+  /// Null on "All", and null for a file shared from another app, where nobody
+  /// was looking at a shelf when it arrived.
+  final String? shelfId;
 
   /// A file to attach as soon as the page opens, from an "open with" or share
   /// (plan 5 #20). Goes through the same [_AddBookPageState._acceptFile] as a
@@ -135,6 +142,7 @@ class _AddBookPageState extends State<AddBookPage> {
         importGenres: widget.settings.importOpenLibraryGenres,
       );
       if (_filePath != null) await widget.repository.attachFile(id, _filePath!);
+      await _joinOpenShelf(id);
       if (!mounted) return;
       Navigator.of(context).pop(result.title);
     } catch (e) {
@@ -144,6 +152,13 @@ class _AddBookPageState extends State<AddBookPage> {
         _error = 'Could not add “${result.title}”: $e';
       });
     }
+  }
+
+  /// Puts the new book on the shelf that was open, when there was one.
+  Future<void> _joinOpenShelf(String bookId) async {
+    final shelfId = widget.shelfId;
+    if (shelfId == null) return;
+    await widget.repository.addToShelf(bookId, shelfId);
   }
 
   /// Creates a bare custom book from the typed title, attaching the picked file
@@ -174,6 +189,7 @@ class _AddBookPageState extends State<AddBookPage> {
         // attachFile auto-generates a first-page cover for a PDF.
         await widget.repository.attachFile(id, _filePath!);
       }
+      await _joinOpenShelf(id);
       if (!mounted) return;
       Navigator.of(context).pop(title);
     } catch (e) {

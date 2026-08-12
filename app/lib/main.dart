@@ -568,23 +568,47 @@ class _LibraryPageState extends State<LibraryPage> {
     });
   }
 
+  /// The shelf a newly added book should join: whichever chip is selected, or
+  /// null on "All". The name comes back too, because a book quietly joining a
+  /// shelf is invisible unless the confirmation says which one.
+  Future<Shelf?> _openShelf() async {
+    final id = widget.settings.selectedShelfId;
+    if (id == null) return null;
+    final shelves = await repository.watchShelves().first;
+    return shelves.where((s) => s.id == id).firstOrNull;
+  }
+
   Future<void> _openAddBook(BuildContext context) async {
+    final shelf = await _openShelf();
+    if (!context.mounted) return;
     final addedTitle = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (_) =>
-            AddBookPage(repository: repository, settings: widget.settings),
+        builder: (_) => AddBookPage(
+          repository: repository,
+          settings: widget.settings,
+          shelfId: shelf?.id,
+        ),
       ),
     );
     if (addedTitle != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L10n.of(context).bookAdded(addedTitle))),
+        SnackBar(
+          content: Text(shelf == null
+              ? L10n.of(context).bookAdded(addedTitle)
+              : L10n.of(context).bookAddedToShelf(addedTitle, shelf.name)),
+        ),
       );
     }
   }
 
   Future<void> _openScan(BuildContext context) async {
+    final shelf = await _openShelf();
+    if (!context.mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ScanPage(repository: repository)),
+      MaterialPageRoute(
+        builder: (_) =>
+            ScanPage(repository: repository, shelfId: shelf?.id),
+      ),
     );
   }
 
@@ -703,12 +727,18 @@ class _LibraryPageState extends State<LibraryPage> {
           label: l10n.cmdImportFolder,
           icon: Icons.folder_open,
           key: LogicalKeyboardKey.keyI,
-          run: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => FolderImportPage(
-              repository: repository,
-              settings: widget.settings,
-            ),
-          )),
+          run: () async {
+            final shelf = await _openShelf();
+            if (!mounted) return;
+            await Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => FolderImportPage(
+                repository: repository,
+                settings: widget.settings,
+                shelfId: shelf?.id,
+                shelfName: shelf?.name,
+              ),
+            ));
+          },
         ),
         LibraryCommand(
           id: 'scan',
@@ -1419,14 +1449,20 @@ class _LibraryPageState extends State<LibraryPage> {
                     label: Text(L10n.of(context).addABook),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FolderImportPage(
-                          repository: repository,
-                          settings: widget.settings,
+                    onPressed: () async {
+                      final shelf = await _openShelf();
+                      if (!mounted) return;
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => FolderImportPage(
+                            repository: repository,
+                            settings: widget.settings,
+                            shelfId: shelf?.id,
+                            shelfName: shelf?.name,
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                     icon: const Icon(Icons.folder_open),
                     label: Text(L10n.of(context).importFolder),
                   ),

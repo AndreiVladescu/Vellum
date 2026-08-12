@@ -29,10 +29,19 @@ class FolderImportPage extends StatefulWidget {
     required this.settings,
     this.initialFolder,
     this.initialFiles,
+    this.shelfId,
+    this.shelfName,
   });
 
   final LibraryRepository repository;
   final AppSettingsStore settings;
+
+  /// The shelf that was open when the import started, if any. Everything
+  /// imported joins it — and [shelfName] is shown in the review step, because
+  /// a bulk import is the one add path where landing on a forgotten shelf
+  /// would be a genuine surprise.
+  final String? shelfId;
+  final String? shelfName;
 
   /// Skip the picker and scan this folder immediately — used by the watched
   /// folder's launch prompt.
@@ -227,6 +236,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
         }
       },
       isCancelled: () async => _cancelRequested,
+      shelfId: widget.shelfId,
     );
     if (!mounted) return;
     setState(() => _report = report);
@@ -435,6 +445,23 @@ class _FolderImportPageState extends State<FolderImportPage> {
                         'metadata later per book',
               ),
             ),
+            if (widget.shelfName != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shelves, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'These go on “${widget.shelfName}”, the shelf you had '
+                        'open — as well as into your library.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Row(
               children: [
                 Expanded(

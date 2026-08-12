@@ -55,9 +55,16 @@ class ScanPage extends StatefulWidget {
     this.barcodes,
     this.cameraAvailable,
     this.initialWishlist = false,
+    this.shelfId,
   });
 
   final LibraryRepository repository;
+
+  /// The shelf that was open when scanning started, if any. A scanned book
+  /// joins it, the same as one added by hand — but only when it is going into
+  /// the library. A wishlist entry is a book you do not have yet, so there is
+  /// nothing to put on a shelf.
+  final String? shelfId;
 
   /// Whether the session starts in wishlist mode. The toggle is on screen
   /// either way; this is for opening the scanner straight from the wishlist.
@@ -148,6 +155,10 @@ class _ScanPageState extends State<ScanPage> {
       final bookId = wanted
           ? await widget.repository.wishlist.addFromSearch(result)
           : await widget.repository.addFromSearch(result);
+      final shelfId = widget.shelfId;
+      if (!wanted && shelfId != null) {
+        await widget.repository.addToShelf(bookId, shelfId);
+      }
       if (!mounted) return;
       setState(() {
         _added.insert(

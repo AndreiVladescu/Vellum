@@ -259,10 +259,17 @@ class FolderImportService {
   /// file behind. Metadata comes from the file name only — the online lookup is
   /// a separate, resumable pass (see [enrich]), so importing 500 books doesn't
   /// depend on 500 network calls succeeding.
+  /// Imports [candidates], optionally putting every one of them on [shelfId].
+  ///
+  /// The shelf is the one that was open when the import was started. A bulk
+  /// import is the one place where that could genuinely surprise someone — 500
+  /// books landing on a shelf they had forgotten was selected — so the review
+  /// step says where they are going before anything is written.
   Future<ImportReport> import(
     List<ImportCandidate> candidates, {
     ImportProgress? onProgress,
     Future<bool> Function()? isCancelled,
+    String? shelfId,
   }) async {
     final outcomes = <ImportOutcome>[];
     var cancelled = false;
@@ -288,6 +295,7 @@ class FolderImportService {
             // A missing or unreadable cover must not lose the book.
           }
         }
+        if (shelfId != null) await repository.addToShelf(bookId, shelfId);
         outcomes.add(ImportOutcome(path: c.path, bookId: bookId));
       } catch (e) {
         outcomes.add(ImportOutcome(path: c.path, error: '$e'));

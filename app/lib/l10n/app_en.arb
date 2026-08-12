@@ -78,6 +78,15 @@
     "placeholders": { "title": { "type": "String" } }
   },
 
+  "bookAddedToShelf": "“{title}” added to {shelf}",
+  "@bookAddedToShelf": {
+    "description": "Adding a book while a shelf is open puts it on that shelf too, which is invisible unless the confirmation says so.",
+    "placeholders": {
+      "title": { "type": "String" },
+      "shelf": { "type": "String" }
+    }
+  },
+
   "syncResultWithIssues": "Synced — pulled {pulled}, pushed {pushed}, {issues}.",
   "@syncResultWithIssues": {
     "description": "The launch sync's result when it also had issues. `issues` is syncIssues, so the plural stays ICU instead of being glued on with a ternary.",
