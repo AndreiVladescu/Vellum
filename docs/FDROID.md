@@ -22,7 +22,7 @@ Vellum builds two ways from one source tree, switched by `app/tool/flavour.sh`:
 ```sh
 cd app
 tool/flavour.sh status   # which one is this tree set to?
-tool/flavour.sh free     # the default, and what is committed
+tool/flavour.sh free     # no proprietary dependencies
 tool/flavour.sh full     # adds Google ML Kit for on-device translation
 ```
 
@@ -69,10 +69,11 @@ compiled.
 
 ### And a second gate in the full build
 
-Shipping a proprietary library and running it are two decisions. The full
-flavour makes only the first: on-device translation stays **off** until it is
-switched on in the reader's settings (`Translate on this device`). Until then
-the full build behaves exactly like the free one.
+Shipping a proprietary library and running it are two decisions, and the
+switch under `Translate on this device` in the reader's settings is the second
+one. It **defaults to on** where the build has ML Kit — a phone that has
+already paid the 17 MB should not also have to be told to use it — and turning
+it off makes the full build behave exactly like the free one.
 
 ---
 
