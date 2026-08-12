@@ -6,6 +6,17 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.2 — 2026-08-12
+
+Maintenance release.
+
+### Fixed
+
+- Release automation and CI hardening updates from
+  [#11](https://github.com/AndreiVladescu/Vellum/pull/11).
+
+---
+
 ## v1.1.1 — 2026-08-06
 
 A small release: one new way to look at your library, and the release
