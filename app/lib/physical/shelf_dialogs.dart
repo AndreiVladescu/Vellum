@@ -282,6 +282,12 @@ class SizeDialog extends StatefulWidget {
 
 class _SizeDialogState extends State<SizeDialog> {
   late String? _formatKey = widget.formatKey;
+
+  /// What is wrong with what has been typed, or null when it is fine. Shown
+  /// under the fields rather than silently trimmed on save: a number that
+  /// quietly becomes a different number is how you end up not trusting the
+  /// dialog.
+  String? _problem;
   late final _thickness =
       TextEditingController(text: widget.thicknessCm.toStringAsFixed(1));
   late final _height =
@@ -354,6 +360,22 @@ class _SizeDialogState extends State<SizeDialog> {
             ),
             field('Thickness (cm)', _thickness),
             field('Height (cm)', _height),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _problem ??
+                    'Up to A3 — ${(PhysicalMetrics.maxThickness * 100)
+                        .toStringAsFixed(0)} cm thick and '
+                    '${(PhysicalMetrics.maxHeight * 100).toStringAsFixed(0)} '
+                    'cm tall.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _problem == null
+                      ? null
+                      : Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -378,7 +400,22 @@ class _SizeDialogState extends State<SizeDialog> {
           onPressed: () {
             final t = double.tryParse(_thickness.text);
             final h = double.tryParse(_height.text);
-            if (t == null || h == null || t <= 0 || h <= 0) return;
+            if (t == null || h == null || t <= 0 || h <= 0) {
+              setState(() => _problem = 'Both sizes have to be numbers '
+                  'greater than zero.');
+              return;
+            }
+            // A3 is the ceiling; `PhysicalMetrics` enforces it regardless, so
+            // this exists to say so rather than to be the only guard.
+            if (t > PhysicalMetrics.maxThickness * 100 ||
+                h > PhysicalMetrics.maxHeight * 100) {
+              setState(() => _problem = 'Nothing bigger than A3: at most '
+                  '${(PhysicalMetrics.maxThickness * 100).toStringAsFixed(0)}'
+                  ' cm thick and '
+                  '${(PhysicalMetrics.maxHeight * 100).toStringAsFixed(0)}'
+                  ' cm tall.');
+              return;
+            }
             Navigator.pop(
               context,
               SizeSpec(
