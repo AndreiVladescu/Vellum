@@ -8,7 +8,7 @@ follow [semantic versioning](https://semver.org/).
 
 ## v1.1.2 — 2026-08-12
 
-Maintenance release.
+Small bug & UI fixes
 
 ### Fixed
 
