@@ -230,8 +230,13 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
                               }),
                               title: Text(request.bookTitle),
                               subtitle: Text(
-                                '${request.status}'
-                                '${request.reply == null ? '' : ' · “${request.reply}”'}',
+                                [
+                                  if (request.ownerName != null)
+                                    'asked ${request.ownerName}',
+                                  request.status,
+                                  if (request.reply != null)
+                                    '“${request.reply}”',
+                                ].join(' · '),
                               ),
                               trailing: request.isPending
                                   ? TextButton(
@@ -301,12 +306,19 @@ class _Header extends StatelessWidget {
 /// Offered only when the server advertises `borrow_requests` **and** the book
 /// isn't yours — asking to borrow your own book is a button that can only
 /// produce an error message.
+/// Asks the owner to lend [title].
+///
+/// [owner] is who will be asked, when the app knows — `books.added_by`, cached
+/// from the server. Naming them was the report: "it is not clear who I ask for
+/// a book". Null falls back to "the owner", which is what a library with an
+/// older server can honestly say.
 Future<void> promptBorrowRequest(
   BuildContext context,
   ServerConnection connection,
   String bookId,
-  String title,
-) async {
+  String title, {
+  String? owner,
+}) async {
   final client = connection.client;
   if (client == null) return;
   final note = TextEditingController();
@@ -318,9 +330,10 @@ Future<void> promptBorrowRequest(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'The owner sees this in their app and can lend it to you. '
-            'Nothing happens until they say yes.',
+          Text(
+            '${owner ?? 'The owner'} sees this in their app and can lend it '
+            'to you. Nothing happens until they say yes, and you are told '
+            'either way.',
           ),
           const SizedBox(height: 12),
           TextField(

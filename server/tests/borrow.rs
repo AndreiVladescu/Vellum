@@ -787,3 +787,41 @@ async fn asking_for_access_you_have_says_so_and_asking_about_nothing_404s() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+/// A request says who it is addressed to (issue #10 item 8).
+///
+/// "Who do I ask to borrow the book?" was on the server all along as
+/// `owner_id` — a uuid, which tells nobody anything. `owner_name` is the
+/// readable form, derived from `app_user` like `BookDto::owner_name`, so it
+/// follows a rename rather than going stale.
+#[tokio::test]
+async fn a_request_names_the_owner_it_is_addressed_to() {
+    let (app, _db) = app().await;
+    let owner = register(&app).await;
+    let reader = member(&app, &owner, "reader@lib.test").await;
+    let (book, _copy) = shared_book(&app, &owner, "Dune", Some("reader@lib.test")).await;
+
+    let (status, created) = call(
+        &app,
+        "POST",
+        "/api/borrow-requests",
+        Some(&reader),
+        Some(serde_json::json!({ "book_id": book })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    // `register` gives the master the display name "Owner".
+    assert_eq!(created["owner_name"], "Owner");
+
+    // And on the list the requester reads — the screen that says what you
+    // asked for, where the whole question came up.
+    let (_, mine) = call(
+        &app,
+        "GET",
+        "/api/borrow-requests?direction=outgoing",
+        Some(&reader),
+        None,
+    )
+    .await;
+    assert_eq!(mine[0]["owner_name"], "Owner");
+}

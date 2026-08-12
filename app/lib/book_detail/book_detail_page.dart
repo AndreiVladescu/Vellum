@@ -364,6 +364,9 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                 widget.connection!,
                 book.id,
                 book.title,
+                // Whoever added it is who owns it — the same name the page
+                // shows under "Added by".
+                owner: book.addedBy,
               ),
             ),
           // Offered on a synced library only — `addedBy` is set by a pull, so

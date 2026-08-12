@@ -1816,12 +1816,17 @@ class BorrowRequest {
     this.note,
     this.reply,
     this.copyId,
+    this.ownerName,
   });
 
   final String id;
   final String bookId;
   final String bookTitle;
   final String requesterEmail;
+
+  /// Whose book it is, as a name. Null on a server older than this field —
+  /// then the screens say "the owner" rather than inventing one.
+  final String? ownerName;
 
   /// 'pending' | 'approved' | 'declined' | 'cancelled'.
   final String status;
@@ -1842,6 +1847,7 @@ class BorrowRequest {
         note: j['note'] as String?,
         reply: j['reply'] as String?,
         copyId: j['copy_id'] as String?,
+        ownerName: j['owner_name'] as String?,
       );
 }
 

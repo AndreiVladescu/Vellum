@@ -39,11 +39,21 @@ pub struct BorrowRequestDto {
     pub created_at: String,
     pub decided_at: Option<String>,
     pub loan_id: Option<String>,
+    /// Who you are asking, as a name rather than an id — their display name,
+    /// or their email if they never set one. Derived like `BookDto::owner_name`
+    /// rather than stored, so it follows a rename.
+    ///
+    /// "It is not clear who I ask for a book" was the report; the answer was
+    /// on the server all along as `owner_id`, which is a uuid and tells nobody
+    /// anything.
+    pub owner_name: Option<String>,
 }
 
 const SELECT: &str = "SELECT r.id, r.book_id, b.title AS book_title, r.copy_id, \
         r.requester_id, r.requester_email, r.owner_id, r.status, r.note, r.reply, \
-        r.created_at, r.decided_at, r.loan_id \
+        r.created_at, r.decided_at, r.loan_id, \
+        (SELECT COALESCE(NULLIF(u.display_name, ''), u.email) FROM app_user u \
+            WHERE u.id = r.owner_id) AS owner_name \
     FROM borrow_request r JOIN book b ON b.id = r.book_id";
 
 #[derive(Deserialize)]
