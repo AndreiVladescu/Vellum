@@ -19,6 +19,7 @@ import '../settings/app_settings.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
 import 'book_picker.dart';
 import 'bookcase_template.dart';
+import 'room_gestures.dart';
 import 'bulk_place.dart';
 import 'labels.dart';
 import 'locate.dart';
@@ -403,18 +404,28 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       setState(() {});
       return;
     }
+    // Whether the press landed on a book at all, selected or not — see
+    // `bookAcceptsDrag`. A book that refuses the drag still swallows it, so
+    // the press pans the room instead of reaching the prop behind the book.
+    var onABook = false;
     for (final pb in _placed.reversed) {
       if (_screenRectOf(pb).contains(focal)) {
-        _dragId = pb.placement.id;
-        _bookStart = Offset(pb.placement.x, pb.placement.y);
-        _grabWorld = _screenToWorld(focal);
-        _dragPos = _bookStart;
+        onABook = true;
+        if (bookAcceptsDrag(
+          bookId: pb.placement.id,
+          selectedBookId: _selectedId,
+        )) {
+          _dragId = pb.placement.id;
+          _bookStart = Offset(pb.placement.x, pb.placement.y);
+          _grabWorld = _screenToWorld(focal);
+          _dragPos = _bookStart;
+        }
         break;
       }
     }
     // A prop, before the shelf it is standing on — it is drawn on top, so it
     // should be grabbed first.
-    if (_dragId == null) {
+    if (_dragId == null && !onABook) {
       for (final prop in _props.reversed) {
         if (_propRect(prop).contains(focal)) {
           _dragPropId = prop.id;
@@ -426,7 +437,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
     // Otherwise a shelf — any shelf can be dragged, and the books resting on it
     // ride along (captured here so they follow live and persist on release).
-    if (_dragId == null && _dragPropId == null) {
+    if (_dragId == null && _dragPropId == null && !onABook) {
       for (final s in _shelves.reversed) {
         if (_shelfHitRect(s).contains(focal)) {
           // Anchored is the default, so a left-click on a shelf pans the room
@@ -455,6 +466,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
     _camStartScale = _scale;
     _camWorldFocal = _screenToWorld(focal);
+  }
+
+  /// Selects the topmost book under [focal], or clears the selection when the
+  /// tap lands on anything else.
+  void _selectAt(Offset focal) {
+    for (final pb in _placed.reversed) {
+      if (_screenRectOf(pb).contains(focal)) {
+        setState(() => _selectedId = pb.placement.id);
+        return;
+      }
+    }
+    setState(() => _selectedId = null);
   }
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
@@ -2007,8 +2030,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           },
         ),
       ),
-      // Hidden while a book is selected, so it doesn't overlap the toolbar.
-      floatingActionButton: _selectedId != null
+      // Hidden while anything else owns the bottom of the screen: the
+      // selected-book toolbar, and the grouping bar — which was the bug, since
+      // this knew about the first mode and not the second, and sat on top of
+      // its Cancel and Group buttons.
+      floatingActionButton: !showAddBooksButton(
+        bookSelected: _selectedId != null,
+        grouping: _grouping != null,
+      )
           ? null
           : FloatingActionButton.extended(
               onPressed: _addBooks,
@@ -2032,7 +2061,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           '• Pinch or scroll to zoom; drag empty space to pan.\n'
           '• “Add book” drops a book in; drag it so it rests on a shelf or '
           'on top of another book.\n'
-          '• Tap a book to select it (rotate / resize / remove).\n'
+          '• Tap a book to select it (rotate / resize / remove), then\n'
+          '  drag it to move it — only the selected book moves.\n'
           '• Right-click or long-press a book or shelf to edit it.\n'
           '• Drag a shelf to move it — the books on it ride along.\n'
           '• A shelf can be furniture instead: a side panel, divider or label '
@@ -2088,6 +2118,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
               onScaleStart: _onScaleStart,
               onScaleUpdate: _onScaleUpdate,
               onScaleEnd: _onScaleEnd,
+              // Selection used to fall out of a scale gesture that ended
+              // without movement, which never fired for a plain mouse click —
+              // so on a desktop a book could only be selected by right-
+              // clicking it or by starting to drag it. An explicit tap
+              // handler says what it means.
+              onTapUp: (d) => _selectAt(d.localPosition),
               onLongPressStart: (d) =>
                   _contextMenuAt(d.localPosition, d.globalPosition),
               onSecondaryTapDown: (d) =>

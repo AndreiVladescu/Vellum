@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import '../shortcuts.dart';
 
@@ -22,7 +23,11 @@ class ReaderHotkeys {
     required this.onFind,
     required this.onGoTo,
     required this.onEscape,
-  });
+    this.isPaged,
+    this.onPageStep,
+    this.onNudge,
+    bool Function()? isTextFieldFocused,
+  }) : isTextFieldFocused = isTextFieldFocused ?? _editableHasFocus;
 
   /// Whether this reader should be answering right now — false once a dialog or
   /// another page is on top of it. Without this every reader left on the
@@ -36,6 +41,30 @@ class ReaderHotkeys {
   /// didn't — Escape still has to be able to close things above us.
   final bool Function() onEscape;
 
+  /// Whether the reader is showing one page at a time. Arrows mean different
+  /// things in the two modes: turning a page is the whole gesture in paged
+  /// mode, while in a continuous scroll it would be a lurch, so there they
+  /// nudge instead. Page Up/Down mean a page in both.
+  final bool Function()? isPaged;
+
+  /// Move by whole pages. +1 is forward.
+  final void Function(int delta)? onPageStep;
+
+  /// Move by a little — a few lines' worth of scrolling. +1 is downward.
+  final void Function(int delta)? onNudge;
+
+  /// Whether something that takes typing holds focus.
+  ///
+  /// **The reason navigation keys are guarded at all.** Handlers here run
+  /// before the focus system, so a claimed key never reaches a text field —
+  /// and the reader has one in its own app bar for searching. Claiming Left
+  /// while someone is editing a query would stop the caret moving, which is a
+  /// worse bug than the one this fixes.
+  final bool Function() isTextFieldFocused;
+
+  static bool _editableHasFocus() =>
+      FocusManager.instance.primaryFocus?.context?.widget is EditableText;
+
   void attach() => HardwareKeyboard.instance.addHandler(handle);
   void detach() => HardwareKeyboard.instance.removeHandler(handle);
 
@@ -46,6 +75,8 @@ class ReaderHotkeys {
     if (event is! KeyDownEvent || !isActive()) return false;
 
     if (event.logicalKey == LogicalKeyboardKey.escape) return onEscape();
+
+    if (_navigate(event.logicalKey)) return true;
 
     final modifier = usesMetaModifier
         ? HardwareKeyboard.instance.isMetaPressed
@@ -61,5 +92,44 @@ class ReaderHotkeys {
       return true;
     }
     return false;
+  }
+
+  /// Moving through the book with no modifier held. Returns true when the key
+  /// was ours.
+  bool _navigate(LogicalKeyboardKey key) {
+    final step = onPageStep;
+    final nudge = onNudge;
+    if (step == null || nudge == null) return false;
+    // A modifier turns these into somebody else's shortcut (Ctrl+Home, and
+    // whatever the platform does with Ctrl+PageDown), so leave them alone.
+    if (HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isAltPressed) {
+      return false;
+    }
+    if (isTextFieldFocused()) return false;
+
+    if (key == LogicalKeyboardKey.pageDown) {
+      step(1);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.pageUp) {
+      step(-1);
+      return true;
+    }
+
+    final forward = key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.arrowDown;
+    final back = key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowUp;
+    if (!forward && !back) return false;
+
+    final delta = forward ? 1 : -1;
+    if (isPaged?.call() ?? false) {
+      step(delta);
+    } else {
+      nudge(delta);
+    }
+    return true;
   }
 }

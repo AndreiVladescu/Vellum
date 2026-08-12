@@ -18,7 +18,10 @@ void main() {
     expect(settings.fontSize, 17.0);
     expect(settings.lineHeight, 1.5);
     expect(settings.measure, 720.0);
-    expect(settings.pdfFit, PdfFit.width);
+    // Fit *page*: opening a book should show you the page. Fitting the width
+    // arrives zoomed into the top third with no clue how much is missing —
+    // reported from Windows as "it opens zoomed in" (issue #10 item 1).
+    expect(settings.pdfFit, PdfFit.page);
     expect(settings.nightMode, false);
     expect(settings.immersive, false);
   });
@@ -30,7 +33,7 @@ void main() {
     await settings.setFontSize(21);
     await settings.setLineHeight(1.8);
     await settings.setMeasure(900);
-    await settings.setPdfFit(PdfFit.page);
+    await settings.setPdfFit(PdfFit.width);
     await settings.setNightMode(true);
     await settings.setImmersive(true);
 
@@ -41,7 +44,7 @@ void main() {
     expect(reloaded.fontSize, 21);
     expect(reloaded.lineHeight, 1.8);
     expect(reloaded.measure, 900);
-    expect(reloaded.pdfFit, PdfFit.page);
+    expect(reloaded.pdfFit, PdfFit.width);
     expect(reloaded.nightMode, true);
     expect(reloaded.immersive, true);
   });

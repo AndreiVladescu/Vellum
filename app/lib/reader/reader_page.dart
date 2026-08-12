@@ -107,7 +107,41 @@ class _ReaderPageState extends State<ReaderPage> {
       _closeSearch();
       return true;
     },
+    isPaged: () => _mode == PdfPageMode.paged,
+    onPageStep: _stepPage,
+    onNudge: _nudge,
   );
+
+  /// A whole page, in either mode.
+  ///
+  /// In paged mode that is what the viewer already does; in a continuous
+  /// scroll it is a screenful, which is what Page Down means everywhere else
+  /// and is not the same as "the next page boundary" — a scroll has no notion
+  /// of landing on one.
+  void _stepPage(int delta) {
+    if (!_controller.isReady) return;
+    if (_mode == PdfPageMode.paged) {
+      final page = _page;
+      if (page == null) return;
+      final target = (page + delta).clamp(1, _controller.pageCount);
+      if (target != page) _controller.goToPage(pageNumber: target);
+      return;
+    }
+    _scrollBy(_controller.visibleRect.height * 0.9 * delta);
+  }
+
+  /// A few lines, for the arrow keys in a continuous scroll.
+  void _nudge(int delta) {
+    if (!_controller.isReady) return;
+    _scrollBy(_controller.visibleRect.height * 0.12 * delta);
+  }
+
+  void _scrollBy(double dy) {
+    _controller.goToPosition(
+      documentOffset: _controller.centerPosition + Offset(0, dy),
+      duration: const Duration(milliseconds: 120),
+    );
+  }
 
   @override
   void initState() {

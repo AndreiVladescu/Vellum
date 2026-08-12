@@ -196,10 +196,15 @@ class ReaderSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// How a PDF is framed when it opens. **Fit page by default**: opening a
+  /// book should show you the page, and fitting the width means arriving
+  /// zoomed into the top third of it with no way to tell how much you are
+  /// missing. Anyone who has already chosen keeps their choice — this only
+  /// answers for someone who never went looking.
   PdfFit get pdfFit {
     final stored = _prefs.getString(_pdfFitKey);
     return PdfFit.values.where((f) => f.name == stored).firstOrNull ??
-        PdfFit.width;
+        PdfFit.page;
   }
 
   Future<void> setPdfFit(PdfFit value) async {
