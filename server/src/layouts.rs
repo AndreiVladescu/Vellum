@@ -266,7 +266,7 @@ pub async fn delete(
         return Err(AppError::NotFound("layout not found".into()));
     }
 
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     sqlx::query("DELETE FROM share WHERE scope = 'layout' AND scope_id = ?")
         .bind(&id)
         .execute(&mut *tx)

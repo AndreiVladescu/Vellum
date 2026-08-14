@@ -1315,7 +1315,7 @@ pub async fn redeem_invite(
     )
     .await?;
 
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     let consumed = sqlx::query(
         "UPDATE invite SET used_at = datetime('now') \
          WHERE token_hash = ? AND used_at IS NULL",

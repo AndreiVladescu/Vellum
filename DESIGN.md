@@ -242,6 +242,33 @@ alongside the `.db`, or run `PRAGMA wal_checkpoint(TRUNCATE)` before copying the
 `.db` on its own. The app defaults new server URLs to `https://` and warns when
 a URL is unencrypted.
 
+## Writing to the server's database
+
+**Every transaction that writes uses `write_tx`, never `db.begin()`.** sqlx's
+`begin()` issues a plain `BEGIN`, which SQLite treats as *deferred*: the
+transaction starts as a reader and only takes the write lock at its first
+write. Most of ours read first — `books::delete` reads the title and the blob
+paths before the row goes, upserts read the current row to decide whether the
+write is needed — so they hold a read snapshot, and if any other connection
+commits in the meantime the upgrade fails with `SQLITE_BUSY_SNAPSHOT` (517).
+
+The `busy_timeout` in `connect_db` does **not** cover this: SQLite does not
+invoke the busy handler for a snapshot conflict, because waiting cannot help —
+the snapshot is already stale. `write_tx` issues `BEGIN IMMEDIATE`, taking the
+write lock up front, where the busy handler does apply and waits out a busy
+writer instead of failing.
+
+This is not theoretical. Every upload spawns a **detached** enrichment task
+that writes a page count and a cover path after the response goes out, so
+"import a folder while a device syncs" is two writers by construction. The
+symptom was a 500 on delete that appeared only on a loaded CI runner and never
+locally; `server/tests/write_contention.rs` reproduces it deliberately.
+
+Keep expensive work *outside* the transaction — `text_index` extracts the text
+before it opens one, and `books::delete` unlinks blobs after the commit. With
+`BEGIN IMMEDIATE` a transaction holds the write lock for its whole life, so a
+slow one now blocks every other writer rather than just racing them.
+
 ## Data model
 
 - **book** — title, subtitle, description, ISBN, publisher, year, page count,

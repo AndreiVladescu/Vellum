@@ -137,6 +137,30 @@ pub struct TlsCertInfo {
     pub fingerprint: String,
 }
 
+/// Begin a transaction that is going to write.
+///
+/// **Always this, never `db.begin()`, for anything that writes.** sqlx's
+/// `begin()` issues a plain `BEGIN`, which SQLite treats as *deferred*: the
+/// transaction starts as a reader and takes the write lock only at its first
+/// write. A transaction that reads first — and most of ours do, to decide
+/// whether the write is needed at all — therefore holds a read snapshot, and
+/// if any other connection commits in between, the upgrade fails with
+/// `SQLITE_BUSY_SNAPSHOT` (code 517).
+///
+/// The `busy_timeout` in [`connect_db`] does **not** cover that: SQLite does
+/// not invoke the busy handler for a snapshot conflict, because waiting cannot
+/// help — the snapshot is already stale. The result was a 500 that appeared
+/// only under concurrency, which on this server means a delete or a push
+/// arriving while an upload's detached enrichment task writes a page count.
+///
+/// `BEGIN IMMEDIATE` takes the write lock up front, where the busy handler
+/// *does* apply and waits out a busy writer instead of failing.
+pub async fn write_tx(
+    db: &SqlitePool,
+) -> Result<sqlx::Transaction<'static, sqlx::Sqlite>, sqlx::Error> {
+    db.begin_with("BEGIN IMMEDIATE").await
+}
+
 /// Open (creating if missing) the SQLite database at `path` and run migrations.
 pub async fn connect_db(path: &str) -> anyhow::Result<SqlitePool> {
     let options = SqliteConnectOptions::new()

@@ -228,8 +228,8 @@ async fn deleting_one_book_keeps_the_other_books_file() {
     upload(&h.app, &token, "one", bytes.clone()).await;
     let (_, kept) = upload(&h.app, &token, "two", bytes).await;
 
-    let (status, _) = call(&h.app, "DELETE", "/api/books/one", Some(&token), None).await;
-    assert_eq!(status, StatusCode::OK);
+    let (status, body) = call(&h.app, "DELETE", "/api/books/one", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK, "delete failed: {body}");
 
     let path = kept["path"].as_str().unwrap();
     assert!(

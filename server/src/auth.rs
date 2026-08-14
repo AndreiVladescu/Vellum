@@ -382,7 +382,7 @@ pub async fn register(
 
     // Check "is there a master yet?" and insert the first user in one
     // transaction, so two simultaneous first-registrations can't both win.
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     let master_exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM app_user WHERE is_master = 1)")
             .fetch_one(&mut *tx)
@@ -858,7 +858,7 @@ pub async fn reset(
     };
 
     let password_hash = hash_password(&input.password)?;
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     // Consuming the token is part of the same transaction as the password write,
     // so a crash can't leave a used token with the old password (or vice versa).
     let consumed = sqlx::query(

@@ -296,7 +296,7 @@ pub async fn upsert(
         }
     }
 
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     if is_update {
         sqlx::query(
             "UPDATE loan SET borrower = ?, returned_at = ?, due_at = ?, \
@@ -368,7 +368,7 @@ pub async fn delete(
         ));
     }
 
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     sqlx::query(
         "INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'loan')",
     )

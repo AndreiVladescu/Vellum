@@ -710,7 +710,7 @@ async fn upsert_one(
     // Metadata write and author/genre join replacement share one transaction so
     // a book never lands with half its relations, or with the tombstone of a
     // revived id still live.
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     if is_update {
         sqlx::query(
             "UPDATE book SET title = ?, subtitle = ?, description = ?, isbn = ?, \
@@ -1118,7 +1118,7 @@ pub async fn delete(
     // Path collection, tombstone, and row delete run in one transaction so a
     // crash can't leave a live book *and* its tombstone — a state that makes
     // clients delete-then-re-download the book (and its blobs) on the next pull.
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
 
     // The title, for the activity log (plan 5 #35) — read before the row goes,
     // since naming the book afterwards is exactly what the log is for.

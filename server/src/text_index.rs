@@ -169,7 +169,7 @@ pub async fn index_one(state: &AppState, file_id: &str, book_id: &str) {
     let path = state.data_dir.join(&rel_path);
     let extraction = extract(state, &path, &format).await;
 
-    let mut tx = match state.db.begin().await {
+    let mut tx = match crate::write_tx(&state.db).await {
         Ok(tx) => tx,
         Err(e) => {
             tracing::warn!("text index: {file_id}: {e}");

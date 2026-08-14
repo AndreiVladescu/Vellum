@@ -172,7 +172,7 @@ pub async fn upsert(
     // Metadata write and tombstone clear share one transaction, same reasoning
     // as books::upsert: a crash must never leave a revived copy still
     // tombstoned (which would delete it again on the next pull).
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     if is_update {
         sqlx::query(
             "UPDATE physical_copy SET location = ?, condition = ?, notes = ?, \
@@ -231,7 +231,7 @@ pub async fn delete(
         ));
     }
 
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     sqlx::query(
         "INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'copy')",
     )

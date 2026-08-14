@@ -227,7 +227,7 @@ pub async fn upsert(
 
     let valid_book_ids = existing_book_ids(&state, &input.book_ids).await?;
 
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     if is_update {
         sqlx::query(
             "UPDATE shelf SET name = ?, sort_order = ?, personal = ?, \
@@ -318,7 +318,7 @@ pub async fn delete(
         ));
     }
 
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     sqlx::query(
         "INSERT OR REPLACE INTO deletion (entity_id, owner_id, kind) VALUES (?, ?, 'shelf')",
     )

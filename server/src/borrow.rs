@@ -266,7 +266,7 @@ pub async fn decide(
         .as_deref()
         .map(str::trim)
         .filter(|r| !r.is_empty());
-    let mut tx = state.db.begin().await?;
+    let mut tx = crate::write_tx(&state.db).await?;
     let mut loan_id: Option<String> = None;
 
     if decision == "approved" {

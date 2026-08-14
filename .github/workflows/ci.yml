@@ -168,10 +168,15 @@ jobs:
   vulnerabilities:
     runs-on: ubuntu-latest
     steps:
+      # Plain checkout, like every other job here. This step once carried
+      # GIT_SSL_CAINFO/SSL_CERT_FILE overrides added after a "server certificate
+      # verification failed" failure; they did not prevent it recurring, and git
+      # still reported `CAfile: none`, so they never reached it. Every other job
+      # checks out with the runner's defaults in the same run, which is the
+      # evidence that the overrides were the only thing different about this one.
+      # If the error comes back with no overrides in place, it is the runner's
+      # TLS and the remedy is a re-run, not a workflow change.
       - uses: actions/checkout@v7
-        env:
-          GIT_SSL_CAINFO: /etc/ssl/certs/ca-certificates.crt
-          SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
       - uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
         with:
           scan-args: |-
