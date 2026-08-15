@@ -27,6 +27,19 @@ pub struct Mailer {
     from: String,
 }
 
+/// A variable's value, treating empty and whitespace-only as absent.
+///
+/// `VELLUM_SMTP_USER=""` reaching the process is not somebody asking to
+/// authenticate as nobody — it is a `${VELLUM_SMTP_USER:-}` in a compose file
+/// that found nothing to substitute. Docker passes those through as empty
+/// strings rather than omitting them, so "set" and "set to nothing" have to
+/// mean the same thing here.
+fn env_value(key: &str) -> Option<String> {
+    let value = std::env::var(key).ok()?;
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
 impl Mailer {
     /// Reads the configuration from the environment.
     ///
@@ -35,26 +48,33 @@ impl Mailer {
     /// missing `VELLUM_MAIL_FROM` should stop the server at boot rather than
     /// surface as a failed password reset weeks later.
     pub fn from_env() -> anyhow::Result<Option<Self>> {
-        let Ok(host) = std::env::var("VELLUM_SMTP_HOST") else {
+        let Some(host) = env_value("VELLUM_SMTP_HOST") else {
+            // Nothing at all, or a passthrough that resolved to nothing. Warn if
+            // the *rest* of the setup is there: "mail: disabled" beside a
+            // populated .env is a confusing thing to read, and the usual cause
+            // is a container that was never handed the variables.
+            if env_value("VELLUM_SMTP_USER").is_some() || env_value("VELLUM_MAIL_FROM").is_some() {
+                tracing::warn!(
+                    "mail: VELLUM_SMTP_HOST is empty or unset, so mail stays off — \
+                     the other SMTP variables are set, which usually means the host \
+                     one did not reach this process (in Docker, check that \
+                     docker-compose.yml passes it through)"
+                );
+            }
             return Ok(None);
         };
-        let host = host.trim().to_string();
-        if host.is_empty() {
-            return Ok(None);
-        }
 
-        let port: u16 = match std::env::var("VELLUM_SMTP_PORT") {
-            Ok(raw) => raw
-                .trim()
+        let port: u16 = match env_value("VELLUM_SMTP_PORT") {
+            Some(raw) => raw
                 .parse()
                 .map_err(|_| anyhow::anyhow!("VELLUM_SMTP_PORT must be a port number"))?,
             // 587 (submission + STARTTLS) rather than 465 or 25: it is what
             // Gmail, Fastmail and most providers expect, and 25 is usually
             // blocked outbound anyway.
-            Err(_) => 587,
+            None => 587,
         };
 
-        let from = std::env::var("VELLUM_MAIL_FROM").map_err(|_| {
+        let from = env_value("VELLUM_MAIL_FROM").ok_or_else(|| {
             anyhow::anyhow!("VELLUM_MAIL_FROM is required when VELLUM_SMTP_HOST is set")
         })?;
         // Parsed once here so a malformed address fails at boot, not at send.
@@ -68,9 +88,12 @@ impl Mailer {
             .map_err(|e| anyhow::anyhow!("SMTP transport: {e}"))?
             .port(port);
 
-        // Credentials are optional: an internal relay may not want any.
-        if let Ok(user) = std::env::var("VELLUM_SMTP_USER") {
-            let pass = std::env::var("VELLUM_SMTP_PASS").unwrap_or_default();
+        // Credentials are optional: an internal relay may not want any. An
+        // *empty* username is not "no username" by accident either — it would
+        // authenticate as nobody and be refused, which is a worse failure than
+        // not authenticating at all.
+        if let Some(user) = env_value("VELLUM_SMTP_USER") {
+            let pass = env_value("VELLUM_SMTP_PASS").unwrap_or_default();
             builder = builder.credentials(Credentials::new(user, pass));
         }
 

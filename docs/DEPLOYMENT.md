@@ -323,6 +323,15 @@ For Gmail: `smtp.gmail.com`, port 587, and an **App Password** — which needs
 misconfiguration (bad port, missing `VELLUM_MAIL_FROM`) stops the server at
 startup rather than surfacing later as a password reset that silently fails.
 
+**In Docker, setting these in `.env` is not enough on its own.** Compose reads
+that file only to substitute `${...}` inside `docker-compose.yml`; the container
+gets exactly the variables the compose file names under `environment:`. All five
+are named there, so an ordinary `.env` works — but a *modified* compose file that
+drops one will silently disable mail, and `server/tests/compose_env.rs` exists to
+fail the build when that happens. After editing `.env`, recreate the container
+(`docker compose up -d`) rather than restarting it: a restart keeps the
+environment the container was created with.
+
 Once it is running, check it from the console rather than by inviting somebody:
 **People → Send me a test** sends to your own address and shows the relay's own
 refusal if there is one — `535 5.7.8 Username and Password not accepted` names

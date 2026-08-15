@@ -38,6 +38,24 @@ services:
       VELLUM_PUBLIC_URL: "${VELLUM_PUBLIC_URL:-https://${DOMAIN:?set DOMAIN or VELLUM_PUBLIC_URL in .env}}"
       VELLUM_MAX_UPLOAD_MB: "${VELLUM_MAX_UPLOAD_MB:-2048}"
       RUST_LOG: "${RUST_LOG:-info}"
+      # Everything below is opt-in and empty by default. They are listed here
+      # one by one because compose's `.env` is only read for `${...}`
+      # substitution *in this file* — a variable that is not named here never
+      # reaches the container, however carefully it was written in .env. That
+      # silence is what made a filled-in .env produce "mail: disabled".
+      #
+      # Deliberately *not* forwarded: VELLUM_PORT. The ports mapping below says
+      # 3000 on the container side, so moving the port inside would leave the
+      # mapping pointing at nothing. Change the left-hand side of the mapping
+      # instead — that is the number you reach it on.
+      VELLUM_SMTP_HOST: "${VELLUM_SMTP_HOST:-}"
+      VELLUM_SMTP_PORT: "${VELLUM_SMTP_PORT:-}"
+      VELLUM_SMTP_USER: "${VELLUM_SMTP_USER:-}"
+      VELLUM_SMTP_PASS: "${VELLUM_SMTP_PASS:-}"
+      VELLUM_MAIL_FROM: "${VELLUM_MAIL_FROM:-}"
+      VELLUM_BOOTSTRAP_TOKEN: "${VELLUM_BOOTSTRAP_TOKEN:-}"
+      VELLUM_INDEX_TEXT: "${VELLUM_INDEX_TEXT:-}"
+      VELLUM_AUDIT: "${VELLUM_AUDIT:-}"
       # No VELLUM_TLS here on purpose: whatever sits in front terminates TLS,
       # and running two certificate stories at once is how you end up debugging
       # both. For a server with *no* proxy at all, drop the ports mapping below
