@@ -84,6 +84,7 @@ const ACTIONS = {
   resetfor: el => resetFor(el.dataset.email),
   removeperson: el => removePerson(el.dataset.id, el.dataset.email),
   revokeinvite: el => revokeInvite(el.dataset.id),
+  invite: () => invitePerson(),
   revokelink: el => revokeLink(el.dataset.id),
   revokeshare: el => revokeShare(el.dataset.id),
   grantaccess: () => grantAccess(),
@@ -124,10 +125,40 @@ async function api(method, path, body){
     headers: { 'content-type':'application/json', ...(S.token?{authorization:'Bearer '+S.token}:{}) },
     body: body!==undefined ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) { logout(); throw new Error('Session expired'); }
+  // A 401 used to log you out on the spot. That is right when the session is
+  // gone and wrong for anything else that answers 401 — and being thrown back
+  // to the login screen destroys whatever you were in the middle of, which was
+  // reported after inviting someone. So ask whether the session is actually
+  // dead before acting as though it is.
+  if (res.status === 401) {
+    if (await sessionIsDead()) {
+      logout();
+      throw new Error('Session expired — please sign in again.');
+    }
+    const data = await res.json().catch(()=>null);
+    throw new Error((data && data.error) || 'That request was not authorised.');
+  }
   const data = res.status===204 ? null : await res.json().catch(()=>null);
   if (!res.ok) throw new Error((data&&data.error) || ('HTTP '+res.status));
   return data;
+}
+
+/// Whether the stored token is genuinely no longer accepted.
+///
+/// Asked only after something *else* answered 401, and deliberately with the
+/// cheapest authenticated endpoint there is. If this succeeds the session is
+/// fine and the 401 belonged to that one request, which is worth a message
+/// rather than an eviction. A network failure here counts as alive: being
+/// signed out because the wifi dropped is the very thing this prevents.
+async function sessionIsDead(){
+  if (!S.token) return true;
+  try {
+    const res = await fetch('/api/auth/me',
+      { headers: { authorization: 'Bearer ' + S.token } });
+    return res.status === 401;
+  } catch(e){
+    return false;
+  }
 }
 
 // Fetch an authenticated blob and hand back an object URL. The session token
@@ -135,7 +166,10 @@ async function api(method, path, body){
 // logs or history; the caller is responsible for revoking the URL.
 async function authBlobUrl(path){
   const res = await fetch(path, { headers: S.token?{authorization:'Bearer '+S.token}:{} });
-  if (res.status === 401) { logout(); throw new Error('Session expired'); }
+  if (res.status === 401) {
+    if (await sessionIsDead()) { logout(); throw new Error('Session expired'); }
+    throw new Error('That request was not authorised.');
+  }
   if (!res.ok) throw new Error('HTTP '+res.status);
   return URL.createObjectURL(await res.blob());
 }
@@ -2433,7 +2467,10 @@ async function showPeople(){
     invites.map(i => `
     <div class="row" style="justify-content:space-between; gap:12px;
         padding:6px 0; font-size:13px">
-      <span>${esc(i.email)}
+      <span>
+        ${i.display_name ? `<strong>${esc(i.display_name)}</strong>
+          <span class="muted">· ${esc(i.email)}</span>`
+          : esc(i.email)}
         <span class="muted">· ${esc(i.permission)}${i.scope ? ' · ' + esc(i.scope) : ''}</span>
       </span>
       <button class="btn sm" data-act="revokeinvite" data-id="${esc(i.id)}">Withdraw</button>
@@ -2444,20 +2481,33 @@ async function showPeople(){
     'Everyone with an account on this server. An owner can manage people and '
       + 'see the whole library; a member sees only what has been shared with them.',
     `${rows}${pending}
-     <div class="row" style="gap:8px; margin-top:18px; align-items:flex-end">
-       <div class="group" style="flex:1">
-         <input id="inv-email" type="text" placeholder="Email to invite"
-                style="width:100%" autocomplete="off">
-       </div>
-       <select id="inv-perm">
-         <option value="viewer">Can read</option>
-         <option value="editor">Can edit</option>
-       </select>
-       <button class="btn primary" onclick="invitePerson()">Invite</button>
+     <p class="sharehead" style="margin-top:22px">Invite someone</p>
+     <div class="row" style="gap:8px; align-items:flex-end; flex-wrap:wrap">
+       <span style="flex:1 1 180px">
+         <label for="inv-name">Name</label>
+         <input id="inv-name" type="text" placeholder="Ana" style="width:100%"
+                autocomplete="off">
+       </span>
+       <span style="flex:2 1 240px">
+         <label for="inv-email">Email address</label>
+         <input id="inv-email" type="email" placeholder="ana@example.com"
+                style="width:100%" autocomplete="off"
+                onkeydown="if(event.key==='Enter')invitePerson()">
+       </span>
+       <span>
+         <label for="inv-perm">Access</label>
+         <select id="inv-perm">
+           <option value="viewer">Can read</option>
+           <option value="editor">Can edit</option>
+         </select>
+       </span>
+       <button class="btn primary" data-act="invite">Invite</button>
      </div>
      <p class="muted" style="font-size:12px; margin:8px 0 0">
-       They choose their own password. Without SMTP configured the link is
-       shown here to pass along yourself.</p>`,
+       The invitation goes to the <strong>email address</strong> — that is what
+       the account is. The name is just what to call them, and they can change
+       it when they join. They choose their own password, and without SMTP the
+       link is shown here to pass along yourself.</p>`,
   );
 }
 
@@ -2486,16 +2536,62 @@ async function removePerson(id, email){
 
 async function invitePerson(){
   const email = document.getElementById('inv-email').value.trim();
-  if (!email) { toast('An email is needed.'); return; }
+  const name = document.getElementById('inv-name').value.trim();
+
+  // Caught here as well as on the server, because the round trip is not what
+  // makes this clear — the field it names is. Typing the name somebody is
+  // known by into the address box is the mistake this screen kept inviting.
+  if (!email){ toast('An email address is needed to send the invitation.'); return; }
+  if (!email.includes('@')){
+    toast('“' + email + '” looks like a name, not an email address. '
+      + 'Put it in the Name field and give their address here.');
+    document.getElementById('inv-email').focus();
+    return;
+  }
+
   const permission = document.getElementById('inv-perm').value;
+  let res;
   try {
-    const res = await api('POST','/api/invites',
-      { email, scope: 'all', permission });
-    // `url` comes back only when the server couldn't email it.
-    if (res && res.url) prompt('Send them this link:', res.url);
-    else toast('Invitation sent.');
-    showPeople();
-  } catch(e){ toast(e.message); }
+    res = await api('POST','/api/invites',
+      { email, display_name: name || undefined, scope: 'all', permission });
+  } catch(e){ toast(e.message); return; }
+
+  document.getElementById('inv-email').value = '';
+  document.getElementById('inv-name').value = '';
+  // `url` comes back only when the server could not email it — a LAN server
+  // with no SMTP, which is the ordinary case here.
+  if (res && res.url) showInviteLink(res, name);
+  else toast('Invitation emailed to ' + (name || email) + '.');
+  showPeople();
+}
+
+/// The link, when the server has no mail to send it with.
+///
+/// This used to be `prompt()`: a browser dialog with the URL crammed into a
+/// text box, no way to tell what it was for, and "OK / Cancel" as the only
+/// choices on something that cannot be cancelled — the invitation is already
+/// made. It is a real dialog now, and its one job is handing over the link.
+function showInviteLink(res, name){
+  const who = esc(name || res.email);
+  const expires = esc((res.expires_at || '').slice(0, 10));
+  document.getElementById('modal-root').innerHTML = `
+   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:min(560px,95vw)">
+      <h2 style="margin:0 0 4px">Invitation ready for ${who}</h2>
+      <p class="muted" style="margin:0 0 12px">This server has no email set up,
+        so pass the link along yourself — a message, a chat, written on paper.
+        It works once, expires on ${expires}, and lets them choose their own
+        password.</p>
+      <input id="inv-url" readonly value="${esc(res.url)}" style="width:100%"
+             onclick="this.select()">
+      <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px">
+        <button class="btn" onclick="closeModal()">Done</button>
+        <button class="btn primary" data-act="copyurl"
+                data-url="${esc(res.url)}">Copy link</button>
+      </div>
+    </div></div>`;
+  const field = document.getElementById('inv-url');
+  if (field) field.select();
 }
 
 async function revokeInvite(id){

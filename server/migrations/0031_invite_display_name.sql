@@ -1,0 +1,15 @@
+-- The name the person is being invited *as*.
+--
+-- An invitation needs an email address, because that is what identifies the
+-- account and what the link is sent to. But a master inviting someone thinks of
+-- them by name, and typing a name into a box that wanted an address is exactly
+-- what people were doing — then getting told the email was invalid.
+--
+-- So the two are separate: `email` is the address, this is the display name,
+-- and the redeem screen offers it as the default so the invitee does not have
+-- to introduce themselves to a library that already knows who they are. They
+-- can still change it — it is their name, not the master's.
+--
+-- Nullable, because every invite made before this has no name and none can be
+-- invented for it.
+ALTER TABLE invite ADD COLUMN display_name TEXT;

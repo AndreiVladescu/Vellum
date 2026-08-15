@@ -1070,6 +1070,12 @@ async fn require_owns_book(state: &AppState, user: &AuthUser, book_id: &str) -> 
 #[derive(Deserialize)]
 pub struct InviteInput {
     pub email: String,
+    /// What to call them, if the master knows. Optional, and *not* a second
+    /// way to identify the account — the email does that. It becomes the
+    /// default on the join screen so the invitee does not have to introduce
+    /// themselves to a library that already knows who they are.
+    #[serde(default)]
+    pub display_name: Option<String>,
     /// Optional grant to apply when the invite is redeemed, same shape as a
     /// share: `all`, `group` or `book`. Omit for "just give them an account".
     #[serde(default)]
@@ -1083,6 +1089,7 @@ pub struct InviteInput {
 #[derive(Serialize)]
 pub struct InviteCreated {
     pub email: String,
+    pub display_name: Option<String>,
     pub expires_at: String,
     /// True when the link was emailed. False means mail is off and the operator
     /// has to pass `url` along themselves — better than refusing to invite at
@@ -1107,6 +1114,9 @@ pub struct InviteCreated {
 pub struct InviteSummary {
     pub id: String,
     pub email: String,
+    /// Who the master said this was for, when they said. The People screen
+    /// shows it beside the address so a pending invite reads as a person.
+    pub display_name: Option<String>,
     pub scope: Option<String>,
     pub permission: String,
     pub expires_at: String,
@@ -1127,7 +1137,8 @@ pub async fn list_invites(
         ));
     }
     let rows = sqlx::query_as::<_, InviteSummary>(
-        "SELECT token_hash AS id, email, scope, permission, expires_at, created_at \
+        "SELECT token_hash AS id, email, display_name, scope, permission, \
+         expires_at, created_at \
          FROM invite \
          WHERE used_at IS NULL AND expires_at > datetime('now') \
          ORDER BY created_at DESC",
@@ -1171,8 +1182,18 @@ pub async fn create_invite(
         return Err(AppError::Forbidden("only the master may invite".into()));
     }
     let email = input.email.trim().to_lowercase();
+    if email.is_empty() {
+        return Err(AppError::BadRequest("an email address is required".into()));
+    }
     if !email.contains('@') {
-        return Err(AppError::BadRequest("a valid email is required".into()));
+        // The mistake people actually make: typing the name they know somebody
+        // by into the field that wanted an address. Saying which of the two
+        // fields is wrong is the difference between a fixable message and a
+        // baffling one.
+        return Err(AppError::BadRequest(format!(
+            "“{email}” looks like a username. An invitation is sent to an \
+             email address — put the name in the name field instead."
+        )));
     }
     let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM app_user WHERE email = ?)")
         .bind(&email)
@@ -1207,14 +1228,20 @@ pub async fn create_invite(
         .execute(&state.db)
         .await?;
 
+    let display_name = input
+        .display_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty());
     let token = crate::auth::new_token_for_invite();
     sqlx::query(
-        "INSERT INTO invite (token_hash, email, invited_by, scope, scope_id, \
-            permission, expires_at) \
-         VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))",
+        "INSERT INTO invite (token_hash, email, display_name, invited_by, scope, \
+            scope_id, permission, expires_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))",
     )
     .bind(crate::auth::sha256_hex(&token))
     .bind(&email)
+    .bind(display_name)
     .bind(&user.id)
     .bind(&input.scope)
     .bind(&input.scope_id)
@@ -1251,6 +1278,7 @@ pub async fn create_invite(
 
     Ok(Json(InviteCreated {
         email,
+        display_name: display_name.map(str::to_string),
         expires_at,
         emailed,
         // Handing the link back when mail is off is the difference between a
@@ -1263,6 +1291,7 @@ pub async fn create_invite(
 #[derive(sqlx::FromRow)]
 struct PendingInvite {
     email: String,
+    display_name: Option<String>,
     scope: Option<String>,
     scope_id: Option<String>,
     permission: String,
@@ -1288,7 +1317,7 @@ pub async fn redeem_invite(
 ) -> AppResult<Json<serde_json::Value>> {
     let hash = crate::auth::sha256_hex(input.token.trim());
     let row: Option<PendingInvite> = sqlx::query_as(
-        "SELECT email, scope, scope_id, permission, invited_by FROM invite \
+        "SELECT email, display_name, scope, scope_id, permission, invited_by FROM invite \
          WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')",
     )
     .bind(&hash)
@@ -1296,6 +1325,7 @@ pub async fn redeem_invite(
     .await?;
     let Some(PendingInvite {
         email,
+        display_name: invited_as,
         scope,
         scope_id,
         permission,
@@ -1307,13 +1337,17 @@ pub async fn redeem_invite(
         ));
     };
 
-    let user_id = crate::auth::create_invited_user(
-        &state,
-        &email,
-        input.display_name.trim(),
-        &input.password,
-    )
-    .await?;
+    // The invitee's own choice wins; the name the master invited them under is
+    // the fallback, so somebody who leaves the field alone still arrives with a
+    // name rather than as an email address.
+    let chosen = input.display_name.trim();
+    let display_name = if chosen.is_empty() {
+        invited_as.unwrap_or_default()
+    } else {
+        chosen.to_string()
+    };
+    let user_id =
+        crate::auth::create_invited_user(&state, &email, &display_name, &input.password).await?;
 
     let mut tx = crate::write_tx(&state.db).await?;
     let consumed = sqlx::query(

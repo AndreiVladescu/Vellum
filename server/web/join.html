@@ -19,7 +19,11 @@
 
   <form id="form" autocomplete="on">
     <label for="name">Your name</label>
-    <input id="name" type="text" autocomplete="name" required style="width:100%">
+    <!-- Not required: whoever invited you may already have said what to call
+         you, and the server falls back to that when this is left empty. It is
+         your name either way, so it stays editable. -->
+    <input id="name" type="text" autocomplete="name" style="width:100%"
+           placeholder="Leave blank to keep the name you were invited under">
     <label for="pw" style="margin-top:10px">Password</label>
     <input id="pw" type="password" autocomplete="new-password" required
            minlength="8" style="width:100%">
