@@ -157,8 +157,31 @@ case "${1:-status}" in
         echo "  $f  MISSING" >&2
       fi
     done
-    echo "lines matching '^analyzer:' in analysis_options.yaml:" >&2
-    grep -n '^analyzer:' analysis_options.yaml >&2 || echo "  (none)" >&2
+    # Whether these bytes are the *committed* ones. This is the question the
+    # hashes above could not answer: a failure on a clean tree means the commit
+    # really is half-switched, and a failure on a dirty one means something on
+    # the machine edited a file after checkout — two completely different bugs
+    # that had until now produced an identical log.
+    if command -v git >/dev/null && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      echo "  HEAD: $(git log -1 --format='%h %s' 2>/dev/null)" >&2
+      changed=$(git status --porcelain -- \
+        pubspec.yaml analysis_options.yaml "$SWITCH" test/reader/proprietary 2>/dev/null)
+      if [ -n "$changed" ]; then
+        echo "  MODIFIED SINCE CHECKOUT — these are not the committed bytes:" >&2
+        echo "$changed" | sed 's|^|    |' >&2
+        git diff -- analysis_options.yaml | sed 's|^|    |' >&2
+      else
+        echo "  working tree is clean, so the commit itself is half-switched" >&2
+      fi
+    else
+      echo "  (not a git checkout — cannot say whether these bytes are committed)" >&2
+    fi
+
+    # The file itself, because a hash only tells you that it is not one of the
+    # two you expected. It is thirty lines; the log can afford them.
+    echo >&2
+    echo "analysis_options.yaml, as read:" >&2
+    sed -n '1,30p' analysis_options.yaml | cat -n | sed 's|^|  |' >&2
     exit 1
     ;;
 
