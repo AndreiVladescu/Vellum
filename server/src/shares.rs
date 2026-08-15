@@ -1115,12 +1115,20 @@ pub struct InviteInput {
     pub scope_id: Option<String>,
     #[serde(default)]
     pub permission: Option<String>,
+    /// Make them an owner of this server rather than a member with a share.
+    ///
+    /// An owner sees everything by role, so `scope`/`permission` are ignored
+    /// when this is set — there is nothing to grant somebody who already has
+    /// it all.
+    #[serde(default)]
+    pub as_owner: bool,
 }
 
 #[derive(Serialize)]
 pub struct InviteCreated {
     pub email: String,
     pub display_name: Option<String>,
+    pub as_owner: bool,
     pub expires_at: String,
     /// True when the link was emailed. False means mail is off and the operator
     /// has to pass `url` along themselves — better than refusing to invite at
@@ -1145,6 +1153,10 @@ pub struct InviteCreated {
 pub struct InviteSummary {
     pub id: String,
     pub email: String,
+    /// True when redeeming makes them an owner. The People screen says which
+    /// of the three an invitation is for, since "invited" otherwise tells you
+    /// nothing about what they will be able to do.
+    pub as_owner: bool,
     /// Who the master said this was for, when they said. The People screen
     /// shows it beside the address so a pending invite reads as a person.
     pub display_name: Option<String>,
@@ -1168,7 +1180,7 @@ pub async fn list_invites(
         ));
     }
     let rows = sqlx::query_as::<_, InviteSummary>(
-        "SELECT token_hash AS id, email, display_name, scope, permission, \
+        "SELECT token_hash AS id, email, display_name, as_owner, scope, permission, \
          expires_at, created_at \
          FROM invite \
          WHERE used_at IS NULL AND expires_at > datetime('now') \
@@ -1265,18 +1277,26 @@ pub async fn create_invite(
         .map(str::trim)
         .filter(|n| !n.is_empty());
     let token = crate::auth::new_token_for_invite();
+    // An owner needs no share: the scope is dropped rather than stored, so the
+    // invitation says one thing rather than two that could disagree.
+    let (scope, scope_id) = if input.as_owner {
+        (None, None)
+    } else {
+        (input.scope.clone(), input.scope_id.clone())
+    };
     sqlx::query(
         "INSERT INTO invite (token_hash, email, display_name, invited_by, scope, \
-            scope_id, permission, expires_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))",
+            scope_id, permission, as_owner, expires_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))",
     )
     .bind(crate::auth::sha256_hex(&token))
     .bind(&email)
     .bind(display_name)
     .bind(&user.id)
-    .bind(&input.scope)
-    .bind(&input.scope_id)
+    .bind(&scope)
+    .bind(&scope_id)
     .bind(permission)
+    .bind(input.as_owner)
     .execute(&state.db)
     .await?;
 
@@ -1310,6 +1330,7 @@ pub async fn create_invite(
     Ok(Json(InviteCreated {
         email,
         display_name: display_name.map(str::to_string),
+        as_owner: input.as_owner,
         expires_at,
         emailed,
         // Handing the link back when mail is off is the difference between a
@@ -1323,6 +1344,7 @@ pub async fn create_invite(
 struct PendingInvite {
     email: String,
     display_name: Option<String>,
+    as_owner: bool,
     scope: Option<String>,
     scope_id: Option<String>,
     permission: String,
@@ -1348,7 +1370,8 @@ pub async fn redeem_invite(
 ) -> AppResult<Json<serde_json::Value>> {
     let hash = crate::auth::sha256_hex(input.token.trim());
     let row: Option<PendingInvite> = sqlx::query_as(
-        "SELECT email, display_name, scope, scope_id, permission, invited_by FROM invite \
+        "SELECT email, display_name, as_owner, scope, scope_id, permission, invited_by \
+         FROM invite \
          WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')",
     )
     .bind(&hash)
@@ -1357,6 +1380,7 @@ pub async fn redeem_invite(
     let Some(PendingInvite {
         email,
         display_name: invited_as,
+        as_owner,
         scope,
         scope_id,
         permission,
@@ -1378,7 +1402,8 @@ pub async fn redeem_invite(
         chosen.to_string()
     };
     let user_id =
-        crate::auth::create_invited_user(&state, &email, &display_name, &input.password).await?;
+        crate::auth::create_invited_user(&state, &email, &display_name, &input.password, as_owner)
+            .await?;
 
     let mut tx = crate::write_tx(&state.db).await?;
     let consumed = sqlx::query(

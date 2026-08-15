@@ -2471,7 +2471,8 @@ async function showPeople(){
         ${i.display_name ? `<strong>${esc(i.display_name)}</strong>
           <span class="muted">· ${esc(i.email)}</span>`
           : esc(i.email)}
-        <span class="muted">· ${esc(i.permission)}${i.scope ? ' · ' + esc(i.scope) : ''}</span>
+        <span class="muted">· ${esc(i.as_owner ? 'an owner'
+          : accessLabel(i.permission))}</span>
       </span>
       <button class="btn sm" data-act="revokeinvite" data-id="${esc(i.id)}">Withdraw</button>
     </div>`).join('') : '';
@@ -2497,8 +2498,9 @@ async function showPeople(){
        <span>
          <label for="inv-perm">Access</label>
          <select id="inv-perm">
-           <option value="viewer">Can read</option>
-           <option value="editor">Can edit</option>
+           <option value="viewer">View only</option>
+           <option value="editor">Read &amp; write</option>
+           <option value="owner">Owner</option>
          </select>
        </span>
        <button class="btn primary" data-act="invite">Invite</button>
@@ -2507,7 +2509,12 @@ async function showPeople(){
        The invitation goes to the <strong>email address</strong> — that is what
        the account is. The name is just what to call them, and they can change
        it when they join. They choose their own password, and without SMTP the
-       link is shown here to pass along yourself.</p>`,
+       link is shown here to pass along yourself.</p>
+     <p class="muted" style="font-size:12px; margin:6px 0 0">
+       <strong>View only</strong> and <strong>read &amp; write</strong> share
+       your whole library with them — the difference is whether they can change
+       what they find. An <strong>owner</strong> is not shared with at all:
+       they see and manage everything on the server, including other people.</p>`,
   );
 }
 
@@ -2549,19 +2556,25 @@ async function invitePerson(){
     return;
   }
 
-  const permission = document.getElementById('inv-perm').value;
+  // Three answers to "what will they be able to do?", and the third is not a
+  // permission at all: an owner has no share, they have the run of the server.
+  const level = document.getElementById('inv-perm').value;
+  const grant = level === 'owner'
+    ? { as_owner: true }
+    : { scope: 'all', permission: level };
+
   let res;
   try {
     res = await api('POST','/api/invites',
-      { email, display_name: name || undefined, scope: 'all', permission });
+      { email, display_name: name || undefined, ...grant });
   } catch(e){ toast(e.message); return; }
 
   document.getElementById('inv-email').value = '';
   document.getElementById('inv-name').value = '';
   // `url` comes back only when the server could not email it — a LAN server
   // with no SMTP, which is the ordinary case here.
-  if (res && res.url) showInviteLink(res, name);
-  else toast('Invitation emailed to ' + (name || email) + '.');
+  if (res && res.url) showInviteLink(res, name, level);
+  else toast('Invitation emailed to ' + (name || email) + ' — ' + accessLabel(level) + '.');
   showPeople();
 }
 
@@ -2571,13 +2584,22 @@ async function invitePerson(){
 /// text box, no way to tell what it was for, and "OK / Cancel" as the only
 /// choices on something that cannot be cancelled — the invitation is already
 /// made. It is a real dialog now, and its one job is handing over the link.
-function showInviteLink(res, name){
+/// What an invitation will make somebody, in the words the form used.
+function accessLabel(level){
+  if (level === 'owner') return 'an owner';
+  if (level === 'editor') return 'read & write';
+  return 'view only';
+}
+
+function showInviteLink(res, name, level){
   const who = esc(name || res.email);
   const expires = esc((res.expires_at || '').slice(0, 10));
   document.getElementById('modal-root').innerHTML = `
    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
     <div class="modal" style="width:min(560px,95vw)">
       <h2 style="margin:0 0 4px">Invitation ready for ${who}</h2>
+      <p style="margin:0 0 8px">They will join as
+        <strong>${esc(accessLabel(level))}</strong>.</p>
       <p class="muted" style="margin:0 0 12px">This server has no email set up,
         so pass the link along yourself — a message, a chat, written on paper.
         It works once, expires on ${expires}, and lets them choose their own

@@ -4976,7 +4976,11 @@ async fn granting_the_same_share_twice_updates_it_rather_than_duplicating() {
     let (status, first) = grant("viewer").await;
     assert_eq!(status, StatusCode::OK, "{first}");
     let (status, again) = grant("viewer").await;
-    assert_eq!(status, StatusCode::OK, "a repeat grant is not an error: {again}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a repeat grant is not an error: {again}"
+    );
 
     let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
     assert_eq!(
@@ -5042,4 +5046,105 @@ async fn two_different_scopes_to_one_person_are_still_two_shares() {
 
     let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
     assert_eq!(shares.as_array().unwrap().len(), 2);
+}
+
+/// Inviting somebody as an owner, which had no path before: you invited a
+/// member and then remembered to promote them.
+#[tokio::test]
+async fn an_owner_invitation_makes_an_owner_and_grants_no_share() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, created) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({
+            "email": "ana@lib.test",
+            "display_name": "Ana",
+            "as_owner": true,
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    assert_eq!(created["as_owner"], true);
+
+    let (_, invites) = call(&app, "GET", "/api/invites", Some(&master), None).await;
+    assert_eq!(
+        invites[0]["as_owner"], true,
+        "the list says which kind it is"
+    );
+
+    let url = created["url"].as_str().unwrap();
+    let token = url.rsplit('/').next().unwrap();
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/api/invites/redeem",
+        None,
+        Some(json!({ "token": token, "display_name": "", "password": "a good passphrase" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, users) = call(&app, "GET", "/api/users", Some(&master), None).await;
+    let joined = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["email"] == "ana@lib.test")
+        .expect("they have an account");
+    assert_eq!(
+        joined["is_master"], true,
+        "invited as an owner, arrives as one"
+    );
+
+    // And no share was created: an owner sees everything by role, so a grant
+    // would be a second, redundant answer to the same question.
+    let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
+    assert!(
+        shares.as_array().unwrap().is_empty(),
+        "an owner needs no share: {shares}"
+    );
+}
+
+#[tokio::test]
+async fn a_member_invitation_still_grants_its_share() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let (_, created) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({
+            "email": "ana@lib.test",
+            "scope": "all",
+            "permission": "editor",
+        })),
+    )
+    .await;
+    let token = created["url"].as_str().unwrap().rsplit('/').next().unwrap();
+    call(
+        &app,
+        "POST",
+        "/api/invites/redeem",
+        None,
+        Some(json!({ "token": token, "display_name": "Ana", "password": "a good passphrase" })),
+    )
+    .await;
+
+    let (_, users) = call(&app, "GET", "/api/users", Some(&master), None).await;
+    let joined = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["email"] == "ana@lib.test")
+        .unwrap();
+    assert_eq!(joined["is_master"], false);
+
+    let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
+    assert_eq!(shares.as_array().unwrap().len(), 1);
+    assert_eq!(shares[0]["permission"], "editor");
 }

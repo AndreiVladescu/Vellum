@@ -899,8 +899,12 @@ pub async fn create_invited_user(
     email: &str,
     display_name: &str,
     password: &str,
+    as_owner: bool,
 ) -> AppResult<String> {
     check_password_length(password)?;
-    let user = insert_user(&state.db, email, display_name, password, false).await?;
+    // `as_owner` comes from the *invitation*, never from the redeeming request
+    // — the same reason the address does. A forwarded link must not be able to
+    // promote whoever opens it.
+    let user = insert_user(&state.db, email, display_name, password, as_owner).await?;
     Ok(user.id)
 }

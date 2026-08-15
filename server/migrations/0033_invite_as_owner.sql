@@ -1,0 +1,16 @@
+-- Inviting somebody as an owner.
+--
+-- An invitation could grant `viewer` or `editor` — two of the three answers to
+-- "what will this person be able to do?". The third, an owner (`is_master`),
+-- had no invite path at all: you invited them as a member and then went to the
+-- People screen and promoted them, which is two steps for one intention and
+-- easy to forget the second half of.
+--
+-- Kept separate from `permission` because it is a different kind of thing. A
+-- permission qualifies a *share* — what this person may do with those books.
+-- An owner has no share: they see the whole server by role, which is why
+-- redemption skips the grant entirely when this is set.
+--
+-- Constant default, and 0 is right for every invite already sent: they were
+-- made when member was the only kind.
+ALTER TABLE invite ADD COLUMN as_owner INTEGER NOT NULL DEFAULT 0;
