@@ -7,6 +7,16 @@
 
 # The following line activates a set of recommended lints for Flutter apps,
 # packages, and plugins designed to encourage good coding practices.
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+    # - lib/reader/translate/proprietary/**
 include: package:flutter_lints/flutter.yaml
 
 # The proprietary flavour's code, excluded in the free flavour — which is what
@@ -16,9 +26,9 @@ include: package:flutter_lints/flutter.yaml
 # `google_mlkit_*`, which the free flavour does not depend on, so analysing
 # them here would be analysing code this build cannot compile. Nothing
 # references them either, so the compiler never reaches them.
-# analyzer:
-#   exclude:
-#     - lib/reader/translate/proprietary/**
+# The line above is commented in the full flavour and uncommented in the free
+# flavour by `tool/flavour.sh`, because the free build does not depend on
+# google_mlkit_*.
 
 
 linter:

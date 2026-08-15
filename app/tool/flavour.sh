@@ -65,7 +65,7 @@ case "${1:-status}" in
     else
       echo "pubspec: no proprietary dependencies"
     fi
-    if grep -q '^analyzer:' analysis_options.yaml; then
+    if grep -q '^    - lib/reader/translate/proprietary/\*\*' analysis_options.yaml; then
       echo "analyser: proprietary/ excluded"
     else
       echo "analyser: reading everything"
@@ -80,7 +80,7 @@ case "${1:-status}" in
     # The proprietary sources stay on disk and stop being analysable, since
     # their imports are no longer dependencies. Nothing compiles them — they
     # are unreferenced — but `flutter analyze` reads every file it can see.
-    sed -i 's|^# analyzer:|analyzer:|; s|^#   exclude:|  exclude:|; s|^#     - lib/reader/translate/proprietary|    - lib/reader/translate/proprietary|' analysis_options.yaml
+    sed -i 's|^    # - lib/reader/translate/proprietary/\*\*|    - lib/reader/translate/proprietary/**|' analysis_options.yaml
     [ -f "$FULL_TEST" ] && mv "$FULL_TEST" "$PARKED_TEST"
     flutter pub get >/dev/null
     echo "flavour: free — no proprietary dependencies"
@@ -94,7 +94,7 @@ case "${1:-status}" in
     fi
     sed -i "s|^$STUB_LINE\$|$REAL_LINE|" "$SWITCH"
     # Analyse it again: in this flavour it is code that ships.
-    sed -i 's|^analyzer:|# analyzer:|; s|^  exclude:|#   exclude:|; s|^    - lib/reader/translate/proprietary|#     - lib/reader/translate/proprietary|' analysis_options.yaml
+    sed -i 's|^    - lib/reader/translate/proprietary/\*\*|    # - lib/reader/translate/proprietary/**|' analysis_options.yaml
     [ -f "$PARKED_TEST" ] && mv "$PARKED_TEST" "$FULL_TEST"
     flutter pub get >/dev/null
     echo "flavour: full — Google ML Kit is in this build (proprietary)"
@@ -113,7 +113,7 @@ case "${1:-status}" in
     # the log hunting through a shell script.
     has_mlkit=no;  grep -q '^  google_mlkit' pubspec.yaml && has_mlkit=yes
     exports=stub;  grep -qF "$REAL_LINE" "$SWITCH" && exports=proprietary
-    excluded=no;   grep -q '^analyzer:' analysis_options.yaml && excluded=yes
+    excluded=no;   grep -q '^    - lib/reader/translate/proprietary/\*\*' analysis_options.yaml && excluded=yes
     test_state=parked; [ -f "$FULL_TEST" ] && test_state=collected
 
     if [ "$has_mlkit" = yes ]; then
