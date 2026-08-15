@@ -131,8 +131,8 @@ case "${1:-status}" in
 
     echo "flavour: half-switched — this tree is neither flavour." >&2
     echo >&2
-    printf '  %-28s %s (wanted %s)\n' \
-      "pubspec ML Kit:" "$has_mlkit" "$has_mlkit" >&2
+    printf '  %-28s %s (this is what decides the flavour)\n' \
+      "pubspec ML Kit:" "$has_mlkit" >&2
     printf '  %-28s %s (wanted %s)\n' \
       "$SWITCH exports:" "$exports" "$want_exports" >&2
     printf '  %-28s %s (wanted %s)\n' \
@@ -143,6 +143,22 @@ case "${1:-status}" in
     echo "The pubspec decides which flavour this is meant to be, so: run" >&2
     echo "  cd app && tool/flavour.sh $want" >&2
     echo "and commit what it changes. See docs/FDROID.md." >&2
+
+    # Which files were actually read. This exists because the check once failed
+    # on CI reporting a state that no commit, branch or pull-request merge in
+    # the repository could produce — so the next time it happens, the log says
+    # *which* bytes it was looking at rather than leaving it to be deduced.
+    echo >&2
+    echo "read from $(pwd):" >&2
+    for f in pubspec.yaml analysis_options.yaml "$SWITCH"; do
+      if [ -f "$f" ]; then
+        echo "  $f  sha256=$(sha256sum "$f" | cut -c1-16)" >&2
+      else
+        echo "  $f  MISSING" >&2
+      fi
+    done
+    echo "lines matching '^analyzer:' in analysis_options.yaml:" >&2
+    grep -n '^analyzer:' analysis_options.yaml >&2 || echo "  (none)" >&2
     exit 1
     ;;
 
