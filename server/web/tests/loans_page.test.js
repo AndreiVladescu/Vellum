@@ -93,14 +93,25 @@ function load(responses) {
 let failures = 0;
 const pending = [];
 function check(name, fn) {
+  // A test that never settles used to exit the runner silently with status 0:
+  // `Promise.all` never fired, the event loop drained, and the missing lines
+  // were the only clue. A dialog that waits for a click nobody makes is
+  // exactly that shape, so time out and fail loudly instead.
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('timed out — did something wait for a click?')),
+      5000,
+    );
+  });
   pending.push(
-    Promise.resolve()
-      .then(fn)
+    Promise.race([Promise.resolve().then(fn), guard])
       .then(() => console.log('  ok   ' + name))
       .catch((e) => {
         failures++;
         console.log('  FAIL ' + name + '\n       ' + e.message);
-      }),
+      })
+      .finally(() => clearTimeout(timer)),
   );
 }
 
@@ -171,8 +182,9 @@ check('lending sends the copy, the borrower and a timestamp', async () => {
     'GET /api/loans/overview': OVERVIEW,
     'PUT /api/loans/11111111-2222-4333-8444-555555555555': {},
   });
-  const answers = ['Bob', '2026-06-01'];
-  sandbox.prompt = () => answers.shift();
+  // One styled dialog now, not two prompts in a row: `ask` resolves with the
+  // fields by index, or null when it was dismissed.
+  sandbox.ask = () => Promise.resolve({ 0: 'Bob', 1: '2026-06-01' });
   await sandbox.lendCopyFromConsole('c-free');
 
   const put = calls.find((c) => c.method === 'PUT');
@@ -184,11 +196,18 @@ check('lending sends the copy, the borrower and a timestamp', async () => {
     'the server format, not an ISO string with a T in it');
 });
 
-check('cancelling the borrower prompt records nothing', async () => {
+check('dismissing the lend dialog records nothing', async () => {
   const { sandbox, calls } = load({});
-  sandbox.prompt = () => null;
+  sandbox.ask = () => Promise.resolve(null);
   await sandbox.lendCopyFromConsole('c-free');
   assert.strictEqual(calls.length, 0, 'no half-made loan left behind');
+});
+
+check('a lend with no borrower named is not recorded either', async () => {
+  const { sandbox, calls } = load({});
+  sandbox.ask = () => Promise.resolve({ 0: '', 1: '' });
+  await sandbox.lendCopyFromConsole('c-free');
+  assert.strictEqual(calls.length, 0, 'a loan needs somebody to be lent to');
 });
 
 check('a return closes the loan and keeps its immutable fields', async () => {

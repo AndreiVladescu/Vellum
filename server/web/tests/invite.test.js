@@ -104,14 +104,25 @@ function load({ responses = {}, fields = {}, fail = () => null, fetchImpl,
 let failures = 0;
 const pending = [];
 function check(name, fn) {
+  // A test that never settles used to exit the runner silently with status 0:
+  // `Promise.all` never fired, the event loop drained, and the missing lines
+  // were the only clue. A dialog that waits for a click nobody makes is
+  // exactly that shape, so time out and fail loudly instead.
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('timed out — did something wait for a click?')),
+      5000,
+    );
+  });
   pending.push(
-    Promise.resolve()
-      .then(fn)
+    Promise.race([Promise.resolve().then(fn), guard])
       .then(() => console.log('  ok   ' + name))
       .catch((e) => {
         failures++;
         console.log('  FAIL ' + name + '\n       ' + e.message);
-      }),
+      })
+      .finally(() => clearTimeout(timer)),
   );
 }
 

@@ -1226,7 +1226,7 @@ function pickUpload(id){
 }
 
 // Apply one picked file to every selected book (a shared cover, say).
-function uploadToSelected(){
+async function uploadToSelected(){
   if (!S.selected.size){ toast('Select some books first'); return; }
   const input = document.createElement('input');
   input.type = 'file'; input.accept = '.pdf,.epub,image/*';
@@ -1236,7 +1236,11 @@ function uploadToSelected(){
     if (kind!=='image' && kind!=='pdf' && kind!=='epub'){ toast('Only PDF, EPUB, or image files'); return; }
     const ids = [...S.selected];
     const what = kind==='image' ? 'cover' : 'file';
-    if (!confirm(`Apply this ${what} (${f.name}) to ${ids.length} selected book(s)?`)) return;
+    if (!await ask({
+      title: `Apply this ${what} to ${ids.length} book${ids.length===1?'':'s'}?`,
+      body: `${f.name} — the ones you have ticked.`,
+      confirmLabel: 'Apply',
+    })) return;
     let ok=0;
     for (const id of ids){
       showProgress('Uploading to '+ok+'/'+ids.length);
@@ -1266,7 +1270,12 @@ async function createTag(){
   // Asked for rather than typed into a box that sat in the toolbar unused:
   // making a tag is occasional, and a permanent input for it is permanent
   // clutter.
-  const name = (prompt('Name the new tag:', '') || '').trim();
+  const answer = await ask({
+    title: 'New tag',
+    fields: [{ label: 'Name', placeholder: 'Technical' }],
+    confirmLabel: 'Create',
+  });
+  const name = answer ? answer[0] : '';
   if (!name) return;
   try { await api('POST','/api/groups',{ name }); await loadAll(); toast('Tag created'); }
   catch(e){ toast(e.message); }
@@ -1341,7 +1350,12 @@ async function bulkEditApply(){
 
 async function deleteSelected(){
   if (S.selected.size===0) return;
-  if (!confirm(`Delete ${S.selected.size} book(s)? This cannot be undone.`)) return;
+  if (!await ask({
+    title: `Delete ${S.selected.size} book${S.selected.size===1?'':'s'}?`,
+    body: 'Their files go too. This cannot be undone.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })) return;
   try { for (const id of S.selected) await api('DELETE', `/api/books/${id}`);
         S.selected.clear(); await loadAll(); toast('Deleted'); }
   catch(e){ toast(e.message); }
@@ -1448,8 +1462,13 @@ function detailIsDirty(){
 /// Cancel is the way out that keeps nothing: the edits, and any fetched match
 /// sitting in the form, are dropped. Confirmed only when there is something to
 /// lose, so the ordinary "I just looked at it" close stays one click.
-function cancelDetail(){
-  if (detailIsDirty() && !confirm('Discard your changes to this book?')) return;
+async function cancelDetail(){
+  if (detailIsDirty() && !await ask({
+    title: 'Discard your changes?',
+    body: 'What you have typed here will be lost.',
+    confirmLabel: 'Discard',
+    danger: true,
+  })) return;
   DETAIL = { id: null, pending: null, results: [] };
   closeModal();
 }
@@ -1546,7 +1565,12 @@ function pickDetailCandidate(i){
 }
 
 async function deleteBook(id){
-  if (!confirm('Delete this book? This cannot be undone.')) return;
+  if (!await ask({
+    title: 'Delete this book?',
+    body: 'Its files go too. This cannot be undone.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })) return;
   try { await api('DELETE','/api/books/'+id); closeModal(); await loadAll(); toast('Deleted'); }
   catch(e){ toast(e.message); }
 }
@@ -1576,6 +1600,74 @@ function openLink(bookId){
     </div>
    </div>`;
 }
+/// A styled stand-in for `confirm()` and `prompt()`.
+///
+/// The browser's own dialogs were doing real work here — revoking a share,
+/// deleting books, naming a tag, taking a due date — and every one of them
+/// looked like a security warning from 1998: no styling, the site's hostname
+/// at the top, and a title bar that says nothing about what you are agreeing
+/// to. They also block the whole tab, which is why a slow one feels like a
+/// hang.
+///
+/// Returns a promise: `null` if it was dismissed, otherwise an object of the
+/// field values (`{}` for a plain confirmation). So a caller reads as
+///
+///     if (!await ask({ title: '…' })) return;
+///
+/// and a prompt-shaped one destructures what it asked for.
+let _askResolve = null;
+
+function ask({ title, body = '', fields = [], confirmLabel = 'OK',
+               cancelLabel = 'Cancel', danger = false }){
+  return new Promise(resolve => {
+    _askResolve = resolve;
+    const inputs = fields.map((f, i) => `
+      <label for="ask-${i}">${esc(f.label)}</label>
+      ${f.options
+        ? `<select id="ask-${i}" style="width:100%">${
+            f.options.map(o => `<option value="${esc(o.value)}"${
+              o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')
+          }</select>`
+        : `<input id="ask-${i}" type="${esc(f.type || 'text')}"
+                  value="${esc(f.value || '')}"
+                  placeholder="${esc(f.placeholder || '')}" style="width:100%">`}
+      ${f.hint ? `<p class="muted" style="font-size:12px; margin:4px 0 10px">${esc(f.hint)}</p>` : ''}
+    `).join('');
+
+    document.getElementById('modal-root').innerHTML = `
+     <div class="modal-bg" onclick="if(event.target===this)askDone(false)">
+      <div class="modal" style="width:min(460px,95vw)"
+           onkeydown="if(event.key==='Escape')askDone(false);
+                      else if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA')askDone(true)">
+        <h2 style="margin:0 0 8px">${esc(title)}</h2>
+        ${body ? `<p class="muted" style="margin:0 0 12px">${esc(body)}</p>` : ''}
+        ${inputs}
+        <div class="row" style="justify-content:flex-end; gap:8px; margin-top:14px">
+          <button class="btn" onclick="askDone(false)">${esc(cancelLabel)}</button>
+          <button class="btn ${danger ? 'danger' : 'primary'}"
+                  onclick="askDone(true)">${esc(confirmLabel)}</button>
+        </div>
+      </div></div>`;
+
+    const first = document.getElementById('ask-0');
+    if (first) { first.focus(); if (first.select) first.select(); }
+  });
+}
+
+/// Closes the dialog opened by [ask] and settles its promise.
+function askDone(ok){
+  const resolve = _askResolve;
+  _askResolve = null;
+  const values = {};
+  for (let i = 0; ; i++){
+    const el = document.getElementById('ask-' + i);
+    if (!el) break;
+    values[i] = (el.value || '').trim();
+  }
+  closeModal();
+  if (resolve) resolve(ok ? values : null);
+}
+
 function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
 
 // ---- server certificate (for importing into the app) --------------------
@@ -1782,13 +1874,27 @@ async function decideRequest(id, status){
   if (status === 'approved'){
     // A date or nothing: "borrow it as long as you like" is a real
     // arrangement, and forcing a date would describe one nobody made.
-    const raw = prompt('Due back on (YYYY-MM-DD), or leave blank for no date:', '');
-    if (raw === null) return;
-    if (raw.trim()) body.due_at = raw.trim() + ' 00:00:00';
+    const answer = await ask({
+      title: 'Lend it',
+      body: 'The loan is recorded against a free copy, and they are told.',
+      fields: [{
+        label: 'Due back on',
+        type: 'date',
+        hint: 'Leave empty for no agreed date.',
+      }],
+      confirmLabel: 'Lend it',
+    });
+    if (!answer) return;
+    if (answer[0]) body.due_at = answer[0] + ' 00:00:00';
   } else {
-    const reply = prompt('Say why (optional):', '');
-    if (reply === null) return;
-    if (reply.trim()) body.reply = reply.trim();
+    const answer = await ask({
+      title: 'Decline this request',
+      body: 'They are told either way; a reason is optional.',
+      fields: [{ label: 'Reason', placeholder: 'Someone else has it' }],
+      confirmLabel: 'Decline',
+    });
+    if (!answer) return;
+    if (answer[0]) body.reply = answer[0];
   }
   try {
     await api('POST','/api/borrow-requests/' + id + '/decide', body);
@@ -1863,21 +1969,32 @@ async function showLoans(){
 }
 
 async function lendCopyFromConsole(copyId){
-  const borrower = prompt('Lend to (a name, or an email):', '');
-  if (borrower === null || !borrower.trim()) return;
-  // A date or nothing, same as approving a request: "keep it as long as you
-  // like" is a real arrangement.
-  const due = prompt('Due back on (YYYY-MM-DD), or leave blank for no date:', '');
-  if (due === null) return;
+  // One dialog rather than two prompts in a row: they are one decision, and
+  // the second prompt gave no way back to the first.
+  const answer = await ask({
+    title: 'Lend this copy',
+    fields: [
+      { label: 'Lend to', placeholder: 'A name, or an email' },
+      {
+        label: 'Due back on',
+        type: 'date',
+        hint: 'Leave empty for no agreed date.',
+      },
+    ],
+    confirmLabel: 'Lend it',
+  });
+  if (!answer) return;
+  const borrower = (answer[0] || '').trim();
+  if (!borrower) return;
   const body = {
     copy_id: copyId,
-    borrower: borrower.trim(),
+    borrower: borrower,
     loaned_at: stamp(new Date()),
   };
-  if (due.trim()) body.due_at = due.trim() + ' 00:00:00';
+  if (answer[1]) body.due_at = answer[1] + ' 00:00:00';
   try { await api('PUT','/api/loans/' + loanId(), body); }
   catch(e){ toast(e.message); return; }
-  toast('Lent to ' + borrower.trim());
+  toast('Lent to ' + borrower);
   showLoans();
 }
 
@@ -1934,11 +2051,25 @@ async function showRooms(){
 // off by default: sharing where the books *are* is not the same as saying what
 // they are, and a link is the thing that can escape.
 async function shareRoom(id, name){
-  const showBooks = confirm(
-    `Create a public link to “${name}”?\n\n` +
-    'OK: also show the titles of the books you collected under its ' +
-    '“Room: ' + name + '” tag.\n' +
-    'Cancel this dialog and use it again if you only want the shapes.');
+  // This was a `confirm()` whose Cancel button did not cancel: it made the
+  // link anyway, without titles. Two outcomes crammed into OK/Cancel, and the
+  // third — "actually, no link" — had nowhere to go.
+  const answer = await ask({
+    title: `Public link to “${name}”`,
+    body: 'Anyone with the URL can look at the room, without an account.',
+    fields: [{
+      label: 'What it shows',
+      value: 'shapes',
+      options: [
+        { value: 'shapes', label: 'The shelves and shapes only' },
+        { value: 'titles', label: 'Shapes and the titles of its tagged books' },
+      ],
+      hint: 'Books collected under the room’s own tag.',
+    }],
+    confirmLabel: 'Create link',
+  });
+  if (!answer) return;
+  const showBooks = answer[0] === 'titles';
   let link;
   try {
     link = await api('POST','/api/share-links',
@@ -2147,7 +2278,12 @@ async function grantAccess(){
 }
 
 async function revokeLink(id){
-  if (!confirm('Revoke this link? Anyone holding the URL loses access at once.')) return;
+  if (!await ask({
+    title: 'Revoke this link?',
+    body: 'Anyone holding the URL loses access at once.',
+    confirmLabel: 'Revoke',
+    danger: true,
+  })) return;
   try { await api('DELETE','/api/share-links/' + encodeURIComponent(id)); }
   catch(e){ toast(e.message); return; }
   toast('Link revoked');
@@ -2155,7 +2291,12 @@ async function revokeLink(id){
 }
 
 async function revokeShare(id){
-  if (!confirm('Revoke this share? They lose access to what it covered.')) return;
+  if (!await ask({
+    title: 'Revoke this share?',
+    body: 'They lose access to what it covered. Books they added stay.',
+    confirmLabel: 'Revoke',
+    danger: true,
+  })) return;
   try { await api('DELETE','/api/shares/' + encodeURIComponent(id)); }
   catch(e){ toast(e.message); return; }
   toast('Share revoked');
@@ -2229,8 +2370,14 @@ function savedViews(){
   catch(_){ return []; }
 }
 
-function saveView(){
-  const name = (prompt('Name this view') || '').trim();
+async function saveView(){
+  const answer = await ask({
+    title: 'Save this view',
+    body: 'The current search, filters, sort and columns, under a name.',
+    fields: [{ label: 'Name', placeholder: 'Unread technical' }],
+    confirmLabel: 'Save',
+  });
+  const name = answer ? answer[0] : '';
   if (!name) return;
   const views = savedViews().filter(v => v.name !== name); // overwrite by name
   views.push({
@@ -2530,10 +2677,13 @@ async function setRole(id, isMaster){
 // says exactly what goes: the cascade takes their highlights, sittings, notes
 // and shares, and leaves the books.
 async function removePerson(id, email){
-  if (!confirm(
-    'Remove ' + email + '?\n\n' +
-    "Their highlights, notes, reading history and shares go with them. " +
-    'Books they added stay in the library.')) return;
+  if (!await ask({
+    title: 'Remove ' + email + '?',
+    body: 'Their highlights, notes, reading history and shares go with them. '
+      + 'Books they added stay in the library.',
+    confirmLabel: 'Remove',
+    danger: true,
+  })) return;
   try {
     await api('DELETE','/api/users/'+id);
     toast('Removed.');
