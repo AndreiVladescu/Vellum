@@ -107,18 +107,43 @@ case "${1:-status}" in
     # thing to commit, but a half-switched tree is not, and it fails in ways
     # (an unresolved import, a test that will not compile) that are much
     # easier to read here than in a build log.
-    fail=0
-    if grep -q '^  google_mlkit' pubspec.yaml; then
-      grep -qF "$REAL_LINE" "$SWITCH" || { echo "pubspec has ML Kit but $SWITCH exports the stub"; fail=1; }
-      grep -q '^analyzer:' analysis_options.yaml && { echo "pubspec has ML Kit but proprietary/ is excluded from analysis"; fail=1; }
-      [ -f "$FULL_TEST" ] || { echo "pubspec has ML Kit but its test is parked"; fail=1; }
+    #
+    # Every failure prints the four observed values and the one command that
+    # fixes them. A check that says only what it disliked sends whoever reads
+    # the log hunting through a shell script.
+    has_mlkit=no;  grep -q '^  google_mlkit' pubspec.yaml && has_mlkit=yes
+    exports=stub;  grep -qF "$REAL_LINE" "$SWITCH" && exports=proprietary
+    excluded=no;   grep -q '^analyzer:' analysis_options.yaml && excluded=yes
+    test_state=parked; [ -f "$FULL_TEST" ] && test_state=collected
+
+    if [ "$has_mlkit" = yes ]; then
+      want_exports=proprietary; want_excluded=no;  want_test=collected; want=full
     else
-      grep -qF "$STUB_LINE" "$SWITCH" || { echo "no ML Kit in pubspec but $SWITCH exports it"; fail=1; }
-      grep -q '^analyzer:' analysis_options.yaml || { echo "no ML Kit in pubspec but proprietary/ would be analysed"; fail=1; }
-      [ -f "$PARKED_TEST" ] || { echo "no ML Kit in pubspec but its test would be collected"; fail=1; }
+      want_exports=stub;        want_excluded=yes; want_test=parked;    want=free
     fi
-    if [ "$fail" -eq 0 ]; then echo "flavour: $(current), consistently"; fi
-    exit "$fail"
+
+    if [ "$exports" = "$want_exports" ] &&
+       [ "$excluded" = "$want_excluded" ] &&
+       [ "$test_state" = "$want_test" ]; then
+      echo "flavour: $want, consistently"
+      exit 0
+    fi
+
+    echo "flavour: half-switched — this tree is neither flavour." >&2
+    echo >&2
+    printf '  %-28s %s (wanted %s)\n' \
+      "pubspec ML Kit:" "$has_mlkit" "$has_mlkit" >&2
+    printf '  %-28s %s (wanted %s)\n' \
+      "$SWITCH exports:" "$exports" "$want_exports" >&2
+    printf '  %-28s %s (wanted %s)\n' \
+      "proprietary/ excluded:" "$excluded" "$want_excluded" >&2
+    printf '  %-28s %s (wanted %s)\n' \
+      "its test:" "$test_state" "$want_test" >&2
+    echo >&2
+    echo "The pubspec decides which flavour this is meant to be, so: run" >&2
+    echo "  cd app && tool/flavour.sh $want" >&2
+    echo "and commit what it changes. See docs/FDROID.md." >&2
+    exit 1
     ;;
 
   *)
