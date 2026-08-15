@@ -390,6 +390,11 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             axum::routing::delete(shares::revoke_invite),
         )
         .route("/invites/redeem", post(shares::redeem_invite))
+        // Setting SMTP up is otherwise a blind edit of five environment
+        // variables whose only feedback is somebody else's invitation not
+        // arriving. These two make it a loop the operator can close alone.
+        .route("/mail/status", get(mail::status))
+        .route("/mail/test", post(mail::test_send))
         // Public per-book links (no account required to read).
         .route(
             "/share-links",

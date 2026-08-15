@@ -203,6 +203,7 @@ jobs:
       - run: node server/web/tests/loans_page.test.js
       - run: node server/web/tests/grant_access.test.js
       - run: node server/web/tests/invite.test.js
+      - run: node server/web/tests/mail_setup.test.js
 
   # The Docker image is part of the product (plan 5 #36), so a change that breaks
   # it should fail here rather than at someone's `docker compose up`. The image

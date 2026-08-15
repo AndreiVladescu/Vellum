@@ -15,6 +15,9 @@ use lettre::message::{Attachment, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 
+use axum::Json;
+use axum::extract::State;
+
 use crate::error::{AppError, AppResult};
 
 /// The mailer, present only when the operator configured SMTP.
@@ -159,12 +162,112 @@ impl Mailer {
         })?;
         Ok(())
     }
+
+    /// The configured sender address, for the operator's own screen.
+    ///
+    /// Named `sender` rather than `from_address`: a `from_*` method that takes
+    /// `self` reads as a constructor everywhere else in Rust.
+    ///
+    /// Safe to show a master: it is the address recipients will see anyway. The
+    /// username and password are never exposed, and the host is not either —
+    /// knowing *that* mail works matters more than which relay carries it.
+    pub fn sender(&self) -> &str {
+        &self.from
+    }
+
+    /// Sends a test message and hands back what the relay actually said.
+    ///
+    /// The other two senders swallow the relay's error on purpose — a user
+    /// resetting a password can do nothing with "535 5.7.8 Username and
+    /// Password not accepted". An operator who has just typed those credentials
+    /// in can do everything with it, and without it they are reduced to reading
+    /// the server log to find out whether their setup works. So this one, and
+    /// only this one, reports the failure verbatim.
+    ///
+    /// The relay's error names the host and may name the username; it never
+    /// contains the password, which lettre sends but does not echo.
+    pub async fn send_test(&self, to: &str) -> Result<(), String> {
+        let message = Message::builder()
+            .from(self.from.parse().map_err(|e| format!("mail from: {e}"))?)
+            .to(to
+                .parse()
+                .map_err(|_| "not a valid email address".to_string())?)
+            .subject("Vellum: mail is working")
+            .header(ContentType::TEXT_PLAIN)
+            .body(
+                "This is a test from your Vellum server.\n\n\
+                 If you are reading it, invitations and password resets will \
+                 reach people too.\n"
+                    .to_string(),
+            )
+            .map_err(|e| format!("mail body: {e}"))?;
+
+        self.transport
+            .send(message)
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Whether mail is available, for the capability handshake and for handlers that
 /// must degrade rather than fail.
 pub fn is_enabled(mailer: &Option<Mailer>) -> bool {
     mailer.is_some()
+}
+
+/// `GET /api/mail/status` — is mail on, and as whom.
+///
+/// `GET /api/capabilities` already answers the on/off half, but it is public and
+/// deliberately says nothing more. An operator setting SMTP up needs the sender
+/// address echoed back: the commonest configuration mistake is a `VELLUM_MAIL_FROM`
+/// the relay will not accept, and seeing it beside the test button is what turns
+/// a silent failure into an obvious one.
+pub async fn status(
+    State(state): State<crate::AppState>,
+    user: crate::auth::AuthUser,
+) -> AppResult<Json<serde_json::Value>> {
+    if !user.is_master {
+        return Err(AppError::Forbidden(
+            "only an owner may see the mail setup".into(),
+        ));
+    }
+    Ok(Json(match &state.mailer {
+        Some(m) => serde_json::json!({ "enabled": true, "from": m.sender() }),
+        None => serde_json::json!({ "enabled": false }),
+    }))
+}
+
+/// `POST /api/mail/test` — sends a test message to the caller's own address.
+///
+/// To *their* address, not one they name: this proves the relay works without
+/// turning the endpoint into something that sends mail to strangers.
+pub async fn test_send(
+    State(state): State<crate::AppState>,
+    user: crate::auth::AuthUser,
+) -> AppResult<Json<serde_json::Value>> {
+    if !user.is_master {
+        return Err(AppError::Forbidden(
+            "only an owner may test the mail setup".into(),
+        ));
+    }
+    let Some(mailer) = &state.mailer else {
+        // Not an error the operator caused — it is the state before setup, and
+        // the answer is the name of the variable that starts it.
+        return Err(AppError::BadRequest(
+            "mail is off on this server: set VELLUM_SMTP_HOST and VELLUM_MAIL_FROM, \
+             then restart it"
+                .into(),
+        ));
+    };
+    match mailer.send_test(&user.email).await {
+        Ok(()) => Ok(Json(serde_json::json!({ "sent_to": user.email }))),
+        // 502: the relay refused, this server did its part. The message is the
+        // relay's own, which is the whole point of the endpoint.
+        Err(e) => Err(AppError::BadGateway(format!(
+            "the mail server refused it: {e}"
+        ))),
+    }
 }
 
 /// Builds a mailer pointing at [host] without reading the environment.

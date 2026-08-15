@@ -5148,3 +5148,97 @@ async fn a_member_invitation_still_grants_its_share() {
     assert_eq!(shares.as_array().unwrap().len(), 1);
     assert_eq!(shares[0]["permission"], "editor");
 }
+
+// ---- Telling the operator whether mail works -------------------------------
+//
+// Setting SMTP up means editing five environment variables and restarting, and
+// until now the only way to find out whether you got it right was to invite
+// somebody and ask them if anything arrived. These two endpoints close that
+// loop against your own address.
+
+#[tokio::test]
+async fn mail_status_says_off_before_anything_is_configured() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(&app, "GET", "/api/mail/status", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["enabled"], false);
+    assert!(body["from"].is_null(), "there is no sender to name yet");
+}
+
+#[tokio::test]
+async fn testing_mail_that_is_off_names_the_variables_to_set() {
+    // The failure an operator is most likely to hit first, so it has to answer
+    // "what do I do next?" rather than just "no".
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(&app, "POST", "/api/mail/test", Some(&master), None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let said = body["error"].as_str().unwrap();
+    assert!(
+        said.contains("VELLUM_SMTP_HOST"),
+        "names the switch: {said}"
+    );
+    assert!(
+        said.contains("VELLUM_MAIL_FROM"),
+        "and its companion: {said}"
+    );
+    assert!(
+        said.contains("restart"),
+        "and that a restart is needed: {said}"
+    );
+}
+
+#[tokio::test]
+async fn mail_status_names_the_sender_once_it_is_configured() {
+    let (app, _db) = test_app_with_mail().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(&app, "GET", "/api/mail/status", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["enabled"], true);
+    // The sender address is the commonest thing to get wrong, so it is echoed.
+    // The host, username and password are not — they are of no use on screen
+    // and the last of them must never leave the process.
+    assert_eq!(body["from"], "vellum@example.com");
+    assert!(body.get("host").is_none(), "the relay is not named");
+    assert!(body.get("user").is_none() && body.get("pass").is_none());
+}
+
+#[tokio::test]
+async fn a_failed_test_send_reports_what_the_relay_said() {
+    // The point of the endpoint: `smtp.invalid.example` does not resolve, and
+    // the operator gets to see that rather than "could not send the email".
+    let (app, _db) = test_app_with_mail().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(&app, "POST", "/api/mail/test", Some(&master), None).await;
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+    let said = body["error"].as_str().unwrap();
+    assert!(
+        said.contains("the mail server refused it"),
+        "says whose failure it is: {said}"
+    );
+    assert!(
+        said.len() > "the mail server refused it: ".len(),
+        "and carries the relay's own words: {said}"
+    );
+}
+
+#[tokio::test]
+async fn only_an_owner_may_look_at_or_test_the_mail_setup() {
+    let (app, _db) = test_app_with_mail().await;
+    let master = register_master(&app).await;
+    let member = add_member(&app, &master, "reader@lib.test").await;
+
+    let (status, _) = call(&app, "GET", "/api/mail/status", Some(&member), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = call(&app, "POST", "/api/mail/test", Some(&member), None).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "a member must not be able to make the server send mail"
+    );
+}

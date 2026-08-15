@@ -323,6 +323,12 @@ For Gmail: `smtp.gmail.com`, port 587, and an **App Password** — which needs
 misconfiguration (bad port, missing `VELLUM_MAIL_FROM`) stops the server at
 startup rather than surfacing later as a password reset that silently fails.
 
+Once it is running, check it from the console rather than by inviting somebody:
+**People → Send me a test** sends to your own address and shows the relay's own
+refusal if there is one — `535 5.7.8 Username and Password not accepted` names
+the variable to fix, where "could not send the email" does not. The same strip
+says *Email is off* with a summary of these variables when nothing is set.
+
 #### Sending books to an e-reader
 
 With mail configured, the server also advertises `send_to_device` and the app's
