@@ -33,9 +33,16 @@ services:
       # The address people actually reach, because public share links embed it.
       # Set VELLUM_PUBLIC_URL directly when your proxy is not simply
       # `https://<domain>` — a subpath, a non-standard port, or plain http on a
-      # LAN. Otherwise DOMAIN is enough. One of the two must be set: a server
+      # LAN. Otherwise DOMAIN is enough. One of the two should be set: a server
       # that guesses this hands out links that go nowhere.
-      VELLUM_PUBLIC_URL: "${VELLUM_PUBLIC_URL:-https://${DOMAIN:?set DOMAIN or VELLUM_PUBLIC_URL in .env}}"
+      #
+      # No `${DOMAIN:?...}` guard here, for the same reason the caddy service
+      # below has none. Some versions of compose interpolate the `:-` default
+      # eagerly, so the guard fires even when VELLUM_PUBLIC_URL *is* set, and
+      # the whole file then refuses to parse — an error about DOMAIN when
+      # DOMAIN is not what you are missing. `:+` yields an empty string when
+      # neither is set, and the server says so at boot in its own words.
+      VELLUM_PUBLIC_URL: "${VELLUM_PUBLIC_URL:-${DOMAIN:+https://${DOMAIN}}}"
       VELLUM_MAX_UPLOAD_MB: "${VELLUM_MAX_UPLOAD_MB:-2048}"
       RUST_LOG: "${RUST_LOG:-info}"
       # Everything below is opt-in and empty by default. They are listed here

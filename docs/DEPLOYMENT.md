@@ -87,9 +87,15 @@ debugging both.
 `VELLUM_PUBLIC_URL` is what public share links embed, so it has to be the
 address people actually reach. Setting `DOMAIN` derives it as
 `https://$DOMAIN`; set `VELLUM_PUBLIC_URL` directly for anything else — a
-non-standard port, a subpath, or plain http on a LAN. Compose refuses to start
-without one of them rather than guessing and handing out links that go
-nowhere.
+non-standard port, a subpath, or plain http on a LAN. With neither set the
+server starts on `http://localhost:3000` and says so at boot with a warning —
+every link it hands out then works only for someone sitting on that machine.
+
+Compose used to refuse to parse instead, via a `${DOMAIN:?…}` guard. That is
+gone: some versions interpolate the whole file up front, including the default
+branch that is not taken, so the guard fired with *"required variable DOMAIN is
+missing a value"* even for people who had correctly set `VELLUM_PUBLIC_URL` and
+never wanted `DOMAIN` at all.
 
 ### LAN-only, self-signed TLS
 

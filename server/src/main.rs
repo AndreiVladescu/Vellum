@@ -69,8 +69,33 @@ async fn main() -> anyhow::Result<()> {
     let db_path = std::env::var("VELLUM_DB").unwrap_or_else(|_| "vellum.db".into());
     let db = connect_db(&db_path).await?;
 
-    let public_base_url =
-        std::env::var("VELLUM_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:3000".into());
+    // Where this server tells people it lives. Share links, invite links and
+    // password-reset links are all built from it, so a wrong value is not a
+    // wrong log line — it is a link that goes nowhere, discovered by whoever
+    // you sent it to.
+    //
+    // A warning rather than a hard failure: an untouched checkout must still
+    // `cargo run` into a working local server, which is the whole promise of
+    // .env.example. But it is said loudly, because in Docker the usual cause is
+    // that neither VELLUM_PUBLIC_URL nor DOMAIN made it into .env, and the
+    // symptom otherwise appears days later.
+    let public_base_url = match std::env::var("VELLUM_PUBLIC_URL")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+    {
+        Some(url) => url,
+        None => {
+            let fallback = "http://localhost:3000";
+            tracing::warn!(
+                "VELLUM_PUBLIC_URL is not set — falling back to {fallback}. Share, \
+                 invite and password-reset links will point there, which only \
+                 works for someone on this machine. Set VELLUM_PUBLIC_URL (or \
+                 DOMAIN, in Docker) to the address people actually reach."
+            );
+            fallback.to_string()
+        }
+    };
     let data_dir = std::env::var("VELLUM_DATA_DIR").unwrap_or_else(|_| "data".into());
     let data_path = PathBuf::from(&data_dir);
     let max_upload_mb: usize = std::env::var("VELLUM_MAX_UPLOAD_MB")

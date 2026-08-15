@@ -111,6 +111,32 @@ fn a_forwarded_variable_defaults_to_empty_rather_than_a_guess() {
 }
 
 #[test]
+fn no_required_variable_guards_in_the_compose_file() {
+    // `${DOMAIN:?message}` looks like input validation and behaves like a trap.
+    // Compose interpolates the whole file up front — before it applies profiles,
+    // and on some versions inside a `:-` default that is not even taken — so the
+    // guard fires for people it was never meant to stop. The reported symptom
+    // was `docker compose build` refusing with "required variable DOMAIN is
+    // missing a value" on a server whose .env set VELLUM_PUBLIC_URL, which is
+    // exactly the case the default existed to serve.
+    //
+    // Validation belongs to the server, which can say what is wrong in a whole
+    // sentence and still start.
+    let compose = std::fs::read_to_string(repo_root().join("docker-compose.yml")).unwrap();
+    let offenders: Vec<&str> = compose
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter(|l| l.contains(":?"))
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "these lines use a `${{VAR:?...}}` required-variable guard, which compose \
+         evaluates eagerly and which therefore fires on setups it should allow: \
+         {offenders:#?}"
+    );
+}
+
+#[test]
 fn the_excluded_ones_really_are_absent() {
     // A name in NOT_FORWARDED that *is* forwarded means the list has gone stale
     // and is now documenting the opposite of what happens.
