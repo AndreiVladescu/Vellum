@@ -193,17 +193,31 @@ check('the link is shown in a dialog, never through prompt()', async () => {
   assert.ok(html.includes('Ana'), 'and who it is for');
   assert.ok(html.includes('2026-08-25'), 'and when it stops working');
   assert.ok(html.includes('data-act="copyurl"'), 'with a way to copy it');
+  assert.ok(/no email set up/.test(html), 'and why it is being handed over');
 });
 
-check('an emailed invitation says so instead of showing a link', async () => {
-  const { sandbox, toasts, get } = load({
+check('an emailed invitation shows the link too, and says it was sent', async () => {
+  // Withholding it once the mail went out made an invitation lost to a spam
+  // folder unrecoverable — the only way back was to withdraw and start again.
+  const { sandbox, get } = load({
     fields: { 'inv-email': 'ana@lib.test', 'inv-name': 'Ana' },
-    responses: { ...PEOPLE, 'POST /api/invites': { email: 'ana@lib.test', emailed: true } },
+    responses: {
+      ...PEOPLE,
+      'POST /api/invites': {
+        email: 'ana@lib.test',
+        emailed: true,
+        url: 'http://vellum.local/join/abc123',
+        expires_at: '2026-08-25 10:00:00',
+      },
+    },
   });
   await sandbox.invitePerson();
 
-  assert.strictEqual(get('modal-root').innerHTML, '', 'no link to hand over');
-  assert.ok(/emailed to Ana/.test(toasts.join(' ')));
+  const html = get('modal-root').innerHTML;
+  assert.ok(html.includes('http://vellum.local/join/abc123'), 'the link is still there');
+  assert.ok(/Emailed to/.test(html), 'and says it went out');
+  assert.ok(html.includes('ana@lib.test'), 'naming where it went');
+  assert.ok(!/no email set up/.test(html), 'not the mail-is-off wording');
 });
 
 console.log('\nA 401 that is not the end of your session');

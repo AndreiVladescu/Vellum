@@ -1130,14 +1130,20 @@ pub struct InviteCreated {
     pub display_name: Option<String>,
     pub as_owner: bool,
     pub expires_at: String,
-    /// True when the link was emailed. False means mail is off and the operator
-    /// has to pass `url` along themselves — better than refusing to invite at
-    /// all on a LAN server.
+    /// True when the link was also emailed. False means mail is off, or the
+    /// relay refused it — either way the operator still has `url` and can pass
+    /// it along, rather than the invitation being lost.
     pub emailed: bool,
-    /// Only returned when it could *not* be emailed; otherwise the link exists
-    /// solely in the recipient's inbox.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+    /// The join link, always.
+    ///
+    /// It used to be withheld once the email went out, on the reasoning that a
+    /// secret should live in one place. In practice the master is the one who
+    /// minted it and is standing next to the person half the time; sending mail
+    /// and then hiding the link means an invitation that lands in a spam folder
+    /// cannot be rescued without withdrawing it and starting again. The token is
+    /// a credential either way, so this returns it to the one account that could
+    /// have created another in the same breath.
+    pub url: String,
 }
 
 /// `POST /api/invites` — master-only: mint an invite and email a join link.
@@ -1333,9 +1339,7 @@ pub async fn create_invite(
         as_owner: input.as_owner,
         expires_at,
         emailed,
-        // Handing the link back when mail is off is the difference between a
-        // usable LAN server and a feature that only works with SMTP.
-        url: (!emailed).then_some(url),
+        url,
     }))
 }
 

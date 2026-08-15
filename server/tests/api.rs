@@ -1754,6 +1754,35 @@ async fn an_invite_without_mail_hands_back_the_link() {
 }
 
 #[tokio::test]
+async fn an_invite_hands_back_the_link_even_when_it_was_emailed() {
+    // It used to be withheld once the mail went out. That made an invitation
+    // lost to a spam folder unrecoverable: the only way back was to withdraw it
+    // and mint another. The master minted this token and could mint a second
+    // one in the same breath, so there is nothing to protect by hiding it.
+    let (app, _db) = test_app_with_mail().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/invites",
+        Some(&master),
+        Some(json!({ "email": "friend@lib.test" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let url = body["url"].as_str().expect("the link is always returned");
+    assert!(url.contains("/join/"), "{url}");
+    // `smtp.invalid.example` cannot deliver, so this one reports honestly that
+    // it did not send — which is the case where the link matters most.
+    assert_eq!(
+        body["emailed"],
+        json!(false),
+        "a relay that refused must not claim it sent"
+    );
+}
+
+#[tokio::test]
 async fn redeeming_an_invite_creates_the_account_and_applies_the_share() {
     let app = test_app().await;
     let master = register_master(&app).await;

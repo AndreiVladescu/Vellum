@@ -2806,8 +2806,10 @@ async function invitePerson(){
   document.getElementById('inv-name').value = '';
   // `url` comes back only when the server could not email it — a LAN server
   // with no SMTP, which is the ordinary case here.
+  // The link is shown whether or not it was emailed: mail landing in a spam
+  // folder used to mean withdrawing the invitation and starting again.
   if (res && res.url) showInviteLink(res, name, level);
-  else toast('Invitation emailed to ' + (name || email) + ' — ' + accessLabel(level) + '.');
+  else toast('Invited ' + (name || email) + ' — ' + accessLabel(level) + '.');
   showPeople();
 }
 
@@ -2833,8 +2835,11 @@ function showInviteLink(res, name, level){
       <h2 style="margin:0 0 4px">Invitation ready for ${who}</h2>
       <p style="margin:0 0 8px">They will join as
         <strong>${esc(accessLabel(level))}</strong>.</p>
-      <p class="muted" style="margin:0 0 12px">This server has no email set up,
-        so pass the link along yourself — a message, a chat, written on paper.
+      <p class="muted" style="margin:0 0 12px">${res.emailed
+        ? `Emailed to <strong>${esc(res.email)}</strong>. Here is the same link,
+           in case it does not arrive — no need to invite them twice.`
+        : `This server has no email set up, so pass the link along yourself —
+           a message, a chat, written on paper.`}
         It works once, expires on ${expires}, and lets them choose their own
         password.</p>
       <input id="inv-url" readonly value="${esc(res.url)}" style="width:100%"
