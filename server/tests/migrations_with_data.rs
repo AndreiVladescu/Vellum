@@ -92,13 +92,48 @@ async fn a_populated_database_upgrades_to_the_latest_schema() {
         .execute(&pool)
         .await
         .unwrap();
+        // Three *open* loans on the one copy — the state 0028 makes impossible,
+        // and which therefore has to survive being made impossible. A real
+        // database can hold this: nothing checked before 0028, so lending an
+        // already-lent copy simply inserted.
+        for (id, borrower, day) in [
+            ("l1", "A friend", "2026-01-01 10:00:00"),
+            ("l2", "Another friend", "2026-02-01 10:00:00"),
+            ("l3", "Whoever has it now", "2026-03-01 10:00:00"),
+        ] {
+            sqlx::query(
+                "INSERT INTO loan (id, copy_id, borrower, loaned_at, updated_at) \
+                 VALUES (?, 'c1', ?, ?, datetime('now'))",
+            )
+            .bind(id)
+            .bind(borrower)
+            .bind(day)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        // And two shares saying the same thing, which 0032 has to clean up
+        // before it can add its unique index — the state every server that ever
+        // double-clicked "Grant" is in.
         sqlx::query(
-            "INSERT INTO loan (id, copy_id, borrower, loaned_at, updated_at) \
-             VALUES ('l1', 'c1', 'A friend', datetime('now'), datetime('now'))",
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u2', 'ana@lib.test', 'Ana', 'x', 0)",
         )
         .execute(&pool)
         .await
         .unwrap();
+        for (id, permission) in [("sh1", "viewer"), ("sh2", "editor")] {
+            sqlx::query(
+                "INSERT INTO share (id, owner_id, grantee_id, scope, scope_id, permission) \
+                 VALUES (?, 'u1', 'u2', 'all', NULL, ?)",
+            )
+            .bind(id)
+            .bind(permission)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
         // Tombstones under the old key, so 0025's table rebuild has rows to
         // carry across rather than migrating an empty table.
         for (id, kind) in [("gone-1", "book"), ("gone-2", "shelf")] {
@@ -126,6 +161,61 @@ async fn a_populated_database_upgrades_to_the_latest_schema() {
         .await
         .unwrap();
     assert_eq!(books, 1, "the library survived the upgrade");
+
+    // 0028's backfill: the history is all still there, but only the most recent
+    // loan is still open, and the earlier two were closed when the next one
+    // started rather than at some invented date.
+    let loans: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM loan")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(loans, 3, "no loan was deleted to satisfy the index");
+    let open: Vec<String> =
+        sqlx::query_scalar("SELECT id FROM loan WHERE returned_at IS NULL ORDER BY id")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert_eq!(open, vec!["l3".to_string()], "one copy, one open loan");
+    let closed: Vec<(String, String)> = sqlx::query_as(
+        "SELECT id, returned_at FROM loan WHERE returned_at IS NOT NULL ORDER BY id",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        closed,
+        vec![
+            ("l1".to_string(), "2026-02-01 10:00:00".to_string()),
+            ("l2".to_string(), "2026-03-01 10:00:00".to_string()),
+        ],
+        "each closed when the next lend began, not when the last one did"
+    );
+    let second_loan = sqlx::query(
+        "INSERT INTO loan (id, copy_id, borrower, loaned_at, updated_at) \
+         VALUES ('l4', 'c1', 'Someone else', datetime('now'), datetime('now'))",
+    )
+    .execute(&db)
+    .await;
+    assert!(second_loan.is_err(), "a copy cannot be lent twice at once");
+
+    // 0032's dedupe: one share left, and it is the editor one — the permission
+    // that was already deciding access.
+    let shares: Vec<(String, String)> =
+        sqlx::query_as("SELECT id, permission FROM share ORDER BY id")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert_eq!(shares, vec![("sh2".to_string(), "editor".to_string())]);
+    let duplicate = sqlx::query(
+        "INSERT INTO share (id, owner_id, grantee_id, scope, scope_id, permission) \
+         VALUES ('sh3', 'u1', 'u2', 'all', NULL, 'viewer')",
+    )
+    .execute(&db)
+    .await;
+    assert!(
+        duplicate.is_err(),
+        "the same person cannot be granted the same thing twice"
+    );
 
     // And the column that broke it is present, populated, and not the epoch —
     // the backfill ran rather than leaving the placeholder behind.

@@ -4941,3 +4941,105 @@ async fn an_invitee_who_types_a_name_keeps_their_own() {
         .unwrap();
     assert_eq!(joined["display_name"], "Ana");
 }
+
+/// Sharing the same thing with the same person twice (reported from the
+/// console: "I can give someone a share for viewer multiple times").
+///
+/// Access was never wrong — `book_access` takes the best permission any share
+/// gives — but the list showed the grant twice and revoking one left the other,
+/// which reads as a revoke that did nothing.
+#[tokio::test]
+async fn granting_the_same_share_twice_updates_it_rather_than_duplicating() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    add_member(&app, &master, "ana@lib.test").await;
+
+    let grant = |permission: &'static str| {
+        let app = app.clone();
+        let master = master.clone();
+        async move {
+            call(
+                &app,
+                "POST",
+                "/api/shares",
+                Some(&master),
+                Some(json!({
+                    "grantee_email": "ana@lib.test",
+                    "scope": "all",
+                    "permission": permission,
+                })),
+            )
+            .await
+        }
+    };
+
+    let (status, first) = grant("viewer").await;
+    assert_eq!(status, StatusCode::OK, "{first}");
+    let (status, again) = grant("viewer").await;
+    assert_eq!(status, StatusCode::OK, "a repeat grant is not an error: {again}");
+
+    let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
+    assert_eq!(
+        shares.as_array().unwrap().len(),
+        1,
+        "one grant, not two: {shares}"
+    );
+    assert_eq!(again["id"], first["id"], "it is the same share");
+
+    // Changing your mind about the permission applies to that one grant.
+    let (status, upgraded) = grant("editor").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(upgraded["id"], first["id"]);
+
+    let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
+    assert_eq!(shares.as_array().unwrap().len(), 1);
+    assert_eq!(shares[0]["permission"], "editor");
+
+    // And revoking the one grant really does revoke it.
+    let id = first["id"].as_str().unwrap();
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/shares/{id}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
+    assert!(shares.as_array().unwrap().is_empty(), "nothing left behind");
+}
+
+#[tokio::test]
+async fn two_different_scopes_to_one_person_are_still_two_shares() {
+    // The uniqueness is per *target*, not per person: "the whole library" and
+    // "this one book" are different grants and both are legitimate.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    add_member(&app, &master, "ana@lib.test").await;
+    let (_, book) = call(
+        &app,
+        "POST",
+        "/api/books",
+        Some(&master),
+        Some(json!({ "title": "Dune" })),
+    )
+    .await;
+    let book_id = book["id"].as_str().unwrap();
+
+    for body in [
+        json!({ "grantee_email": "ana@lib.test", "scope": "all", "permission": "viewer" }),
+        json!({
+            "grantee_email": "ana@lib.test",
+            "scope": "book",
+            "scope_id": book_id,
+            "permission": "editor",
+        }),
+    ] {
+        let (status, got) = call(&app, "POST", "/api/shares", Some(&master), Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{got}");
+    }
+
+    let (_, shares) = call(&app, "GET", "/api/shares", Some(&master), None).await;
+    assert_eq!(shares.as_array().unwrap().len(), 2);
+}

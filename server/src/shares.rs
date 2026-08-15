@@ -110,24 +110,55 @@ pub async fn create(
         ));
     }
 
-    let id = uuid::Uuid::new_v4().to_string();
     let scope_id = if input.scope == "all" {
         None
     } else {
         input.scope_id.clone()
     };
-    sqlx::query(
-        "INSERT INTO share (id, owner_id, grantee_id, scope, scope_id, permission) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+
+    // Granting the same person the same thing again **updates** the grant it
+    // already has (migration 0032). Two rows saying the same thing showed the
+    // share twice and made revoking one look like it did nothing — and the
+    // second grant is nearly always somebody changing their mind about the
+    // permission, which this applies rather than duplicating.
+    let existing: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM share \
+         WHERE owner_id = ? AND grantee_id = ? AND scope = ? \
+           AND IFNULL(scope_id, '') = IFNULL(?, '')",
     )
-    .bind(&id)
     .bind(&user.id)
     .bind(&grantee_id)
     .bind(&input.scope)
     .bind(&scope_id)
-    .bind(&permission)
-    .execute(&state.db)
+    .fetch_optional(&state.db)
     .await?;
+
+    let id = match existing {
+        Some(id) => {
+            sqlx::query("UPDATE share SET permission = ? WHERE id = ?")
+                .bind(&permission)
+                .bind(&id)
+                .execute(&state.db)
+                .await?;
+            id
+        }
+        None => {
+            let id = uuid::Uuid::new_v4().to_string();
+            sqlx::query(
+                "INSERT INTO share (id, owner_id, grantee_id, scope, scope_id, permission) \
+                 VALUES (?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&id)
+            .bind(&user.id)
+            .bind(&grantee_id)
+            .bind(&input.scope)
+            .bind(&scope_id)
+            .bind(&permission)
+            .execute(&state.db)
+            .await?;
+            id
+        }
+    };
 
     let share = sqlx::query_as::<_, ShareDto>(&format!("{SHARE_SELECT} WHERE s.id = ?"))
         .bind(&id)
