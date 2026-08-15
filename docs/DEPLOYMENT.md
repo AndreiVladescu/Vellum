@@ -66,9 +66,14 @@ long before `VELLUM_MAX_UPLOAD_MB` is consulted) and `X-Forwarded-For` (without
 it every request looks like it came from the proxy, so one impatient client
 throttles everybody).
 
-To listen on something other than loopback — a proxy on another machine — set
-`VELLUM_BIND=0.0.0.0:3000`. Only do that on a network you trust: it is
-unencrypted.
+`VELLUM_BIND` is the whole left-hand side of the ports mapping, so it sets both
+the interface and the port you reach the container on: `127.0.0.1:3200` moves it
+to 3200 on loopback, `0.0.0.0:3000` exposes it to a proxy on another machine.
+Only do the latter on a network you trust — that port is unencrypted.
+
+Note that `VELLUM_PORT` is the wrong knob here: the mapping fixes the port
+*inside* the container at 3000, and that variable is deliberately not passed
+through, so setting it in `.env` does nothing under Docker.
 
 **With Caddy, for automatic TLS** — a public domain and no existing proxy:
 
