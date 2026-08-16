@@ -88,7 +88,18 @@ class _ServerPageState extends State<ServerPage> {
     super.dispose();
   }
 
-  Future<void> _run(Future<void> Function() action) async {
+  /// [isAuthAttempt] is true only for [_authenticate]'s own call: a 401 from
+  /// *logging in* means the credentials were wrong (or the account is
+  /// throttled), which is a completely different fact from a 401 on an
+  /// already-authenticated call, which means *this device's* session died.
+  /// Both used to show "Session expired — please log in again", which is a
+  /// straightforwardly wrong thing to tell someone who just mistyped a
+  /// password or got rate-limited — and there is no session to clear in the
+  /// first case, since one was never established.
+  Future<void> _run(
+    Future<void> Function() action, {
+    bool isAuthAttempt = false,
+  }) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -96,7 +107,7 @@ class _ServerPageState extends State<ServerPage> {
     try {
       await action();
     } on ServerException catch (e) {
-      if (e.isUnauthorized) {
+      if (e.isUnauthorized && !isAuthAttempt) {
         // The session expired or was revoked — drop to the sign-in screen.
         await widget.connection.clearExpiredSession();
         if (mounted) {
@@ -310,7 +321,7 @@ class _ServerPageState extends State<ServerPage> {
     ));
   }
 
-  Future<void> _authenticate() => _run(() async {
+  Future<void> _authenticate() => _run(isAuthAttempt: true, () async {
         final url = _url.text;
         final client = widget.connection.anonymousClient(url);
         final auth = _registerMode
