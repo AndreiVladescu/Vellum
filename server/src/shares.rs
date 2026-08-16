@@ -36,9 +36,9 @@ pub struct ShareInput {
 
 /// Shares the caller created or received.
 pub async fn list(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<Vec<ShareDto>>> {
-    let shares = sqlx::query_as::<_, ShareDto>(&format!(
+    let shares = sqlx::query_as::<_, ShareDto>(sqlx::AssertSqlSafe(format!(
         "{SHARE_SELECT} WHERE s.owner_id = ? OR s.grantee_id = ? ORDER BY s.created_at DESC"
-    ))
+    )))
     .bind(&user.id)
     .bind(&user.id)
     .fetch_all(&state.db)
@@ -160,10 +160,12 @@ pub async fn create(
         }
     };
 
-    let share = sqlx::query_as::<_, ShareDto>(&format!("{SHARE_SELECT} WHERE s.id = ?"))
-        .bind(&id)
-        .fetch_one(&state.db)
-        .await?;
+    let share = sqlx::query_as::<_, ShareDto>(sqlx::AssertSqlSafe(format!(
+        "{SHARE_SELECT} WHERE s.id = ?"
+    )))
+    .bind(&id)
+    .fetch_one(&state.db)
+    .await?;
     crate::audit::record(
         &state,
         Some(&user),
@@ -580,9 +582,9 @@ pub async fn unlock(
 
     // An expired, revoked or used-up link cannot be unlocked: the password is a
     // second gate, never a way around the first.
-    let row: Option<(String, Option<String>)> = sqlx::query_as(&format!(
+    let row: Option<(String, Option<String>)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT id, password_hash FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
-    ))
+    )))
     .bind(&hash)
     .fetch_optional(&state.db)
     .await?;
@@ -671,19 +673,19 @@ pub async fn public_book(
         return Err(AppError::TooManyRequests("too many requests".into()));
     }
     ensure_unlocked(&state, &token, &headers).await?;
-    let row: Option<(String, Option<i64>)> = sqlx::query_as(&format!(
+    let row: Option<(String, Option<i64>)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT book_id, max_uses FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
-    ))
+    )))
     .bind(sha256_hex(&token))
     .fetch_optional(&state.db)
     .await?;
     let (book_id, max_uses) =
         row.ok_or_else(|| AppError::NotFound("link is invalid or expired".into()))?;
 
-    let book = sqlx::query_as::<_, BookDto>(&format!(
+    let book = sqlx::query_as::<_, BookDto>(sqlx::AssertSqlSafe(format!(
         "SELECT {} FROM book b WHERE b.id = ?",
         crate::books::BOOK_COLUMNS
-    ))
+    )))
     .bind(&book_id)
     .fetch_optional(&state.db)
     .await?
@@ -720,10 +722,10 @@ pub(crate) async fn layout_for_link(
     state: &AppState,
     token: &str,
 ) -> AppResult<Option<(String, bool)>> {
-    Ok(sqlx::query_as(&format!(
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT l.layout_id, l.show_books FROM share_link l \
          WHERE l.token_hash = ? AND l.kind = 'layout' AND {LINK_VALID}"
-    ))
+    )))
     .bind(sha256_hex(token))
     .fetch_optional(&state.db)
     .await?)
@@ -826,10 +828,10 @@ async fn public_room_books(
 /// *downloads*, and burning a one-time link on a page turn would destroy it the
 /// moment someone opened the book.
 pub(crate) async fn book_id_for_link(state: &AppState, token: &str) -> AppResult<Option<String>> {
-    Ok(sqlx::query_scalar(&format!(
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT book_id FROM share_link WHERE token_hash = ? AND kind = 'book' \
          AND {LINK_VALID}"
-    ))
+    )))
     .bind(sha256_hex(token))
     .fetch_optional(&state.db)
     .await?)
@@ -853,9 +855,9 @@ pub async fn public_file(
     let hash = sha256_hex(&token);
 
     // Which book, and does it have a file? (No consume yet.)
-    let book_id: Option<String> = sqlx::query_scalar(&format!(
+    let book_id: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT book_id FROM share_link WHERE token_hash = ? AND {LINK_VALID}"
-    ))
+    )))
     .bind(&hash)
     .fetch_optional(&state.db)
     .await?;
@@ -883,9 +885,9 @@ pub async fn public_file(
 
     // Consume a use atomically; the WHERE re-checks validity, so concurrent
     // downloads of a one-time link can't both succeed.
-    let consumed = sqlx::query(&format!(
+    let consumed = sqlx::query(sqlx::AssertSqlSafe(format!(
         "UPDATE share_link SET use_count = use_count + 1 WHERE token_hash = ? AND {LINK_VALID}"
-    ))
+    )))
     .bind(&hash)
     .execute(&state.db)
     .await?

@@ -83,16 +83,17 @@ pub async fn list(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<Vec<LayoutSummary>>> {
-    let rows: Vec<(String, String, i64, String, String)> = sqlx::query_as(&format!(
-        "SELECT l.id, l.name, l.revision, l.published_at, l.owner_id \
+    let rows: Vec<(String, String, i64, String, String)> =
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT l.id, l.name, l.revision, l.published_at, l.owner_id \
          FROM layout l WHERE {} ORDER BY l.name",
-        visible_predicate()
-    ))
-    .bind(&user.id)
-    .bind(user.is_master)
-    .bind(&user.id)
-    .fetch_all(&state.db)
-    .await?;
+            visible_predicate()
+        )))
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .fetch_all(&state.db)
+        .await?;
 
     Ok(Json(
         rows.into_iter()
@@ -115,17 +116,18 @@ pub async fn get(
     user: AuthUser,
     Path(id): Path<String>,
 ) -> AppResult<Json<LayoutDoc>> {
-    let row: Option<(String, String, i64, String, String, String)> = sqlx::query_as(&format!(
-        "SELECT l.id, l.name, l.revision, l.published_at, l.owner_id, l.doc \
+    let row: Option<(String, String, i64, String, String, String)> =
+        sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT l.id, l.name, l.revision, l.published_at, l.owner_id, l.doc \
          FROM layout l WHERE l.id = ? AND {}",
-        visible_predicate()
-    ))
-    .bind(&id)
-    .bind(&user.id)
-    .bind(user.is_master)
-    .bind(&user.id)
-    .fetch_optional(&state.db)
-    .await?;
+            visible_predicate()
+        )))
+        .bind(&id)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id)
+        .fetch_optional(&state.db)
+        .await?;
 
     // 404 rather than 403 for a layout the caller can't see — the same rule the
     // rest of the API follows, so this can't be used to probe which ids exist.
@@ -305,10 +307,10 @@ pub async fn books(
     user: AuthUser,
     Path(id): Path<String>,
 ) -> AppResult<Json<Vec<RoomBook>>> {
-    let doc: Option<String> = sqlx::query_scalar(&format!(
+    let doc: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT l.doc FROM layout l WHERE l.id = ? AND {}",
         visible_predicate()
-    ))
+    )))
     .bind(&id)
     .bind(&user.id)
     .bind(user.is_master)
@@ -351,7 +353,8 @@ pub(crate) async fn resolve_books(
         "SELECT b.id, b.title, b.cover_path FROM book b          WHERE b.id IN ({placeholders}) AND {}",
         crate::books::access_predicate()
     );
-    let mut query = sqlx::query_as::<_, (String, String, Option<String>)>(&sql);
+    let mut query =
+        sqlx::query_as::<_, (String, String, Option<String>)>(sqlx::AssertSqlSafe(sql.as_str()));
     for id in ids {
         query = query.bind(id.clone());
     }

@@ -203,7 +203,8 @@ pub async fn list(
     }
     sql.push_str(" ORDER BY r.created_at DESC");
 
-    let mut query = sqlx::query_as::<_, BorrowRequestDto>(&sql).bind(&user.id);
+    let mut query =
+        sqlx::query_as::<_, BorrowRequestDto>(sqlx::AssertSqlSafe(sql.as_str())).bind(&user.id);
     if let Some(status) = &status {
         query = query.bind(status.clone());
     }
@@ -386,10 +387,12 @@ pub async fn decide(
 }
 
 async fn fetch(state: &AppState, id: &str) -> AppResult<Json<BorrowRequestDto>> {
-    let row = sqlx::query_as::<_, BorrowRequestDto>(&format!("{SELECT} WHERE r.id = ?"))
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("request not found".into()))?;
+    let row = sqlx::query_as::<_, BorrowRequestDto>(sqlx::AssertSqlSafe(format!(
+        "{SELECT} WHERE r.id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("request not found".into()))?;
     Ok(Json(row))
 }

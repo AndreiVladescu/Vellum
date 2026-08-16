@@ -1497,10 +1497,10 @@ async fn test_app_with_mail() -> (axum::Router, sqlx::SqlitePool) {
 /// The plaintext token can't be read from the response (by design), so tests
 /// mint one the same way the handler does and insert it directly.
 async fn seed_reset_token(db: &sqlx::SqlitePool, user_id: &str, token: &str, sql_expiry: &str) {
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO password_reset (token_hash, user_id, expires_at) \
          VALUES (?, ?, {sql_expiry})"
-    ))
+    )))
     .bind(vellum_server::sha256_hex_for_tests(token))
     .bind(user_id)
     .execute(db)

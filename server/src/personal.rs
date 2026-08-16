@@ -127,7 +127,7 @@ pub async fn list_annotations(
          ORDER BY a.updated_at",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, AnnotationDto>(&sql)
+    let mut query = sqlx::query_as::<_, AnnotationDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(&user.id)
         .bind(user.is_master)
@@ -262,7 +262,8 @@ pub async fn list_annotation_deletions(
         "SELECT entity_id AS id, deleted_at FROM deletion \
          WHERE kind = 'annotation' AND owner_id = ? {filter} ORDER BY deleted_at"
     );
-    let mut query = sqlx::query_as::<_, AnnotationTombstoneDto>(&sql).bind(&user.id);
+    let mut query = sqlx::query_as::<_, AnnotationTombstoneDto>(sqlx::AssertSqlSafe(sql.as_str()))
+        .bind(&user.id);
     if let Some(ts) = since(&q.cursor) {
         query = query.bind(ts.to_string());
     }
@@ -314,7 +315,7 @@ pub async fn list_sessions(
          ORDER BY s.updated_at",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, SessionDto>(&sql)
+    let mut query = sqlx::query_as::<_, SessionDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(&user.id)
         .bind(user.is_master)
@@ -401,7 +402,7 @@ pub async fn list_notes(
          ORDER BY n.updated_at",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, BookNoteDto>(&sql)
+    let mut query = sqlx::query_as::<_, BookNoteDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(&user.id)
         .bind(user.is_master)

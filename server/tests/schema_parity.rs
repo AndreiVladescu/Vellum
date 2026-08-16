@@ -29,7 +29,7 @@ use sqlx::Row;
 use vellum_server::connect_db;
 
 async fn columns(db: &sqlx::SqlitePool, table: &str) -> Vec<String> {
-    sqlx::query(&format!("PRAGMA table_info({table})"))
+    sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA table_info({table})")))
         .fetch_all(db)
         .await
         .unwrap()

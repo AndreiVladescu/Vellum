@@ -118,7 +118,7 @@ pub async fn visible_books(
         "SELECT {BOOK_COLUMNS} FROM book b WHERE {} {filter} ORDER BY b.title, b.id",
         access_predicate()
     );
-    let mut query = sqlx::query_as::<_, BookDto>(&sql)
+    let mut query = sqlx::query_as::<_, BookDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -164,7 +164,7 @@ pub async fn visible_books_page(
     let sql = format!(
         "SELECT {BOOK_COLUMNS} FROM book b WHERE {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"
     );
-    let mut query = sqlx::query_as::<_, BookDto>(&sql)
+    let mut query = sqlx::query_as::<_, BookDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -174,7 +174,7 @@ pub async fn visible_books_page(
     let items = query.bind(limit).bind(offset).fetch_all(&state.db).await?;
 
     let count_sql = format!("SELECT COUNT(*) FROM book b WHERE {where_sql}");
-    let mut count = sqlx::query_scalar::<_, i64>(&count_sql)
+    let mut count = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(count_sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -338,7 +338,7 @@ pub async fn author_map_for(
              WHERE ba.book_id IN ({}) ORDER BY ba.book_id, ba.position",
             in_placeholders(chunk.len())
         );
-        let mut query = sqlx::query_as::<_, Row>(&sql);
+        let mut query = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(sql.as_str()));
         for id in chunk {
             query = query.bind(id);
         }
@@ -371,7 +371,7 @@ pub async fn genre_map_for(
              WHERE bg.book_id IN ({}) ORDER BY bg.book_id, g.name",
             in_placeholders(chunk.len())
         );
-        let mut query = sqlx::query_as::<_, Row>(&sql);
+        let mut query = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(sql.as_str()));
         for id in chunk {
             query = query.bind(id);
         }
@@ -399,7 +399,8 @@ pub async fn files_full_map_for(
              FROM book_file WHERE book_id IN ({}) ORDER BY book_id, added_at",
             in_placeholders(chunk.len())
         );
-        let mut query = sqlx::query_as::<_, crate::blobs::FileDto>(&sql);
+        let mut query =
+            sqlx::query_as::<_, crate::blobs::FileDto>(sqlx::AssertSqlSafe(sql.as_str()));
         for id in chunk {
             query = query.bind(id);
         }
@@ -958,27 +959,30 @@ async fn id_for_name_tx(
     table: &str,
     name: &str,
 ) -> AppResult<String> {
-    let existing: Option<String> =
-        sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = ?"))
-            .bind(name)
-            .fetch_optional(&mut *conn)
-            .await?;
+    let existing: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT id FROM {table} WHERE name = ?"
+    )))
+    .bind(name)
+    .fetch_optional(&mut *conn)
+    .await?;
     if let Some(id) = existing {
         return Ok(id);
     }
     let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO {table} (id, name) VALUES (?, ?) ON CONFLICT(name) DO NOTHING"
-    ))
+    )))
     .bind(&id)
     .bind(name)
     .execute(&mut *conn)
     .await?;
     // A concurrent insert may have won the race; re-read to get the real id.
-    let id: String = sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = ?"))
-        .bind(name)
-        .fetch_one(&mut *conn)
-        .await?;
+    let id: String = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT id FROM {table} WHERE name = ?"
+    )))
+    .bind(name)
+    .fetch_one(&mut *conn)
+    .await?;
     Ok(id)
 }
 
@@ -1250,7 +1254,7 @@ pub async fn deletions(
             format!("{filter} AND")
         }
     );
-    let mut query = sqlx::query_as::<_, DeletionDto>(&sql);
+    let mut query = sqlx::query_as::<_, DeletionDto>(sqlx::AssertSqlSafe(sql.as_str()));
     if let Some(ts) = since {
         query = query.bind(ts.to_string());
     }
@@ -1261,12 +1265,13 @@ pub async fn deletions(
 }
 
 pub(crate) async fn fetch_book(state: &AppState, id: &str) -> AppResult<Json<BookDto>> {
-    let book =
-        sqlx::query_as::<_, BookDto>(&format!("SELECT {BOOK_COLUMNS} FROM book b WHERE b.id = ?"))
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("book not found".into()))?;
+    let book = sqlx::query_as::<_, BookDto>(sqlx::AssertSqlSafe(format!(
+        "SELECT {BOOK_COLUMNS} FROM book b WHERE b.id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("book not found".into()))?;
     Ok(Json(book))
 }
 

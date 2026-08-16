@@ -46,7 +46,7 @@ jobs:
       # than becoming a runtime 500.
       - name: Check .sqlx is current
         run: |
-          cargo install sqlx-cli --version 0.8.6 --no-default-features \
+          cargo install sqlx-cli --version 0.9.0 --no-default-features \
             --features sqlite,rustls --locked
           export DATABASE_URL="sqlite://$PWD/ci-prepare.db?mode=rwc"
           sqlx database create

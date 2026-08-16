@@ -325,13 +325,13 @@ pub async fn search_description(State(state): State<AppState>) -> Response {
 // ---- browse-by navigation feeds -------------------------------------------
 
 pub async fn authors(State(state): State<AppState>, user: AuthUser) -> AppResult<Response> {
-    let names: Vec<String> = sqlx::query_scalar(&format!(
+    let names: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT DISTINCT a.name FROM author a \
          JOIN book_author ba ON ba.author_id = a.id \
          JOIN book b ON b.id = ba.book_id \
          WHERE {} ORDER BY a.name",
         access_predicate()
-    ))
+    )))
     .bind(&user.id)
     .bind(user.is_master)
     .bind(&user.id)
@@ -341,13 +341,13 @@ pub async fn authors(State(state): State<AppState>, user: AuthUser) -> AppResult
 }
 
 pub async fn genres(State(state): State<AppState>, user: AuthUser) -> AppResult<Response> {
-    let names: Vec<String> = sqlx::query_scalar(&format!(
+    let names: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT DISTINCT g.name FROM genre g \
          JOIN book_genre bg ON bg.genre_id = g.id \
          JOIN book b ON b.id = bg.book_id \
          WHERE {} ORDER BY g.name",
         access_predicate()
-    ))
+    )))
     .bind(&user.id)
     .bind(user.is_master)
     .bind(&user.id)
@@ -359,13 +359,13 @@ pub async fn genres(State(state): State<AppState>, user: AuthUser) -> AppResult<
 /// Tags (groups) the caller can actually see books in — an empty tag would be a
 /// dead end on a device where going back is expensive.
 pub async fn groups(State(state): State<AppState>, user: AuthUser) -> AppResult<Response> {
-    let rows: Vec<(String, String)> = sqlx::query_as(&format!(
+    let rows: Vec<(String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT DISTINCT gr.id, gr.name FROM book_group gr \
          JOIN book_group_item gi ON gi.group_id = gr.id \
          JOIN book b ON b.id = gi.book_id \
          WHERE {} ORDER BY gr.name",
         access_predicate()
-    ))
+    )))
     .bind(&user.id)
     .bind(user.is_master)
     .bind(&user.id)
@@ -525,7 +525,7 @@ async fn query_page(
         "SELECT {} FROM book b WHERE {where_sql} ORDER BY {order} LIMIT ? OFFSET ?",
         crate::books::BOOK_COLUMNS
     );
-    let mut query = sqlx::query_as::<_, BookDto>(&sql)
+    let mut query = sqlx::query_as::<_, BookDto>(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -535,7 +535,7 @@ async fn query_page(
     let items = query.bind(limit).bind(offset).fetch_all(&state.db).await?;
 
     let count_sql = format!("SELECT COUNT(*) FROM book b WHERE {where_sql}");
-    let mut count = sqlx::query_scalar::<_, i64>(&count_sql)
+    let mut count = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(count_sql.as_str()))
         .bind(&user.id)
         .bind(user.is_master)
         .bind(&user.id);
@@ -641,10 +641,10 @@ fn feed_response(
 /// newest change among them. Per-user on purpose — a share granted to one
 /// account must not be served from another's cached feed.
 async fn etag(state: &AppState, user: &AuthUser) -> AppResult<String> {
-    let row: (i64, Option<String>) = sqlx::query_as(&format!(
+    let row: (i64, Option<String>) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT COUNT(*), MAX(b.updated_at) FROM book b WHERE {}",
         access_predicate()
-    ))
+    )))
     .bind(&user.id)
     .bind(user.is_master)
     .bind(&user.id)

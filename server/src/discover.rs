@@ -438,19 +438,22 @@ pub async fn apply_filename_metadata(
 /// fixed literal from this module, never user input.
 async fn id_for_name(state: &AppState, table: &str, name: &str) -> AppResult<String> {
     let name = name.trim();
-    let existing: Option<String> =
-        sqlx::query_scalar(&format!("SELECT id FROM {table} WHERE name = ?"))
-            .bind(name)
-            .fetch_optional(&state.db)
-            .await?;
+    let existing: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT id FROM {table} WHERE name = ?"
+    )))
+    .bind(name)
+    .fetch_optional(&state.db)
+    .await?;
     if let Some(id) = existing {
         return Ok(id);
     }
     let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query(&format!("INSERT INTO {table} (id, name) VALUES (?, ?)"))
-        .bind(&id)
-        .bind(name)
-        .execute(&state.db)
-        .await?;
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "INSERT INTO {table} (id, name) VALUES (?, ?)"
+    )))
+    .bind(&id)
+    .bind(name)
+    .execute(&state.db)
+    .await?;
     Ok(id)
 }

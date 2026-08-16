@@ -153,7 +153,7 @@ pub async fn list(
     }
     sql.push_str(" ORDER BY id DESC LIMIT ?");
 
-    let mut query = sqlx::query_as::<_, AuditRow>(&sql);
+    let mut query = sqlx::query_as::<_, AuditRow>(sqlx::AssertSqlSafe(sql.as_str()));
     for bind in &binds {
         query = query.bind(bind.clone());
     }
