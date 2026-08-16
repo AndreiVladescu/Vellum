@@ -825,6 +825,85 @@ async fn the_master_can_promote_and_demote() {
 }
 
 #[tokio::test]
+async fn the_master_can_rename_someone_without_touching_their_role() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let (_, me) = call(&app, "GET", "/api/auth/me", Some(&friend), None).await;
+    let id = me["id"].as_str().unwrap();
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{id}"),
+        Some(&master),
+        Some(json!({ "display_name": "Ana" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["display_name"], "Ana");
+    assert_eq!(body["is_master"], false, "renaming must not touch the role");
+
+    // The rename sticks — not just echoed back in the response.
+    let (_, users) = call(&app, "GET", "/api/users", Some(&master), None).await;
+    let renamed = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["id"] == id)
+        .unwrap();
+    assert_eq!(renamed["display_name"], "Ana");
+}
+
+#[tokio::test]
+async fn a_blank_name_is_refused_and_an_empty_request_does_nothing() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let (_, me) = call(&app, "GET", "/api/auth/me", Some(&friend), None).await;
+    let id = me["id"].as_str().unwrap();
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{id}"),
+        Some(&master),
+        Some(json!({ "display_name": "   " })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{id}"),
+        Some(&master),
+        Some(json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+}
+
+#[tokio::test]
+async fn a_member_cannot_rename_anyone_including_themselves() {
+    let app = test_app().await;
+    let master = register(&app, "master@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let (_, me) = call(&app, "GET", "/api/auth/me", Some(&friend), None).await;
+    let id = me["id"].as_str().unwrap();
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        &format!("/api/users/{id}"),
+        Some(&friend),
+        Some(json!({ "display_name": "Ana" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
 async fn the_last_master_cannot_be_demoted() {
     // Otherwise the library has no administrator and no way back.
     let app = test_app().await;

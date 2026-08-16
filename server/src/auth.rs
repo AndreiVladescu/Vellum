@@ -522,19 +522,39 @@ pub async fn list_users(
     Ok(Json(users))
 }
 
-/// Master-only: change whether an account is a master.
+/// Master-only: change an account's role and/or its display name.
+///
+/// Both fields are optional so the console can send just the one it changed —
+/// `setrole` never has to know the current name, and a rename never has to
+/// know the current role. At least one has to be present, or there is nothing
+/// to do and nothing to audit.
 ///
 /// The library must never end up with **no** master — that is an account nobody
 /// can administer, recoverable only by editing the database by hand. So a
 /// demotion checks there is another one first, which also covers the obvious
 /// mistake of demoting yourself.
+///
+/// Deliberately not the same path as a member changing their *own* name
+/// (`personal.rs`'s profile endpoint): this one needs no session of the
+/// target's own, which is the whole point of an owner being able to fix a
+/// typo for someone who mistyped it at invite time.
 pub async fn set_user_role(
     State(state): State<AppState>,
     caller: AuthUser,
     Path(id): Path<String>,
-    Json(input): Json<RoleInput>,
+    Json(input): Json<UpdateUserInput>,
 ) -> AppResult<Json<AuthUser>> {
     require_master(&caller)?;
+    let name = input.display_name.as_deref().map(str::trim);
+    if input.is_master.is_none() && name.is_none() {
+        return Err(AppError::BadRequest("nothing to change".into()));
+    }
+    if let Some(n) = name
+        && n.is_empty()
+    {
+        return Err(AppError::BadRequest("a name can't be blank".into()));
+    }
+
     let target: Option<AuthUser> =
         sqlx::query_as("SELECT id, email, display_name, is_master FROM app_user WHERE id = ?")
             .bind(&id)
@@ -542,7 +562,10 @@ pub async fn set_user_role(
             .await?;
     let target = target.ok_or_else(|| AppError::NotFound("no such user".into()))?;
 
-    if target.is_master && !input.is_master {
+    if let Some(is_master) = input.is_master
+        && target.is_master
+        && !is_master
+    {
         let others: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM app_user WHERE is_master = 1 AND id != ?")
                 .bind(&id)
@@ -555,27 +578,45 @@ pub async fn set_user_role(
         }
     }
 
-    sqlx::query("UPDATE app_user SET is_master = ? WHERE id = ?")
-        .bind(input.is_master)
+    let is_master = input.is_master.unwrap_or(target.is_master);
+    let display_name = name.unwrap_or(&target.display_name);
+    sqlx::query("UPDATE app_user SET is_master = ?, display_name = ? WHERE id = ?")
+        .bind(is_master)
+        .bind(display_name)
         .bind(&id)
         .execute(&state.db)
         .await?;
-    crate::audit::record(
-        &state,
-        Some(&caller),
-        if input.is_master {
-            "user.promote"
-        } else {
-            "user.demote"
-        },
-        "user",
-        &id,
-        Some(&target.email),
-    )
-    .await;
+
+    if let Some(is_master) = input.is_master {
+        crate::audit::record(
+            &state,
+            Some(&caller),
+            if is_master {
+                "user.promote"
+            } else {
+                "user.demote"
+            },
+            "user",
+            &id,
+            Some(&target.email),
+        )
+        .await;
+    }
+    if name.is_some() {
+        crate::audit::record(
+            &state,
+            Some(&caller),
+            "user.rename",
+            "user",
+            &id,
+            Some(&target.email),
+        )
+        .await;
+    }
 
     Ok(Json(AuthUser {
-        is_master: input.is_master,
+        is_master,
+        display_name: display_name.to_string(),
         ..target
     }))
 }
@@ -625,8 +666,9 @@ pub async fn delete_user(
 }
 
 #[derive(Deserialize)]
-pub struct RoleInput {
-    pub is_master: bool,
+pub struct UpdateUserInput {
+    pub is_master: Option<bool>,
+    pub display_name: Option<String>,
 }
 
 // ---- helpers --------------------------------------------------------------

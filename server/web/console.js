@@ -2629,9 +2629,11 @@ async function showPeople(){
       <span>
         <strong>${esc(u.display_name || u.email)}</strong>
         ${u.is_master ? '<span class="muted"> · owner</span>' : ''}
-        <div class="muted" style="font-size:12px">${esc(u.email)}</div>
+        <div class="muted" style="font-size:12px; margin-top:3px">${esc(u.email)}</div>
       </span>
       <span class="row" style="gap:6px">
+        <button class="btn sm" data-act="renameperson" data-id="${esc(u.id)}"
+                data-name="${esc(u.display_name)}">Rename</button>
         <button class="btn sm" data-act="setrole" data-id="${esc(u.id)}" data-master="${u.is_master ? '0' : '1'}">
           ${u.is_master ? 'Make member' : 'Make owner'}</button>
         <button class="btn sm" data-act="resetfor" data-email="${esc(u.email)}">Send reset</button>
@@ -2769,6 +2771,26 @@ async function setRole(id, isMaster){
   try {
     await api('PUT','/api/users/'+id, { is_master: isMaster });
     toast(isMaster ? 'Now an owner.' : 'Now a member.');
+    showPeople();
+  } catch(e){ toast(e.message); }
+}
+
+// The email address is the account — that's what signing in uses, and it
+// doesn't change here. The display name is just what to call them, which is
+// why an owner can fix it without their involvement: it's not a credential.
+async function renamePerson(id, currentName){
+  const answer = await ask({
+    title: 'Rename',
+    body: "This changes what they're called, not how they sign in — their "
+      + 'email address stays the same.',
+    fields: [{ label: 'Display name', value: currentName, placeholder: 'Ana' }],
+    confirmLabel: 'Save',
+  });
+  const name = answer ? answer[0] : '';
+  if (!name) return;
+  try {
+    await api('PUT','/api/users/'+id, { display_name: name });
+    toast('Renamed.');
     showPeople();
   } catch(e){ toast(e.message); }
 }
