@@ -352,55 +352,14 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     return Scaffold(
       appBar: AppBar(
         title: Text(book.title),
+        // The three sharing-related actions below are each conditional on
+        // server/connection state, and used to sit unconditionally alongside
+        // the five actions that are always shown — up to eight icons at once
+        // on a book synced from a server you don't own. They now collapse
+        // into one "More" button, the same fix the room editor's toolbar
+        // just got: the icon count stops depending on how many of those
+        // conditions happen to be true at once.
         actions: [
-          // Only for a book you don't own: asking to borrow your own book is a
-          // button that can only produce an error.
-          if (_canRequestBorrow)
-            IconButton(
-              icon: const Icon(Icons.pan_tool_alt_outlined),
-              tooltip: 'Ask to borrow',
-              onPressed: () => promptBorrowRequest(
-                context,
-                widget.connection!,
-                book.id,
-                book.title,
-                // Whoever added it is who owns it — the same name the page
-                // shows under "Added by".
-                owner: book.addedBy,
-              ),
-            ),
-          // Offered on a synced library only — `addedBy` is set by a pull, so
-          // it is the app's one signal that this book came from a server with
-          // an owner to ask. Whether *this* account can already edit it is the
-          // server's to answer, and it does, in a sentence.
-          if (widget.connection?.isConnected == true && book.addedBy != null)
-            IconButton(
-              icon: const Icon(Icons.edit_note_outlined),
-              tooltip: 'Ask to edit',
-              onPressed: () => promptWriteAccessRequest(
-                context,
-                widget.connection!,
-                book.id,
-                book.title,
-              ),
-            ),
-          // Only when the server has a mailer (plan 5 #53) — the file and the
-          // outbound email both live there.
-          if (SendToDeviceSheet.availableOn(widget.connection))
-            IconButton(
-              icon: const Icon(Icons.send_outlined),
-              tooltip: 'Send to a device',
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                showDragHandle: true,
-                builder: (_) => SendToDeviceSheet(
-                  book: book,
-                  repository: repository,
-                  connection: widget.connection!,
-                ),
-              ),
-            ),
           if (widget.settings != null)
             IconButton(
               icon: const Icon(Icons.travel_explore_outlined),
@@ -440,6 +399,72 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
             tooltip: 'Edit details',
             onPressed: _openEditSheet,
           ),
+          if (_canRequestBorrow ||
+              (widget.connection?.isConnected == true &&
+                  book.addedBy != null) ||
+              SendToDeviceSheet.availableOn(widget.connection))
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              onSelected: (choice) {
+                switch (choice) {
+                  case 'borrow':
+                    promptBorrowRequest(
+                      context,
+                      widget.connection!,
+                      book.id,
+                      book.title,
+                      // Whoever added it is who owns it — the same name the
+                      // page shows under "Added by".
+                      owner: book.addedBy,
+                    );
+                  case 'edit-request':
+                    promptWriteAccessRequest(
+                      context,
+                      widget.connection!,
+                      book.id,
+                      book.title,
+                    );
+                  case 'send':
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      showDragHandle: true,
+                      builder: (_) => SendToDeviceSheet(
+                        book: book,
+                        repository: repository,
+                        connection: widget.connection!,
+                      ),
+                    );
+                }
+              },
+              itemBuilder: (context) => [
+                // Only for a book you don't own: asking to borrow your own
+                // book is a button that can only produce an error.
+                if (_canRequestBorrow)
+                  const PopupMenuItem(
+                    value: 'borrow',
+                    child: Text('Ask to borrow'),
+                  ),
+                // Offered on a synced library only — `addedBy` is set by a
+                // pull, so it is the app's one signal that this book came
+                // from a server with an owner to ask. Whether *this* account
+                // can already edit it is the server's to answer, and it
+                // does, in a sentence.
+                if (widget.connection?.isConnected == true &&
+                    book.addedBy != null)
+                  const PopupMenuItem(
+                    value: 'edit-request',
+                    child: Text('Ask to edit'),
+                  ),
+                // Only when the server has a mailer (plan 5 #53) — the file
+                // and the outbound email both live there.
+                if (SendToDeviceSheet.availableOn(widget.connection))
+                  const PopupMenuItem(
+                    value: 'send',
+                    child: Text('Send to a device'),
+                  ),
+              ],
+            ),
         ],
       ),
       body: DropTarget(
