@@ -6,6 +6,73 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.3 — 2026-08-16
+
+A round of Android polish, a safer sqlx upgrade, and console/invite fixes.
+
+### Added
+
+- **Invite someone as an owner** — a third level beside view-only and
+  read-and-write. An owner invite grants no share and stores no scope,
+  matching what "owner" already means everywhere else; the People screen
+  says which of the three a pending invite is for.
+- The console's People screen shows whether **email is configured** and who
+  it sends as, a **Send me a test** button that reports the mail server's
+  own refusal back to you verbatim, and a **Set up email** panel listing the
+  variables to set when it isn't.
+
+### Changed
+
+- **Invites ask for a name and an email as two separate fields.** Typing a
+  username into the address box — what people were actually doing — is now
+  corrected rather than rejected as an invalid email. The name follows the
+  invite to the join screen as a default, so leaving it blank there still
+  arrives as a person rather than an email address.
+- **The invite link is always handed back** in the console, even after it's
+  been emailed, so a link that lands in someone's spam folder can still be
+  recovered without withdrawing and re-minting the invite.
+- Every confirm/prompt dialog in the console is a real modal now, not the
+  browser's.
+- **Granting the same person the same access twice now updates the existing
+  grant** instead of creating a silent duplicate — revoking used to leave a
+  phantom copy of the access behind, which read as a revoke that did nothing.
+- Docker Compose: SMTP variables are actually passed through to the
+  container now (they previously only substituted into `.env` and never
+  arrived), and a `DOMAIN` guard that misfired on correctly configured
+  setups is gone.
+- Server dependencies updated, including **sqlx to 0.9** — its new
+  compile-time guard against dynamic SQL strings meant auditing every
+  non-literal query in the server by hand; each one checked out (fixed
+  column lists and closed sort keys, never raw input — real values still go
+  through bind parameters).
+
+### Fixed
+
+- **Android's room editor had a crowded, half-broken toolbar.** Its search
+  field used to be squeezed behind seven always-visible icons; search now
+  takes over the bar the way in-book search already did, and the
+  less-used actions (add a prop, room contents, zoom) moved into **More**.
+- **The app goes properly fullscreen on Android now.** The status and
+  navigation bars are hidden and only reappear on a swipe from the edge,
+  instead of always sitting drawn over the content — which is what put the
+  gesture bar over the Physical tab's toolbar and its *Add books* button.
+- **Seven lists could hide their own last row** behind Android's gesture
+  bar: trash, an author's books, series, the wishlist, duplicate books,
+  search results and scanned books all lacked the bottom padding the
+  *Move to trash* button already got, so the last row's action — Restore,
+  Undo, a merge — could be unreachable.
+- **A book's sharing actions no longer crowd the toolbar.** Ask to borrow,
+  ask to edit and send to a device now collapse into one **More** button
+  instead of stacking up to eight icons at once on a shared, connected book.
+- A rare 500 on deleting a book under load, caused by a stale-snapshot
+  transaction race on a loaded server — writes now take their lock up front
+  rather than upgrading a read partway through.
+- The console no longer signs you out the instant any request gets a 401;
+  it double-checks with the server first, so one refused request doesn't
+  cost you your place mid-task.
+
+---
+
 ## v1.1.2 — 2026-08-12
 
 Small bug & UI fixes
