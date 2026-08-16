@@ -16,14 +16,20 @@ use crate::error::{AppError, AppResult};
 
 /// Every one of this module's embedded pages and scripts is compiled into the
 /// binary and served at one fixed, hash-less URL — so without a cache header
-/// the browser applies its own heuristic and may keep serving the previous
-/// copy indefinitely. The symptom is upgrading the server, seeing nothing
-/// change, and reasonably concluding the fix did not ship — a CSS fix for the
-/// import dialog was reported that way once already, and a stale `room.js`
-/// reported the room viewer's own fix as not having shipped a second time.
-/// `no-cache` still allows caching; it requires revalidation first, so an
-/// unchanged asset costs a 304 rather than a re-download.
-const REVALIDATE: (header::HeaderName, &str) = (header::CACHE_CONTROL, "no-cache");
+/// the browser, or a CDN in front of it, may keep serving a previous copy
+/// indefinitely. The symptom is upgrading the server, seeing nothing change,
+/// and reasonably concluding the fix did not ship — this has now been the
+/// reported cause twice on the browser side alone.
+///
+/// `no-store` rather than `no-cache`: `no-cache` still permits a cache to
+/// *store* the response and serve it after revalidating, which relies on the
+/// cache actually honouring that — and a CDN sitting in front of this server
+/// (Cloudflare, reported in the wild) may cache a `.js`/`.css` response by
+/// file extension regardless, since nothing here hands it a validator to
+/// revalidate against in the first place. `no-store` forbids storing the
+/// response at all, which nothing gets to reinterpret. The cost is a full
+/// re-fetch instead of an occasional 304 — irrelevant at this file size.
+const REVALIDATE: (header::HeaderName, &str) = (header::CACHE_CONTROL, "no-store");
 
 pub async fn console() -> impl IntoResponse {
     ([REVALIDATE], Html(include_str!("../web/console.html")))
