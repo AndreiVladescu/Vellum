@@ -2223,7 +2223,7 @@ async function showShares(){
       sync; read &amp; write also lets them edit and upload. Revoking is on the
       list below.</p>
     <div class="row" style="gap:8px; flex-wrap:wrap; align-items:flex-end">
-      <span>
+      <span style="display:flex; flex-direction:column">
         <label for="g-email">Person</label>
         <input id="g-email" type="email" list="g-people" placeholder="their email"
                style="min-width:220px">
@@ -2231,17 +2231,17 @@ async function showShares(){
           ${people.map(u => `<option value="${esc(u.email)}"></option>`).join('')}
         </datalist>
       </span>
-      <span>
+      <span style="display:flex; flex-direction:column">
         <label for="g-scope">What</label>
-        <select id="g-scope">
+        <select id="g-scope" style="width:100%">
           <option value="all">The whole library</option>
           ${selected ? `<option value="selected">The ${selected} book${selected===1?'':'s'} you ticked</option>` : ''}
           ${S.groups.map(g => `<option value="group:${esc(g.id)}">Tag: ${esc(g.name)}</option>`).join('')}
         </select>
       </span>
-      <span>
+      <span style="display:flex; flex-direction:column">
         <label for="g-perm">Access</label>
-        <select id="g-perm">
+        <select id="g-perm" style="width:100%">
           <option value="viewer">Read</option>
           <option value="editor">Read &amp; write</option>
         </select>
@@ -2664,20 +2664,20 @@ async function showPeople(){
     `${rows}${pending}
      <p class="sharehead" style="margin-top:22px">Invite someone</p>
      <div class="row" style="gap:16px 20px; align-items:flex-end; flex-wrap:wrap">
-       <span style="flex:1 1 180px">
+       <span style="display:flex; flex-direction:column; flex:1 1 180px">
          <label for="inv-name">Name</label>
          <input id="inv-name" type="text" placeholder="Ana" style="width:100%"
                 autocomplete="off">
        </span>
-       <span style="flex:2 1 240px">
+       <span style="display:flex; flex-direction:column; flex:2 1 240px">
          <label for="inv-email">Email address</label>
          <input id="inv-email" type="email" placeholder="ana@example.com"
                 style="width:100%" autocomplete="off"
                 onkeydown="if(event.key==='Enter')invitePerson()">
        </span>
-       <span>
+       <span style="display:flex; flex-direction:column">
          <label for="inv-perm">Access</label>
-         <select id="inv-perm">
+         <select id="inv-perm" style="width:100%">
            <option value="viewer">View only</option>
            <option value="editor">Read &amp; write</option>
            <option value="owner">Owner</option>
