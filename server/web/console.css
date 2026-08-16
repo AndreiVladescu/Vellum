@@ -43,6 +43,16 @@ body {
 button, select, input, textarea { font:inherit; }
 .hidden { display:none !important; }
 
+/* The base rule `.row` itself was missing — every one of its ~40 uses across
+   the console sets gap/align-items/flex-wrap/justify-content inline, all of
+   which are no-ops without display:flex on the element carrying them. It
+   went unnoticed because unwrapped content just falls back to normal inline
+   flow and looks close enough; the invite form's fields, needing an actual
+   wrap on a narrow window, are what exposed it — width:100% inputs inside
+   plain inline spans stack with no controlled gap between them, not a real
+   flex wrap. Every call site's inline style still overrides these as before. */
+.row { display:flex; align-items:center; gap:8px; }
+
 /* ---- header ---- */
 #topbar { position:sticky; top:0; z-index:6; background:var(--bg); }
 header {
