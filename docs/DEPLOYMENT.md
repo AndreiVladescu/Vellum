@@ -259,6 +259,7 @@ same list, commented out at its defaults — to `server/.env` and source it.
 | `VELLUM_TLS_KEY` | `<data>/key.pem` | PEM key |
 | `VELLUM_TLS_SANS` | — | Extra comma-separated SANs for the generated certificate |
 | `VELLUM_BOOTSTRAP_TOKEN` | — | Secret the **first** (master) registration must present |
+| `VELLUM_LOGIN_MAX_FAILURES` | `10` | Failed logins per email/IP per 15 minutes before throttling; `0` disables it |
 | `RUST_LOG` | `info` | Log filter, e.g. `vellum_server=debug` |
 
 ### Content search (optional)

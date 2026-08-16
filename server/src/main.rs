@@ -25,6 +25,8 @@ ENVIRONMENT:
     VELLUM_TLS_KEY           PEM key path (default <data dir>/key.pem)
     VELLUM_TLS_SANS          Extra comma-separated SANs for the generated cert
     VELLUM_BOOTSTRAP_TOKEN   Secret the first (master) registration must present
+    VELLUM_LOGIN_MAX_FAILURES  Failed logins per email/IP per 15 min before
+                             throttling (default 10); 0 disables it
 
 MAIL (all optional; without VELLUM_SMTP_HOST mail features stay off):
     VELLUM_SMTP_HOST         SMTP server for password resets and invites
@@ -180,6 +182,23 @@ async fn main() -> anyhow::Result<()> {
         }
     );
 
+    // Failed-login throttle (10 per 15 minutes per email and per IP by
+    // default — see throttle.rs). An operator locked out by it has no session
+    // to reach a console setting with, so the only override that can help is
+    // one set before the server starts. `0` disables it outright.
+    let login_max_failures: usize = std::env::var("VELLUM_LOGIN_MAX_FAILURES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+    tracing::info!(
+        "login throttle: {}",
+        if login_max_failures == 0 {
+            "off (VELLUM_LOGIN_MAX_FAILURES=0)".to_string()
+        } else {
+            format!("{login_max_failures} failed attempts per 15 minutes")
+        }
+    );
+
     let state = AppState {
         db,
         public_base_url,
@@ -196,7 +215,7 @@ async fn main() -> anyhow::Result<()> {
             .build()
             .unwrap_or_else(|_| reqwest::Client::new()),
         max_upload_bytes: max_upload_mb * 1024 * 1024,
-        throttle: std::sync::Arc::default(),
+        throttle: std::sync::Arc::new(vellum_server::LoginThrottle::new(login_max_failures)),
         render_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(2)),
         enrich_semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(1)),
         basic_cache: std::sync::Arc::default(),

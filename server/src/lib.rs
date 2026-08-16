@@ -47,7 +47,7 @@ pub mod tls;
 mod unpublish;
 mod web;
 
-pub use throttle::RateLimiter;
+pub use throttle::{LoginThrottle, RateLimiter};
 
 /// Re-exported so `main.rs` and the tests can build an `AppState`.
 pub use events::EventBus;

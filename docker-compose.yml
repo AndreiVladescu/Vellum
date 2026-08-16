@@ -63,6 +63,7 @@ services:
       VELLUM_BOOTSTRAP_TOKEN: "${VELLUM_BOOTSTRAP_TOKEN:-}"
       VELLUM_INDEX_TEXT: "${VELLUM_INDEX_TEXT:-}"
       VELLUM_AUDIT: "${VELLUM_AUDIT:-}"
+      VELLUM_LOGIN_MAX_FAILURES: "${VELLUM_LOGIN_MAX_FAILURES:-}"
       # No VELLUM_TLS here on purpose: whatever sits in front terminates TLS,
       # and running two certificate stories at once is how you end up debugging
       # both. For a server with *no* proxy at all, drop the ports mapping below
