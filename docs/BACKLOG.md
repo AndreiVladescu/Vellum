@@ -87,6 +87,25 @@ Kotlin, the manifest, the shortcut XML and the widget layout all compile in
 4. **Constraints.** Off Wi-Fi, or unplugged, the job must not run at all. This
    is the whole point of the defaults and the only way to check them.
 
+**Sync notification and backgrounding** (plan 6). `syncProgressBody`'s wording
+is unit-tested (`app/test/notifications/sync_tray_test.dart`) and
+`SyncForegroundService.kt` compiles in `flutter build apk`, but whether it
+actually does its one job — keep the app's network alive through backgrounding
+— only shows up on a device:
+
+1. **The notification itself.** Press Sync on a library with something to
+   pull or push. Expect a status-bar notification with a progress bar,
+   updating as the phase label on screen does, replaced by a one-line result
+   ("Pulled 3, pushed 1.") once it finishes.
+2. **The actual point of it.** Start a sync on a library large enough to take
+   a few seconds, then switch to another app (home button, not force-stop)
+   before it finishes. Expect the notification to keep updating and the
+   result to be correct when you switch back — not the "could not reach the
+   server ... failed host lookup" this replaced.
+3. **Cleanup.** After a sync finishes (foreground or backgrounded), confirm
+   there is no lingering "syncing" notification and no orphaned foreground
+   service (`adb shell dumpsys activity services app.vellum.Vellum` should
+   show none once it's done).
 
 **Open-with / share-target import** (plan 5 #20). The Dart side is unit-tested
 through a fake channel (`app/test/import/incoming_share_test.dart`) and the
