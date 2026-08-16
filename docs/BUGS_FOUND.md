@@ -1,9 +1,10 @@
 # Bugs found — 2026-08-16
 
 Found by reading the code after fixing the Android toolbar/fullscreen report
-(`app/lib/main.dart`, `app/lib/physical/environment_editor_page.dart`). Both
-items below are now fixed; kept here as a record of what was found and how,
-rather than deleted, since the reasoning is what makes it checkable later.
+(`app/lib/main.dart`, `app/lib/physical/environment_editor_page.dart`). Items
+1 and 2 are fixed; item 3 was found on a later pass and is **not fixed yet**.
+Kept here as a record of what was found and how, rather than deleted, since
+the reasoning is what makes it checkable later.
 
 Not duplicated here: the console sticky-header bug and the settle-bounds item
 already tracked in [`BACKLOG.md`](BACKLOG.md#open--possible-follow-ups).
@@ -60,3 +61,45 @@ toolbar just got. The 5 that make sense regardless of connection state stay
 on the bar. `flutter analyze` and the full test suite pass unchanged; no
 widget test constructs `BookDetailPage` directly, so this was verified by
 reading rather than by a test asserting on the icon count.
+
+---
+
+## 3. The OPDS browser's intro screen can hide its own last catalogue card
+
+**Not fixed.** Same bug class as #1, one instance item #1's grep missed
+because it isn't a bare top-level `ListView(` the earlier pattern-match would
+flag on its own — it's inside `_OpdsIntro`, a separate `StatelessWidget`
+embedded in `OpdsBrowserPage`'s body.
+
+`app/lib/import/opds_browser_page.dart`: `_OpdsIntro` (shown before anything
+has been browsed or picked) is a `ListView` ending in one `Card`/`ListTile`
+per built-in free catalogue, each tappable (`onTap: () => onPick!(...)`).  Its
+padding is a flat `EdgeInsets.fromLTRB(24, 24, 24, 24)` — no `pageInsets()`.
+
+The reason #1's seven didn't need checking against a `bottomNavigationBar`
+but this one does: `OpdsBrowserPage`'s own `Scaffold` sets
+`bottomNavigationBar: _selected.isEmpty ? null : Padding(...)` — a button that
+appears once you've picked something. In the intro state (`_selected.isEmpty`,
+which is the state this screen is *in* while `_OpdsIntro` is what's showing),
+that's `null`, so Scaffold isn't self-insetting the body against the system
+bar the way it would if a bottom bar were always present. The last free
+catalogue in the list can end up under Android's gesture bar, same as #1.
+
+**Fix shape**, matching #1 exactly:
+```dart
+return ListView(
+  padding: pageInsets(context, const EdgeInsets.fromLTRB(24, 24, 24, 24)),
+  ...
+```
+plus the import of `../widgets/page_insets.dart`.
+
+**Checked and ruled out on the same pass** (re-running #1's grep, widened to
+catch `ListView.builder`/`.separated` too, then reading each hit's Scaffold):
+`folder_import_page.dart`'s review list (its `bottomNavigationBar` condition
+is `_phase == _Phase.review && _plan.isNotEmpty` — exactly when the list has
+rows, so it's always self-inset when it matters); `physical_libraries_page.dart`'s
+hardcoded `bottom: 88` (odd, but this tab sits under `main.dart`'s
+`NavigationBar`, which already self-insets it against the real system bar —
+88 is just extra breathing room, not covering for a missing inset); and every
+`ListView` that turned out to be `shrinkWrap: true` inside a bounded dialog or
+already-`SafeArea`'d sheet.
