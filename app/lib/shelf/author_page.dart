@@ -5,6 +5,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
+import '../widgets/page_insets.dart';
 
 /// Everything you hold by one author.
 ///
@@ -46,6 +47,7 @@ class AuthorPage extends StatelessWidget {
           }
           final owned = books.where((b) => b.status != 'wishlist').length;
           return ListView.separated(
+            padding: pageInsets(context, EdgeInsets.zero),
             itemCount: books.length + 1,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, i) {

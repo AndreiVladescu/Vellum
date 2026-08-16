@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
 import '../import/import_plan.dart';
+import '../widgets/page_insets.dart';
 import 'barcode_camera.dart';
 import 'isbn.dart';
 
@@ -349,6 +350,7 @@ class _ScanPageState extends State<ScanPage> {
                     ),
                   )
                 : ListView.builder(
+                    padding: pageInsets(context, EdgeInsets.zero),
                     itemCount: _added.length,
                     itemBuilder: (context, i) {
                       final book = _added[i];

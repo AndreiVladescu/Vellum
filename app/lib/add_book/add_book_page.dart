@@ -7,6 +7,7 @@ import '../data/library_repository.dart';
 import '../data/metadata.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
+import '../widgets/page_insets.dart';
 
 /// Add a book: search Open Library / Google Books and pick an edition, or create
 /// one yourself (for a PDF no library has) — optionally attaching the file.
@@ -370,6 +371,7 @@ class _AddBookPageState extends State<AddBookPage> {
       );
     }
     return ListView.builder(
+      padding: pageInsets(context, EdgeInsets.zero),
       itemCount: results.length,
       itemBuilder: (context, i) {
         final r = results[i];

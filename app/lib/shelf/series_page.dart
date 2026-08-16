@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
+import '../widgets/page_insets.dart';
 
 /// Every series you own, and what is missing from each.
 ///
@@ -30,6 +31,7 @@ class SeriesPage extends StatelessWidget {
           }
           if (series.isEmpty) return const _Empty();
           return ListView.separated(
+            padding: pageInsets(context, EdgeInsets.zero),
             itemCount: series.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, i) => _SeriesTile(

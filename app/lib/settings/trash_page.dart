@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../widgets/page_insets.dart';
 
 /// The trash (plan 5 #52): books removed from the library but not yet deleted.
 ///
@@ -27,6 +28,7 @@ class TrashPage extends StatelessWidget {
           }
           if (books.isEmpty) return const _EmptyTrash();
           return ListView.builder(
+            padding: pageInsets(context, EdgeInsets.zero),
             itemCount: books.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) return _TrashHeader(repository: repository);
