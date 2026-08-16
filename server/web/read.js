@@ -16,7 +16,16 @@ const BASE = MODE === 'link' ? `/api/public/${encodeURIComponent(KEY)}/read`
                              : `/api/books/${encodeURIComponent(KEY)}/read`;
 
 // The console keeps its bearer token in sessionStorage (plan 5 #35); a share
-// link needs none, which is the whole point of the read-only mode.
+// link needs none, which is the whole point of the read-only mode. But
+// sessionStorage isn't shared with a tab window.open() creates for a
+// different URL, so a book opened from the console arrives here with none —
+// the console hands it over via the URL fragment instead (never sent to the
+// server, unlike a query string), consumed once and then scrubbed from the
+// address bar. See the matching comment in room.js.
+if (MODE === 'book' && location.hash.startsWith('#t=')) {
+  sessionStorage.setItem('vellum_token', decodeURIComponent(location.hash.slice(3)));
+  history.replaceState(null, '', location.pathname);
+}
 const TOKEN = MODE === 'book' ? sessionStorage.getItem('vellum_token') : null;
 
 // Where you were, per book, in *this browser*. Deliberately not #5's

@@ -77,10 +77,20 @@ const ACTIONS = {
   lendcopy: el => lendCopyFromConsole(el.dataset.copy),
   returncopy: el => returnCopyFromConsole(el.dataset.loan, el.dataset.copy,
     el.dataset.borrower, el.dataset.since),
-  viewroom: el => window.open('/room/' + encodeURIComponent(el.dataset.id), '_blank', 'noopener'),
+  // The room viewer has no sign-in form of its own — unlike reopening the
+  // console itself in a new tab, there is nothing there to "just sign in
+  // again" on. sessionStorage isn't shared with a tab window.open() creates,
+  // so the token rides in the URL fragment instead (never sent to the
+  // server, unlike a query string) and the new tab picks it up once. See the
+  // matching comment in room.js.
+  viewroom: el => window.open(
+    '/room/' + encodeURIComponent(el.dataset.id) + '#t=' + encodeURIComponent(S.token),
+    '_blank', 'noopener',
+  ),
   shareroom: el => shareRoom(el.dataset.id, el.dataset.name),
   activity: el => showActivity(el.dataset.before === '' ? null : Number(el.dataset.before)),
   setrole: el => setRole(el.dataset.id, el.dataset.master === '1'),
+  renameperson: el => renamePerson(el.dataset.id, el.dataset.name),
   resetfor: el => resetFor(el.dataset.email),
   removeperson: el => removePerson(el.dataset.id, el.dataset.email),
   revokeinvite: el => revokeInvite(el.dataset.id),
@@ -1814,7 +1824,14 @@ function fmtBytes(n){
 // Reading in the browser (plan 5 #33). A new tab, because reading and managing
 // are different activities and losing your place in the table to skim a chapter
 // is exactly the annoyance this would otherwise create.
-function openReader(id){ window.open('/read/' + encodeURIComponent(id), '_blank', 'noopener'); }
+// The token rides the URL fragment for the same reason viewroom's does — see
+// that comment above and the matching one in read.js.
+function openReader(id){
+  window.open(
+    '/read/' + encodeURIComponent(id) + '#t=' + encodeURIComponent(S.token),
+    '_blank', 'noopener',
+  );
+}
 
 // ---- borrow requests (plan 5 #49) ---------------------------------------
 

@@ -14,6 +14,19 @@ const PATH = location.pathname.split('/').filter(Boolean);
 // '/room/<layout id>' signed in, '/pr/<token>' for a public link.
 const MODE = PATH[0] === 'pr' ? 'link' : 'room';
 const KEY = decodeURIComponent(PATH[1] || '');
+
+// sessionStorage isn't shared with a tab window.open() creates for a
+// different URL — only the console's own tab has the console's token. The
+// console hands it to this new tab via the URL fragment instead (never sent
+// to the server, unlike a query string, so it never reaches an access log);
+// consumed once into this tab's own sessionStorage and then scrubbed from
+// the address bar so it doesn't linger there. Without this, every room
+// opened from the console 401ed with "sign in to the console first" — even
+// signed in, in the tab right next to it.
+if (MODE === 'room' && location.hash.startsWith('#t=')) {
+  sessionStorage.setItem('vellum_token', decodeURIComponent(location.hash.slice(3)));
+  history.replaceState(null, '', location.pathname);
+}
 const TOKEN = MODE === 'room' ? sessionStorage.getItem('vellum_token') : null;
 
 const S = { doc: null, books: new Map(), view: null };
@@ -174,7 +187,14 @@ function render(){
       'access to them, and the room itself never carried one.';
 }
 
-function openBook(id){ window.open('/read/' + encodeURIComponent(id), '_blank', 'noopener'); }
+// Same token-in-fragment handoff as the console's own links to this page —
+// only reachable when MODE === 'room', where TOKEN is guaranteed set (see top).
+function openBook(id){
+  window.open(
+    '/read/' + encodeURIComponent(id) + '#t=' + encodeURIComponent(TOKEN),
+    '_blank', 'noopener',
+  );
+}
 
 function apply(){
   const svg = document.getElementById('svg');
