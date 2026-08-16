@@ -291,7 +291,7 @@ class _OpdsIntro extends StatelessWidget {
     // that it offers somewhere to go, and a hint that reads "paste an address"
     // over an empty box is the state this replaces.
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      padding: pageInsets(context, const EdgeInsets.fromLTRB(24, 24, 24, 24)),
       children: [
         Icon(
           Icons.rss_feed,
