@@ -39,6 +39,9 @@ class MainActivity : FlutterActivity() {
      */
     private var pendingShortcut: String? = null
 
+    /** Starts/stops [SyncForegroundService] around a manual sync. */
+    private val syncServiceChannelName = "app.vellum.Vellum/sync_service"
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
@@ -62,6 +65,21 @@ class MainActivity : FlutterActivity() {
         }
         pending = copyFrom(intent)
         pendingShortcut = intent?.getStringExtra("vellum_shortcut")
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, syncServiceChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "start" -> {
+                        startForegroundService(Intent(this, SyncForegroundService::class.java))
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        stopService(Intent(this, SyncForegroundService::class.java))
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     override fun onNewIntent(intent: Intent) {

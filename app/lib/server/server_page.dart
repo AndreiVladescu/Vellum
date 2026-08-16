@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import '../widgets/page_insets.dart';
 
@@ -7,12 +8,14 @@ import 'package:flutter/semantics.dart';
 
 import '../account/user_profile.dart';
 import '../data/library_repository.dart';
+import '../notifications/sync_tray.dart';
 import '../settings/app_settings.dart';
 import '../snack_bars.dart';
 import 'cert_trust.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
 import 'sharing_page.dart';
+import 'sync_foreground_service.dart';
 import 'sync_scope_page.dart';
 import 'sync_service.dart';
 
@@ -67,6 +70,13 @@ class _ServerPageState extends State<ServerPage> {
   // Live sync progress: [0..1] fraction and the current phase label.
   double? _progress;
   String _phase = '';
+
+  // The Android status-bar counterpart to the two fields above: a
+  // notification with the same progress, live only while _notifyingSync is
+  // true (the main Sync action, below) — Pull/Push under Advanced don't set
+  // it, so _onProgress's calls from those don't post a notification too.
+  final _syncTray = SyncNotificationTray();
+  bool _notifyingSync = false;
 
   @override
   void initState() {
@@ -168,6 +178,11 @@ class _ServerPageState extends State<ServerPage> {
   }
 
   void _onProgress(int done, int total, String phase) {
+    // Kept outside the `if (!mounted)` guard below: the whole point of the
+    // notification is to still be useful once the app (and this State) is
+    // backgrounded, which is exactly when `mounted` stops being a reliable
+    // signal to gate anything sync-related on.
+    if (_notifyingSync) unawaited(_syncTray.update(done, total, phase));
     if (!mounted) return;
     if (phase != _announcedPhase) {
       _announcedPhase = phase;
@@ -396,7 +411,24 @@ class _ServerPageState extends State<ServerPage> {
     }
   }
 
-  Future<void> _syncNow() => _run(() async {
+  /// The main Sync action — wrapped (Android only) in a foreground service
+  /// and a status-bar progress notification, so a sync survives the app
+  /// being backgrounded instead of dying mid-request with a DNS failure, and
+  /// says so in the notification rather than only on a screen that may not
+  /// be on screen any more. [SyncForegroundService.start]/[stop] are no-ops
+  /// off Android; [_syncTray] checks the platform itself.
+  ///
+  /// [resultMessage] is set inside the wrapped action on success and read
+  /// back out in `finally`, because [_run] swallows its own errors into
+  /// [_error] rather than rethrowing — the two together are how this knows
+  /// what the notification should say without [_run] having to change.
+  Future<void> _syncNow() async {
+    await SyncForegroundService.start();
+    _notifyingSync = true;
+    await _syncTray.start();
+    String? resultMessage;
+    try {
+      await _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
         final report = await _sync.sync(
@@ -421,13 +453,14 @@ class _ServerPageState extends State<ServerPage> {
             // Offline, or a server without the endpoint.
           }
         }
-        if (!mounted) return;
         final n = report.issues.length;
         final changed = report.pulled + report.pushed;
         final msg = changed == 0 && !report.hasIssues
             ? 'Already up to date.'
             : 'Pulled ${report.pulled}, pushed ${report.pushed}'
                 '${report.hasIssues ? ', $n issue${n == 1 ? '' : 's'}' : ''}.';
+        resultMessage = msg;
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           appSnackBar(
             content: Text(msg),
@@ -440,6 +473,12 @@ class _ServerPageState extends State<ServerPage> {
           ),
         );
       });
+    } finally {
+      await _syncTray.finish(resultMessage ?? _error ?? 'Sync finished.');
+      _notifyingSync = false;
+      await SyncForegroundService.stop();
+    }
+  }
 
   Future<void> _pull() => _run(() async {
         final client = widget.connection.client;
