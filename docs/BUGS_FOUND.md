@@ -1,10 +1,10 @@
 # Bugs found — 2026-08-16
 
 Found by reading the code after fixing the Android toolbar/fullscreen report
-(`app/lib/main.dart`, `app/lib/physical/environment_editor_page.dart`). Items
-1 and 2 are fixed; item 3 was found on a later pass and is **not fixed yet**.
-Kept here as a record of what was found and how, rather than deleted, since
-the reasoning is what makes it checkable later.
+(`app/lib/main.dart`, `app/lib/physical/environment_editor_page.dart`). Item 3
+was found on a later pass, after 1 and 2 were already fixed. All three are now
+fixed; kept here as a record of what was found and how, rather than deleted,
+since the reasoning is what makes it checkable later.
 
 Not duplicated here: the console sticky-header bug and the settle-bounds item
 already tracked in [`BACKLOG.md`](BACKLOG.md#open--possible-follow-ups).
@@ -64,9 +64,11 @@ reading rather than by a test asserting on the icon count.
 
 ---
 
-## 3. The OPDS browser's intro screen can hide its own last catalogue card
+## ✅ 3. The OPDS browser's intro screen can hide its own last catalogue card
 
-**Not fixed.** Same bug class as #1, one instance item #1's grep missed
+**Fixed** — commit `f2e40f8`.
+
+Same bug class as #1, one instance item #1's grep missed
 because it isn't a bare top-level `ListView(` the earlier pattern-match would
 flag on its own — it's inside `_OpdsIntro`, a separate `StatelessWidget`
 embedded in `OpdsBrowserPage`'s body.
