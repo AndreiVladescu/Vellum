@@ -1890,117 +1890,138 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                 onChanged: (value) => setState(() => _query = value),
               )
             : Text(widget.environmentName),
-        actions: [
-          IconButton(
-            tooltip: _searchOpen ? 'Close search' : 'Search this room',
-            onPressed: () => setState(() {
-              _searchOpen = !_searchOpen;
-              if (!_searchOpen) {
-                _search.clear();
-                _query = '';
-              }
-            }),
-            icon: Icon(_searchOpen ? Icons.close : Icons.search),
-          ),
-          IconButton(
-            tooltip: 'Add bookcase',
-            onPressed: _addBookcase,
-            icon: const Icon(Icons.shelves),
-          ),
-          IconButton(
-            tooltip: 'Add one shelf',
-            onPressed: _addShelf,
-            icon: const Icon(Icons.horizontal_rule),
-          ),
-          IconButton(
-            tooltip: 'Put something on a shelf',
-            onPressed: _addProp,
-            icon: const Icon(Icons.emoji_objects_outlined),
-          ),
-          IconButton(
-            tooltip: 'Room contents',
-            onPressed: _showRoomContents,
-            icon: const Icon(Icons.format_list_bulleted),
-          ),
-          IconButton(
-            tooltip: 'Zoom in',
-            onPressed: () => _zoomAt(_viewCentre(), 1.25),
-            icon: const Icon(Icons.zoom_in),
-          ),
-          IconButton(
-            tooltip: 'Zoom out',
-            onPressed: () => _zoomAt(_viewCentre(), 0.8),
-            icon: const Icon(Icons.zoom_out),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'More',
-            onSelected: (choice) async {
-              switch (choice) {
-                case 'labels':
-                  await _printLabels();
-                case 'snapshot':
-                  await _saveSnapshot();
-                case 'stocktake':
-                  await _startStocktake();
-                case 'backdrop':
-                  await _chooseBackdrop();
-                case 'calibrate':
-                  await _calibrateBackdrop();
-                case 'backdrop-opacity':
-                  await _showBackdropSettings();
-                case 'measure':
-                  setState(() {
-                    _measuring = !_measuring;
-                    _measureFrom = null;
-                    _measureTo = null;
-                  });
-                case 'decor':
-                  await _showRoomDecor();
-                case 'help':
-                  _showHelp();
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'measure',
-                child: Text(_measuring ? 'Stop measuring' : 'Measure…'),
-              ),
-              const PopupMenuItem(
-                value: 'decor',
-                child: Text('Wall and floor…'),
-              ),
-              PopupMenuItem(
-                value: 'backdrop',
-                child: Text(_environment?.backdropPath == null
-                    ? 'Add a room photo…'
-                    : 'Change the room photo…'),
-              ),
-              if (_environment?.backdropPath != null) ...[
-                const PopupMenuItem(
-                  value: 'calibrate',
-                  child: Text('Calibrate the photo…'),
+        // Seven-plus actions plus the leading back arrow don't fit an
+        // ordinary phone width: the room name (the title) was losing the
+        // fight for space and getting squeezed to nothing, which is also what
+        // made the search field unusable the moment it opened — it inherited
+        // the same crowded row instead of taking it over. Search now replaces
+        // the row outright while it's open, the way the readers' in-book
+        // search already does; closed, only the two actions people reach for
+        // while building a room (add a bookcase, add a shelf) stay on the bar,
+        // and everything else — including zoom, which pinch and the scroll
+        // wheel already do — moves into "More".
+        actions: _searchOpen
+            ? [
+                IconButton(
+                  tooltip: 'Close search',
+                  onPressed: () => setState(() {
+                    _searchOpen = false;
+                    _search.clear();
+                    _query = '';
+                  }),
+                  icon: const Icon(Icons.close),
                 ),
-                const PopupMenuItem(
-                  value: 'backdrop-opacity',
-                  child: Text('Photo strength…'),
+              ]
+            : [
+                IconButton(
+                  tooltip: 'Search this room',
+                  onPressed: () => setState(() => _searchOpen = true),
+                  icon: const Icon(Icons.search),
+                ),
+                IconButton(
+                  tooltip: 'Add bookcase',
+                  onPressed: _addBookcase,
+                  icon: const Icon(Icons.shelves),
+                ),
+                IconButton(
+                  tooltip: 'Add one shelf',
+                  onPressed: _addShelf,
+                  icon: const Icon(Icons.horizontal_rule),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'More',
+                  onSelected: (choice) async {
+                    switch (choice) {
+                      case 'prop':
+                        await _addProp();
+                      case 'contents':
+                        _showRoomContents();
+                      case 'zoom-in':
+                        _zoomAt(_viewCentre(), 1.25);
+                      case 'zoom-out':
+                        _zoomAt(_viewCentre(), 0.8);
+                      case 'labels':
+                        await _printLabels();
+                      case 'snapshot':
+                        await _saveSnapshot();
+                      case 'stocktake':
+                        await _startStocktake();
+                      case 'backdrop':
+                        await _chooseBackdrop();
+                      case 'calibrate':
+                        await _calibrateBackdrop();
+                      case 'backdrop-opacity':
+                        await _showBackdropSettings();
+                      case 'measure':
+                        setState(() {
+                          _measuring = !_measuring;
+                          _measureFrom = null;
+                          _measureTo = null;
+                        });
+                      case 'decor':
+                        await _showRoomDecor();
+                      case 'help':
+                        _showHelp();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'prop',
+                      child: Text('Put something on a shelf…'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'contents',
+                      child: Text('Room contents'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'zoom-in',
+                      child: Text('Zoom in'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'zoom-out',
+                      child: Text('Zoom out'),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'measure',
+                      child: Text(_measuring ? 'Stop measuring' : 'Measure…'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'decor',
+                      child: Text('Wall and floor…'),
+                    ),
+                    PopupMenuItem(
+                      value: 'backdrop',
+                      child: Text(_environment?.backdropPath == null
+                          ? 'Add a room photo…'
+                          : 'Change the room photo…'),
+                    ),
+                    if (_environment?.backdropPath != null) ...[
+                      const PopupMenuItem(
+                        value: 'calibrate',
+                        child: Text('Calibrate the photo…'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'backdrop-opacity',
+                        child: Text('Photo strength…'),
+                      ),
+                    ],
+                    const PopupMenuItem(
+                      value: 'labels',
+                      child: Text('Print shelf labels…'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'snapshot',
+                      child: Text('Save a picture of this room'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'stocktake',
+                      child: Text('Stocktake this room…'),
+                    ),
+                    const PopupMenuItem(value: 'help', child: Text('Help')),
+                  ],
                 ),
               ],
-              const PopupMenuItem(
-                value: 'labels',
-                child: Text('Print shelf labels…'),
-              ),
-              const PopupMenuItem(
-                value: 'snapshot',
-                child: Text('Save a picture of this room'),
-              ),
-              const PopupMenuItem(
-                value: 'stocktake',
-                child: Text('Stocktake this room…'),
-              ),
-              const PopupMenuItem(value: 'help', child: Text('Help')),
-            ],
-          ),
-        ],
       ),
       // Listen to settings so a spine-artwork preference change repaints the
       // books (they use widget.settings.spineArt in _bookVisual).
