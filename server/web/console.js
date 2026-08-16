@@ -2661,7 +2661,7 @@ async function showPeople(){
       + 'see the whole library; a member sees only what has been shared with them.',
     `${rows}${pending}
      <p class="sharehead" style="margin-top:22px">Invite someone</p>
-     <div class="row" style="gap:8px; align-items:flex-end; flex-wrap:wrap">
+     <div class="row" style="gap:16px 20px; align-items:flex-end; flex-wrap:wrap">
        <span style="flex:1 1 180px">
          <label for="inv-name">Name</label>
          <input id="inv-name" type="text" placeholder="Ana" style="width:100%"
