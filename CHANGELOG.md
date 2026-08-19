@@ -6,6 +6,71 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.4 — 2026-08-19
+
+Physical copies get their own overlay in the app and the console, Android
+sync gets a status-bar notification and survives being backgrounded, and a
+round of console fixes: two caching bugs that made earlier fixes look like
+they hadn't shipped, a real one behind the "still looks cramped" report, and
+the room viewer no longer needing a second sign-in in its own tab.
+
+### Added
+
+- **Physical copies now open in an overlay** instead of spending a full row
+  per copy on the book page — a book with three or four copies used to be
+  mostly copy rows. A single summary button ("3 physical copies") opens a
+  sheet with the same detail as cards: location, lending state, condition
+  photos, past borrowers, lend/return — plus a **delete button** per copy,
+  confirmed, that warns specifically when the copy is on loan. The
+  console's book table gets the same thing: a **Copies** button per row
+  opens a modal with the same list and per-copy delete.
+- **The login throttle is configurable** — `VELLUM_LOGIN_MAX_FAILURES`
+  (default 10, matching the previous hardcoded limit) sets failed logins
+  per email/IP per 15 minutes before throttling kicks in; `0` disables it.
+  Has to be set before the server starts: someone locked out by it has no
+  session to reach a console setting with.
+- **An owner can rename anyone** in People, not just themselves — the one
+  field an invite typo used to stick you with forever, since only the
+  invited person could previously fix their own display name.
+- **Android sync shows a status-bar notification with a progress bar** for
+  as long as it runs, and now survives the app being backgrounded instead
+  of the sync dying mid-request with a DNS lookup failure.
+
+### Fixed
+
+- **A failed login no longer claims your session expired.** A wrong
+  password (or a throttled account) showed "Session expired — please log
+  in again", which sent at least one person chasing the wrong problem; it
+  now shows the server's real reason.
+- **Opening a room or the reader from the console worked only if you
+  happened to still be signed in in that exact tab.** Both open in a new
+  tab, and the session doesn't carry over to a tab a new window opens —
+  so both always failed with "sign in to the console first", even signed
+  in one tab over. The console now hands the session across in the URL it
+  opens with.
+- **Two caching bugs made server-side fixes look like they hadn't
+  shipped.** The room viewer and reader pages never got the cache header
+  `console.js`/`console.css` already had, so a browser could keep serving
+  a pre-fix copy after an upgrade; separately, a CDN in front of the
+  server (Cloudflare, reported in the wild) could do the same regardless
+  of that header, since `no-cache` still permits storing a response if
+  the cache never actually revalidates it. Every embedded console page
+  now sends `no-store`, which forbids storing the response at all.
+- **Form fields in the console's dialogs didn't reliably stack under
+  their labels.** The base `.row` layout class was missing `display:flex`
+  entirely, so every inline `gap`/`align-items`/wrap style built on top of
+  it — across roughly 40 places — was doing nothing; it went unnoticed
+  because unwrapped content just falls back to normal inline flow and
+  looks close enough. Exposed by the invite form needing a real wrap on a
+  narrow window, and by extension the near-identical "Grant access" row
+  on the Sharing page, which had the same problem on all three of its
+  fields.
+- **The OPDS browser's intro screen could hide its own last catalogue
+  card** behind Android's gesture bar — the same missing-inset bug class
+  fixed for seven other pages in v1.1.3, on an eighth it missed.
+
+---
+
 ## v1.1.3 — 2026-08-16
 
 A round of Android polish, a safer sqlx upgrade, and console/invite fixes.
