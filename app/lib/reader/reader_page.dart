@@ -12,6 +12,8 @@ import '../data/library_repository.dart';
 import '../stats/stats_queries.dart';
 import '../shortcuts.dart';
 import 'auto_scroll.dart';
+import 'dictionary/dictionary_sheet.dart';
+import 'dictionary/wordnet.dart';
 import 'auto_scroll_bar.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
@@ -709,6 +711,44 @@ class _ReaderPageState extends State<ReaderPage>
   /// Translates what is selected, and offers to keep the result as a note on
   /// the passage — which is the annotation the note button already writes, so a
   /// translation ends up in the same list as everything else you marked.
+  /// The selection as a single word, if that is what it is — the dictionary
+  /// was asked for words, not phrases (see [singleWord]).
+  String? get _selectedWord => _selectedRanges.isEmpty
+      ? null
+      : singleWord(_selectedRanges.map((r) => r.text).join(' '));
+
+  Future<void> _defineSelection() async {
+    final word = _selectedWord;
+    if (word == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Select a single word to look it up.'),
+      ));
+      return;
+    }
+    final first = _selectedRanges.first;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => DictionarySheet(
+        word: word,
+        onSaveAsNote: (definition) => _annotations.add(
+          bookId: widget.book.id,
+          kind: AnnotationKind.note,
+          page: first.pageNumber,
+          locator: PdfTextLocator(
+            page: first.pageNumber,
+            start: first.start,
+            end: first.end,
+          ),
+          quotedText: word,
+          note: definition,
+          color: _highlightColour.argb,
+        ),
+      ),
+    );
+  }
+
   Future<void> _translateSelection() async {
     final settings = _settings;
     final ranges = _selectedRanges;
@@ -957,6 +997,16 @@ class _ReaderPageState extends State<ReaderPage>
               tooltip: 'Note on selection',
               onPressed: () => _highlightSelection(withNote: true),
             ),
+            // Only for a single word, which is what was asked for: on a
+            // paragraph the button would be there and return nothing, which
+            // reads as broken. Unlike translation it is not gated on setup —
+            // the sheet is where the dictionary is downloaded.
+            if (_selectedWord != null)
+              IconButton(
+                icon: const Icon(Icons.menu_book_outlined),
+                tooltip: 'Look up “${_selectedWord!}”',
+                onPressed: _defineSelection,
+              ),
             // Always offered, because the sheet is also where translation is
             // set up: gating the button on a configured backend left the
             // desktop unable to reach the only screen that configures one.

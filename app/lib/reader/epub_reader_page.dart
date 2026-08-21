@@ -10,6 +10,8 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shortcuts.dart';
 import 'auto_scroll.dart';
+import 'dictionary/dictionary_sheet.dart';
+import 'dictionary/wordnet.dart';
 import 'auto_scroll_bar.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
@@ -381,6 +383,49 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(withNote ? 'Note saved' : 'Highlighted')),
+    );
+  }
+
+  /// The selected text, as the chapter's own plain text has it.
+  String _selectedText(EpubBook epub) {
+    final range = _selectionRange;
+    if (range == null) return '';
+    final plain = epub.chapters[_chapter].plainText;
+    final start = range.start.clamp(0, plain.length);
+    final end = range.end.clamp(start, plain.length);
+    return plain.substring(start, end).trim();
+  }
+
+  /// Looks the selected word up. Words only, as asked — see [singleWord].
+  Future<void> _defineSelection(EpubBook epub) async {
+    final range = _selectionRange;
+    if (range == null) return;
+    final word = singleWord(_selectedText(epub));
+    if (word == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Select a single word to look it up.'),
+      ));
+      return;
+    }
+    final plain = epub.chapters[_chapter].plainText;
+    final start = range.start.clamp(0, plain.length);
+    final end = range.end.clamp(start, plain.length);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => DictionarySheet(
+        word: word,
+        onSaveAsNote: (definition) => _annotations.add(
+          bookId: widget.book.id,
+          kind: AnnotationKind.note,
+          chapter: _chapter,
+          locator: EpubTextLocator(chapter: _chapter, start: start, end: end),
+          quotedText: word,
+          note: definition,
+          color: _highlightColour.argb,
+        ),
+      ),
     );
   }
 
@@ -851,6 +896,13 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   icon: const Icon(Icons.sticky_note_2_outlined),
                   onPressed: () => _highlightSelection(epub, withNote: true),
                 ),
+                // A word, not a phrase — the same rule as the PDF reader.
+                if (singleWord(_selectedText(epub)) != null)
+                  IconButton(
+                    tooltip: 'Look up “${singleWord(_selectedText(epub))}”',
+                    icon: const Icon(Icons.menu_book_outlined),
+                    onPressed: () => _defineSelection(epub),
+                  ),
                 // Same as the PDF reader: always offered, because the sheet is
                 // where it gets set up.
                 if (settings != null)

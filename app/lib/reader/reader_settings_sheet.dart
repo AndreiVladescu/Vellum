@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'dictionary/dictionary_tile.dart';
 import 'page_metric.dart';
 import 'reader_settings.dart';
 import '../widgets/page_insets.dart';
@@ -179,6 +180,10 @@ class ReaderSettingsSheet extends StatelessWidget {
                   value: settings.immersive,
                   onChanged: settings.setImmersive,
                 ),
+                // Where the word lookup's dictionary is managed. The download
+                // is also offered inside the lookup itself, which is where it
+                // is first wanted; this is where it can be given back.
+                const DictionaryTile(),
               ],
             ),
           ),
