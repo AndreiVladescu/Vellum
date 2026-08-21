@@ -77,10 +77,67 @@ class LibraryHeader extends StatelessWidget {
 
   final VoidCallback? onDismiss;
 
+  /// Below this many logical pixels of screen height, the header shows its
+  /// compact form.
+  ///
+  /// A phone held in landscape has roughly 400 of them, and an app bar and a
+  /// navigation bar take a third of that. The full header — two titled
+  /// sections, a card row, a chip row and a divider — is about 200px tall,
+  /// which left the shelf underneath a sliver too short to scroll. That is the
+  /// reported bug, and it is a *height* problem rather than an orientation one:
+  /// a small window on a desktop has it too.
+  static const compactBelowHeight = 520.0;
+
+  static bool isCompact(BuildContext context) =>
+      MediaQuery.sizeOf(context).height < compactBelowHeight;
+
   @override
   Widget build(BuildContext context) {
     if (highlights.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    // Compact: what you were in the middle of, and nothing else. *Recently
+    // added* and the section headings are the first things to go, because
+    // "carry on reading" is the only one of the three that is worth a third of
+    // a short screen.
+    if (isCompact(context)) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 4, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      for (final book in highlights.continueReading.isNotEmpty
+                          ? highlights.continueReading
+                          : highlights.recentlyAdded)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _ContinueCard(
+                            book: book,
+                            onTap: () => onOpen(book),
+                            compact: true,
+                          ),
+                        ),
+                    ]),
+                  ),
+                ),
+                if (onDismiss != null)
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Hide for now',
+                    onPressed: onDismiss,
+                  ),
+              ],
+            ),
+            Divider(height: 8, color: theme.dividerColor),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 0),
       child: Column(
@@ -174,15 +231,63 @@ class _Section extends StatelessWidget {
 }
 
 class _ContinueCard extends StatelessWidget {
-  const _ContinueCard({required this.book, required this.onTap});
+  const _ContinueCard({
+    required this.book,
+    required this.onTap,
+    this.compact = false,
+  });
 
   final Book book;
   final VoidCallback onTap;
+
+  /// Half the height: the title and the progress bar, with the percentage
+  /// folded onto the title's line instead of below it.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final progress = (book.readingProgress ?? 0).clamp(0.0, 1.0);
+    if (compact) {
+      return SizedBox(
+        width: 200,
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          book.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall,
+                        ),
+                      ),
+                      if (progress > 0)
+                        Text('${(progress * 100).round()}%',
+                            style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                  if (progress > 0) ...[
+                    const SizedBox(height: 5),
+                    LinearProgressIndicator(value: progress, minHeight: 3),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       width: 220,
       child: Card(
