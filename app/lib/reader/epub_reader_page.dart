@@ -16,6 +16,7 @@ import 'edge_turn.dart';
 import 'epub_book.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
+import 'page_metric.dart';
 import 'reader_settings.dart';
 import 'translate/translate_sheet.dart';
 import 'reader_settings_sheet.dart';
@@ -684,12 +685,34 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               if (!_searching) ...[
               // The counter is the obvious place to press when you want a
               // particular chapter, so it is the control rather than a label.
-              TextButton(
-                onPressed: _promptChapterJump,
-                style: TextButton.styleFrom(
-                  foregroundColor: readerTheme.foreground,
+              // Hold it to change what it counts, exactly as in the PDF
+              // reader. An EPUB counts chapters rather than pages, so *time
+              // left* has nothing to measure and is left out of the cycle here.
+              GestureDetector(
+                onLongPress: () {
+                  final s = _settings;
+                  if (s == null) return;
+                  var next = s.pageMetric.next;
+                  if (next == PageMetric.timeLeft) next = next.next;
+                  s.setPageMetric(next);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(next.label),
+                      duration: const Duration(milliseconds: 900),
+                    ),
+                  );
+                },
+                child: TextButton(
+                  onPressed: _promptChapterJump,
+                  style: TextButton.styleFrom(
+                    foregroundColor: readerTheme.foreground,
+                  ),
+                  child: Text(pageMetricLabel(
+                    settings?.pageMetric ?? PageMetric.pagesOf,
+                    page: _chapter + 1,
+                    count: count,
+                  )),
                 ),
-                child: Text('${_chapter + 1} / $count'),
               ),
               if (_selectionRange != null) ...[
                 IconButton(

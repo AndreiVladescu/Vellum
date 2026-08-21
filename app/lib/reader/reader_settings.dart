@@ -3,6 +3,8 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'page_metric.dart';
+
 import 'translate/on_device.dart';
 import 'translate/translation_backend.dart';
 
@@ -126,6 +128,7 @@ class ReaderSettings extends ChangeNotifier {
   static const _immersiveKey = 'reader.immersive';
   static const _pdfModeKey = 'reader.pdfMode';
   static const _highlightColorKey = 'reader.highlightColor';
+  static const _pageMetricKey = 'reader.pageMetric';
   // Translation (next features #12). The URL is what decides whether the
   // feature exists at all: no server, no button — the same rule the sync
   // server's own features follow.
@@ -310,6 +313,15 @@ class ReaderSettings extends ChangeNotifier {
 
   Future<void> setTranslateTo(TranslationLanguage value) async {
     await _prefs.setString(_translateToKey, value.code);
+    notifyListeners();
+  }
+
+  /// What the toolbar's counter says. Long-pressing it cycles this; the
+  /// reader's options offer the same list.
+  PageMetric get pageMetric => PageMetric.parse(_prefs.getString(_pageMetricKey));
+
+  Future<void> setPageMetric(PageMetric value) async {
+    await _prefs.setString(_pageMetricKey, value.name);
     notifyListeners();
   }
 

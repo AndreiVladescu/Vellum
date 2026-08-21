@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'page_metric.dart';
 import 'reader_settings.dart';
 import '../widgets/page_insets.dart';
 import 'translate/on_device.dart';
@@ -151,6 +152,26 @@ class ReaderSettingsSheet extends StatelessWidget {
                     onSelectionChanged: (s) => settings.setPdfFit(s.first),
                   ),
                 ],
+                const _Label('The counter'),
+                // The same list the long-press cycles. Both exist because the
+                // gesture is quick once you know it and invisible until you do.
+                DropdownButtonFormField<PageMetric>(
+                  initialValue: settings.pageMetric,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    helperText: 'Or hold the counter in the reader to cycle it',
+                  ),
+                  items: [
+                    for (final metric in PageMetric.values)
+                      DropdownMenuItem(value: metric, child: Text(metric.label)),
+                  ],
+                  onChanged: (metric) {
+                    if (metric != null) settings.setPageMetric(metric);
+                  },
+                ),
+                const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Hide controls while reading'),

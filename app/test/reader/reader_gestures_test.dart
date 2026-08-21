@@ -3,7 +3,6 @@
 // Both requests are about a finger on a page, and both come down to arithmetic
 // on one offset. Kept out of the reader so the answers can be checked without a
 // PDF, a viewer, or a device.
-import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/reader_gestures.dart';

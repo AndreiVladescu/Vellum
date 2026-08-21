@@ -48,6 +48,35 @@ class ReadingStats {
     return out;
   }
 
+  /// Pages a minute, measured from what has actually been read.
+  ///
+  /// Feeds the reader's *time left* counter and the speed auto-scroll starts
+  /// at, so both answer "how fast do **you** read" rather than a number someone
+  /// picked. Null when there is nothing to measure from — a fresh library, or
+  /// sessions that never recorded a page — because a made-up pace is worse than
+  /// an absent one: it produces a confident "about 20 minutes left" that is
+  /// wrong every time.
+  ///
+  /// Sessions shorter than a minute are dropped rather than extrapolated: a
+  /// reader who opened a book, turned two pages and closed it did not read 120
+  /// pages an hour.
+  static double? pagesPerMinute(List<ReadingSession> sessions) {
+    var pages = 0;
+    var minutes = 0;
+    for (final s in sessions) {
+      final start = s.startPage;
+      final end = s.endPage;
+      if (start == null || end == null) continue;
+      final read = (end - start).clamp(0, 1 << 30);
+      final spent = s.endedAt.difference(s.startedAt).inMinutes;
+      if (read == 0 || spent < 1) continue;
+      pages += read;
+      minutes += spent;
+    }
+    if (minutes == 0 || pages == 0) return null;
+    return pages / minutes;
+  }
+
   /// The set of days with any reading at all.
   static Set<DateTime> readingDays(List<ReadingSession> sessions) =>
       {for (final s in sessions) dayOf(s.startedAt)};

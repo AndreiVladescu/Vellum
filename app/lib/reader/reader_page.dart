@@ -8,12 +8,14 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../stats/stats_queries.dart';
 import '../shortcuts.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
 import 'night_mode.dart';
+import 'page_metric.dart';
 import 'edge_turn.dart';
 import 'reader_gestures.dart';
 import 'reader_hotkeys.dart';
@@ -161,6 +163,7 @@ class _ReaderPageState extends State<ReaderPage> {
     }
     _hotkeys.attach();
     _watchForASlowOpen();
+    _loadPace();
     _annotationsSub =
         _annotations.watchForBook(widget.book.id).listen((annotations) {
       _highlights.update(annotations);
@@ -403,6 +406,18 @@ class _ReaderPageState extends State<ReaderPage> {
     } finally {
       _navigating = false;
     }
+  }
+
+  /// Pages a minute, from this reader's own recorded sittings. Null until
+  /// there is enough history to measure, which the counter handles by falling
+  /// back to a percentage rather than inventing a time.
+  double? _pace;
+
+  Future<void> _loadPace() async {
+    final db = widget.repository.db;
+    final sessions = await db.select(db.readingSessions).get();
+    if (!mounted) return;
+    setState(() => _pace = ReadingStats.pagesPerMinute(sessions));
   }
 
   /// Enters or leaves reading mode.
@@ -765,12 +780,34 @@ class _ReaderPageState extends State<ReaderPage> {
             // The counter is the obvious place to press when you want a
             // particular page, so it is the control rather than a label with
             // the real one buried in the overflow menu.
-            TextButton(
-              onPressed: _promptPageJump,
-              style: TextButton.styleFrom(
-                foregroundColor: readerTheme.foreground,
+            // The counter is the control: press it to go to a page, hold it
+            // to change what it counts. A long book announcing its length on
+            // every page turn is the thing being escaped.
+            GestureDetector(
+              onLongPress: () {
+                final s = _settings;
+                if (s == null) return;
+                final next = s.pageMetric.next;
+                s.setPageMetric(next);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(next.label),
+                    duration: const Duration(milliseconds: 900),
+                  ),
+                );
+              },
+              child: TextButton(
+                onPressed: _promptPageJump,
+                style: TextButton.styleFrom(
+                  foregroundColor: readerTheme.foreground,
+                ),
+                child: Text(pageMetricLabel(
+                  settings?.pageMetric ?? PageMetric.pagesOf,
+                  page: _page!,
+                  count: _pageCount!,
+                  pagesPerMinute: _pace,
+                )),
               ),
-              child: Text('$_page / $_pageCount'),
             ),
           // Selection-dependent actions appear only while text is selected, so
           // the bar isn't a row of buttons that silently do nothing.
