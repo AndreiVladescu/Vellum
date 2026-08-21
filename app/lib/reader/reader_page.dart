@@ -240,15 +240,43 @@ class _ReaderPageState extends State<ReaderPage> {
     // paged mode lands on a page rather than leaving you across a seam.
     _navigating = true;
     try {
-      await _controller.goToPage(
-        pageNumber: page,
-        anchor: _settings?.pdfFit == PdfFit.page
-            ? PdfPageAnchor.all
-            : PdfPageAnchor.topCenter,
-      );
+      if (_settings?.pdfFit == PdfFit.page) {
+        await _controller.goToPage(pageNumber: page, anchor: PdfPageAnchor.all);
+      } else {
+        await _fitWidth(page);
+      }
     } finally {
       _navigating = false;
     }
+  }
+
+  /// Zooms so the page's *width* fills the viewport.
+  ///
+  /// **Not `goToPage`**, which is what this used to call and why *Fit width*
+  /// appeared to do nothing while *Fit page* worked. pdfrx computes a fit as
+  /// `min(viewW / rect.width, viewH / rect.height)` and then clamps it with
+  /// `zoomMax: currentZoom` — so `goToPage` can only ever zoom *out*. Fitting a
+  /// whole page usually is zooming out, so that one worked; fitting the width
+  /// of a portrait page means zooming *in*, and the clamp swallowed it.
+  ///
+  /// `goToArea` applies no such clamp. Handing it a rect as wide as the page
+  /// and shaped like the viewport makes both terms of that `min` equal
+  /// `viewW / pageWidth`, which is fit-width exactly.
+  Future<void> _fitWidth(int page) async {
+    final pages = _controller.layout.pageLayouts;
+    if (page < 1 || page > pages.length) return;
+    final rect = pages[page - 1];
+    final view = _controller.viewSize;
+    if (view.width <= 0 || view.height <= 0) return;
+    await _controller.goToArea(
+      rect: Rect.fromLTWH(
+        rect.left,
+        rect.top,
+        rect.width,
+        rect.width * view.height / view.width,
+      ),
+      anchor: PdfPageAnchor.topCenter,
+    );
   }
 
   Future<void> _promptPageJump() async {

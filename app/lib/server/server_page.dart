@@ -786,15 +786,26 @@ class _ServerPageState extends State<ServerPage> {
         const SizedBox(height: 12),
         Row(
           children: [
-            FilledButton.icon(
-              onPressed: _busy ? null : _syncNow,
-              icon: _busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.sync),
-              label: const Text('Sync now'),
+            // Listens to the *service*, not only to this page. The launch sync
+            // starts before this screen exists and is silent by design, so a
+            // button that watched `_busy` alone looked idle mid-sync, was
+            // pressed, and answered "a sync is already in progress" for a sync
+            // the reader never saw start. Now it says what is true.
+            ValueListenableBuilder<bool>(
+              valueListenable: _sync.running,
+              builder: (context, syncing, _) {
+                final busy = _busy || syncing;
+                return FilledButton.icon(
+                  onPressed: busy ? null : _syncNow,
+                  icon: busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.sync),
+                  label: Text(busy ? 'Syncing…' : 'Sync now'),
+                );
+              },
             ),
             const SizedBox(width: 12),
             // What syncs is a decision, not a setting to hunt for: it belongs

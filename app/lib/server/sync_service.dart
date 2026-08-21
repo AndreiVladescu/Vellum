@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
 
@@ -99,11 +100,22 @@ class SyncService {
   String? _capsBaseUrl;
 
   /// True while a pull or push is in flight; a second concurrent call throws.
-  bool _running = false;
+  ///
+  /// **Observable**, because the launch sync (`main.dart`'s `_autoSync`) is
+  /// deliberately silent: it starts before any screen is open and says nothing
+  /// unless it found something. A Sync button that only knew about its own
+  /// page's busy flag would therefore look idle, be pressed, and answer "a sync
+  /// is already in progress" for a sync the reader never saw start. Anything
+  /// offering to sync listens to this instead.
+  final ValueNotifier<bool> running = ValueNotifier<bool>(false);
+
+  bool get _running => running.value;
+
+  set _running(bool value) => running.value = value;
 
   /// Whether a pull/push/sync is currently in flight. Callers use this to
   /// disable actions (e.g. restore) that must not run concurrently with a sync.
-  bool get isRunning => _running;
+  bool get isRunning => running.value;
 
   VellumDatabase get _db => repository.db;
   Directory get _dataDir => repository.dataDir;
