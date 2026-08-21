@@ -22,6 +22,7 @@ import 'import/folder_import_service.dart';
 import 'import/import_plan.dart';
 import 'import/incoming_share.dart';
 import 'navigation_history.dart';
+import 'notifications/sync_tray.dart';
 import 'onboarding/first_run_sheet.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
@@ -32,6 +33,7 @@ import 'server/live_sync.dart';
 import 'server/server_client.dart';
 import 'server/server_page.dart';
 import 'server/sync_service.dart';
+import 'server/sync_foreground_service.dart';
 import 'settings/app_settings.dart';
 import 'settings/appearance.dart';
 import 'settings/book_face.dart';
@@ -353,12 +355,26 @@ class _LibraryPageState extends State<LibraryPage> {
     // as the launch sync, and a second implementation would be a second set of
     // cursor bugs. WorkManager only decides *when*; the policy decides whether.
     unawaited(_noteBackgroundSyncRan());
+    // The status bar carries this one too, not only the Sync button's.
+    //
+    // A launch sync is quiet on screen by design — it starts before anything is
+    // on screen to be quiet *on*. That silence is what made the Sync button
+    // look broken: pressing it during a launch sync answered "a sync is already
+    // in progress" for a sync nobody had seen. The notification is the honest
+    // signal that Vellum is using the network, whoever started it, and the
+    // foreground service keeps the request alive if the app is backgrounded
+    // mid-sync. Both are no-ops off Android.
+    await SyncForegroundService.start();
+    final tray = SyncNotificationTray();
+    await tray.start();
     try {
       final report = await _sync.sync(
         client,
         cursor: conn.syncCursor,
         onCursor: conn.setSyncCursor,
         scope: widget.settings.syncScope,
+        onProgress: (done, total, phase) =>
+            unawaited(tray.update(done, total, phase)),
       );
       // Reading position rides its own pass, after the sync guard is free and
       // only when the user opted in (plan 5 #5). Its own try/catch: a failure
@@ -393,6 +409,11 @@ class _LibraryPageState extends State<LibraryPage> {
       if (e.isUnauthorized) await conn.clearExpiredSession();
     } catch (_) {
       // Offline or unreachable — stay quiet, the local library works as is.
+    } finally {
+      // Paired like a lock: a notification left ongoing, or a service left
+      // running, is a phone that says it is syncing forever.
+      await tray.finish('Sync finished.');
+      await SyncForegroundService.stop();
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -242,12 +243,18 @@ class ServerConnection extends ChangeNotifier {
   /// Forget the session (keeps the last URL as a convenience default). Tells the
   /// server to invalidate the token too, best-effort — offline is fine, the
   /// local credentials are cleared regardless.
+  ///
+  /// **Locally first, server second.** This used to `await client!.logout()`
+  /// before touching anything here, which meant that on a phone that could not
+  /// reach the server — the usual case, since the server is often a machine on
+  /// a LAN the phone is not on — pressing *Disconnect* hung on a request with
+  /// no short timeout and did visibly nothing: no state change, so no repaint,
+  /// so the page still said connected. Forgetting the session is what the user
+  /// asked for and is entirely local; telling the server is a courtesy, and a
+  /// courtesy must not be able to block the thing it is attached to.
   Future<void> disconnect() async {
-    try {
-      await client?.logout();
-    } catch (_) {
-      // Offline or already-invalid token — clearing locally is enough.
-    }
+    // Taken before the token is cleared, since that is what authenticates it.
+    final farewell = client;
     _token = null;
     _tokenInsecure = false;
     _capabilities = null;
@@ -266,6 +273,17 @@ class ServerConnection extends ChangeNotifier {
       await _prefs.remove(_readingCursorKey(baseUrl));
     }
     notifyListeners();
+
+    // Unawaited, and bounded: the session is already gone here, and a server
+    // that never answers should cost nothing. A token left alive on the server
+    // expires on its own in 30 days.
+    unawaited(() async {
+      try {
+        await farewell?.logout().timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // Offline, unreachable, or an already-invalid token. Nothing to do.
+      }
+    }());
   }
 
   /// Clears just the session token after the server rejected it (a 401), so the

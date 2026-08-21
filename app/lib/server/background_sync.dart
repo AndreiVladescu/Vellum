@@ -11,12 +11,14 @@
 /// background sync can do to a user who didn't want it is drain their phone.
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:workmanager/workmanager.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../notifications/sync_tray.dart';
 import '../settings/app_settings.dart';
 import '../notifications/tray.dart';
 import 'connection_store.dart';
@@ -161,12 +163,19 @@ void backgroundSyncCallback() {
       if (client == null) return true;
 
       final repository = await LibraryRepository.open(VellumDatabase());
+      // The same status-bar progress the launch and manual syncs raise. A
+      // periodic sync is the one the reader is least aware of and the one most
+      // likely to be blamed for battery or data, so it says it is running.
+      final tray = SyncNotificationTray();
+      await tray.start();
       try {
         await SyncService(repository).sync(
           client,
           cursor: connection.syncCursor,
           onCursor: connection.setSyncCursor,
           scope: settings.syncScope,
+          onProgress: (done, total, phase) =>
+              unawaited(tray.update(done, total, phase)),
         );
         await settings.setLastBackgroundSyncAt(DateTime.now());
         // The status bar, if this device asked for it. After the sync, because
@@ -175,6 +184,9 @@ void backgroundSyncCallback() {
         await _postTrayNotification(settings, client);
         return true;
       } finally {
+        // Cleared whichever way the sync went: an ongoing notification left
+        // behind by a background task is one nobody can dismiss.
+        await tray.clear();
         // Always closed: a background isolate that leaves the database open
         // holds a lock the foreground app will trip over.
         await repository.db.close();

@@ -27,6 +27,31 @@ void main() {
         reason: 'unrelated prefs are untouched');
   });
 
+  test('disconnect forgets the session even when the server never answers',
+      () async {
+    // The Android report: pressing Disconnect did nothing at all. It awaited
+    // `logout()` first, and a phone that cannot reach the server waits a long
+    // time on a request with no short timeout — during which nothing local had
+    // changed, so nothing repainted.
+    SharedPreferences.setMockInitialValues({
+      'server.url': 'http://unreachable.test',
+      'server.token': 'plaintext-tok',
+      'server.email': 'reader@example.com',
+    });
+    final conn = await ServerConnection.load();
+    expect(conn.isConnected, true);
+
+    await conn.disconnect().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => fail('disconnect waited on the network'),
+        );
+
+    expect(conn.isConnected, false, reason: 'the session is gone locally');
+    expect(conn.email, '', reason: 'and so is the account it was for');
+    expect(conn.baseUrl, 'http://unreachable.test',
+        reason: 'the address is kept as a convenience for signing back in');
+  });
+
   test('warns once when the token loads from plaintext prefs (no keyring)',
       () async {
     // With no secure-storage platform channel registered, the read throws and
