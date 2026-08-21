@@ -619,12 +619,13 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          height: 320,
-                          child: AnnotationsPanel(
-                            book: book,
-                            store: repository.annotations,
-                          ),
+                        // Three entries here, the rest behind a button: the
+                        // detail page scrolls as a whole, and a fixed-height
+                        // list inside it swallows the page's own scroll.
+                        AnnotationsPanel(
+                          book: book,
+                          store: repository.annotations,
+                          maxInline: 3,
                         ),
                       ],
                     ),

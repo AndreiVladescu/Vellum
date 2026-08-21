@@ -13,6 +13,12 @@ import 'markdown_export.dart';
 /// Shown as a side sheet from either reader, and as a section on the book's
 /// detail page. [onJump] is optional because the detail page has nowhere to jump
 /// *to* — there, the panel is a reading record rather than a navigation aid.
+///
+/// With [maxInline] set the panel shrink-wraps to at most that many entries and
+/// hands the rest to a button that opens the full panel in a sheet. That is how
+/// the detail page uses it: a reader with a hundred highlights would otherwise
+/// push everything below annotations off the end of a phone screen, or trap the
+/// list in a fixed-height box that fights the page's own scroll.
 class AnnotationsPanel extends StatelessWidget {
   const AnnotationsPanel({
     super.key,
@@ -20,6 +26,7 @@ class AnnotationsPanel extends StatelessWidget {
     required this.store,
     this.onJump,
     this.authors = const [],
+    this.maxInline,
   });
 
   final Book book;
@@ -30,14 +37,39 @@ class AnnotationsPanel extends StatelessWidget {
 
   final List<String> authors;
 
+  /// Show at most this many entries, with a button for the rest. Null lists all.
+  final int? maxInline;
+
+  /// The rest of the list, in a sheet of its own.
+  void _openAll(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: AnnotationsPanel(
+          book: book,
+          store: store,
+          authors: authors,
+          onJump: onJump,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Annotation>>(
       stream: store.watchForBook(book.id),
       builder: (context, snapshot) {
         final annotations = snapshot.data ?? const <Annotation>[];
+        final limit = maxInline;
+        final shown =
+            limit == null ? null : annotations.take(limit).toList();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: shown == null ? MainAxisSize.max : MainAxisSize.min,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
@@ -82,7 +114,22 @@ class AnnotationsPanel extends StatelessWidget {
                   'reading.',
                 ),
               )
-            else
+            else if (shown != null) ...[
+              for (final annotation in shown)
+                AnnotationTile(
+                  annotation: annotation,
+                  store: store,
+                  onJump: onJump,
+                ),
+              if (shown.length < annotations.length)
+                ListTile(
+                  leading: const Icon(Icons.more_horiz),
+                  title: Text(
+                    'Show all ${annotations.length} annotations',
+                  ),
+                  onTap: () => _openAll(context),
+                ),
+            ] else
               Expanded(
                 child: ListView.separated(
                   // The panel is a bottom sheet, so its last row would
@@ -90,7 +137,7 @@ class AnnotationsPanel extends StatelessWidget {
                   padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
                   itemCount: annotations.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, i) => _AnnotationTile(
+                  itemBuilder: (context, i) => AnnotationTile(
                     annotation: annotations[i],
                     store: store,
                     onJump: onJump,
@@ -104,8 +151,9 @@ class AnnotationsPanel extends StatelessWidget {
   }
 }
 
-class _AnnotationTile extends StatelessWidget {
-  const _AnnotationTile({
+class AnnotationTile extends StatelessWidget {
+  const AnnotationTile({
+    super.key,
     required this.annotation,
     required this.store,
     this.onJump,
