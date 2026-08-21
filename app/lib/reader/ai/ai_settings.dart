@@ -22,8 +22,10 @@ class AiSettings extends ChangeNotifier {
   String? _apiKey;
 
   /// True when the key had to be kept in plain preferences because the OS
-  /// secure store was unavailable. Shown, not hidden.
-  final bool keyInsecure;
+  /// secure store was unavailable. Shown, not hidden — and settable here
+  /// because the fallback can happen on the first save, which is exactly when
+  /// the reader is looking at the key field.
+  bool keyInsecure;
 
   static Future<AiSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -87,6 +89,7 @@ class AiSettings extends ChangeNotifier {
         await _prefs.remove(_secretKey);
       } else {
         await _prefs.setString(_secretKey, key);
+        keyInsecure = true;
       }
     }
     notifyListeners();

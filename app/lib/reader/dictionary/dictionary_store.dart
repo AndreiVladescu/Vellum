@@ -20,11 +20,17 @@ import 'package:path_provider/path_provider.dart';
 import 'wordnet.dart';
 
 /// The published archive. Princeton has served this exact path since 2007.
-const wordNetArchiveUrl = 'https://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz';
+///
+/// The full distribution rather than the database-only `WNdb-3.0.tar.gz`: it is
+/// one megabyte larger and it carries the `.exc` files, which are what make
+/// "ran" find *run* and "geese" find *goose*. Everything in it that a lookup
+/// does not read is dropped on the way in.
+const wordNetArchiveUrl =
+    'https://wordnetcode.princeton.edu/3.0/WordNet-3.0.tar.gz';
 
 /// What the download costs, for the sentence shown before it starts. Nobody
 /// should find out how big it was from their data bill.
-const wordNetDownloadBytes = 10518425;
+const wordNetDownloadBytes = 11537239;
 
 /// Roughly what it takes once unpacked, for the same reason.
 const wordNetInstalledBytes = 20 << 20;
@@ -126,19 +132,28 @@ class DictionaryStore {
         await input.close();
         await output.close();
       }
-      final entries = TarDecoder().decodeStream(InputFileStream(tarPath));
+      // Held in a local and closed below: an open handle on the unpacked tar
+      // makes the delete in the `finally` fail on Windows, which would leave
+      // 34 MB sitting in the dictionary directory — and counted by
+      // [bytesOnDisk] as if it were the dictionary.
+      final tarInput = InputFileStream(tarPath);
       var written = 0;
-      for (final entry in entries.files) {
-        if (!entry.isFile) continue;
-        final name = entry.name.split('/').last;
-        if (!WordNet.wantedFiles.contains(name)) continue;
-        final out = OutputFileStream('${dir.path}/$name');
-        try {
-          entry.writeContent(out);
-        } finally {
-          await out.close();
+      try {
+        final entries = TarDecoder().decodeStream(tarInput);
+        for (final entry in entries.files) {
+          if (!entry.isFile) continue;
+          final name = entry.name.split('/').last;
+          if (!WordNet.wantedFiles.contains(name)) continue;
+          final out = OutputFileStream('${dir.path}/$name');
+          try {
+            entry.writeContent(out);
+          } finally {
+            await out.close();
+          }
+          written++;
         }
-        written++;
+      } finally {
+        await tarInput.close();
       }
       if (written == 0 || !isInstalled) {
         throw const DictionaryInstallException(

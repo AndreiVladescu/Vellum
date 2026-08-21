@@ -13,11 +13,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/dictionary/dictionary_store.dart';
 
 /// A stand-in for Princeton's tarball: the same layout, tiny contents.
+///
+/// The nesting matters — the real archive puts everything under
+/// `WordNet-3.0/dict/`, alongside sources and man pages, so the install has to
+/// find its files by name rather than by position.
 File writeArchive(Directory dir, Iterable<String> names) {
   final archive = Archive();
+  archive.add(ArchiveFile.directory('WordNet-3.0/dict'));
+  archive.add(ArchiveFile.bytes(
+      'WordNet-3.0/doc/man/wnintro.1', utf8.encode('not a dictionary')));
   for (final name in names) {
     final bytes = utf8.encode('  1 licence\ndog n 1 0 1 0 00000012\n');
-    archive.add(ArchiveFile.bytes('dict/$name', bytes));
+    archive.add(ArchiveFile.bytes('WordNet-3.0/dict/$name', bytes));
   }
   final tar = TarEncoder().encodeBytes(archive);
   final file = File('${dir.path}/WNdb-3.0.tar.gz')
@@ -63,6 +70,8 @@ void main() {
 
     expect(File('${store.dir.path}/index.sense').existsSync(), false,
         reason: 'a 15 MB file nothing reads has no business on a phone');
+    expect(File('${store.dir.path}/wnintro.1').existsSync(), false,
+        reason: 'nor the manual pages the full distribution carries');
     expect(store.isInstalled, true);
   });
 

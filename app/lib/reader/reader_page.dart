@@ -1257,11 +1257,18 @@ class _ReaderPageState extends State<ReaderPage>
                       .toList()
                   : const <PdfPageTextRange>[];
               if (!mounted) return;
-              // Only rebuild when the *presence* of a selection changes: this
-              // fires continuously while dragging.
+              // Only rebuild when something the toolbar shows changes: this
+              // fires continuously while dragging. That is the presence of a
+              // selection — and whether it is a single word, because that is
+              // what decides if the dictionary button is there. Without the
+              // second test, narrowing a three-word selection down to one word
+              // never brings the button back.
               final had = _hasSelection;
+              final hadWord = _selectedWord != null;
               _selectedRanges = ranges;
-              if (ranges.isNotEmpty != had) setState(() {});
+              if (ranges.isNotEmpty != had || (_selectedWord != null) != hadWord) {
+                setState(() {});
+              }
             },
           ),
         ),

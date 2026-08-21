@@ -304,11 +304,24 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final next = range == null
         ? null
         : (start: range.startOffset, end: range.endOffset);
-    // Rebuild only when the presence of a selection changes; this fires
-    // continuously while dragging.
+    // Rebuild only when something the toolbar shows changes; this fires
+    // continuously while dragging. Two things do: whether there is a selection
+    // at all, and whether it is a single word — which is what decides if the
+    // dictionary button is there. Without the second test, narrowing a phrase
+    // down to one word never brings the button back.
     final had = _selectionRange != null;
+    final hadWord = _selectionIsWord;
     _selectionRange = next;
-    if ((next != null) != had && mounted) setState(() {});
+    if (((next != null) != had || _selectionIsWord != hadWord) && mounted) {
+      setState(() {});
+    }
+  }
+
+  /// Whether what is selected right now is one word — see [singleWord].
+  bool get _selectionIsWord {
+    final epub = _loaded;
+    if (epub == null || _selectionRange == null) return false;
+    return singleWord(_selectedText(epub)) != null;
   }
 
   /// The marker currently in hand. A setting, not a question asked per
@@ -947,7 +960,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   onPressed: () => _highlightSelection(epub, withNote: true),
                 ),
                 // A word, not a phrase — the same rule as the PDF reader.
-                if (singleWord(_selectedText(epub)) != null)
+                if (_selectionIsWord)
                   IconButton(
                     tooltip: 'Look up “${singleWord(_selectedText(epub))}”',
                     icon: const Icon(Icons.menu_book_outlined),
