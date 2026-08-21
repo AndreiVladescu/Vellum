@@ -6,6 +6,83 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.5 — 2026-08-21
+
+Sixteen notes from a week of using the app, and their answers. Most of them
+land in the reader: it can hide itself, turn pages from a swipe, scroll at
+your own pace, look a word up without a network, and hand a passage to a
+model you choose. The rest are the small things that made the app feel wrong
+— a fit that didn't fit, a sync that refused the first press, a library that
+couldn't scroll in landscape.
+
+### Added
+
+- **Reading mode**, in both readers: the toolbar goes, the scroll thumb goes
+  with it, and the screen is held awake — reading is the one thing you do
+  with a phone without touching it, and a page that dims halfway down is why
+  people tap at nothing. A swipe down from the top edge brings the chrome
+  back, the way a video player does; a strip nothing else uses, because taps
+  are how pages turn.
+- **The page turns from a swipe** in page-by-page mode — up and left forward,
+  down and right back, so nobody has to remember which one this reader
+  wanted. Only while the page is at its resting zoom: once you have zoomed
+  in, dragging is how you look around the page.
+- **A vertical drag stays vertical** in continuous mode when you are zoomed
+  in, so reading down a column no longer drifts sideways off the text.
+- **The page can scroll by itself.** Press play and it moves continuously at
+  a speed that starts from your own recorded sittings — pages a minute in a
+  PDF, lines a minute in an EPUB, since an EPUB has no pages and a line is a
+  thing the settings know the exact height of. A floating slower/faster
+  control stays visible in reading mode, a finger on the page holds it still
+  and it carries on when you lift, and in an EPUB it rolls into the next
+  chapter instead of stopping at the break. With no measured pace it starts
+  from a slow default rather than inventing one.
+- **Look a word up without leaving the book.** Select a single word and the
+  reader offers definitions, synonyms and WordNet's own examples. The
+  dictionary is an 11 MB download, offered where it is first wanted and
+  removable from the reader's options; every lookup happens on the device, so
+  no word you read is ever sent anywhere. Words only, not phrases — the
+  button appears for one and not the other, rather than appearing always and
+  returning nothing.
+- **Ask a model about a passage, a page or a chapter.** One OpenAI-compatible
+  request, so a model you run yourself (Ollama, LM Studio, llama.cpp, vLLM)
+  and a paid service are the same code path with a different address in it.
+  Nothing is configured by default and nothing is sent until you name a
+  server: the sheet shows the text before it goes and names the host it goes
+  to. An answer can be kept as a note on the passage.
+- **The page counter says what you want it to say.** Hold it — or right-click
+  — to cycle through page and total, percent, pages read, pages left and time
+  left; the reader's options offer the same list. Time left is measured from
+  your own sittings, and shows a percentage rather than inventing a pace when
+  there is nothing to measure yet.
+- **Android shows the sync notification by default**, for background syncs
+  and for the one at launch, not only for a sync you asked for by hand.
+
+### Fixed
+
+- **Fit width didn't fit the width.** Fit page worked because it zooms *out*;
+  pdfrx's page fit refuses to zoom in, so asking for the width did nothing at
+  all. It now goes to the page's own width directly.
+- **"A sync is already in progress" on the first press, working on the
+  second.** The sync at launch is silent by design, so the Sync button — which
+  watched only its own state — looked idle while one was running. It now
+  watches the service, says *Syncing…* and stays disabled until it is free.
+- **Disconnect did nothing on Android.** It said goodbye to the server before
+  changing anything locally, so against a server that had gone away it hung
+  on the network and never disconnected. It now clears the session first and
+  says goodbye afterwards.
+- **The library couldn't be scrolled in landscape.** The recently-read strip
+  took about 200px of a 280px-tall body, leaving the shelf no room; below a
+  short screen it now shows one compact row and gives the rest back.
+- **A book's page listed every annotation in a fixed-height box** that fought
+  the page's own scroll. It shows three, with the rest behind a button that
+  opens the full panel.
+- **Continuous mode could be dragged off into empty space** — the axis lock
+  replaced pdfrx's own boundary clamp instead of adding to it, so nothing
+  held the document inside the view.
+
+---
+
 ## v1.1.4 — 2026-08-19
 
 Physical copies get their own overlay in the app and the console, Android
