@@ -1,0 +1,22 @@
+# Which container `cross` builds the musl targets in.
+#
+# Its 0.2.5 release images are Ubuntu 16.04 — glibc 2.23 — and `cross` runs the
+# *host* toolchain inside them. Cargo compiles every build script for the host
+# triple, so those binaries are linked against the toolchain's own baseline, and
+# Rust has since raised it past what 16.04 has:
+#
+#     build-script-build: /lib/x86_64-linux-gnu/libc.so.6:
+#     version `GLIBC_2.28' not found
+#
+# Nothing in this repository caused that and nothing here can avoid it: the
+# workflow asks for `stable`, so the day Rust moved its floor, a tree that built
+# last week stopped building. The `main` images are the same targets on a
+# modern base, which is where cross itself points people for this error.
+[target.aarch64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:main"
+
+# Pinned too, though it still builds today: it is one Rust release away from the
+# identical failure, and finding that out from a release run is how this one was
+# found.
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:main"
