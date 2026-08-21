@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
@@ -13,6 +15,7 @@ import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
 import 'night_mode.dart';
 import 'edge_turn.dart';
+import 'reader_gestures.dart';
 import 'reader_hotkeys.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
@@ -207,6 +210,8 @@ class _ReaderPageState extends State<ReaderPage> {
 
   @override
   void dispose() {
+    // The wakelock belongs to this page, not to the app.
+    unawaited(WakelockPlus.disable().catchError((_) {}));
     _openTimer?.cancel();
     _hotkeys.detach();
     // Closing the session is fire-and-forget: the widget is going away, and a
@@ -337,6 +342,26 @@ class _ReaderPageState extends State<ReaderPage> {
   /// The mode in force, before the settings have finished loading.
   PdfPageMode get _mode => _settings?.pdfMode ?? PdfPageMode.scroll;
 
+  /// Where a pointer went down, and when — the two numbers a swipe is made of.
+  ///
+  /// A raw [Listener] rather than a `GestureDetector`: pdfrx runs its own pan
+  /// and zoom recognisers on the same pixels, and a competing recogniser would
+  /// have to win the arena to see anything, which would cost the panning that
+  /// is the viewer's whole job. A Listener observes without competing, and
+  /// these fields are what it observes.
+  Offset? _pointerDownAt;
+  DateTime? _pointerDownTime;
+
+  /// While a mostly-vertical drag is in progress in continuous mode, the
+  /// horizontal offset it started at. [_clamp] pins the viewport to it, so a
+  /// page you have zoomed into does not wander sideways while you read down it
+  /// (next features: the axis-lock request).
+  double? _lockedX;
+
+  /// Set once a drag has committed to being vertical, so a diagonal wobble
+  /// early in a gesture cannot flip it back and forth.
+  bool _axisDecided = false;
+
   /// Bumped to build a fresh viewer, which is what *Try again* does — the same
   /// thing closing the book and opening it again does, without the trip.
   int _viewerAttempt = 0;
@@ -380,6 +405,88 @@ class _ReaderPageState extends State<ReaderPage> {
     }
   }
 
+  /// Enters or leaves reading mode.
+  ///
+  /// Reading mode is the chrome gone — no toolbar, no scroll thumb — and the
+  /// screen kept awake, because reading is the one thing you do with a phone
+  /// without touching it, and a page that dims halfway down is the reason
+  /// people tap at nothing. Leaving it puts the screen back on the system's
+  /// own timeout.
+  Future<void> _setReadingMode(bool on) async {
+    setState(() => _chromeHidden = on);
+    try {
+      if (on) {
+        await WakelockPlus.enable();
+      } else {
+        await WakelockPlus.disable();
+      }
+    } catch (_) {
+      // A platform without a wakelock, or one that refuses: reading mode is
+      // still reading mode without it.
+    }
+  }
+
+  /// True when the page is shown whole, rather than zoomed into.
+  ///
+  /// The test that decides whether a swipe turns the page or pans it: once you
+  /// have zoomed in, dragging is how you look around the page, and stealing
+  /// that to turn pages would make a zoomed page unreadable. A small tolerance
+  /// because a "fit" zoom is rarely exactly the fit zoom after an animation.
+  bool get _atRestingZoom {
+    if (!_controller.isReady) return false;
+    final page = _page;
+    if (page == null) return false;
+    final pages = _controller.layout.pageLayouts;
+    if (page < 1 || page > pages.length) return false;
+    final rect = pages[page - 1];
+    final view = _controller.viewSize;
+    if (rect.width <= 0 || view.width <= 0) return false;
+    final fit = _settings?.pdfFit == PdfFit.page
+        ? math.min(view.width / rect.width, view.height / rect.height)
+        : view.width / rect.width;
+    return _controller.currentZoom <= fit * 1.05;
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    _pointerDownAt = event.position;
+    _pointerDownTime = DateTime.now();
+    _lockedX = null;
+    _axisDecided = false;
+  }
+
+  /// Decides, once per drag, whether this is a vertical one — and if it is,
+  /// remembers where it started horizontally so [_clamp] can hold it there.
+  void _onPointerMove(PointerMoveEvent event) {
+    if (_axisDecided || _mode != PdfPageMode.scroll) return;
+    final from = _pointerDownAt;
+    if (from == null) return;
+    final delta = event.position - from;
+    if (!axisDecided(delta)) return;
+    _axisDecided = true;
+    if (isVerticalDrag(delta) && !_atRestingZoom) {
+      _lockedX = _controller.value.row0[3];
+    }
+  }
+
+  /// A swipe, if that is what it was: page turns in paged mode.
+  void _onPointerUp(PointerUpEvent event) {
+    final from = _pointerDownAt;
+    final at = _pointerDownTime;
+    _pointerDownAt = null;
+    _pointerDownTime = null;
+    _lockedX = null;
+    _axisDecided = false;
+    if (from == null || at == null) return;
+    final turn = swipeTurn(
+      delta: event.position - from,
+      elapsed: DateTime.now().difference(at),
+      paged: _mode == PdfPageMode.paged,
+      atRestingZoom: _atRestingZoom,
+    );
+    if (turn == null) return;
+    _step(turn == SwipeTurn.forward ? 1 : -1);
+  }
+
   /// Pins the viewport inside one page, so paged mode is genuinely paged: you
   /// cannot scroll a second page into view, and you cannot come to rest across
   /// the seam between two. See [clampToPage].
@@ -394,6 +501,17 @@ class _ReaderPageState extends State<ReaderPage> {
         !controller.isReady ||
         layout.pageLayouts.isEmpty) {
       return matrix;
+    }
+    // Continuous mode's only rule: while a vertical drag is in progress on a
+    // page you have zoomed into, the horizontal offset does not move. Reading
+    // down a zoomed column and drifting sideways off the text is the thing
+    // being fixed; nothing else about panning changes.
+    if (_mode != PdfPageMode.paged) {
+      final lockedX = _lockedX;
+      if (lockedX == null) return matrix;
+      final held = matrix.clone();
+      held.setEntry(0, 3, lockedX);
+      return held;
     }
     final zoom = matrix.zoom;
     if (zoom <= 0) return matrix;
@@ -706,6 +824,11 @@ class _ReaderPageState extends State<ReaderPage> {
             onPressed: _page == null ? null : _toggleBookmark,
           ),
           IconButton(
+            icon: const Icon(Icons.fullscreen),
+            tooltip: 'Reading mode — swipe down from the top to come back',
+            onPressed: () => _setReadingMode(true),
+          ),
+          IconButton(
             icon: const Icon(Icons.list_alt),
             tooltip: 'Annotations',
             onPressed: _openPanel,
@@ -749,9 +872,14 @@ class _ReaderPageState extends State<ReaderPage> {
         final strip =
             ReaderEdgeTurn.stripWidth(constraints.maxWidth, constraints.maxWidth * 0.8);
         return Stack(children: [
-          GestureDetector(
+          Listener(
+            // Observes; does not compete. See [_onPointerDown].
+            onPointerDown: _onPointerDown,
+            onPointerMove: _onPointerMove,
+            onPointerUp: _onPointerUp,
+            child: GestureDetector(
             onTap: settings?.immersive == true
-                ? () => setState(() => _chromeHidden = !_chromeHidden)
+                ? () => _setReadingMode(!_chromeHidden)
                 : null,
             child: nightModeWrap(
               enabled: dark,
@@ -779,7 +907,7 @@ class _ReaderPageState extends State<ReaderPage> {
           scrollByMouseWheel: 1.5,
           // The scrollbar belongs to scrolling. In paged mode there is nothing
           // for it to represent — you are on a page, not somewhere in a river.
-          viewerOverlayBuilder: _mode == PdfPageMode.scroll
+          viewerOverlayBuilder: _mode == PdfPageMode.scroll && !_chromeHidden
               ? (context, size, handleLinkTap) => [
                     PdfViewerScrollThumb(
                       controller: _controller,
@@ -790,7 +918,8 @@ class _ReaderPageState extends State<ReaderPage> {
                     ),
                   ]
               : null,
-          normalizeMatrix: _mode == PdfPageMode.paged ? _clamp : null,
+          // Both modes: the page clamp when paged, the axis lock when not.
+          normalizeMatrix: _clamp,
           onViewerReady: (_, _) {
             // `onPageChanged` only fires on a *change*, so until you scrolled
             // there was no current page: the counter was blank, Bookmark was
@@ -834,6 +963,26 @@ class _ReaderPageState extends State<ReaderPage> {
       ),
             ),
           ),
+          ),
+          // A swipe down from the very top edge brings the chrome back, the way
+          // a video player does. A deliberate gesture from a place nothing else
+          // uses, rather than a tap: taps are how pages turn.
+          if (_chromeHidden)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 48,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onVerticalDragEnd: (details) {
+                  if (details.primaryVelocity != null &&
+                      details.primaryVelocity! > 0) {
+                    _setReadingMode(false);
+                  }
+                },
+              ),
+            ),
           // Until the document reports in there is nothing to look at but the
           // background, and a blank page is indistinguishable from a broken
           // one. Say which it is.
