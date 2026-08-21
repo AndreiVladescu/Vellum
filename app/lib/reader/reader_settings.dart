@@ -129,6 +129,8 @@ class ReaderSettings extends ChangeNotifier {
   static const _pdfModeKey = 'reader.pdfMode';
   static const _highlightColorKey = 'reader.highlightColor';
   static const _pageMetricKey = 'reader.pageMetric';
+  static const _autoScrollKey = 'reader.autoScrollPagesPerMinute';
+  static const _autoScrollLinesKey = 'reader.autoScrollLinesPerMinute';
   // Translation (next features #12). The URL is what decides whether the
   // feature exists at all: no server, no button — the same rule the sync
   // server's own features follow.
@@ -322,6 +324,32 @@ class ReaderSettings extends ChangeNotifier {
 
   Future<void> setPageMetric(PageMetric value) async {
     await _prefs.setString(_pageMetricKey, value.name);
+    notifyListeners();
+  }
+
+  /// How fast the PDF reader's self-scroller moves, in pages a minute.
+  ///
+  /// Null until it has been set by hand, which is what lets the reader start
+  /// from your own measured pace instead of a number someone else picked.
+  double? get autoScrollPagesPerMinute {
+    final value = _prefs.getDouble(_autoScrollKey);
+    return value != null && value > 0 ? value : null;
+  }
+
+  Future<void> setAutoScrollPagesPerMinute(double value) async {
+    await _prefs.setDouble(_autoScrollKey, value);
+    notifyListeners();
+  }
+
+  /// The same for the EPUB reader, in lines a minute — an EPUB has no pages to
+  /// count, and a line is a thing these settings know the exact height of.
+  double? get autoScrollLinesPerMinute {
+    final value = _prefs.getDouble(_autoScrollLinesKey);
+    return value != null && value > 0 ? value : null;
+  }
+
+  Future<void> setAutoScrollLinesPerMinute(double value) async {
+    await _prefs.setDouble(_autoScrollLinesKey, value);
     notifyListeners();
   }
 

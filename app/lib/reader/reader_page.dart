@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -10,6 +11,8 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../stats/stats_queries.dart';
 import '../shortcuts.dart';
+import 'auto_scroll.dart';
+import 'auto_scroll_bar.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
@@ -50,7 +53,8 @@ class ReaderPage extends StatefulWidget {
   State<ReaderPage> createState() => _ReaderPageState();
 }
 
-class _ReaderPageState extends State<ReaderPage> {
+class _ReaderPageState extends State<ReaderPage>
+    with SingleTickerProviderStateMixin {
   final _controller = PdfViewerController();
   int? _page;
   int? _pageCount;
@@ -213,6 +217,7 @@ class _ReaderPageState extends State<ReaderPage> {
 
   @override
   void dispose() {
+    _autoTicker?.dispose();
     // The wakelock belongs to this page, not to the app.
     unawaited(WakelockPlus.disable().catchError((_) {}));
     _openTimer?.cancel();
@@ -441,6 +446,118 @@ class _ReaderPageState extends State<ReaderPage> {
     }
   }
 
+  /// The self-scroller: a ticker, the offset it is driving, and whether a
+  /// finger is currently on the page (next features: "scroll for you slowly,
+  /// continuously").
+  ///
+  /// It moves the viewport's own translation rather than animating a jump,
+  /// because the point is continuous motion — a series of `goTo` animations
+  /// would arrive in steps, which is the reading-by-page-turn it replaces.
+  Ticker? _autoTicker;
+  Duration _autoLastTick = Duration.zero;
+  double? _autoY;
+  int _autoStuckFrames = 0;
+
+  /// While a finger is down the scroller holds still, so you can drag the page
+  /// where you want it and have it carry on from there when you let go.
+  bool _autoHeld = false;
+
+  bool get _autoScrolling => _autoTicker?.isActive ?? false;
+
+  /// The speed in force: what you last set, or your own measured pace, or a
+  /// slow default. Never a fabricated pace presented as measured — see
+  /// [defaultAutoScrollPagesPerMinute].
+  double get _autoSpeed => clampAutoScrollSpeed(
+        _settings?.autoScrollPagesPerMinute ??
+            _pace ??
+            defaultAutoScrollPagesPerMinute,
+        min: minAutoScrollPagesPerMinute,
+        max: maxAutoScrollPagesPerMinute,
+      );
+
+  /// The current page as drawn, which is what "a page a minute" means on screen.
+  double get _pageHeightOnScreen {
+    final page = _page;
+    if (page == null || !_controller.isReady) return 0;
+    final pages = _controller.layout.pageLayouts;
+    if (page < 1 || page > pages.length) return 0;
+    return pages[page - 1].height * _controller.currentZoom;
+  }
+
+  void _toggleAutoScroll() {
+    if (_autoScrolling) {
+      _stopAutoScroll();
+    } else {
+      _startAutoScroll();
+    }
+  }
+
+  void _startAutoScroll() {
+    if (_mode != PdfPageMode.scroll || !_controller.isReady) return;
+    // A drag that ended in a lock would otherwise pin the horizontal offset for
+    // the whole of the scroll.
+    _lockedX = null;
+    _axisDecided = false;
+    _autoY = null;
+    _autoHeld = false;
+    _autoStuckFrames = 0;
+    _autoLastTick = Duration.zero;
+    _autoTicker ??= createTicker(_onAutoTick);
+    _autoTicker!.start();
+    setState(() {});
+  }
+
+  void _stopAutoScroll() {
+    _autoTicker?.stop();
+    _autoY = null;
+    if (mounted) setState(() {});
+  }
+
+  void _onAutoTick(Duration elapsed) {
+    final seconds = (elapsed - _autoLastTick).inMicroseconds /
+        Duration.microsecondsPerSecond;
+    _autoLastTick = elapsed;
+    // A long gap means the app was away; skip it rather than lurching.
+    if (_autoHeld || seconds <= 0 || seconds > 0.5 || !_controller.isReady) {
+      return;
+    }
+    final speed = autoScrollPixelsPerSecond(
+      unitsPerMinute: _autoSpeed,
+      unitHeightPixels: _pageHeightOnScreen,
+    );
+    if (speed <= 0) return;
+    final before = _controller.value.row1[3];
+    // Driven from our own running offset, not from the matrix: at a slow speed
+    // a frame moves a third of a pixel, and reading the position back each time
+    // would round that away to nothing. Re-synced whenever something else — a
+    // drag, a jump — has moved the page out from under us.
+    var target = _autoY;
+    if (target == null || (target - before).abs() > 2) target = before;
+    target -= speed * seconds;
+    _controller.value = _controller.value.clone()..setEntry(1, 3, target);
+    final after = _controller.value.row1[3];
+    _autoY = after;
+    // The clamp refuses to move past the last page, so a run of frames that
+    // went nowhere is the end of the document.
+    if ((after - before).abs() < 0.05) {
+      if (++_autoStuckFrames >= autoScrollStuckFrames) _stopAutoScroll();
+    } else {
+      _autoStuckFrames = 0;
+    }
+  }
+
+  Future<void> _setAutoSpeed(double pagesPerMinute) async {
+    final settings = _settings;
+    if (settings == null) return;
+    await settings.setAutoScrollPagesPerMinute(roundAutoScrollSpeed(
+      clampAutoScrollSpeed(
+        pagesPerMinute,
+        min: minAutoScrollPagesPerMinute,
+        max: maxAutoScrollPagesPerMinute,
+      ),
+    ));
+  }
+
   /// True when the page is shown whole, rather than zoomed into.
   ///
   /// The test that decides whether a swipe turns the page or pans it: once you
@@ -463,6 +580,9 @@ class _ReaderPageState extends State<ReaderPage> {
   }
 
   void _onPointerDown(PointerDownEvent event) {
+    // Holds the self-scroller still rather than stopping it: touching the page
+    // to steady it is not the same as wanting to stop reading.
+    if (_autoScrolling) _autoHeld = true;
     _pointerDownAt = event.position;
     _pointerDownTime = DateTime.now();
     _lockedX = null;
@@ -485,6 +605,7 @@ class _ReaderPageState extends State<ReaderPage> {
 
   /// A swipe, if that is what it was: page turns in paged mode.
   void _onPointerUp(PointerUpEvent event) {
+    _autoHeld = false;
     final from = _pointerDownAt;
     final at = _pointerDownTime;
     _pointerDownAt = null;
@@ -522,9 +643,17 @@ class _ReaderPageState extends State<ReaderPage> {
     // down a zoomed column and drifting sideways off the text is the thing
     // being fixed; nothing else about panning changes.
     if (_mode != PdfPageMode.paged) {
+      // This hook *replaces* pdfrx's own boundary clamp rather than adding to
+      // it, so continuous mode has to ask for it back — without it the document
+      // can be dragged off into empty space, and the self-scroller would never
+      // find a bottom to stop at.
+      final bounded = controller.calcMatrixForClampedToNearestBoundary(
+        matrix,
+        viewSize: viewSize,
+      );
       final lockedX = _lockedX;
-      if (lockedX == null) return matrix;
-      final held = matrix.clone();
+      if (lockedX == null) return bounded;
+      final held = bounded.clone();
       held.setEntry(0, 3, lockedX);
       return held;
     }
@@ -860,6 +989,18 @@ class _ReaderPageState extends State<ReaderPage> {
                 : 'Remove bookmark',
             onPressed: _page == null ? null : _toggleBookmark,
           ),
+          // Scrolling by itself only means anything where scrolling is how you
+          // move; in paged mode there is nothing to scroll.
+          if (_mode == PdfPageMode.scroll)
+            IconButton(
+              icon: Icon(_autoScrolling
+                  ? Icons.pause_circle_outline
+                  : Icons.play_circle_outline),
+              tooltip: _autoScrolling
+                  ? 'Stop scrolling by itself'
+                  : 'Scroll by itself',
+              onPressed: _controller.isReady ? _toggleAutoScroll : null,
+            ),
           IconButton(
             icon: const Icon(Icons.fullscreen),
             tooltip: 'Reading mode — swipe down from the top to come back',
@@ -1018,6 +1159,25 @@ class _ReaderPageState extends State<ReaderPage> {
                     _setReadingMode(false);
                   }
                 },
+              ),
+            ),
+          // The speed control, shown only while the page is moving by itself —
+          // and shown in reading mode too, because that is where it is used:
+          // the chrome is gone and this is the one thing you still need.
+          if (_autoScrolling)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 24,
+              child: Center(
+                child: AutoScrollBar(
+                  speed: _autoSpeed,
+                  unit: 'pages',
+                  min: minAutoScrollPagesPerMinute,
+                  max: maxAutoScrollPagesPerMinute,
+                  onSpeed: _setAutoSpeed,
+                  onStop: _stopAutoScroll,
+                ),
               ),
             ),
           // Until the document reports in there is nothing to look at but the

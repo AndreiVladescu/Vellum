@@ -2,11 +2,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shortcuts.dart';
+import 'auto_scroll.dart';
+import 'auto_scroll_bar.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/epub_highlight_html.dart';
@@ -70,7 +74,8 @@ class EpubReaderPage extends StatefulWidget {
   State<EpubReaderPage> createState() => _EpubReaderPageState();
 }
 
-class _EpubReaderPageState extends State<EpubReaderPage> {
+class _EpubReaderPageState extends State<EpubReaderPage>
+    with SingleTickerProviderStateMixin {
   late final Future<EpubBook> _epub =
       EpubBook.openCached(widget.book.id, widget.file);
   final _scroll = ScrollController();
@@ -95,6 +100,117 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   /// Whether the chrome is currently hidden; seeded from the preference so a tap
   /// can reveal it temporarily without changing the setting.
   bool _chromeHidden = false;
+
+  /// Enters or leaves reading mode: the chrome gone, and the screen kept awake.
+  ///
+  /// The same thing the PDF reader does, and for the same reason — reading is
+  /// the one thing you do with a phone without touching it, so a screen that
+  /// dims halfway down a chapter is why people tap at nothing.
+  Future<void> _setReadingMode(bool on) async {
+    setState(() => _chromeHidden = on);
+    try {
+      if (on) {
+        await WakelockPlus.enable();
+      } else {
+        await WakelockPlus.disable();
+      }
+    } catch (_) {
+      // A platform without a wakelock, or one that refuses: reading mode is
+      // still reading mode without it.
+    }
+  }
+
+  /// The self-scroller. Lines a minute here rather than pages: an EPUB has no
+  /// pages, and a line is a thing the settings know the exact height of —
+  /// `fontSize × lineHeight`. See `auto_scroll.dart`.
+  Ticker? _autoTicker;
+  Duration _autoLastTick = Duration.zero;
+  bool _autoHeld = false;
+  int _autoStuckFrames = 0;
+
+  bool get _autoScrolling => _autoTicker?.isActive ?? false;
+
+  double get _autoSpeed => clampAutoScrollSpeed(
+        _settings?.autoScrollLinesPerMinute ?? defaultAutoScrollLinesPerMinute,
+        min: minAutoScrollLinesPerMinute,
+        max: maxAutoScrollLinesPerMinute,
+      );
+
+  /// One line of body text as it is drawn right now.
+  double get _lineHeightOnScreen {
+    final settings = _settings;
+    if (settings == null) return 0;
+    return settings.fontSize * settings.lineHeight;
+  }
+
+  void _toggleAutoScroll() {
+    if (_autoScrolling) {
+      _stopAutoScroll();
+    } else {
+      _startAutoScroll();
+    }
+  }
+
+  void _startAutoScroll() {
+    if (!_scroll.hasClients) return;
+    _autoHeld = false;
+    _autoStuckFrames = 0;
+    _autoLastTick = Duration.zero;
+    _autoTicker ??= createTicker(_onAutoTick);
+    _autoTicker!.start();
+    setState(() {});
+  }
+
+  void _stopAutoScroll() {
+    _autoTicker?.stop();
+    if (mounted) setState(() {});
+  }
+
+  void _onAutoTick(Duration elapsed) {
+    final seconds = (elapsed - _autoLastTick).inMicroseconds /
+        Duration.microsecondsPerSecond;
+    _autoLastTick = elapsed;
+    // A long gap means the app was away; skip it rather than lurching.
+    if (_autoHeld || seconds <= 0 || seconds > 0.5 || !_scroll.hasClients) {
+      return;
+    }
+    final speed = autoScrollPixelsPerSecond(
+      unitsPerMinute: _autoSpeed,
+      unitHeightPixels: _lineHeightOnScreen,
+    );
+    if (speed <= 0) return;
+    final position = _scroll.position;
+    final before = position.pixels;
+    final target =
+        (before + speed * seconds).clamp(0.0, position.maxScrollExtent);
+    _scroll.jumpTo(target);
+    if ((target - before).abs() < 0.05) {
+      // The bottom of the chapter. Roll into the next one rather than stopping
+      // dead at every chapter break — the same reasoning as [_pageForward].
+      if (++_autoStuckFrames >= autoScrollStuckFrames) {
+        if (_chapter < _count - 1) {
+          _autoStuckFrames = 0;
+          _goTo(_chapter + 1, _count);
+        } else {
+          _stopAutoScroll();
+        }
+      }
+    } else {
+      _autoStuckFrames = 0;
+    }
+  }
+
+  Future<void> _setAutoSpeed(double linesPerMinute) async {
+    final settings = _settings;
+    if (settings == null) return;
+    await settings.setAutoScrollLinesPerMinute(roundAutoScrollSpeed(
+      clampAutoScrollSpeed(
+        linesPerMinute,
+        min: minAutoScrollLinesPerMinute,
+        max: maxAutoScrollLinesPerMinute,
+      ),
+    ));
+  }
 
   /// Reports the live text selection inside the chapter (plan 5 #22). The range
   /// it gives is in characters of the *rendered* chapter text, which is what
@@ -162,6 +278,9 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
   @override
   void dispose() {
+    _autoTicker?.dispose();
+    // The wakelock belongs to this page, not to the app.
+    unawaited(WakelockPlus.disable().catchError((_) {}));
     _hotkeys.detach();
     _annotationsSub?.cancel();
     _saveDebounce?.cancel();
@@ -751,6 +870,20 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                 onPressed: _toggleBookmark,
               ),
               IconButton(
+                icon: Icon(_autoScrolling
+                    ? Icons.pause_circle_outline
+                    : Icons.play_circle_outline),
+                tooltip: _autoScrolling
+                    ? 'Stop scrolling by itself'
+                    : 'Scroll by itself',
+                onPressed: _toggleAutoScroll,
+              ),
+              IconButton(
+                icon: const Icon(Icons.fullscreen),
+                tooltip: 'Reading mode — swipe down from the top to come back',
+                onPressed: () => _setReadingMode(true),
+              ),
+              IconButton(
                 tooltip: 'Annotations',
                 icon: const Icon(Icons.list_alt),
                 onPressed: () => _openPanel(epub),
@@ -784,12 +917,20 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               settings?.measure ?? 720,
             );
             return Stack(children: [
-              GestureDetector(
+              Listener(
+                // Holds the self-scroller still while a finger is down, rather
+                // than stopping it: steadying the page is not the same as
+                // wanting to stop. A raw Listener observes without joining the
+                // gesture arena, so the scroll view keeps its own drags.
+                onPointerDown: (_) => _autoHeld = _autoScrolling,
+                onPointerUp: (_) => _autoHeld = false,
+                onPointerCancel: (_) => _autoHeld = false,
+                child: GestureDetector(
             // A tap toggles the chrome when the reader asked for a
             // distraction-free page; otherwise it does nothing, so a stray tap
             // can't hide the controls someone is using.
             onTap: settings?.immersive == true
-                ? () => setState(() => _chromeHidden = !_chromeHidden)
+                ? () => _setReadingMode(!_chromeHidden)
                 : null,
             child: SingleChildScrollView(
               controller: _scroll,
@@ -845,6 +986,45 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
               ),
             ),
           ),
+              ),
+              // A swipe down from the very top edge brings the chrome back, the
+              // way a video player does — a deliberate gesture from a strip
+              // nothing else uses, because taps are how pages turn.
+              if (_chromeHidden)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 48,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity != null &&
+                          details.primaryVelocity! > 0) {
+                        _setReadingMode(false);
+                      }
+                    },
+                  ),
+                ),
+              // The speed control, shown only while the page is moving by
+              // itself — and shown in reading mode too, because that is where
+              // it is used.
+              if (_autoScrolling)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 24,
+                  child: Center(
+                    child: AutoScrollBar(
+                      speed: _autoSpeed,
+                      unit: 'lines',
+                      min: minAutoScrollLinesPerMinute,
+                      max: maxAutoScrollLinesPerMinute,
+                      onSpeed: _setAutoSpeed,
+                      onStop: _stopAutoScroll,
+                    ),
+                  ),
+                ),
               // The edge tap zones. The chevron sits at the vertical middle of
               // the page — where your thumb already is — and the whole strip is
               // the target, not just the glyph.
