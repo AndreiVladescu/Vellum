@@ -9,6 +9,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../shortcuts.dart';
+import 'ai/ai_settings.dart';
+import 'ai/ask_ai_sheet.dart';
 import 'auto_scroll.dart';
 import 'dictionary/dictionary_sheet.dart';
 import 'dictionary/wordnet.dart';
@@ -423,6 +425,54 @@ class _EpubReaderPageState extends State<EpubReaderPage>
           locator: EpubTextLocator(chapter: _chapter, start: start, end: end),
           quotedText: word,
           note: definition,
+          color: _highlightColour.argb,
+        ),
+      ),
+    );
+  }
+
+  /// The model's settings, loaded the first time something asks for them.
+  AiSettings? _ai;
+
+  Future<AiSettings> _aiSettings() async => _ai ??= await AiSettings.load();
+
+  /// Sends the selection — or the whole chapter — to whatever model has been
+  /// named. The chapter as a fallback for the same reason the PDF reader sends
+  /// the page: the question "what is this about" comes before the reading.
+  Future<void> _askAi(EpubBook epub, {bool wholeChapter = false}) async {
+    final range = _selectionRange;
+    final plain = epub.chapters[_chapter].plainText;
+    final selected = wholeChapter ? '' : _selectedText(epub);
+    final passage = selected.isEmpty ? plain.trim() : selected;
+    final what = selected.isEmpty ? 'chapter' : 'passage';
+    if (passage.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('There is no text here to send.')),
+      );
+      return;
+    }
+    final settings = await _aiSettings();
+    if (!mounted) return;
+    final start = range == null ? 0 : range.start.clamp(0, plain.length);
+    final end = range == null ? 0 : range.end.clamp(start, plain.length);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => AskAiSheet(
+        passage: passage,
+        settings: settings,
+        bookTitle: widget.book.title,
+        what: what,
+        onSaveAsNote: (answer) => _annotations.add(
+          bookId: widget.book.id,
+          kind: AnnotationKind.note,
+          chapter: _chapter,
+          locator: selected.isEmpty
+              ? EpubScrollLocator(chapter: _chapter, fraction: 0)
+              : EpubTextLocator(chapter: _chapter, start: start, end: end),
+          quotedText: selected.isEmpty ? null : selected,
+          note: answer,
           color: _highlightColour.argb,
         ),
       ),
@@ -903,6 +953,11 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                     icon: const Icon(Icons.menu_book_outlined),
                     onPressed: () => _defineSelection(epub),
                   ),
+                IconButton(
+                  tooltip: 'Ask a model about this',
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  onPressed: () => _askAi(epub),
+                ),
                 // Same as the PDF reader: always offered, because the sheet is
                 // where it gets set up.
                 if (settings != null)
@@ -949,6 +1004,13 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                 tooltip: 'Chapters',
                 icon: const Icon(Icons.toc),
                 onPressed: () => _pickChapter(epub),
+              ),
+              // The whole chapter, for when nothing is selected — the reader's
+              // "what is this one about" before reading it.
+              IconButton(
+                tooltip: 'Ask a model about this chapter',
+                icon: const Icon(Icons.auto_awesome),
+                onPressed: () => _askAi(epub, wholeChapter: true),
               ),
               if (settings != null)
                 IconButton(

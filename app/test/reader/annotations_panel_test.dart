@@ -13,7 +13,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/reader/annotations/annotation_locator.dart';
-import 'package:vellum/reader/annotations/annotation_store.dart';
 import 'package:vellum/reader/annotations/annotations_panel.dart';
 
 void main() {

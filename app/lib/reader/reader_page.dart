@@ -11,6 +11,8 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../stats/stats_queries.dart';
 import '../shortcuts.dart';
+import 'ai/ai_settings.dart';
+import 'ai/ask_ai_sheet.dart';
 import 'auto_scroll.dart';
 import 'dictionary/dictionary_sheet.dart';
 import 'dictionary/wordnet.dart';
@@ -749,6 +751,72 @@ class _ReaderPageState extends State<ReaderPage>
     );
   }
 
+  /// The model's settings, loaded the first time something asks for them —
+  /// most sittings never do.
+  AiSettings? _ai;
+
+  Future<AiSettings> _aiSettings() async => _ai ??= await AiSettings.load();
+
+  /// Sends the selection, or the page, to whatever model has been named.
+  ///
+  /// The page as a fallback because the request was about getting text *out of*
+  /// the PDF, not only out of a selection: "what is this page about" is the
+  /// question you have when you have not read it yet, so there is nothing
+  /// selected to ask about.
+  Future<void> _askAi({bool wholePage = false}) async {
+    final page = _page;
+    var passage = _selectedRanges.map((r) => r.text).join(' ').trim();
+    var what = 'passage';
+    if (wholePage || passage.isEmpty) {
+      if (page == null) return;
+      what = 'page';
+      passage = await _controller.useDocument(
+            (document) async =>
+                (await document.pages[page - 1].loadStructuredText()).fullText,
+          ) ??
+          '';
+      passage = passage.trim();
+    }
+    if (!mounted) return;
+    if (passage.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('There is no text here to send — this page may be a '
+            'scan.'),
+      ));
+      return;
+    }
+    final settings = await _aiSettings();
+    if (!mounted) return;
+    final first = _selectedRanges.isEmpty ? null : _selectedRanges.first;
+    final quoted = passage;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => AskAiSheet(
+        passage: quoted,
+        settings: settings,
+        bookTitle: widget.book.title,
+        what: what,
+        onSaveAsNote: (answer) => _annotations.add(
+          bookId: widget.book.id,
+          kind: AnnotationKind.note,
+          page: first?.pageNumber ?? page,
+          locator: first == null
+              ? (page == null ? null : PdfPageLocator(page: page))
+              : PdfTextLocator(
+                  page: first.pageNumber,
+                  start: first.start,
+                  end: first.end,
+                ),
+          quotedText: first == null ? null : quoted,
+          note: answer,
+          color: _highlightColour.argb,
+        ),
+      ),
+    );
+  }
+
   Future<void> _translateSelection() async {
     final settings = _settings;
     final ranges = _selectedRanges;
@@ -1007,6 +1075,11 @@ class _ReaderPageState extends State<ReaderPage>
                 tooltip: 'Look up “${_selectedWord!}”',
                 onPressed: _defineSelection,
               ),
+            IconButton(
+              icon: const Icon(Icons.auto_awesome_outlined),
+              tooltip: 'Ask a model about this',
+              onPressed: _askAi,
+            ),
             // Always offered, because the sheet is also where translation is
             // set up: gating the button on a configured backend left the
             // desktop unable to reach the only screen that configures one.
@@ -1075,6 +1148,8 @@ class _ReaderPageState extends State<ReaderPage>
               switch (choice) {
                 case 'jump':
                   _promptPageJump();
+                case 'ask':
+                  _askAi(wholePage: true);
                 case 'options':
                   final s = _settings;
                   if (s != null) {
@@ -1087,6 +1162,8 @@ class _ReaderPageState extends State<ReaderPage>
                 value: 'jump',
                 child: Text('Go to page…  ${commandModifierLabel()}G'),
               ),
+              const PopupMenuItem(
+                  value: 'ask', child: Text('Ask a model about this page…')),
               const PopupMenuItem(
                   value: 'options', child: Text('Reading options…')),
             ],
