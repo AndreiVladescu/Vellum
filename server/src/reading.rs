@@ -67,7 +67,7 @@ async fn my_progress(
     updated_since: Option<&str>,
 ) -> AppResult<Vec<ProgressDto>> {
     let filter = if updated_since.is_some() {
-        " AND rp.updated_at >= ?"
+        " AND rp.synced_at >= ?"
     } else {
         ""
     };
@@ -147,15 +147,17 @@ pub async fn upsert(
     let device_id = input.device_id.trim();
     sqlx::query(
         "INSERT INTO reading_progress \
-            (book_id, user_id, device_id, device_label, progress, page, unit, scroll, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now'))) \
+            (book_id, user_id, device_id, device_label, progress, page, unit, scroll, \
+             updated_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now')) \
          ON CONFLICT(book_id, user_id, device_id) DO UPDATE SET \
             device_label = excluded.device_label, \
             progress = excluded.progress, \
             page = excluded.page, \
             unit = excluded.unit, \
             scroll = excluded.scroll, \
-            updated_at = excluded.updated_at",
+            updated_at = excluded.updated_at, \
+            synced_at = datetime('now')",
     )
     .bind(&book_id)
     .bind(&user.id)

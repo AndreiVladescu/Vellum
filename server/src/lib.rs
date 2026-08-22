@@ -313,6 +313,8 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/sessions/{id}", put(personal::upsert_session))
         .route("/notes", get(personal::list_notes))
         .route("/notes/{book_id}", put(personal::upsert_note))
+        .route("/statuses", get(personal::list_statuses))
+        .route("/statuses/{book_id}", put(personal::upsert_status))
         .route(
             "/profile",
             get(personal::get_profile).put(personal::update_profile),

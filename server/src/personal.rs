@@ -114,8 +114,11 @@ pub async fn list_annotations(
     user: AuthUser,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
+    // Filtered on the *server's* clock, not the writing device's: a note made
+    // on Monday and pushed on Friday has to reach a device that synced on
+    // Wednesday. See migration 0034.
     let filter = if since(&q.cursor).is_some() {
-        " AND a.updated_at >= ?"
+        " AND a.synced_at >= ?"
     } else {
         ""
     };
@@ -124,7 +127,7 @@ pub async fn list_annotations(
                 a.quoted_text, a.note, a.color, a.created_at, a.updated_at \
          FROM annotation a JOIN book b ON b.id = a.book_id \
          WHERE a.user_id = ? AND {} {filter} \
-         ORDER BY a.updated_at",
+         ORDER BY a.synced_at",
         access_predicate()
     );
     let mut query = sqlx::query_as::<_, AnnotationDto>(sqlx::AssertSqlSafe(sql.as_str()))
@@ -159,14 +162,14 @@ pub async fn upsert_annotation(
     let affected = sqlx::query(
         "INSERT INTO annotation \
             (id, user_id, book_id, kind, page, chapter, locator, quoted_text, note, color, \
-             created_at, updated_at) \
+             created_at, updated_at, synced_at) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
-                 COALESCE(?, datetime('now')), COALESCE(?, datetime('now'))) \
+                 COALESCE(?, datetime('now')), COALESCE(?, datetime('now')), datetime('now')) \
          ON CONFLICT(id) DO UPDATE SET \
             kind = excluded.kind, page = excluded.page, chapter = excluded.chapter, \
             locator = excluded.locator, quoted_text = excluded.quoted_text, \
             note = excluded.note, color = excluded.color, \
-            updated_at = excluded.updated_at \
+            updated_at = excluded.updated_at, synced_at = datetime('now') \
          WHERE annotation.user_id = ? AND excluded.updated_at >= annotation.updated_at",
     )
     .bind(&id)
@@ -303,7 +306,7 @@ pub async fn list_sessions(
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
     let filter = if since(&q.cursor).is_some() {
-        " AND s.updated_at >= ?"
+        " AND s.synced_at >= ?"
     } else {
         ""
     };
@@ -312,7 +315,7 @@ pub async fn list_sessions(
                 s.start_page, s.end_page, s.updated_at \
          FROM reading_session s JOIN book b ON b.id = s.book_id \
          WHERE s.user_id = ? AND {} {filter} \
-         ORDER BY s.updated_at",
+         ORDER BY s.synced_at",
         access_predicate()
     );
     let mut query = sqlx::query_as::<_, SessionDto>(sqlx::AssertSqlSafe(sql.as_str()))
@@ -341,8 +344,8 @@ pub async fn upsert_session(
     sqlx::query(
         "INSERT INTO reading_session \
             (id, user_id, book_id, device_id, device_label, started_at, ended_at, \
-             start_page, end_page, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) \
+             start_page, end_page, updated_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')) \
          ON CONFLICT(id) DO NOTHING",
     )
     .bind(&id)
@@ -391,7 +394,7 @@ pub async fn list_notes(
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
     let filter = if since(&q.cursor).is_some() {
-        " AND n.updated_at >= ?"
+        " AND n.synced_at >= ?"
     } else {
         ""
     };
@@ -399,7 +402,7 @@ pub async fn list_notes(
         "SELECT n.book_id, n.note, n.updated_at \
          FROM book_note n JOIN book b ON b.id = n.book_id \
          WHERE n.user_id = ? AND {} {filter} \
-         ORDER BY n.updated_at",
+         ORDER BY n.synced_at",
         access_predicate()
     );
     let mut query = sqlx::query_as::<_, BookNoteDto>(sqlx::AssertSqlSafe(sql.as_str()))
@@ -414,6 +417,113 @@ pub async fn list_notes(
     envelope(&state, &q.cursor, entries).await
 }
 
+/// Where a book stands with *you*: unread, reading, finished, wanted.
+///
+/// Per user rather than on the book row — migration 0006 took reading state off
+/// `book` and 0034 explains why it stays off. In a shared library "I finished
+/// it" is a fact about the reader, not the book.
+#[derive(Serialize, sqlx::FromRow)]
+pub struct BookStatusDto {
+    pub book_id: String,
+    pub status: String,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
+    pub read_count: i64,
+    pub updated_at: String,
+}
+
+#[derive(Deserialize)]
+pub struct BookStatusInput {
+    pub status: String,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
+    #[serde(default)]
+    pub read_count: i64,
+    /// The writing device's clock, and the last-write-wins comparison key.
+    pub updated_at: Option<String>,
+}
+
+pub async fn list_statuses(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(q): Query<ListQuery>,
+) -> AppResult<Json<serde_json::Value>> {
+    let filter = if since(&q.cursor).is_some() {
+        " AND s.synced_at >= ?"
+    } else {
+        ""
+    };
+    let sql = format!(
+        "SELECT s.book_id, s.status, s.started_at, s.finished_at, s.read_count, \
+                s.updated_at \
+         FROM book_status s JOIN book b ON b.id = s.book_id \
+         WHERE s.user_id = ? AND {} {filter} \
+         ORDER BY s.synced_at",
+        access_predicate()
+    );
+    let mut query = sqlx::query_as::<_, BookStatusDto>(sqlx::AssertSqlSafe(sql.as_str()))
+        .bind(&user.id)
+        .bind(&user.id)
+        .bind(user.is_master)
+        .bind(&user.id);
+    if let Some(ts) = since(&q.cursor) {
+        query = query.bind(ts.to_string());
+    }
+    let entries = query.fetch_all(&state.db).await?;
+    envelope(&state, &q.cursor, entries).await
+}
+
+/// Last-write-wins on the whole row: the status and its dates are one act, and
+/// a "finished" that arrived without its finish date would be half a fact.
+///
+/// The status string is not checked against a list. A device that learns a new
+/// state should not need its server upgraded before its own other devices can
+/// see it; an unknown value reads back as whatever the app makes of it.
+pub async fn upsert_status(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(book_id): Path<String>,
+    Json(input): Json<BookStatusInput>,
+) -> AppResult<Json<BookStatusDto>> {
+    if input.status.trim().is_empty() {
+        return Err(AppError::BadRequest("status must not be empty".into()));
+    }
+    require_view(&state, &user, &book_id).await?;
+    sqlx::query(
+        "INSERT INTO book_status \
+            (user_id, book_id, status, started_at, finished_at, read_count, \
+             updated_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now')) \
+         ON CONFLICT(user_id, book_id) DO UPDATE SET \
+            status = excluded.status, \
+            started_at = excluded.started_at, \
+            finished_at = excluded.finished_at, \
+            read_count = excluded.read_count, \
+            updated_at = excluded.updated_at, \
+            synced_at = datetime('now') \
+         WHERE excluded.updated_at >= book_status.updated_at",
+    )
+    .bind(&user.id)
+    .bind(&book_id)
+    .bind(input.status.trim())
+    .bind(&input.started_at)
+    .bind(&input.finished_at)
+    .bind(input.read_count)
+    .bind(&input.updated_at)
+    .execute(&state.db)
+    .await?;
+
+    let row: BookStatusDto = sqlx::query_as(
+        "SELECT book_id, status, started_at, finished_at, read_count, updated_at \
+         FROM book_status WHERE user_id = ? AND book_id = ?",
+    )
+    .bind(&user.id)
+    .bind(&book_id)
+    .fetch_one(&state.db)
+    .await?;
+    Ok(Json(row))
+}
+
 /// Last-write-wins on the note text. Clearing it stores an empty string rather
 /// than deleting the row: there is nothing else in the row to lose, and a
 /// tombstone for one string is more machinery than the case deserves.
@@ -425,10 +535,11 @@ pub async fn upsert_note(
 ) -> AppResult<Json<BookNoteDto>> {
     require_view(&state, &user, &book_id).await?;
     sqlx::query(
-        "INSERT INTO book_note (user_id, book_id, note, updated_at) \
-         VALUES (?, ?, ?, COALESCE(?, datetime('now'))) \
+        "INSERT INTO book_note (user_id, book_id, note, updated_at, synced_at) \
+         VALUES (?, ?, ?, COALESCE(?, datetime('now')), datetime('now')) \
          ON CONFLICT(user_id, book_id) DO UPDATE SET \
-            note = excluded.note, updated_at = excluded.updated_at \
+            note = excluded.note, updated_at = excluded.updated_at, \
+            synced_at = datetime('now') \
          WHERE excluded.updated_at >= book_note.updated_at",
     )
     .bind(&user.id)

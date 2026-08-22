@@ -160,6 +160,11 @@ fn entries(body: &Value) -> &Vec<Value> {
     body["entries"].as_array().unwrap()
 }
 
+/// A server timestamp has a space in it, which a URI does not.
+fn encode(cursor: &str) -> String {
+    cursor.replace(' ', "%20")
+}
+
 // ---- annotations ----------------------------------------------------------
 
 #[tokio::test]
@@ -738,6 +743,10 @@ async fn the_display_name_syncs_and_cannot_be_blanked() {
 
 #[tokio::test]
 async fn a_cursor_returns_only_what_changed_since() {
+    // "Since" means since the server heard it, not since the device wrote it —
+    // see `a_late_push_of_an_old_edit_still_reaches_the_other_device` for the
+    // bug that distinction fixes. So the cursor is taken between the two
+    // pushes rather than made up from their timestamps.
     let app = test_app().await;
     let token = register(&app, "solo@lib.test").await;
     let book = create_book(&app, &token, "Dune").await;
@@ -752,6 +761,15 @@ async fn a_cursor_returns_only_what_changed_since() {
         })),
     )
     .await;
+
+    // The server's clock has one-second resolution and the pull is inclusive,
+    // so a row written in the same second as the cursor is genuinely ambiguous.
+    // Wait that second out rather than assert something the format cannot
+    // support.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let (_, body) = call(&app, "GET", "/api/annotations?cursor=", Some(&token), None).await;
+    let cursor = encode(body["server_now"].as_str().unwrap());
+
     call(
         &app,
         "PUT",
@@ -767,7 +785,7 @@ async fn a_cursor_returns_only_what_changed_since() {
     let (_, body) = call(
         &app,
         "GET",
-        "/api/annotations?cursor=2026-07-10%2000:00:00",
+        &format!("/api/annotations?cursor={cursor}"),
         Some(&token),
         None,
     )
@@ -1422,4 +1440,250 @@ async fn un_publishing_something_that_is_not_a_resource_is_refused() {
         StatusCode::BAD_REQUEST,
         "books are the library itself; there is no 'un-publish my catalogue'"
     );
+}
+
+// ---- the delta cursor -----------------------------------------------------
+
+/// The v1.1.5 bug, in one test: "only the new notes made on a book sync".
+///
+/// A note is written on one device on Monday and pushed on Friday, while the
+/// other device syncs on Wednesday. The row's `updated_at` is Monday — it has
+/// to be, that is when the edit happened and it is what last-write-wins
+/// compares — but the cursor is the *server's* clock. Filtering the pull on
+/// `updated_at` made that note invisible to the Wednesday device forever: it
+/// arrived after the cursor and was stamped before it.
+#[tokio::test]
+async fn a_late_push_of_an_old_edit_still_reaches_the_other_device() {
+    let app = test_app().await;
+    let token = register(&app, "two-devices@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    // The other device syncs first and takes the server's clock as its cursor.
+    let (_, body) = call(&app, "GET", "/api/annotations?cursor=", Some(&token), None).await;
+    let cursor = encode(body["server_now"].as_str().unwrap());
+
+    // Only now does the first device push what it wrote days ago.
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/annotations/old-note",
+        Some(&token),
+        Some(json!({
+            "book_id": book,
+            "kind": "note",
+            "note": "written long before it was pushed",
+            "updated_at": "2020-01-01 00:00:00",
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "upsert: {body}");
+
+    let (status, body) = call(
+        &app,
+        "GET",
+        &format!("/api/annotations?cursor={cursor}"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        entries(&body).len(),
+        1,
+        "a delta pull must be about when the server heard, not when the device wrote"
+    );
+    assert_eq!(
+        entries(&body)[0]["updated_at"], "2020-01-01 00:00:00",
+        "and the edit keeps its own clock, which is what LWW compares"
+    );
+}
+
+#[tokio::test]
+async fn the_same_holds_for_private_notes_and_reading_positions() {
+    let app = test_app().await;
+    let token = register(&app, "late@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    let (status, body) = call(&app, "GET", "/api/notes?cursor=", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK, "notes list: {body}");
+    let cursor = encode(body["server_now"].as_str().unwrap());
+
+    call(
+        &app,
+        "PUT",
+        &format!("/api/notes/{book}"),
+        Some(&token),
+        Some(json!({"note": "old thought", "updated_at": "2020-01-01 00:00:00"})),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        &format!("/api/reading-progress/{book}"),
+        Some(&token),
+        Some(json!({
+            "device_id": "phone",
+            "progress": 0.7,
+            "page": 210,
+            "unit": "page",
+            "updated_at": "2020-01-01 00:00:00",
+        })),
+    )
+    .await;
+
+    let (_, notes) = call(
+        &app,
+        "GET",
+        &format!("/api/notes?cursor={cursor}"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(entries(&notes).len(), 1, "the private note arrives");
+
+    let (_, positions) = call(
+        &app,
+        "GET",
+        &format!("/api/reading-progress?cursor={cursor}"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(
+        entries(&positions).len(),
+        1,
+        "so does the position — the same bug read as 'the pages didn’t update'"
+    );
+}
+
+// ---- reading status -------------------------------------------------------
+
+#[tokio::test]
+async fn a_books_status_travels_between_a_readers_own_devices() {
+    // v1.1.5: a book on the wishlist arrived on the tablet as one you own, and
+    // a book read to the end stayed unread on the phone. Reading status had no
+    // server representation at all.
+    let app = test_app().await;
+    let token = register(&app, "reader@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        &format!("/api/statuses/{book}"),
+        Some(&token),
+        Some(json!({
+            "status": "finished",
+            "started_at": "2026-08-01 09:00:00",
+            "finished_at": "2026-08-20 22:15:00",
+            "read_count": 2,
+            "updated_at": "2026-08-20 22:15:00",
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "upsert: {body}");
+
+    let (status, body) = call(&app, "GET", "/api/statuses?cursor=", Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let list = entries(&body);
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0]["status"], "finished");
+    assert_eq!(list[0]["finished_at"], "2026-08-20 22:15:00");
+    assert_eq!(
+        list[0]["read_count"], 2,
+        "the dates travel with the status: they are the same act"
+    );
+}
+
+#[tokio::test]
+async fn a_wishlist_book_stays_wanted_rather_than_becoming_owned() {
+    let app = test_app().await;
+    let token = register(&app, "wants@lib.test").await;
+    let book = create_book(&app, &token, "Piranesi").await;
+
+    call(
+        &app,
+        "PUT",
+        &format!("/api/statuses/{book}"),
+        Some(&token),
+        Some(json!({"status": "wishlist", "updated_at": "2026-08-21 10:00:00"})),
+    )
+    .await;
+
+    let (_, body) = call(&app, "GET", "/api/statuses?cursor=", Some(&token), None).await;
+    assert_eq!(entries(&body)[0]["status"], "wishlist");
+}
+
+#[tokio::test]
+async fn an_older_status_does_not_overwrite_a_newer_one() {
+    let app = test_app().await;
+    let token = register(&app, "race@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    call(
+        &app,
+        "PUT",
+        &format!("/api/statuses/{book}"),
+        Some(&token),
+        Some(json!({"status": "finished", "updated_at": "2026-08-21 12:00:00"})),
+    )
+    .await;
+    // A device that has been offline since yesterday pushes what it knew then.
+    call(
+        &app,
+        "PUT",
+        &format!("/api/statuses/{book}"),
+        Some(&token),
+        Some(json!({"status": "reading", "updated_at": "2026-08-20 12:00:00"})),
+    )
+    .await;
+
+    let (_, body) = call(&app, "GET", "/api/statuses?cursor=", Some(&token), None).await;
+    assert_eq!(
+        entries(&body)[0]["status"], "finished",
+        "last write wins by the writer's clock, and the stale one is not it"
+    );
+}
+
+#[tokio::test]
+async fn one_readers_status_is_invisible_to_another_sharing_the_book() {
+    // The rule the whole module exists for: in a shared library, "I finished
+    // it" is a fact about the reader, not about the book.
+    let app = test_app().await;
+    let master = register(&app, "owner@lib.test").await;
+    let member = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    call(
+        &app,
+        "PUT",
+        &format!("/api/statuses/{book}"),
+        Some(&master),
+        Some(json!({"status": "finished", "updated_at": "2026-08-21 12:00:00"})),
+    )
+    .await;
+
+    let (status, body) = call(&app, "GET", "/api/statuses?cursor=", Some(&member), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        entries(&body).is_empty(),
+        "the other reader sees their own statuses only"
+    );
+}
+
+#[tokio::test]
+async fn a_status_must_say_something() {
+    let app = test_app().await;
+    let token = register(&app, "empty@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        &format!("/api/statuses/{book}"),
+        Some(&token),
+        Some(json!({"status": "  "})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }

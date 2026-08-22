@@ -1249,6 +1249,11 @@ async fn reading_progress_stops_being_returned_when_a_book_is_unshared() {
 
 #[tokio::test]
 async fn reading_progress_delta_pull_uses_the_server_cursor() {
+    // "Since" is when the server heard, not when the device wrote: a position
+    // pushed late but stamped early still has to reach the other devices
+    // (migration 0034). So the two rows here are separated by taking the
+    // cursor between them, not by their own clocks — the old row deliberately
+    // carries the *newer* device timestamp to prove the filter ignores it.
     let app = test_app().await;
     let master = register_master(&app).await;
     let book = create_book(&app, &master, "Dune").await;
@@ -1257,15 +1262,7 @@ async fn reading_progress_delta_pull_uses_the_server_cursor() {
         &master,
         &book,
         "old-device",
-        json!({ "progress": 0.2, "page": 40, "unit": "page", "updated_at": "2020-01-01 00:00:00" }),
-    )
-    .await;
-    put_progress(
-        &app,
-        &master,
-        &book,
-        "new-device",
-        json!({ "progress": 0.8, "page": 300, "unit": "page", "updated_at": "2026-01-01 00:00:00" }),
+        json!({ "progress": 0.2, "page": 40, "unit": "page", "updated_at": "2030-01-01 00:00:00" }),
     )
     .await;
 
@@ -1280,18 +1277,39 @@ async fn reading_progress_delta_pull_uses_the_server_cursor() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert!(all["server_now"].is_string());
-    assert_eq!(all["entries"].as_array().unwrap().len(), 2);
+    assert_eq!(all["entries"].as_array().unwrap().len(), 1);
+
+    // The server clock has one-second resolution and the pull is inclusive.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let (_, envelope) = call(
+        &app,
+        "GET",
+        "/api/reading-progress?cursor=",
+        Some(&master),
+        None,
+    )
+    .await;
+    let cursor = envelope["server_now"].as_str().unwrap().replace(' ', "%20");
+
+    put_progress(
+        &app,
+        &master,
+        &book,
+        "new-device",
+        json!({ "progress": 0.8, "page": 300, "unit": "page", "updated_at": "2020-01-01 00:00:00" }),
+    )
+    .await;
 
     let (_, delta) = call(
         &app,
         "GET",
-        "/api/reading-progress?cursor=2025-01-01%2000:00:00",
+        &format!("/api/reading-progress?cursor={cursor}"),
         Some(&master),
         None,
     )
     .await;
     let entries = delta["entries"].as_array().unwrap();
-    assert_eq!(entries.len(), 1);
+    assert_eq!(entries.len(), 1, "a delta pull, not a full one: {delta}");
     assert_eq!(entries[0]["device_id"], json!("new-device"));
 }
 

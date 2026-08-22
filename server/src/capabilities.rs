@@ -58,6 +58,11 @@ const FEATURES: &[&str] = &[
     "loan_sync",
     "batch_push",
     "reading_progress",
+    // Reading status on the personal channel (migration 0034): "finished",
+    // "wishlist" and the dates that go with them, per user. Still not on the
+    // `book` row — that is what migration 0006 settled, and this is the same
+    // per-user channel `book_note` uses, for the same reason.
+    "book_status",
     "layouts",
     "borrow_requests",
     // Live sync hints over SSE (plan 5 #8). Always on: the endpoint costs
