@@ -1687,3 +1687,155 @@ async fn a_status_must_say_something() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn a_sitting_synced_mid_read_is_corrected_when_it_ends() {
+    // v1.1.5 hunt: a sync during a sitting pushed a row that was true so far,
+    // and `DO NOTHING` froze it. Every other device then held a sitting that
+    // ended early — and the reading pace measured from it was wrong.
+    let app = test_app().await;
+    let token = register(&app, "reader@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    let mid = json!({
+        "book_id": book,
+        "device_id": "phone",
+        "device_label": "phone",
+        "started_at": "2026-08-22 09:00:00",
+        "ended_at": "2026-08-22 09:10:00",
+        "start_page": 10,
+        "end_page": 24,
+    });
+    let (status, body) = call(&app, "PUT", "/api/sessions/s1", Some(&token), Some(mid)).await;
+    assert_eq!(status, StatusCode::OK, "mid-read push: {body}");
+
+    // The reader carries on and closes the book an hour later.
+    let end = json!({
+        "book_id": book,
+        "device_id": "phone",
+        "device_label": "phone",
+        "started_at": "2026-08-22 09:00:00",
+        "ended_at": "2026-08-22 10:05:00",
+        "start_page": 10,
+        "end_page": 96,
+    });
+    call(&app, "PUT", "/api/sessions/s1", Some(&token), Some(end)).await;
+
+    let (_, body) = call(&app, "GET", "/api/sessions?cursor=", Some(&token), None).await;
+    let list = entries(&body);
+    assert_eq!(list.len(), 1, "one sitting, not two");
+    assert_eq!(list[0]["ended_at"], "2026-08-22 10:05:00");
+    assert_eq!(list[0]["end_page"], 96);
+    assert_eq!(
+        list[0]["start_page"], 10,
+        "where it started is a fact, and is not moved"
+    );
+}
+
+#[tokio::test]
+async fn a_sitting_cannot_be_made_to_end_earlier_than_it_did() {
+    let app = test_app().await;
+    let token = register(&app, "late@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    let full = json!({
+        "book_id": book,
+        "device_id": "phone",
+        "started_at": "2026-08-22 09:00:00",
+        "ended_at": "2026-08-22 10:05:00",
+        "start_page": 10,
+        "end_page": 96,
+    });
+    call(&app, "PUT", "/api/sessions/s1", Some(&token), Some(full)).await;
+
+    // An older copy of the same sitting arrives from a device that was offline.
+    let stale = json!({
+        "book_id": book,
+        "device_id": "phone",
+        "started_at": "2026-08-22 09:00:00",
+        "ended_at": "2026-08-22 09:10:00",
+        "start_page": 10,
+        "end_page": 24,
+    });
+    call(&app, "PUT", "/api/sessions/s1", Some(&token), Some(stale)).await;
+
+    let (_, body) = call(&app, "GET", "/api/sessions?cursor=", Some(&token), None).await;
+    assert_eq!(entries(&body)[0]["end_page"], 96, "a sitting only grows");
+}
+
+#[tokio::test]
+async fn another_account_cannot_edit_a_sitting_by_guessing_its_id() {
+    let app = test_app().await;
+    let master = register(&app, "owner@lib.test").await;
+    let member = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let mine = json!({
+        "book_id": book,
+        "device_id": "phone",
+        "started_at": "2026-08-22 09:00:00",
+        "ended_at": "2026-08-22 10:00:00",
+        "start_page": 1,
+        "end_page": 50,
+    });
+    call(&app, "PUT", "/api/sessions/s1", Some(&master), Some(mine)).await;
+
+    // Same id, someone else's token: the update half is scoped by user, so this
+    // is a new row of theirs, never an edit of mine.
+    let theirs = json!({
+        "book_id": book,
+        "device_id": "laptop",
+        "started_at": "2026-08-22 11:00:00",
+        "ended_at": "2026-08-22 12:00:00",
+        "start_page": 200,
+        "end_page": 300,
+    });
+    call(&app, "PUT", "/api/sessions/s1", Some(&member), Some(theirs)).await;
+
+    let (_, body) = call(&app, "GET", "/api/sessions?cursor=", Some(&master), None).await;
+    assert_eq!(entries(&body)[0]["end_page"], 50, "my sitting is untouched");
+}
+
+#[tokio::test]
+async fn a_photo_pushed_late_still_reaches_the_other_device() {
+    // The 0034 bug, in the one channel that migration missed: a photo carries
+    // the camera's clock (it is the last-write-wins key) and the delta pull
+    // filtered on it, so a photo taken on Monday and pushed on Friday was
+    // invisible to every device that had synced in between. Migration 0035.
+    let app = test_app().await;
+    let token = register(&app, "photos@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    let copy = create_copy(&app, &token, &book).await;
+
+    let (_, body) = call(&app, "GET", "/api/copy-photos?cursor=", Some(&token), None).await;
+    let cursor = encode(body["server_now"].as_str().unwrap());
+
+    call(
+        &app,
+        "PUT",
+        "/api/copy-photos/p1",
+        Some(&token),
+        Some(json!({
+            "copy_id": copy,
+            "caption": "taken last week, sent today",
+            "taken_at": "2020-01-01 00:00:00",
+            "updated_at": "2020-01-01 00:00:00",
+        })),
+    )
+    .await;
+
+    let (status, list) = call(
+        &app,
+        "GET",
+        &format!("/api/copy-photos?cursor={cursor}"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        list["photos"].as_array().unwrap().len(),
+        1,
+        "a delta pull is about when the server heard, not when the camera wrote"
+    );
+}

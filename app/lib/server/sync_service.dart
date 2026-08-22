@@ -332,11 +332,19 @@ class SyncService {
 
     // Replace authors/genres for the rows we adopted. Null means the server
     // didn't send them (old server) — leave the local joins untouched.
-    // setAuthors/setGenres mark the row dirty; the needsPush clear below undoes
-    // that, since adopting server state leaves nothing local to push.
+    // Applied with `markDirty: false`: these names came *from* the server, so
+    // the row is not "edited here". Marking it dirty was survivable — the
+    // needsPush clear below undid it — but the clock bump that now comes with
+    // an edit is not: it would push every pulled book's timestamp to this
+    // device's "now", and every later edit from elsewhere would then look older
+    // and never be adopted. `sync_model_test` catches exactly that.
     for (final b in applied) {
-      if (b.authors != null) await repository.setAuthors(b.id, b.authors!);
-      if (b.genres != null) await repository.setGenres(b.id, b.genres!);
+      if (b.authors != null) {
+        await repository.setAuthors(b.id, b.authors!, markDirty: false);
+      }
+      if (b.genres != null) {
+        await repository.setGenres(b.id, b.genres!, markDirty: false);
+      }
     }
 
     // Everything below writes *against* a local book row — a cover path onto

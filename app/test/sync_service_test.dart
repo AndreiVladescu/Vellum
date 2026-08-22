@@ -382,6 +382,35 @@ void main() {
     expect(details.genres, ['Sci-fi']);
   });
 
+  test('a pulled book keeps the server\'s clock, authors and all', () async {
+    // Applying the server's authors goes through the same setter a person's
+    // edit does. When that setter learned to move the row's clock forward —
+    // which is what stops the server dropping an edit as older than what it
+    // holds — the pull started stamping every book it received with *this*
+    // device's now. Every later edit from elsewhere then looked older and was
+    // never adopted: a library that silently stopped receiving changes.
+    final repo = await _repo(dir);
+    final client = _client(_server(books: [
+      {
+        'id': 'b1',
+        'title': 'Dune',
+        'updated_at': '2024-01-01 00:00:00',
+        'authors': ['Frank Herbert'],
+        'genres': ['Sci-Fi'],
+      },
+    ]));
+
+    await SyncService(repo).pull(client);
+
+    final row = await (repo.db.select(repo.db.books)
+          ..where((b) => b.id.equals('b1')))
+        .getSingle();
+    expect(row.updatedAt.toUtc(), DateTime.utc(2024, 1, 1),
+        reason: 'the row is the server\'s copy, not an edit made here');
+    expect(row.needsPush, isFalse,
+        reason: 'and there is nothing to send back');
+  });
+
   test('pull sends the cursor and persists the new server clock', () async {
     final repo = await _repo(dir);
     String? sentCursor;
@@ -1309,7 +1338,13 @@ void main() {
     expect(sent['subtitle'], 'A novel');
     expect(sent['isbn'], '9780441013593');
     expect(sent['published_year'], 1965);
-    expect(sent['updated_at'], '2024-05-04 03:02:01');
+    // Not the seeded timestamp: setting the authors is an edit, and an edit
+    // moves the row's clock past whatever the server may already hold — a push
+    // that doesn't is dropped in silence (see `sync_clock.dart`). What the
+    // batch must carry is the row's *own* current stamp.
+    final row = await (db.select(db.books)..where((b) => b.id.equals('b1')))
+        .getSingle();
+    expect(sent['updated_at'], formatServerTime(row.updatedAt));
     expect(sent['authors'], ['Frank Herbert']);
     // Title-cased by the repository on the way in, not by the push.
     expect(sent['genres'], ['Science Fiction']);

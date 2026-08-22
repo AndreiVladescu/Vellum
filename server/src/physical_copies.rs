@@ -293,7 +293,8 @@ pub async fn list_photos(
 ) -> AppResult<Json<serde_json::Value>> {
     let since = q.cursor.as_deref().map(str::trim).filter(|c| !c.is_empty());
     let filter = if since.is_some() {
-        " AND cp.updated_at >= ?"
+        // The server's clock, not the camera's — see migration 0035.
+        " AND cp.synced_at >= ?"
     } else {
         ""
     };
@@ -351,11 +352,13 @@ pub async fn upsert_photo(
     // outside the store.
     let rel = format!("copy-photos/{id}");
     sqlx::query(
-        "INSERT INTO copy_photo (id, copy_id, path, caption, taken_at, updated_at) \
-         VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')), COALESCE(?, datetime('now'))) \
+        "INSERT INTO copy_photo \
+            (id, copy_id, path, caption, taken_at, updated_at, synced_at) \
+         VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')), \
+                 COALESCE(?, datetime('now')), datetime('now')) \
          ON CONFLICT(id) DO UPDATE SET \
             caption = excluded.caption, taken_at = excluded.taken_at, \
-            updated_at = excluded.updated_at \
+            updated_at = excluded.updated_at, synced_at = datetime('now') \
          WHERE excluded.updated_at >= copy_photo.updated_at",
     )
     .bind(&id)

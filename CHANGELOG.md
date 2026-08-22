@@ -16,6 +16,27 @@ after a week of use.
 change working together; the app alone fixes nothing until the server has run
 migration 0034.
 
+### Fixed (a sync bug hunt)
+
+- **An edit the server silently threw away.** It stamps a row's `updated_at`
+  with its own clock, then refuses any push whose timestamp isn't newer than
+  that stamp — answering 200 while doing it, so the app couldn't tell. Two
+  everyday edits landed in that hole: changing only a book's **authors or
+  genres**, which marked the row for sending without moving its clock (so it
+  was rejected every single time, on every device), and any edit made on a
+  device whose clock runs behind the server's. Both were then quietly replaced
+  on the next pull, since the server's copy looked newer. An edit is now
+  stamped later than the row it edits, not merely "now".
+- **A sitting synced mid-read was frozen half-finished.** A sync while a book
+  was open published "ended 09:10, page 24" of a sitting that ran to 10:05, and
+  the server kept the first version of a session and ignored the rest — so
+  every other device held a truncated sitting, and the reading pace measured
+  from it was wrong. Sittings are published when they end, and the server now
+  accepts the correction for the ones already stored.
+- **A photo of a shelf could be invisible to your other devices** — the same
+  clock confusion the notes and positions had, in the one channel migration
+  0034 missed.
+
 ### Fixed
 
 - **A note written on one device could never reach another.** Every personal

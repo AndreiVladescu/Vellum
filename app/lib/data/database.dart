@@ -1011,7 +1011,7 @@ class VellumDatabase extends _$VellumDatabase {
               await customStatement(
                 "UPDATE books SET status_needs_push = 1, "
                 "status_updated_at = COALESCE(finished_at, started_at, "
-                "last_read_at, strftime('%s', 'now')) "
+                "last_read_at, CAST(strftime('%s', 'now') AS INTEGER)) "
                 "WHERE status IS NOT NULL AND status != 'unread'",
               );
             }

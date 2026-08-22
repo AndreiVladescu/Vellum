@@ -8,6 +8,7 @@ import '../reader/epub_book.dart';
 import '../shelf/cover_color.dart';
 import '../shelf/spine_style.dart';
 import 'database.dart';
+import 'sync_clock.dart';
 import 'pdf_cover.dart';
 
 /// Cover bytes/files, embedded-cover extraction, and the dominant-colour
@@ -46,12 +47,9 @@ class CoverService {
       rethrow;
     }
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
-      BooksCompanion(
-        coverPath: Value(rel),
-        updatedAt: Value(DateTime.now()),
-        needsPush: const Value(true),
-      ),
+      BooksCompanion(coverPath: Value(rel)),
     );
+    await stampSyncClock(db, SyncedRow.book, bookId);
     await updateCoverColor(bookId, bytes);
   }
 

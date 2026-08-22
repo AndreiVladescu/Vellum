@@ -256,10 +256,12 @@ class LibraryRepository {
     pageCount: pageCount,
     description: description,
   );
-  Future<void> setAuthors(String bookId, List<String> names) =>
-      writes.setAuthors(bookId, names);
-  Future<void> setGenres(String bookId, List<String> names) =>
-      writes.setGenres(bookId, names);
+  Future<void> setAuthors(String bookId, List<String> names,
+          {bool markDirty = true}) =>
+      writes.setAuthors(bookId, names, markDirty: markDirty);
+  Future<void> setGenres(String bookId, List<String> names,
+          {bool markDirty = true}) =>
+      writes.setGenres(bookId, names, markDirty: markDirty);
   Future<void> addGenre(String bookId, String name) =>
       writes.addGenre(bookId, name);
   Future<void> removeGenre(String bookId, String name) =>

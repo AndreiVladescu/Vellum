@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import 'database.dart';
+import 'sync_clock.dart';
 
 /// Custom shelves — manual panes, distinct from genres and from the
 /// physical-layout "shelves". They order books explicitly and never delete
@@ -49,14 +50,11 @@ class ShelfService {
       .watch();
 
   /// Marks [id] dirty for the next push — every write path below calls this
-  /// so a rename, reorder, or membership change all reach the server. Bumps
-  /// `updatedAt` explicitly (not just relying on the column default) since
-  /// this is called from an `update`, which doesn't re-run column defaults.
-  Future<void> _touch(String id) async {
-    await (db.update(db.shelves)..where((s) => s.id.equals(id))).write(
-      ShelvesCompanion(updatedAt: Value(DateTime.now()), needsPush: const Value(true)),
-    );
-  }
+  /// so a rename, reorder, or membership change all reach the server. The clock
+  /// is bumped past the row's own value rather than set to "now": the server
+  /// drops a push it thinks is older than what it holds, and says 200 while
+  /// doing it (see [stampSyncClock]).
+  Future<void> _touch(String id) => stampSyncClock(db, SyncedRow.shelf, id);
 
   /// Creates a shelf. [personal] keeps it to its owner: it still syncs (it is
   /// yours on every device you use) but the server withholds it from shares,

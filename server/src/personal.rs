@@ -330,9 +330,15 @@ pub async fn list_sessions(
     envelope(&state, &q.cursor, entries).await
 }
 
-/// Record a sitting. Idempotent by id: a session is a fact that already
-/// happened, so a re-push is the same fact arriving twice, not a second row and
-/// not a conflict.
+/// Record a sitting.
+///
+/// Idempotent by id, and *correctable*: the end of a sitting is not known when
+/// it starts, and a client that syncs mid-read pushes a row that is true so far
+/// and wrong by the time the reader puts the book down. `DO NOTHING` froze that
+/// half-sitting for good — every other device then held a sitting that ended
+/// early, and the pace measured from it was wrong. Only the mutable half moves,
+/// and only forwards: where it started is a fact, where it ended is a fact that
+/// was still being made.
 pub async fn upsert_session(
     State(state): State<AppState>,
     user: AuthUser,
@@ -346,7 +352,14 @@ pub async fn upsert_session(
             (id, user_id, book_id, device_id, device_label, started_at, ended_at, \
              start_page, end_page, updated_at, synced_at) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')) \
-         ON CONFLICT(id) DO NOTHING",
+         ON CONFLICT(id) DO UPDATE SET \
+            ended_at = excluded.ended_at, \
+            end_page = excluded.end_page, \
+            device_label = excluded.device_label, \
+            updated_at = datetime('now'), \
+            synced_at = datetime('now') \
+         WHERE reading_session.user_id = ? \
+           AND excluded.ended_at >= reading_session.ended_at",
     )
     .bind(&id)
     .bind(&user.id)
@@ -357,6 +370,7 @@ pub async fn upsert_session(
     .bind(&input.ended_at)
     .bind(input.start_page)
     .bind(input.end_page)
+    .bind(&user.id)
     .execute(&state.db)
     .await?;
 

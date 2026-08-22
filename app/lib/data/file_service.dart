@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../reader/epub_book.dart';
 import 'cover_service.dart';
 import 'database.dart';
+import 'sync_clock.dart';
 import 'pdf_cover.dart';
 
 /// Attaching/detaching digital files, hashing, and page count. Split out of
@@ -147,11 +148,6 @@ class FileService {
 
   /// Marks a book's synced data as changed since the last push, so the next
   /// sync uploads it. Local-only setters never call this.
-  Future<void> _markNeedsPush(String bookId) async {
-    await (db.update(
-      db.books,
-    )..where((b) => b.id.equals(bookId))).write(
-      const BooksCompanion(needsPush: Value(true)),
-    );
-  }
+  Future<void> _markNeedsPush(String bookId) =>
+      stampSyncClock(db, SyncedRow.book, bookId);
 }

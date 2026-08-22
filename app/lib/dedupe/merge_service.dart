@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../data/database.dart';
+import '../data/sync_clock.dart';
 import '../data/library_repository.dart';
 
 /// Which book's value to keep for a field where the two disagree.
@@ -155,11 +156,11 @@ class MergeService {
           pageCount:
               Value(pickInt('pageCount', keeper.pageCount, loser.pageCount)),
           coverPath: Value(pick('coverPath', keeper.coverPath, loser.coverPath)),
-          // A merge changes synced data, so the result has to be pushed.
-          updatedAt: Value(DateTime.now()),
-          needsPush: const Value(true),
         ),
       );
+      // A merge changes synced data, so the result has to be pushed — with a
+      // clock the server will accept (see [stampSyncClock]).
+      await stampSyncClock(db, SyncedRow.book, keeper.id);
 
       // ---- files ----
       final movedFiles = await db.customUpdate(

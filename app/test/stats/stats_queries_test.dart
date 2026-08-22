@@ -282,6 +282,39 @@ void main() {
       return repo;
     }
 
+    test('an open sitting is not published until it is over', () async {
+      // A sync mid-read used to publish "ended 09:10, page 24" of a sitting
+      // that ran to 10:05 — and a server that kept the first version of a
+      // session and ignored the rest froze it that way for everyone.
+      final repo = await seeded();
+      final recorder = SessionRecorder(repo.db);
+      final start = DateTime(2026, 7, 1, 20);
+      await recorder.begin('b1', page: 10, now: start);
+      await recorder.touch(page: 24, now: start.add(const Duration(minutes: 10)));
+
+      final open = await repo.db.select(repo.db.readingSessions).get();
+      expect(open.single.needsPush, isFalse,
+          reason: 'a sitting still being made is not a fact yet');
+
+      await recorder.end(page: 96, now: start.add(const Duration(minutes: 65)));
+
+      final closed = await repo.db.select(repo.db.readingSessions).get();
+      expect(closed.single.needsPush, isTrue);
+      expect(closed.single.endPage, 96);
+    });
+
+    test('a sitting too short to count is never published either', () async {
+      final repo = await seeded();
+      final recorder = SessionRecorder(repo.db);
+      final start = DateTime(2026, 7, 1, 20);
+      await recorder.begin('b1', page: 10, now: start);
+      await recorder.end(page: 10, now: start.add(const Duration(seconds: 2)));
+
+      expect(await repo.db.select(repo.db.readingSessions).get(), isEmpty,
+          reason: 'and having never been pushed, it leaves nothing behind on '
+              'the server to contradict that');
+    });
+
     test('a sitting is one row, however many pages are turned', () async {
       final repo = await seeded();
       final recorder = SessionRecorder(repo.db);

@@ -10,6 +10,7 @@ import '../reader/epub_book.dart';
 import '../shelf/spine_style.dart';
 import 'cover_service.dart';
 import 'database.dart';
+import 'sync_clock.dart';
 import 'metadata.dart';
 
 /// Author names and genre names for a book, for the detail view.
@@ -86,26 +87,29 @@ class BookWriteService {
         publishedYear: Value(publishedYear),
         pageCount: Value(pageCount),
         description: Value(_blankToNull(description)),
-        updatedAt: Value(DateTime.now()),
-        needsPush: const Value(true),
       ),
     );
+    await stampSyncClock(db, SyncedRow.book, id);
   }
 
   /// Marks a book's synced data as changed since the last push, so the next
   /// sync uploads it. Used by mutations that don't already write the books row
   /// (author/genre joins). Local-only setters never call this.
-  Future<void> _markNeedsPush(String bookId) async {
-    await (db.update(
-      db.books,
-    )..where((b) => b.id.equals(bookId))).write(
-      const BooksCompanion(needsPush: Value(true)),
-    );
-  }
+  Future<void> _markNeedsPush(String bookId) =>
+      stampSyncClock(db, SyncedRow.book, bookId);
 
   /// Replaces a book's authors with [names] (comma-splitting is the caller's
   /// job). Blank names are ignored; order is preserved.
-  Future<void> setAuthors(String bookId, List<String> names) async {
+  ///
+  /// [markDirty] is false when the names came *from* the server, exactly as
+  /// [SeriesService.setSeries] takes it: applying a pulled row must not move
+  /// that row's clock, or every later edit from elsewhere looks older than the
+  /// copy this device just received and is never adopted.
+  Future<void> setAuthors(
+    String bookId,
+    List<String> names, {
+    bool markDirty = true,
+  }) async {
     await db.transaction(() async {
       await db.customStatement(
         'DELETE FROM book_authors WHERE book_id = ?',
@@ -128,12 +132,16 @@ class BookWriteService {
       }
       await _gcOrphanAuthors();
     });
-    await _markNeedsPush(bookId);
+    if (markDirty) await _markNeedsPush(bookId);
   }
 
   /// Replaces a book's genres with [names]. Blank names are ignored. Mirror of
-  /// [setAuthors]; genres carry no explicit order (the server sorts by name).
-  Future<void> setGenres(String bookId, List<String> names) async {
+  /// [setAuthors], [markDirty] and all.
+  Future<void> setGenres(
+    String bookId,
+    List<String> names, {
+    bool markDirty = true,
+  }) async {
     await db.transaction(() async {
       await db.customStatement(
         'DELETE FROM book_genres WHERE book_id = ?',
@@ -153,7 +161,7 @@ class BookWriteService {
       }
       await _gcOrphanGenres();
     });
-    await _markNeedsPush(bookId);
+    if (markDirty) await _markNeedsPush(bookId);
   }
 
   /// Adds one genre to a book (get-or-create the genre by canonical name).
@@ -263,10 +271,9 @@ class BookWriteService {
         publisher: Value(m['publisher'] as String?),
         publishedYear: Value(m['publishedYear'] as int?),
         pageCount: Value(m['pageCount'] as int?),
-        updatedAt: Value(DateTime.now()),
-        needsPush: const Value(true),
       ),
     );
+    await stampSyncClock(db, SyncedRow.book, book.id);
     final coverUrl = m['coverUrl'] as String?;
     if (coverUrl != null) {
       try {
@@ -484,10 +491,9 @@ class BookWriteService {
                   'coverUrl': result.largeCoverUrl?.toString(),
                 }))
               : const Value.absent(),
-          updatedAt: Value(DateTime.now()),
-          needsPush: const Value(true),
         ),
       );
+      await stampSyncClock(db, SyncedRow.book, book.id);
       if (!hadAuthors) {
         var position = 0;
         for (final name in result.authors) {

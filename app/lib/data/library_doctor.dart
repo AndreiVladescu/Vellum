@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import '../import/import_plan.dart';
 import 'database.dart';
+import 'sync_clock.dart';
 import 'library_repository.dart';
 
 /// A kind of inconsistency the doctor looks for (plan 5 #11).
@@ -395,8 +396,7 @@ class LibraryDoctor {
         // The book's file list changed, which is synced data.
         final bookId = defect.bookId;
         if (removed > 0 && bookId != null) {
-          await (db.update(db.books)..where((b) => b.id.equals(bookId)))
-              .write(const BooksCompanion(needsPush: Value(true)));
+          await stampSyncClock(db, SyncedRow.book, bookId);
         }
         return removed > 0;
 
@@ -409,9 +409,9 @@ class LibraryDoctor {
           const BooksCompanion(
             coverPath: Value(null),
             coverEtag: Value(null),
-            needsPush: Value(true),
           ),
         );
+        await stampSyncClock(db, SyncedRow.book, bookId);
         return true;
 
       case DefectKind.orphanBlob:

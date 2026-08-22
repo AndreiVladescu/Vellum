@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import 'copy_photo_service.dart';
 import 'database.dart';
+import 'sync_clock.dart';
 
 /// A loan joined with the book it's for, for the cross-library Loans overview.
 typedef LoanEntry = ({Loan loan, Book book});
@@ -149,26 +150,24 @@ class PhysicalService {
     required DateTime? dueAt,
     String? contact,
     String? notes,
-  }) =>
-      (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
-        LoansCompanion(
-          dueAt: Value(dueAt),
-          borrowerContact: Value(_blankToNull(contact)),
-          notes: Value(_blankToNull(notes)),
-          updatedAt: Value(DateTime.now()),
-          needsPush: const Value(true),
-        ),
-      );
+  }) async {
+    await (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
+      LoansCompanion(
+        dueAt: Value(dueAt),
+        borrowerContact: Value(_blankToNull(contact)),
+        notes: Value(_blankToNull(notes)),
+      ),
+    );
+    await stampSyncClock(db, SyncedRow.loan, loanId);
+  }
 
   /// Records that a due reminder has been shown, so it isn't shown again.
-  Future<void> markReminderSent(String loanId) =>
-      (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
-        LoansCompanion(
-          reminderSentAt: Value(DateTime.now()),
-          updatedAt: Value(DateTime.now()),
-          needsPush: const Value(true),
-        ),
-      );
+  Future<void> markReminderSent(String loanId) async {
+    await (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
+      LoansCompanion(reminderSentAt: Value(DateTime.now())),
+    );
+    await stampSyncClock(db, SyncedRow.loan, loanId);
+  }
 
   static String? _blankToNull(String? value) {
     final trimmed = value?.trim();
@@ -181,11 +180,8 @@ class PhysicalService {
   /// re-run on one -- an unbumped return would never reach the server.
   Future<void> returnLoan(String loanId) async {
     await (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
-      LoansCompanion(
-        returnedAt: Value(DateTime.now()),
-        updatedAt: Value(DateTime.now()),
-        needsPush: const Value(true),
-      ),
+      LoansCompanion(returnedAt: Value(DateTime.now())),
     );
+    await stampSyncClock(db, SyncedRow.loan, loanId);
   }
 }

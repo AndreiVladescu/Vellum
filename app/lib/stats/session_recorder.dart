@@ -65,6 +65,12 @@ class SessionRecorder {
           endPage: Value(page),
           deviceId: Value(deviceId),
           deviceLabel: Value(deviceLabel),
+          // Not yet: an open sitting is a fact still being made, and the row
+          // defaults to dirty. A sync mid-read used to publish "ended at
+          // 09:10, page 24" of a sitting that ran to 10:05 — and a server that
+          // took the first version of a session and ignored the rest kept it
+          // that way for good. See [end].
+          needsPush: const Value(false),
         ));
     _sessionId = id;
     return id;
@@ -79,9 +85,10 @@ class SessionRecorder {
       ReadingSessionsCompanion(
         endedAt: Value(now ?? DateTime.now()),
         endPage: page == null ? const Value.absent() : Value(page),
-        // Still unsent: a sitting is only worth publishing once it is over,
-        // and `end` is what settles its final page and duration.
-        needsPush: const Value(true),
+        // Deliberately not marked for push: a sitting is only worth publishing
+        // once it is over, and [end] is what settles its final page and
+        // duration. This comment used to sit above a line that did the
+        // opposite.
       ),
     );
   }
@@ -105,7 +112,11 @@ class SessionRecorder {
     final moved = (row.endPage ?? 0) != (row.startPage ?? 0);
     if (duration.inSeconds < 5 && !moved) {
       await (db.delete(db.readingSessions)..where((s) => s.id.equals(id))).go();
+      return;
     }
+    // Over, and therefore a fact: now it can go.
+    await (db.update(db.readingSessions)..where((s) => s.id.equals(id)))
+        .write(const ReadingSessionsCompanion(needsPush: Value(true)));
   }
 
   /// Wipes the history — the "Clear reading history" action. Behavioural data the
