@@ -1395,6 +1395,10 @@ class SyncService {
     }
 
     if (scope.books) {
+      // No capability probe on this side: `/api/statuses` carries no book id,
+      // so a 404 here means the endpoint is missing and nothing else — the
+      // same reading `_serverLacksPersonal` makes for every other personal
+      // list. The push is the ambiguous one.
       try {
         final statuses = await client.listBookStatuses(cursor: cursor);
         for (final remote in statuses.entries) {
@@ -1573,10 +1577,26 @@ class SyncService {
     // rather than the annotations one — "finished" is about the catalogue
     // entry, not about marginalia, and someone syncing books without
     // highlights still expects a book they finished to be finished elsewhere.
-    final statusBooks = scope.books
+    //
+    // Asked of the server rather than discovered from a 404: a book this
+    // device keeps to itself, or has trashed, was never pushed, so its status
+    // would PUT against an id the server has never heard of — and a 404 read
+    // as "old server" would swallow the error *and* leave the flag set, one
+    // doomed request per book on every sync from here on.
+    final dirtyStatuses = scope.books
         ? await (db.select(db.books)
-              ..where((b) => b.statusNeedsPush.equals(true)))
+              ..where((b) =>
+                  b.statusNeedsPush.equals(true) &
+                  b.deletedAt.isNull() &
+                  b.syncExcluded.equals(false)))
             .get()
+        : const <Book>[];
+    // The handshake only when there is something to send: a push with nothing
+    // to say must not cost a request to find that out (see the batch-push
+    // handshake, which is skipped for the same reason).
+    final statusBooks = dirtyStatuses.isNotEmpty &&
+            await _supportsBookStatus(client)
+        ? dirtyStatuses
         : const <Book>[];
     for (final b in statusBooks) {
       try {
@@ -1592,10 +1612,8 @@ class SyncService {
             .write(const BooksCompanion(statusNeedsPush: Value(false)));
         pushed++;
       } catch (e) {
-        if (!_serverLacksPersonal(e)) {
-          issues.add(
-              _personalIssue('push', 'A reading status could not be sent: $e'));
-        }
+        issues.add(
+            _personalIssue('push', 'A reading status could not be sent: $e'));
       }
     }
     return pushed;
@@ -1874,6 +1892,29 @@ class SyncService {
       published++;
     }
     return (published: published, cached: listed.entries.length);
+  }
+
+  /// Whether [client]'s server has the per-user reading-status channel
+  /// (server migration 0034). Asked once per base URL, like [_supportsBatchPush]
+  /// — and asked at all because the alternative is inferring it from a 404,
+  /// which is also what a book the server does not have answers.
+  Future<bool> _supportsBookStatus(VellumServerClient client) async {
+    if (_capsBaseUrl != client.baseUrl) {
+      try {
+        _caps = await client.capabilities();
+        _capsBaseUrl = client.baseUrl;
+      } on ServerException {
+        // The server answered, just not with capabilities — a real negative,
+        // worth remembering.
+        _caps = null;
+        _capsBaseUrl = client.baseUrl;
+      } catch (_) {
+        // Offline, or an answer in a shape we don't understand. Not cached:
+        // status simply waits for the next sync, with its flag still set.
+        return false;
+      }
+    }
+    return _caps?.hasFeature('book_status') ?? false;
   }
 
   /// Whether [client]'s server advertises the batch push endpoint (plan 5 #7).

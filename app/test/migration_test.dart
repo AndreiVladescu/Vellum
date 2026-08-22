@@ -198,6 +198,52 @@ void main() {
   // per version — 84k lines of dead code across 20 snapshots — and regenerate
   // every existing file in the process, burying the one real change. This
   // comment said otherwise until 2026-07-27, and the churn duly happened.
+  // A schema replay proves the DDL applies. It says nothing about a *backfill*,
+  // because every snapshot database starts empty — and the v34 backfill is the
+  // whole point of that step: it is what carries an existing reader's finished
+  // and wishlisted books to their other device the first time they sync.
+  test('upgrading a library that already has statuses queues them to publish',
+      () async {
+    final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
+    final schema = await verifier.schemaAt(33);
+    addTearDown(schema.close);
+    // Written straight into the v33 database: it has no `status_needs_push`
+    // column yet, which is the situation being tested.
+    final finishedAt = DateTime.utc(2026, 8, 1, 12).millisecondsSinceEpoch ~/ 1000;
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, finished_at, created_at, "
+      "updated_at, needs_push, reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('read', 'Dune', 'finished', $finishedAt, 0, 0, 0, 0, 0)",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, created_at, updated_at, "
+      "needs_push, reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('untouched', 'Piranesi', 'unread', 0, 0, 0, 0, 0)",
+    );
+
+    final db = VellumDatabase(schema.newConnection());
+    addTearDown(db.close);
+    // Forcing a query runs the real onUpgrade, 33 -> 34.
+    final read = await (db.select(db.books)..where((b) => b.id.equals('read')))
+        .getSingle();
+
+    expect(read.status, 'finished', reason: 'the row itself survives');
+    expect(read.statusNeedsPush, isTrue,
+        reason: 'a book already finished has something to tell the other '
+            'device, and nothing else will ever mark it');
+    expect(read.statusUpdatedAt, isNotNull);
+    expect(read.statusUpdatedAt!.year, 2026,
+        reason: 'dated from what the row already knew, not from the epoch');
+
+    final untouched = await (db.select(db.books)
+          ..where((b) => b.id.equals('untouched')))
+        .getSingle();
+    expect(untouched.statusNeedsPush, isFalse,
+        reason: 'a library of unread books has nothing to announce, and one '
+            'request per book to say so is not nothing');
+    expect(untouched.statusUpdatedAt, isNull);
+  });
+
   group('every historical schema version migrates cleanly to the latest', () {
     final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
     final latest = versions.GeneratedHelper.versions.last;

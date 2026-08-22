@@ -12,11 +12,12 @@
 //! don't appear here. `book.owner_id` is the mirror image: a server-only
 //! column, present here but not in the app.
 //!
-//! The personal tables (migration 0023: annotation, reading_session, book_note)
-//! are excluded for the same reason as `reading_progress` below — they are
-//! keyed by `user_id`, which the app has no column for, and `book_note` is a
-//! whole table on this side against one column (`books.reader_notes`) on the
-//! other. Their contract is `server/tests/personal.rs`, which tests the
+//! The personal tables (migration 0023: annotation, reading_session, book_note;
+//! migration 0034: book_status) are excluded for the same reason as
+//! `reading_progress` below — they are keyed by `user_id`, which the app has no
+//! column for, and `book_note`/`book_status` are whole tables on this side
+//! against columns on the book row on the other (`books.reader_notes`,
+//! `books.status`). Their contract is `server/tests/personal.rs`, which tests the
 //! behaviour that actually matters: isolation between accounts.
 //!
 //! `reading_progress` (migration 0011, plan 5 #5) is excluded on purpose, not by

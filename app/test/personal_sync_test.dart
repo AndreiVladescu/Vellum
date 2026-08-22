@@ -43,6 +43,7 @@ Future<http.Response> Function(http.Request) _server({
   List<Map<String, dynamic>>? pushedCopyPhotos,
   List<String>? uploadedPhotoImages,
   bool personalSupported = true,
+  bool bookStatusSupported = true,
 }) {
   return (req) async {
     final path = req.url.path;
@@ -62,6 +63,17 @@ Future<http.Response> Function(http.Request) _server({
       return http.Response('{"error":"not found"}', 404);
     }
 
+    if (req.method == 'GET' && path == '/api/capabilities') {
+      // Reading status is asked for by name rather than discovered from a 404
+      // — see `_supportsBookStatus`.
+      return http.Response(
+        jsonEncode({
+          'version': 'test',
+          'features': [if (bookStatusSupported) 'book_status'],
+        }),
+        200,
+      );
+    }
     if (req.method == 'GET') {
       switch (path) {
         case '/api/annotations':
@@ -414,17 +426,52 @@ void main() {
           reason: 'an untouched `unread` book has no opinion to publish');
     });
 
-    test('an older server that has never heard of statuses is not an error',
+    test('a server without the feature is left alone, not asked anyway',
         () async {
       final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
       await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
 
-      final report = await SyncService(repo)
-          .push(_client(_server(personalSupported: false)));
+      final report = await SyncService(repo).push(_client(
+          _server(pushedStatuses: pushed, bookStatusSupported: false)));
 
+      expect(pushed, isEmpty);
       expect(report.issues, isEmpty,
-          reason: 'a server without migration 0034 answers 404; that is a '
-              'server without the feature, not a failed sync');
+          reason: 'a server without migration 0034 is a server without the '
+              'feature, not a failed sync');
+
+      final book = await (repo.db.select(repo.db.books)
+            ..where((b) => b.id.equals('b1')))
+          .getSingle();
+      expect(book.statusNeedsPush, isTrue,
+          reason: 'and it is still waiting for a server that can take it');
+    });
+
+    test('a book kept on this device only keeps its status here too', () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+      await (repo.db.update(repo.db.books)
+            ..where((b) => b.id.equals('b1')))
+          .write(const BooksCompanion(syncExcluded: Value(true)));
+
+      await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
+
+      expect(pushed, isEmpty,
+          reason: 'the server has never heard of this book, and is not owed '
+              'the fact that it was finished');
+    });
+
+    test('a trashed book does not announce itself on the way out', () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+      await (repo.db.update(repo.db.books)..where((b) => b.id.equals('b1')))
+          .write(BooksCompanion(deletedAt: Value(DateTime.now())));
+
+      await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
+
+      expect(pushed, isEmpty);
     });
   });
 

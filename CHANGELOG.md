@@ -6,6 +6,53 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.6 — 2026-08-22
+
+The sync bugs behind "only the new notes made on a book sync" and "the book I
+finished is still unread on the phone", and a few things the reader wanted
+after a week of use.
+
+**Upgrade the server too.** The two sync fixes are a server change and an app
+change working together; the app alone fixes nothing until the server has run
+migration 0034.
+
+### Fixed
+
+- **A note written on one device could never reach another.** Every personal
+  row — highlights, notes, sittings, reading positions — carried one timestamp
+  doing two jobs: the writing device's clock, which is what decides
+  last-write-wins, and the filter for "what changed since my last sync", which
+  has to be the server's. So a note written on Monday and pushed on Friday was
+  invisible to a device that had synced on Wednesday: it arrived after that
+  device's cursor and was stamped before it, and no later sync would ever
+  reconsider it. The two clocks are now two columns. The upgrade also stamps
+  every existing row as changed, so each device receives its own personal data
+  once and the gaps close.
+- **Reading status never synced at all.** "Finished", "Wishlist" and the dates
+  behind them had no server representation, so a book you wanted on the phone
+  arrived on the tablet as one you own, and a book read to the end stayed
+  unread everywhere else. It now travels on the per-user channel — like your
+  private notes, and for the same reason: in a shared library "I finished it"
+  is a fact about the reader, not about the book, and it stays off the book row
+  that everyone can see.
+- **A page turn on one device didn't show on the other.** The same
+  clock confusion as the notes above: a position pushed after another device
+  had synced was filtered out by its own timestamp.
+
+### Added
+
+- **Selecting text leaves reading mode.** Highlight, note, look up and
+  translate all live in the toolbar that reading mode hides, so asking for one
+  of them now brings the toolbar back.
+- **A quiet line in the corner while the chrome is hidden**: where you are, how
+  far through, and — when your pace has been measured — how long is left.
+  Reading mode only; with the toolbar up, the counter already says it.
+- **Books you have finished are marked on the shelf**, with a small blue check
+  on the spine — inside the spine's own bounds, so it never sits on the book
+  beside it.
+
+---
+
 ## v1.1.5 — 2026-08-21
 
 Sixteen notes from a week of using the app, and their answers. Most of them
