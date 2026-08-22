@@ -177,6 +177,7 @@ void main() {
           title: title,
           needsPush: true, syncExcluded: false,
           readerNotesNeedsPush: false,
+      statusNeedsPush: false,
           needsProgressPush: false,
           status: 'unread',
           readCount: 0,

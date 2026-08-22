@@ -102,6 +102,8 @@ class WishlistService {
         BooksCompanion(
           status: Value(ReadingStatus.unread.name),
           readerNotes: const Value(null),
+          statusUpdatedAt: Value(DateTime.now()),
+          statusNeedsPush: const Value(true),
         ),
       );
 
@@ -131,6 +133,8 @@ class WishlistService {
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
       BooksCompanion(
         status: Value(ReadingStatus.wishlist.name),
+        statusUpdatedAt: Value(DateTime.now()),
+        statusNeedsPush: const Value(true),
         // Reading state on a book you haven't got is meaningless; clear it so
         // a re-wished book doesn't claim you're halfway through it.
         readingProgress: const Value(null),

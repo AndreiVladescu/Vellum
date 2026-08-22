@@ -1245,6 +1245,67 @@ class VellumServerClient {
     _body(res);
   }
 
+  // ---- reading status ------------------------------------------------------
+  //
+  // Personal, like the note above: a shared library holds each reader's own
+  // "finished". Server migration 0034 and `Books.statusUpdatedAt` say why it is
+  // here rather than on the book.
+
+  Future<
+      ({
+        String? serverNow,
+        List<
+            ({
+              String bookId,
+              String status,
+              DateTime? startedAt,
+              DateTime? finishedAt,
+              int readCount,
+              DateTime? updatedAt,
+            })> entries
+      })> listBookStatuses({String? cursor}) async {
+    final uri =
+        _uri('/api/statuses').replace(queryParameters: {'cursor': cursor ?? ''});
+    final map =
+        _body(await _http.get(uri, headers: _headers)) as Map<String, dynamic>;
+    return (
+      serverNow: map['server_now'] as String?,
+      entries: [
+        for (final e in (map['entries'] as List? ?? []))
+          (
+            bookId: (e as Map<String, dynamic>)['book_id'] as String,
+            status: e['status'] as String? ?? 'unread',
+            startedAt: ServerBook._parseServerTime(e['started_at'] as String?),
+            finishedAt: ServerBook._parseServerTime(e['finished_at'] as String?),
+            readCount: (e['read_count'] as num?)?.toInt() ?? 0,
+            updatedAt: ServerBook._parseServerTime(e['updated_at'] as String?),
+          ),
+      ],
+    );
+  }
+
+  Future<void> pushBookStatus({
+    required String bookId,
+    required String status,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+    int readCount = 0,
+    DateTime? updatedAt,
+  }) async {
+    final res = await _http.put(
+      _uri('/api/statuses/$bookId'),
+      headers: _headers,
+      body: jsonEncode({
+        'status': status,
+        'started_at': formatServerTime(startedAt),
+        'finished_at': formatServerTime(finishedAt),
+        'read_count': readCount,
+        'updated_at': formatServerTime(updatedAt),
+      }),
+    );
+    _body(res);
+  }
+
   // ---- profile -------------------------------------------------------------
 
   Future<({String displayName, bool hasAvatar, DateTime? updatedAt})>

@@ -33,10 +33,12 @@ Future<http.Response> Function(http.Request) _server({
   List<Map<String, dynamic>> annotationDeletions = const [],
   List<Map<String, dynamic>> sessions = const [],
   List<Map<String, dynamic>> notes = const [],
+  List<Map<String, dynamic>> statuses = const [],
   List<Map<String, dynamic>>? pushedAnnotations,
   List<String>? deletedAnnotations,
   List<Map<String, dynamic>>? pushedSessions,
   List<Map<String, dynamic>>? pushedNotes,
+  List<Map<String, dynamic>>? pushedStatuses,
   List<Map<String, dynamic>> copyPhotos = const [],
   List<Map<String, dynamic>>? pushedCopyPhotos,
   List<String>? uploadedPhotoImages,
@@ -54,6 +56,7 @@ Future<http.Response> Function(http.Request) _server({
         (path.startsWith('/api/annotations') ||
             path.startsWith('/api/sessions') ||
             path.startsWith('/api/notes') ||
+            path.startsWith('/api/statuses') ||
             path.startsWith('/api/profile'))) {
       // Exactly what a server that predates migration 0023 answers.
       return http.Response('{"error":"not found"}', 404);
@@ -69,6 +72,8 @@ Future<http.Response> Function(http.Request) _server({
           return envelope(sessions);
         case '/api/notes':
           return envelope(notes);
+        case '/api/statuses':
+          return envelope(statuses);
         case '/api/books':
           return http.Response(
               jsonEncode({'server_now': now, 'books': []}), 200);
@@ -114,6 +119,13 @@ Future<http.Response> Function(http.Request) _server({
     if (req.method == 'PUT' && path.startsWith('/api/copy-photos/')) {
       pushedCopyPhotos?.add({
         'id': path.split('/').last,
+        ...jsonDecode(req.body) as Map<String, dynamic>,
+      });
+      return http.Response('{}', 200);
+    }
+    if (req.method == 'PUT' && path.startsWith('/api/statuses/')) {
+      pushedStatuses?.add({
+        'book_id': path.split('/').last,
         ...jsonDecode(req.body) as Map<String, dynamic>,
       });
       return http.Response('{}', 200);
@@ -299,6 +311,121 @@ void main() {
     expect(book.readerNotesNeedsPush, isFalse);
     expect(book.needsPush, isFalse,
         reason: "a note is not a catalogue edit, so it must not dirty the book");
+  });
+
+  group('reading status', () {
+    // v1.1.5: a book wanted on the phone arrived on the tablet as one you own,
+    // and a book read to the end stayed unread everywhere else. Status is
+    // personal — per reader, not per book — so it travels the same channel the
+    // private note does, never the book row (server migration 0006 and 0034).
+
+    test('marking a book finished sends it, with its dates', () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+
+      await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
+
+      expect(pushed, hasLength(1));
+      expect(pushed.single['book_id'], 'b1');
+      expect(pushed.single['status'], 'finished');
+      expect(pushed.single['finished_at'], isNotNull,
+          reason: 'the date is half the fact');
+      expect(pushed.single['read_count'], 1);
+
+      final book = await (repo.db.select(repo.db.books)
+            ..where((b) => b.id.equals('b1')))
+          .getSingle();
+      expect(book.statusNeedsPush, isFalse, reason: 'sent once, not every sync');
+      expect(book.needsPush, isFalse,
+          reason: 'finishing a book is not a catalogue edit');
+    });
+
+    test('a wishlist book stays wanted here rather than becoming owned',
+        () async {
+      final repo = await _repo();
+      await SyncService(repo).pull(_client(_server(statuses: [
+        {
+          'book_id': 'b1',
+          'status': 'wishlist',
+          'read_count': 0,
+          'updated_at': '2026-07-27 10:00:00',
+        }
+      ])));
+
+      final book = await (repo.db.select(repo.db.books)
+            ..where((b) => b.id.equals('b1')))
+          .getSingle();
+      expect(book.status, 'wishlist');
+      expect(book.statusNeedsPush, isFalse,
+          reason: 'it came from the server; it is not waiting to go back');
+    });
+
+    test("another device's finish arrives, with the dates behind it", () async {
+      final repo = await _repo();
+      await SyncService(repo).pull(_client(_server(statuses: [
+        {
+          'book_id': 'b1',
+          'status': 'finished',
+          'started_at': '2026-07-01 09:00:00',
+          'finished_at': '2026-07-20 22:00:00',
+          'read_count': 2,
+          'updated_at': '2026-07-20 22:00:00',
+        }
+      ])));
+
+      final book = await (repo.db.select(repo.db.books)
+            ..where((b) => b.id.equals('b1')))
+          .getSingle();
+      expect(book.status, 'finished');
+      expect(book.readCount, 2);
+      expect(book.finishedAt, isNotNull);
+    });
+
+    test('a newer local change is not overwritten by an older one', () async {
+      final repo = await _repo();
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+
+      // The server still holds what this book was yesterday.
+      await SyncService(repo).pull(_client(_server(statuses: [
+        {
+          'book_id': 'b1',
+          'status': 'reading',
+          'read_count': 0,
+          'updated_at': '2020-01-01 00:00:00',
+        }
+      ])));
+
+      final book = await (repo.db.select(repo.db.books)
+            ..where((b) => b.id.equals('b1')))
+          .getSingle();
+      expect(book.status, 'finished');
+      expect(book.statusNeedsPush, isTrue,
+          reason: 'and it is still waiting to be published');
+    });
+
+    test('a book with nothing to say about its status says nothing', () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+
+      await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
+
+      expect(pushed, isEmpty,
+          reason: 'an untouched `unread` book has no opinion to publish');
+    });
+
+    test('an older server that has never heard of statuses is not an error',
+        () async {
+      final repo = await _repo();
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+
+      final report = await SyncService(repo)
+          .push(_client(_server(personalSupported: false)));
+
+      expect(report.issues, isEmpty,
+          reason: 'a server without migration 0034 answers 404; that is a '
+              'server without the feature, not a failed sync');
+    });
   });
 
   test('an incoming note replaces the local one', () async {

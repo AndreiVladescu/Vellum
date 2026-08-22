@@ -81,6 +81,23 @@ class Books extends Table {
   DateTimeColumn get finishedAt => dateTime().nullable()();
   /// How many times this book has been finished, for re-reads.
   IntColumn get readCount => integer().withDefault(const Constant(0))();
+
+  /// When the status above was last changed, and whether that change is still
+  /// waiting to be published.
+  ///
+  /// Its own pair rather than the book's `updatedAt`/`needsPush`, for the same
+  /// reason [readerNotesUpdatedAt] has its own: reading status is **personal**.
+  /// It travels on the per-user channel (`book_status`, server migration 0034),
+  /// so a shared library holds each reader's own "finished" instead of
+  /// publishing one person's to everyone. Putting it on the book row is what
+  /// server migration 0006 undid deliberately.
+  ///
+  /// Null means "never changed here": a book that has sat at `unread` since it
+  /// was added has nothing to say about its status, and saying it anyway would
+  /// let a device that has never opened the book overwrite one that finished it.
+  DateTimeColumn get statusUpdatedAt => dateTime().nullable()();
+  BoolColumn get statusNeedsPush =>
+      boolean().withDefault(const Constant(false))();
   // ---- Trash (plan 5 #52) --------------------------------------------------
   /// When this book was moved to the trash, or null for a live book.
   ///
@@ -672,7 +689,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 33;
+  int get schemaVersion => 34;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -971,6 +988,32 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 34) {
+            // Reading status becomes personal data that syncs (v1.1.5 bug: a
+            // wishlist book arrived on the tablet as one you own). The columns
+            // are the note's pattern — its own clock, its own dirty flag.
+            final bookCols = await columnsOf('books');
+            if (!bookCols.contains('status_updated_at')) {
+              await m.addColumn(books, books.statusUpdatedAt);
+            }
+            if (!bookCols.contains('status_needs_push')) {
+              await m.addColumn(books, books.statusNeedsPush);
+              // Publish what this device already knows, once — but only where
+              // the status says something. A library of `unread` books would
+              // otherwise open with one request per book to announce that
+              // nothing has happened to any of them.
+              // Dated from whatever the row already knows about when this
+              // happened, and only from those columns — a status with no date
+              // behind it gets the moment of the upgrade, which is still older
+              // than any change made after it.
+              await customStatement(
+                "UPDATE books SET status_needs_push = 1, "
+                "status_updated_at = COALESCE(finished_at, started_at, "
+                "last_read_at, strftime('%s', 'now')) "
+                "WHERE status IS NOT NULL AND status != 'unread'",
+              );
             }
           }
           if (from < 33) {

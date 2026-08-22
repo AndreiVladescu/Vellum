@@ -91,6 +91,7 @@ void main() {
           updatedAt: DateTime(2024),
           needsPush: false, syncExcluded: false,
           readerNotesNeedsPush: false,
+      statusNeedsPush: false,
           needsProgressPush: false,
         );
 

@@ -14,6 +14,7 @@ Book _book({String title = 'Dune', String? subtitle, String? isbn}) => Book(
       updatedAt: DateTime(2026),
       needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
+      statusNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,

@@ -1304,7 +1304,7 @@ class SyncService {
     List<SyncIssue> issues,
     SyncScope scope,
   ) async {
-    if (!scope.annotations && !scope.sessions) return 0;
+    if (!scope.annotations && !scope.sessions && !scope.books) return 0;
     final db = _db;
     var pulled = 0;
     // Books this device actually has. An annotation whose book failed its own
@@ -1394,6 +1394,45 @@ class SyncService {
     }
     }
 
+    if (scope.books) {
+      try {
+        final statuses = await client.listBookStatuses(cursor: cursor);
+        for (final remote in statuses.entries) {
+          if (!known.contains(remote.bookId)) continue;
+          final local = await (db.select(db.books)
+                ..where((b) => b.id.equals(remote.bookId)))
+              .getSingleOrNull();
+          if (local == null) continue;
+          // Last-write-wins on the status's own clock, and a local change that
+          // has not been pushed yet is not overwritten by the older row it is
+          // about to replace. A local null means this device has never had an
+          // opinion, so the server's wins.
+          final mine = local.statusUpdatedAt;
+          final theirs = remote.updatedAt;
+          if (mine != null &&
+              (theirs == null || !mine.isBefore(theirs))) {
+            continue;
+          }
+          await (db.update(db.books)..where((b) => b.id.equals(remote.bookId)))
+              .write(BooksCompanion(
+            status: Value(remote.status),
+            startedAt: Value(remote.startedAt),
+            finishedAt: Value(remote.finishedAt),
+            readCount: Value(remote.readCount),
+            statusUpdatedAt: Value(theirs),
+            // It came *from* the server, so it is not waiting to go there.
+            statusNeedsPush: const Value(false),
+          ));
+          pulled++;
+        }
+      } catch (e) {
+        if (!_serverLacksPersonal(e)) {
+          issues.add(_personalIssue(
+              'pull', 'Reading statuses could not be pulled: $e'));
+        }
+      }
+    }
+
     if (scope.annotations) {
       try {
       final notes = await client.listBookNotes(cursor: cursor);
@@ -1423,7 +1462,7 @@ class SyncService {
     List<SyncIssue> issues,
     SyncScope scope,
   ) async {
-    if (!scope.annotations && !scope.sessions) return 0;
+    if (!scope.annotations && !scope.sessions && !scope.books) return 0;
     final db = _db;
     var pushed = 0;
 
@@ -1527,6 +1566,36 @@ class SyncService {
         pushed++;
       } catch (e) {
         issues.add(_personalIssue('push', 'A reader note could not be sent: $e'));
+      }
+    }
+
+    // Reading status: personal like the note above, and on the books scope
+    // rather than the annotations one — "finished" is about the catalogue
+    // entry, not about marginalia, and someone syncing books without
+    // highlights still expects a book they finished to be finished elsewhere.
+    final statusBooks = scope.books
+        ? await (db.select(db.books)
+              ..where((b) => b.statusNeedsPush.equals(true)))
+            .get()
+        : const <Book>[];
+    for (final b in statusBooks) {
+      try {
+        await client.pushBookStatus(
+          bookId: b.id,
+          status: b.status,
+          startedAt: b.startedAt,
+          finishedAt: b.finishedAt,
+          readCount: b.readCount,
+          updatedAt: b.statusUpdatedAt,
+        );
+        await (db.update(db.books)..where((row) => row.id.equals(b.id)))
+            .write(const BooksCompanion(statusNeedsPush: Value(false)));
+        pushed++;
+      } catch (e) {
+        if (!_serverLacksPersonal(e)) {
+          issues.add(
+              _personalIssue('push', 'A reading status could not be sent: $e'));
+        }
       }
     }
     return pushed;

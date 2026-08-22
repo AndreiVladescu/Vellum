@@ -77,6 +77,11 @@ class ReadingStatusService {
     await (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
       BooksCompanion(
         status: Value(status.name),
+        // The status is personal data with its own channel and its own clock —
+        // see `Books.statusUpdatedAt`. Every write that changes it stamps both,
+        // or the other devices never hear.
+        statusUpdatedAt: Value(now),
+        statusNeedsPush: const Value(true),
         startedAt: book.startedAt == null && status != ReadingStatus.unread
             ? Value(now)
             : const Value.absent(),
@@ -113,6 +118,8 @@ class ReadingStatusService {
       BooksCompanion(
         status: Value(ReadingStatus.reading.name),
         startedAt: Value(book.startedAt ?? DateTime.now()),
+        statusUpdatedAt: Value(DateTime.now()),
+        statusNeedsPush: const Value(true),
       ),
     );
   }

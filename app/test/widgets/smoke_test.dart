@@ -53,6 +53,7 @@ Book _book(String id, String title) => Book(
       updatedAt: DateTime(2024),
       needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
+      statusNeedsPush: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,
