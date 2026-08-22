@@ -74,3 +74,38 @@ String pageMetricLabel(
 }
 
 int _percent(int page, int count) => ((page / count) * 100).round();
+
+/// The line shown in the corner while the chrome is hidden (requests 8/19 #5
+/// and #6: "see the page number, progress, hours till you finish the book…",
+/// and "only in reading mode, since you'd see that on the top bar otherwise").
+///
+/// Everything the toolbar would have said, in one short line, because the
+/// toolbar is gone: where you are, how far through, and — when the reader's own
+/// pace has been measured — how much is left. Nothing here is invented: with no
+/// measured pace the line is simply shorter.
+String readingModeStatus({
+  required int page,
+  required int count,
+  double? pagesPerMinute,
+  String unit = 'page',
+}) {
+  if (count <= 0) return '$unit $page';
+  final clamped = page.clamp(1, count);
+  final parts = <String>[
+    '$unit $clamped of $count',
+    '${_percent(clamped, count)}%',
+  ];
+  final pace = pagesPerMinute;
+  if (pace != null && pace > 0) {
+    final left = pageMetricLabel(
+      PageMetric.timeLeft,
+      page: clamped,
+      count: count,
+      pagesPerMinute: pace,
+    );
+    // The metric's own words, minus the "about" that reads as padding in a
+    // line this short.
+    parts.add(left.startsWith('about ') ? left.substring(6) : left);
+  }
+  return parts.join('  ·  ');
+}

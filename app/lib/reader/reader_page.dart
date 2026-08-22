@@ -1266,6 +1266,13 @@ class _ReaderPageState extends State<ReaderPage>
               final had = _hasSelection;
               final hadWord = _selectedWord != null;
               _selectedRanges = ranges;
+              // Selecting text is asking for the toolbar: highlight, note,
+              // look up, translate all live there. Only on the edge where a
+              // selection *appears* — clearing it leaves you out of reading
+              // mode, because the next thing you do is one of those.
+              if (!had && ranges.isNotEmpty && _chromeHidden) {
+                _setReadingMode(false);
+              }
               if (ranges.isNotEmpty != had || (_selectedWord != null) != hadWord) {
                 setState(() {});
               }
@@ -1293,6 +1300,27 @@ class _ReaderPageState extends State<ReaderPage>
                     _setReadingMode(false);
                   }
                 },
+              ),
+            ),
+          // What the toolbar would have said, now that the toolbar is gone:
+          // where you are, how far through, how long is left. Reading mode
+          // only — with the chrome up, the counter above says it already.
+          if (_chromeHidden && _page != null && _pageCount != null)
+            Positioned(
+              left: 16,
+              bottom: 12,
+              child: IgnorePointer(
+                child: Text(
+                  readingModeStatus(
+                    page: _page!,
+                    count: _pageCount!,
+                    pagesPerMinute: _pace,
+                  ),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: readerTheme.foreground.withValues(alpha: 0.55),
+                  ),
+                ),
               ),
             ),
           // The speed control, shown only while the page is moving by itself —

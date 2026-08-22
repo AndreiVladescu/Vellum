@@ -79,6 +79,8 @@ void main() {
     });
   });
 
+  _readingModeStatus();
+
   group('cycling', () {
     test('long-pressing walks the whole list and comes back', () {
       var metric = PageMetric.pagesOf;
@@ -94,6 +96,37 @@ void main() {
       expect(PageMetric.parse('nonsense'), PageMetric.pagesOf);
       expect(PageMetric.parse(null), PageMetric.pagesOf);
       expect(PageMetric.parse('percent'), PageMetric.percent);
+    });
+  });
+}
+
+// The corner readout while the chrome is hidden (requests 8/19 #5 and #6).
+void _readingModeStatus() {
+  group('the reading-mode line', () {
+    test('says where you are, how far through, and how much is left', () {
+      expect(
+        readingModeStatus(page: 128, count: 340, pagesPerMinute: 4),
+        'page 128 of 340  ·  38%  ·  53 min left',
+      );
+    });
+
+    test('is shorter rather than invented when no pace is known', () {
+      expect(
+        readingModeStatus(page: 128, count: 340),
+        'page 128 of 340  ·  38%',
+        reason: 'the same honesty the counter keeps',
+      );
+    });
+
+    test('counts in the unit the book turns in', () {
+      expect(
+        readingModeStatus(page: 3, count: 12, unit: 'chapter'),
+        'chapter 3 of 12  ·  25%',
+      );
+    });
+
+    test('a document with no length still says where you are', () {
+      expect(readingModeStatus(page: 7, count: 0), 'page 7');
     });
   });
 }

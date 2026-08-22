@@ -312,6 +312,11 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final had = _selectionRange != null;
     final hadWord = _selectionIsWord;
     _selectionRange = next;
+    // Selecting text is asking for the toolbar — highlight, note, look up,
+    // translate all live there. Only on the edge where a selection appears.
+    if (!had && next != null && _chromeHidden && mounted) {
+      _setReadingMode(false);
+    }
     if (((next != null) != had || _selectionIsWord != hadWord) && mounted) {
       setState(() {});
     }
@@ -1131,6 +1136,27 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                         _setReadingMode(false);
                       }
                     },
+                  ),
+                ),
+              // What the bottom bar would have said, now that it is gone.
+              // Chapters rather than pages: that is what this reader turns,
+              // and calling them pages would be a number nobody could check.
+              if (_chromeHidden)
+                Positioned(
+                  left: 16,
+                  bottom: 12,
+                  child: IgnorePointer(
+                    child: Text(
+                      readingModeStatus(
+                        page: _chapter + 1,
+                        count: count,
+                        unit: 'chapter',
+                      ),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: readerTheme.foreground.withValues(alpha: 0.55),
+                      ),
+                    ),
                   ),
                 ),
               // The speed control, shown only while the page is moving by

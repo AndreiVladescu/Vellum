@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
+import '../data/reading_status.dart';
 import '../settings/appearance.dart';
 import '../settings/book_face.dart';
 import '../settings/spine_art.dart';
@@ -323,8 +324,14 @@ class BookSpine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = SpineStyle.fromJson(book.spineStyle, title: book.title);
+    final finished =
+        ReadingStatus.parse(book.status) == ReadingStatus.finished;
     return Semantics(
-      label: bookSemanticLabel(book.title, book.subtitle),
+      // The mark below is painted inside `excludeSemantics`, so the one place
+      // a screen reader can hear about it is here.
+      label: finished
+          ? '${bookSemanticLabel(book.title, book.subtitle)}, finished'
+          : bookSemanticLabel(book.title, book.subtitle),
       button: onTap != null,
       onTap: onTap,
       // The title is painted into the spine art; screen readers get it from the
@@ -355,16 +362,71 @@ class BookSpine extends StatelessWidget {
             height: _bookAreaHeight * style.heightFactor,
             child: SelectedBookOverlay(
               selected: selected,
-              child: SpineFace(
-                book: book,
-                coverFile: coverFile,
-                style: style,
-                spineArt: spineArt,
-                titleScale: typography.clampedTitle,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: SpineFace(
+                      book: book,
+                      coverFile: coverFile,
+                      style: style,
+                      spineArt: spineArt,
+                      titleScale: typography.clampedTitle,
+                    ),
+                  ),
+                  // Books you have read, marked on the shelf itself (v1.1.5
+                  // request). Inside the spine's own bounds, not hanging off
+                  // the corner: a badge that overlapped would sit on the book
+                  // beside it, which is a different book's shelf space.
+                  if (finished)
+                    const Positioned(
+                      top: 2,
+                      right: 2,
+                      child: _FinishedMark(),
+                    ),
+                ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The mark on a book you have finished.
+///
+/// Deliberately small — a spine is about thirty pixels wide, and the request
+/// was explicit that it "not go over the next book". The dark ring behind it is
+/// what keeps a blue tick legible on a blue cover.
+class _FinishedMark extends StatelessWidget {
+  const _FinishedMark();
+
+  /// Small enough to sit inside the narrowest spine with room to spare.
+  static const _size = 13.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // The same glyph twice: a black one a hair larger, as an outline.
+          Icon(
+            Icons.verified,
+            size: _size,
+            color: Colors.black.withValues(alpha: 0.45),
+          ),
+          const Icon(
+            Icons.verified,
+            size: _size - 2,
+            // A fixed blue rather than the theme's primary: the shelf's accent
+            // follows the wallpaper, and "finished" should mean the same thing
+            // on every one of them.
+            color: Color(0xFF2F80ED),
+          ),
+        ],
       ),
     );
   }
