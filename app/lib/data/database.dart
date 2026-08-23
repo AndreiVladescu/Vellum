@@ -588,6 +588,11 @@ class Annotations extends Table {
 
   /// Waiting to be pushed. Same convention as every other synced table: set on
   /// local write, cleared once the server has it.
+  /// The marks themselves, for [AnnotationKind.ink]: strokes and text boxes in
+  /// page-relative coordinates, as versioned JSON (see `ink_markup.dart`).
+  /// Null for every other kind.
+  TextColumn get ink => text().nullable()();
+
   BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
 
   @override
@@ -689,7 +694,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 34;
+  int get schemaVersion => 35;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -988,6 +993,15 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 35) {
+            // Writing on the page (8/23 request). A new kind of annotation
+            // rather than a new table: the channel is already per-user, which
+            // is exactly what "you wouldn't share them with anybody else"
+            // asks for.
+            if (!(await columnsOf('annotations')).contains('ink')) {
+              await m.addColumn(annotations, annotations.ink);
             }
           }
           if (from < 34) {

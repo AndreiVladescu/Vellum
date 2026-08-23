@@ -18,6 +18,9 @@ import 'dictionary/dictionary_sheet.dart';
 import 'dictionary/wordnet.dart';
 import 'auto_scroll_bar.dart';
 import 'annotations/annotation_locator.dart';
+import 'annotations/ink_markup.dart';
+import 'annotations/ink_painter.dart';
+import 'ink_tools.dart';
 import 'annotations/annotations_panel.dart';
 import 'annotations/highlight_palette.dart';
 import 'annotations/pdf_highlight_painter.dart';
@@ -107,6 +110,16 @@ class _ReaderPageState extends State<ReaderPage>
     if (mounted) setState(() {});
   });
   StreamSubscription<List<Annotation>>? _annotationsSub;
+
+  /// Writing on the page (8/23 request). The painter holds what is stored; the
+  /// live stroke is kept in view coordinates and drawn by an overlay, so a pen
+  /// moving at sixty frames a second never touches the database or the matrix.
+  final _ink = InkPainter();
+  bool _penMode = false;
+  InkTool _tool = InkTool.pen;
+  int _inkColor = inkColors.first;
+  double _inkWidth = inkWidths[1];
+  List<Offset> _livePoints = const [];
   final _searchController = TextEditingController();
   bool _searching = false;
 
@@ -175,6 +188,7 @@ class _ReaderPageState extends State<ReaderPage>
     _annotationsSub =
         _annotations.watchForBook(widget.book.id).listen((annotations) {
       _highlights.update(annotations);
+      _ink.adopt(annotations);
       if (mounted) setState(() {});
     });
     ReaderSettings.load().then((settings) {
@@ -560,6 +574,176 @@ class _ReaderPageState extends State<ReaderPage>
         max: maxAutoScrollPagesPerMinute,
       ),
     ));
+  }
+
+  /// The page under a point in the viewer's own coordinates, and where on that
+  /// page it falls — 0,0 its top-left corner, 1,1 its bottom-right.
+  ///
+  /// Everything written is stored in those fractions rather than in pixels:
+  /// see `ink_markup.dart`. This is the one place the two meet.
+  ({int page, Offset at})? _pageAt(Offset local) {
+    if (!_controller.isReady) return null;
+    final inverse = Matrix4.tryInvert(_controller.value);
+    if (inverse == null) return null;
+    final document = MatrixUtils.transformPoint(inverse, local);
+    final pages = _controller.layout.pageLayouts;
+    for (var i = 0; i < pages.length; i++) {
+      final rect = pages[i];
+      if (!rect.contains(document)) continue;
+      return (
+        page: i + 1,
+        at: Offset(
+          (document.dx - rect.left) / rect.width,
+          (document.dy - rect.top) / rect.height,
+        ),
+      );
+    }
+    return null;
+  }
+
+  /// The page the pen is working on. Fixed at the start of a stroke so a line
+  /// that runs off the bottom of one page does not jump onto the next.
+  int? _inkPage;
+
+  void _onInkDown(PointerDownEvent event) {
+    final hit = _pageAt(event.localPosition);
+    if (hit == null) return;
+    _inkPage = hit.page;
+    switch (_tool) {
+      case InkTool.pen:
+        setState(() => _livePoints = [event.localPosition]);
+      case InkTool.eraser:
+        _eraseAt(hit);
+      case InkTool.text:
+        // Placed on the way up, so a stray touch while scrolling doesn't open
+        // a dialog.
+        break;
+    }
+  }
+
+  void _onInkMove(PointerMoveEvent event) {
+    final page = _inkPage;
+    if (page == null) return;
+    switch (_tool) {
+      case InkTool.pen:
+        setState(() => _livePoints = [..._livePoints, event.localPosition]);
+      case InkTool.eraser:
+        final hit = _pageAt(event.localPosition);
+        if (hit != null && hit.page == page) _eraseAt(hit);
+      case InkTool.text:
+        break;
+    }
+  }
+
+  Future<void> _onInkUp(PointerUpEvent event) async {
+    final page = _inkPage;
+    _inkPage = null;
+    if (page == null) return;
+    switch (_tool) {
+      case InkTool.pen:
+        final points = _livePoints;
+        setState(() => _livePoints = const []);
+        if (points.isEmpty) return;
+        final fractions = <Offset>[];
+        for (final point in points) {
+          final hit = _pageAt(point);
+          // Points that wandered onto another page (or off the document) are
+          // dropped rather than clamped: a line should stop at the edge of the
+          // paper, not fold along it.
+          if (hit != null && hit.page == page) fractions.add(hit.at);
+        }
+        if (fractions.isEmpty) return;
+        await _annotations.setInk(
+          widget.book.id,
+          page,
+          _ink.markupOf(page).withStroke(InkStroke(
+                points: fractions,
+                color: _inkColor,
+                width: _inkWidth,
+              )),
+        );
+      case InkTool.eraser:
+        break;
+      case InkTool.text:
+        final hit = _pageAt(event.localPosition);
+        if (hit == null || hit.page != page) return;
+        await _writeText(page, hit.at);
+    }
+  }
+
+  Future<void> _eraseAt(({int page, Offset at}) hit) async {
+    final before = _ink.markupOf(hit.page);
+    final after = before.erasedAt(hit.at, inkEraserRadius);
+    if (after.strokes.length == before.strokes.length &&
+        after.texts.length == before.texts.length) {
+      return;
+    }
+    await _annotations.setInk(widget.book.id, hit.page, after);
+  }
+
+  Future<void> _writeText(int page, Offset at) async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Write on the page'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          minLines: 1,
+          decoration: const InputDecoration(hintText: 'A word in the margin'),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Write'),
+          ),
+        ],
+      ),
+    );
+    if (text == null || text.trim().isEmpty) return;
+    await _annotations.setInk(
+      widget.book.id,
+      page,
+      _ink.markupOf(page).withText(InkText(
+            at: at,
+            text: text.trim(),
+            color: _inkColor,
+            size: inkTextSize,
+          )),
+    );
+  }
+
+  /// Takes back the last mark on the page you are looking at.
+  Future<void> _undoInk() async {
+    final page = _page;
+    if (page == null) return;
+    final markup = _ink.markupOf(page);
+    if (markup.isEmpty) return;
+    await _annotations.setInk(widget.book.id, page, markup.withoutLast());
+  }
+
+  /// Enters or leaves writing mode.
+  ///
+  /// Turning it on stops the page moving under the pen: panning is off (pinch
+  /// still zooms), text selection is off, and the self-scroller — which would
+  /// slide the paper out from under a stroke — is stopped.
+  void _setPenMode(bool on) {
+    if (on) {
+      _stopAutoScroll();
+      _lockedX = null;
+      _axisDecided = false;
+    }
+    setState(() {
+      _penMode = on;
+      _livePoints = const [];
+    });
   }
 
   /// True when the page is shown whole, rather than zoomed into.
@@ -1125,6 +1309,12 @@ class _ReaderPageState extends State<ReaderPage>
               onPressed: _controller.isReady ? _toggleAutoScroll : null,
             ),
           IconButton(
+            icon: Icon(_penMode ? Icons.edit : Icons.edit_outlined),
+            tooltip: _penMode ? 'Stop writing' : 'Write on the page',
+            isSelected: _penMode,
+            onPressed: _controller.isReady ? () => _setPenMode(!_penMode) : null,
+          ),
+          IconButton(
             icon: const Icon(Icons.fullscreen),
             tooltip: 'Reading mode — swipe down from the top to come back',
             onPressed: () => _setReadingMode(true),
@@ -1223,6 +1413,9 @@ class _ReaderPageState extends State<ReaderPage>
                     ),
                   ]
               : null,
+          // A one-finger drag draws instead of panning while the pen is out;
+          // pinch-to-zoom is left alone, so you can still move the page.
+          panEnabled: !_penMode,
           // Both modes: the page clamp when paged, the axis lock when not.
           normalizeMatrix: _clamp,
           onViewerReady: (_, _) {
@@ -1245,9 +1438,13 @@ class _ReaderPageState extends State<ReaderPage>
             // Highlights first, search matches on top: the transient thing you
             // are hunting for right now should win over the permanent one.
             _highlights.paint,
+            // Writing goes over the marker, the way it does on paper.
+            _ink.paint,
             if (_searcher != null) _searcher!.pageTextMatchPaintCallback,
           ],
           textSelectionParams: PdfTextSelectionParams(
+            // A dragged finger is a pen stroke now, not a selection.
+            enabled: !_penMode,
             onTextSelectionChange: (selection) async {
               // Resolved here, while the selection is live, and kept as a
               // snapshot — see [_selectedRanges].
@@ -1300,6 +1497,54 @@ class _ReaderPageState extends State<ReaderPage>
                     _setReadingMode(false);
                   }
                 },
+              ),
+            ),
+          // The pen layer. A Listener rather than a GestureDetector for the
+          // same reason the swipes use one: it observes the pointer without
+          // entering the arena, so pinch-to-zoom still belongs to the viewer
+          // while a single finger draws.
+          if (_penMode)
+            Positioned.fill(
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: _onInkDown,
+                onPointerMove: _onInkMove,
+                onPointerUp: _onInkUp,
+                onPointerCancel: (_) =>
+                    setState(() => _livePoints = const []),
+                child: CustomPaint(
+                  // The stroke being made right now, drawn in view coordinates
+                  // so a moving pen costs one small repaint instead of a
+                  // database write and a page rebuild per frame.
+                  painter: _LiveStrokePainter(
+                    points: _tool == InkTool.pen ? _livePoints : const [],
+                    color: Color(_inkColor),
+                    width: _inkWidth *
+                        (_page == null ? 0 : _pageHeightOnScreen),
+                  ),
+                ),
+              ),
+            ),
+          if (_penMode)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 16,
+              child: Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: InkToolbar(
+                    tool: _tool,
+                    color: _inkColor,
+                    width: _inkWidth,
+                    canUndo: _page != null && !_ink.markupOf(_page!).isEmpty,
+                    onTool: (tool) => setState(() => _tool = tool),
+                    onColor: (color) => setState(() => _inkColor = color),
+                    onWidth: (width) => setState(() => _inkWidth = width),
+                    onUndo: _undoInk,
+                    onDone: () => _setPenMode(false),
+                  ),
+                ),
               ),
             ),
           // What the toolbar would have said, now that the toolbar is gone:
@@ -1420,4 +1665,51 @@ class _ReaderPageState extends State<ReaderPage>
     _searchController.clear();
     setState(() => _searching = false);
   }
+}
+
+/// The stroke under the pen right now.
+///
+/// Separate from [InkPainter], which draws what is *stored* on the page: this
+/// one lives in view coordinates and repaints on every pointer move, which is
+/// cheap precisely because it knows nothing about pages, matrices or the
+/// database. The moment the pen lifts, the stroke moves to the other painter
+/// and this one goes empty.
+class _LiveStrokePainter extends CustomPainter {
+  const _LiveStrokePainter({
+    required this.points,
+    required this.color,
+    required this.width,
+  });
+
+  final List<Offset> points;
+  final Color color;
+  final double width;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = width.clamp(0.5, 64.0)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..isAntiAlias = true;
+    if (points.length == 1) {
+      canvas.drawCircle(
+          points.first, paint.strokeWidth / 2, Paint()..color = color);
+      return;
+    }
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_LiveStrokePainter old) =>
+      old.points.length != points.length ||
+      old.color != color ||
+      old.width != width;
 }

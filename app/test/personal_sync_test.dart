@@ -17,6 +17,7 @@ import 'package:http/testing.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/server/server_client.dart';
+import 'package:vellum/reader/annotations/ink_markup.dart';
 import 'package:vellum/server/sync_service.dart';
 
 VellumServerClient _client(Future<http.Response> Function(http.Request) handler) =>
@@ -323,6 +324,52 @@ void main() {
     expect(book.readerNotesNeedsPush, isFalse);
     expect(book.needsPush, isFalse,
         reason: "a note is not a catalogue edit, so it must not dirty the book");
+  });
+
+  test('writing on a page travels as an annotation, marks and all', () async {
+    final repo = await _repo();
+    final pushed = <Map<String, dynamic>>[];
+    await repo.annotations.setInk(
+      'b1',
+      7,
+      const InkMarkup(strokes: [
+        InkStroke(
+          points: [Offset(0.1, 0.2), Offset(0.15, 0.25)],
+          color: 0xFF2F80ED,
+          width: 0.004,
+        ),
+      ], texts: [
+        InkText(at: Offset(0.4, 0.5), text: 'see ch. 4', color: 1, size: 0.02),
+      ]),
+    );
+
+    await SyncService(repo).push(_client(_server(pushedAnnotations: pushed)));
+
+    expect(pushed, hasLength(1));
+    expect(pushed.single['kind'], 'ink');
+    expect(pushed.single['page'], 7);
+    expect(pushed.single['ink'], contains('see ch. 4'),
+        reason: 'the marks are the payload; without them it is an empty page');
+  });
+
+  test("another device's writing arrives and is drawable", () async {
+    final repo = await _repo();
+    const marks = '{"v":1,"strokes":[{"c":1,"w":0.004,"p":[0.1,0.1,0.9,0.9]}]}';
+    await SyncService(repo).pull(_client(_server(annotations: [
+      {
+        'id': 'ink1',
+        'book_id': 'b1',
+        'kind': 'ink',
+        'page': 7,
+        'ink': marks,
+        'updated_at': '2026-08-23 10:00:00',
+      }
+    ])));
+
+    final row = await repo.annotations.inkForPage('b1', 7);
+    expect(row, isNotNull);
+    expect(InkMarkup.decode(row!.ink)!.strokes.single.points, hasLength(2));
+    expect(row.needsPush, isFalse);
   });
 
   group('reading status', () {

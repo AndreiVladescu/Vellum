@@ -167,6 +167,7 @@ class AnnotationTile extends StatelessWidget {
         AnnotationKind.bookmark => Icons.bookmark_outline,
         AnnotationKind.highlight => Icons.format_color_text,
         AnnotationKind.note => Icons.sticky_note_2_outlined,
+        AnnotationKind.ink => Icons.draw_outlined,
         null => Icons.label_outline,
       };
 

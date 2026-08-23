@@ -1140,6 +1140,7 @@ class VellumServerClient {
     String? quotedText,
     String? note,
     int? color,
+    String? ink,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) async {
@@ -1157,6 +1158,7 @@ class VellumServerClient {
         'quoted_text': quotedText,
         'note': note,
         'color': color,
+        'ink': ink,
         'created_at': formatServerTime(createdAt),
         'updated_at': formatServerTime(updatedAt),
       }),
@@ -1635,6 +1637,7 @@ class ServerAnnotation {
     this.quotedText,
     this.note,
     this.color,
+    this.ink,
     this.createdAt,
     this.updatedAt,
   });
@@ -1650,6 +1653,7 @@ class ServerAnnotation {
         quotedText: json['quoted_text'] as String?,
         note: json['note'] as String?,
         color: (json['color'] as num?)?.toInt(),
+        ink: json['ink'] as String?,
         createdAt: ServerBook._parseServerTime(json['created_at'] as String?),
         updatedAt: ServerBook._parseServerTime(json['updated_at'] as String?),
       );
@@ -1663,6 +1667,11 @@ class ServerAnnotation {
   final String? quotedText;
   final String? note;
   final int? color;
+
+  /// The marks on the page, for `kind == 'ink'` — versioned JSON the server
+  /// keeps verbatim (server migration 0036).
+  final String? ink;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 }

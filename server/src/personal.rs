@@ -90,6 +90,7 @@ pub struct AnnotationDto {
     pub quoted_text: Option<String>,
     pub note: Option<String>,
     pub color: Option<i64>,
+    pub ink: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -104,6 +105,10 @@ pub struct AnnotationInput {
     pub quoted_text: Option<String>,
     pub note: Option<String>,
     pub color: Option<i64>,
+    /// The marks themselves, for `kind = 'ink'`: strokes and text boxes in
+    /// page-relative coordinates, as the versioned JSON migration 0036
+    /// describes. Stored and returned verbatim — the server does not read it.
+    pub ink: Option<String>,
     pub created_at: Option<String>,
     /// The writing device's clock, and the last-write-wins comparison key.
     pub updated_at: Option<String>,
@@ -124,7 +129,7 @@ pub async fn list_annotations(
     };
     let sql = format!(
         "SELECT a.id, a.book_id, a.kind, a.page, a.chapter, a.locator, \
-                a.quoted_text, a.note, a.color, a.created_at, a.updated_at \
+                a.quoted_text, a.note, a.color, a.ink, a.created_at, a.updated_at \
          FROM annotation a JOIN book b ON b.id = a.book_id \
          WHERE a.user_id = ? AND {} {filter} \
          ORDER BY a.synced_at",
@@ -149,9 +154,12 @@ pub async fn upsert_annotation(
     Json(input): Json<AnnotationInput>,
 ) -> AppResult<Json<AnnotationDto>> {
     crate::ids::check("annotation", &id)?;
-    if !matches!(input.kind.as_str(), "highlight" | "note" | "bookmark") {
+    if !matches!(
+        input.kind.as_str(),
+        "highlight" | "note" | "bookmark" | "ink"
+    ) {
         return Err(AppError::BadRequest(
-            "kind must be 'highlight', 'note' or 'bookmark'".into(),
+            "kind must be 'highlight', 'note', 'bookmark' or 'ink'".into(),
         ));
     }
     require_view(&state, &user, &input.book_id).await?;
@@ -162,13 +170,13 @@ pub async fn upsert_annotation(
     let affected = sqlx::query(
         "INSERT INTO annotation \
             (id, user_id, book_id, kind, page, chapter, locator, quoted_text, note, color, \
-             created_at, updated_at, synced_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
+             ink, created_at, updated_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
                  COALESCE(?, datetime('now')), COALESCE(?, datetime('now')), datetime('now')) \
          ON CONFLICT(id) DO UPDATE SET \
             kind = excluded.kind, page = excluded.page, chapter = excluded.chapter, \
             locator = excluded.locator, quoted_text = excluded.quoted_text, \
-            note = excluded.note, color = excluded.color, \
+            note = excluded.note, color = excluded.color, ink = excluded.ink, \
             updated_at = excluded.updated_at, synced_at = datetime('now') \
          WHERE annotation.user_id = ? AND excluded.updated_at >= annotation.updated_at",
     )
@@ -182,6 +190,7 @@ pub async fn upsert_annotation(
     .bind(&input.quoted_text)
     .bind(&input.note)
     .bind(input.color)
+    .bind(&input.ink)
     .bind(&input.created_at)
     .bind(&input.updated_at)
     .bind(&user.id)
@@ -190,7 +199,7 @@ pub async fn upsert_annotation(
     .rows_affected();
 
     let row: Option<AnnotationDto> = sqlx::query_as(
-        "SELECT id, book_id, kind, page, chapter, locator, quoted_text, note, color, \
+        "SELECT id, book_id, kind, page, chapter, locator, quoted_text, note, color, ink, \
                 created_at, updated_at \
          FROM annotation WHERE id = ? AND user_id = ?",
     )

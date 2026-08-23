@@ -1839,3 +1839,90 @@ async fn a_photo_pushed_late_still_reaches_the_other_device() {
         "a delta pull is about when the server heard, not when the camera wrote"
     );
 }
+
+#[tokio::test]
+async fn ink_is_an_annotation_like_any_other_and_stays_private() {
+    // Writing on the page rides the channel highlights already ride: keyed by
+    // user, so a shared library carries each reader's marks separately. The
+    // payload is opaque here — the server stores the string and returns it.
+    let app = test_app().await;
+    let master = register(&app, "owner@lib.test").await;
+    let member = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    const MARKS: &str = r#"{"v":1,"strokes":[{"c":4294901760,"w":0.004,"p":[0.1,0.2,0.11,0.21]}],"texts":[{"x":0.3,"y":0.4,"s":0.02,"c":4278190080,"t":"see ch. 4"}]}"#;
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/annotations/ink1",
+        Some(&master),
+        Some(json!({
+            "book_id": book,
+            "kind": "ink",
+            "page": 42,
+            "ink": MARKS,
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "upsert: {body}");
+    assert_eq!(body["ink"], MARKS, "returned verbatim");
+
+    let (_, mine) = call(&app, "GET", "/api/annotations?cursor=", Some(&master), None).await;
+    assert_eq!(entries(&mine)[0]["ink"], MARKS);
+    assert_eq!(entries(&mine)[0]["kind"], "ink");
+
+    let (_, theirs) = call(&app, "GET", "/api/annotations?cursor=", Some(&member), None).await;
+    assert!(
+        entries(&theirs).is_empty(),
+        "what you write on a page is yours, in a library you share"
+    );
+}
+
+#[tokio::test]
+async fn a_page_can_be_written_on_twice() {
+    let app = test_app().await;
+    let token = register(&app, "pen@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    for (marks, at) in [
+        (r#"{"v":1,"strokes":[{"c":1,"w":0.004,"p":[0.1,0.1,0.2,0.2]}]}"#, "2026-08-23 10:00:00"),
+        (
+            r#"{"v":1,"strokes":[{"c":1,"w":0.004,"p":[0.1,0.1,0.2,0.2]},{"c":1,"w":0.004,"p":[0.3,0.3,0.4,0.4]}]}"#,
+            "2026-08-23 10:05:00",
+        ),
+    ] {
+        call(
+            &app,
+            "PUT",
+            "/api/annotations/ink1",
+            Some(&token),
+            Some(json!({"book_id": book, "kind": "ink", "page": 1, "ink": marks, "updated_at": at})),
+        )
+        .await;
+    }
+
+    let (_, body) = call(&app, "GET", "/api/annotations?cursor=", Some(&token), None).await;
+    let list = entries(&body);
+    assert_eq!(list.len(), 1, "one page, one sheet of marks");
+    assert!(
+        list[0]["ink"].as_str().unwrap().contains("0.3"),
+        "the later drawing wins, strokes and all"
+    );
+}
+
+#[tokio::test]
+async fn a_kind_the_server_does_not_know_is_still_refused() {
+    let app = test_app().await;
+    let token = register(&app, "odd@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/annotations/x1",
+        Some(&token),
+        Some(json!({"book_id": book, "kind": "sticker"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

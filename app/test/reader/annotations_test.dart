@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/reader/annotations/annotation_locator.dart';
+import 'package:vellum/reader/annotations/ink_markup.dart';
 import 'package:vellum/reader/annotations/markdown_export.dart';
 import 'package:vellum/reader/epub_book.dart';
 
@@ -182,6 +183,58 @@ void main() {
       final after = (await repo.watchBook('b1').first)!;
       expect(after.needsPush, false);
       expect(after.updatedAt, before.updatedAt);
+    });
+
+    test('writing on a page is one row, however many strokes', () async {
+      // A page of scribble is one thing you undo, erase and sync; a row per
+      // stroke would make a busy page hundreds of rows to merge.
+      final repo = await seeded();
+      const first = InkMarkup(strokes: [
+        InkStroke(points: [Offset(0.1, 0.1), Offset(0.2, 0.2)], color: 1, width: 0.004),
+      ]);
+      await repo.annotations.setInk('b1', 7, first);
+      await repo.annotations.setInk('b1', 7, first.withStroke(
+        const InkStroke(points: [Offset(0.5, 0.5)], color: 1, width: 0.004),
+      ));
+
+      final rows = await repo.annotations.forBook('b1');
+      expect(rows, hasLength(1));
+      expect(rows.single.kind, 'ink');
+      expect(rows.single.page, 7);
+      expect(InkMarkup.decode(rows.single.ink)!.strokes, hasLength(2));
+      expect(rows.single.needsPush, isTrue, reason: 'and it travels');
+    });
+
+    test('each page keeps its own writing', () async {
+      final repo = await seeded();
+      const mark = InkMarkup(strokes: [
+        InkStroke(points: [Offset(0.1, 0.1)], color: 1, width: 0.004),
+      ]);
+      await repo.annotations.setInk('b1', 3, mark);
+      await repo.annotations.setInk('b1', 4, mark);
+
+      expect((await repo.annotations.inkForPage('b1', 3))?.page, 3);
+      expect((await repo.annotations.inkForPage('b1', 4))?.page, 4);
+      expect(await repo.annotations.inkForPage('b1', 5), isNull);
+    });
+
+    test('rubbing a page clean deletes it, and says so to the other devices',
+        () async {
+      final repo = await seeded();
+      await repo.annotations.setInk(
+        'b1',
+        7,
+        const InkMarkup(strokes: [
+          InkStroke(points: [Offset(0.1, 0.1)], color: 1, width: 0.004),
+        ]),
+      );
+
+      await repo.annotations.setInk('b1', 7, const InkMarkup());
+
+      expect(await repo.annotations.forBook('b1'), isEmpty);
+      final tombstones = await repo.db.select(repo.db.localDeletions).get();
+      expect(tombstones.single.kind, 'annotation',
+          reason: 'erasing has to travel, or it comes back on the next sync');
     });
 
     test('a bookmark on a page is found so the action can toggle', () async {

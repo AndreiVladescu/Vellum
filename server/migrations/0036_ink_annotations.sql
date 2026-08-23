@@ -1,0 +1,21 @@
+-- Writing on the page (8/23 request: "a pen writing feature, so you can draw
+-- on the pdf… these written/scribbled notes would be like normal notes, and
+-- you wouldn't share them with anybody else").
+--
+-- An annotation already *is* that: the table is keyed by `user_id`, so a
+-- library shared with someone carries their marks and yours separately and
+-- neither sees the other's. So ink is a new kind of annotation rather than a
+-- new table — it inherits the whole channel, tombstones and all.
+--
+-- What it needs that a highlight does not is somewhere to put the marks. They
+-- are strokes and text boxes in *page-relative* coordinates (fractions of the
+-- page rectangle, so they land in the same place at every zoom and on every
+-- device), as JSON, versioned like the locators are:
+--
+--   {"v":1,"strokes":[{"c":4294901760,"w":0.004,"p":[0.12,0.33,0.13,0.34,…]}],
+--          "texts":[{"x":0.2,"y":0.4,"s":0.02,"c":4278190080,"t":"see ch. 4"}]}
+--
+-- Opaque to the server on purpose. It stores and returns the string; what a
+-- stroke means is the reader's business, and a server that parsed it would
+-- have to be upgraded before a client could draw anything new.
+ALTER TABLE annotation ADD COLUMN ink TEXT;

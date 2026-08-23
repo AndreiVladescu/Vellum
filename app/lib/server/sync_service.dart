@@ -1359,6 +1359,7 @@ class SyncService {
                 quotedText: Value(a.quotedText),
                 note: Value(a.note),
                 color: Value(a.color),
+                ink: Value(a.ink),
                 createdAt: Value(a.createdAt ?? DateTime.now()),
                 updatedAt: Value(a.updatedAt ?? DateTime.now()),
                 // It came *from* the server, so it is not waiting to go there.
@@ -1521,6 +1522,7 @@ class SyncService {
           quotedText: a.quotedText,
           note: a.note,
           color: a.color,
+          ink: a.ink,
           createdAt: a.createdAt,
           updatedAt: a.updatedAt,
         );

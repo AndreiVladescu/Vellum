@@ -3,12 +3,17 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/database.dart';
 import 'annotation_locator.dart';
+import 'ink_markup.dart';
 
 /// The three things a reader can leave behind. Values match the `kind` column.
 enum AnnotationKind {
   bookmark,
   highlight,
-  note;
+  note,
+
+  /// Marks made on the page itself — pen strokes and typed labels, in
+  /// page-relative coordinates. One row per page, carried in `ink`.
+  ink;
 
   static AnnotationKind? parse(String raw) =>
       AnnotationKind.values.where((k) => k.name == raw).firstOrNull;
@@ -17,6 +22,7 @@ enum AnnotationKind {
         AnnotationKind.bookmark => 'Bookmark',
         AnnotationKind.highlight => 'Highlight',
         AnnotationKind.note => 'Note',
+        AnnotationKind.ink => 'Writing',
       };
 }
 
@@ -69,6 +75,7 @@ class AnnotationStore {
     String? quotedText,
     String? note,
     int? color,
+    String? ink,
   }) async {
     final id = _uuid.v4();
     await db.into(db.annotations).insert(AnnotationsCompanion.insert(
@@ -81,6 +88,7 @@ class AnnotationStore {
           quotedText: Value(_blankToNull(quotedText)),
           note: Value(_blankToNull(note)),
           color: Value(color),
+          ink: Value(ink),
           updatedAt: Value(DateTime.now()),
         ));
     return id;
@@ -127,6 +135,48 @@ class AnnotationStore {
   /// tombstone per highlight would be noise saying the same thing.
   Future<void> deleteForBook(String bookId) =>
       (db.delete(db.annotations)..where((a) => a.bookId.equals(bookId))).go();
+
+  /// The marks written on one page, if any (8/23 request).
+  ///
+  /// One row per page rather than one per stroke: a page of writing is one
+  /// thing you undo, erase and sync, and a row per stroke would make a busy
+  /// page hundreds of rows to merge.
+  Future<Annotation?> inkForPage(String bookId, int page) async {
+    final rows = await (db.select(db.annotations)
+          ..where((a) =>
+              a.bookId.equals(bookId) &
+              a.kind.equals(AnnotationKind.ink.name) &
+              a.page.equals(page))
+          ..limit(1))
+        .get();
+    return rows.firstOrNull;
+  }
+
+  /// Replaces what is written on [page]. An empty page deletes the row (with a
+  /// tombstone, so the erasing travels), rather than storing "nothing".
+  Future<void> setInk(String bookId, int page, InkMarkup markup) async {
+    final existing = await inkForPage(bookId, page);
+    if (markup.isEmpty) {
+      if (existing != null) await delete(existing.id);
+      return;
+    }
+    if (existing == null) {
+      await add(
+        bookId: bookId,
+        kind: AnnotationKind.ink,
+        page: page,
+        locator: PdfPageLocator(page: page),
+        ink: markup.encode(),
+      );
+      return;
+    }
+    await (db.update(db.annotations)..where((a) => a.id.equals(existing.id)))
+        .write(AnnotationsCompanion(
+      ink: Value(markup.encode()),
+      updatedAt: Value(DateTime.now()),
+      needsPush: const Value(true),
+    ));
+  }
 
   /// Whether this book has a bookmark at [page] already, so the reader's
   /// bookmark button can toggle instead of stacking duplicates.

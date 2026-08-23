@@ -9473,6 +9473,15 @@ class $AnnotationsTable extends Annotations
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _inkMeta = const VerificationMeta('ink');
+  @override
+  late final GeneratedColumn<String> ink = GeneratedColumn<String>(
+    'ink',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _needsPushMeta = const VerificationMeta(
     'needsPush',
   );
@@ -9501,6 +9510,7 @@ class $AnnotationsTable extends Annotations
     color,
     createdAt,
     updatedAt,
+    ink,
     needsPush,
   ];
   @override
@@ -9584,6 +9594,12 @@ class $AnnotationsTable extends Annotations
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('ink')) {
+      context.handle(
+        _inkMeta,
+        ink.isAcceptableOrUnknown(data['ink']!, _inkMeta),
+      );
+    }
     if (data.containsKey('needs_push')) {
       context.handle(
         _needsPushMeta,
@@ -9643,6 +9659,10 @@ class $AnnotationsTable extends Annotations
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      ink: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ink'],
+      ),
       needsPush: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}needs_push'],
@@ -9685,6 +9705,10 @@ class Annotation extends DataClass implements Insertable<Annotation> {
 
   /// Waiting to be pushed. Same convention as every other synced table: set on
   /// local write, cleared once the server has it.
+  /// The marks themselves, for [AnnotationKind.ink]: strokes and text boxes in
+  /// page-relative coordinates, as versioned JSON (see `ink_markup.dart`).
+  /// Null for every other kind.
+  final String? ink;
   final bool needsPush;
   const Annotation({
     required this.id,
@@ -9698,6 +9722,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     this.color,
     required this.createdAt,
     required this.updatedAt,
+    this.ink,
     required this.needsPush,
   });
   @override
@@ -9726,6 +9751,9 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || ink != null) {
+      map['ink'] = Variable<String>(ink);
+    }
     map['needs_push'] = Variable<bool>(needsPush);
     return map;
   }
@@ -9751,6 +9779,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           : Value(color),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      ink: ink == null && nullToAbsent ? const Value.absent() : Value(ink),
       needsPush: Value(needsPush),
     );
   }
@@ -9772,6 +9801,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       color: serializer.fromJson<int?>(json['color']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      ink: serializer.fromJson<String?>(json['ink']),
       needsPush: serializer.fromJson<bool>(json['needsPush']),
     );
   }
@@ -9790,6 +9820,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       'color': serializer.toJson<int?>(color),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'ink': serializer.toJson<String?>(ink),
       'needsPush': serializer.toJson<bool>(needsPush),
     };
   }
@@ -9806,6 +9837,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     Value<int?> color = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
+    Value<String?> ink = const Value.absent(),
     bool? needsPush,
   }) => Annotation(
     id: id ?? this.id,
@@ -9819,6 +9851,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     color: color.present ? color.value : this.color,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    ink: ink.present ? ink.value : this.ink,
     needsPush: needsPush ?? this.needsPush,
   );
   Annotation copyWithCompanion(AnnotationsCompanion data) {
@@ -9836,6 +9869,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
       color: data.color.present ? data.color.value : this.color,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      ink: data.ink.present ? data.ink.value : this.ink,
       needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
     );
   }
@@ -9854,6 +9888,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           ..write('color: $color, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('ink: $ink, ')
           ..write('needsPush: $needsPush')
           ..write(')'))
         .toString();
@@ -9872,6 +9907,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
     color,
     createdAt,
     updatedAt,
+    ink,
     needsPush,
   );
   @override
@@ -9889,6 +9925,7 @@ class Annotation extends DataClass implements Insertable<Annotation> {
           other.color == this.color &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
+          other.ink == this.ink &&
           other.needsPush == this.needsPush);
 }
 
@@ -9904,6 +9941,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
   final Value<int?> color;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String?> ink;
   final Value<bool> needsPush;
   final Value<int> rowid;
   const AnnotationsCompanion({
@@ -9918,6 +9956,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.color = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.ink = const Value.absent(),
     this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -9933,6 +9972,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     this.color = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.ink = const Value.absent(),
     this.needsPush = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -9950,6 +9990,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Expression<int>? color,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? ink,
     Expression<bool>? needsPush,
     Expression<int>? rowid,
   }) {
@@ -9965,6 +10006,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       if (color != null) 'color': color,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (ink != null) 'ink': ink,
       if (needsPush != null) 'needs_push': needsPush,
       if (rowid != null) 'rowid': rowid,
     });
@@ -9982,6 +10024,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     Value<int?>? color,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<String?>? ink,
     Value<bool>? needsPush,
     Value<int>? rowid,
   }) {
@@ -9997,6 +10040,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
       color: color ?? this.color,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      ink: ink ?? this.ink,
       needsPush: needsPush ?? this.needsPush,
       rowid: rowid ?? this.rowid,
     );
@@ -10038,6 +10082,9 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (ink.present) {
+      map['ink'] = Variable<String>(ink.value);
+    }
     if (needsPush.present) {
       map['needs_push'] = Variable<bool>(needsPush.value);
     }
@@ -10061,6 +10108,7 @@ class AnnotationsCompanion extends UpdateCompanion<Annotation> {
           ..write('color: $color, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('ink: $ink, ')
           ..write('needsPush: $needsPush, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -19252,6 +19300,7 @@ typedef $$AnnotationsTableCreateCompanionBuilder =
       Value<int?> color,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<String?> ink,
       Value<bool> needsPush,
       Value<int> rowid,
     });
@@ -19268,6 +19317,7 @@ typedef $$AnnotationsTableUpdateCompanionBuilder =
       Value<int?> color,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<String?> ink,
       Value<bool> needsPush,
       Value<int> rowid,
     });
@@ -19350,6 +19400,11 @@ class $$AnnotationsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ink => $composableBuilder(
+    column: $table.ink,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -19441,6 +19496,11 @@ class $$AnnotationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ink => $composableBuilder(
+    column: $table.ink,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get needsPush => $composableBuilder(
     column: $table.needsPush,
     builder: (column) => ColumnOrderings(column),
@@ -19511,6 +19571,9 @@ class $$AnnotationsTableAnnotationComposer
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
+  GeneratedColumn<String> get ink =>
+      $composableBuilder(column: $table.ink, builder: (column) => column);
+
   GeneratedColumn<bool> get needsPush =>
       $composableBuilder(column: $table.needsPush, builder: (column) => column);
 
@@ -19577,6 +19640,7 @@ class $$AnnotationsTableTableManager
                 Value<int?> color = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> ink = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion(
@@ -19591,6 +19655,7 @@ class $$AnnotationsTableTableManager
                 color: color,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                ink: ink,
                 needsPush: needsPush,
                 rowid: rowid,
               ),
@@ -19607,6 +19672,7 @@ class $$AnnotationsTableTableManager
                 Value<int?> color = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> ink = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion.insert(
@@ -19621,6 +19687,7 @@ class $$AnnotationsTableTableManager
                 color: color,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                ink: ink,
                 needsPush: needsPush,
                 rowid: rowid,
               ),
