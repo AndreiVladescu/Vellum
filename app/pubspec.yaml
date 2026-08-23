@@ -66,6 +66,7 @@ dependencies:
   google_mlkit_language_id: ^0.14.0
   flutter_zxing: ^2.3.0
   wakelock_plus: ^1.5.2
+  package_info_plus: ^9.0.1
 
 dev_dependencies:
   flutter_test:

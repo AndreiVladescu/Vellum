@@ -35,6 +35,18 @@ class MarkdownExport {
 
     for (final a in annotations) {
       final kind = AnnotationKind.parse(a.kind);
+      // Writing on a page is strokes and coordinates; there is no text to
+      // export and an empty heading would be a lie about what is there. Said
+      // in words instead, so the export doesn't imply the page is unmarked.
+      if (kind == AnnotationKind.ink) {
+        final where = _location(a);
+        out
+          ..writeln('## Writing${where == null ? '' : ' — $where'}')
+          ..writeln()
+          ..writeln('_Pen marks on the page — open the book to see them._')
+          ..writeln();
+        continue;
+      }
       final location = _location(a);
       out.writeln('## ${kind?.label ?? a.kind}'
           '${location == null ? '' : ' — $location'}');

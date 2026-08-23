@@ -45,6 +45,7 @@ Future<http.Response> Function(http.Request) _server({
   List<String>? uploadedPhotoImages,
   bool personalSupported = true,
   bool bookStatusSupported = true,
+  bool inkSupported = true,
 }) {
   return (req) async {
     final path = req.url.path;
@@ -70,7 +71,10 @@ Future<http.Response> Function(http.Request) _server({
       return http.Response(
         jsonEncode({
           'version': 'test',
-          'features': [if (bookStatusSupported) 'book_status'],
+          'features': [
+            if (bookStatusSupported) 'book_status',
+            if (inkSupported) 'ink_annotations',
+          ],
         }),
         200,
       );
@@ -350,6 +354,56 @@ void main() {
     expect(pushed.single['page'], 7);
     expect(pushed.single['ink'], contains('see ch. 4'),
         reason: 'the marks are the payload; without them it is an empty page');
+  });
+
+  test('a server that cannot take writing is waited for, not failed at',
+      () async {
+    // An older server answers 400 to a kind it does not know — an error, not a
+    // 404's "no such endpoint". Pushing anyway would report a failed sync on
+    // every pass and never clear the flag.
+    final repo = await _repo();
+    final pushed = <Map<String, dynamic>>[];
+    await repo.annotations.setInk(
+      'b1',
+      7,
+      const InkMarkup(strokes: [
+        InkStroke(points: [Offset(0.1, 0.1)], color: 1, width: 0.004),
+      ]),
+    );
+
+    final report = await SyncService(repo)
+        .push(_client(_server(pushedAnnotations: pushed, inkSupported: false)));
+
+    expect(pushed, isEmpty);
+    expect(report.issues, isEmpty);
+    final row = await repo.annotations.inkForPage('b1', 7);
+    expect(row!.needsPush, isTrue,
+        reason: 'it goes the moment the server is upgraded');
+  });
+
+  test('a highlight still goes to a server that cannot take writing',
+      () async {
+    final repo = await _repo();
+    final pushed = <Map<String, dynamic>>[];
+    await repo.annotations.add(
+      bookId: 'b1',
+      kind: AnnotationKind.highlight,
+      page: 3,
+      quotedText: 'the spice must flow',
+    );
+    await repo.annotations.setInk(
+      'b1',
+      7,
+      const InkMarkup(strokes: [
+        InkStroke(points: [Offset(0.1, 0.1)], color: 1, width: 0.004),
+      ]),
+    );
+
+    await SyncService(repo)
+        .push(_client(_server(pushedAnnotations: pushed, inkSupported: false)));
+
+    expect(pushed, hasLength(1), reason: 'one held back, not both');
+    expect(pushed.single['kind'], 'highlight');
   });
 
   test("another device's writing arrives and is drawable", () async {

@@ -63,6 +63,12 @@ const FEATURES: &[&str] = &[
     // `book` row — that is what migration 0006 settled, and this is the same
     // per-user channel `book_note` uses, for the same reason.
     "book_status",
+    // Writing on the page (migration 0036): annotations of kind 'ink', with
+    // their marks in the `ink` column. Advertised because a server without it
+    // answers 400 to that kind — and a client that read *that* as "not
+    // supported" would have to guess, while one that reads it as an error
+    // reports a failed sync on every pass, for good.
+    "ink_annotations",
     "layouts",
     "borrow_requests",
     // Live sync hints over SSE (plan 5 #8). Always on: the endpoint costs

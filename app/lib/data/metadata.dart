@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -350,7 +351,9 @@ class MetadataService {
         },
       ]) {
         try {
-          final results = await attempt();
+          // A source that hangs must not hold the scanner: six catalogues with
+          // no deadline is a scan that never comes back.
+          final results = await attempt().timeout(const Duration(seconds: 8));
           // Whatever the source was asked about, record the *barcode* on the
           // book: it is the key the rest of the app dedupes and searches by.
           final hit = results.firstOrNull;

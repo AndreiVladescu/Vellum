@@ -1506,11 +1506,32 @@ class SyncService {
       }
     }
 
+    // Writing on the page is a kind an older server does not know: it answers
+    // 400, which is an error rather than a 404's "no such endpoint", so a
+    // client that pushed it anyway would report a failed sync on every pass
+    // and never clear the flag. Ask instead — and only when there is ink
+    // waiting, so an ordinary sync still costs no handshake.
+    final inkWaiting = scope.annotations &&
+        await (db.select(db.annotations)
+              ..where((a) =>
+                  a.needsPush.equals(true) &
+                  a.kind.equals(AnnotationKind.ink.name))
+              ..limit(1))
+            .getSingleOrNull() !=
+            null;
+    final canInk = !inkWaiting || await _supportsInk(client);
+
     final dirty = scope.annotations
         ? await (db.select(db.annotations)..where((a) => a.needsPush.equals(true)))
             .get()
         : const <Annotation>[];
     for (final a in dirty) {
+      // Ink waits for a server that can take it, rather than failing every
+      // sync until one arrives. The flag stays set, so it goes the moment the
+      // server is upgraded.
+      if (!canInk && AnnotationKind.parse(a.kind) == AnnotationKind.ink) {
+        continue;
+      }
       try {
         await client.pushAnnotation(
           id: a.id,
@@ -1902,6 +1923,23 @@ class SyncService {
       published++;
     }
     return (published: published, cached: listed.entries.length);
+  }
+
+  /// Whether [client]'s server can take writing on a page (server migration
+  /// 0036). Memoized per base URL, like the other two handshakes.
+  Future<bool> _supportsInk(VellumServerClient client) async {
+    if (_capsBaseUrl != client.baseUrl) {
+      try {
+        _caps = await client.capabilities();
+        _capsBaseUrl = client.baseUrl;
+      } on ServerException {
+        _caps = null;
+        _capsBaseUrl = client.baseUrl;
+      } catch (_) {
+        return false;
+      }
+    }
+    return _caps?.hasFeature('ink_annotations') ?? false;
   }
 
   /// Whether [client]'s server has the per-user reading-status channel

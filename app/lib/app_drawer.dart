@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'app_version.dart';
 import 'widgets/page_insets.dart';
 
 import 'account/account_page.dart';
@@ -237,12 +239,17 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('About Vellum'),
-            onTap: () {
+            onTap: () async {
               Navigator.of(context).pop();
+              // Read from the package itself rather than typed in here: this
+              // line said 0.1.0 through eleven releases, because a number
+              // written twice is a number that stops agreeing with itself.
+              final version = await appVersion();
+              if (!context.mounted) return;
               showAboutDialog(
                 context: context,
                 applicationName: 'Vellum',
-                applicationVersion: '0.1.0',
+                applicationVersion: version,
                 applicationIcon:
                     Image.asset('assets/logo.png', width: 48, height: 48),
                 children: const [

@@ -684,9 +684,16 @@ class _ReaderPageState extends State<ReaderPage>
     }
   }
 
-  /// Rubs out what the eraser touched — on screen only. The page is written
-  /// once, when the finger lifts (see [_ink.pending]).
+  /// Where the eraser has been during this drag, page-relative.
+  ///
+  /// The *path*, not the result: applying it to the stored page when the finger
+  /// lifts means a stroke that arrived from another device mid-drag is erased
+  /// too, rather than being overwritten by a snapshot taken before it existed.
+  final List<Offset> _erasePath = [];
+
+  /// Rubs out what the eraser touched — on screen only, until the finger lifts.
   void _eraseAt(({int page, Offset at}) hit) {
+    _erasePath.add(hit.at);
     final before = _ink.pendingPage == hit.page
         ? (_ink.pending ?? _ink.markupOf(hit.page))
         : _ink.markupOf(hit.page);
@@ -700,13 +707,20 @@ class _ReaderPageState extends State<ReaderPage>
     setState(() => _ink.pending = after);
   }
 
-  /// Stores whatever the eraser left behind.
+  /// Stores what the eraser left behind, applied to the page as it stands now.
   Future<void> _commitErase(int page) async {
-    final left = _ink.pending;
-    _ink.pending = null;
-    _ink.pendingPage = null;
-    if (left == null) return;
+    final path = [..._erasePath];
+    _erasePath.clear();
+    setState(() {
+      _ink.pending = null;
+      _ink.pendingPage = null;
+    });
+    if (path.isEmpty) return;
     final stored = _ink.markupOf(page);
+    var left = stored;
+    for (final at in path) {
+      left = left.erasedAt(at, inkEraserRadius);
+    }
     if (left.strokes.length == stored.strokes.length &&
         left.texts.length == stored.texts.length) {
       return; // nothing was actually rubbed out

@@ -300,8 +300,11 @@ class _ScanPageState extends State<ScanPage> {
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-                child: SafeArea(
-                  top: false,
+                // The ISBN field is in here, so the panel has to clear the
+                // keyboard *and* the gesture bar — which is what
+                // `sheetBottomInset` is for, and why this is not a SafeArea.
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
