@@ -6,15 +6,15 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
-## v1.1.6 — 2026-08-22
+## v1.1.7 — 2026-08-23
 
-The sync bugs behind "only the new notes made on a book sync" and "the book I
-finished is still unread on the phone", and a few things the reader wanted
-after a week of use.
+Writing on the page, a scanner that finds more books, and the bugs a hunt
+through all of it turned up.
 
-**Upgrade the server too.** The two sync fixes are a server change and an app
-change working together; the app alone fixes nothing until the server has run
-migration 0034.
+**Upgrade the server too** if you want your writing on your other devices: it
+rides the same per-account channel your highlights do, and needs migration
+0036. Until then the app keeps it locally and waits — it does not fail the
+sync.
 
 ### Added
 
@@ -37,6 +37,41 @@ migration 0034.
   the top three-fifths, and the scanner centres its box inside its own preview
   — so the box sat a third of the way down, nowhere near where the phone is
   pointed. The controls float over the bottom of the picture instead.
+
+### Fixed
+
+- **Writing would have failed every sync against an older server.** A kind the
+  server does not know is a 400 — an error rather than "no such endpoint" — so
+  the push would have reported a failed sync on every pass and never let go.
+  The app asks the server what it can take, and holds the writing back until
+  the answer is yes. Highlights and notes go regardless.
+- **The eraser could bring a stroke back.** It rubbed out a copy of the page
+  taken when your finger went down, so anything that arrived from another
+  device mid-drag reappeared when you lifted it. It replays the eraser's path
+  over the page as it stands.
+- **A hung catalogue no longer stalls a scan** — each source gets eight seconds
+  to answer.
+- **The scanner's ISBN field sat under the keyboard** on a short screen.
+- **The About box said 0.1.0**, and had done for eleven releases: the number
+  lived in the source instead of coming from the build. It reads the installed
+  version now, so it cannot drift again.
+- **A burst of edits stamped a row seconds into the future** — adding five
+  books to a shelf is five edits in one second — and until real time caught up
+  the device ignored changes arriving from elsewhere as older than what it
+  held. Capped at one second.
+- A page of writing exports as a line saying so, rather than an empty heading.
+
+---
+
+## v1.1.6 — 2026-08-22
+
+The sync bugs behind "only the new notes made on a book sync" and "the book I
+finished is still unread on the phone", and a few things the reader wanted
+after a week of use.
+
+**Upgrade the server too.** The two sync fixes are a server change and an app
+change working together; the app alone fixes nothing until the server has run
+migration 0034.
 
 ### Fixed (a sync bug hunt)
 
