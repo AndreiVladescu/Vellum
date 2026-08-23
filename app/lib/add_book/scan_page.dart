@@ -257,123 +257,158 @@ class _ScanPageState extends State<ScanPage> {
             ),
         ],
       ),
-      body: Column(
+      // The camera fills the screen and the controls float over it, rather
+      // than the camera taking a slice off the top. The scanner's own box is
+      // centred in its preview, so a preview that is the top three-fifths of
+      // the screen puts the box a third of the way down — which is what "it's
+      // up at the top" was about. Filling the screen puts the box where you
+      // are already pointing the phone.
+      body: Stack(
+        key: const Key('scanBody'),
         children: [
           if (_useCamera)
-            Expanded(
-              flex: 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Only the symbologies books actually use, so the decoder
-                  // isn't also hunting QR codes on the same frames.
-                  BarcodeCamera(
-                    formats: isbnFormats,
-                    onCode: _onBarcode,
-                    onError: (message) => _CameraUnavailable(detail: message),
-                  ),
-                  if (_busy)
-                    const Align(
-                      alignment: Alignment.topCenter,
-                      child: LinearProgressIndicator(),
-                    ),
-                ],
+            Positioned.fill(
+              child: BarcodeCamera(
+                formats: isbnFormats,
+                onCode: _onBarcode,
+                onError: (message) => _CameraUnavailable(detail: message),
               ),
+            )
+          else
+            const Positioned.fill(
+              child: _CameraUnavailable(detail: 'No camera on this device.'),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(
-                  value: false,
-                  label: Text('I own it'),
-                  icon: Icon(Icons.library_add_check_outlined),
-                ),
-                ButtonSegment(
-                  value: true,
-                  label: Text('I want it'),
-                  icon: Icon(Icons.bookmark_add_outlined),
-                ),
-              ],
-              selected: {_toWishlist},
-              onSelectionChanged: (s) => setState(() => _toWishlist = s.first),
+          if (_busy)
+            const Align(
+              alignment: Alignment.topCenter,
+              child: LinearProgressIndicator(),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _manualIsbn,
-                    keyboardType: TextInputType.text,
-                    decoration: InputDecoration(
-                      labelText: 'ISBN',
-                      helperText: _useCamera
-                          ? 'Or type it, if the barcode won’t scan'
-                          : 'Type or paste an ISBN-10 or ISBN-13',
-                      border: const OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => _submitManual(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _busy ? null : _submitManual,
-                  child: const Text('Add'),
-                ),
-              ],
-            ),
-          ),
-          if (_message != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(_message!)),
-                ],
+          // Everything that is not the viewfinder, in a panel along the bottom.
+          // Capped so it can never grow up into the box: the list scrolls
+          // instead, and on a short screen in landscape there is still a
+          // viewfinder above it.
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.42,
               ),
-            ),
-          Expanded(
-            flex: 2,
-            child: _added.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Point the camera at a book’s barcode, or type an ISBN. '
-                        'Books you add appear here.',
-                        textAlign: TextAlign.center,
-                      ),
+              child: Material(
+                color: Theme.of(context).colorScheme.surface.withValues(
+                      alpha: 0.94,
                     ),
-                  )
-                : ListView.builder(
-                    padding: pageInsets(context, EdgeInsets.zero),
-                    itemCount: _added.length,
-                    itemBuilder: (context, i) {
-                      final book = _added[i];
-                      return ListTile(
-                        leading: Icon(book.duplicateOf != null
-                            ? Icons.copy_outlined
-                            : book.wanted
-                                ? Icons.bookmark_added_outlined
-                                : Icons.check_circle_outline),
-                        title: Text(book.title,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: Text(book.duplicateOf != null
-                            ? 'Possible duplicate of “${book.duplicateOf}”'
-                            : book.wanted
-                                ? '${formatIsbn13(book.isbn13)} · wishlist'
-                                : formatIsbn13(book.isbn13)),
-                        trailing: TextButton(
-                          onPressed: () => _undo(book),
-                          child: const Text('Undo'),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment(
+                              value: false,
+                              label: Text('I own it'),
+                              icon: Icon(Icons.library_add_check_outlined),
+                            ),
+                            ButtonSegment(
+                              value: true,
+                              label: Text('I want it'),
+                              icon: Icon(Icons.bookmark_add_outlined),
+                            ),
+                          ],
+                          selected: {_toWishlist},
+                          onSelectionChanged: (s) =>
+                              setState(() => _toWishlist = s.first),
                         ),
-                      );
-                    },
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _manualIsbn,
+                                keyboardType: TextInputType.text,
+                                decoration: InputDecoration(
+                                  labelText: 'ISBN',
+                                  helperText: _useCamera
+                                      ? 'Or type it, if the barcode won’t scan'
+                                      : 'Type or paste an ISBN-10 or ISBN-13',
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                onSubmitted: (_) => _submitManual(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: _busy ? null : _submitManual,
+                              child: const Text('Add'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_message != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(_message!)),
+                            ],
+                          ),
+                        ),
+                      Flexible(
+                        child: _added.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.fromLTRB(24, 8, 24, 12),
+                                child: Text(
+                                  'Point the camera at a book’s barcode, or '
+                                  'type an ISBN. Books you add appear here.',
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                padding: pageInsets(context, EdgeInsets.zero),
+                                itemCount: _added.length,
+                                itemBuilder: (context, i) {
+                                  final book = _added[i];
+                                  return ListTile(
+                                    dense: true,
+                                    leading: Icon(book.duplicateOf != null
+                                        ? Icons.copy_outlined
+                                        : book.wanted
+                                            ? Icons.bookmark_added_outlined
+                                            : Icons.check_circle_outline),
+                                    title: Text(book.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                    subtitle: Text(book.duplicateOf != null
+                                        ? 'Possible duplicate of '
+                                            '“${book.duplicateOf}”'
+                                        : book.wanted
+                                            ? '${formatIsbn13(book.isbn13)} · '
+                                                'wishlist'
+                                            : formatIsbn13(book.isbn13)),
+                                    trailing: TextButton(
+                                      onPressed: () => _undo(book),
+                                      child: const Text('Undo'),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

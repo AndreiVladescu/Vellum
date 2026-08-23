@@ -55,6 +55,28 @@ String? isbn10To13(String value) {
   return '$body${_ean13CheckDigit(body)}';
 }
 
+/// The ISBN-10 form of a 978-prefixed ISBN-13, or null when there isn't one.
+///
+/// **Why anyone still needs this.** Catalogues built before 2007 are indexed by
+/// ISBN-10, and some never re-indexed: a lookup for the 13-digit barcode
+/// printed on the back of the same book finds nothing, while the 10-digit form
+/// of it finds the record. That is one of the ways a book "isn't in the
+/// database" when it is.
+///
+/// A `979` ISBN has no ISBN-10 at all — the 10-digit space ran out, which is
+/// why 979 exists — so it returns null rather than inventing one.
+String? isbn13To10(String value) {
+  final digits = normalizeIsbnInput(value);
+  if (!isValidIsbn13(digits) || !digits.startsWith('978')) return null;
+  final body = digits.substring(3, 12);
+  var sum = 0;
+  for (var i = 0; i < 9; i++) {
+    sum += (10 - i) * int.parse(body[i]);
+  }
+  final check = (11 - sum % 11) % 11;
+  return '$body${check == 10 ? 'X' : check}';
+}
+
 /// The ISBN-13 form of any accepted input (a scanned EAN-13 or a typed
 /// ISBN-10), or null when the input is not a book identifier at all.
 ///

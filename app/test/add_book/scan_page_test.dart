@@ -94,6 +94,49 @@ void main() {
     return (app: app, repo: repo, codes: codes);
   }
 
+  testWidgets('the viewfinder gets the middle of the screen', (tester) async {
+    // "The scan block is up at the top": the camera used to take the top
+    // three-fifths of the screen, and the scanner centres its box inside its
+    // own preview — so the box sat a third of the way down, nowhere near where
+    // the phone is pointed. The camera fills the screen now, with the controls
+    // over the bottom of it.
+    final t = await build(tester);
+    await tester.pumpWidget(t.app);
+    await settle(tester);
+
+    final screen = tester.getRect(find.byType(Scaffold));
+    final panel = tester.getRect(find.byType(SegmentedButton<bool>));
+    expect(panel.top, greaterThan(screen.center.dy),
+        reason: 'the controls stay below the middle, so the box is clear of '
+            'them');
+
+    // Nothing but the viewfinder behind the panel: no strip of chrome pushing
+    // the preview (and its box) upwards, and nothing cutting it short.
+    final body = tester.getRect(find.byKey(const Key('scanBody')));
+    expect(body.bottom, screen.bottom);
+    expect(body.height, greaterThan(screen.height * 0.85),
+        reason: 'the preview is the screen, not a slice of it');
+  });
+
+  testWidgets('a long list of scans cannot push the viewfinder away',
+      (tester) async {
+    final t = await build(tester, known: {
+      for (var i = 0; i < 12; i++)
+        '978044101359${i % 10}': 'Book $i',
+    });
+    await tester.pumpWidget(t.app);
+    await settle(tester);
+    for (var i = 0; i < 12; i++) {
+      t.codes.add('978044101359${i % 10}');
+      await settle(tester);
+    }
+
+    final screen = tester.getRect(find.byType(Scaffold));
+    final panel = tester.getRect(find.byType(SegmentedButton<bool>));
+    expect(panel.top, greaterThan(screen.height * 0.5),
+        reason: 'the panel is capped and its list scrolls inside it');
+  });
+
   testWidgets('a scanned ISBN adds a book and lists it', (tester) async {
     final t = await build(tester);
     await tester.pumpWidget(t.app);

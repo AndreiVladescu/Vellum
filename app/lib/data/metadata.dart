@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../add_book/isbn.dart';
+
 /// One edition/work found by an online metadata search. The same shape is
 /// produced by every source (Open Library, Google Books), so the rest of the
 /// app doesn't care where a result came from.
@@ -62,6 +64,56 @@ class BookSearchResult {
       return Uri.parse('https://covers.openlibrary.org/b/id/$coverId-L.jpg');
     }
     return coverUrl;
+  }
+
+  /// Open Library's *books* API (`/api/books?jscmd=data`), which answers from
+  /// the edition records rather than the search index — see
+  /// [OpenLibraryClient.lookupEdition] for why that is a different question.
+  /// The same result under the barcode that was scanned. A lookup may have
+  /// succeeded against the ISBN-10 form, but the book is stored under the
+  /// 13-digit one — that is the key duplicate detection and search use.
+  BookSearchResult withIsbn(String isbn13) => BookSearchResult(
+        workKey: workKey,
+        title: title,
+        subtitle: subtitle,
+        authors: authors,
+        firstPublishYear: firstPublishYear,
+        isbn: isbn13,
+        coverId: coverId,
+        coverUrl: coverUrl,
+        description: description,
+        subjects: subjects,
+        publisher: publisher,
+        pageCount: pageCount,
+      );
+
+  factory BookSearchResult.fromOpenLibraryData(
+    Map<String, dynamic> data, {
+    required String isbn,
+  }) {
+    List<String> names(dynamic v) => v is List
+        ? [
+            for (final e in v)
+              if (e is Map && e['name'] is String) e['name'] as String,
+          ]
+        : const [];
+    final cover = data['cover'];
+    final coverUrl = cover is Map ? (cover['large'] ?? cover['medium']) : null;
+    // "1990" or "March 1990" or "1990-03-01": the year is the part every one
+    // of those has, and the only part this app shows.
+    final year = RegExp(r'\d{4}').firstMatch('${data['publish_date'] ?? ''}');
+    return BookSearchResult(
+      workKey: '',
+      title: (data['title'] as String?) ?? '',
+      subtitle: data['subtitle'] as String?,
+      authors: names(data['authors']),
+      firstPublishYear: year == null ? null : int.tryParse(year.group(0)!),
+      isbn: isbn,
+      coverUrl: coverUrl is String ? Uri.tryParse(coverUrl) : null,
+      subjects: names(data['subjects']),
+      publisher: names(data['publishers']).firstOrNull,
+      pageCount: (data['number_of_pages'] as num?)?.toInt(),
+    );
   }
 
   factory BookSearchResult.fromOpenLibraryDoc(Map<String, dynamic> doc) {
@@ -165,6 +217,29 @@ class OpenLibraryClient {
   Future<List<BookSearchResult>> searchByIsbn(String isbn13) =>
       search('isbn:$isbn13');
 
+  /// One edition, straight from the edition record.
+  ///
+  /// A different question from [searchByIsbn], and that is the point: the
+  /// search index only knows editions that made it into a *work*, while this
+  /// answers from the edition itself. A book catalogued by a library or added
+  /// by an importer — which is most of the ones a barcode finds nothing for —
+  /// is often present here and absent there.
+  Future<BookSearchResult?> lookupEdition(String isbn) async {
+    final uri = Uri.https('openlibrary.org', '/api/books', {
+      'bibkeys': 'ISBN:$isbn',
+      'format': 'json',
+      'jscmd': 'data',
+    });
+    final res = await _http.get(uri);
+    if (res.statusCode != 200) return null;
+    final body = jsonDecode(res.body);
+    if (body is! Map) return null;
+    final data = body['ISBN:$isbn'];
+    if (data is! Map<String, dynamic>) return null;
+    final result = BookSearchResult.fromOpenLibraryData(data, isbn: isbn);
+    return result.title.isEmpty ? null : result;
+  }
+
   /// The work's description is not in search results; fetch it separately.
   Future<String?> fetchDescription(String workKey) async {
     if (workKey.isEmpty) return null;
@@ -239,29 +314,54 @@ class MetadataService {
     return _googleBooks.search(query);
   }
 
-  /// The one book behind a scanned barcode, or null if neither source knows it
+  /// The one book behind a scanned barcode, or null if nothing knows it
   /// (plan 5 #16).
   ///
-  /// Same Open-Library-then-Google order as [search], but ISBN-qualified on both
-  /// sides and reduced to a single result: a barcode identifies one edition, so
-  /// presenting a list of twenty would just be a worse confirm step. Returns
-  /// null rather than throwing when nothing matches — "not found" is an ordinary
-  /// outcome that the caller answers with the manual form.
+  /// Reduced to a single result: a barcode identifies one edition, so a list of
+  /// twenty would only be a worse confirm step. Returns null rather than
+  /// throwing when nothing matches — "not found" is an ordinary outcome the
+  /// caller answers with the manual form.
+  ///
+  /// **Why it asks so many times.** A book that "isn't in the database" usually
+  /// is, under a different key. Each of these finds books the others don't:
+  ///
+  ///  * Open Library's *search* index — good coverage, but only editions that
+  ///    were folded into a work.
+  ///  * Google Books — a different catalogue entirely, and better on recent and
+  ///    non-English printings.
+  ///  * Open Library's *edition* record — the same library, a different index;
+  ///    imported and library-catalogued editions live here and nowhere else.
+  ///  * All three again against the **ISBN-10** form. Records made before 2007
+  ///    are keyed by it, and plenty were never re-indexed, so the ten-digit
+  ///    form of the barcode on the back of the book finds what the barcode
+  ///    itself does not.
+  ///
+  /// The order is cheapest-and-likeliest first, and it stops at the first hit,
+  /// so the common case is still one request.
   Future<BookSearchResult?> lookupByIsbn(String isbn13) async {
-    List<BookSearchResult> results = const [];
-    try {
-      results = await _openLibrary.searchByIsbn(isbn13);
-    } catch (_) {
-      // Fall through to Google Books.
-    }
-    if (results.isEmpty) {
-      try {
-        results = await _googleBooks.searchByIsbn(isbn13);
-      } catch (_) {
-        return null;
+    final forms = <String>[isbn13, ?isbn13To10(isbn13)];
+    for (final isbn in forms) {
+      for (final attempt in <Future<List<BookSearchResult>> Function()>[
+        () => _openLibrary.searchByIsbn(isbn),
+        () => _googleBooks.searchByIsbn(isbn),
+        () async {
+          final edition = await _openLibrary.lookupEdition(isbn);
+          return edition == null ? const [] : [edition];
+        },
+      ]) {
+        try {
+          final results = await attempt();
+          // Whatever the source was asked about, record the *barcode* on the
+          // book: it is the key the rest of the app dedupes and searches by.
+          final hit = results.firstOrNull;
+          if (hit != null) return hit.withIsbn(isbn13);
+        } catch (_) {
+          // A source that is down or rate-limiting is not an answer; ask the
+          // next one rather than failing the scan.
+        }
       }
     }
-    return results.firstOrNull;
+    return null;
   }
 
   /// The description for a chosen result: inline when the source supplied one
