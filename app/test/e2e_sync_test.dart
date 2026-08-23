@@ -161,7 +161,14 @@ void main() {
     // (same convention as books), so without this gap B's reorder could land
     // in the same second as A's original push and get skipped as "not
     // strictly newer" — a real e2e timing edge, not a design flaw.
-    await Future<void>.delayed(const Duration(seconds: 1));
+    //
+    // Two seconds rather than one: an edit is stamped at *most* a second past
+    // the wall clock (`sync_clock.dart` — the row has to end up newer than the
+    // one it edits even when both happen inside one second), so A's shelf can
+    // be a second ahead of real time when B starts. The residual window is the
+    // known cost of the app and the server keeping separate clocks; the fix
+    // for it is for a push to adopt the stamp the server assigns.
+    await Future<void>.delayed(const Duration(seconds: 2));
     await repoB.removeFromShelf(c, shelfId);
     await repoB.addToShelf(c, shelfId);
     await SyncService(repoB).sync(client);

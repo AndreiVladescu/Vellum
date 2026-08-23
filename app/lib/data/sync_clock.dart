@@ -46,10 +46,17 @@ Future<void> stampSyncClock(
 ) =>
     db.customStatement(
       'UPDATE ${row.table} SET '
+      // Now, unless the row is already at or past it — then one second on, and
+      // no further. The cap matters: without it a burst of edits (adding five
+      // books to a shelf) walks the row's clock five seconds into the future,
+      // and until the world catches up the device ignores every change coming
+      // the other way as "older than what I hold".
+      //
       // CAST because `strftime` answers text, and SQLite sorts every integer
       // before every string — so an uncast MAX() always picks the text and the
-      // clock never moves.
-      "updated_at = MAX(CAST(strftime('%s', 'now') AS INTEGER), updated_at + 1), "
+      // clock never moves at all.
+      "updated_at = MIN(MAX(CAST(strftime('%s', 'now') AS INTEGER), "
+      "updated_at + 1), CAST(strftime('%s', 'now') AS INTEGER) + 1), "
       'needs_push = 1 '
       'WHERE id = ?',
       [id],

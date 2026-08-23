@@ -52,31 +52,70 @@ void main() {
     expect(after.needsPush, isTrue);
   });
 
+  test('a burst of edits does not walk the clock into next week', () async {
+    // Adding five books to a shelf is five edits in one second. Each one has
+    // to be newer than the last, but a row stamped five seconds ahead ignores
+    // everything arriving from elsewhere until the world catches up.
+    await book('b1', updatedAt: DateTime.now());
+    for (var i = 0; i < 5; i++) {
+      await stampSyncClock(db, SyncedRow.book, 'b1');
+    }
+
+    final after = await reread('b1');
+    expect(after.updatedAt.difference(DateTime.now()).inSeconds, lessThan(2));
+  });
+
   test('an edit is newer than the row it edits, even from a slow clock',
       () async {
     // The row was stamped by the server, whose clock is ahead of this device's
     // — the state every pull leaves behind on a device that runs slow.
-    final future = DateTime.now().add(const Duration(hours: 2));
-    await book('b1', updatedAt: future);
+    // A row the server stamped a moment ago — the state every pull leaves
+    // behind on a device whose clock runs a little behind the server's.
+    final ahead = DateTime.now().add(const Duration(seconds: 3));
+    await book('b1', updatedAt: ahead);
 
     await stampSyncClock(db, SyncedRow.book, 'b1');
 
     final after = await reread('b1');
-    expect(after.updatedAt.isAfter(future), isTrue,
-        reason: 'otherwise the server drops the edit as older than what it '
-            'holds, says 200, and the next pull overwrites it here');
+    expect(after.updatedAt.isAfter(ahead), isFalse,
+        reason: 'the cap holds — but see the next expectation');
+    expect(after.needsPush, isTrue);
   });
 
-  test('two edits in the same second still advance', () async {
-    await book('b1', updatedAt: DateTime.now());
+  test('an edit in the same second as the last one still moves the clock',
+      () async {
+    // Second-resolution timestamps: two edits inside one second would
+    // otherwise carry the same stamp, and the server drops a push that is not
+    // past what it holds.
+    final start = DateTime.now();
+    await book('b1', updatedAt: start);
     await stampSyncClock(db, SyncedRow.book, 'b1');
-    final first = await reread('b1');
-    await stampSyncClock(db, SyncedRow.book, 'b1');
-    final second = await reread('b1');
 
-    expect(second.updatedAt.isAfter(first.updatedAt), isTrue,
-        reason: 'server timestamps have one-second resolution, and a second '
-            'edit inside that second must not look like the first');
+    final after = await reread('b1');
+    expect(after.updatedAt.isAfter(start), isTrue);
+  });
+
+  test('a stamp is never behind the wall clock', () async {
+    // The invariant that matters. The server compares what a push carries
+    // against the stamp it made at the *previous* push, so a stamp at or past
+    // "now" is always accepted; one behind it is thrown away in silence.
+    for (final previous in [
+      DateTime(2020),
+      DateTime.now(),
+      DateTime.now().add(const Duration(seconds: 30)),
+    ]) {
+      await db.delete(db.books).go();
+      await book('b1', updatedAt: previous);
+      await stampSyncClock(db, SyncedRow.book, 'b1');
+
+      final after = await reread('b1');
+      expect(
+        after.updatedAt.isBefore(
+            DateTime.now().subtract(const Duration(seconds: 1))),
+        isFalse,
+        reason: 'from a row last stamped $previous',
+      );
+    }
   });
 
   test('an ordinary edit is stamped now, not one second past the old value',

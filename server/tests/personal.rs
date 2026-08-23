@@ -1493,7 +1493,8 @@ async fn a_late_push_of_an_old_edit_still_reaches_the_other_device() {
         "a delta pull must be about when the server heard, not when the device wrote"
     );
     assert_eq!(
-        entries(&body)[0]["updated_at"], "2020-01-01 00:00:00",
+        entries(&body)[0]["updated_at"],
+        "2020-01-01 00:00:00",
         "and the edit keeps its own clock, which is what LWW compares"
     );
 }
@@ -1640,7 +1641,8 @@ async fn an_older_status_does_not_overwrite_a_newer_one() {
 
     let (_, body) = call(&app, "GET", "/api/statuses?cursor=", Some(&token), None).await;
     assert_eq!(
-        entries(&body)[0]["status"], "finished",
+        entries(&body)[0]["status"],
+        "finished",
         "last write wins by the writer's clock, and the stale one is not it"
     );
 }
@@ -1885,7 +1887,10 @@ async fn a_page_can_be_written_on_twice() {
     let book = create_book(&app, &token, "Dune").await;
 
     for (marks, at) in [
-        (r#"{"v":1,"strokes":[{"c":1,"w":0.004,"p":[0.1,0.1,0.2,0.2]}]}"#, "2026-08-23 10:00:00"),
+        (
+            r#"{"v":1,"strokes":[{"c":1,"w":0.004,"p":[0.1,0.1,0.2,0.2]}]}"#,
+            "2026-08-23 10:00:00",
+        ),
         (
             r#"{"v":1,"strokes":[{"c":1,"w":0.004,"p":[0.1,0.1,0.2,0.2]},{"c":1,"w":0.004,"p":[0.3,0.3,0.4,0.4]}]}"#,
             "2026-08-23 10:05:00",
@@ -1896,7 +1901,9 @@ async fn a_page_can_be_written_on_twice() {
             "PUT",
             "/api/annotations/ink1",
             Some(&token),
-            Some(json!({"book_id": book, "kind": "ink", "page": 1, "ink": marks, "updated_at": at})),
+            Some(
+                json!({"book_id": book, "kind": "ink", "page": 1, "ink": marks, "updated_at": at}),
+            ),
         )
         .await;
     }
