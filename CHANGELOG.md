@@ -16,6 +16,28 @@ after a week of use.
 change working together; the app alone fixes nothing until the server has run
 migration 0034.
 
+### Added
+
+- **Write on a PDF page** — a pen, an eraser and a text tool. Marks are stored
+  in the page's own coordinates, so a line stays on the same word at every zoom
+  and on every device, and they are **yours**: they ride the same per-account
+  channel your highlights do, so a library you share carries your marks and
+  everyone else's separately and none of you sees the others'. Not in the EPUB
+  reader — reflowable text has no fixed page to anchor a stroke to.
+- **A barcode is now asked about six ways.** A book that "isn't in the
+  database" is usually in one of them under another key: Open Library's search
+  index, Google Books and Open Library's *edition* records are each asked, and
+  then all three again under the ISBN-10 form of the same barcode — records
+  made before 2007 are keyed by it and plenty were never re-indexed. A book
+  that is found still costs one request.
+
+### Changed
+
+- **The scanner's viewfinder gets the whole screen.** The camera used to take
+  the top three-fifths, and the scanner centres its box inside its own preview
+  — so the box sat a third of the way down, nowhere near where the phone is
+  pointed. The controls float over the bottom of the picture instead.
+
 ### Fixed (a sync bug hunt)
 
 - **An edit the server silently threw away.** It stamps a row's `updated_at`

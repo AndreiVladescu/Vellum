@@ -17,11 +17,15 @@ class InkPainter {
   /// The marks of each page, rebuilt whenever the annotation stream emits.
   final Map<int, InkMarkup> _byPage = {};
 
-  /// What the pen is drawing *right now*, before the stroke is finished and
-  /// stored. Kept apart so a live stroke does not go through the database on
-  /// every pointer move.
-  InkStroke? live;
-  int? livePage;
+  /// A page being rubbed out right now, and what is left of it.
+  ///
+  /// Held here rather than written straight to the database: an eraser dragged
+  /// across a scribbled page fires a pointer event every few milliseconds, and
+  /// each one would otherwise re-encode the whole page and write it. The page
+  /// paints from this while the finger is down, and the result is stored once
+  /// when it lifts.
+  int? pendingPage;
+  InkMarkup? pending;
 
   void adopt(List<Annotation> annotations) {
     _byPage.clear();
@@ -36,13 +40,10 @@ class InkPainter {
 
   InkMarkup markupOf(int page) => _byPage[page] ?? const InkMarkup();
 
-  /// Everything on this page, including the stroke in progress.
-  InkMarkup _paintable(int page) {
-    final stored = markupOf(page);
-    final drawing = live;
-    if (drawing == null || livePage != page) return stored;
-    return stored.withStroke(drawing);
-  }
+  /// What the page looks like right now — the stored marks, or what is left of
+  /// them mid-erase.
+  InkMarkup _paintable(int page) =>
+      page == pendingPage ? (pending ?? markupOf(page)) : markupOf(page);
 
   void paint(ui.Canvas canvas, Rect pageRect, PdfPage page) {
     final markup = _paintable(page.pageNumber);

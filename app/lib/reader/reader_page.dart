@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:pdfrx/pdfrx.dart';
@@ -119,7 +120,12 @@ class _ReaderPageState extends State<ReaderPage>
   InkTool _tool = InkTool.pen;
   int _inkColor = inkColors.first;
   double _inkWidth = inkWidths[1];
-  List<Offset> _livePoints = const [];
+  /// The stroke under the pen, in view coordinates.
+  ///
+  /// A notifier rather than state: a pen moving at sixty frames a second would
+  /// otherwise rebuild the whole reader — and with it the viewer's params — on
+  /// every point. Only the overlay listens, and only the overlay repaints.
+  final ValueNotifier<List<Offset>> _livePoints = ValueNotifier(const []);
   final _searchController = TextEditingController();
   bool _searching = false;
 
@@ -236,6 +242,7 @@ class _ReaderPageState extends State<ReaderPage>
   @override
   void dispose() {
     _autoTicker?.dispose();
+    _livePoints.dispose();
     // The wakelock belongs to this page, not to the app.
     unawaited(WakelockPlus.disable().catchError((_) {}));
     _openTimer?.cancel();
@@ -605,19 +612,22 @@ class _ReaderPageState extends State<ReaderPage>
   /// that runs off the bottom of one page does not jump onto the next.
   int? _inkPage;
 
+  /// Where a text-tool touch went down, to tell a tap from a drag.
+  Offset? _textDownAt;
+
   void _onInkDown(PointerDownEvent event) {
     final hit = _pageAt(event.localPosition);
     if (hit == null) return;
     _inkPage = hit.page;
     switch (_tool) {
       case InkTool.pen:
-        setState(() => _livePoints = [event.localPosition]);
+        _livePoints.value = [event.localPosition];
       case InkTool.eraser:
         _eraseAt(hit);
       case InkTool.text:
-        // Placed on the way up, so a stray touch while scrolling doesn't open
-        // a dialog.
-        break;
+        // Placed on the way up, and only if the finger stayed put: a dialog
+        // that opens at the end of a drag is one nobody asked for.
+        _textDownAt = event.localPosition;
     }
   }
 
@@ -626,7 +636,7 @@ class _ReaderPageState extends State<ReaderPage>
     if (page == null) return;
     switch (_tool) {
       case InkTool.pen:
-        setState(() => _livePoints = [..._livePoints, event.localPosition]);
+        _livePoints.value = [..._livePoints.value, event.localPosition];
       case InkTool.eraser:
         final hit = _pageAt(event.localPosition);
         if (hit != null && hit.page == page) _eraseAt(hit);
@@ -641,8 +651,8 @@ class _ReaderPageState extends State<ReaderPage>
     if (page == null) return;
     switch (_tool) {
       case InkTool.pen:
-        final points = _livePoints;
-        setState(() => _livePoints = const []);
+        final points = _livePoints.value;
+        _livePoints.value = const [];
         if (points.isEmpty) return;
         final fractions = <Offset>[];
         for (final point in points) {
@@ -663,22 +673,45 @@ class _ReaderPageState extends State<ReaderPage>
               )),
         );
       case InkTool.eraser:
-        break;
+        await _commitErase(page);
       case InkTool.text:
+        final from = _textDownAt;
+        _textDownAt = null;
+        if (from != null && (event.localPosition - from).distance > 10) return;
         final hit = _pageAt(event.localPosition);
         if (hit == null || hit.page != page) return;
         await _writeText(page, hit.at);
     }
   }
 
-  Future<void> _eraseAt(({int page, Offset at}) hit) async {
-    final before = _ink.markupOf(hit.page);
+  /// Rubs out what the eraser touched — on screen only. The page is written
+  /// once, when the finger lifts (see [_ink.pending]).
+  void _eraseAt(({int page, Offset at}) hit) {
+    final before = _ink.pendingPage == hit.page
+        ? (_ink.pending ?? _ink.markupOf(hit.page))
+        : _ink.markupOf(hit.page);
     final after = before.erasedAt(hit.at, inkEraserRadius);
+    _ink.pendingPage = hit.page;
     if (after.strokes.length == before.strokes.length &&
         after.texts.length == before.texts.length) {
+      _ink.pending = before;
       return;
     }
-    await _annotations.setInk(widget.book.id, hit.page, after);
+    setState(() => _ink.pending = after);
+  }
+
+  /// Stores whatever the eraser left behind.
+  Future<void> _commitErase(int page) async {
+    final left = _ink.pending;
+    _ink.pending = null;
+    _ink.pendingPage = null;
+    if (left == null) return;
+    final stored = _ink.markupOf(page);
+    if (left.strokes.length == stored.strokes.length &&
+        left.texts.length == stored.texts.length) {
+      return; // nothing was actually rubbed out
+    }
+    await _annotations.setInk(widget.book.id, page, left);
   }
 
   Future<void> _writeText(int page, Offset at) async {
@@ -742,7 +775,7 @@ class _ReaderPageState extends State<ReaderPage>
     }
     setState(() {
       _penMode = on;
-      _livePoints = const [];
+      _livePoints.value = const [];
     });
   }
 
@@ -1510,17 +1543,19 @@ class _ReaderPageState extends State<ReaderPage>
                 onPointerDown: _onInkDown,
                 onPointerMove: _onInkMove,
                 onPointerUp: _onInkUp,
-                onPointerCancel: (_) =>
-                    setState(() => _livePoints = const []),
-                child: CustomPaint(
-                  // The stroke being made right now, drawn in view coordinates
-                  // so a moving pen costs one small repaint instead of a
-                  // database write and a page rebuild per frame.
-                  painter: _LiveStrokePainter(
-                    points: _tool == InkTool.pen ? _livePoints : const [],
-                    color: Color(_inkColor),
-                    width: _inkWidth *
-                        (_page == null ? 0 : _pageHeightOnScreen),
+                onPointerCancel: (_) => _livePoints.value = const [],
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    // The stroke being made right now, drawn in view
+                    // coordinates: it repaints from the notifier without
+                    // rebuilding the reader, and only becomes a stored,
+                    // page-anchored mark when the pen lifts.
+                    painter: _LiveStrokePainter(
+                      points: _livePoints,
+                      color: Color(_inkColor),
+                      width: _inkWidth *
+                          (_page == null ? 0 : _pageHeightOnScreen),
+                    ),
                   ),
                 ),
               ),
@@ -1675,18 +1710,21 @@ class _ReaderPageState extends State<ReaderPage>
 /// database. The moment the pen lifts, the stroke moves to the other painter
 /// and this one goes empty.
 class _LiveStrokePainter extends CustomPainter {
-  const _LiveStrokePainter({
+  _LiveStrokePainter({
     required this.points,
     required this.color,
     required this.width,
-  });
+  }) : super(repaint: points);
 
-  final List<Offset> points;
+  /// Repainted from this directly, which is what keeps a moving pen off the
+  /// widget tree.
+  final ValueListenable<List<Offset>> points;
   final Color color;
   final double width;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final points = this.points.value;
     if (points.isEmpty) return;
     final paint = Paint()
       ..color = color
@@ -1709,7 +1747,5 @@ class _LiveStrokePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_LiveStrokePainter old) =>
-      old.points.length != points.length ||
-      old.color != color ||
-      old.width != width;
+      old.points != points || old.color != color || old.width != width;
 }
