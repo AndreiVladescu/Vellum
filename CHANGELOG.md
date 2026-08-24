@@ -18,6 +18,15 @@ sync.
 
 ### Added
 
+- **Look a wishlist book up by its ISBN** — ten digits or thirteen, since a
+  barcode and a copyright page say the same thing two ways. There's a field
+  when you add one, and *Look up online…* in an entry's own menu.
+- **A book with no PDF gets a cover anyway.** There's no first page to take one
+  from, so the catalogues are asked instead: automatically for a new wishlist
+  entry, and from any book's edit sheet. Only the blanks are filled — what you
+  typed is what you meant — and a title search has to actually match, so your
+  copy of Dune doesn't quietly end up wearing the cover of the Dune
+  Encyclopedia.
 - **Write on a PDF page** — a pen, an eraser and a text tool. Marks are stored
   in the page's own coordinates, so a line stays on the same word at every zoom
   and on every device, and they are **yours**: they ride the same per-account
@@ -59,6 +68,16 @@ sync.
   books to a shelf is five edits in one second — and until real time caught up
   the device ignored changes arriving from elsewhere as older than what it
   held. Capped at one second.
+- **The reader's toolbar drew over the back arrow** on a phone. An `AppBar`
+  gives its buttons their intrinsic width and squeezes the *title*, so a row
+  that is too long doesn't complain — it overlaps. The bar has a width budget
+  now, and what doesn't fit folds into the overflow menu **by name**, so
+  nothing becomes unreachable.
+- **"An annotation deletion could not be sent: no such annotation"**, on every
+  sync, after an afternoon with the pen. A page drawn on and rubbed out between
+  two syncs leaves a tombstone for something the server never saw — which is
+  the state the tombstone wanted anyway. The check for that read the error's
+  text instead of its status code, so it never matched.
 - A page of writing exports as a line saying so, rather than an empty heading.
 
 ---

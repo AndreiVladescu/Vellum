@@ -69,6 +69,7 @@ void main() {
       db,
       MetadataService(client: catalogue(volume: volume, asked: asked)),
       (bookId, bytes) async => coveredBooks.add(bookId),
+      repo.writes.idForName,
     );
   }
 
@@ -186,6 +187,20 @@ void main() {
 
     expect(outcome, EnrichOutcome.filled);
     expect(coveredBooks, ['b1']);
+  });
+
+  test('an author it adds is the same author the rest of the app knows',
+      () async {
+    // Two id schemes would mean two devices deriving different ids for one
+    // name — and a duplicate author row that then syncs.
+    await repo.writes.createCustomBook(title: 'Children of Dune',
+        author: 'Frank Herbert');
+    final row = await book('b1', BooksCompanion.insert(id: 'b1', title: 'Dune'));
+
+    await (await enrich()).fill(row);
+
+    final authors = await db.select(db.authors).get();
+    expect(authors.where((a) => a.name == 'Frank Herbert'), hasLength(1));
   });
 
   test('nothing online is an outcome, not an error', () async {

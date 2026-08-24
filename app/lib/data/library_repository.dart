@@ -200,7 +200,12 @@ class LibraryRepository {
       seriesService: seriesService,
       trash: TrashService(db, writes),
       wishlist: WishlistService(db, writes, seriesService),
-      enrich: CatalogueEnrich(db, metadataService, covers.setCoverBytes),
+      enrich: CatalogueEnrich(
+        db,
+        metadataService,
+        covers.setCoverBytes,
+        writes.idForName,
+      ),
     );
   }
 

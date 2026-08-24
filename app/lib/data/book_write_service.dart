@@ -515,6 +515,14 @@ class BookWriteService {
   }
 
   /// Get-or-create for the name-keyed lookup tables (authors, genres).
+  /// The id of the author or genre called [name], creating it if it is new.
+  ///
+  /// Shared rather than private: a second place inventing ids is a second
+  /// scheme, and two devices deriving different ids for the same name is a
+  /// duplicate author row that then syncs. See [CatalogueEnrich].
+  Future<String> idForName(TableInfo table, String name) =>
+      _idForName(table, name);
+
   Future<String> _idForName(TableInfo table, String name) async {
     final existing = await db
         .customSelect(

@@ -33,7 +33,7 @@ enum EnrichOutcome {
 }
 
 class CatalogueEnrich {
-  CatalogueEnrich(this.db, this.metadata, this.covers);
+  CatalogueEnrich(this.db, this.metadata, this.covers, this.idForName);
 
   final VellumDatabase db;
   final MetadataService metadata;
@@ -41,6 +41,11 @@ class CatalogueEnrich {
   /// Where a downloaded cover goes — `CoverService.setCoverBytes`, passed as a
   /// function so this stays testable without a data directory.
   final Future<void> Function(String bookId, Uint8List bytes) covers;
+
+  /// `BookWriteService.idForName`: the one place author ids are minted. A
+  /// second scheme here would mean two devices deriving different ids for the
+  /// same author, and a duplicate that syncs.
+  final Future<String> Function(TableInfo table, String name) idForName;
 
   /// Looks [book] up and fills what it is missing.
   ///
@@ -93,7 +98,7 @@ class CatalogueEnrich {
     if (authors.isEmpty && found.authors.isNotEmpty) {
       var position = 0;
       for (final name in found.authors) {
-        final authorId = await _authorId(name);
+        final authorId = await idForName(db.authors, name);
         await db.into(db.bookAuthors).insert(
               BookAuthorsCompanion.insert(
                 bookId: book.id,
@@ -145,19 +150,6 @@ class CatalogueEnrich {
           ..orderBy([OrderingTerm.asc(db.bookAuthors.position)]))
         .get();
     return [for (final row in rows) row.readTable(db.authors).name];
-  }
-
-  Future<String> _authorId(String name) async {
-    final existing = await (db.select(db.authors)
-          ..where((a) => a.name.equals(name)))
-        .getSingleOrNull();
-    if (existing != null) return existing.id;
-    final id = 'author-${name.hashCode.toUnsigned(32)}';
-    await db.into(db.authors).insert(
-          AuthorsCompanion.insert(id: id, name: name),
-          mode: InsertMode.insertOrIgnore,
-        );
-    return id;
   }
 
   static bool _blank(String? value) => value == null || value.trim().isEmpty;
