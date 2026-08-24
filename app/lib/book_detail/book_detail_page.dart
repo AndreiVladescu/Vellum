@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../data/book_file_validation.dart';
 import '../data/database.dart';
 import '../shelf/author_page.dart';
+import '../data/catalogue_enrich.dart';
 import '../data/library_repository.dart';
 import '../loans/borrow_requests.dart';
 import '../physical/find_copy.dart';
@@ -201,6 +202,29 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     );
   }
 
+  /// Asks the catalogues about this book — the only way a book with no file
+  /// gets a cover, since there is no first page to take one from.
+  Future<void> _lookUpOnline() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Looking it up…'),
+      duration: Duration(seconds: 2),
+    ));
+    try {
+      final outcome = await repository.enrich.fill(book);
+      messenger.showSnackBar(SnackBar(
+        content: Text(switch (outcome) {
+          EnrichOutcome.filled => 'Filled in what was missing',
+          EnrichOutcome.alreadyComplete => 'Nothing to add — it already knows',
+          EnrichOutcome.notFound =>
+            'No catalogue has this one. An ISBN would help.',
+        }),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Lookup failed: $e')));
+    }
+  }
+
   void _openEditSheet() => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -209,6 +233,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       repository: repository,
       onPickCover: _pickCover,
       onCoverFromFirstPage: _coverFromFirstPage,
+      onLookUpOnline: _lookUpOnline,
     ),
   );
 

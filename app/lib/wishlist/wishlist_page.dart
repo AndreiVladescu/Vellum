@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../add_book/isbn.dart';
 import '../book_detail/book_detail_page.dart';
+import '../data/catalogue_enrich.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../server/connection_store.dart';
@@ -134,6 +138,8 @@ class _WishTile extends StatelessWidget {
         onSelected: (action) async {
           final messenger = ScaffoldMessenger.of(context);
           switch (action) {
+            case 'lookup':
+              await lookUpWishlistBook(context, repository, book);
             case 'own':
               await repository.wishlist.markOwned(book.id);
               messenger.showSnackBar(SnackBar(
@@ -153,6 +159,10 @@ class _WishTile extends StatelessWidget {
           }
         },
         itemBuilder: (context) => const [
+          // A book jotted down by hand has no cover and no details, and no
+          // file to take them from — so it is asked about online, by its ISBN
+          // if you have the barcode in front of you.
+          PopupMenuItem(value: 'lookup', child: Text('Look up online…')),
           PopupMenuItem(value: 'own', child: Text('I own this now')),
           PopupMenuItem(value: 'remove', child: Text('Remove from wishlist')),
         ],
@@ -171,6 +181,7 @@ Future<String?> promptAddToWishlist(
   final titleController = TextEditingController(text: initialTitle ?? '');
   final authorController = TextEditingController();
   final noteController = TextEditingController();
+  final isbnController = TextEditingController();
   final added = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -186,6 +197,16 @@ Future<String?> promptAddToWishlist(
           TextField(
             controller: authorController,
             decoration: const InputDecoration(labelText: 'Author (optional)'),
+          ),
+          TextField(
+            controller: isbnController,
+            keyboardType: TextInputType.text,
+            decoration: const InputDecoration(
+              labelText: 'ISBN (optional)',
+              hintText: '978… or the ten-digit form',
+              helperText: 'With one of these, the rest fills itself in',
+              helperMaxLines: 2,
+            ),
           ),
           TextField(
             controller: noteController,
@@ -214,10 +235,109 @@ Future<String?> promptAddToWishlist(
   authorController.dispose();
   final note = noteController.text.trim();
   noteController.dispose();
-  if (added != true || title.isEmpty) return null;
-  return repository.wishlist.add(
+  final isbn = toIsbn13(isbnController.text);
+  isbnController.dispose();
+  if (added != true) return null;
+
+  // An ISBN is the whole record: title, author, publisher, cover. Ten digits or
+  // thirteen — a barcode and a copyright page say the same thing two ways.
+  if (isbn != null) {
+    final found = await repository.metadata.lookupByIsbn(isbn);
+    if (found != null) {
+      return repository.wishlist.addFromSearch(
+        found,
+        note: note.isEmpty ? null : note,
+      );
+    }
+  }
+  if (title.isEmpty) return null;
+  final id = await repository.wishlist.add(
     title: title,
     author: author.isEmpty ? null : author,
     note: note.isEmpty ? null : note,
   );
+  // No file to take a cover from, so ask the catalogues — quietly, and only
+  // for the blanks. A wishlist entry with a cover looks like a book rather
+  // than a to-do item.
+  unawaited(() async {
+    try {
+      final book = await repository.watchBook(id).first;
+      if (book != null) {
+        await repository.enrich.fill(book, isbn: isbn);
+      }
+    } catch (_) {
+      // Offline, or nothing found: the entry stands as typed.
+    }
+  }());
+  return id;
+}
+
+/// Asks the catalogues about a wishlist entry — by ISBN when the reader has
+/// one, otherwise by what the book already says about itself.
+Future<void> lookUpWishlistBook(
+  BuildContext context,
+  LibraryRepository repository,
+  Book book,
+) async {
+  final controller = TextEditingController(text: book.isbn ?? '');
+  final asked = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Look up online'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'ISBN (optional)',
+              hintText: '978… or the ten-digit form',
+              helperText: 'Leave it empty to search by title and author',
+              helperMaxLines: 2,
+            ),
+            onSubmitted: (_) => Navigator.pop(dialogContext, true),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Look up'),
+        ),
+      ],
+    ),
+  );
+  final typed = controller.text.trim();
+  controller.dispose();
+  if (asked != true || !context.mounted) return;
+
+  final messenger = ScaffoldMessenger.of(context);
+  final isbn = typed.isEmpty ? null : toIsbn13(typed);
+  if (typed.isNotEmpty && isbn == null) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('That is not an ISBN.')),
+    );
+    return;
+  }
+  messenger.showSnackBar(const SnackBar(
+    content: Text('Looking it up…'),
+    duration: Duration(seconds: 2),
+  ));
+  try {
+    final outcome = await repository.enrich.fill(book, isbn: isbn);
+    messenger.showSnackBar(SnackBar(
+      content: Text(switch (outcome) {
+        EnrichOutcome.filled => 'Filled in what was missing',
+        EnrichOutcome.alreadyComplete => 'Nothing to add — it already knows',
+        EnrichOutcome.notFound => 'No catalogue has this one',
+      }),
+    ));
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('Lookup failed: $e')));
+  }
 }

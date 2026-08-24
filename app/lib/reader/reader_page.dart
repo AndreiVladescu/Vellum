@@ -20,6 +20,7 @@ import 'dictionary/wordnet.dart';
 import 'auto_scroll_bar.dart';
 import 'annotations/annotation_locator.dart';
 import 'annotations/ink_markup.dart';
+import 'reader_actions.dart';
 import 'annotations/ink_painter.dart';
 import 'ink_tools.dart';
 import 'annotations/annotations_panel.dart';
@@ -582,6 +583,112 @@ class _ReaderPageState extends State<ReaderPage>
       ),
     ));
   }
+
+  /// What the bar can do, in the order it gives things up.
+  ///
+  /// Selection actions come first on purpose: while text is selected they are
+  /// the only reason the bar is being looked at, and the reading controls can
+  /// wait in the menu for a moment.
+  List<ReaderAction> _barActions(ReaderSettings? settings) => [
+        if (_hasSelection) ...[
+          ReaderAction(
+            icon: Icons.format_color_text,
+            color: _highlightColour.color,
+            label: 'Highlight in ${_highlightColour.label}',
+            onPressed: _highlightSelection,
+          ),
+          if (settings != null)
+            ReaderAction(
+              icon: Icons.palette_outlined,
+              label: 'Highlighter colour — ${_highlightColour.label}',
+              onPressed: () => showHighlightColorSheet(
+                context,
+                selected: _highlightColour,
+                onChanged: (colour) => settings.setHighlightColor(colour.argb),
+              ),
+              widget: HighlightColorButton(
+                selected: _highlightColour,
+                onChanged: (colour) => settings.setHighlightColor(colour.argb),
+              ),
+            ),
+          ReaderAction(
+            icon: Icons.sticky_note_2_outlined,
+            label: 'Note on selection',
+            onPressed: () => _highlightSelection(withNote: true),
+          ),
+          if (_selectedWord != null)
+            ReaderAction(
+              icon: Icons.menu_book_outlined,
+              label: 'Look up “${_selectedWord!}”',
+              onPressed: _defineSelection,
+            ),
+          ReaderAction(
+            icon: Icons.auto_awesome_outlined,
+            label: 'Ask a model about this',
+            onPressed: _askAi,
+          ),
+          if (settings != null)
+            ReaderAction(
+              icon: Icons.translate,
+              label: 'Translate selection',
+              onPressed: _translateSelection,
+            ),
+        ],
+        if (settings != null)
+          ReaderAction(
+            icon: settings.pdfMode == PdfPageMode.paged
+                ? Icons.auto_stories_outlined
+                : Icons.swap_vert,
+            label: '${settings.pdfMode.label} — switch to '
+                '${settings.pdfMode == PdfPageMode.paged ? PdfPageMode.scroll.label : PdfPageMode.paged.label}',
+            onPressed: () => settings.setPdfMode(
+              settings.pdfMode == PdfPageMode.paged
+                  ? PdfPageMode.scroll
+                  : PdfPageMode.paged,
+            ),
+          ),
+        ReaderAction(
+          icon: _bookmarkOnPage == null ? Icons.bookmark_outline : Icons.bookmark,
+          label: _bookmarkOnPage == null
+              ? 'Bookmark this page'
+              : 'Remove bookmark',
+          onPressed: _page == null ? null : _toggleBookmark,
+        ),
+        if (_mode == PdfPageMode.scroll)
+          ReaderAction(
+            icon: _autoScrolling
+                ? Icons.pause_circle_outline
+                : Icons.play_circle_outline,
+            label: _autoScrolling
+                ? 'Stop scrolling by itself'
+                : 'Scroll by itself',
+            onPressed: _controller.isReady ? _toggleAutoScroll : null,
+          ),
+        ReaderAction(
+          icon: _penMode ? Icons.edit : Icons.edit_outlined,
+          label: _penMode ? 'Stop writing' : 'Write on the page',
+          selected: _penMode,
+          onPressed: _controller.isReady ? () => _setPenMode(!_penMode) : null,
+        ),
+        ReaderAction(
+          icon: Icons.fullscreen,
+          label: 'Reading mode — swipe down from the top to come back',
+          onPressed: () => _setReadingMode(true),
+        ),
+        ReaderAction(
+          icon: Icons.list_alt,
+          label: 'Annotations',
+          onPressed: _openPanel,
+        ),
+        ReaderAction(
+          icon: Icons.search,
+          label: 'Search in this book (${commandModifierLabel()}F)',
+          // Disabled until the document is loaded, which is also when the
+          // searcher exists — a search box that silently does nothing is worse
+          // than one that is visibly not ready yet.
+          onPressed: _searcher == null ? null : _openSearch,
+        ),
+      ];
 
   /// The page under a point in the viewer's own coordinates, and where on that
   /// page it falls — 0,0 its top-left corner, 1,1 its bottom-right.
@@ -1244,167 +1351,74 @@ class _ReaderPageState extends State<ReaderPage>
             ),
           ],
           if (!_searching) ...[
-          if (_page != null && _pageCount != null)
-            // The counter is the obvious place to press when you want a
-            // particular page, so it is the control rather than a label with
-            // the real one buried in the overflow menu.
-            // The counter is the control: press it to go to a page, hold it
-            // to change what it counts. A long book announcing its length on
-            // every page turn is the thing being escaped.
-            GestureDetector(
-              onLongPress: () {
-                final s = _settings;
-                if (s == null) return;
-                final next = s.pageMetric.next;
-                s.setPageMetric(next);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(next.label),
-                    duration: const Duration(milliseconds: 900),
+            if (_page != null && _pageCount != null)
+              // The counter is the control: press it to go to a page, hold it
+              // to change what it counts. A long book announcing its length on
+              // every page turn is the thing being escaped.
+              //
+              // Width-capped, because the bar's budget below has to know what
+              // this costs — an uncapped counter would eat the buttons.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: kCounterWidth),
+                child: GestureDetector(
+                  onLongPress: () {
+                    final s = _settings;
+                    if (s == null) return;
+                    final next = s.pageMetric.next;
+                    s.setPageMetric(next);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(next.label),
+                        duration: const Duration(milliseconds: 900),
+                      ),
+                    );
+                  },
+                  child: TextButton(
+                    onPressed: _promptPageJump,
+                    style: TextButton.styleFrom(
+                      foregroundColor: readerTheme.foreground,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Text(
+                      pageMetricLabel(
+                        settings?.pageMetric ?? PageMetric.pagesOf,
+                        page: _page!,
+                        count: _pageCount!,
+                        pagesPerMinute: _pace,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                );
-              },
-              child: TextButton(
-                onPressed: _promptPageJump,
-                style: TextButton.styleFrom(
-                  foregroundColor: readerTheme.foreground,
                 ),
-                child: Text(pageMetricLabel(
-                  settings?.pageMetric ?? PageMetric.pagesOf,
-                  page: _page!,
-                  count: _pageCount!,
-                  pagesPerMinute: _pace,
-                )),
               ),
-            ),
-          // Selection-dependent actions appear only while text is selected, so
-          // the bar isn't a row of buttons that silently do nothing.
-          if (_hasSelection) ...[
-            IconButton(
-              icon:
-                  Icon(Icons.format_color_text, color: _highlightColour.color),
-              tooltip: 'Highlight in ${_highlightColour.label}',
-              onPressed: _highlightSelection,
-            ),
-            if (settings != null)
-              HighlightColorButton(
-                selected: _highlightColour,
-                onChanged: (colour) => settings.setHighlightColor(colour.argb),
-              ),
-            IconButton(
-              icon: const Icon(Icons.sticky_note_2_outlined),
-              tooltip: 'Note on selection',
-              onPressed: () => _highlightSelection(withNote: true),
-            ),
-            // Only for a single word, which is what was asked for: on a
-            // paragraph the button would be there and return nothing, which
-            // reads as broken. Unlike translation it is not gated on setup —
-            // the sheet is where the dictionary is downloaded.
-            if (_selectedWord != null)
-              IconButton(
-                icon: const Icon(Icons.menu_book_outlined),
-                tooltip: 'Look up “${_selectedWord!}”',
-                onPressed: _defineSelection,
-              ),
-            IconButton(
-              icon: const Icon(Icons.auto_awesome_outlined),
-              tooltip: 'Ask a model about this',
-              onPressed: _askAi,
-            ),
-            // Always offered, because the sheet is also where translation is
-            // set up: gating the button on a configured backend left the
-            // desktop unable to reach the only screen that configures one.
-            if (settings != null)
-              IconButton(
-                icon: const Icon(Icons.translate),
-                tooltip: 'Translate selection',
-                onPressed: _translateSelection,
-              ),
-          ],
-          if (settings != null)
-            IconButton(
-              icon: Icon(settings.pdfMode == PdfPageMode.paged
-                  ? Icons.auto_stories_outlined
-                  : Icons.swap_vert),
-              tooltip: '${settings.pdfMode.label} — switch to '
-                  '${settings.pdfMode == PdfPageMode.paged ? PdfPageMode.scroll.label : PdfPageMode.paged.label}',
-              onPressed: () => settings.setPdfMode(
-                settings.pdfMode == PdfPageMode.paged
-                    ? PdfPageMode.scroll
-                    : PdfPageMode.paged,
-              ),
-            ),
-          IconButton(
-            icon: Icon(_bookmarkOnPage == null
-                ? Icons.bookmark_outline
-                : Icons.bookmark),
-            tooltip: _bookmarkOnPage == null
-                ? 'Bookmark this page'
-                : 'Remove bookmark',
-            onPressed: _page == null ? null : _toggleBookmark,
-          ),
-          // Scrolling by itself only means anything where scrolling is how you
-          // move; in paged mode there is nothing to scroll.
-          if (_mode == PdfPageMode.scroll)
-            IconButton(
-              icon: Icon(_autoScrolling
-                  ? Icons.pause_circle_outline
-                  : Icons.play_circle_outline),
-              tooltip: _autoScrolling
-                  ? 'Stop scrolling by itself'
-                  : 'Scroll by itself',
-              onPressed: _controller.isReady ? _toggleAutoScroll : null,
-            ),
-          IconButton(
-            icon: Icon(_penMode ? Icons.edit : Icons.edit_outlined),
-            tooltip: _penMode ? 'Stop writing' : 'Write on the page',
-            isSelected: _penMode,
-            onPressed: _controller.isReady ? () => _setPenMode(!_penMode) : null,
-          ),
-          IconButton(
-            icon: const Icon(Icons.fullscreen),
-            tooltip: 'Reading mode — swipe down from the top to come back',
-            onPressed: () => _setReadingMode(true),
-          ),
-          IconButton(
-            icon: const Icon(Icons.list_alt),
-            tooltip: 'Annotations',
-            onPressed: _openPanel,
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: 'Search in this book (${commandModifierLabel()}F)',
-            // Disabled until the document is loaded, which is also when the
-            // searcher exists — a search box that silently does nothing is
-            // worse than one that is visibly not ready yet.
-            onPressed: _searcher == null ? null : _openSearch,
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'More',
-            onSelected: (choice) {
-              switch (choice) {
-                case 'jump':
-                  _promptPageJump();
-                case 'ask':
-                  _askAi(wholePage: true);
-                case 'options':
-                  final s = _settings;
-                  if (s != null) {
+            // Everything else is measured against what is left of the row: on
+            // a phone the last few fold into the menu instead of drawing over
+            // the back arrow. See `reader_actions.dart`.
+            ReaderActionBar(
+              foreground: readerTheme.foreground,
+              reserved: kLeadingWidth +
+                  (_page != null && _pageCount != null ? kCounterWidth : 0),
+              actions: _barActions(settings),
+              menuExtras: [
+                PopupMenuItem(
+                  value: _promptPageJump,
+                  child: Text('Go to page…  ${commandModifierLabel()}G'),
+                ),
+                PopupMenuItem(
+                  value: () => _askAi(wholePage: true),
+                  child: const Text('Ask a model about this page…'),
+                ),
+                PopupMenuItem(
+                  value: () {
+                    final s = _settings;
+                    if (s == null) return;
                     ReaderSettingsSheet.show(context, settings: s, pdf: true);
-                  }
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'jump',
-                child: Text('Go to page…  ${commandModifierLabel()}G'),
-              ),
-              const PopupMenuItem(
-                  value: 'ask', child: Text('Ask a model about this page…')),
-              const PopupMenuItem(
-                  value: 'options', child: Text('Reading options…')),
-            ],
-          ),
+                  },
+                  child: const Text('Reading options…'),
+                ),
+              ],
+            ),
           ],
         ],
       ),

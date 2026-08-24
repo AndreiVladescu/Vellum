@@ -118,6 +118,31 @@ void main() {
         reason: 'the preview is the screen, not a slice of it');
   });
 
+  testWidgets('the Add button stays reachable with the keyboard up',
+      (tester) async {
+    // Reported: tapping the ISBN field raised the screen, and Add could not be
+    // pressed until you dismissed the keyboard with the system back button.
+    final t = await build(tester);
+    await tester.pumpWidget(MediaQuery(
+      // What a phone reports with a keyboard on screen.
+      data: const MediaQueryData(
+        size: Size(400, 800),
+        viewInsets: EdgeInsets.only(bottom: 320),
+      ),
+      child: t.app,
+    ));
+    await settle(tester);
+
+    final add = tester.getRect(find.widgetWithText(FilledButton, 'Add'));
+    expect(add.bottom, lessThanOrEqualTo(800 - 320),
+        reason: 'the panel rides above the keyboard, not under it');
+    expect(add.top, greaterThanOrEqualTo(0.0));
+
+    // And it is the button that gets the tap, not something over it.
+    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await settle(tester);
+  });
+
   testWidgets('a long list of scans cannot push the viewfinder away',
       (tester) async {
     final t = await build(tester, known: {

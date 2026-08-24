@@ -25,6 +25,7 @@ import 'epub_book.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
 import 'page_metric.dart';
+import 'reader_actions.dart';
 import 'reader_settings.dart';
 import 'translate/translate_sheet.dart';
 import 'reader_settings_sheet.dart';
@@ -920,126 +921,153 @@ class _EpubReaderPageState extends State<EpubReaderPage>
               // Hold it to change what it counts, exactly as in the PDF
               // reader. An EPUB counts chapters rather than pages, so *time
               // left* has nothing to measure and is left out of the cycle here.
-              GestureDetector(
-                onLongPress: () {
-                  final s = _settings;
-                  if (s == null) return;
-                  var next = s.pageMetric.next;
-                  if (next == PageMetric.timeLeft) next = next.next;
-                  s.setPageMetric(next);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(next.label),
-                      duration: const Duration(milliseconds: 900),
+              //
+              // Width-capped for the same reason as the PDF reader's: the
+              // budget below has to know what it costs.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: kCounterWidth),
+                child: GestureDetector(
+                  onLongPress: () {
+                    final s = _settings;
+                    if (s == null) return;
+                    var next = s.pageMetric.next;
+                    if (next == PageMetric.timeLeft) next = next.next;
+                    s.setPageMetric(next);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(next.label),
+                        duration: const Duration(milliseconds: 900),
+                      ),
+                    );
+                  },
+                  child: TextButton(
+                    onPressed: _promptChapterJump,
+                    style: TextButton.styleFrom(
+                      foregroundColor: readerTheme.foreground,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
-                  );
-                },
-                child: TextButton(
-                  onPressed: _promptChapterJump,
-                  style: TextButton.styleFrom(
-                    foregroundColor: readerTheme.foreground,
-                  ),
-                  child: Text(pageMetricLabel(
-                    settings?.pageMetric ?? PageMetric.pagesOf,
-                    page: _chapter + 1,
-                    count: count,
-                  )),
-                ),
-              ),
-              if (_selectionRange != null) ...[
-                IconButton(
-                  tooltip: 'Highlight in ${_highlightColour.label}',
-                  icon: Icon(Icons.format_color_text,
-                      color: _highlightColour.color),
-                  onPressed: () => _highlightSelection(epub),
-                ),
-                if (settings != null)
-                  HighlightColorButton(
-                    selected: _highlightColour,
-                    onChanged: (colour) =>
-                        settings.setHighlightColor(colour.argb),
-                  ),
-                IconButton(
-                  tooltip: 'Note on selection',
-                  icon: const Icon(Icons.sticky_note_2_outlined),
-                  onPressed: () => _highlightSelection(epub, withNote: true),
-                ),
-                // A word, not a phrase — the same rule as the PDF reader.
-                if (_selectionIsWord)
-                  IconButton(
-                    tooltip: 'Look up “${singleWord(_selectedText(epub))}”',
-                    icon: const Icon(Icons.menu_book_outlined),
-                    onPressed: () => _defineSelection(epub),
-                  ),
-                IconButton(
-                  tooltip: 'Ask a model about this',
-                  icon: const Icon(Icons.auto_awesome_outlined),
-                  onPressed: () => _askAi(epub),
-                ),
-                // Same as the PDF reader: always offered, because the sheet is
-                // where it gets set up.
-                if (settings != null)
-                  IconButton(
-                    tooltip: 'Translate selection',
-                    icon: const Icon(Icons.translate),
-                    onPressed: () => _translateSelection(epub),
-                  ),
-              ],
-              IconButton(
-                tooltip: _bookmarkOnChapter == null
-                    ? 'Bookmark this chapter'
-                    : 'Remove bookmark',
-                icon: Icon(_bookmarkOnChapter == null
-                    ? Icons.bookmark_outline
-                    : Icons.bookmark),
-                onPressed: _toggleBookmark,
-              ),
-              IconButton(
-                icon: Icon(_autoScrolling
-                    ? Icons.pause_circle_outline
-                    : Icons.play_circle_outline),
-                tooltip: _autoScrolling
-                    ? 'Stop scrolling by itself'
-                    : 'Scroll by itself',
-                onPressed: _toggleAutoScroll,
-              ),
-              IconButton(
-                icon: const Icon(Icons.fullscreen),
-                tooltip: 'Reading mode — swipe down from the top to come back',
-                onPressed: () => _setReadingMode(true),
-              ),
-              IconButton(
-                tooltip: 'Annotations',
-                icon: const Icon(Icons.list_alt),
-                onPressed: () => _openPanel(epub),
-              ),
-              IconButton(
-                tooltip: 'Search in this book (${commandModifierLabel()}F)',
-                icon: const Icon(Icons.search),
-                onPressed: _openSearch,
-              ),
-              IconButton(
-                tooltip: 'Chapters',
-                icon: const Icon(Icons.toc),
-                onPressed: () => _pickChapter(epub),
-              ),
-              // The whole chapter, for when nothing is selected — the reader's
-              // "what is this one about" before reading it.
-              IconButton(
-                tooltip: 'Ask a model about this chapter',
-                icon: const Icon(Icons.auto_awesome),
-                onPressed: () => _askAi(epub, wholeChapter: true),
-              ),
-              if (settings != null)
-                IconButton(
-                  tooltip: 'Reading options',
-                  icon: const Icon(Icons.text_fields),
-                  onPressed: () => ReaderSettingsSheet.show(
-                    context,
-                    settings: settings,
-                    typography: true,
+                    child: Text(
+                      pageMetricLabel(
+                        settings?.pageMetric ?? PageMetric.pagesOf,
+                        page: _chapter + 1,
+                        count: count,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
+              ),
+              // What fits, then a menu — see `reader_actions.dart`. This bar
+              // is the longer of the two readers', so it overflowed first.
+              ReaderActionBar(
+                foreground: readerTheme.foreground,
+                reserved: kLeadingWidth + kCounterWidth,
+                actions: [
+                  if (_selectionRange != null) ...[
+                    ReaderAction(
+                      icon: Icons.format_color_text,
+                      color: _highlightColour.color,
+                      label: 'Highlight in ${_highlightColour.label}',
+                      onPressed: () => _highlightSelection(epub),
+                    ),
+                    if (settings != null)
+                      ReaderAction(
+                        icon: Icons.palette_outlined,
+                        label:
+                            'Highlighter colour — ${_highlightColour.label}',
+                        onPressed: () => showHighlightColorSheet(
+                          context,
+                          selected: _highlightColour,
+                          onChanged: (colour) =>
+                              settings.setHighlightColor(colour.argb),
+                        ),
+                        widget: HighlightColorButton(
+                          selected: _highlightColour,
+                          onChanged: (colour) =>
+                              settings.setHighlightColor(colour.argb),
+                        ),
+                      ),
+                    ReaderAction(
+                      icon: Icons.sticky_note_2_outlined,
+                      label: 'Note on selection',
+                      onPressed: () => _highlightSelection(epub, withNote: true),
+                    ),
+                    // A word, not a phrase — the same rule as the PDF reader.
+                    if (_selectionIsWord)
+                      ReaderAction(
+                        icon: Icons.menu_book_outlined,
+                        label: 'Look up “${singleWord(_selectedText(epub))}”',
+                        onPressed: () => _defineSelection(epub),
+                      ),
+                    ReaderAction(
+                      icon: Icons.auto_awesome_outlined,
+                      label: 'Ask a model about this',
+                      onPressed: () => _askAi(epub),
+                    ),
+                    if (settings != null)
+                      ReaderAction(
+                        icon: Icons.translate,
+                        label: 'Translate selection',
+                        onPressed: () => _translateSelection(epub),
+                      ),
+                  ],
+                  ReaderAction(
+                    icon: _bookmarkOnChapter == null
+                        ? Icons.bookmark_outline
+                        : Icons.bookmark,
+                    label: _bookmarkOnChapter == null
+                        ? 'Bookmark this chapter'
+                        : 'Remove bookmark',
+                    onPressed: _toggleBookmark,
+                  ),
+                  ReaderAction(
+                    icon: _autoScrolling
+                        ? Icons.pause_circle_outline
+                        : Icons.play_circle_outline,
+                    label: _autoScrolling
+                        ? 'Stop scrolling by itself'
+                        : 'Scroll by itself',
+                    onPressed: _toggleAutoScroll,
+                  ),
+                  ReaderAction(
+                    icon: Icons.fullscreen,
+                    label:
+                        'Reading mode — swipe down from the top to come back',
+                    onPressed: () => _setReadingMode(true),
+                  ),
+                  ReaderAction(
+                    icon: Icons.list_alt,
+                    label: 'Annotations',
+                    onPressed: () => _openPanel(epub),
+                  ),
+                  ReaderAction(
+                    icon: Icons.search,
+                    label: 'Search in this book (${commandModifierLabel()}F)',
+                    onPressed: _openSearch,
+                  ),
+                  ReaderAction(
+                    icon: Icons.toc,
+                    label: 'Chapters',
+                    onPressed: () => _pickChapter(epub),
+                  ),
+                  ReaderAction(
+                    icon: Icons.auto_awesome,
+                    label: 'Ask a model about this chapter',
+                    onPressed: () => _askAi(epub, wholeChapter: true),
+                  ),
+                  if (settings != null)
+                    ReaderAction(
+                      icon: Icons.text_fields,
+                      label: 'Reading options',
+                      onPressed: () => ReaderSettingsSheet.show(
+                        context,
+                        settings: settings,
+                        typography: true,
+                      ),
+                    ),
+                ],
+              ),
               ],
             ],
           ),

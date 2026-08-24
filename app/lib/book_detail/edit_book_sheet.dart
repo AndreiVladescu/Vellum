@@ -12,12 +12,18 @@ class EditBookSheet extends StatefulWidget {
     required this.repository,
     required this.onPickCover,
     required this.onCoverFromFirstPage,
+    required this.onLookUpOnline,
   });
 
   final Book book;
   final LibraryRepository repository;
   final Future<void> Function() onPickCover;
   final Future<void> Function() onCoverFromFirstPage;
+
+  /// Asks the catalogues for a cover and whatever else is missing. The only
+  /// route for a book with no file to take a cover from — one typed in by
+  /// hand, or wanted rather than owned.
+  final Future<void> Function() onLookUpOnline;
 
   @override
   State<EditBookSheet> createState() => EditBookSheetState();
@@ -177,6 +183,15 @@ class EditBookSheetState extends State<EditBookSheet> {
               },
               icon: const Icon(Icons.picture_as_pdf_outlined),
               label: const Text('Use first page of the PDF as cover'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onLookUpOnline();
+              },
+              icon: const Icon(Icons.travel_explore),
+              label: const Text('Find cover and details online'),
             ),
             const SizedBox(height: 6),
             Text(

@@ -11,6 +11,7 @@ import 'cover_service.dart';
 import 'database.dart';
 import 'file_service.dart';
 import 'library_queries.dart';
+import 'catalogue_enrich.dart';
 import 'metadata.dart';
 import 'copy_photo_service.dart';
 import 'physical_service.dart';
@@ -65,6 +66,7 @@ class LibraryRepository {
     required this.seriesService,
     required this.trash,
     required this.wishlist,
+    required this.enrich,
   });
 
   final VellumDatabase db;
@@ -123,6 +125,10 @@ class LibraryRepository {
   /// Books you want but don't own yet (plan 5 #21a). Reached as
   /// `repository.wishlist`.
   final WishlistService wishlist;
+
+  /// Filling in a book that arrived with almost nothing — an ISBN lookup, or a
+  /// cover for a book that has no file to take one from.
+  final CatalogueEnrich enrich;
 
   static Future<LibraryRepository> open(VellumDatabase db) async {
     final dir = await getApplicationSupportDirectory();
@@ -194,6 +200,7 @@ class LibraryRepository {
       seriesService: seriesService,
       trash: TrashService(db, writes),
       wishlist: WishlistService(db, writes, seriesService),
+      enrich: CatalogueEnrich(db, metadataService, covers.setCoverBytes),
     );
   }
 

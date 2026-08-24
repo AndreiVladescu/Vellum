@@ -46,6 +46,7 @@ Future<http.Response> Function(http.Request) _server({
   bool personalSupported = true,
   bool bookStatusSupported = true,
   bool inkSupported = true,
+  Set<String> unknownAnnotations = const {},
 }) {
   return (req) async {
     final path = req.url.path;
@@ -115,7 +116,13 @@ Future<http.Response> Function(http.Request) _server({
       return http.Response('{}', 200);
     }
     if (req.method == 'DELETE' && path.startsWith('/api/annotations/')) {
-      deletedAnnotations?.add(path.split('/').last);
+      final id = path.split('/').last;
+      // What the real server answers for an id it has never seen: 404, with its
+      // own words and no status code anywhere in the message.
+      if (unknownAnnotations.contains(id)) {
+        return http.Response('{"error":"no such annotation"}', 404);
+      }
+      deletedAnnotations?.add(id);
       return http.Response('{}', 200);
     }
     if (req.method == 'PUT' && path.startsWith('/api/sessions/')) {
@@ -270,6 +277,51 @@ void main() {
           ..where((d) => d.kind.equals('annotation')))
         .get();
     expect(after, isEmpty, reason: 'sent once, not on every sync forever');
+  });
+
+  test('erasing something the server never saw is not a failed sync', () async {
+    // Reported after an afternoon with the pen: "An annotation deletion could
+    // not be sent: no such annotation", on every sync. A page drawn on and
+    // rubbed out between two syncs leaves a tombstone for a row the server has
+    // never heard of — which is the state the tombstone wanted in the first
+    // place.
+    final repo = await _repo();
+    final id = await repo.annotations.add(
+      bookId: 'b1',
+      kind: AnnotationKind.highlight,
+      page: 3,
+      quotedText: 'gone already',
+    );
+    await repo.annotations.delete(id);
+
+    final report = await SyncService(repo)
+        .push(_client(_server(unknownAnnotations: {id})));
+
+    expect(report.issues, isEmpty);
+    expect(await repo.db.select(repo.db.localDeletions).get(), isEmpty,
+        reason: 'and the tombstone goes, instead of being retried forever');
+  });
+
+  test('a deletion that fails for a real reason is still reported', () async {
+    final repo = await _repo();
+    final id = await repo.annotations.add(
+      bookId: 'b1',
+      kind: AnnotationKind.highlight,
+      page: 3,
+    );
+    await repo.annotations.delete(id);
+
+    final report = await SyncService(repo).push(_client((req) async {
+      if (req.method == 'DELETE') {
+        return http.Response('{"error":"the database is on fire"}', 500);
+      }
+      return http.Response(
+          '{"server_now":"2026-07-28 00:00:00","entries":[]}', 200);
+    }));
+
+    expect(report.issues, isNotEmpty);
+    expect(await repo.db.select(repo.db.localDeletions).get(), hasLength(1),
+        reason: 'a real failure keeps the tombstone for the next sync');
   });
 
   test("a deletion from elsewhere removes the highlight here", () async {

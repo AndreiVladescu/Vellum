@@ -57,6 +57,34 @@ enum HighlightColor {
 /// picked up once and then simply used, and the only thing you need on screen
 /// is which one you are holding. So this sits beside the highlight button, is
 /// the swatch itself, and changing it is a deliberate second act.
+/// The same palette as a sheet, for when the swatch has been folded into the
+/// overflow menu and there is no button to hang a popup off.
+Future<void> showHighlightColorSheet(
+  BuildContext context, {
+  required HighlightColor selected,
+  required ValueChanged<HighlightColor> onChanged,
+}) async {
+  final choice = await showModalBottomSheet<HighlightColor>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final option in HighlightColor.values)
+            ListTile(
+              leading: _Swatch(choice: option, size: 22),
+              title: Text(option.label),
+              trailing: option == selected ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(sheetContext, option),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (choice != null) onChanged(choice);
+}
+
 class HighlightColorButton extends StatelessWidget {
   const HighlightColorButton({
     super.key,

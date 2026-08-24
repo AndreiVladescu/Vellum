@@ -1496,7 +1496,13 @@ class SyncService {
       } catch (e) {
         // A 404 means the server never had it — the tombstone has done its job
         // either way, so it goes rather than being retried forever.
-        if (e.toString().contains('404')) {
+        //
+        // Asked of the status code, not of the message: `ServerException`
+        // prints the server's own words ("no such annotation") and nothing
+        // else, so a `contains('404')` never matched and every erased mark the
+        // server had not seen — a page drawn on and rubbed out between two
+        // syncs — was reported as a failed deletion, on every sync, for good.
+        if (e is ServerException && e.statusCode == 404) {
           await (db.delete(db.localDeletions)
                 ..where((d) => d.bookId.equals(t.bookId)))
               .go();
