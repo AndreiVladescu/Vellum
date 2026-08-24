@@ -6,15 +6,21 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
-## v1.1.7 — 2026-08-23
+## v1.1.7 — 2026-08-24
 
-Writing on the page, a scanner that finds more books, and the bugs a hunt
+Writing on the page — and, once it is there, picking it up again — a scanner
+that finds more books, ISBN lookup from the wishlist, and the bugs a hunt
 through all of it turned up.
 
 **Upgrade the server too** if you want your writing on your other devices: it
 rides the same per-account channel your highlights do, and needs migration
 0036. Until then the app keeps it locally and waits — it does not fail the
 sync.
+
+**One limit worth knowing.** Writing syncs a page at a time: a page's marks are
+one thing, so if two devices both draw on *the same page* between syncs, the
+later one replaces the other's marks rather than merging them. Different pages,
+and different books, are unaffected.
 
 ### Added
 
@@ -83,6 +89,10 @@ sync.
   two syncs leaves a tombstone for something the server never saw — which is
   the state the tombstone wanted anyway. The check for that read the error's
   text instead of its status code, so it never matched.
+- **A note in the margin can be resized again**: its corner handle sits off the
+  paper, and an off-page touch used to be ignored outright. A drag also keeps
+  the view it started in, so pinching part-way through moves the page without
+  dragging the mark out from under your finger.
 - A page of writing exports as a line saying so, rather than an empty heading.
 
 ---
