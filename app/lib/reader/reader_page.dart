@@ -730,8 +730,17 @@ class _ReaderPageState extends State<ReaderPage>
   _InkDrag? _drag;
 
   void _onInkDown(PointerDownEvent event) {
-    final hit = _pageAt(event.localPosition);
-    if (hit == null) return;
+    var hit = _pageAt(event.localPosition);
+    if (hit == null) {
+      // A note written in the margin has its corner handle off the paper. The
+      // select tool still gets the event, aimed at the page the selection is
+      // on; every other tool wants the finger on a page.
+      final selectedPage = _ink.selectedPage;
+      if (_tool != InkTool.select || selectedPage == null) return;
+      final at = _fractionOn(selectedPage, event.localPosition);
+      if (at == null) return;
+      hit = (page: selectedPage, at: at);
+    }
     _inkPage = hit.page;
     switch (_tool) {
       case InkTool.select:
@@ -752,8 +761,13 @@ class _ReaderPageState extends State<ReaderPage>
     if (page == null) return;
     switch (_tool) {
       case InkTool.select:
-        final hit = _pageAt(event.localPosition);
-        if (hit != null && hit.page == page) _moveSelection(hit.at);
+        final drag = _drag;
+        if (drag == null) return;
+        // Through the matrix the drag started with: a pinch mid-drag would
+        // otherwise make this finger position mean a different point on the
+        // page, and the mark would jump.
+        final at = _fractionOn(page, event.localPosition, matrix: drag.matrix);
+        if (at != null) _moveSelection(at);
       case InkTool.pen:
         _livePoints.value = [..._livePoints.value, event.localPosition];
       case InkTool.eraser:
@@ -821,6 +835,28 @@ class _ReaderPageState extends State<ReaderPage>
     return MatrixUtils.transformRect(_controller.value, pages[page - 1]);
   }
 
+  /// Where [local] falls on [page], whether or not it is over the paper —
+  /// and, when [matrix] is given, according to the view as it was *then*.
+  ///
+  /// Both matter for a drag: the corner handle of a note in the margin sits
+  /// off the page, and a two-finger zoom mid-drag would otherwise make the
+  /// same finger position mean a different point on the page and the mark
+  /// jump. See [_InkDrag.matrix].
+  Offset? _fractionOn(int page, Offset local, {Matrix4? matrix}) {
+    if (!_controller.isReady) return null;
+    final inverse = Matrix4.tryInvert(matrix ?? _controller.value);
+    if (inverse == null) return null;
+    final pages = _controller.layout.pageLayouts;
+    if (page < 1 || page > pages.length) return null;
+    final rect = pages[page - 1];
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    final document = MatrixUtils.transformPoint(inverse, local);
+    return Offset(
+      (document.dx - rect.left) / rect.width,
+      (document.dy - rect.top) / rect.height,
+    );
+  }
+
   /// The mark under a point, if any. Text is measured with the same painter
   /// that draws it, so what you can see is what you can grab.
   InkTarget? _markAt(({int page, Offset at}) hit) {
@@ -873,6 +909,7 @@ class _ReaderPageState extends State<ReaderPage>
         _drag = _InkDrag(
           target: target,
           from: hit.at,
+          matrix: _controller.value.clone(),
           text: markup.texts[target.index],
           handle: true,
         );
@@ -890,6 +927,7 @@ class _ReaderPageState extends State<ReaderPage>
           : _InkDrag(
               target: target,
               from: hit.at,
+              matrix: _controller.value.clone(),
               stroke: target.kind == InkTargetKind.stroke
                   ? markup.strokes[target.index]
                   : null,
@@ -2051,6 +2089,7 @@ class _InkDrag {
   const _InkDrag({
     required this.target,
     required this.from,
+    required this.matrix,
     this.stroke,
     this.text,
     this.handle = false,
@@ -2060,6 +2099,11 @@ class _InkDrag {
 
   /// Where the finger went down, page-relative.
   final Offset from;
+
+  /// The view transform when it went down. Every frame of the drag converts
+  /// through this one, so a two-finger zoom part-way through moves the page
+  /// without moving the mark out from under the finger.
+  final Matrix4 matrix;
 
   final InkStroke? stroke;
   final InkText? text;
