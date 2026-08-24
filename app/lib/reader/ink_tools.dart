@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 import 'annotations/ink_markup.dart';
 
 enum InkTool {
+  /// Pick a mark up: tap to select, drag to move, and — for a piece of text —
+  /// drag the corner to turn and resize it.
+  select('Select', Icons.back_hand_outlined),
   pen('Pen', Icons.edit_outlined),
   eraser('Eraser', Icons.cleaning_services_outlined),
   text('Text', Icons.title);
@@ -37,6 +40,105 @@ const inkEraserRadius = 0.02;
 /// The default size of a typed label, as a fraction of the page height. About
 /// the size of body text on a paperback page.
 const inkTextSize = 0.022;
+
+/// What a piece of text may be scaled to. The floor is "still legible on a
+/// phone"; the ceiling is a word across half the page, which is as big as
+/// anybody writes in a margin.
+const minInkTextSize = 0.006;
+const maxInkTextSize = 0.12;
+
+/// One press of the smaller/bigger buttons, and one of turn left/right.
+const inkTextSizeStep = 1.25;
+const inkRotationStep = 15 * 3.1415926535897932 / 180;
+
+/// The controls for the mark that is selected: what it is, and the ways to
+/// change it that a drag cannot express.
+///
+/// A drag turns and resizes text by its corner, which is the gesture people
+/// already know — but a corner handle is nine pixels wide, and a mouse or a
+/// screen reader deserves buttons. Both, therefore.
+class InkSelectionBar extends StatelessWidget {
+  const InkSelectionBar({
+    super.key,
+    required this.isText,
+    required this.onSmaller,
+    required this.onBigger,
+    required this.onTurnLeft,
+    required this.onTurnRight,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final bool isText;
+  final VoidCallback onSmaller;
+  final VoidCallback onBigger;
+  final VoidCallback onTurnLeft;
+  final VoidCallback onTurnRight;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.inverseSurface.withValues(alpha: 0.92),
+      shape: const StadiumBorder(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isText) ...[
+              IconButton(
+                icon: const Icon(Icons.text_decrease),
+                tooltip: 'Smaller',
+                color: scheme.onInverseSurface,
+                onPressed: onSmaller,
+              ),
+              IconButton(
+                icon: const Icon(Icons.text_increase),
+                tooltip: 'Bigger',
+                color: scheme.onInverseSurface,
+                onPressed: onBigger,
+              ),
+              IconButton(
+                icon: const Icon(Icons.rotate_left),
+                tooltip: 'Turn left',
+                color: scheme.onInverseSurface,
+                onPressed: onTurnLeft,
+              ),
+              IconButton(
+                icon: const Icon(Icons.rotate_right),
+                tooltip: 'Turn right',
+                color: scheme.onInverseSurface,
+                onPressed: onTurnRight,
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_note),
+                tooltip: 'Edit the words',
+                color: scheme.onInverseSurface,
+                onPressed: onEdit,
+              ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'Drag to move',
+                  style: TextStyle(color: scheme.onInverseSurface),
+                ),
+              ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete',
+              color: scheme.onInverseSurface,
+              onPressed: onDelete,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// The bar shown while writing is switched on.
 class InkToolbar extends StatelessWidget {

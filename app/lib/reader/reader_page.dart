@@ -722,11 +722,20 @@ class _ReaderPageState extends State<ReaderPage>
   /// Where a text-tool touch went down, to tell a tap from a drag.
   Offset? _textDownAt;
 
+  /// What a drag in the select tool is doing, and what it started from.
+  ///
+  /// The original mark is kept so every move is computed from where the finger
+  /// went down rather than accumulated frame by frame — accumulating is how a
+  /// dragged object slowly drifts away from the finger.
+  _InkDrag? _drag;
+
   void _onInkDown(PointerDownEvent event) {
     final hit = _pageAt(event.localPosition);
     if (hit == null) return;
     _inkPage = hit.page;
     switch (_tool) {
+      case InkTool.select:
+        _beginSelectDrag(hit, event.localPosition);
       case InkTool.pen:
         _livePoints.value = [event.localPosition];
       case InkTool.eraser:
@@ -742,6 +751,9 @@ class _ReaderPageState extends State<ReaderPage>
     final page = _inkPage;
     if (page == null) return;
     switch (_tool) {
+      case InkTool.select:
+        final hit = _pageAt(event.localPosition);
+        if (hit != null && hit.page == page) _moveSelection(hit.at);
       case InkTool.pen:
         _livePoints.value = [..._livePoints.value, event.localPosition];
       case InkTool.eraser:
@@ -757,6 +769,8 @@ class _ReaderPageState extends State<ReaderPage>
     _inkPage = null;
     if (page == null) return;
     switch (_tool) {
+      case InkTool.select:
+        await _endSelectDrag(page);
       case InkTool.pen:
         final points = _livePoints.value;
         _livePoints.value = const [];
@@ -798,6 +812,204 @@ class _ReaderPageState extends State<ReaderPage>
   /// too, rather than being overwritten by a snapshot taken before it existed.
   final List<Offset> _erasePath = [];
 
+  /// Where the page under [page] is drawn, in the viewer's own coordinates —
+  /// what the painter's text measurements are relative to.
+  Rect? _pageRectOnScreen(int page) {
+    if (!_controller.isReady) return null;
+    final pages = _controller.layout.pageLayouts;
+    if (page < 1 || page > pages.length) return null;
+    return MatrixUtils.transformRect(_controller.value, pages[page - 1]);
+  }
+
+  /// The mark under a point, if any. Text is measured with the same painter
+  /// that draws it, so what you can see is what you can grab.
+  InkTarget? _markAt(({int page, Offset at}) hit) {
+    final pageRect = _pageRectOnScreen(hit.page);
+    if (pageRect == null) return null;
+    return _ink.markupOf(hit.page).hitTest(
+          hit.at,
+          // A finger is wider than a pen line: the reach is the eraser's, so
+          // a hairline stroke is still selectable.
+          inkEraserRadius / 2,
+          textBounds: (text) => textBoundsOnPage(text, pageRect),
+        );
+  }
+
+  /// Whether the finger went down on the corner handle of the selected text —
+  /// the one that turns it and changes its size.
+  bool _onHandle(({int page, Offset at}) hit) {
+    final target = _ink.selected;
+    if (target == null ||
+        target.kind != InkTargetKind.text ||
+        _ink.selectedPage != hit.page) {
+      return false;
+    }
+    final pageRect = _pageRectOnScreen(hit.page);
+    if (pageRect == null) return false;
+    final markup = _ink.markupOf(hit.page);
+    if (target.index >= markup.texts.length) return false;
+    final text = markup.texts[target.index];
+    final box = textBoundsOnScreen(text, pageRect);
+    final origin = fromPageFraction(text.at, pageRect);
+    // The handle sits at the box's far corner, turned with the text.
+    final corner = origin +
+        rotateAbout(
+          Offset(box.width + 3, box.height + 3),
+          Offset.zero,
+          text.rotation,
+        );
+    final finger = fromPageFraction(hit.at, pageRect);
+    return (finger - corner).distance <= handleRadius * 2.5;
+  }
+
+  /// A touch in the select tool: the handle if it caught it, otherwise
+  /// whatever mark is under the finger — and nothing is also an answer, since
+  /// tapping the page is how you put a mark down.
+  void _beginSelectDrag(({int page, Offset at}) hit, Offset local) {
+    final markup = _ink.markupOf(hit.page);
+    if (_onHandle(hit)) {
+      final target = _ink.selected!;
+      setState(() {
+        _drag = _InkDrag(
+          target: target,
+          from: hit.at,
+          text: markup.texts[target.index],
+          handle: true,
+        );
+        _ink.pendingPage = hit.page;
+        _ink.pending = markup;
+      });
+      return;
+    }
+    final target = _markAt(hit);
+    setState(() {
+      _ink.selected = target;
+      _ink.selectedPage = target == null ? null : hit.page;
+      _drag = target == null
+          ? null
+          : _InkDrag(
+              target: target,
+              from: hit.at,
+              stroke: target.kind == InkTargetKind.stroke
+                  ? markup.strokes[target.index]
+                  : null,
+              text: target.kind == InkTargetKind.text
+                  ? markup.texts[target.index]
+                  : null,
+            );
+      if (target != null) {
+        _ink.pendingPage = hit.page;
+        _ink.pending = markup;
+      }
+    });
+  }
+
+  /// Moving, or turning and resizing — on screen only, until the finger lifts.
+  void _moveSelection(Offset at) {
+    final drag = _drag;
+    final page = _ink.pendingPage;
+    if (drag == null || page == null) return;
+    final stored = _ink.markupOf(page);
+    setState(() {
+      if (drag.handle) {
+        final text = drag.text!;
+        // The turn is the angle the finger has swept about the text's anchor;
+        // the size is how much further away it has moved. One gesture, because
+        // on paper turning a note and writing it bigger are one motion.
+        final was = drag.from - text.at;
+        final now = at - text.at;
+        if (was.distance < 1e-6 || now.distance < 1e-6) return;
+        final turn = math.atan2(now.dy, now.dx) - math.atan2(was.dy, was.dx);
+        final scale = now.distance / was.distance;
+        _ink.pending = stored.replacingText(
+          drag.target.index,
+          text.copyWith(
+            rotation: text.rotation + turn,
+            size: (text.size * scale)
+                .clamp(minInkTextSize, maxInkTextSize)
+                .toDouble(),
+          ),
+        );
+        return;
+      }
+      final by = at - drag.from;
+      _ink.pending = switch (drag.target.kind) {
+        InkTargetKind.stroke =>
+          stored.replacingStroke(drag.target.index, drag.stroke!.movedBy(by)),
+        InkTargetKind.text =>
+          stored.replacingText(drag.target.index, drag.text!.movedBy(by)),
+      };
+    });
+  }
+
+  /// Stores where it ended up, once.
+  Future<void> _endSelectDrag(int page) async {
+    final drag = _drag;
+    final moved = _ink.pending;
+    _drag = null;
+    if (drag == null || moved == null) {
+      setState(() {
+        _ink.pending = null;
+        _ink.pendingPage = null;
+      });
+      return;
+    }
+    setState(() {
+      _ink.pending = null;
+      _ink.pendingPage = null;
+    });
+    // A tap that selected something without moving it has nothing to store —
+    // and storing it anyway would dirty the page and push an identical
+    // payload to every other device.
+    if (moved.encode() == _ink.markupOf(page).encode()) return;
+    await _annotations.setInk(widget.book.id, page, moved);
+  }
+
+  /// Applies a change to the selected piece of text — the buttons' path, where
+  /// the handle is the gesture's.
+  Future<void> _changeSelectedText(InkText Function(InkText) change) async {
+    final target = _ink.selected;
+    final page = _ink.selectedPage;
+    if (target == null || page == null || target.kind != InkTargetKind.text) {
+      return;
+    }
+    final markup = _ink.markupOf(page);
+    if (target.index >= markup.texts.length) return;
+    await _annotations.setInk(
+      widget.book.id,
+      page,
+      markup.replacingText(target.index, change(markup.texts[target.index])),
+    );
+  }
+
+  Future<void> _editSelectedText() async {
+    final target = _ink.selected;
+    final page = _ink.selectedPage;
+    if (target == null || page == null || target.kind != InkTargetKind.text) {
+      return;
+    }
+    final markup = _ink.markupOf(page);
+    if (target.index >= markup.texts.length) return;
+    final words = await _promptForText(markup.texts[target.index].text);
+    if (words == null) return;
+    await _changeSelectedText((text) => text.copyWith(text: words));
+  }
+
+  Future<void> _deleteSelected() async {
+    final target = _ink.selected;
+    final page = _ink.selectedPage;
+    if (target == null || page == null) return;
+    setState(() {
+      _ink.selected = null;
+      _ink.selectedPage = null;
+    });
+    await _annotations.setInk(
+      widget.book.id,
+      page,
+      _ink.markupOf(page).without(target),
+    );
+  }
+
   /// Rubs out what the eraser touched — on screen only, until the finger lifts.
   void _eraseAt(({int page, Offset at}) hit) {
     _erasePath.add(hit.at);
@@ -836,7 +1048,23 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   Future<void> _writeText(int page, Offset at) async {
-    final controller = TextEditingController();
+    final text = await _promptForText('');
+    if (text == null) return;
+    await _annotations.setInk(
+      widget.book.id,
+      page,
+      _ink.markupOf(page).withText(InkText(
+            at: at,
+            text: text,
+            color: _inkColor,
+            size: inkTextSize,
+          )),
+    );
+  }
+
+  /// The words for a note, new or being changed. Null when nothing was typed.
+  Future<String?> _promptForText(String initial) async {
+    final controller = TextEditingController(text: initial);
     final text = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -861,17 +1089,8 @@ class _ReaderPageState extends State<ReaderPage>
         ],
       ),
     );
-    if (text == null || text.trim().isEmpty) return;
-    await _annotations.setInk(
-      widget.book.id,
-      page,
-      _ink.markupOf(page).withText(InkText(
-            at: at,
-            text: text.trim(),
-            color: _inkColor,
-            size: inkTextSize,
-          )),
-    );
+    if (text == null || text.trim().isEmpty) return null;
+    return text.trim();
   }
 
   /// Takes back the last mark on the page you are looking at.
@@ -897,6 +1116,9 @@ class _ReaderPageState extends State<ReaderPage>
     setState(() {
       _penMode = on;
       _livePoints.value = const [];
+      _ink.selected = null;
+      _ink.selectedPage = null;
+      _drag = null;
     });
   }
 
@@ -1588,6 +1810,38 @@ class _ReaderPageState extends State<ReaderPage>
                 ),
               ),
             ),
+          // What is selected, and the ways to change it a drag cannot express.
+          // Above the tool bar, because it is about the mark rather than about
+          // the pen.
+          if (_penMode && _ink.selected != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 74,
+              child: Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: InkSelectionBar(
+                    isText: _ink.selected!.kind == InkTargetKind.text,
+                    onSmaller: () => _changeSelectedText((text) =>
+                        text.copyWith(
+                            size: (text.size / inkTextSizeStep)
+                                .clamp(minInkTextSize, maxInkTextSize)
+                                .toDouble())),
+                    onBigger: () => _changeSelectedText((text) => text.copyWith(
+                        size: (text.size * inkTextSizeStep)
+                            .clamp(minInkTextSize, maxInkTextSize)
+                            .toDouble())),
+                    onTurnLeft: () => _changeSelectedText((text) =>
+                        text.copyWith(rotation: text.rotation - inkRotationStep)),
+                    onTurnRight: () => _changeSelectedText((text) =>
+                        text.copyWith(rotation: text.rotation + inkRotationStep)),
+                    onEdit: _editSelectedText,
+                    onDelete: _deleteSelected,
+                  ),
+                ),
+              ),
+            ),
           if (_penMode)
             Positioned(
               left: 0,
@@ -1601,7 +1855,16 @@ class _ReaderPageState extends State<ReaderPage>
                     color: _inkColor,
                     width: _inkWidth,
                     canUndo: _page != null && !_ink.markupOf(_page!).isEmpty,
-                    onTool: (tool) => setState(() => _tool = tool),
+                    onTool: (tool) => setState(() {
+                      _tool = tool;
+                      // A selection belongs to the select tool; leaving it with
+                      // a box still drawn round something is a lie about what
+                      // the next drag will do.
+                      if (tool != InkTool.select) {
+                        _ink.selected = null;
+                        _ink.selectedPage = null;
+                      }
+                    }),
                     onColor: (color) => setState(() => _inkColor = color),
                     onWidth: (width) => setState(() => _inkWidth = width),
                     onUndo: _undoInk,
@@ -1776,4 +2039,32 @@ class _LiveStrokePainter extends CustomPainter {
   @override
   bool shouldRepaint(_LiveStrokePainter old) =>
       old.points != points || old.color != color || old.width != width;
+}
+
+/// A mark being dragged: what it is, where the finger started, and the mark as
+/// it was before the drag began.
+///
+/// The original is kept because every frame computes the new position from the
+/// *start* of the gesture rather than from the last frame. Accumulating deltas
+/// is how a dragged thing slowly drifts out from under the finger.
+class _InkDrag {
+  const _InkDrag({
+    required this.target,
+    required this.from,
+    this.stroke,
+    this.text,
+    this.handle = false,
+  });
+
+  final InkTarget target;
+
+  /// Where the finger went down, page-relative.
+  final Offset from;
+
+  final InkStroke? stroke;
+  final InkText? text;
+
+  /// True when the drag started on the corner handle, which turns and resizes
+  /// instead of moving.
+  final bool handle;
 }

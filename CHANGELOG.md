@@ -27,6 +27,11 @@ sync.
   typed is what you meant — and a title search has to actually match, so your
   copy of Dune doesn't quietly end up wearing the cover of the Dune
   Encyclopedia.
+- **What you wrote can be picked up again.** A select tool: tap a stroke or a
+  note to choose it, drag it where it should have gone, and drag a note's
+  corner to turn it and change its size in one motion — with buttons for the
+  same, since a corner handle is nine pixels wide and a mouse deserves better.
+  A selected note can be re-typed or deleted.
 - **Write on a PDF page** — a pen, an eraser and a text tool. Marks are stored
   in the page's own coordinates, so a line stays on the same word at every zoom
   and on every device, and they are **yours**: they ride the same per-account

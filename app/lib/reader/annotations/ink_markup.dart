@@ -15,6 +15,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui';
 
 /// One continuous line, from the pen going down to it coming up.
@@ -48,6 +49,23 @@ class InkStroke {
         ],
       };
 
+  /// The same stroke, picked up and put down [by] (page-relative).
+  InkStroke movedBy(Offset by) => InkStroke(
+        points: [for (final p in points) p + by],
+        color: color,
+        width: width,
+      );
+
+  /// The box it occupies, for drawing a selection around it.
+  Rect get bounds {
+    var rect = Rect.fromCircle(center: points.first, radius: width);
+    for (final point in points.skip(1)) {
+      rect = rect.expandToInclude(
+          Rect.fromCircle(center: point, radius: width));
+    }
+    return rect;
+  }
+
   static InkStroke? fromJson(Map<String, dynamic> json) {
     final flat = json['p'];
     if (flat is! List || flat.length < 2) return null;
@@ -74,8 +92,11 @@ class InkText {
     required this.text,
     required this.color,
     required this.size,
+    this.rotation = 0,
   });
 
+  /// Where the text starts — its top-left corner before rotation, and the point
+  /// it turns about.
   final Offset at;
   final String text;
   final int color;
@@ -83,12 +104,37 @@ class InkText {
   /// Font size as a fraction of the page height.
   final double size;
 
+  /// Turn, in radians, clockwise about [at]. Zero is level with the page, which
+  /// is what an absent value in the JSON means — a note written before this
+  /// existed is a level one.
+  final double rotation;
+
+  InkText movedBy(Offset by) => copyWith(at: at + by);
+
+  InkText copyWith({
+    Offset? at,
+    String? text,
+    int? color,
+    double? size,
+    double? rotation,
+  }) =>
+      InkText(
+        at: at ?? this.at,
+        text: text ?? this.text,
+        color: color ?? this.color,
+        size: size ?? this.size,
+        rotation: rotation ?? this.rotation,
+      );
+
   Map<String, dynamic> toJson() => {
         'x': _round(at.dx),
         'y': _round(at.dy),
         's': size,
         'c': color,
         't': text,
+        // Absent when level, which is most of them: a note that was never
+        // turned should not cost four bytes in every page of writing.
+        if (rotation != 0) 'r': _round(rotation),
       };
 
   static InkText? fromJson(Map<String, dynamic> json) {
@@ -102,6 +148,7 @@ class InkText {
       text: text,
       color: (json['c'] as num?)?.toInt() ?? 0xFF000000,
       size: (json['s'] as num?)?.toDouble() ?? 0.02,
+      rotation: (json['r'] as num?)?.toDouble() ?? 0,
     );
   }
 }
@@ -137,6 +184,60 @@ class InkMarkup {
     }
     return this;
   }
+
+  /// Which mark is under [at], if any — the nearest one, so overlapping marks
+  /// pick the one whose line you actually touched.
+  ///
+  /// Text is measured by the caller, since only the reader knows how wide a
+  /// string is at a given size: [textBounds] comes from the painter, which has
+  /// the font. Null means empty page, or a tap on nothing.
+  InkTarget? hitTest(
+    Offset at,
+    double radius, {
+    required Rect Function(InkText text) textBounds,
+  }) {
+    // Text first: it sits on top of the strokes when drawn, so it is what you
+    // meant if the two overlap.
+    for (var i = texts.length - 1; i >= 0; i--) {
+      if (_containsRotated(texts[i], at, textBounds(texts[i]))) {
+        return InkTarget.text(i);
+      }
+    }
+    for (var i = strokes.length - 1; i >= 0; i--) {
+      if (_strokeTouches(strokes[i], at, radius)) return InkTarget.stroke(i);
+    }
+    return null;
+  }
+
+  /// The same markup with one mark replaced. Out-of-range indices are ignored
+  /// rather than thrown on: a selection can outlive the thing it pointed at
+  /// when a sync arrives mid-drag.
+  InkMarkup replacingStroke(int index, InkStroke stroke) {
+    if (index < 0 || index >= strokes.length) return this;
+    final next = [...strokes]..[index] = stroke;
+    return InkMarkup(strokes: next, texts: texts);
+  }
+
+  InkMarkup replacingText(int index, InkText text) {
+    if (index < 0 || index >= texts.length) return this;
+    final next = [...texts]..[index] = text;
+    return InkMarkup(strokes: strokes, texts: next);
+  }
+
+  InkMarkup without(InkTarget target) => switch (target.kind) {
+        InkTargetKind.stroke => target.index < 0 || target.index >= strokes.length
+            ? this
+            : InkMarkup(
+                strokes: [...strokes]..removeAt(target.index),
+                texts: texts,
+              ),
+        InkTargetKind.text => target.index < 0 || target.index >= texts.length
+            ? this
+            : InkMarkup(
+                strokes: strokes,
+                texts: [...texts]..removeAt(target.index),
+              ),
+      };
 
   /// Everything except what the eraser touched at [at], within [radius] (both
   /// page-relative). A stroke goes whole: half a pen line is not a thing anyone
@@ -183,6 +284,55 @@ class InkMarkup {
       return null;
     }
   }
+}
+
+/// Which of the two kinds of mark a selection points at.
+enum InkTargetKind { stroke, text }
+
+/// A mark on a page, by kind and position in its list.
+///
+/// An index rather than an id: the page is one row and one payload, edited as a
+/// whole, so there is nothing for an id to survive. The index is only ever held
+/// for the length of a gesture, and every method that takes one ignores an
+/// index that no longer exists.
+class InkTarget {
+  const InkTarget(this.kind, this.index);
+
+  const InkTarget.stroke(this.index) : kind = InkTargetKind.stroke;
+  const InkTarget.text(this.index) : kind = InkTargetKind.text;
+
+  final InkTargetKind kind;
+  final int index;
+
+  @override
+  bool operator ==(Object other) =>
+      other is InkTarget && other.kind == kind && other.index == index;
+
+  @override
+  int get hashCode => Object.hash(kind, index);
+
+  @override
+  String toString() => '${kind.name} $index';
+}
+
+/// Whether [at] falls inside a text's box, allowing for the turn it was given.
+///
+/// The point is rotated *back* about the anchor rather than the box being
+/// rotated forward: a rectangle test is exact, and a rotated-rectangle test is
+/// four half-plane tests that get the corners subtly wrong.
+bool _containsRotated(InkText text, Offset at, Rect bounds) {
+  if (text.rotation == 0) return bounds.contains(at);
+  final local = rotateAbout(at, text.at, -text.rotation);
+  return bounds.contains(local);
+}
+
+/// [point] turned by [radians] about [origin].
+Offset rotateAbout(Offset point, Offset origin, double radians) {
+  final sin = math.sin(radians);
+  final cos = math.cos(radians);
+  final d = point - origin;
+  return origin +
+      Offset(d.dx * cos - d.dy * sin, d.dx * sin + d.dy * cos);
 }
 
 /// Whether the eraser at [at] catches any part of [stroke].
