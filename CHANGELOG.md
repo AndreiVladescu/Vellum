@@ -6,16 +6,10 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
-## v1.1.7 — 2026-08-24
+## v1.1.8 — 2026-08-24
 
-Writing on the page — and, once it is there, picking it up again — a scanner
-that finds more books, ISBN lookup from the wishlist, and the bugs a hunt
-through all of it turned up.
-
-**Upgrade the server too** if you want your writing on your other devices: it
-rides the same per-account channel your highlights do, and needs migration
-0036. Until then the app keeps it locally and waits — it does not fail the
-sync.
+Picking up what you wrote, looking a wanted book up by its ISBN, and the
+sync error that turned up after an afternoon with the pen.
 
 **One limit worth knowing.** Writing syncs a page at a time: a page's marks are
 one thing, so if two devices both draw on *the same page* between syncs, the
@@ -24,6 +18,11 @@ and different books, are unaffected.
 
 ### Added
 
+- **What you wrote can be picked up again.** A select tool: tap a stroke or a
+  note to choose it, drag it where it should have gone, and drag a note's
+  corner to turn it and change its size in one motion — with buttons for the
+  same, since a corner handle is nine pixels wide and a mouse deserves better.
+  A selected note can be re-typed or deleted.
 - **Look a wishlist book up by its ISBN** — ten digits or thirteen, since a
   barcode and a copyright page say the same thing two ways. There's a field
   when you add one, and *Look up online…* in an entry's own menu.
@@ -33,11 +32,38 @@ and different books, are unaffected.
   typed is what you meant — and a title search has to actually match, so your
   copy of Dune doesn't quietly end up wearing the cover of the Dune
   Encyclopedia.
-- **What you wrote can be picked up again.** A select tool: tap a stroke or a
-  note to choose it, drag it where it should have gone, and drag a note's
-  corner to turn it and change its size in one motion — with buttons for the
-  same, since a corner handle is nine pixels wide and a mouse deserves better.
-  A selected note can be re-typed or deleted.
+
+### Fixed
+
+- **"An annotation deletion could not be sent: no such annotation"**, on every
+  sync, after an afternoon with the pen. A page drawn on and rubbed out between
+  two syncs leaves a tombstone for something the server never saw — which is
+  the state the tombstone wanted anyway. The check for that read the error's
+  text instead of its status code, so it never matched.
+- **The reader's toolbar drew over the back arrow** on a phone. An `AppBar`
+  gives its buttons their intrinsic width and squeezes the *title*, so a row
+  that is too long doesn't complain — it overlaps. The bar has a width budget
+  now, and what doesn't fit folds into the overflow menu **by name**, so
+  nothing becomes unreachable.
+- **A note in the margin can be resized again**: its corner handle sits off the
+  paper, and an off-page touch used to be ignored outright. A drag also keeps
+  the view it started in, so pinching part-way through moves the page without
+  dragging the mark out from under your finger.
+
+---
+
+## v1.1.7 — 2026-08-24
+
+Writing on the page, a scanner that finds more books, and the bugs a hunt
+through all of it turned up.
+
+**Upgrade the server too** if you want your writing on your other devices: it
+rides the same per-account channel your highlights do, and needs migration
+0036. Until then the app keeps it locally and waits — it does not fail the
+sync.
+
+### Added
+
 - **Write on a PDF page** — a pen, an eraser and a text tool. Marks are stored
   in the page's own coordinates, so a line stays on the same word at every zoom
   and on every device, and they are **yours**: they ride the same per-account
@@ -79,20 +105,6 @@ and different books, are unaffected.
   books to a shelf is five edits in one second — and until real time caught up
   the device ignored changes arriving from elsewhere as older than what it
   held. Capped at one second.
-- **The reader's toolbar drew over the back arrow** on a phone. An `AppBar`
-  gives its buttons their intrinsic width and squeezes the *title*, so a row
-  that is too long doesn't complain — it overlaps. The bar has a width budget
-  now, and what doesn't fit folds into the overflow menu **by name**, so
-  nothing becomes unreachable.
-- **"An annotation deletion could not be sent: no such annotation"**, on every
-  sync, after an afternoon with the pen. A page drawn on and rubbed out between
-  two syncs leaves a tombstone for something the server never saw — which is
-  the state the tombstone wanted anyway. The check for that read the error's
-  text instead of its status code, so it never matched.
-- **A note in the margin can be resized again**: its corner handle sits off the
-  paper, and an off-page touch used to be ignored outright. A drag also keeps
-  the view it started in, so pinching part-way through moves the page without
-  dragging the mark out from under your finger.
 - A page of writing exports as a line saying so, rather than an empty heading.
 
 ---
