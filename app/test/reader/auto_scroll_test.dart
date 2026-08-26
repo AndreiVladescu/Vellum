@@ -61,6 +61,40 @@ void main() {
       expect(clampAutoScrollSpeed(6, min: 0.5, max: 30), 6);
     });
 
+    test('the slowest a PDF scrolls is a page every five minutes', () {
+      // 0.5 — a page every two minutes — was still too fast for dense text.
+      expect(minAutoScrollPagesPerMinute, 0.2);
+    });
+
+    test('and the way down passes through the slow end, not over it', () {
+      var speed = 1.0;
+      final stops = <double>[];
+      // Pressed until it stops moving — the floor is reachable, and the point
+      // is what it passes through on the way.
+      for (var i = 0; i < 40; i++) {
+        final next = stepAutoScrollSpeed(speed,
+            faster: false,
+            min: minAutoScrollPagesPerMinute,
+            max: maxAutoScrollPagesPerMinute);
+        if (next == speed) break;
+        stops.add(speed = next);
+      }
+      expect(stops.last, minAutoScrollPagesPerMinute,
+          reason: 'the floor is reachable by pressing');
+      expect(stops.where((s) => s > 0.2 && s < 0.5).length, greaterThan(3),
+          reason: 'the new range is somewhere to sit, not a cliff onto the '
+              'floor');
+    });
+
+    test('a slow step is gentler than a fast one', () {
+      final fromSlow = 0.4 -
+          stepAutoScrollSpeed(0.4, faster: false, min: 0.2, max: 30);
+      final fromFast =
+          8.0 - stepAutoScrollSpeed(8, faster: false, min: 0.2, max: 30);
+      expect(fromSlow / 0.4, lessThan(fromFast / 8),
+          reason: 'a quarter off 0.4 is a different speed entirely');
+    });
+
     test('a broken number falls back to the slowest rather than NaN', () {
       expect(clampAutoScrollSpeed(double.nan, min: 0.5, max: 30), 0.5);
     });

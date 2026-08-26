@@ -39,6 +39,26 @@ int nearestPage(List<Rect> pages, Offset centre) {
   return best;
 }
 
+/// The horizontal half of [clampToPage], for continuous mode.
+///
+/// **The bug this is for** (8/26): zoomed in, you could go on dragging sideways
+/// long after the page had run out, so the text slid away and left background
+/// on both sides. pdfrx's own boundary clamp holds the *document* — which is
+/// laid out with margins — not the page, so it allowed exactly that.
+///
+/// The rule the report asks for: you may pan while there is page to move onto,
+/// and not otherwise. A page narrower than the window has nothing to slide, so
+/// it is pinned to its own centre.
+double clampToPageHorizontally({
+  required double centreX,
+  required Rect page,
+  required double viewportWidth,
+}) {
+  final half = viewportWidth / 2;
+  if (page.width <= viewportWidth) return page.center.dx;
+  return centreX.clamp(page.left + half, page.right - half);
+}
+
 /// [centre] pulled back inside [page].
 ///
 /// [viewport] is the visible area in *document* units — the widget's size

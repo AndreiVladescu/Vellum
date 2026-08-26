@@ -1240,10 +1240,6 @@ class _ReaderPageState extends State<ReaderPage>
         layout.pageLayouts.isEmpty) {
       return matrix;
     }
-    // Continuous mode's only rule: while a vertical drag is in progress on a
-    // page you have zoomed into, the horizontal offset does not move. Reading
-    // down a zoomed column and drifting sideways off the text is the thing
-    // being fixed; nothing else about panning changes.
     if (_mode != PdfPageMode.paged) {
       // This hook *replaces* pdfrx's own boundary clamp rather than adding to
       // it, so continuous mode has to ask for it back — without it the document
@@ -1253,14 +1249,44 @@ class _ReaderPageState extends State<ReaderPage>
         matrix,
         viewSize: viewSize,
       );
-      final lockedX = _lockedX;
-      if (lockedX == null) return bounded;
-      final held = bounded.clone();
-      held.setEntry(0, 3, lockedX);
-      return held;
+      final zoom = bounded.zoom;
+      if (zoom <= 0) return bounded;
+      // Sideways, the *page* is the limit rather than the document: pdfrx lays
+      // the document out with margins, so its own clamp let you drag on past
+      // the paper until there was background on both sides (8/26 report).
+      // While a vertical drag is in progress the offset is held outright — the
+      // axis lock — and otherwise it is held inside the page.
+      final centre = bounded.calcPosition(viewSize);
+      final page = layout.pageLayouts[nearestPage(layout.pageLayouts, centre)];
+      final x = _lockedX == null
+          ? clampToPageHorizontally(
+              centreX: centre.dx,
+              page: page,
+              viewportWidth: viewSize.width / zoom,
+            )
+          : null;
+      if (x == null) {
+        final held = bounded.clone();
+        held.setEntry(0, 3, _lockedX!);
+        return held;
+      }
+      if (x == centre.dx) return bounded;
+      return controller.calcMatrixFor(Offset(x, centre.dy),
+          zoom: zoom, viewSize: viewSize);
     }
     final zoom = matrix.zoom;
     if (zoom <= 0) return matrix;
+    // Paged mode at its resting zoom: the page is shown as it is meant to be
+    // seen, so a drag has nothing to reveal. It used to shift the page a little
+    // and *then* turn it, which read as a glitch (8/25 report: "it will move
+    // momentarily, weirdly, and then it will page down"). Zooming is still
+    // free — that is the one thing a drag here could usefully do — so only a
+    // change that leaves the zoom alone is refused.
+    if (_atRestingZoom &&
+        (zoom - controller.currentZoom).abs() < 1e-6 &&
+        !_penMode) {
+      return controller.value;
+    }
     final centre = matrix.calcPosition(viewSize);
     final page = layout.pageLayouts[nearestPage(layout.pageLayouts, centre)];
     final clamped = clampToPage(

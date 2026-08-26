@@ -16,6 +16,7 @@ final _pages = [
 ];
 
 void main() {
+  _sidewaysPan();
   group('picking the page', () {
     test('the one the viewport is sitting on', () {
       expect(nearestPage(_pages, const Offset(300, 400)), 0);
@@ -96,6 +97,58 @@ void main() {
       );
       expect(out.dx, 100);
       expect(out.dy, 400);
+    });
+  });
+}
+
+// Panning sideways, and where it has to stop (8/26 report: "when zoomed to
+// almost the edge of the book, I can still pan left and right… you may only pan
+// when there's a page to move").
+//
+// pdfrx's own clamp holds the *document*, which is laid out with margins — so
+// it allowed dragging on past the paper until there was background on both
+// sides. The page is the limit instead.
+void _sidewaysPan() {
+  group('panning sideways in continuous mode', () {
+    const page = Rect.fromLTWH(100, 0, 400, 600);
+
+    test('a page wider than the window slides, as far as its edges', () {
+      // Window showing 200 of the page's 400: the centre may travel from
+      // left+100 to right-100 and no further.
+      expect(
+        clampToPageHorizontally(centreX: 150, page: page, viewportWidth: 200),
+        200,
+        reason: 'the left edge of the paper meets the left of the window',
+      );
+      expect(
+        clampToPageHorizontally(centreX: 900, page: page, viewportWidth: 200),
+        400,
+      );
+      expect(
+        clampToPageHorizontally(centreX: 300, page: page, viewportWidth: 200),
+        300,
+        reason: 'and in between it is left alone',
+      );
+    });
+
+    test('a page narrower than the window does not move at all', () {
+      // The reported case: background on both sides, and dragging still
+      // scrolled it.
+      for (final attempt in [0.0, 300.0, 1200.0]) {
+        expect(
+          clampToPageHorizontally(
+              centreX: attempt, page: page, viewportWidth: 900),
+          page.center.dx,
+          reason: 'nothing to slide onto, so it is pinned: $attempt',
+        );
+      }
+    });
+
+    test('a window exactly the width of the page is pinned too', () {
+      expect(
+        clampToPageHorizontally(centreX: 250, page: page, viewportWidth: 400),
+        page.center.dx,
+      );
     });
   });
 }

@@ -16,7 +16,11 @@ library;
 /// unavoidable — but this is a starting point with a control under it, not a
 /// number presented as your pace.
 const defaultAutoScrollPagesPerMinute = 4.0;
-const minAutoScrollPagesPerMinute = 0.5;
+
+/// A page every five minutes. The floor was 0.5 — a page every two minutes —
+/// and that was still too fast for dense text (8/26 report), so it goes down
+/// to where a page of mathematics or a poem can be read at.
+const minAutoScrollPagesPerMinute = 0.2;
 const maxAutoScrollPagesPerMinute = 30.0;
 
 /// Where an EPUB starts: about 250 words a minute over lines of ten words,
@@ -55,7 +59,11 @@ double stepAutoScrollSpeed(
   required double min,
   required double max,
 }) {
-  final stepped = faster ? speed * 1.25 : speed / 1.25;
+  // Gentler at the slow end, where the whole usable range is a fraction of a
+  // page a minute: a quarter off 0.4 leaves 0.3, and those two do not look
+  // alike on the page. Above 1 a fifth keeps the list of stops short.
+  final factor = speed <= 1 ? 1.1 : 1.25;
+  final stepped = faster ? speed * factor : speed / factor;
   // Two decimals at the slow end, where the steps are small, and one further
   // up — a speed readout of "7.8125" helps nobody.
   final rounded = stepped < 2
