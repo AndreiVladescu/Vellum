@@ -201,6 +201,7 @@ jobs:
       - run: node server/web/tests/detail_edits.test.js
       - run: node server/web/tests/pages.test.js
       - run: node server/web/tests/loans_page.test.js
+      - run: node server/web/tests/reminders_page.test.js
       - run: node server/web/tests/grant_access.test.js
       - run: node server/web/tests/invite.test.js
       - run: node server/web/tests/mail_setup.test.js
