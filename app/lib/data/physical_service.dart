@@ -123,6 +123,7 @@ class PhysicalService {
     DateTime? dueAt,
     String? contact,
     String? notes,
+    bool remind = true,
   }) async {
     final out = await (db.select(db.loans)
           ..where((l) => l.copyId.equals(copyId) & l.returnedAt.isNull())
@@ -139,6 +140,7 @@ class PhysicalService {
             dueAt: Value(dueAt),
             borrowerContact: Value(_blankToNull(contact)),
             notes: Value(_blankToNull(notes)),
+            remind: Value(remind),
           ),
         );
   }
@@ -150,12 +152,14 @@ class PhysicalService {
     required DateTime? dueAt,
     String? contact,
     String? notes,
+    bool? remind,
   }) async {
     await (db.update(db.loans)..where((l) => l.id.equals(loanId))).write(
       LoansCompanion(
         dueAt: Value(dueAt),
         borrowerContact: Value(_blankToNull(contact)),
         notes: Value(_blankToNull(notes)),
+        remind: remind == null ? const Value.absent() : Value(remind),
       ),
     );
     await stampSyncClock(db, SyncedRow.loan, loanId);

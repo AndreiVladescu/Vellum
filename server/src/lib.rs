@@ -32,6 +32,8 @@ mod loans;
 mod mail;
 mod metadata;
 pub mod notifications;
+pub mod reminders;
+pub use reminders::run_reminder_worker;
 mod observability;
 mod opds;
 mod personal;
@@ -39,6 +41,7 @@ mod physical_copies;
 mod reader;
 mod reading;
 mod send;
+pub mod settings;
 mod shares;
 mod shelves;
 mod text_index;
@@ -343,6 +346,14 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             get(physical_copies::get_photo_image).put(
                 physical_copies::put_photo_image.layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
             ),
+        )
+        .route("/settings", get(settings::list).put(settings::update))
+        // Runs the reminder sweep at once. The worker does this hourly; this
+        // is what a settings screen's "send any that are due now" needs, and
+        // what makes the feature testable without waiting.
+        .route(
+            "/settings/loan-reminders/run",
+            post(settings::run_reminders),
         )
         .route("/notifications", get(notifications::list))
         .route(

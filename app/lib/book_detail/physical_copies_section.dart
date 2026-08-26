@@ -16,6 +16,7 @@ class LendDetails {
     this.dueAt,
     this.contact,
     this.photograph = false,
+    this.remind = true,
   });
 
   final String borrower;
@@ -28,6 +29,15 @@ class LendDetails {
   /// Opt-in per loan, not a setting: it matters for the borrowed-by-a-stranger
   /// case and is noise for lending to a flatmate.
   final bool photograph;
+
+  /// Whether this loan may send the borrower a due-date reminder by email
+  /// (server migration 0037).
+  ///
+  /// On by default and off per loan: a book lent across the kitchen table
+  /// needs no email, and the person lending knows which is which. Nothing is
+  /// sent regardless unless the server has a mailer *and* the owner has
+  /// switched reminders on — this switch only ever takes one loan out.
+  final bool remind;
 }
 
 /// Asks who is taking the book, when it's due back, and how to reach them.
@@ -42,6 +52,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
   DateTime? due;
   int? selectedPreset;
   bool photograph = false;
+  bool remind = true;
 
   final result = await showDialog<LendDetails>(
     context: context,
@@ -135,6 +146,24 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                   dense: true,
                   title: const Text('Photograph its condition first'),
                 ),
+                // Only offered where it could do anything: a reminder needs a
+                // due date to be about and an address to go to. Shown greyed
+                // rather than hidden when there is a date but no contact, so
+                // it is clear *why* nothing will arrive.
+                if (due != null)
+                  CheckboxListTile(
+                    value: remind && contact.text.trim().isNotEmpty,
+                    onChanged: contact.text.trim().isEmpty
+                        ? null
+                        : (v) => setState(() => remind = v ?? false),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    title: const Text('Email a reminder when it is due'),
+                    subtitle: Text(contact.text.trim().isEmpty
+                        ? 'Needs an email address above'
+                        : 'If your server is set up to send mail'),
+                  ),
               ],
             ),
           ),
@@ -152,6 +181,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                   dueAt: due,
                   contact: contact.text.trim(),
                   photograph: photograph,
+                  remind: remind && contact.text.trim().isNotEmpty,
                 ));
               },
               child: const Text('Lend'),
@@ -387,6 +417,7 @@ class _CopyCard extends StatelessWidget {
         details.borrower,
         dueAt: details.dueAt,
         contact: details.contact,
+        remind: details.remind,
       );
     } on StateError catch (e) {
       // The button is only shown for a free copy, so this means a sync landed
@@ -596,6 +627,7 @@ class PhysicalCopyTile extends StatelessWidget {
         details.borrower,
         dueAt: details.dueAt,
         contact: details.contact,
+        remind: details.remind,
       );
     } on StateError catch (e) {
       // The button is only shown for a free copy, so this means a sync landed

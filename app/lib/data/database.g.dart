@@ -4486,6 +4486,19 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _remindMeta = const VerificationMeta('remind');
+  @override
+  late final GeneratedColumn<bool> remind = GeneratedColumn<bool>(
+    'remind',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("remind" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _reminderSentAtMeta = const VerificationMeta(
     'reminderSentAt',
   );
@@ -4510,6 +4523,7 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
     dueAt,
     borrowerContact,
     notes,
+    remind,
     reminderSentAt,
   ];
   @override
@@ -4590,6 +4604,12 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('remind')) {
+      context.handle(
+        _remindMeta,
+        remind.isAcceptableOrUnknown(data['remind']!, _remindMeta),
+      );
+    }
     if (data.containsKey('reminder_sent_at')) {
       context.handle(
         _reminderSentAtMeta,
@@ -4648,6 +4668,10 @@ class $LoansTable extends Loans with TableInfo<$LoansTable, Loan> {
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      remind: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}remind'],
+      )!,
       reminderSentAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}reminder_sent_at'],
@@ -4675,6 +4699,16 @@ class Loan extends DataClass implements Insertable<Loan> {
   final String? borrowerContact;
   final String? notes;
 
+  /// Whether this loan may send the borrower a due-date reminder by email
+  /// (server migration 0037).
+  ///
+  /// True unless someone says otherwise for this loan in particular: a book
+  /// lent across the kitchen table needs no email, and turning it off for one
+  /// arrangement must not turn it off for the rest. It is the loan's own
+  /// switch — the server-wide one, and the mailer that has to exist at all,
+  /// are the console's.
+  final bool remind;
+
   /// When a due reminder was last raised, so it isn't raised twice.
   final DateTime? reminderSentAt;
   const Loan({
@@ -4688,6 +4722,7 @@ class Loan extends DataClass implements Insertable<Loan> {
     this.dueAt,
     this.borrowerContact,
     this.notes,
+    required this.remind,
     this.reminderSentAt,
   });
   @override
@@ -4711,6 +4746,7 @@ class Loan extends DataClass implements Insertable<Loan> {
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
+    map['remind'] = Variable<bool>(remind);
     if (!nullToAbsent || reminderSentAt != null) {
       map['reminder_sent_at'] = Variable<DateTime>(reminderSentAt);
     }
@@ -4737,6 +4773,7 @@ class Loan extends DataClass implements Insertable<Loan> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      remind: Value(remind),
       reminderSentAt: reminderSentAt == null && nullToAbsent
           ? const Value.absent()
           : Value(reminderSentAt),
@@ -4759,6 +4796,7 @@ class Loan extends DataClass implements Insertable<Loan> {
       dueAt: serializer.fromJson<DateTime?>(json['dueAt']),
       borrowerContact: serializer.fromJson<String?>(json['borrowerContact']),
       notes: serializer.fromJson<String?>(json['notes']),
+      remind: serializer.fromJson<bool>(json['remind']),
       reminderSentAt: serializer.fromJson<DateTime?>(json['reminderSentAt']),
     );
   }
@@ -4776,6 +4814,7 @@ class Loan extends DataClass implements Insertable<Loan> {
       'dueAt': serializer.toJson<DateTime?>(dueAt),
       'borrowerContact': serializer.toJson<String?>(borrowerContact),
       'notes': serializer.toJson<String?>(notes),
+      'remind': serializer.toJson<bool>(remind),
       'reminderSentAt': serializer.toJson<DateTime?>(reminderSentAt),
     };
   }
@@ -4791,6 +4830,7 @@ class Loan extends DataClass implements Insertable<Loan> {
     Value<DateTime?> dueAt = const Value.absent(),
     Value<String?> borrowerContact = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    bool? remind,
     Value<DateTime?> reminderSentAt = const Value.absent(),
   }) => Loan(
     id: id ?? this.id,
@@ -4805,6 +4845,7 @@ class Loan extends DataClass implements Insertable<Loan> {
         ? borrowerContact.value
         : this.borrowerContact,
     notes: notes.present ? notes.value : this.notes,
+    remind: remind ?? this.remind,
     reminderSentAt: reminderSentAt.present
         ? reminderSentAt.value
         : this.reminderSentAt,
@@ -4825,6 +4866,7 @@ class Loan extends DataClass implements Insertable<Loan> {
           ? data.borrowerContact.value
           : this.borrowerContact,
       notes: data.notes.present ? data.notes.value : this.notes,
+      remind: data.remind.present ? data.remind.value : this.remind,
       reminderSentAt: data.reminderSentAt.present
           ? data.reminderSentAt.value
           : this.reminderSentAt,
@@ -4844,6 +4886,7 @@ class Loan extends DataClass implements Insertable<Loan> {
           ..write('dueAt: $dueAt, ')
           ..write('borrowerContact: $borrowerContact, ')
           ..write('notes: $notes, ')
+          ..write('remind: $remind, ')
           ..write('reminderSentAt: $reminderSentAt')
           ..write(')'))
         .toString();
@@ -4861,6 +4904,7 @@ class Loan extends DataClass implements Insertable<Loan> {
     dueAt,
     borrowerContact,
     notes,
+    remind,
     reminderSentAt,
   );
   @override
@@ -4877,6 +4921,7 @@ class Loan extends DataClass implements Insertable<Loan> {
           other.dueAt == this.dueAt &&
           other.borrowerContact == this.borrowerContact &&
           other.notes == this.notes &&
+          other.remind == this.remind &&
           other.reminderSentAt == this.reminderSentAt);
 }
 
@@ -4891,6 +4936,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
   final Value<DateTime?> dueAt;
   final Value<String?> borrowerContact;
   final Value<String?> notes;
+  final Value<bool> remind;
   final Value<DateTime?> reminderSentAt;
   final Value<int> rowid;
   const LoansCompanion({
@@ -4904,6 +4950,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     this.dueAt = const Value.absent(),
     this.borrowerContact = const Value.absent(),
     this.notes = const Value.absent(),
+    this.remind = const Value.absent(),
     this.reminderSentAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4918,6 +4965,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     this.dueAt = const Value.absent(),
     this.borrowerContact = const Value.absent(),
     this.notes = const Value.absent(),
+    this.remind = const Value.absent(),
     this.reminderSentAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4934,6 +4982,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     Expression<DateTime>? dueAt,
     Expression<String>? borrowerContact,
     Expression<String>? notes,
+    Expression<bool>? remind,
     Expression<DateTime>? reminderSentAt,
     Expression<int>? rowid,
   }) {
@@ -4948,6 +4997,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
       if (dueAt != null) 'due_at': dueAt,
       if (borrowerContact != null) 'borrower_contact': borrowerContact,
       if (notes != null) 'notes': notes,
+      if (remind != null) 'remind': remind,
       if (reminderSentAt != null) 'reminder_sent_at': reminderSentAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4964,6 +5014,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     Value<DateTime?>? dueAt,
     Value<String?>? borrowerContact,
     Value<String?>? notes,
+    Value<bool>? remind,
     Value<DateTime?>? reminderSentAt,
     Value<int>? rowid,
   }) {
@@ -4978,6 +5029,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
       dueAt: dueAt ?? this.dueAt,
       borrowerContact: borrowerContact ?? this.borrowerContact,
       notes: notes ?? this.notes,
+      remind: remind ?? this.remind,
       reminderSentAt: reminderSentAt ?? this.reminderSentAt,
       rowid: rowid ?? this.rowid,
     );
@@ -5016,6 +5068,9 @@ class LoansCompanion extends UpdateCompanion<Loan> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (remind.present) {
+      map['remind'] = Variable<bool>(remind.value);
+    }
     if (reminderSentAt.present) {
       map['reminder_sent_at'] = Variable<DateTime>(reminderSentAt.value);
     }
@@ -5038,6 +5093,7 @@ class LoansCompanion extends UpdateCompanion<Loan> {
           ..write('dueAt: $dueAt, ')
           ..write('borrowerContact: $borrowerContact, ')
           ..write('notes: $notes, ')
+          ..write('remind: $remind, ')
           ..write('reminderSentAt: $reminderSentAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -16347,6 +16403,7 @@ typedef $$LoansTableCreateCompanionBuilder =
       Value<DateTime?> dueAt,
       Value<String?> borrowerContact,
       Value<String?> notes,
+      Value<bool> remind,
       Value<DateTime?> reminderSentAt,
       Value<int> rowid,
     });
@@ -16362,6 +16419,7 @@ typedef $$LoansTableUpdateCompanionBuilder =
       Value<DateTime?> dueAt,
       Value<String?> borrowerContact,
       Value<String?> notes,
+      Value<bool> remind,
       Value<DateTime?> reminderSentAt,
       Value<int> rowid,
     });
@@ -16439,6 +16497,11 @@ class $$LoansTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get remind => $composableBuilder(
+    column: $table.remind,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16525,6 +16588,11 @@ class $$LoansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get remind => $composableBuilder(
+    column: $table.remind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get reminderSentAt => $composableBuilder(
     column: $table.reminderSentAt,
     builder: (column) => ColumnOrderings(column),
@@ -16594,6 +16662,9 @@ class $$LoansTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<bool> get remind =>
+      $composableBuilder(column: $table.remind, builder: (column) => column);
+
   GeneratedColumn<DateTime> get reminderSentAt => $composableBuilder(
     column: $table.reminderSentAt,
     builder: (column) => column,
@@ -16661,6 +16732,7 @@ class $$LoansTableTableManager
                 Value<DateTime?> dueAt = const Value.absent(),
                 Value<String?> borrowerContact = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<bool> remind = const Value.absent(),
                 Value<DateTime?> reminderSentAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LoansCompanion(
@@ -16674,6 +16746,7 @@ class $$LoansTableTableManager
                 dueAt: dueAt,
                 borrowerContact: borrowerContact,
                 notes: notes,
+                remind: remind,
                 reminderSentAt: reminderSentAt,
                 rowid: rowid,
               ),
@@ -16689,6 +16762,7 @@ class $$LoansTableTableManager
                 Value<DateTime?> dueAt = const Value.absent(),
                 Value<String?> borrowerContact = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<bool> remind = const Value.absent(),
                 Value<DateTime?> reminderSentAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LoansCompanion.insert(
@@ -16702,6 +16776,7 @@ class $$LoansTableTableManager
                 dueAt: dueAt,
                 borrowerContact: borrowerContact,
                 notes: notes,
+                remind: remind,
                 reminderSentAt: reminderSentAt,
                 rowid: rowid,
               ),

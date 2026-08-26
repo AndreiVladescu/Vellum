@@ -140,6 +140,7 @@ async fn synced_tables_have_the_expected_columns() {
                 "borrower_contact",
                 "notes",
                 "reminder_sent_at",
+                "remind",
             ],
         ),
     ];

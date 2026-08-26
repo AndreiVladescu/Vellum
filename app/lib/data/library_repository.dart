@@ -390,6 +390,7 @@ class LibraryRepository {
     DateTime? dueAt,
     String? contact,
     String? notes,
+    bool remind = true,
   }) =>
       physical.lendCopy(
         copyId,
@@ -397,6 +398,7 @@ class LibraryRepository {
         dueAt: dueAt,
         contact: contact,
         notes: notes,
+        remind: remind,
       );
   Future<void> updateLoan(
     String loanId, {

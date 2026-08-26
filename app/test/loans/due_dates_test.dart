@@ -23,6 +23,7 @@ Loan _loan({
       returnedAt: returnedAt,
       updatedAt: DateTime(2026, 6, 1),
       needsPush: false,
+        remind: true,
       dueAt: dueAt,
       reminderSentAt: reminderSentAt,
     );

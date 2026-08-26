@@ -5289,3 +5289,187 @@ async fn only_an_owner_may_look_at_or_test_the_mail_setup() {
         "a member must not be able to make the server send mail"
     );
 }
+
+// ---- loan reminders (migration 0037) --------------------------------------
+//
+// The settings behind the emails: whose they are, and what happens to a
+// reminder already sent when the arrangement changes.
+
+#[tokio::test]
+async fn only_the_owner_reads_or_changes_the_reminder_settings() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let member = add_member(&app, &master, "member@lib.test").await;
+
+    let (status, _) = call(&app, "GET", "/api/settings", Some(&member), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/settings",
+        Some(&member),
+        Some(json!({"loan_reminders": true})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let (status, body) = call(&app, "GET", "/api/settings", Some(&master), None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+}
+
+#[tokio::test]
+async fn reminders_are_off_and_say_whether_mail_is_even_possible() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (_, body) = call(&app, "GET", "/api/settings", Some(&master), None).await;
+    assert_eq!(body["loan_reminders"], false, "off until asked for");
+    assert_eq!(
+        body["mail_configured"], false,
+        "and a screen that hid this would invite someone to switch reminders \
+         on and wonder why nothing arrives"
+    );
+    assert!(
+        body["before_body"].as_str().unwrap().contains("{title}"),
+        "the stock message names the book"
+    );
+}
+
+#[tokio::test]
+async fn a_reworded_message_is_kept() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/settings",
+        Some(&master),
+        Some(json!({
+            "loan_reminders": true,
+            "lead_days": 7,
+            "due_subject": "Bring back {title}!",
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["due_subject"], "Bring back {title}!");
+
+    let (_, reread) = call(&app, "GET", "/api/settings", Some(&master), None).await;
+    assert_eq!(reread["loan_reminders"], true);
+    assert_eq!(reread["lead_days"], 7);
+    assert_eq!(reread["due_subject"], "Bring back {title}!");
+    assert!(
+        reread["overdue_subject"]
+            .as_str()
+            .unwrap()
+            .contains("{title}"),
+        "the ones left alone keep their stock wording"
+    );
+}
+
+#[tokio::test]
+async fn a_nonsense_lead_time_is_refused() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    for days in [-1, 400] {
+        let (status, _) = call(
+            &app,
+            "PUT",
+            "/api/settings",
+            Some(&master),
+            Some(json!({"lead_days": days})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{days} days");
+    }
+}
+
+#[tokio::test]
+async fn a_loan_can_opt_out_on_its_own() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({"book_id": book, "location": "Shelf"})),
+    )
+    .await;
+    let copy = "c-1";
+
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/loans/l1",
+        Some(&master),
+        Some(json!({
+            "copy_id": copy,
+            "borrower": "Ana",
+            "loaned_at": "2026-08-01 10:00:00",
+            "due_at": "2026-08-29 10:00:00",
+            "borrower_contact": "ana@example.test",
+            "remind": false,
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["remind"], false);
+
+    // A bare list without a cursor, an envelope with one — see `loans::list`.
+    let (_, listed) = call(&app, "GET", "/api/loans", Some(&master), None).await;
+    assert_eq!(listed.as_array().unwrap()[0]["remind"], false);
+}
+
+#[tokio::test]
+async fn a_loan_reminds_unless_told_not_to() {
+    // An older client sends no opinion, and reminders are off server-wide
+    // until switched on — so defaulting to yes cannot surprise anybody.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({"book_id": book, "location": "Shelf"})),
+    )
+    .await;
+    let copy = "c-1";
+
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/loans/l1",
+        Some(&master),
+        Some(json!({
+            "copy_id": copy,
+            "borrower": "Ana",
+            "loaned_at": "2026-08-01 10:00:00",
+        })),
+    )
+    .await;
+    assert_eq!(body["remind"], true);
+}
+
+#[tokio::test]
+async fn a_sweep_with_no_mailer_sends_nothing_and_says_so() {
+    let app = test_app().await;
+    let master = register_master(&app).await;
+
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/settings/loan-reminders/run",
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["sent"], 0);
+}

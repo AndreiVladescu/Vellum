@@ -993,6 +993,7 @@ class VellumServerClient {
     String? borrowerContact,
     String? notes,
     DateTime? reminderSentAt,
+    bool remind = true,
   }) async {
     final res = await _http.put(
       _uri('/api/loans/$id'),
@@ -1010,6 +1011,7 @@ class VellumServerClient {
         'borrower_contact': borrowerContact,
         'notes': notes,
         'reminder_sent_at': formatServerTime(reminderSentAt),
+        'remind': remind,
       }),
     );
     _body(res);
@@ -1791,6 +1793,7 @@ class ServerLoan {
     this.borrowerContact,
     this.notes,
     this.reminderSentAt,
+    this.remind = true,
   });
 
   final String id;
@@ -1806,6 +1809,11 @@ class ServerLoan {
   final String? notes;
   final DateTime? reminderSentAt;
 
+  /// Whether this loan sends due-date reminders. An older server sends nothing
+  /// and means yes — reminders are off server-wide until switched on, so the
+  /// default cannot surprise anybody.
+  final bool remind;
+
   factory ServerLoan.fromJson(Map<String, dynamic> j) => ServerLoan(
     id: j['id'] as String,
     copyId: j['copy_id'] as String,
@@ -1816,6 +1824,7 @@ class ServerLoan {
     borrowerContact: j['borrower_contact'] as String?,
     notes: j['notes'] as String?,
     reminderSentAt: ServerBook._parseServerTime(j['reminder_sent_at'] as String?),
+    remind: j['remind'] != false && j['remind'] != 0,
     updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
   );
 }

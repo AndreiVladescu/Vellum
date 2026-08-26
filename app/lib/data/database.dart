@@ -290,6 +290,16 @@ class Loans extends Table {
   /// Free text — a phone number, an email, "Ana from book club".
   TextColumn get borrowerContact => text().nullable()();
   TextColumn get notes => text().nullable()();
+  /// Whether this loan may send the borrower a due-date reminder by email
+  /// (server migration 0037).
+  ///
+  /// True unless someone says otherwise for this loan in particular: a book
+  /// lent across the kitchen table needs no email, and turning it off for one
+  /// arrangement must not turn it off for the rest. It is the loan's own
+  /// switch — the server-wide one, and the mailer that has to exist at all,
+  /// are the console's.
+  BoolColumn get remind => boolean().withDefault(const Constant(true))();
+
   /// When a due reminder was last raised, so it isn't raised twice.
   DateTimeColumn get reminderSentAt => dateTime().nullable()();
 
@@ -732,7 +742,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 37;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1031,6 +1041,15 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 37) {
+            // The per-loan reminder switch (server migration 0037). Defaults
+            // true, which is what every existing loan should say: reminders
+            // are off server-wide until switched on, so this cannot surprise
+            // anyone on upgrade.
+            if (!(await columnsOf('loans')).contains('remind')) {
+              await m.addColumn(loans, loans.remind);
             }
           }
           if (from < 36) {

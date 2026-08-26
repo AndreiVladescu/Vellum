@@ -29,16 +29,25 @@ pub struct LoanDto {
     pub borrower_contact: Option<String>,
     pub notes: Option<String>,
     pub reminder_sent_at: Option<String>,
+    /// Whether this loan may send due-date reminders (migration 0037). True
+    /// unless someone said otherwise for this loan in particular — a book lent
+    /// across the kitchen table needs no email.
+    #[serde(default = "yes")]
+    pub remind: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 const LOAN_COLUMNS: &str = "id, copy_id, borrower, loaned_at, returned_at, updated_at, \
-     due_at, borrower_contact, notes, reminder_sent_at";
+     due_at, borrower_contact, notes, reminder_sent_at, remind";
 
 /// The same list qualified with `l.`, for the list query — which joins
 /// `physical_copy`, and that table has a `notes` column too, so an unqualified
 /// list is ambiguous SQL (caught immediately by the loan tests).
 const LOAN_COLUMNS_ALIASED: &str = "l.id, l.copy_id, l.borrower, l.loaned_at, l.returned_at, \
-     l.updated_at, l.due_at, l.borrower_contact, l.notes, l.reminder_sent_at";
+     l.updated_at, l.due_at, l.borrower_contact, l.notes, l.reminder_sent_at, l.remind";
 
 #[derive(Deserialize)]
 pub struct LoanInput {
@@ -67,6 +76,12 @@ pub struct LoanInput {
     pub notes: Option<String>,
     #[serde(default)]
     pub reminder_sent_at: Option<String>,
+    /// Whether this loan sends due-date reminders. Absent means yes, which is
+    /// what an older client sending no opinion should mean: reminders are off
+    /// server-wide until switched on, so the default here cannot surprise
+    /// anybody.
+    #[serde(default = "yes")]
+    pub remind: bool,
 }
 
 /// Loans of copies the caller can see, joined through `access_predicate()` on
@@ -272,9 +287,13 @@ pub async fn upsert(
         }
     }
 
+    // Whether the arrangement itself changed, which is what makes an already
+    // sent reminder stale — see the delete below.
+    let mut due_changed = !is_update;
     // No-op guard, same reasoning as physical_copies::upsert.
     if is_update {
         let current = fetch_loan(&state, &id).await?.0;
+        due_changed = current.due_at != input.due_at;
         let tombstoned: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM deletion WHERE entity_id = ? AND kind = 'loan')",
         )
@@ -290,6 +309,7 @@ pub async fn upsert(
             && current.borrower_contact == input.borrower_contact
             && current.notes == input.notes
             && current.reminder_sent_at == input.reminder_sent_at
+            && current.remind == input.remind
             && !tombstoned
         {
             return Ok(Json(current));
@@ -301,7 +321,7 @@ pub async fn upsert(
         sqlx::query(
             "UPDATE loan SET borrower = ?, returned_at = ?, due_at = ?, \
                 borrower_contact = ?, notes = ?, reminder_sent_at = ?, \
-                updated_at = datetime('now') \
+                remind = ?, updated_at = datetime('now') \
              WHERE id = ?",
         )
         .bind(input.borrower.trim())
@@ -310,14 +330,15 @@ pub async fn upsert(
         .bind(&input.borrower_contact)
         .bind(&input.notes)
         .bind(&input.reminder_sent_at)
+        .bind(input.remind)
         .bind(&id)
         .execute(&mut *tx)
         .await?;
     } else {
         sqlx::query(
             "INSERT INTO loan (id, copy_id, borrower, loaned_at, returned_at, \
-                due_at, borrower_contact, notes, reminder_sent_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                due_at, borrower_contact, notes, reminder_sent_at, remind) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(&input.copy_id)
@@ -328,8 +349,19 @@ pub async fn upsert(
         .bind(&input.borrower_contact)
         .bind(&input.notes)
         .bind(&input.reminder_sent_at)
+        .bind(input.remind)
         .execute(&mut *tx)
         .await?;
+    }
+    // A due date that moved is a different arrangement: whatever was already
+    // said about the old one should be sayable about the new. Clearing the
+    // record here is the whole reason reminders are rows rather than a counter
+    // (migration 0037).
+    if due_changed {
+        sqlx::query("DELETE FROM loan_reminder WHERE loan_id = ?")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
     }
     sqlx::query("DELETE FROM deletion WHERE entity_id = ? AND kind = 'loan'")
         .bind(&id)

@@ -263,6 +263,13 @@ async fn main() -> anyhow::Result<()> {
         tokio::spawn(vellum_server::run_text_worker(state.clone()));
     }
 
+    // Loan reminders (migration 0037). Started unconditionally: the sweep
+    // itself checks whether there is a mailer and whether the owner has
+    // switched reminders on, so a server with neither spends one query an hour
+    // finding that out — and the day someone switches it on, it works without
+    // a restart.
+    tokio::spawn(vellum_server::run_reminder_worker(state.clone()));
+
     let port: u16 = std::env::var("VELLUM_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
