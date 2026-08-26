@@ -285,6 +285,11 @@ class LibraryRepository {
       writes.setReaderNotes(bookId, notes);
   bool canRevert(Book book) => writes.canRevert(book);
   Future<void> revertToDefault(Book book) => writes.revertToDefault(book);
+  /// One file by its id, or null if it has gone.
+  Future<BookFile?> fileById(String id) =>
+      (db.select(db.bookFiles)..where((f) => f.id.equals(id)))
+          .getSingleOrNull();
+
   Future<void> saveReadingPosition(String bookId, int page, int pageCount) =>
       writes.saveReadingPosition(bookId, page, pageCount);
   Future<void> saveEpubPosition(

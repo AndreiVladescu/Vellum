@@ -44,12 +44,17 @@ class ReaderPage extends StatefulWidget {
     super.key,
     required this.book,
     required this.file,
+    this.bookFile,
     required this.repository,
     this.initialPage,
   });
 
   final Book book;
   final File file;
+
+  /// The library row behind [file], when the caller has it. Null from an older
+  /// call site, in which case the position is only recorded against the book.
+  final BookFile? bookFile;
   final LibraryRepository repository;
 
   /// Open here instead of where you left off — how a content-search hit jumps
@@ -362,6 +367,19 @@ class _ReaderPageState extends State<ReaderPage>
     // Fire-and-forget; tiny row update, safe to do per page turn.
     widget.repository.saveReadingPosition(
         widget.book.id, page, _controller.pageCount);
+    final bookFile = widget.bookFile;
+    if (bookFile != null) {
+      // And against this file, so a PDF and an EPUB of the same book keep
+      // their places apart (8/25 request).
+      widget.repository.readingPositions.saveFilePosition(
+        fileId: bookFile.id,
+        bookId: widget.book.id,
+        progress: _controller.pageCount == 0
+            ? 0
+            : page / _controller.pageCount,
+        page: page,
+      );
+    }
     _session.begin(widget.book.id, page: page).then((_) {
       _session.touch(page: page);
     });

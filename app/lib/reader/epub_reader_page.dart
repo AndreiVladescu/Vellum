@@ -68,11 +68,15 @@ class EpubReaderPage extends StatefulWidget {
     super.key,
     required this.book,
     required this.file,
+    this.bookFile,
     required this.repository,
   });
 
   final Book book;
   final File file;
+
+  /// The library row behind [file] — see [ReaderPage.bookFile].
+  final BookFile? bookFile;
   final LibraryRepository repository;
 
   @override
@@ -724,7 +728,24 @@ class _EpubReaderPageState extends State<EpubReaderPage>
         chapterCount: _count,
         scrollFraction: _scrollFraction,
       );
+      _saveFilePosition(_count, _scrollFraction);
     });
+  }
+
+  /// The same position, against this *file* — so an EPUB and a PDF of one book
+  /// keep their places apart (8/25 request).
+  void _saveFilePosition(int count, double scrollFraction) {
+    final bookFile = widget.bookFile;
+    if (bookFile == null || count == 0) return;
+    widget.repository.readingPositions.saveFilePosition(
+      fileId: bookFile.id,
+      bookId: widget.book.id,
+      progress: ((_chapter + scrollFraction.clamp(0, 1)) / count)
+          .clamp(0, 1)
+          .toDouble(),
+      page: _chapter + 1,
+      scroll: scrollFraction,
+    );
   }
 
   /// One screenful forward, rolling into the next chapter at the end.
@@ -788,6 +809,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
       chapterCount: count,
       scrollFraction: 0,
     );
+    _saveFilePosition(count, 0);
   }
 
   /// Restore the saved in-chapter scroll after the first layout: the global

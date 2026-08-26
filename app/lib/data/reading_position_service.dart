@@ -9,6 +9,25 @@ import 'database.dart';
 String readingUnitForFormats(Iterable<String> formats) =>
     formats.contains('pdf') ? 'page' : 'chapter';
 
+/// Another *file* of the same book is further along — the PDF when you are
+/// opening the EPUB, say. Produced by
+/// [ReadingPositionService.offerFromAnotherFile].
+class FileJumpOffer {
+  const FileJumpOffer({
+    required this.progress,
+    required this.page,
+    required this.fromFileId,
+  });
+
+  /// How far through the other file you were, 0..1.
+  final double progress;
+
+  /// That fraction of *this* file — the page or chapter the offer names.
+  final int page;
+
+  final String fromFileId;
+}
+
 /// Another device is further along in a book than this one, by enough to be
 /// worth offering to jump. Produced by [ReadingPositionService.offerFor].
 class ReadingJumpOffer {
@@ -133,6 +152,78 @@ class ReadingPositionService {
 
   /// Books whose position still needs publishing: dirty *and* actually opened
   /// at least once (an unread book has no position to publish).
+  /// Where you are in one file, or null if it has not been opened yet.
+  Future<FilePosition?> positionOf(String fileId) =>
+      (db.select(db.filePositions)..where((p) => p.fileId.equals(fileId)))
+          .getSingleOrNull();
+
+  /// Every file of a book that has a place in it, newest first — what the Read
+  /// button lists.
+  Future<List<FilePosition>> positionsForBook(String bookId) =>
+      (db.select(db.filePositions)
+            ..where((p) => p.bookId.equals(bookId))
+            ..orderBy([(p) => OrderingTerm.desc(p.lastReadAt)]))
+          .get();
+
+  /// Records where you are in [fileId].
+  ///
+  /// The book row is written too, because that is what the shelf, the Continue
+  /// row and the statistics have always read — so "where I am in this book"
+  /// means "where I am in the one I read last", which is what a reader means
+  /// by it.
+  Future<void> saveFilePosition({
+    required String fileId,
+    required String bookId,
+    required double progress,
+    required int page,
+    double? scroll,
+  }) async {
+    final now = DateTime.now();
+    await db.into(db.filePositions).insertOnConflictUpdate(
+          FilePositionsCompanion.insert(
+            fileId: fileId,
+            bookId: bookId,
+            progress: Value(progress),
+            lastReadPage: Value(page),
+            scroll: Value(scroll),
+            lastReadAt: Value(now),
+          ),
+        );
+  }
+
+  /// Whether another *file* of the same book is further along, and by enough to
+  /// be worth offering.
+  ///
+  /// Deliberately an offer rather than a jump: a translation and a first
+  /// edition do not share a page number, and the percentage is a guess about
+  /// where the same passage falls. A guess is a fine thing to offer and a
+  /// terrible thing to apply — which is why this returns what to *say*, and the
+  /// caller asks.
+  Future<FileJumpOffer?> offerFromAnotherFile({
+    required String bookId,
+    required String openingFileId,
+    required int pageCount,
+  }) async {
+    if (pageCount <= 0) return null;
+    final here = await positionOf(openingFileId);
+    // Somewhere already in this file: it knows better than any translation of
+    // another file's percentage.
+    if ((here?.progress ?? 0) > 0.001) return null;
+    final others = [
+      for (final p in await positionsForBook(bookId))
+        if (p.fileId != openingFileId && (p.progress ?? 0) > 0.02) p,
+    ];
+    if (others.isEmpty) return null;
+    final best = others.first;
+    final progress = best.progress!;
+    if (progress >= 0.995) return null;
+    return FileJumpOffer(
+      progress: progress,
+      page: (progress * pageCount).round().clamp(1, pageCount),
+      fromFileId: best.fileId,
+    );
+  }
+
   Future<List<Book>> booksNeedingProgressPush() => (db.select(db.books)
         ..where((b) => b.needsProgressPush.equals(true) & b.readingProgress.isNotNull()))
       .get();

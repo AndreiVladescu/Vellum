@@ -60,6 +60,80 @@ class ReadButton extends StatelessWidget {
     if (jump == true) await positions.applyOffer(book.id, offer);
   }
 
+  /// Opens one file, and asks first whether to start where the *other* file
+  /// left off (8/25 request).
+  ///
+  /// Asked, never applied: a translation and a first edition do not share a
+  /// page number, so the percentage is a guess about where the same passage
+  /// falls. A guess is a fine thing to offer and a terrible thing to apply.
+  Future<void> _openFile(BuildContext context, BookFile file) async {
+    final navigator = Navigator.of(context);
+    final unit = readingUnitForFormats([file.format]);
+    await _maybeOfferJump(context, unit);
+    await repository.readingStatus.noteOpened(book.id);
+    if (!context.mounted) return;
+
+    final current = await repository.watchBook(book.id).first ?? book;
+    // The count this file turns in: a PDF's pages are not known until it is
+    // open, so the offer is made against the book's own page count where there
+    // is one, and skipped where there is not.
+    final pageCount = file.format == 'pdf' ? (current.pageCount ?? 0) : 0;
+    var startAt = 0;
+    if (pageCount > 0 && context.mounted) {
+      final offer = await repository.readingPositions.offerFromAnotherFile(
+        bookId: book.id,
+        openingFileId: file.id,
+        pageCount: pageCount,
+      );
+      if (offer != null && context.mounted) {
+        final other = await repository.fileById(offer.fromFileId);
+        if (!context.mounted) return;
+        final take = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Start where you left off?'),
+            content: Text(
+              'You were ${(offer.progress * 100).round()}% through '
+              '${other == null ? 'another file' : 'the ${other.format.toUpperCase()}'}'
+              ' of this book.\n\nThat is about page ${offer.page} here — '
+              'the same fraction of a different file, so it may not be the '
+              'same passage.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Start at the beginning'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text('Go to page ${offer.page}'),
+              ),
+            ],
+          ),
+        );
+        if (take == true) startAt = offer.page;
+      }
+    }
+    if (!context.mounted) return;
+
+    await navigator.push(MaterialPageRoute(
+      builder: (_) => file.format == 'pdf'
+          ? ReaderPage(
+              book: current,
+              file: repository.fileOf(file),
+              bookFile: file,
+              repository: repository,
+              initialPage: startAt > 0 ? startAt : null,
+            )
+          : EpubReaderPage(
+              book: current,
+              file: repository.fileOf(file),
+              bookFile: file,
+              repository: repository,
+            ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<BookFile>>(
@@ -101,41 +175,94 @@ class ReadButton extends StatelessWidget {
     required String label,
   }) {
     final started = book.readingProgress != null;
+    final readable = [
+      for (final file in files)
+        if (file.format == 'pdf' || file.format == 'epub') file,
+    ];
+    // One readable file is a button. Several is a choice — and it has to be
+    // offered, because before this the PDF simply won and the EPUB could not
+    // be opened at all (8/25 report).
+    if (readable.length > 1) {
+      return _FilePickerButton(
+        book: book,
+        repository: repository,
+        files: readable,
+        label: label,
+        started: started,
+        onOpen: (file) => _openFile(context, file),
+      );
+    }
     return FilledButton.icon(
-          onPressed: pdf == null && epub == null
-              ? null
-              : () async {
-                  final navigator = Navigator.of(context);
-                  // The jump prompt needs the context, so it goes first; the
-                  // status write is fire-and-forget either way.
-                  await _maybeOfferJump(context, unit);
-                  // The one automatic status transition (plan 5 #18):
-                  // unread -> reading. Unambiguous and reversible; everything
-                  // else is the reader's own call.
-                  await repository.readingStatus.noteOpened(book.id);
-                  // An accepted jump wrote to the book row, so re-read it:
-                  // `book` is the snapshot this widget was built with.
-                  final current =
-                      await repository.watchBook(book.id).first ?? book;
-                  await navigator.push(
-                    MaterialPageRoute(
-                      builder: (_) => pdf != null
-                          ? ReaderPage(
-                              book: current,
-                              file: repository.fileOf(pdf),
-                              repository: repository,
-                            )
-                          : EpubReaderPage(
-                              book: current,
-                              file: repository.fileOf(epub!),
-                              repository: repository,
-                            ),
-                    ),
-                  );
-                },
-          icon: Icon(started ? Icons.play_arrow : Icons.menu_book),
-          label: Text(files.isEmpty ? 'Read (no digital copy yet)' : label),
+      onPressed: readable.isEmpty
+          ? null
+          : () => _openFile(context, readable.single),
+      icon: Icon(started ? Icons.play_arrow : Icons.menu_book),
+      label: Text(files.isEmpty ? 'Read (no digital copy yet)' : label),
+    );
+  }
+}
+
+/// The Read button for a book that has more than one file: a menu of them,
+/// each with its own place in it.
+class _FilePickerButton extends StatelessWidget {
+  const _FilePickerButton({
+    required this.book,
+    required this.repository,
+    required this.files,
+    required this.label,
+    required this.started,
+    required this.onOpen,
+  });
+
+  final Book book;
+  final LibraryRepository repository;
+  final List<BookFile> files;
+  final String label;
+  final bool started;
+  final void Function(BookFile file) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<FilePosition>>(
+      future: repository.readingPositions.positionsForBook(book.id),
+      builder: (context, snapshot) {
+        final places = {
+          for (final position in snapshot.data ?? const <FilePosition>[])
+            position.fileId: position,
+        };
+        return MenuAnchor(
+          menuChildren: [
+            for (final file in files)
+              MenuItemButton(
+                leadingIcon: Icon(file.format == 'pdf'
+                    ? Icons.picture_as_pdf_outlined
+                    : Icons.menu_book_outlined),
+                onPressed: () => onOpen(file),
+                child: Text(_describe(file, places[file.id])),
+              ),
+          ],
+          builder: (context, controller, child) => FilledButton.icon(
+            onPressed: () =>
+                controller.isOpen ? controller.close() : controller.open(),
+            icon: Icon(started ? Icons.play_arrow : Icons.menu_book),
+            label: Text(label),
+          ),
         );
+      },
+    );
+  }
+
+  /// "PDF · page 214 (38%)", or "EPUB · not started". Its own place, not the
+  /// book's: that is the whole point of listing them separately.
+  static String _describe(BookFile file, FilePosition? position) {
+    final format = file.format.toUpperCase();
+    final progress = position?.progress;
+    if (progress == null || position?.lastReadPage == null) {
+      return '$format · not started';
+    }
+    final unit = file.format == 'pdf' ? 'page' : 'chapter';
+    return '$format · $unit ${position!.lastReadPage} '
+        '(${(progress * 100).round()}%)';
   }
 }
 

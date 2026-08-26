@@ -212,6 +212,43 @@ class BookFiles extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Where you are in one *file*, as opposed to in the book (8/25 request: "if I
+/// have an epub and pdf, how can I open each, and how do they sync with each
+/// other on page count?").
+///
+/// A book can hold a PDF and an EPUB, two editions, or a translation — and page
+/// 214 of one is not page 214 of another. So each file keeps its own place, and
+/// [Books.readingProgress] mirrors whichever you read last, which is what the
+/// shelf, the Continue row and the statistics have always meant by "where you
+/// are in this book".
+///
+/// **App-local by design**, like [Books.sourceMetadata]: the cross-device
+/// channel (`reading_progress`, server migration 0011) is per *book* and
+/// per device, and splitting it per file would mean matching files across
+/// devices by hash — which the server does keep, but which is a bigger change
+/// than this is worth. So two devices still exchange one position per book;
+/// this is what keeps two files' places apart on the device you read them on.
+@DataClassName('FilePosition')
+class FilePositions extends Table {
+  TextColumn get fileId => text().references(BookFiles, #id)();
+  TextColumn get bookId => text().references(Books, #id)();
+
+  /// 0..1 through this file, the format-agnostic key an offer is made from.
+  RealColumn get progress => real().nullable()();
+
+  /// 1-based, and counted in whatever this file's reader turns: PDF pages, or
+  /// EPUB chapters.
+  IntColumn get lastReadPage => integer().nullable()();
+
+  /// In-page or in-chapter fraction, so an EPUB resumes mid-chapter.
+  RealColumn get scroll => real().nullable()();
+
+  DateTimeColumn get lastReadAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {fileId};
+}
+
 @DataClassName('PhysicalCopy')
 class PhysicalCopies extends Table {
   TextColumn get id => text()();
@@ -674,6 +711,7 @@ class BookTexts extends Table {
   Genres,
   BookGenres,
   BookFiles,
+  FilePositions,
   PhysicalCopies,
   Loans,
   CopyPhotos,
@@ -694,7 +732,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 35;
+  int get schemaVersion => 36;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -993,6 +1031,15 @@ class VellumDatabase extends _$VellumDatabase {
               if (!photoCols.contains(name)) {
                 await m.addColumn(copyPhotos, column);
               }
+            }
+          }
+          if (from < 36) {
+            // Where you are in each *file* (8/25 request). Nothing to
+            // backfill: the book's own position is still the headline, and a
+            // file with no row here has simply not been opened since the
+            // upgrade — which is the honest answer.
+            if (!(await tableNames()).contains('file_positions')) {
+              await m.createTable(filePositions);
             }
           }
           if (from < 35) {

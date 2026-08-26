@@ -3476,6 +3476,442 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
   }
 }
 
+class $FilePositionsTable extends FilePositions
+    with TableInfo<$FilePositionsTable, FilePosition> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FilePositionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _fileIdMeta = const VerificationMeta('fileId');
+  @override
+  late final GeneratedColumn<String> fileId = GeneratedColumn<String>(
+    'file_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES book_files (id)',
+    ),
+  );
+  static const VerificationMeta _bookIdMeta = const VerificationMeta('bookId');
+  @override
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES books (id)',
+    ),
+  );
+  static const VerificationMeta _progressMeta = const VerificationMeta(
+    'progress',
+  );
+  @override
+  late final GeneratedColumn<double> progress = GeneratedColumn<double>(
+    'progress',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastReadPageMeta = const VerificationMeta(
+    'lastReadPage',
+  );
+  @override
+  late final GeneratedColumn<int> lastReadPage = GeneratedColumn<int>(
+    'last_read_page',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _scrollMeta = const VerificationMeta('scroll');
+  @override
+  late final GeneratedColumn<double> scroll = GeneratedColumn<double>(
+    'scroll',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastReadAtMeta = const VerificationMeta(
+    'lastReadAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastReadAt = GeneratedColumn<DateTime>(
+    'last_read_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    fileId,
+    bookId,
+    progress,
+    lastReadPage,
+    scroll,
+    lastReadAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'file_positions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FilePosition> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('file_id')) {
+      context.handle(
+        _fileIdMeta,
+        fileId.isAcceptableOrUnknown(data['file_id']!, _fileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileIdMeta);
+    }
+    if (data.containsKey('book_id')) {
+      context.handle(
+        _bookIdMeta,
+        bookId.isAcceptableOrUnknown(data['book_id']!, _bookIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookIdMeta);
+    }
+    if (data.containsKey('progress')) {
+      context.handle(
+        _progressMeta,
+        progress.isAcceptableOrUnknown(data['progress']!, _progressMeta),
+      );
+    }
+    if (data.containsKey('last_read_page')) {
+      context.handle(
+        _lastReadPageMeta,
+        lastReadPage.isAcceptableOrUnknown(
+          data['last_read_page']!,
+          _lastReadPageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('scroll')) {
+      context.handle(
+        _scrollMeta,
+        scroll.isAcceptableOrUnknown(data['scroll']!, _scrollMeta),
+      );
+    }
+    if (data.containsKey('last_read_at')) {
+      context.handle(
+        _lastReadAtMeta,
+        lastReadAt.isAcceptableOrUnknown(
+          data['last_read_at']!,
+          _lastReadAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {fileId};
+  @override
+  FilePosition map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FilePosition(
+      fileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      progress: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}progress'],
+      ),
+      lastReadPage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_read_page'],
+      ),
+      scroll: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}scroll'],
+      ),
+      lastReadAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_read_at'],
+      ),
+    );
+  }
+
+  @override
+  $FilePositionsTable createAlias(String alias) {
+    return $FilePositionsTable(attachedDatabase, alias);
+  }
+}
+
+class FilePosition extends DataClass implements Insertable<FilePosition> {
+  final String fileId;
+  final String bookId;
+
+  /// 0..1 through this file, the format-agnostic key an offer is made from.
+  final double? progress;
+
+  /// 1-based, and counted in whatever this file's reader turns: PDF pages, or
+  /// EPUB chapters.
+  final int? lastReadPage;
+
+  /// In-page or in-chapter fraction, so an EPUB resumes mid-chapter.
+  final double? scroll;
+  final DateTime? lastReadAt;
+  const FilePosition({
+    required this.fileId,
+    required this.bookId,
+    this.progress,
+    this.lastReadPage,
+    this.scroll,
+    this.lastReadAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['file_id'] = Variable<String>(fileId);
+    map['book_id'] = Variable<String>(bookId);
+    if (!nullToAbsent || progress != null) {
+      map['progress'] = Variable<double>(progress);
+    }
+    if (!nullToAbsent || lastReadPage != null) {
+      map['last_read_page'] = Variable<int>(lastReadPage);
+    }
+    if (!nullToAbsent || scroll != null) {
+      map['scroll'] = Variable<double>(scroll);
+    }
+    if (!nullToAbsent || lastReadAt != null) {
+      map['last_read_at'] = Variable<DateTime>(lastReadAt);
+    }
+    return map;
+  }
+
+  FilePositionsCompanion toCompanion(bool nullToAbsent) {
+    return FilePositionsCompanion(
+      fileId: Value(fileId),
+      bookId: Value(bookId),
+      progress: progress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(progress),
+      lastReadPage: lastReadPage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReadPage),
+      scroll: scroll == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scroll),
+      lastReadAt: lastReadAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReadAt),
+    );
+  }
+
+  factory FilePosition.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FilePosition(
+      fileId: serializer.fromJson<String>(json['fileId']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      progress: serializer.fromJson<double?>(json['progress']),
+      lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
+      scroll: serializer.fromJson<double?>(json['scroll']),
+      lastReadAt: serializer.fromJson<DateTime?>(json['lastReadAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'fileId': serializer.toJson<String>(fileId),
+      'bookId': serializer.toJson<String>(bookId),
+      'progress': serializer.toJson<double?>(progress),
+      'lastReadPage': serializer.toJson<int?>(lastReadPage),
+      'scroll': serializer.toJson<double?>(scroll),
+      'lastReadAt': serializer.toJson<DateTime?>(lastReadAt),
+    };
+  }
+
+  FilePosition copyWith({
+    String? fileId,
+    String? bookId,
+    Value<double?> progress = const Value.absent(),
+    Value<int?> lastReadPage = const Value.absent(),
+    Value<double?> scroll = const Value.absent(),
+    Value<DateTime?> lastReadAt = const Value.absent(),
+  }) => FilePosition(
+    fileId: fileId ?? this.fileId,
+    bookId: bookId ?? this.bookId,
+    progress: progress.present ? progress.value : this.progress,
+    lastReadPage: lastReadPage.present ? lastReadPage.value : this.lastReadPage,
+    scroll: scroll.present ? scroll.value : this.scroll,
+    lastReadAt: lastReadAt.present ? lastReadAt.value : this.lastReadAt,
+  );
+  FilePosition copyWithCompanion(FilePositionsCompanion data) {
+    return FilePosition(
+      fileId: data.fileId.present ? data.fileId.value : this.fileId,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      progress: data.progress.present ? data.progress.value : this.progress,
+      lastReadPage: data.lastReadPage.present
+          ? data.lastReadPage.value
+          : this.lastReadPage,
+      scroll: data.scroll.present ? data.scroll.value : this.scroll,
+      lastReadAt: data.lastReadAt.present
+          ? data.lastReadAt.value
+          : this.lastReadAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FilePosition(')
+          ..write('fileId: $fileId, ')
+          ..write('bookId: $bookId, ')
+          ..write('progress: $progress, ')
+          ..write('lastReadPage: $lastReadPage, ')
+          ..write('scroll: $scroll, ')
+          ..write('lastReadAt: $lastReadAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(fileId, bookId, progress, lastReadPage, scroll, lastReadAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FilePosition &&
+          other.fileId == this.fileId &&
+          other.bookId == this.bookId &&
+          other.progress == this.progress &&
+          other.lastReadPage == this.lastReadPage &&
+          other.scroll == this.scroll &&
+          other.lastReadAt == this.lastReadAt);
+}
+
+class FilePositionsCompanion extends UpdateCompanion<FilePosition> {
+  final Value<String> fileId;
+  final Value<String> bookId;
+  final Value<double?> progress;
+  final Value<int?> lastReadPage;
+  final Value<double?> scroll;
+  final Value<DateTime?> lastReadAt;
+  final Value<int> rowid;
+  const FilePositionsCompanion({
+    this.fileId = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.progress = const Value.absent(),
+    this.lastReadPage = const Value.absent(),
+    this.scroll = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FilePositionsCompanion.insert({
+    required String fileId,
+    required String bookId,
+    this.progress = const Value.absent(),
+    this.lastReadPage = const Value.absent(),
+    this.scroll = const Value.absent(),
+    this.lastReadAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : fileId = Value(fileId),
+       bookId = Value(bookId);
+  static Insertable<FilePosition> custom({
+    Expression<String>? fileId,
+    Expression<String>? bookId,
+    Expression<double>? progress,
+    Expression<int>? lastReadPage,
+    Expression<double>? scroll,
+    Expression<DateTime>? lastReadAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (fileId != null) 'file_id': fileId,
+      if (bookId != null) 'book_id': bookId,
+      if (progress != null) 'progress': progress,
+      if (lastReadPage != null) 'last_read_page': lastReadPage,
+      if (scroll != null) 'scroll': scroll,
+      if (lastReadAt != null) 'last_read_at': lastReadAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FilePositionsCompanion copyWith({
+    Value<String>? fileId,
+    Value<String>? bookId,
+    Value<double?>? progress,
+    Value<int?>? lastReadPage,
+    Value<double?>? scroll,
+    Value<DateTime?>? lastReadAt,
+    Value<int>? rowid,
+  }) {
+    return FilePositionsCompanion(
+      fileId: fileId ?? this.fileId,
+      bookId: bookId ?? this.bookId,
+      progress: progress ?? this.progress,
+      lastReadPage: lastReadPage ?? this.lastReadPage,
+      scroll: scroll ?? this.scroll,
+      lastReadAt: lastReadAt ?? this.lastReadAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (fileId.present) {
+      map['file_id'] = Variable<String>(fileId.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (progress.present) {
+      map['progress'] = Variable<double>(progress.value);
+    }
+    if (lastReadPage.present) {
+      map['last_read_page'] = Variable<int>(lastReadPage.value);
+    }
+    if (scroll.present) {
+      map['scroll'] = Variable<double>(scroll.value);
+    }
+    if (lastReadAt.present) {
+      map['last_read_at'] = Variable<DateTime>(lastReadAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FilePositionsCompanion(')
+          ..write('fileId: $fileId, ')
+          ..write('bookId: $bookId, ')
+          ..write('progress: $progress, ')
+          ..write('lastReadPage: $lastReadPage, ')
+          ..write('scroll: $scroll, ')
+          ..write('lastReadAt: $lastReadAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $PhysicalCopiesTable extends PhysicalCopies
     with TableInfo<$PhysicalCopiesTable, PhysicalCopy> {
   @override
@@ -11079,6 +11515,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
   late final $GenresTable genres = $GenresTable(this);
   late final $BookGenresTable bookGenres = $BookGenresTable(this);
   late final $BookFilesTable bookFiles = $BookFilesTable(this);
+  late final $FilePositionsTable filePositions = $FilePositionsTable(this);
   late final $PhysicalCopiesTable physicalCopies = $PhysicalCopiesTable(this);
   late final $LoansTable loans = $LoansTable(this);
   late final $CopyPhotosTable copyPhotos = $CopyPhotosTable(this);
@@ -11111,6 +11548,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     genres,
     bookGenres,
     bookFiles,
+    filePositions,
     physicalCopies,
     loans,
     copyPhotos,
@@ -11508,6 +11946,24 @@ final class $$BooksTableReferences
     );
   }
 
+  static MultiTypedResultKey<$FilePositionsTable, List<FilePosition>>
+  _filePositionsRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
+    db.filePositions,
+    aliasName: 'books__id__file_positions__book_id',
+  );
+
+  $$FilePositionsTableProcessedTableManager get filePositionsRefs {
+    final manager = $$FilePositionsTableTableManager(
+      $_db,
+      $_db.filePositions,
+    ).filter((f) => f.bookId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_filePositionsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$PhysicalCopiesTable, List<PhysicalCopy>>
   _physicalCopiesRefsTable(_$VellumDatabase db) =>
       MultiTypedResultKey.fromTable(
@@ -11866,6 +12322,31 @@ class $$BooksTableFilterComposer
           }) => $$BookFilesTableFilterComposer(
             $db: $db,
             $table: $db.bookFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> filePositionsRefs(
+    Expression<bool> Function($$FilePositionsTableFilterComposer f) f,
+  ) {
+    final $$FilePositionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.filePositions,
+      getReferencedColumn: (t) => t.bookId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FilePositionsTableFilterComposer(
+            $db: $db,
+            $table: $db.filePositions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -12437,6 +12918,31 @@ class $$BooksTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> filePositionsRefs<T extends Object>(
+    Expression<T> Function($$FilePositionsTableAnnotationComposer a) f,
+  ) {
+    final $$FilePositionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.filePositions,
+      getReferencedColumn: (t) => t.bookId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FilePositionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.filePositions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> physicalCopiesRefs<T extends Object>(
     Expression<T> Function($$PhysicalCopiesTableAnnotationComposer a) f,
   ) {
@@ -12581,6 +13087,7 @@ class $$BooksTableTableManager
             bool bookAuthorsRefs,
             bool bookGenresRefs,
             bool bookFilesRefs,
+            bool filePositionsRefs,
             bool physicalCopiesRefs,
             bool shelfBooksRefs,
             bool annotationsRefs,
@@ -12759,6 +13266,7 @@ class $$BooksTableTableManager
                 bookAuthorsRefs = false,
                 bookGenresRefs = false,
                 bookFilesRefs = false,
+                filePositionsRefs = false,
                 physicalCopiesRefs = false,
                 shelfBooksRefs = false,
                 annotationsRefs = false,
@@ -12771,6 +13279,7 @@ class $$BooksTableTableManager
                     if (bookAuthorsRefs) db.bookAuthors,
                     if (bookGenresRefs) db.bookGenres,
                     if (bookFilesRefs) db.bookFiles,
+                    if (filePositionsRefs) db.filePositions,
                     if (physicalCopiesRefs) db.physicalCopies,
                     if (shelfBooksRefs) db.shelfBooks,
                     if (annotationsRefs) db.annotations,
@@ -12860,6 +13369,27 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).bookFilesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.bookId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (filePositionsRefs)
+                        await $_getPrefetchedData<
+                          Book,
+                          $BooksTable,
+                          FilePosition
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BooksTableReferences
+                              ._filePositionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BooksTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).filePositionsRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.bookId == item.id,
@@ -12988,6 +13518,7 @@ typedef $$BooksTableProcessedTableManager =
         bool bookAuthorsRefs,
         bool bookGenresRefs,
         bool bookFilesRefs,
+        bool filePositionsRefs,
         bool physicalCopiesRefs,
         bool shelfBooksRefs,
         bool annotationsRefs,
@@ -14211,6 +14742,24 @@ final class $$BookFilesTableReferences
     );
   }
 
+  static MultiTypedResultKey<$FilePositionsTable, List<FilePosition>>
+  _filePositionsRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
+    db.filePositions,
+    aliasName: 'book_files__id__file_positions__file_id',
+  );
+
+  $$FilePositionsTableProcessedTableManager get filePositionsRefs {
+    final manager = $$FilePositionsTableTableManager(
+      $_db,
+      $_db.filePositions,
+    ).filter((f) => f.fileId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_filePositionsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$BookTextsTable, List<BookText>>
   _bookTextsRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
     db.bookTexts,
@@ -14290,6 +14839,31 @@ class $$BookFilesTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> filePositionsRefs(
+    Expression<bool> Function($$FilePositionsTableFilterComposer f) f,
+  ) {
+    final $$FilePositionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.filePositions,
+      getReferencedColumn: (t) => t.fileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FilePositionsTableFilterComposer(
+            $db: $db,
+            $table: $db.filePositions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 
   Expression<bool> bookTextsRefs(
@@ -14431,6 +15005,31 @@ class $$BookFilesTableAnnotationComposer
     return composer;
   }
 
+  Expression<T> filePositionsRefs<T extends Object>(
+    Expression<T> Function($$FilePositionsTableAnnotationComposer a) f,
+  ) {
+    final $$FilePositionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.filePositions,
+      getReferencedColumn: (t) => t.fileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FilePositionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.filePositions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> bookTextsRefs<T extends Object>(
     Expression<T> Function($$BookTextsTableAnnotationComposer a) f,
   ) {
@@ -14470,7 +15069,11 @@ class $$BookFilesTableTableManager
           $$BookFilesTableUpdateCompanionBuilder,
           (BookFile, $$BookFilesTableReferences),
           BookFile,
-          PrefetchHooks Function({bool bookId, bool bookTextsRefs})
+          PrefetchHooks Function({
+            bool bookId,
+            bool filePositionsRefs,
+            bool bookTextsRefs,
+          })
         > {
   $$BookFilesTableTableManager(_$VellumDatabase db, $BookFilesTable table)
     : super(
@@ -14531,67 +15134,98 @@ class $$BookFilesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({bookId = false, bookTextsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (bookTextsRefs) db.bookTexts],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$BookFilesTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn: $$BookFilesTableReferences
-                                    ._bookIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                bookId = false,
+                filePositionsRefs = false,
+                bookTextsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (filePositionsRefs) db.filePositions,
+                    if (bookTextsRefs) db.bookTexts,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (bookId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.bookId,
+                                    referencedTable: $$BookFilesTableReferences
+                                        ._bookIdTable(db),
+                                    referencedColumn: $$BookFilesTableReferences
+                                        ._bookIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (filePositionsRefs)
+                        await $_getPrefetchedData<
+                          BookFile,
+                          $BookFilesTable,
+                          FilePosition
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BookFilesTableReferences
+                              ._filePositionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BookFilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).filePositionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.fileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (bookTextsRefs)
+                        await $_getPrefetchedData<
+                          BookFile,
+                          $BookFilesTable,
+                          BookText
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BookFilesTableReferences
+                              ._bookTextsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BookFilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bookTextsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.fileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (bookTextsRefs)
-                    await $_getPrefetchedData<
-                      BookFile,
-                      $BookFilesTable,
-                      BookText
-                    >(
-                      currentTable: table,
-                      referencedTable: $$BookFilesTableReferences
-                          ._bookTextsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$BookFilesTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).bookTextsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.fileId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -14608,7 +15242,444 @@ typedef $$BookFilesTableProcessedTableManager =
       $$BookFilesTableUpdateCompanionBuilder,
       (BookFile, $$BookFilesTableReferences),
       BookFile,
-      PrefetchHooks Function({bool bookId, bool bookTextsRefs})
+      PrefetchHooks Function({
+        bool bookId,
+        bool filePositionsRefs,
+        bool bookTextsRefs,
+      })
+    >;
+typedef $$FilePositionsTableCreateCompanionBuilder =
+    FilePositionsCompanion Function({
+      required String fileId,
+      required String bookId,
+      Value<double?> progress,
+      Value<int?> lastReadPage,
+      Value<double?> scroll,
+      Value<DateTime?> lastReadAt,
+      Value<int> rowid,
+    });
+typedef $$FilePositionsTableUpdateCompanionBuilder =
+    FilePositionsCompanion Function({
+      Value<String> fileId,
+      Value<String> bookId,
+      Value<double?> progress,
+      Value<int?> lastReadPage,
+      Value<double?> scroll,
+      Value<DateTime?> lastReadAt,
+      Value<int> rowid,
+    });
+
+final class $$FilePositionsTableReferences
+    extends
+        BaseReferences<_$VellumDatabase, $FilePositionsTable, FilePosition> {
+  $$FilePositionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $BookFilesTable _fileIdTable(_$VellumDatabase db) =>
+      db.bookFiles.createAlias('file_positions__file_id__book_files__id');
+
+  $$BookFilesTableProcessedTableManager get fileId {
+    final $_column = $_itemColumn<String>('file_id')!;
+
+    final manager = $$BookFilesTableTableManager(
+      $_db,
+      $_db.bookFiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_fileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $BooksTable _bookIdTable(_$VellumDatabase db) =>
+      db.books.createAlias('file_positions__book_id__books__id');
+
+  $$BooksTableProcessedTableManager get bookId {
+    final $_column = $_itemColumn<String>('book_id')!;
+
+    final manager = $$BooksTableTableManager(
+      $_db,
+      $_db.books,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_bookIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$FilePositionsTableFilterComposer
+    extends Composer<_$VellumDatabase, $FilePositionsTable> {
+  $$FilePositionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<double> get progress => $composableBuilder(
+    column: $table.progress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastReadPage => $composableBuilder(
+    column: $table.lastReadPage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get scroll => $composableBuilder(
+    column: $table.scroll,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$BookFilesTableFilterComposer get fileId {
+    final $$BookFilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fileId,
+      referencedTable: $db.bookFiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookFilesTableFilterComposer(
+            $db: $db,
+            $table: $db.bookFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BooksTableFilterComposer get bookId {
+    final $$BooksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.bookId,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableFilterComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$FilePositionsTableOrderingComposer
+    extends Composer<_$VellumDatabase, $FilePositionsTable> {
+  $$FilePositionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<double> get progress => $composableBuilder(
+    column: $table.progress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastReadPage => $composableBuilder(
+    column: $table.lastReadPage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get scroll => $composableBuilder(
+    column: $table.scroll,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$BookFilesTableOrderingComposer get fileId {
+    final $$BookFilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fileId,
+      referencedTable: $db.bookFiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookFilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.bookFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BooksTableOrderingComposer get bookId {
+    final $$BooksTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.bookId,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableOrderingComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$FilePositionsTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $FilePositionsTable> {
+  $$FilePositionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<double> get progress =>
+      $composableBuilder(column: $table.progress, builder: (column) => column);
+
+  GeneratedColumn<int> get lastReadPage => $composableBuilder(
+    column: $table.lastReadPage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get scroll =>
+      $composableBuilder(column: $table.scroll, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastReadAt => $composableBuilder(
+    column: $table.lastReadAt,
+    builder: (column) => column,
+  );
+
+  $$BookFilesTableAnnotationComposer get fileId {
+    final $$BookFilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fileId,
+      referencedTable: $db.bookFiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookFilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bookFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BooksTableAnnotationComposer get bookId {
+    final $$BooksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.bookId,
+      referencedTable: $db.books,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BooksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.books,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$FilePositionsTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $FilePositionsTable,
+          FilePosition,
+          $$FilePositionsTableFilterComposer,
+          $$FilePositionsTableOrderingComposer,
+          $$FilePositionsTableAnnotationComposer,
+          $$FilePositionsTableCreateCompanionBuilder,
+          $$FilePositionsTableUpdateCompanionBuilder,
+          (FilePosition, $$FilePositionsTableReferences),
+          FilePosition,
+          PrefetchHooks Function({bool fileId, bool bookId})
+        > {
+  $$FilePositionsTableTableManager(
+    _$VellumDatabase db,
+    $FilePositionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FilePositionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FilePositionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FilePositionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> fileId = const Value.absent(),
+                Value<String> bookId = const Value.absent(),
+                Value<double?> progress = const Value.absent(),
+                Value<int?> lastReadPage = const Value.absent(),
+                Value<double?> scroll = const Value.absent(),
+                Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FilePositionsCompanion(
+                fileId: fileId,
+                bookId: bookId,
+                progress: progress,
+                lastReadPage: lastReadPage,
+                scroll: scroll,
+                lastReadAt: lastReadAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String fileId,
+                required String bookId,
+                Value<double?> progress = const Value.absent(),
+                Value<int?> lastReadPage = const Value.absent(),
+                Value<double?> scroll = const Value.absent(),
+                Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FilePositionsCompanion.insert(
+                fileId: fileId,
+                bookId: bookId,
+                progress: progress,
+                lastReadPage: lastReadPage,
+                scroll: scroll,
+                lastReadAt: lastReadAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$FilePositionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({fileId = false, bookId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (fileId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.fileId,
+                                referencedTable: $$FilePositionsTableReferences
+                                    ._fileIdTable(db),
+                                referencedColumn: $$FilePositionsTableReferences
+                                    ._fileIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+                    if (bookId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.bookId,
+                                referencedTable: $$FilePositionsTableReferences
+                                    ._bookIdTable(db),
+                                referencedColumn: $$FilePositionsTableReferences
+                                    ._bookIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$FilePositionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $FilePositionsTable,
+      FilePosition,
+      $$FilePositionsTableFilterComposer,
+      $$FilePositionsTableOrderingComposer,
+      $$FilePositionsTableAnnotationComposer,
+      $$FilePositionsTableCreateCompanionBuilder,
+      $$FilePositionsTableUpdateCompanionBuilder,
+      (FilePosition, $$FilePositionsTableReferences),
+      FilePosition,
+      PrefetchHooks Function({bool fileId, bool bookId})
     >;
 typedef $$PhysicalCopiesTableCreateCompanionBuilder =
     PhysicalCopiesCompanion Function({
@@ -20589,6 +21660,8 @@ class $VellumDatabaseManager {
       $$BookGenresTableTableManager(_db, _db.bookGenres);
   $$BookFilesTableTableManager get bookFiles =>
       $$BookFilesTableTableManager(_db, _db.bookFiles);
+  $$FilePositionsTableTableManager get filePositions =>
+      $$FilePositionsTableTableManager(_db, _db.filePositions);
   $$PhysicalCopiesTableTableManager get physicalCopies =>
       $$PhysicalCopiesTableTableManager(_db, _db.physicalCopies);
   $$LoansTableTableManager get loans =>
