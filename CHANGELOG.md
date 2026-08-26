@@ -6,6 +6,52 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.9 — 2026-08-26
+
+Opening either file of a book that has two, reminding a borrower a book is
+due, and three things about how the page moves under your finger.
+
+**Upgrade the server too** for the loan reminders: the switch, the wording and
+the per-loan opt-out all need migration 0037. The app is ready for it either
+way — a 1.1.9 app against an older server simply has a switch nothing acts on.
+
+### Added
+
+- **A book with a PDF *and* an EPUB can open either.** Before this the PDF
+  always won and the EPUB could not be reached at all. The Read button becomes
+  a menu, each file listed with its own place in it — "PDF · page 214 (38%)",
+  "EPUB · not started" — because page 214 of one edition is not page 214 of a
+  translation.
+- **And it offers to carry your place across.** Opening a file you have not
+  started, when another is halfway through, asks whether to go to the same
+  fraction of this one — in either direction, PDF to EPUB or back. Offered and
+  never applied, and it says plainly that the same fraction of a different file
+  may not be the same passage.
+- **A borrower can be emailed when a book is due.** One a few days before, one
+  on the day, one when it goes late, and then silence — each sent once, so a
+  restart cannot repeat them. Off until you switch it on in the console, where
+  the lead time and all three messages live; the messages are templates, so
+  `{title}`, `{borrower}`, `{due_date}`, `{loaned_date}`, `{days}` and
+  `{library}` are yours to arrange. A single loan can opt out when you lend it
+  — a book handed across the kitchen table needs no email — and a server with
+  no mail configured says so rather than offering a switch that does nothing.
+
+### Fixed
+
+- **Swiping to turn a page no longer shifts it first.** In page-by-page mode at
+  its resting zoom the page is already shown as it is meant to be seen, so a
+  drag had nothing to reveal and the little lurch before the turn read as a
+  glitch. Zooming is untouched, and a page you have zoomed into still pans.
+- **Panning sideways stops where the paper does.** Zoomed in, you could go on
+  dragging long after the page had run out, leaving background on both sides —
+  pdfrx's own limit is the *document*, which is laid out with margins, not the
+  page.
+- **The self-scroller goes down to a page every five minutes**, and its steps
+  at the slow end are a tenth rather than a quarter: dense text needs somewhere
+  to sit down there, not a cliff onto the floor.
+
+---
+
 ## v1.1.8 — 2026-08-24
 
 Picking up what you wrote, looking a wanted book up by its ISBN, and the
