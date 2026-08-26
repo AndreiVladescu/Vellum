@@ -141,6 +141,58 @@ void main() {
       expect(offer.page, greaterThanOrEqualTo(1));
     });
 
+    test('the offer works in both directions', () async {
+      // The reported case is opening the EPUB after reading the PDF, so that
+      // direction has to work as well as the other — the chapter count comes
+      // from the file itself, not from the book's paper page count.
+      final positions = repo.readingPositions;
+      await positions.saveFilePosition(
+          fileId: 'f-epub', bookId: 'b1', progress: 0.5, page: 12);
+
+      final offer = await positions.offerFromAnotherFile(
+        bookId: 'b1',
+        openingFileId: 'f-pdf',
+        pageCount: 560,
+      );
+
+      expect(offer!.fromFileId, 'f-epub');
+      expect(offer.page, 280, reason: 'half of five hundred and sixty');
+    });
+
+    test('the file read most recently is the one carried over', () async {
+      final positions = repo.readingPositions;
+      await db.into(db.bookFiles).insert(BookFilesCompanion.insert(
+            id: 'f-old',
+            bookId: 'b1',
+            format: 'pdf',
+            path: 'files/f-old',
+            sizeBytes: 1,
+            sha256: 'f-old',
+          ));
+      await positions.saveFilePosition(
+          fileId: 'f-old',
+          bookId: 'b1',
+          progress: 0.9,
+          page: 500,
+          at: DateTime(2026, 3, 1));
+      await positions.saveFilePosition(
+          fileId: 'f-pdf',
+          bookId: 'b1',
+          progress: 0.2,
+          page: 112,
+          at: DateTime(2026, 8, 25));
+
+      final offer = await positions.offerFromAnotherFile(
+        bookId: 'b1',
+        openingFileId: 'f-epub',
+        pageCount: 24,
+      );
+
+      expect(offer!.fromFileId, 'f-pdf',
+          reason: 'where you were last night, not the edition you abandoned '
+              'in the spring');
+    });
+
     test('a book of one file has nothing to offer', () async {
       await repo.readingPositions.saveFilePosition(
           fileId: 'f-pdf', bookId: 'b1', progress: 0.38, page: 214);

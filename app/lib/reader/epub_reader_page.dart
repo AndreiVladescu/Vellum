@@ -69,6 +69,7 @@ class EpubReaderPage extends StatefulWidget {
     required this.book,
     required this.file,
     this.bookFile,
+    this.initialChapter,
     required this.repository,
   });
 
@@ -77,6 +78,11 @@ class EpubReaderPage extends StatefulWidget {
 
   /// The library row behind [file] — see [ReaderPage.bookFile].
   final BookFile? bookFile;
+
+  /// Open here rather than where this file was left off — how an accepted
+  /// carry-over from the book's *other* file arrives (see `ReadButton`). The
+  /// saved position is left alone until the reader records a new one.
+  final int? initialChapter;
   final LibraryRepository repository;
 
   @override
@@ -875,11 +881,12 @@ class _EpubReaderPageState extends State<EpubReaderPage>
         if (!_restored) {
           // Saved position is 1-based (like PDF pages); clamp for safety.
           _restored = true;
-          _chapter = epubPositionFrom(
-            progress: widget.book.readingProgress,
-            lastReadPage: widget.book.lastReadPage,
-            chapterCount: count,
-          ).chapter;
+          _chapter = widget.initialChapter?.clamp(0, count - 1) ??
+              epubPositionFrom(
+                progress: widget.book.readingProgress,
+                lastReadPage: widget.book.lastReadPage,
+                chapterCount: count,
+              ).chapter;
           // Restore the in-chapter scroll once this chapter has laid out.
           _restoreScroll(count);
           _refreshBookmark();

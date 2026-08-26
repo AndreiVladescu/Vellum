@@ -177,8 +177,13 @@ class ReadingPositionService {
     required double progress,
     required int page,
     double? scroll,
+    DateTime? at,
   }) async {
-    final now = DateTime.now();
+    // Drift stores a `dateTime` as whole Unix seconds, so two files read
+    // inside one second are a genuine tie for "most recent" — which is why
+    // this takes the moment rather than only reading the clock: a test that
+    // wants an order has to be able to state one.
+    final now = at ?? DateTime.now();
     await db.into(db.filePositions).insertOnConflictUpdate(
           FilePositionsCompanion.insert(
             fileId: fileId,

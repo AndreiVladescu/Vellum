@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/external_open.dart';
 import '../data/library_repository.dart';
+import '../reader/epub_book.dart';
 import '../reader/epub_reader_page.dart';
 import '../reader/reader_page.dart';
 
@@ -60,6 +63,22 @@ class ReadButton extends StatelessWidget {
     if (jump == true) await positions.applyOffer(book.id, offer);
   }
 
+  /// How many chapters an EPUB has, or 0 if it cannot be read.
+  ///
+  /// Opened here rather than taken from the book row because `pageCount` is the
+  /// *paper* book's length — a number from a catalogue, and nothing to do with
+  /// how this file is divided.
+  static Future<int> _chapterCount(File file) async {
+    try {
+      final epub = await EpubBook.open(file);
+      return epub.chapters.length;
+    } catch (_) {
+      // A file that will not open has no offer to make; the reader itself
+      // says so a moment later.
+      return 0;
+    }
+  }
+
   /// Opens one file, and asks first whether to start where the *other* file
   /// left off (8/25 request).
   ///
@@ -74,10 +93,12 @@ class ReadButton extends StatelessWidget {
     if (!context.mounted) return;
 
     final current = await repository.watchBook(book.id).first ?? book;
-    // The count this file turns in: a PDF's pages are not known until it is
-    // open, so the offer is made against the book's own page count where there
-    // is one, and skipped where there is not.
-    final pageCount = file.format == 'pdf' ? (current.pageCount ?? 0) : 0;
+    // What this file turns in: a PDF's pages, or an EPUB's chapters. The
+    // chapter count means opening the EPUB after reading the PDF gets the same
+    // offer as the other way round — which is the case that prompted this.
+    final pageCount = file.format == 'pdf'
+        ? (current.pageCount ?? 0)
+        : await _chapterCount(repository.fileOf(file));
     var startAt = 0;
     if (pageCount > 0 && context.mounted) {
       final offer = await repository.readingPositions.offerFromAnotherFile(
@@ -106,7 +127,9 @@ class ReadButton extends StatelessWidget {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text('Go to page ${offer.page}'),
+                child: Text('Go to '
+                    '${file.format == 'pdf' ? 'page' : 'chapter'} '
+                    '${offer.page}'),
               ),
             ],
           ),
@@ -130,6 +153,7 @@ class ReadButton extends StatelessWidget {
               file: repository.fileOf(file),
               bookFile: file,
               repository: repository,
+              initialChapter: startAt > 0 ? startAt - 1 : null,
             ),
     ));
   }

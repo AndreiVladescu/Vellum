@@ -32,12 +32,7 @@ pub struct LoanDto {
     /// Whether this loan may send due-date reminders (migration 0037). True
     /// unless someone said otherwise for this loan in particular — a book lent
     /// across the kitchen table needs no email.
-    #[serde(default = "yes")]
     pub remind: bool,
-}
-
-fn yes() -> bool {
-    true
 }
 
 const LOAN_COLUMNS: &str = "id, copy_id, borrower, loaned_at, returned_at, updated_at, \
@@ -76,12 +71,16 @@ pub struct LoanInput {
     pub notes: Option<String>,
     #[serde(default)]
     pub reminder_sent_at: Option<String>,
-    /// Whether this loan sends due-date reminders. Absent means yes, which is
-    /// what an older client sending no opinion should mean: reminders are off
-    /// server-wide until switched on, so the default here cannot surprise
-    /// anybody.
-    #[serde(default = "yes")]
-    pub remind: bool,
+    /// Whether this loan sends due-date reminders.
+    ///
+    /// **Absent means "nothing to say", not "yes"** — the same rule this
+    /// struct's `updated_at` follows. A client from before migration 0037
+    /// sends no opinion, and reading that as yes let an ordinary edit from an
+    /// old device switch reminders back on for a loan somebody had switched
+    /// them off for, on every device. A new loan with no opinion still gets
+    /// the column default, which is on.
+    #[serde(default)]
+    pub remind: Option<bool>,
 }
 
 /// Loans of copies the caller can see, joined through `access_predicate()` on
@@ -309,7 +308,7 @@ pub async fn upsert(
             && current.borrower_contact == input.borrower_contact
             && current.notes == input.notes
             && current.reminder_sent_at == input.reminder_sent_at
-            && current.remind == input.remind
+            && input.remind.is_none_or(|remind| current.remind == remind)
             && !tombstoned
         {
             return Ok(Json(current));
@@ -321,7 +320,7 @@ pub async fn upsert(
         sqlx::query(
             "UPDATE loan SET borrower = ?, returned_at = ?, due_at = ?, \
                 borrower_contact = ?, notes = ?, reminder_sent_at = ?, \
-                remind = ?, updated_at = datetime('now') \
+                remind = COALESCE(?, remind), updated_at = datetime('now') \
              WHERE id = ?",
         )
         .bind(input.borrower.trim())
@@ -338,7 +337,7 @@ pub async fn upsert(
         sqlx::query(
             "INSERT INTO loan (id, copy_id, borrower, loaned_at, returned_at, \
                 due_at, borrower_contact, notes, reminder_sent_at, remind) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 1))",
         )
         .bind(&id)
         .bind(&input.copy_id)

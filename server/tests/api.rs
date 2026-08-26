@@ -5473,3 +5473,86 @@ async fn a_sweep_with_no_mailer_sends_nothing_and_says_so() {
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["sent"], 0);
 }
+
+#[tokio::test]
+async fn an_older_client_cannot_switch_reminders_back_on() {
+    // A device from before migration 0037 sends no `remind` at all. Reading
+    // that as "yes" meant an ordinary loan edit — renaming the borrower —
+    // silently undid somebody's decision not to email their friend, and the
+    // next pull carried it to every device.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({"book_id": book, "location": "Shelf"})),
+    )
+    .await;
+    call(
+        &app,
+        "PUT",
+        "/api/loans/l1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1",
+            "borrower": "Ana",
+            "loaned_at": "2026-08-01 10:00:00",
+            "remind": false,
+        })),
+    )
+    .await;
+
+    let (_, after) = call(
+        &app,
+        "PUT",
+        "/api/loans/l1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1",
+            "borrower": "Ana Popescu",
+            "loaned_at": "2026-08-01 10:00:00",
+        })),
+    )
+    .await;
+
+    assert_eq!(after["remind"], false, "silence is not consent");
+    assert_eq!(
+        after["borrower"], "Ana Popescu",
+        "and the edit still landed"
+    );
+}
+
+#[tokio::test]
+async fn a_new_loan_from_an_older_client_still_reminds() {
+    // The other half: absent on a *new* loan takes the column default, which
+    // is on — and reminders are off server-wide until switched on, so that
+    // cannot surprise anybody.
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+    call(
+        &app,
+        "PUT",
+        "/api/copies/c-1",
+        Some(&master),
+        Some(json!({"book_id": book, "location": "Shelf"})),
+    )
+    .await;
+
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/loans/l1",
+        Some(&master),
+        Some(json!({
+            "copy_id": "c-1",
+            "borrower": "Ana",
+            "loaned_at": "2026-08-01 10:00:00",
+        })),
+    )
+    .await;
+    assert_eq!(body["remind"], true);
+}
