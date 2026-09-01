@@ -33,7 +33,7 @@ image = { version = "0.25", default-features = false, features = [
 ] }
 # Pure-Rust zip reader, to pull an EPUB's declared cover image out of its
 # archive (an EPUB is a zip) without shelling out. Read-only, deflate + stored.
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
 # TLS for the sync server (opt-in via VELLUM_TLS). ring backend everywhere to
 # avoid the aws-lc-rs C/cmake build and keep one crypto provider.
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
@@ -60,4 +60,4 @@ tower = { version = "0.5", features = ["util"] }
 # Building a real (tiny) PDF fixture for the content-index tests, rather than
 # committing a binary blob nobody can read the provenance of.
 lopdf = "0.44.0"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
