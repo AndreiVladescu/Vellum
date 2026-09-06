@@ -152,6 +152,27 @@ void main() {
     expect(roundAutoScrollSpeed(0.7777), 0.78);
   });
 
+  group('telling a slow tick from a stuck one', () {
+    test('a tick that moved as much as it asked for is not stuck', () {
+      expect(autoScrollFrameStuck(attempted: 0.03, actual: 0.03), isFalse);
+    });
+
+    test('a tiny but proportionate move at the slow end is not stuck', () {
+      // The regression (8/29 report): 0.2 pages/min on a page drawn small on
+      // a phone can genuinely move under a twentieth of a pixel a tick.
+      expect(autoScrollFrameStuck(attempted: 0.029, actual: 0.029), isFalse);
+    });
+
+    test('near-zero movement against a real request is stuck', () {
+      expect(autoScrollFrameStuck(attempted: 3.0, actual: 0.001), isTrue);
+    });
+
+    test('nothing was asked for, so nothing can be stuck', () {
+      expect(autoScrollFrameStuck(attempted: 0, actual: 0), isFalse);
+      expect(autoScrollFrameStuck(attempted: -1, actual: 0), isFalse);
+    });
+  });
+
   test('the defaults are inside their own limits', () {
     expect(defaultAutoScrollPagesPerMinute,
         inInclusiveRange(minAutoScrollPagesPerMinute,

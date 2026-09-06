@@ -86,6 +86,24 @@ String autoScrollSpeedLabel(double speed, String unit) {
 /// bounce, short enough that the scroller does not sit buzzing at the last page.
 const autoScrollStuckFrames = 30;
 
+/// Whether one tick's movement means the document has actually run out,
+/// rather than the tick merely being a slow one.
+///
+/// Judged against how far the tick *asked* to move, not a fixed pixel amount.
+/// A fixed threshold (0.05px) worked while the floor was a page every two
+/// minutes, but at a page every five — the new floor, dense text needs it —
+/// a single 1/60s tick can legitimately move under a twentieth of a pixel on
+/// a page drawn small on screen, and every one of those was being counted as
+/// stuck: pressing play auto-stopped it within half a second (8/29 report).
+/// Worse on a phone than a tablet, since fit-to-width zoom draws the same
+/// page smaller on a narrower screen. Genuinely clamped movement is ~0
+/// regardless of what was asked for, so a ratio tells the two apart where a
+/// constant cannot.
+bool autoScrollFrameStuck({required double attempted, required double actual}) {
+  if (attempted <= 0) return false;
+  return actual < attempted * 0.2;
+}
+
 /// Rounds a speed for storage, so the persisted value cannot drift by floating
 /// point across sessions.
 double roundAutoScrollSpeed(double speed) => (speed * 100).round() / 100;

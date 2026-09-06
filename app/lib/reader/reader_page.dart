@@ -582,8 +582,11 @@ class _ReaderPageState extends State<ReaderPage>
     final after = _controller.value.row1[3];
     _autoY = after;
     // The clamp refuses to move past the last page, so a run of frames that
-    // went nowhere is the end of the document.
-    if ((after - before).abs() < 0.05) {
+    // went nowhere is the end of the document — "went nowhere" judged against
+    // what this frame asked for, not a fixed pixel amount (see
+    // autoScrollFrameStuck: a fixed amount mistook the slowest speed for the
+    // end of the document within half a second of pressing play).
+    if (autoScrollFrameStuck(attempted: speed * seconds, actual: (after - before).abs())) {
       if (++_autoStuckFrames >= autoScrollStuckFrames) _stopAutoScroll();
     } else {
       _autoStuckFrames = 0;

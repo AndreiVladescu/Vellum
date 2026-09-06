@@ -199,7 +199,11 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final target =
         (before + speed * seconds).clamp(0.0, position.maxScrollExtent);
     _scroll.jumpTo(target);
-    if ((target - before).abs() < 0.05) {
+    // Judged against what this tick asked for, not a fixed pixel amount — see
+    // autoScrollFrameStuck. At the slowest speed a tick can legitimately move
+    // under a twentieth of a pixel, which a fixed threshold mistook for the
+    // bottom of the chapter.
+    if (autoScrollFrameStuck(attempted: speed * seconds, actual: (target - before).abs())) {
       // The bottom of the chapter. Roll into the next one rather than stopping
       // dead at every chapter break — the same reasoning as [_pageForward].
       if (++_autoStuckFrames >= autoScrollStuckFrames) {
