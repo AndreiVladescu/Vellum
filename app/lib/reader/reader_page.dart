@@ -1305,6 +1305,18 @@ class _ReaderPageState extends State<ReaderPage>
         !_penMode) {
       return controller.value;
     }
+    // While the pinch is actively changing the zoom, trust pdfrx's own
+    // focal-point-preserving matrix outright rather than reclamping it every
+    // frame. `clampToPage` centres an axis the page no longer overflows — right
+    // for a *settled* pan, where there is genuinely nothing left to slide onto,
+    // but a page zoomed from fit up through "now it overflows" spends its early
+    // frames exactly in that regime, so reclamping there fights the gesture:
+    // the zoom kept re-centring instead of staying under your fingers, and
+    // `nearestPage` flipping between neighbours as the forced centre crossed a
+    // seam is what made the page hop back and forth (8/30 report). It settles
+    // back into bounds on its own the moment the zoom stops changing, on the
+    // very next frame this hook sees.
+    if ((zoom - controller.currentZoom).abs() > 1e-6) return matrix;
     final centre = matrix.calcPosition(viewSize);
     final page = layout.pageLayouts[nearestPage(layout.pageLayouts, centre)];
     final clamped = clampToPage(
