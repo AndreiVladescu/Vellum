@@ -16,14 +16,16 @@ ReadingSession _session({
   int? startPage,
   int? endPage,
   String bookId = 'b1',
+  String? deviceLabel,
 }) =>
     ReadingSession(
-      id: 'x${start.microsecondsSinceEpoch}$startPage',
+      id: 'x${start.microsecondsSinceEpoch}$startPage${deviceLabel ?? ''}',
       bookId: bookId,
       startedAt: start,
       endedAt: start.add(length),
       startPage: startPage,
       endPage: endPage,
+      deviceLabel: deviceLabel,
       needsPush: false,
     );
 
@@ -228,6 +230,27 @@ void main() {
       expect(byMonth, hasLength(2));
     });
 
+    test('total pages and total minutes are lifetime sums', () {
+      final sessions = [
+        _session(start: DateTime(2026, 7, 1), startPage: 0, endPage: 20),
+        _session(start: DateTime(2026, 7, 2), startPage: 20, endPage: 45),
+        _session(start: DateTime(2026, 7, 3)), // no page info
+      ];
+      expect(ReadingStats.totalPages(sessions), 45);
+      expect(ReadingStats.totalMinutes(sessions), 90);
+    });
+
+    test('total finished counts across the whole library, not by month', () {
+      expect(
+        ReadingStats.totalFinished([
+          _book(id: 'a', finishedAt: DateTime(2026, 6, 1)),
+          _book(id: 'b', finishedAt: DateTime(2026, 7, 1)),
+          _book(id: 'c'),
+        ]),
+        2,
+      );
+    });
+
     test('the genre split counts finished books, commonest first', () {
       final split = ReadingStats.finishedByGenre(
         books: [
@@ -243,6 +266,121 @@ void main() {
       );
       expect(split.first, (genre: 'Science Fiction', count: 2));
       expect(split.map((s) => s.genre), isNot(contains('History')));
+    });
+
+    test('the format split counts once per format a finished book has', () {
+      final split = ReadingStats.finishedByFormat(
+        books: [
+          _book(id: 'a', finishedAt: DateTime(2026, 6, 1)),
+          _book(id: 'b', finishedAt: DateTime(2026, 6, 2)),
+          _book(id: 'c'), // unfinished — must not count
+        ],
+        formatsByBook: {
+          'a': ['pdf', 'epub'], // kept in both
+          'b': ['epub'],
+        },
+      );
+      expect(split.first, (format: 'epub', count: 2));
+      expect(split.last, (format: 'pdf', count: 1));
+    });
+
+    test('a physical-only finished book has no format and is absent', () {
+      final split = ReadingStats.finishedByFormat(
+        books: [_book(id: 'a', finishedAt: DateTime(2026, 6, 1))],
+        formatsByBook: const {},
+      );
+      expect(split, isEmpty);
+    });
+  });
+
+  group('best day', () {
+    test('the day with the most pages, and how many', () {
+      final best = ReadingStats.bestDay({
+        DateTime(2026, 7, 1): 12,
+        DateTime(2026, 7, 2): 87,
+        DateTime(2026, 7, 3): 40,
+      });
+      expect(best, (day: DateTime(2026, 7, 2), pages: 87));
+    });
+
+    test('nothing measured means no best day', () {
+      expect(ReadingStats.bestDay(const {}), isNull);
+    });
+  });
+
+  group('when and where you read', () {
+    test('minutes fall into the local hour a sitting started in', () {
+      final byHour = ReadingStats.minutesByHour([
+        _session(start: DateTime(2026, 7, 1, 22, 30)),
+        _session(start: DateTime(2026, 7, 2, 22, 45)),
+        _session(start: DateTime(2026, 7, 3, 7)),
+      ]);
+      expect(byHour, hasLength(24));
+      expect(byHour[22], 60, reason: 'two 30-minute sittings starting at 22:xx');
+      expect(byHour[7], 30);
+      expect(byHour[8], 0);
+    });
+
+    test('a sitting with no real duration adds nothing', () {
+      final byHour = ReadingStats.minutesByHour(
+        [_session(start: DateTime(2026, 7, 1, 9), length: Duration.zero)],
+      );
+      expect(byHour.every((m) => m == 0), isTrue);
+    });
+
+    test('minutes per device, most first', () {
+      final byDevice = ReadingStats.minutesByDevice([
+        _session(start: DateTime(2026, 7, 1), deviceLabel: 'Pixel'),
+        _session(
+          start: DateTime(2026, 7, 2),
+          length: const Duration(minutes: 90),
+          deviceLabel: 'Pixel',
+        ),
+        _session(start: DateTime(2026, 7, 3), deviceLabel: 'Desk'),
+      ]);
+      expect(byDevice.first, (device: 'Pixel', minutes: 120));
+      expect(byDevice.last, (device: 'Desk', minutes: 30));
+    });
+
+    test('a sitting synced with no device label is not dropped', () {
+      final byDevice = ReadingStats.minutesByDevice(
+        [_session(start: DateTime(2026, 7, 1))],
+      );
+      expect(byDevice.single.device, 'Unknown device');
+    });
+  });
+
+  group('trailing windows', () {
+    test('sums a trailing window of a day-by-day map', () {
+      final byDay = {
+        DateTime(2026, 7, 8): 10,
+        DateTime(2026, 7, 9): 5,
+        DateTime(2026, 7, 10): 7,
+      };
+      expect(
+        ReadingStats.sumTrailingDays(byDay, days: 3, today: DateTime(2026, 7, 10)),
+        22,
+      );
+    });
+
+    test('the window before that is reached with an offset', () {
+      final byDay = {
+        DateTime(2026, 7, 1): 100, // outside either window
+        DateTime(2026, 7, 5): 8,
+        DateTime(2026, 7, 6): 2,
+        DateTime(2026, 7, 8): 10,
+        DateTime(2026, 7, 9): 5,
+      };
+      final today = DateTime(2026, 7, 9);
+      final thisWeek = ReadingStats.sumTrailingDays(byDay, days: 4, today: today);
+      final lastWeek = ReadingStats.sumTrailingDays(
+        byDay,
+        days: 4,
+        today: today,
+        endOffsetDays: 4,
+      );
+      expect(thisWeek, 17, reason: '7/6 + 7/7(0) + 7/8 + 7/9 = 2+0+10+5');
+      expect(lastWeek, 8, reason: '7/2(0) + 7/3(0) + 7/4(0) + 7/5 = 8');
     });
   });
 

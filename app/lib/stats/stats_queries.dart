@@ -197,4 +197,130 @@ class ReadingStats {
         ),
     ];
   }
+
+  /// Every page ever turned, across every sitting. The lifetime counterpart to
+  /// [pagesPerDay] — same rule (unknown or backwards movement counts as
+  /// nothing), just not broken down by day.
+  static int totalPages(List<ReadingSession> sessions) {
+    var total = 0;
+    for (final s in sessions) {
+      final start = s.startPage;
+      final end = s.endPage;
+      if (start == null || end == null) continue;
+      total += (end - start).clamp(0, 1 << 30);
+    }
+    return total;
+  }
+
+  /// Every minute ever spent reading, across every sitting.
+  static int totalMinutes(List<ReadingSession> sessions) {
+    var total = 0;
+    for (final s in sessions) {
+      final minutes = s.endedAt.difference(s.startedAt).inMinutes;
+      if (minutes > 0) total += minutes;
+    }
+    return total;
+  }
+
+  /// How many books this library has ever marked finished — not per month,
+  /// just the one number a shelf of them adds up to.
+  static int totalFinished(List<Book> books) =>
+      books.where((b) => b.finishedAt != null).length;
+
+  /// The single day with the most pages turned, and how many — a record to
+  /// point at, not a trend to read. Null when nothing has been measured.
+  static ({DateTime day, int pages})? bestDay(Map<DateTime, int> pagesPerDay) {
+    if (pagesPerDay.isEmpty) return null;
+    var bestDate = pagesPerDay.keys.first;
+    var bestPages = pagesPerDay[bestDate]!;
+    for (final entry in pagesPerDay.entries) {
+      if (entry.value > bestPages) {
+        bestDate = entry.key;
+        bestPages = entry.value;
+      }
+    }
+    return (day: bestDate, pages: bestPages);
+  }
+
+  /// Minutes read, bucketed by the local hour a sitting *started* in (0..23) —
+  /// "when do I actually read", which nothing else here answers. A sitting
+  /// that runs past the hour it started in is still counted whole against that
+  /// hour, the same way a day is decided by when a sitting began rather than
+  /// split across midnight.
+  static List<int> minutesByHour(List<ReadingSession> sessions) {
+    final out = List<int>.filled(24, 0);
+    for (final s in sessions) {
+      final minutes = s.endedAt.difference(s.startedAt).inMinutes;
+      if (minutes <= 0) continue;
+      out[s.startedAt.toLocal().hour] += minutes;
+    }
+    return out;
+  }
+
+  /// Minutes read per device, most first — "where do I actually read", the
+  /// reason `ReadingSession.deviceLabel` is recorded at all. A sitting from
+  /// before this device sent a label of itself (or synced from one that never
+  /// will) is folded into one honest "Unknown device" rather than dropped or
+  /// mislabelled.
+  static List<({String device, int minutes})> minutesByDevice(
+    List<ReadingSession> sessions,
+  ) {
+    final totals = <String, int>{};
+    for (final s in sessions) {
+      final minutes = s.endedAt.difference(s.startedAt).inMinutes;
+      if (minutes <= 0) continue;
+      final label = s.deviceLabel?.trim();
+      final key = (label == null || label.isEmpty) ? 'Unknown device' : label;
+      totals[key] = (totals[key] ?? 0) + minutes;
+    }
+    final out = [
+      for (final e in totals.entries) (device: e.key, minutes: e.value),
+    ]..sort((a, b) {
+        final byMinutes = b.minutes.compareTo(a.minutes);
+        return byMinutes != 0 ? byMinutes : a.device.compareTo(b.device);
+      });
+    return out;
+  }
+
+  /// Format split of finished books, commonest first — the same "count once
+  /// per thing it has, not a partition" rule as [finishedByGenre], so a book
+  /// kept as both a PDF and an EPUB counts in both. A physical-only book has
+  /// no format and is silently absent, which is correct: it was never read on
+  /// a screen.
+  static List<({String format, int count})> finishedByFormat({
+    required List<Book> books,
+    required Map<String, List<String>> formatsByBook,
+  }) {
+    final counts = <String, int>{};
+    for (final book in books) {
+      if (book.finishedAt == null) continue;
+      for (final format in formatsByBook[book.id] ?? const <String>[]) {
+        counts[format] = (counts[format] ?? 0) + 1;
+      }
+    }
+    final out = [
+      for (final e in counts.entries) (format: e.key, count: e.value),
+    ]..sort((a, b) {
+        final byCount = b.count.compareTo(a.count);
+        return byCount != 0 ? byCount : a.format.compareTo(b.format);
+      });
+    return out;
+  }
+
+  /// The total over the trailing [days] days up to and including [today] —
+  /// one window of a day-by-day map, for comparing this week to the one before
+  /// it without a whole second query.
+  static int sumTrailingDays(
+    Map<DateTime, int> byDay, {
+    required int days,
+    DateTime? today,
+    int endOffsetDays = 0,
+  }) {
+    final end = dayOf(today ?? DateTime.now());
+    var total = 0;
+    for (var i = 0; i < days; i++) {
+      total += byDay[_addDays(end, -i - endOffsetDays)] ?? 0;
+    }
+    return total;
+  }
 }
