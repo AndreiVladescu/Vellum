@@ -3022,9 +3022,18 @@ async function invitePerson(){
   // with no SMTP, which is the ordinary case here.
   // The link is shown whether or not it was emailed: mail landing in a spam
   // folder used to mean withdrawing the invitation and starting again.
+  //
+  // showPeople() is *not* called here when there is a link: it calls
+  // openPage(), which starts by closing whatever modal is open — so calling
+  // it right after opening the link dialog closed the dialog it had just
+  // shown, the instant that call's own fetch resolved (9/2 report: "it will
+  // show for a moment... but then it will disappear"). showInviteLink()
+  // refreshes the list itself once its dialog is actually dismissed.
   if (res && res.url) showInviteLink(res, name, level);
-  else toast('Invited ' + (name || email) + ' — ' + accessLabel(level) + '.');
-  showPeople();
+  else {
+    toast('Invited ' + (name || email) + ' — ' + accessLabel(level) + '.');
+    showPeople();
+  }
 }
 
 /// The link, when the server has no mail to send it with.
@@ -3044,7 +3053,7 @@ function showInviteLink(res, name, level){
   const who = esc(name || res.email);
   const expires = esc((res.expires_at || '').slice(0, 10));
   document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+   <div class="modal-bg" onclick="if(event.target===this){closeModal();showPeople();}">
     <div class="modal" style="width:min(560px,95vw)">
       <h2 style="margin:0 0 4px">Invitation ready for ${who}</h2>
       <p style="margin:0 0 8px">They will join as
@@ -3059,7 +3068,7 @@ function showInviteLink(res, name, level){
       <input id="inv-url" readonly value="${esc(res.url)}" style="width:100%"
              onclick="this.select()">
       <div class="row" style="justify-content:flex-end; gap:8px; margin-top:12px">
-        <button class="btn" onclick="closeModal()">Done</button>
+        <button class="btn" onclick="closeModal();showPeople()">Done</button>
         <button class="btn primary" data-act="copyurl"
                 data-url="${esc(res.url)}">Copy link</button>
       </div>
