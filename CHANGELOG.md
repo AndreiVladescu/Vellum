@@ -6,6 +6,34 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.10 — 2026-09-20
+
+A fresher reading-insights screen, and three small reader and console
+glitches gone.
+
+### Added
+
+- **The reading insights screen has more to say.** Lifetime totals (pages
+  read, time spent, books finished, this week against last week), a best-day
+  callout, a new "when you read" chart of which hours you actually reach for
+  a book, a "where you read" breakdown once more than one device has logged a
+  sitting, and an "on paper or on screen" format split alongside the existing
+  genre one.
+
+### Fixed
+
+- **Pinch-zooming a paged PDF no longer jumps or recentres itself.** The page
+  was being snapped back to its resting position in the middle of the
+  gesture, fighting the fingers doing the zooming.
+- **A slow self-scroll no longer pauses itself**, especially on a phone: at
+  very low speeds a frame can legitimately move less than a pixel, and the
+  stuck-detector was mistaking that for actually being stuck.
+- **The console's invite-link dialog no longer flashes shut** right after you
+  add a person — the People list was refreshing itself out from under the
+  dialog the instant it opened.
+
+---
+
 ## v1.1.9 — 2026-08-26
 
 Opening either file of a book that has two, reminding a borrower a book is
