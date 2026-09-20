@@ -34,7 +34,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  drift: ^2.34.3
+  drift: ^2.35.0
   drift_flutter: ^0.3.1
   path_provider: ^2.1.6
   http: ^1.6.0
@@ -44,13 +44,13 @@ dependencies:
   file_selector: ^1.1.0
   crypto: ^3.0.7
   pdfrx: ^2.4.7
-  desktop_drop: ^0.7.1
+  desktop_drop: ^0.8.4
   flutter_secure_storage: ^10.3.1
-  pool: ^1.5.1
-  archive: ^4.0.9
+  pool: ^1.5.3
+  archive: ^4.3.0
   xml: ^7.0.1
-  flutter_widget_from_html_core: ^0.17.2
-  share_plus: ^12.0.2
+  flutter_widget_from_html_core: ^0.17.4
+  share_plus: ^13.3.0
   image_picker: ^1.2.3
   qr: ^4.0.0
   cryptography: ^2.9.0
@@ -59,14 +59,14 @@ dependencies:
     sdk: flutter
   intl: ^0.20.2
   home_widget: ^0.9.3
-  workmanager: ^0.9.0+3
+  workmanager: ^0.10.10
   open_filex: ^4.7.0
-  flutter_local_notifications: ^22.3.0
-  google_mlkit_translation: ^0.14.0
-  google_mlkit_language_id: ^0.14.0
+  flutter_local_notifications: ^22.3.1
+  google_mlkit_translation: ^0.15.1
+  google_mlkit_language_id: ^0.15.1
   flutter_zxing: ^2.3.0
-  wakelock_plus: ^1.5.2
-  package_info_plus: ^9.0.1
+  wakelock_plus: ^1.8.0
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   flutter_test:
@@ -79,7 +79,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   drift_dev: ^2.34.5
-  build_runner: ^2.15.0
+  build_runner: ^2.16.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
