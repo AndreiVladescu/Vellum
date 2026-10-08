@@ -255,3 +255,22 @@ pins the query plans, since a dropped index is otherwise invisible until a
 library is big enough to feel it. App-local: the server has its own.
 
 `watchDirtyCount` was checked too and left alone — 1 ms unindexed at 5,000.
+
+### #2 WAL journal for the app database
+
+The app used SQLite's default rollback journal, so every commit paid two fsyncs
+— and a page turn is a commit (the reading position). The server has run WAL
+from the start. 200 single-row position writes on the development disk (ext4,
+NVMe):
+
+| Journal | 200 writes | Per write |
+|---|---|---|
+| Rollback (`DELETE`) | 2,380–2,700 ms | ~12 ms |
+| WAL + `synchronous = NORMAL` | 25–35 ms | ~0.15 ms |
+
+Set in `DriftNativeOptions.setup`, so it applies on the database isolate every
+time the file opens — including Android's background-sync isolate, which is the
+one other writer and the reason for the `busy_timeout`. Backups were already
+WAL-safe (`VACUUM INTO`, and a restore deletes the sidecars).
+`database_location_test.dart` opens the real connection and pins all three
+pragmas.

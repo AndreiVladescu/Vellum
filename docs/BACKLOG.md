@@ -160,7 +160,7 @@ this order.
 - [x] **1. App database indexes.** The app schema has no secondary indexes: the
   shelf's `has_file` check scans `book_files` once per book, on every `books`
   write (every page turn). 393 ms → 20 ms at 5,000 books.
-- [ ] **2. WAL journal for the app database.** Cheaper page-turn writes, reads
+- [x] **2. WAL journal for the app database.** Cheaper page-turn writes, reads
   that don't wait on writers. Restore must clear stale `-wal`/`-shm` files.
 - [ ] **3. Cover thumbnails.** Spines decode full-size covers (up to 1.7 MB PNG
   at 908×1200). Store covers as JPEG, keep a small shelf thumbnail made off the

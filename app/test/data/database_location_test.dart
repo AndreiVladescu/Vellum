@@ -95,4 +95,20 @@ void main() {
 
     expect(File(p.join(fresh.path, 'vellum.sqlite')).existsSync(), isTrue);
   });
+
+  // The real connection, not an in-memory one: the pragmas live in its setup
+  // hook, and a memory database has no journal to put in WAL mode.
+  test('the library opens in WAL mode with NORMAL sync', () async {
+    final db = VellumDatabase();
+    addTearDown(db.close);
+
+    Future<Object?> pragma(String name) async =>
+        (await db.customSelect('PRAGMA $name').getSingle()).data.values.first;
+
+    expect(await pragma('journal_mode'), 'wal');
+    expect(await pragma('synchronous'), 1, reason: '1 = NORMAL');
+    expect(await pragma('busy_timeout'), 5000);
+    expect(moved('').existsSync(), isTrue,
+        reason: 'opened where the location tests above say it lives');
+  });
 }

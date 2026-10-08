@@ -1375,6 +1375,24 @@ class VellumDatabase extends _$VellumDatabase {
           await _relocateLegacyDatabase(dir);
           return dir;
         },
+        // Runs on the database's own isolate, each time it opens the file.
+        //
+        // WAL (performance round #2): a write appends to `vellum.sqlite-wal`
+        // instead of rewriting pages through a rollback journal, so a page
+        // turn's position save costs one sequential append, not two fsyncs —
+        // ~12 ms → ~0.15 ms measured — and reads no longer wait on it. The
+        // server has run this way from the start. `synchronous = NORMAL` is
+        // the standard WAL pairing: a power cut can lose the last commits,
+        // never corrupt the file. The busy timeout covers the one other
+        // writer, Android's background sync, which opens its own connection.
+        //
+        // Backups go through `VACUUM INTO` and a restore deletes the sidecars,
+        // so neither copies the main file without its log.
+        setup: (db) {
+          db.execute('PRAGMA journal_mode = WAL');
+          db.execute('PRAGMA synchronous = NORMAL');
+          db.execute('PRAGMA busy_timeout = 5000');
+        },
       ),
     );
   }
