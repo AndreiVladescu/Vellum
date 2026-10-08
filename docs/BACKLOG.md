@@ -173,7 +173,7 @@ this order.
   fetches every book; ask only about the books being pushed.
 - [x] **6. Concurrent pull.** A no-change sync is ~18 sequential GETs; fetch the
   independent lists together, apply them in foreign-key order.
-- [ ] **7. Gzip on the server's JSON responses.**
+- [x] **7. Gzip on the server's JSON responses.**
 - [ ] **8. Import hashing off the UI isolate.** SHA-256 of every imported file
   runs on the UI isolate, one file at a time; hash in background isolates, in
   parallel. Same for the content indexer's EPUB parse.

@@ -378,3 +378,27 @@ requests in flight at once (10 or more; it was 1). A request that fails before
 the pull reaches it is held until it does, so failures are still reported where
 they were — and a 404 from a server without the personal tables is still read
 as "not supported yet".
+
+### #7 Gzip on JSON responses
+
+The server sent every response uncompressed. `src/gzip.rs` gzips JSON bodies
+over 1 KB when the request accepts it — dart:io sends `Accept-Encoding: gzip`
+and inflates by itself, as browsers do for the console, so the app needed no
+change. Covers and files are left alone: they are compressed already and are
+served with byte ranges. It is the outermost layer, so `request_id` still sees
+error bodies as plain JSON.
+
+| `GET /api/books`, 5,000 books, release build | On the wire |
+|---|---|
+| Before | 4.38 MB |
+| Gzip (`Compression::fast`) | 273 KB |
+
+That is synthetic data, and generous: the development library's real metadata
+compresses **3.3×** (65 KB → 20 KB), since real descriptions differ and hashes
+and ids don't compress. Server time was unchanged on localhost (0.14–0.17 s
+either way). The app's real client was checked against it: it asked for gzip,
+got 273 KB, and parsed all 5,000 books.
+
+A small middleware on `flate2` (already compiled in via `lopdf` and `png`)
+rather than `tower-http`'s `CompressionLayer`, for the same reason
+`observability.rs` gives for its request ids.

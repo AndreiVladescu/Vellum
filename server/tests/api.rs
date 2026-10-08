@@ -4487,6 +4487,68 @@ async fn re_uploading_the_same_cover_changes_nothing() {
     assert_eq!(res.status(), StatusCode::OK, "the old tag no longer matches");
 }
 
+/// A sync's lists are JSON and compress ~20× (performance round #7). Only JSON
+/// is touched, only when asked for, and only past a size worth compressing.
+#[tokio::test]
+async fn json_is_gzipped_when_asked_and_only_json() {
+    use std::io::Read;
+    let app = test_app().await;
+    let master = register_master(&app).await;
+    let mut book = String::new();
+    for i in 0..30 {
+        book = create_book(&app, &master, &format!("A long enough title, number {i}")).await;
+    }
+    let get = |uri: String, gzip: bool| {
+        let mut b = Request::builder()
+            .uri(uri)
+            .header("authorization", format!("Bearer {master}"));
+        if gzip {
+            b = b.header("accept-encoding", "gzip, deflate, br");
+        }
+        b.body(Body::empty()).unwrap()
+    };
+    async fn body(res: axum::response::Response) -> Vec<u8> {
+        axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap().to_vec()
+    }
+
+    let plain = app.clone().oneshot(get("/api/books".into(), false)).await.unwrap();
+    assert!(plain.headers().get("content-encoding").is_none(), "not asked: not gzipped");
+    let plain = body(plain).await;
+
+    let gz = app.clone().oneshot(get("/api/books".into(), true)).await.unwrap();
+    assert_eq!(gz.status(), StatusCode::OK);
+    assert_eq!(gz.headers()["content-encoding"], "gzip");
+    assert!(gz.headers()["vary"].to_str().unwrap().contains("accept-encoding"));
+    let gz = body(gz).await;
+    assert!(gz.len() < plain.len() / 3, "{} vs {} bytes", gz.len(), plain.len());
+    let mut inflated = Vec::new();
+    flate2::read::GzDecoder::new(gz.as_slice())
+        .read_to_end(&mut inflated)
+        .unwrap();
+    assert_eq!(inflated, plain, "the same JSON, byte for byte");
+
+    // Small JSON isn't worth it.
+    let me = app.clone().oneshot(get("/api/auth/me".into(), true)).await.unwrap();
+    assert!(me.headers().get("content-encoding").is_none());
+
+    // A cover is already compressed, and serves byte ranges.
+    let put = Request::builder()
+        .method("PUT")
+        .uri(format!("/api/books/{book}/cover"))
+        .header("authorization", format!("Bearer {master}"))
+        .header("content-type", "image/png")
+        .body(Body::from([b"\x89PNG\r\n\x1a\n".as_slice(), &[0u8; 4096]].concat()))
+        .unwrap();
+    app.clone().oneshot(put).await.unwrap();
+    let cover = app
+        .clone()
+        .oneshot(get(format!("/api/books/{book}/cover"), true))
+        .await
+        .unwrap();
+    assert_eq!(cover.status(), StatusCode::OK);
+    assert!(cover.headers().get("content-encoding").is_none());
+}
+
 #[tokio::test]
 async fn basic_auth_cache_repeats_and_stays_password_specific() {
     use base64::Engine;

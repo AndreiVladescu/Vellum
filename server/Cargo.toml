@@ -49,6 +49,9 @@ lettre = { version = "0.11.22", default-features = false, features = [
     "webpki-roots",
 ] }
 async-stream = "0.3.6"
+# Gzip for JSON responses (src/gzip.rs). Already compiled in via lopdf and
+# png; listed so the middleware can name it.
+flate2 = "1"
 
 # Used only to apply setrlimit resource caps to the PDF-render subprocesses on
 # Unix (see blobs.rs). Unused on other platforms.

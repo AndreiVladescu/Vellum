@@ -25,6 +25,7 @@ mod discover;
 mod error;
 mod events;
 mod groups;
+mod gzip;
 mod ids;
 mod import_check;
 mod layouts;
@@ -536,9 +537,12 @@ pub fn router(state: AppState) -> Router {
         // Ids from the URL end up in filesystem paths, and axum decodes a
         // captured segment — so `..%2F..%2Fx` used to arrive as `../../x`.
         .layer(axum::middleware::from_fn(ids::reject_smuggled_separators))
-        // Outermost, so every response — including one rejected before any
-        // handler runs — carries a request id (plan 5 #37).
+        // Outermost but one, so every response — including one rejected before
+        // any handler runs — carries a request id (plan 5 #37).
         .layer(axum::middleware::from_fn(observability::request_id))
+        // Truly outermost: compresses what the layers inside produced, so
+        // `request_id` still reads (and rewrites) error bodies as plain JSON.
+        .layer(axum::middleware::from_fn(gzip::gzip_json))
 }
 
 /// A restrictive Content-Security-Policy that still lets the self-hosted console
