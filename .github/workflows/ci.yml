@@ -106,10 +106,12 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v7
+      # 21, not 17: app/android/gradle/gradle-daemon-jvm.properties asks for a
+      # JDK 21 to run Gradle, and this one (JAVA_HOME) is where it finds it.
       - uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
