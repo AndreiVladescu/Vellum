@@ -226,3 +226,32 @@ it built had `spineStyle == null`, which takes `fromJson`'s null early-return �
 the decode path under test never ran. Any benchmark over `Book` fixtures has to
 set the fields whose handling it is timing; a flat result is a reason to check
 the fixture before believing it.
+
+## 2026-10 round: what the earlier benchmarks could not see
+
+Every benchmark above seeds books with **no covers and no files** (`seedLibrary`
+says so). That is exactly where this round's costs were — the checklist is in
+[`BACKLOG.md`](BACKLOG.md#performance-round-october-2026). Measurements below
+are on a copy of the development library (94 books, 25 MB of covers, 2.4 GB of
+files) padded to 5,000 books with one file each.
+
+### #1 Indexes on the app's foreign-key columns (schema v38)
+
+The app schema had no secondary index at all — only the primary keys' implicit
+ones. `EXPLAIN QUERY PLAN` on `watchLibrary`'s books query showed the
+`has_file` subquery as `SCAN bf`: all of `book_files`, once per book. It runs on
+every `books` write, and a page turn is a `books` write.
+
+| `watchLibrary` books query, 5,000 books + 5,000 files | |
+|---|---|
+| Before | 396 ms |
+| After (`idx_book_files_book` and friends) | 18 ms |
+
+The same was true of every lookup by a foreign key — copies by book, loans by
+copy, annotations and sittings by book, a room's shelves and placements. All
+sixteen are declared with `@TableIndex`, so `createAll` builds them on a fresh
+install and `_ensureIndexes` adds them on upgrade. `library_queries_test.dart`
+pins the query plans, since a dropped index is otherwise invisible until a
+library is big enough to feel it. App-local: the server has its own.
+
+`watchDirtyCount` was checked too and left alone — 1 ms unindexed at 5,000.

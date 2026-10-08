@@ -157,7 +157,7 @@ Found by measuring rather than guessing — see
 [`PERFORMANCE.md`](PERFORMANCE.md) for the numbers. One commit per item, in
 this order.
 
-- [ ] **1. App database indexes.** The app schema has no secondary indexes: the
+- [x] **1. App database indexes.** The app schema has no secondary indexes: the
   shelf's `has_file` check scans `book_files` once per book, on every `books`
   write (every page turn). 393 ms → 20 ms at 5,000 books.
 - [ ] **2. WAL journal for the app database.** Cheaper page-turn writes, reads

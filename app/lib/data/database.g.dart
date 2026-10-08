@@ -11592,6 +11592,70 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     this,
   );
   late final $BookTextsTable bookTexts = $BookTextsTable(this);
+  late final Index idxBooksSeries = Index(
+    'idx_books_series',
+    'CREATE INDEX idx_books_series ON books (series_id)',
+  );
+  late final Index idxBookAuthorsAuthor = Index(
+    'idx_book_authors_author',
+    'CREATE INDEX idx_book_authors_author ON book_authors (author_id)',
+  );
+  late final Index idxBookGenresGenre = Index(
+    'idx_book_genres_genre',
+    'CREATE INDEX idx_book_genres_genre ON book_genres (genre_id)',
+  );
+  late final Index idxBookFilesBook = Index(
+    'idx_book_files_book',
+    'CREATE INDEX idx_book_files_book ON book_files (book_id)',
+  );
+  late final Index idxPhysicalCopiesBook = Index(
+    'idx_physical_copies_book',
+    'CREATE INDEX idx_physical_copies_book ON physical_copies (book_id)',
+  );
+  late final Index idxLoansCopy = Index(
+    'idx_loans_copy',
+    'CREATE INDEX idx_loans_copy ON loans (copy_id)',
+  );
+  late final Index idxCopyPhotosCopy = Index(
+    'idx_copy_photos_copy',
+    'CREATE INDEX idx_copy_photos_copy ON copy_photos (copy_id)',
+  );
+  late final Index idxShelfBooksBook = Index(
+    'idx_shelf_books_book',
+    'CREATE INDEX idx_shelf_books_book ON shelf_books (book_id)',
+  );
+  late final Index idxPhysicalShelvesEnvironment = Index(
+    'idx_physical_shelves_environment',
+    'CREATE INDEX idx_physical_shelves_environment ON physical_shelves (environment_id)',
+  );
+  late final Index idxBookPlacementsEnvironment = Index(
+    'idx_book_placements_environment',
+    'CREATE INDEX idx_book_placements_environment ON book_placements (environment_id)',
+  );
+  late final Index idxBookPlacementsCopy = Index(
+    'idx_book_placements_copy',
+    'CREATE INDEX idx_book_placements_copy ON book_placements (copy_id)',
+  );
+  late final Index idxRoomPropsEnvironment = Index(
+    'idx_room_props_environment',
+    'CREATE INDEX idx_room_props_environment ON room_props (environment_id)',
+  );
+  late final Index idxAnnotationsBook = Index(
+    'idx_annotations_book',
+    'CREATE INDEX idx_annotations_book ON annotations (book_id)',
+  );
+  late final Index idxReadingSessionsBook = Index(
+    'idx_reading_sessions_book',
+    'CREATE INDEX idx_reading_sessions_book ON reading_sessions (book_id)',
+  );
+  late final Index idxBookTextBook = Index(
+    'idx_book_text_book',
+    'CREATE INDEX idx_book_text_book ON book_text (book_id)',
+  );
+  late final Index idxBookTextStatus = Index(
+    'idx_book_text_status',
+    'CREATE INDEX idx_book_text_status ON book_text (status)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -11619,6 +11683,22 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     annotations,
     readingSessions,
     bookTexts,
+    idxBooksSeries,
+    idxBookAuthorsAuthor,
+    idxBookGenresGenre,
+    idxBookFilesBook,
+    idxPhysicalCopiesBook,
+    idxLoansCopy,
+    idxCopyPhotosCopy,
+    idxShelfBooksBook,
+    idxPhysicalShelvesEnvironment,
+    idxBookPlacementsEnvironment,
+    idxBookPlacementsCopy,
+    idxRoomPropsEnvironment,
+    idxAnnotationsBook,
+    idxReadingSessionsBook,
+    idxBookTextBook,
+    idxBookTextStatus,
   ];
 }
 

@@ -12,6 +12,7 @@ part 'database.g.dart';
 
 // Mirrors server/migrations/0001_init.sql — keep the two in sync (DESIGN.md).
 
+@TableIndex(name: 'idx_books_series', columns: {#seriesId})
 class Books extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
@@ -160,6 +161,7 @@ class Authors extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@TableIndex(name: 'idx_book_authors_author', columns: {#authorId})
 class BookAuthors extends Table {
   TextColumn get bookId => text().references(Books, #id)();
   TextColumn get authorId => text().references(Authors, #id)();
@@ -189,6 +191,7 @@ String canonicalGenreName(String raw) => raw
     .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
     .join(' ');
 
+@TableIndex(name: 'idx_book_genres_genre', columns: {#genreId})
 class BookGenres extends Table {
   TextColumn get bookId => text().references(Books, #id)();
   TextColumn get genreId => text().references(Genres, #id)();
@@ -199,6 +202,7 @@ class BookGenres extends Table {
 
 /// Digital files attached to a book (0..n): a book may be physical-only,
 /// digital-only, or both, possibly in several formats.
+@TableIndex(name: 'idx_book_files_book', columns: {#bookId})
 class BookFiles extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text().references(Books, #id)();
@@ -250,6 +254,7 @@ class FilePositions extends Table {
 }
 
 @DataClassName('PhysicalCopy')
+@TableIndex(name: 'idx_physical_copies_book', columns: {#bookId})
 class PhysicalCopies extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text().references(Books, #id)();
@@ -268,6 +273,7 @@ class PhysicalCopies extends Table {
 
 /// Loan history per physical copy; the active loan is the row with
 /// returnedAt == null.
+@TableIndex(name: 'idx_loans_copy', columns: {#copyId})
 class Loans extends Table {
   TextColumn get id => text()();
   TextColumn get copyId => text().references(PhysicalCopies, #id)();
@@ -325,6 +331,7 @@ class Loans extends Table {
 /// copies sync, and it is visible to whoever the book is shared with — like its
 /// covers. That is why these carry the same `updatedAt`/`needsPush` pair as
 /// every other synced row, and not the per-user channel `readerNotes` uses.
+@TableIndex(name: 'idx_copy_photos_copy', columns: {#copyId})
 class CopyPhotos extends Table {
   TextColumn get id => text()();
   TextColumn get copyId => text().references(PhysicalCopies, #id)();
@@ -377,6 +384,7 @@ class Shelves extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@TableIndex(name: 'idx_shelf_books_book', columns: {#bookId})
 class ShelfBooks extends Table {
   TextColumn get shelfId => text().references(Shelves, #id)();
   TextColumn get bookId => text().references(Books, #id)();
@@ -453,6 +461,7 @@ class PhysicalEnvironments extends Table {
 /// segment). Horizontal in practice, but both endpoints are stored so a shelf
 /// can later be angled.
 @DataClassName('PhysicalShelf')
+@TableIndex(name: 'idx_physical_shelves_environment', columns: {#environmentId})
 class PhysicalShelves extends Table {
   TextColumn get id => text()();
   TextColumn get environmentId => text().references(PhysicalEnvironments, #id)();
@@ -505,6 +514,7 @@ class PhysicalShelves extends Table {
 /// `(x, y)` is the bottom-left corner in world metres, exactly like a book
 /// placement, so a prop settles onto a shelf through the same code books do.
 @DataClassName('RoomProp')
+@TableIndex(name: 'idx_room_props_environment', columns: {#environmentId})
 class RoomProps extends Table {
   TextColumn get id => text()();
   TextColumn get environmentId => text().references(PhysicalEnvironments, #id)();
@@ -538,6 +548,8 @@ class RoomProps extends Table {
 /// The width (thickness) and height default from the book's page count but can
 /// be overridden per placement.
 @DataClassName('BookPlacement')
+@TableIndex(name: 'idx_book_placements_environment', columns: {#environmentId})
+@TableIndex(name: 'idx_book_placements_copy', columns: {#copyId})
 class BookPlacements extends Table {
   TextColumn get id => text()();
   TextColumn get environmentId => text().references(PhysicalEnvironments, #id)();
@@ -610,6 +622,7 @@ class RemoteReadingPositions extends Table {
 /// catalogue data. If they ever sync they get their own table and endpoint
 /// (the shape #5 established), never a column on the book row.
 @DataClassName('Annotation')
+@TableIndex(name: 'idx_annotations_book', columns: {#bookId})
 class Annotations extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text().references(Books, #id)();
@@ -657,6 +670,7 @@ class Annotations extends Table {
 /// how long. It rides backups (they snapshot the database file) and can be wiped
 /// from Preferences, but it has no sync channel and should never get one.
 @DataClassName('ReadingSession')
+@TableIndex(name: 'idx_reading_sessions_book', columns: {#bookId})
 class ReadingSessions extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text().references(Books, #id)();
@@ -691,6 +705,8 @@ class ReadingSessions extends Table {
 /// `status = 'pending'` *is* the work item, so an app killed mid-extraction
 /// resumes exactly where it stopped with no job state held in memory.
 @DataClassName('BookText')
+@TableIndex(name: 'idx_book_text_book', columns: {#bookId})
+@TableIndex(name: 'idx_book_text_status', columns: {#status})
 class BookTexts extends Table {
   @override
   String get tableName => 'book_text';
@@ -742,7 +758,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 37;
+  int get schemaVersion => 38;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1194,12 +1210,48 @@ class VellumDatabase extends _$VellumDatabase {
               }
             }
           }
+          if (from < 38) {
+            // Lookup indexes on the foreign-key columns (performance round
+            // #1). App-local: the server keeps its own (0007_list_indexes.sql
+            // and later), so there is no matching server migration. Last, so
+            // every table an index names exists by now. Without them the
+            // shelf's `has_file` check scanned all of book_files once per
+            // book on every `books` write — 396 ms → 20 ms at 5,000 books.
+            await _ensureIndexes(m);
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
           await _ensureSearchIndex();
         },
       );
+
+  /// Creates every index the tables declare (`@TableIndex`) that the database
+  /// lacks. Idempotent, like the rest of `onUpgrade`: a fresh install already
+  /// has them from `createAll`, and a retried upgrade skips what it built.
+  ///
+  /// Skips an index whose table isn't there, like `_ensureSearchIndex`: a
+  /// partially-migrated database can reach here without one, and a throw from
+  /// an index would abort an upgrade that is otherwise fine.
+  Future<void> _ensureIndexes(Migrator m) async {
+    final present = {
+      for (final row in await customSelect(
+              "SELECT name FROM sqlite_master "
+              "WHERE type IN ('table', 'index')")
+          .get())
+        row.read<String>('name'),
+    };
+    // drift's `Index` doesn't name its table; the generated statement does
+    // (`CREATE INDEX idx ON table (column)`).
+    final onTable = RegExp(r' ON (\w+)');
+    for (final index in allSchemaEntities.whereType<Index>()) {
+      if (present.contains(index.entityName)) continue;
+      final sql = index.createStatementsByDialect[SqlDialect.sqlite]!;
+      final table = onTable.firstMatch(sql)?.group(1);
+      if (table == null || !present.contains(table)) continue;
+      await m.createIndex(index);
+    }
+  }
 
   /// Creates `book_search` and its triggers if missing, then backfills —
   /// idempotent, like the rest of `onUpgrade`. Runs from `beforeOpen` (every
