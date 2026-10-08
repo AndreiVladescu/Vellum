@@ -434,3 +434,33 @@ The local content indexer's EPUB pass (unzip, parse, flatten every chapter) now
 runs in an isolate too; it runs at startup, while the shelf is drawn. Still on
 the UI isolate, and left for now: verifying a backup archive, which hashes
 in-memory archive entries and would need the whole check moved over.
+
+### #9 The EPUB reader stops rewriting its chapter on every rebuild
+
+The chapter handed to `HtmlWidget` is the book's markup with night mode's
+colours stripped and the highlights painted in — both rewrites of the whole
+chapter, done in the reader page's `build`, so on *every* rebuild: a selection
+appearing, the chrome toggling, a bookmark. `HtmlWidget` itself only re-parses
+when the string or text style changes by value, so the cost was the rewrite plus
+a character-by-character comparison that found nothing new.
+
+The development library's largest chapter is 8 MB of HTML (EPUB images arrive
+inlined as data URIs). Per rebuild, debug build:
+
+| | Per rebuild |
+|---|---|
+| `withoutBookColours` (night mode) | 26 ms |
+| `mapHtmlText` (inside `withHighlights`, when the chapter has any) | 115 ms |
+| `HtmlWidget` comparing the new string with the old | 15 ms |
+| Cached (`ChapterMarkup`), all of the above | **0.05 ms** |
+
+`ChapterMarkup` keeps the last result keyed by chapter, night mode, ink colour
+and the annotation list's identity — the page replaces that list whenever
+annotations change and never edits it in place — and hands back the very same
+string, which compares with itself instantly. Its first build of a chapter costs
+what every build used to.
+
+*Not done:* `HtmlWidget` still lays out a whole chapter at once. Its
+`RenderMode.listView` builds lazily, but conflicts with `SelectionArea` and with
+restoring the reading position by scroll offset — worth trying only with a
+profile of a long chapter in hand.

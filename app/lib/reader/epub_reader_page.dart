@@ -21,6 +21,7 @@ import 'annotations/epub_highlight_html.dart';
 import 'annotations/highlight_palette.dart';
 import 'night_mode.dart';
 import 'edge_turn.dart';
+import 'chapter_markup.dart';
 import 'epub_book.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
@@ -243,7 +244,12 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   String? _bookmarkOnChapter;
 
   /// This book's annotations, so the chapter markup can carry its highlights.
+  /// Always replaced, never changed in place: [ChapterMarkup] keys on it.
   List<Annotation> _bookAnnotations = const [];
+
+  /// The chapter as the `HtmlWidget` shows it, remade only when its inputs
+  /// change rather than on every rebuild (performance round #9).
+  final _markup = ChapterMarkup();
   StreamSubscription<List<Annotation>>? _annotationsSub;
 
   /// The parsed book, once the future has resolved — so the shortcuts, which
@@ -1142,19 +1148,12 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                       child: SelectionListener(
                         selectionNotifier: _selectionNotifier,
                         child: HtmlWidget(
-                          // Stored highlights painted into the markup, so the
-                          // text is coloured like a marker rather than only
-                          // listed in the panel.
-                          withHighlights(
-                            // Night mode: the book's own colours come out
-                            // first, or a heading that asked for near-black
-                            // stays near-black on a near-black page.
-                            darkPage
-                                ? withoutBookColours(chapter.html)
-                                : chapter.html,
-                            _bookAnnotations,
-                            _chapter,
+                          _markup.of(
+                            chapter,
+                            index: _chapter,
+                            darkPage: darkPage,
                             ink: readerTheme.foreground,
+                            annotations: _bookAnnotations,
                           ),
                           // The reader's own typography, applied to the book's
                           // text only — the surrounding UI keeps following the

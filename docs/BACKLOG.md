@@ -177,7 +177,7 @@ this order.
 - [x] **8. Import hashing off the UI isolate.** SHA-256 of every imported file
   runs on the UI isolate, one file at a time; hash in background isolates, in
   parallel. Same for the content indexer's EPUB parse.
-- [ ] **9. EPUB reader: stop re-transforming chapter HTML on every build.**
+- [x] **9. EPUB reader: stop re-transforming chapter HTML on every build.**
 
 ---
 
