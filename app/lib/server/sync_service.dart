@@ -568,12 +568,6 @@ class SyncService {
     );
   }
 
-  /// Pulls shelves: applies the server's shelf tombstones, then upserts
-  /// shelves LWW by `updatedAt` (same convention as books' metadata above).
-  /// Incoming membership is filtered to book ids this device actually has —
-  /// `shelf_books.book_id` has a foreign key, and a shared library or a book
-  /// that failed its own pull must not make this throw. Adopted shelves have
-  /// `needsPush` cleared, same as books' `applied` handling.
   /// Whether the server already holds exactly [cover] for [book] — so pushing
   /// the book need not send it (performance round #4).
   ///
@@ -597,6 +591,12 @@ class SyncService {
         .write(BooksCompanion(coverEtag: Value(etag)));
   }
 
+  /// Pulls shelves: applies the server's shelf tombstones, then upserts
+  /// shelves LWW by `updatedAt` (same convention as books' metadata above).
+  /// Incoming membership is filtered to book ids this device actually has —
+  /// `shelf_books.book_id` has a foreign key, and a shared library or a book
+  /// that failed its own pull must not make this throw. Adopted shelves have
+  /// `needsPush` cleared, same as books' `applied` handling.
   Future<({int pulled, int deletedLocally})> _pullShelves(
     VellumServerClient client,
     String? cursor,
