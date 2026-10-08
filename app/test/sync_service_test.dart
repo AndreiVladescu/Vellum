@@ -756,6 +756,105 @@ void main() {
     });
   });
 
+  group('a push learns which files the server already has', () {
+    // It used to list the whole library for that on every push — 4.4 MB at
+    // 5,000 books, for the one book an auto-push usually carries.
+    late LibraryRepository repo;
+    setUp(() async => repo = await _repo(dir));
+
+    /// [count] dirty books, each with one local file whose hash is 'h<i>'.
+    Future<void> booksWithFiles(int count) async {
+      final db = repo.db;
+      for (var i = 0; i < count; i++) {
+        File(p.join(dir.path, 'files', 'f$i.pdf'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync('pdf $i');
+        await db.into(db.books).insert(BooksCompanion.insert(id: 'b$i', title: 'Book $i'));
+        await db.into(db.bookFiles).insert(BookFilesCompanion.insert(
+              id: 'f$i',
+              bookId: 'b$i',
+              format: 'pdf',
+              path: 'files/f$i.pdf',
+              sizeBytes: 5,
+              sha256: 'h$i',
+            ));
+      }
+    }
+
+    /// Records each request as `METHOD path`; [serverHas] are the file hashes
+    /// the server answers with, per book and in the full listing alike.
+    VellumServerClient server(List<String> log, {Set<String> serverHas = const {}}) {
+      Map<String, Object> file(String bookId) =>
+          {'id': 'r$bookId', 'book_id': bookId, 'format': 'pdf', 'size_bytes': 5, 'sha256': 'h${bookId.substring(1)}'};
+      bool has(String bookId) => serverHas.contains('h${bookId.substring(1)}');
+      return _client((req) async {
+        final path = req.url.path;
+        log.add('${req.method} $path');
+        final perBook = RegExp(r'^/api/books/(b\d+)/files$').firstMatch(path);
+        if (req.method == 'GET' && perBook != null) {
+          final id = perBook.group(1)!;
+          return http.Response(jsonEncode([if (has(id)) file(id)]), 200);
+        }
+        if (req.method == 'GET' && path == '/api/books') {
+          final ids = [for (var i = 0; i < 30; i++) 'b$i'];
+          return http.Response(
+            jsonEncode({
+              'server_now': '2024-06-01 00:00:00',
+              'books': [
+                for (final id in ids)
+                  {..._serverBook(id, 'x', '2024-01-01 00:00:00'), 'files': [if (has(id)) file(id)]},
+              ],
+            }),
+            200,
+          );
+        }
+        if (req.method == 'POST' && perBook != null) {
+          return http.Response(jsonEncode(file(perBook.group(1)!)), 200);
+        }
+        if (req.method == 'GET' && path == '/api/capabilities') {
+          return http.Response('{"error":"no"}', 404);
+        }
+        if (req.method == 'PUT' && path.startsWith('/api/books/')) {
+          return http.Response('{}', 200);
+        }
+        return _server(books: const [])(req);
+      });
+    }
+
+    test('a small push asks about its own books, not the library', () async {
+      await booksWithFiles(2);
+      final log = <String>[];
+
+      await SyncService(repo).push(server(log, serverHas: {'h0'}));
+
+      expect(log, isNot(contains('GET /api/books')));
+      expect(log, containsAll(['GET /api/books/b0/files', 'GET /api/books/b1/files']));
+      expect(log.where((r) => r.startsWith('POST')), ['POST /api/books/b1/files'],
+          reason: 'the server had b0\'s file already; only b1\'s goes up');
+    });
+
+    test('a large push lists the library once instead', () async {
+      await booksWithFiles(21);
+      final log = <String>[];
+
+      await SyncService(repo).push(server(log, serverHas: {for (var i = 0; i < 21; i++) 'h$i'}));
+
+      expect(log.where((r) => r == 'GET /api/books'), hasLength(1));
+      expect(log.where((r) => r.endsWith('/files') && r.startsWith('GET')), isEmpty);
+      expect(log.where((r) => r.startsWith('POST')), isEmpty,
+          reason: 'every file was already on the server');
+    });
+
+    test('books without files ask nothing at all', () async {
+      await repo.db.into(repo.db.books).insert(BooksCompanion.insert(id: 'b0', title: 'Paper only'));
+      final log = <String>[];
+
+      await SyncService(repo).push(server(log));
+
+      expect(log.where((r) => r.contains('/files') || r == 'GET /api/books'), isEmpty);
+    });
+  });
+
   test('push sends only books that need pushing, and clears the flag', () async {
     final repo = await _repo(dir);
     final db = repo.db;

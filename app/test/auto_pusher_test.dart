@@ -14,6 +14,21 @@ import 'package:vellum/server/sync_service.dart';
 Future<LibraryRepository> _repo(Directory dir) async =>
     LibraryRepository.forTesting(VellumDatabase(NativeDatabase.memory()), dir);
 
+/// Counts push runs at the source. These tests used to count `GET /api/books`
+/// as a stand-in — one per push — until a push stopped needing it
+/// (performance round #5).
+class _CountingSync extends SyncService {
+  _CountingSync(super.repository);
+
+  var pushRuns = 0;
+
+  @override
+  Future<SyncReport> push(VellumServerClient client, {SyncProgress? onProgress}) {
+    pushRuns++;
+    return super.push(client, onProgress: onProgress);
+  }
+}
+
 void main() {
   late Directory dir;
   setUp(() => dir = Directory.systemTemp.createTempSync('vellum_autopush_test'));
@@ -21,11 +36,7 @@ void main() {
 
   test('coalesces a burst of edits into a single push run', () async {
     final repo = await _repo(dir);
-    final sync = SyncService(repo);
-
-    // Count push *runs*: each _push over dirty books fetches the book list once
-    // (for remote file hashes), so one GET /api/books == one push run.
-    var pushRuns = 0;
+    final sync = _CountingSync(repo);
     final pushedIds = <String>[];
     final client = VellumServerClient(
       baseUrl: 'http://test',
@@ -33,7 +44,6 @@ void main() {
       httpClient: MockClient((req) async {
         final path = req.url.path;
         if (req.method == 'GET' && path == '/api/books') {
-          pushRuns++;
           return http.Response(
             jsonEncode({'server_now': '2024-06-01 00:00:00', 'books': []}),
             200,
@@ -67,7 +77,7 @@ void main() {
     // Wait past the debounce for the coalesced push to fire and finish.
     await Future.delayed(const Duration(milliseconds: 400));
 
-    expect(pushRuns, 1, reason: 'three edits coalesce into one push run');
+    expect(sync.pushRuns, 1, reason: 'three edits coalesce into one push run');
     expect(pushedIds..sort(), ['a', 'b', 'c']);
     for (final id in ['a', 'b', 'c']) {
       expect((await repo.watchBook(id).first)?.needsPush, false);
@@ -77,13 +87,11 @@ void main() {
 
   test('does not push while the preference is off', () async {
     final repo = await _repo(dir);
-    final sync = SyncService(repo);
-    var pushRuns = 0;
+    final sync = _CountingSync(repo);
     final client = VellumServerClient(
       baseUrl: 'http://test',
       token: 't',
       httpClient: MockClient((req) async {
-        if (req.method == 'GET' && req.url.path == '/api/books') pushRuns++;
         return http.Response(
           jsonEncode({'server_now': 'x', 'books': []}),
           200,
@@ -104,7 +112,7 @@ void main() {
     await db.into(db.books).insert(BooksCompanion.insert(id: 'a', title: 'a'));
     await Future.delayed(const Duration(milliseconds: 200));
 
-    expect(pushRuns, 0, reason: 'disabled: nothing is pushed');
+    expect(sync.pushRuns, 0, reason: 'disabled: nothing is pushed');
     expect((await repo.watchBook('a').first)?.needsPush, true);
     pusher.dispose();
   });

@@ -87,6 +87,10 @@ class SyncService {
   /// server comfortable. DB writes still serialize inside drift.
   static const _blobConcurrency = 4;
 
+  /// Up to this many books with files, a push asks the server about each one's
+  /// files; past it, it lists the whole library once instead.
+  static const _perBookFileQueries = 20;
+
   /// How many books go in one `POST /api/books:batch` (plan 5 #7). Must not
   /// exceed the server's own cap (`books.rs::batch_upsert`'s `MAX_BATCH`),
   /// which rejects an oversized batch outright rather than truncating it.
@@ -951,14 +955,25 @@ class SyncService {
               b.syncExcluded.equals(false)))
         .get();
 
-    // One list fetch gives the server's existing file hashes per book, so we
-    // skip re-uploading files it already has without a `GET .../files` each.
-    final remoteHashesByBook = <String, Set<String>>{};
-    if (books.isNotEmpty) {
-      for (final sb in (await client.listBooks()).books) {
-        remoteHashesByBook[sb.id] = {for (final f in sb.files) f.sha256};
-      }
-    }
+    // Which files the server already has, so they aren't uploaded again. Only
+    // books with local files need asking (performance round #5). A few ask
+    // about themselves, one `GET .../files` each; past that, one listing of
+    // the whole library is cheaper than a request per book. That listing used
+    // to be fetched for every push, though: at 5,000 books it is 4.4 MB, for
+    // the one book an auto-push after an edit usually carries.
+    final booksWithFiles = {
+      for (final row in await (db.selectOnly(db.bookFiles, distinct: true)
+            ..addColumns([db.bookFiles.bookId]))
+          .get())
+        row.read(db.bookFiles.bookId)!,
+    };
+    final asking = books.where((b) => booksWithFiles.contains(b.id)).length;
+    final remoteHashesByBook = asking > _perBookFileQueries
+        ? {
+            for (final sb in (await client.listBooks()).books)
+              sb.id: {for (final f in sb.files) f.sha256},
+          }
+        : null;
 
     // Batch-push metadata up front when the server supports it (plan 5 #7):
     // one or a few round trips instead of one PUT per book. Null (rather than
@@ -1037,7 +1052,11 @@ class SyncService {
           db.bookFiles,
         )..where((f) => f.bookId.equals(b.id))).get();
         if (localFiles.isNotEmpty) {
-          final remoteHashes = remoteHashesByBook[b.id] ?? const {};
+          // After the metadata push above, so a book new to the server is
+          // there to be asked about.
+          final remoteHashes = remoteHashesByBook != null
+              ? remoteHashesByBook[b.id] ?? const <String>{}
+              : {for (final f in await client.listFiles(b.id)) f.sha256};
           for (final lf in localFiles) {
             if (remoteHashes.contains(lf.sha256)) continue;
             final file = repository.fileOf(lf);

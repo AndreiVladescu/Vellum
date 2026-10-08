@@ -169,7 +169,7 @@ this order.
   its whole cover; the server rewrites it and bumps `updated_at`, so every
   other device downloads it again. Upload only changed covers; the server
   skips identical bytes and uses a content-hash ETag.
-- [ ] **5. Push lists the whole library.** Learning which files the server has
+- [x] **5. Push lists the whole library.** Learning which files the server has
   fetches every book; ask only about the books being pushed.
 - [ ] **6. Concurrent pull.** A no-change sync is ~18 sequential GETs; fetch the
   independent lists together, apply them in foreign-key order.

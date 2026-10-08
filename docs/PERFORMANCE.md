@@ -339,3 +339,19 @@ cover once more, since every stored weak tag stops matching.
 upload, a title edit on the other device sends no cover, and the first device
 revalidates with a `304` instead of downloading. With the app-side check
 disabled the test sees the upload.
+
+### #5 A push no longer downloads the library
+
+To skip uploading files the server already holds, every push with a dirty book
+fetched `GET /api/books` — the whole library, files included — and read the
+hashes off it. On a server seeded with 5,000 books that listing is **4.4 MB**
+and 0.4 s of server time (debug build), and an auto-push after a single edit
+paid all of it.
+
+Now only books with local files are asked about at all, and up to twenty of
+them ask with one `GET /api/books/<id>/files` each — after their metadata push,
+so a book new to the server is there to be asked about. Past twenty (a first
+sync, a bulk import) the one listing is still the cheaper way, and is what runs.
+
+`auto_pusher_test.dart` had used that listing as its count of push runs; it now
+counts `push()` calls directly.
