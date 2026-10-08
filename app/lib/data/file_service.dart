@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../reader/epub_book.dart';
 import 'cover_service.dart';
+import 'file_hash.dart';
 import 'database.dart';
 import 'sync_clock.dart';
 import 'pdf_cover.dart';
@@ -60,7 +60,9 @@ class FileService {
       // short read or a full disk has to be caught here rather than recorded as
       // a valid file with a hash that no longer matches its bytes (which sync
       // dedupes on).
-      final digest = await sha256.bind(dest.openRead()).first;
+      // In a background isolate: a 500 MB PDF is seconds of hashing, and on
+      // the UI isolate every one of them is a frozen frame.
+      final digest = await sha256OfFileInBackground(dest.path);
       final size = await dest.length();
       await db.transaction(() async {
         await db.into(db.bookFiles).insert(
@@ -70,7 +72,7 @@ class FileService {
                 format: ext.isEmpty ? 'unknown' : ext,
                 path: relPath,
                 sizeBytes: size,
-                sha256: digest.toString(),
+                sha256: digest,
               ),
             );
         // A new file is synced data, so the book needs pushing

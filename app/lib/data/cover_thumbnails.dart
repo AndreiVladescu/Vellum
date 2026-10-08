@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
-import 'package:pool/pool.dart';
+
+import 'background_work.dart';
 
 /// Small JPEG copies of cover images, for the shelf (performance round #3).
 ///
@@ -18,17 +18,13 @@ import 'package:pool/pool.dart';
 /// know thumbnails exist. Backups and the library doctor only look at files
 /// directly inside `covers/`, so neither sees them.
 ///
-/// The work runs in background isolates — Dart's threads, each with its own
-/// memory — a few at a time, so a cold shelf spreads over the machine's cores
-/// instead of queueing on one.
+/// The work runs in background isolates ([inBackground]) — Dart's threads, each
+/// with its own memory — a few at a time, so a cold shelf spreads over the
+/// machine's cores instead of queueing on one.
 abstract final class CoverThumbnails {
   /// Above this a spine is zoomed far enough in (the physical room) that the
   /// cover itself is what it should show.
   static const maxHeight = 1024;
-
-  /// One isolate per spare core, at most four: the UI isolate keeps a core to
-  /// itself, and past four a phone runs hot for no visible gain.
-  static final _pool = Pool((Platform.numberOfProcessors - 1).clamp(1, 4));
 
   /// Thumbnails being made right now, so a cover asked for twice — two spines
   /// of the same book, or a rebuild mid-decode — is made once.
@@ -67,8 +63,8 @@ abstract final class CoverThumbnails {
     // anything it captures is copied with it.
     final source = cover.path;
     final thumb = fileFor(cover, height).path;
-    return _inFlight[thumb] ??= _pool
-        .withResource(() => Isolate.run(() => _write(source, thumb, height)))
+    return _inFlight[thumb] ??=
+        inBackground(() => _write(source, thumb, height))
         // A block body, not `=>`: `remove` returns the future being built
         // here, and `whenComplete` waits on whatever its callback returns — so
         // the arrow form waits on itself and never completes.

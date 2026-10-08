@@ -174,7 +174,7 @@ this order.
 - [x] **6. Concurrent pull.** A no-change sync is ~18 sequential GETs; fetch the
   independent lists together, apply them in foreign-key order.
 - [x] **7. Gzip on the server's JSON responses.**
-- [ ] **8. Import hashing off the UI isolate.** SHA-256 of every imported file
+- [x] **8. Import hashing off the UI isolate.** SHA-256 of every imported file
   runs on the UI isolate, one file at a time; hash in background isolates, in
   parallel. Same for the content indexer's EPUB parse.
 - [ ] **9. EPUB reader: stop re-transforming chapter HTML on every build.**

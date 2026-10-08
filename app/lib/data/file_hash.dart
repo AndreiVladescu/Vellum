@@ -1,17 +1,19 @@
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+
+import 'background_work.dart';
 
 /// The SHA-256 of the file at [path], as lowercase hex, worked out in a
 /// background isolate.
 ///
 /// Hashing is pure CPU: on the UI isolate a big file holds up frames for as
 /// long as it takes, while in an isolate — Dart's thread, with its own memory —
-/// it runs on another core. Several calls at once run on several cores.
+/// it runs on another core. Several calls at once run on several cores, up to
+/// [backgroundSlots].
 Future<String> sha256OfFileInBackground(String path) =>
-    Isolate.run(() => sha256OfFileSync(path));
+    inBackground(() => sha256OfFileSync(path));
 
 /// The body of [sha256OfFileInBackground], for code already off the UI
 /// isolate. Reads in 1 MB chunks, so memory stays flat over a 500 MB PDF.

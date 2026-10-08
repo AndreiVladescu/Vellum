@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'backup_crypto.dart';
+import 'file_hash.dart';
 import 'library_repository.dart';
 
 /// What [BackupService.verify] found in an archive (plan 5 #13).
@@ -222,8 +223,10 @@ class BackupService {
 
   /// Streamed rather than `readAsBytes`: a book file can be hundreds of
   /// megabytes and this runs over every blob in the library.
-  static Future<String> _sha256(File file) async =>
-      (await sha256.bind(file.openRead()).first).toString();
+  /// Off the UI isolate: a backup hashes every cover and book file it holds,
+  /// which for a large library is minutes of CPU that used to freeze the app.
+  static Future<String> _sha256(File file) =>
+      sha256OfFileInBackground(file.path);
 
   /// Checks an archive without restoring it (plan 5 #13).
   ///

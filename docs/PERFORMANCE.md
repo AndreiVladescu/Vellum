@@ -402,3 +402,35 @@ got 273 KB, and parsed all 5,000 books.
 A small middleware on `flate2` (already compiled in via `lopdf` and `png`)
 rather than `tower-http`'s `CompressionLayer`, for the same reason
 `observability.rs` gives for its request ids.
+
+### #8 Hashing and EPUB parsing off the UI isolate
+
+Every imported file is hashed (the duplicate check, and what sync dedupes on).
+The folder and catalogue scans did it one file at a time on the UI isolate;
+attaching a file and writing a backup did the same through a byte stream. Now
+all of it goes through `sha256OfFileInBackground`, and the scans run
+`backgroundSlots` files at once.
+
+`background_work.dart` holds the one pool every background isolate comes from —
+cover thumbnails (#3) and hashes alike — so together they never take more than
+one core short of the machine, four at most.
+
+40 of the development library's book files, 1.1 GB, debug build:
+
+| | Wall time | Worst gap in a 16 ms ticker |
+|---|---|---|
+| One at a time, UI isolate | 10.4 s | 22 ms |
+| Four background isolates | 4.0 s | 17 ms |
+
+The old loop yielded every 64 KB, so it rarely blocked a frame outright — its
+cost was ten seconds of the UI isolate's CPU, which every frame shared with it.
+That is now zero, and the scan finishes 2.6× sooner.
+
+A cancelled scan checks as each file starts *and* as it finishes: with four in
+flight, a cancel otherwise lands mid-hash and the scan would finish and report
+them all.
+
+The local content indexer's EPUB pass (unzip, parse, flatten every chapter) now
+runs in an isolate too; it runs at startup, while the shelf is drawn. Still on
+the UI isolate, and left for now: verifying a backup archive, which hashes
+in-memory archive entries and would need the whole check moved over.

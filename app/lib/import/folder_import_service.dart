@@ -1,50 +1,55 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart' show Value;
 
+import '../data/background_work.dart';
 import '../data/database.dart';
+import '../data/file_hash.dart';
 import '../data/library_repository.dart';
 import 'catalog_entry.dart';
 import 'filename_metadata.dart';
 import 'import_plan.dart';
 
-/// Collects the single digest a chunked hash conversion emits.
-class _DigestSink implements Sink<Digest> {
-  Digest? value;
-
-  @override
-  void add(Digest data) => value = data;
-
-  @override
-  void close() {}
-}
-
-/// sha256 of a file, read in bounded chunks.
+/// Runs [task] for every index below [count], [backgroundSlots] at a time,
+/// and returns what they made in index order (performance round #8).
 ///
-/// Deliberately `RandomAccessFile` + a chunked digest rather than
-/// `sha256.bind(file.openRead())`: a folder import hashes every file up front,
-/// so memory has to stay flat over a 500 MB PDF, and plain future-based reads
-/// also mean the scan can be driven to completion in a widget test (a stream's
-/// events never arrive under `testWidgets`' fake async).
-Future<String> sha256OfFile(File file, {int chunkSize = 64 * 1024}) async {
-  final sink = _DigestSink();
-  final hasher = sha256.startChunkedConversion(sink);
-  final handle = await file.open();
-  try {
-    final buffer = Uint8List(chunkSize);
+/// A scan used to hash one file at a time on the UI isolate: seconds of frames
+/// held up per big PDF, and one core doing what four could. Each task's hash
+/// now runs in a background isolate, several at once.
+///
+/// Stops handing out work once [isCancelled] says so — checked as each task
+/// starts *and* as it finishes, because with several in flight a cancel lands
+/// while some are still hashing, and a cancelled scan should stop at what it
+/// had then rather than finish them all and report everything.
+Future<List<T>> _inParallel<T extends Object>(
+  int count,
+  Future<T> Function(int index) task, {
+  Future<bool> Function()? isCancelled,
+  void Function(int done, int index)? onDone,
+}) async {
+  final results = List<T?>.filled(count, null);
+  var next = 0;
+  var done = 0;
+  var cancelled = false;
+  Future<bool> stopping() async =>
+      cancelled = cancelled || (await isCancelled?.call() ?? false);
+
+  Future<void> worker() async {
     while (true) {
-      final read = await handle.readInto(buffer);
-      if (read == 0) break;
-      hasher.add(read == chunkSize ? buffer : Uint8List.sublistView(buffer, 0, read));
+      // Claimed before any await: checking `next < count` and then awaiting
+      // would let another worker take the last index in between.
+      final i = next++;
+      if (i >= count || await stopping()) return;
+      final result = await task(i);
+      if (await stopping()) return;
+      results[i] = result;
+      onDone?.call(++done, i);
     }
-  } finally {
-    await handle.close();
   }
-  hasher.close();
-  return sink.value!.toString();
+
+  await Future.wait([for (var w = 0; w < backgroundSlots; w++) worker()]);
+  return [for (final r in results) ?r];
 }
 
 /// Progress of a scan or an import: [done] of [total], naming the current file.
@@ -170,32 +175,33 @@ class FolderImportService {
         if (supportedFormats.contains(_formatOf(f.path))) f,
     ];
     final library = await libraryFingerprint();
-    final candidates = <ImportCandidate>[];
-    for (var i = 0; i < files.length; i++) {
-      if (await isCancelled?.call() ?? false) break;
-      final file = files[i];
-      onProgress?.call(i, files.length, filenameStem(file.path));
-      String? hash;
-      String? error;
-      var size = 0;
-      try {
-        // Every step here awaits real file I/O, which yields to the event loop
-        // on its own — so the progress callback above stays responsive without
-        // an artificial `Duration.zero` yield per file.
-        size = await file.length();
-        hash = await sha256OfFile(file);
-      } catch (e) {
-        error = '$e';
-      }
-      candidates.add(classify(
-        path: file.path,
-        sizeBytes: size,
-        format: _formatOf(file.path),
-        sha256: hash,
-        library: library,
-        error: error,
-      ));
-    }
+    onProgress?.call(0, files.length, '');
+    final candidates = await _inParallel(
+      files.length,
+      isCancelled: isCancelled,
+      onDone: (done, i) =>
+          onProgress?.call(done, files.length, filenameStem(files[i].path)),
+      (i) async {
+        final file = files[i];
+        String? hash;
+        String? error;
+        var size = 0;
+        try {
+          size = await file.length();
+          hash = await sha256OfFileInBackground(file.path);
+        } catch (e) {
+          error = '$e';
+        }
+        return classify(
+          path: file.path,
+          sizeBytes: size,
+          format: _formatOf(file.path),
+          sha256: hash,
+          library: library,
+          error: error,
+        );
+      },
+    );
     onProgress?.call(files.length, files.length, '');
     return candidates;
   }
@@ -213,40 +219,43 @@ class FolderImportService {
     Future<bool> Function()? isCancelled,
   }) async {
     final library = await libraryFingerprint();
-    final candidates = <ImportCandidate>[];
-    for (var i = 0; i < entries.length; i++) {
-      if (await isCancelled?.call() ?? false) break;
-      final entry = entries[i];
-      onProgress?.call(i, entries.length, entry.title);
-      String? hash;
-      String? error;
-      var size = 0;
-      final path = entry.filePath;
-      if (path != null) {
-        try {
-          final file = File(path);
-          size = await file.length();
-          hash = await sha256OfFile(file);
-        } catch (e) {
-          // The catalogue names a file that isn't there — a moved Calibre
-          // library, most often. Say so on the row rather than dropping it.
-          error = 'file not readable: $e';
+    onProgress?.call(0, entries.length, '');
+    final candidates = await _inParallel(
+      entries.length,
+      isCancelled: isCancelled,
+      onDone: (done, i) =>
+          onProgress?.call(done, entries.length, entries[i].title),
+      (i) async {
+        final entry = entries[i];
+        String? hash;
+        String? error;
+        var size = 0;
+        final path = entry.filePath;
+        if (path != null) {
+          try {
+            size = await File(path).length();
+            hash = await sha256OfFileInBackground(path);
+          } catch (e) {
+            // The catalogue names a file that isn't there — a moved Calibre
+            // library, most often. Say so on the row rather than dropping it.
+            error = 'file not readable: $e';
+          }
+        } else {
+          // Nothing to read, so nothing to yield to; keep the progress callback
+          // responsive over a long metadata-only import.
+          await Future<void>.delayed(Duration.zero);
         }
-      } else {
-        // Nothing to read, so nothing to yield to; keep the progress callback
-        // responsive over a long metadata-only import.
-        await Future<void>.delayed(Duration.zero);
-      }
-      candidates.add(classify(
-        path: path ?? entry.title,
-        sizeBytes: size,
-        format: path == null ? '' : _formatOf(path),
-        sha256: hash,
-        library: library,
-        entry: entry,
-        error: error,
-      ));
-    }
+        return classify(
+          path: path ?? entry.title,
+          sizeBytes: size,
+          format: path == null ? '' : _formatOf(path),
+          sha256: hash,
+          library: library,
+          entry: entry,
+          error: error,
+        );
+      },
+    );
     onProgress?.call(entries.length, entries.length, '');
     return candidates;
   }

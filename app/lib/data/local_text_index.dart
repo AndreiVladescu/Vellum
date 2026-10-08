@@ -28,6 +28,7 @@ import 'package:drift/drift.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import '../reader/epub_book.dart';
+import 'background_work.dart';
 import 'database.dart';
 import 'search_index.dart';
 
@@ -240,8 +241,18 @@ class LocalTextIndex {
     }
   }
 
-  Future<List<({int page, String body})>> _extractEpub(File file) async {
-    final book = await EpubBook.open(file);
+  /// In a background isolate (performance round #8): unzipping, parsing and
+  /// flattening every chapter of a big EPUB is seconds of CPU, and this runs at
+  /// startup, while the shelf is being drawn.
+  Future<List<({int page, String body})>> _extractEpub(File file) {
+    final path = file.path;
+    return inBackground(() => _extractEpubIn(path));
+  }
+
+  static Future<List<({int page, String body})>> _extractEpubIn(
+    String path,
+  ) async {
+    final book = await EpubBook.open(File(path));
     final out = <({int page, String body})>[];
     var bytes = 0;
     for (var i = 0; i < book.chapters.length; i++) {
