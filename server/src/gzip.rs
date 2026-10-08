@@ -37,7 +37,9 @@ pub async fn gzip_json(request: Request, next: Next) -> Response {
         .and_then(|v| v.to_str().ok())
         .is_some_and(accepts_gzip);
     let response = next.run(request).await;
-    if !wants_gzip || !is_json(&response) || response.headers().contains_key(header::CONTENT_ENCODING)
+    if !wants_gzip
+        || !is_json(&response)
+        || response.headers().contains_key(header::CONTENT_ENCODING)
     {
         return response;
     }

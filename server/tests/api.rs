@@ -4440,7 +4440,9 @@ async fn re_uploading_the_same_cover_changes_nothing() {
         b.body(Body::empty()).unwrap()
     };
     async fn json_of(res: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap();
         serde_json::from_slice(&bytes).unwrap()
     }
     let updated_at = || async {
@@ -4455,7 +4457,11 @@ async fn re_uploading_the_same_cover_changes_nothing() {
     let res = app.clone().oneshot(put(first)).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let etag = json_of(res).await["etag"].as_str().unwrap().to_string();
-    assert_eq!(etag, etag_of(first), "the upload answers with the content hash");
+    assert_eq!(
+        etag,
+        etag_of(first),
+        "the upload answers with the content hash"
+    );
 
     // The GET carries the same tag, and revalidating with it is a 304.
     let res = app.clone().oneshot(get(None)).await.unwrap();
@@ -4474,9 +4480,17 @@ async fn re_uploading_the_same_cover_changes_nothing() {
     let res = app.clone().oneshot(put(first)).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     assert_eq!(json_of(res).await["etag"], etag.as_str());
-    assert_eq!(updated_at().await, "2000-01-01 00:00:00", "same bytes: not a change");
+    assert_eq!(
+        updated_at().await,
+        "2000-01-01 00:00:00",
+        "same bytes: not a change"
+    );
     let res = app.clone().oneshot(get(Some(&etag))).await.unwrap();
-    assert_eq!(res.status(), StatusCode::NOT_MODIFIED, "other devices keep theirs");
+    assert_eq!(
+        res.status(),
+        StatusCode::NOT_MODIFIED,
+        "other devices keep theirs"
+    );
 
     // A cover that really did change still is one.
     let second: &[u8] = b"\x89PNG\r\n\x1a\n a better cover";
@@ -4484,7 +4498,11 @@ async fn re_uploading_the_same_cover_changes_nothing() {
     assert_eq!(json_of(res).await["etag"], etag_of(second).as_str());
     assert_ne!(updated_at().await, "2000-01-01 00:00:00");
     let res = app.clone().oneshot(get(Some(&etag))).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK, "the old tag no longer matches");
+    assert_eq!(
+        res.status(),
+        StatusCode::OK,
+        "the old tag no longer matches"
+    );
 }
 
 /// A sync's lists are JSON and compress ~20× (performance round #7). Only JSON
@@ -4508,19 +4526,43 @@ async fn json_is_gzipped_when_asked_and_only_json() {
         b.body(Body::empty()).unwrap()
     };
     async fn body(res: axum::response::Response) -> Vec<u8> {
-        axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap().to_vec()
+        axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec()
     }
 
-    let plain = app.clone().oneshot(get("/api/books".into(), false)).await.unwrap();
-    assert!(plain.headers().get("content-encoding").is_none(), "not asked: not gzipped");
+    let plain = app
+        .clone()
+        .oneshot(get("/api/books".into(), false))
+        .await
+        .unwrap();
+    assert!(
+        plain.headers().get("content-encoding").is_none(),
+        "not asked: not gzipped"
+    );
     let plain = body(plain).await;
 
-    let gz = app.clone().oneshot(get("/api/books".into(), true)).await.unwrap();
+    let gz = app
+        .clone()
+        .oneshot(get("/api/books".into(), true))
+        .await
+        .unwrap();
     assert_eq!(gz.status(), StatusCode::OK);
     assert_eq!(gz.headers()["content-encoding"], "gzip");
-    assert!(gz.headers()["vary"].to_str().unwrap().contains("accept-encoding"));
+    assert!(
+        gz.headers()["vary"]
+            .to_str()
+            .unwrap()
+            .contains("accept-encoding")
+    );
     let gz = body(gz).await;
-    assert!(gz.len() < plain.len() / 3, "{} vs {} bytes", gz.len(), plain.len());
+    assert!(
+        gz.len() < plain.len() / 3,
+        "{} vs {} bytes",
+        gz.len(),
+        plain.len()
+    );
     let mut inflated = Vec::new();
     flate2::read::GzDecoder::new(gz.as_slice())
         .read_to_end(&mut inflated)
@@ -4528,7 +4570,11 @@ async fn json_is_gzipped_when_asked_and_only_json() {
     assert_eq!(inflated, plain, "the same JSON, byte for byte");
 
     // Small JSON isn't worth it.
-    let me = app.clone().oneshot(get("/api/auth/me".into(), true)).await.unwrap();
+    let me = app
+        .clone()
+        .oneshot(get("/api/auth/me".into(), true))
+        .await
+        .unwrap();
     assert!(me.headers().get("content-encoding").is_none());
 
     // A cover is already compressed, and serves byte ranges.
@@ -4537,7 +4583,9 @@ async fn json_is_gzipped_when_asked_and_only_json() {
         .uri(format!("/api/books/{book}/cover"))
         .header("authorization", format!("Bearer {master}"))
         .header("content-type", "image/png")
-        .body(Body::from([b"\x89PNG\r\n\x1a\n".as_slice(), &[0u8; 4096]].concat()))
+        .body(Body::from(
+            [b"\x89PNG\r\n\x1a\n".as_slice(), &[0u8; 4096]].concat(),
+        ))
         .unwrap();
     app.clone().oneshot(put).await.unwrap();
     let cover = app

@@ -226,7 +226,10 @@ async fn content_etag(state: &AppState, rel: &str) -> Option<String> {
     .ok()?
     .ok()?;
     let tag = format!("\"{digest}\"");
-    COVER_ETAGS.lock().unwrap().insert(full, (stamp, tag.clone()));
+    COVER_ETAGS
+        .lock()
+        .unwrap()
+        .insert(full, (stamp, tag.clone()));
     Some(tag)
 }
 
