@@ -151,6 +151,36 @@ in the same pass. None of them block the rest of the item.
 
 ---
 
+## Performance round (October 2026)
+
+Found by measuring rather than guessing — see
+[`PERFORMANCE.md`](PERFORMANCE.md) for the numbers. One commit per item, in
+this order.
+
+- [ ] **1. App database indexes.** The app schema has no secondary indexes: the
+  shelf's `has_file` check scans `book_files` once per book, on every `books`
+  write (every page turn). 393 ms → 20 ms at 5,000 books.
+- [ ] **2. WAL journal for the app database.** Cheaper page-turn writes, reads
+  that don't wait on writers. Restore must clear stale `-wal`/`-shm` files.
+- [ ] **3. Cover thumbnails.** Spines decode full-size covers (up to 1.7 MB PNG
+  at 908×1200). Store covers as JPEG, keep a small shelf thumbnail made off the
+  UI isolate, backfill existing covers across cores.
+- [ ] **4. Sync re-uploads unchanged covers.** Every push of a dirty book sends
+  its whole cover; the server rewrites it and bumps `updated_at`, so every
+  other device downloads it again. Upload only changed covers; the server
+  skips identical bytes and uses a content-hash ETag.
+- [ ] **5. Push lists the whole library.** Learning which files the server has
+  fetches every book; ask only about the books being pushed.
+- [ ] **6. Concurrent pull.** A no-change sync is ~18 sequential GETs; fetch the
+  independent lists together, apply them in foreign-key order.
+- [ ] **7. Gzip on the server's JSON responses.**
+- [ ] **8. Import hashing off the UI isolate.** SHA-256 of every imported file
+  runs on the UI isolate, one file at a time; hash in background isolates, in
+  parallel. Same for the content indexer's EPUB parse.
+- [ ] **9. EPUB reader: stop re-transforming chapter HTML on every build.**
+
+---
+
 ## Open / possible follow-ups
 
 - **The console's import list has a header stranded in the middle of it.**
