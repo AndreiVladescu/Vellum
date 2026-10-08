@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'background_work.dart';
 import 'backup_crypto.dart';
 import 'file_hash.dart';
 import 'library_repository.dart';
@@ -234,7 +235,24 @@ class BackupService {
   /// way to learn a backup is bad *before* you need it — and it is read-only:
   /// nothing about the live library is touched, so it is safe to run on the
   /// backup you are about to trust.
-  Future<BackupCheck> verify(File archive, {String? passphrase}) async {
+  ///
+  /// All of it runs in a background isolate: decrypting (a deliberately slow
+  /// key derivation, then every byte), unzipping, and hashing every entry is
+  /// minutes of CPU for a large library, and it used to be the UI isolate's.
+  Future<BackupCheck> verify(File archive, {String? passphrase}) {
+    final archivePath = archive.path;
+    final scratch = repository.dataDir.path;
+    return inBackground(() => _verifyIn(archivePath, passphrase, scratch));
+  }
+
+  /// [verify]'s body, run in the background isolate: plain paths in, a
+  /// [BackupCheck] (plain data) out.
+  static Future<BackupCheck> _verifyIn(
+    String archivePath,
+    String? passphrase,
+    String scratchDir,
+  ) async {
+    final archive = File(archivePath);
     File readable = archive;
     File? decrypted;
     try {
@@ -251,7 +269,7 @@ class BackupService {
         // `getTemporaryDirectory()` would drag a platform plugin into a check
         // that is otherwise pure file IO.
         decrypted = File(p.join(
-          repository.dataDir.path,
+          scratchDir,
           '.verify-${DateTime.now().microsecondsSinceEpoch}.zip',
         ));
         try {

@@ -431,9 +431,20 @@ flight, a cancel otherwise lands mid-hash and the scan would finish and report
 them all.
 
 The local content indexer's EPUB pass (unzip, parse, flatten every chapter) now
-runs in an isolate too; it runs at startup, while the shelf is drawn. Still on
-the UI isolate, and left for now: verifying a backup archive, which hashes
-in-memory archive entries and would need the whole check moved over.
+runs in an isolate too; it runs at startup, while the shelf is drawn.
+
+**Verifying a backup** followed in a second commit: the whole check — the
+encryption test, decrypting (Argon2, then every byte), unzipping, hashing each
+entry — moved into one background isolate, since it hashes in-memory archive
+entries rather than files. A 300 MB archive, with a 16 ms ticker on the UI
+isolate:
+
+| | Wall time | Ticks | Worst gap |
+|---|---|---|---|
+| Before | 2.65 s | 1 | 2,653 ms — frozen throughout |
+| After | 2.71 s | 165 | 46 ms |
+
+At the development library's 2.4 GB that was a ~20-second freeze.
 
 ### #9 The EPUB reader stops rewriting its chapter on every rebuild
 
