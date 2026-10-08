@@ -6,6 +6,67 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.1.11 — 2026-10-08
+
+A speed release: a big library opens, scrolls and syncs much faster, and the
+heavy jobs — hashing an import, verifying a backup — no longer freeze the
+screen while they run.
+
+### Changed
+
+- **A large shelf opens in a fraction of the time.** The library database now
+  indexes the columns books are looked up by: at 5,000 books the shelf query
+  went from 396 ms to 18 ms.
+- **Keeping your place costs next to nothing.** The library is opened in
+  SQLite's write-ahead-log mode, so the write behind every page turn dropped
+  from about 12 ms to 0.15 ms.
+- **Shelf covers come from thumbnails** sized for the shelf and made in the
+  background, instead of decoding every full-size image: 92 covers decode in
+  201 ms rather than 755 ms and read 4.7 MB from disk rather than 25 MB. A
+  cover you replace is never shown stale.
+- **Importing hashes files in the background, several at once.** A 1.1 GB
+  import that held the screen for 10.4 s now takes 4.0 s and leaves it free.
+  Attaching a file, making a backup and the EPUB search indexer moved off it
+  too.
+- **Verifying a backup no longer freezes the app.** Decrypting, unzipping and
+  checking a 300 MB archive used to lock the screen for 2.65 s; the worst
+  hitch now is 46 ms.
+- **Long EPUB chapters stay smooth.** The night-mode and highlight rewrite of
+  a chapter runs once per change instead of on every redraw — for an 8 MB
+  chapter, 175 ms down to 0.05 ms.
+
+### Sync
+
+- **Editing a book no longer re-uploads its cover.** The server now names a
+  cover by a hash of its bytes, so the app skips sending one the server
+  already has, and an identical re-upload is a no-op. Changing a title moves
+  no cover bytes at all.
+- **A push asks only about the books it carries.** Every push used to fetch
+  the whole library's file list — 4.4 MB at 5,000 books — to avoid
+  re-uploading files. A small push now asks about its own books' files, and
+  books without files ask nothing.
+- **A pull sends its requests together** rather than one after another: a
+  pull with nothing new, at 50 ms of latency, went from 862 ms to 136 ms.
+- **The server gzips JSON responses** over 1 KB: a 5,000-book listing goes
+  from 4.38 MB to 273 KB on the wire.
+
+Mixed versions work. A v1.1.11 app syncs with an older server, which simply
+keeps receiving covers on every push, and an older app syncs with a v1.1.11
+server.
+
+### Security
+
+- Server: rustls updated to 0.23.45 for RUSTSEC-2026-0285.
+
+### Fixed
+
+- **The Android app builds on a fresh machine again.** Gradle was pinned to
+  one specific JetBrains JDK download that foojay has since withdrawn, so
+  every machine without it cached failed with `400 Bad Request`. It now runs
+  on any JDK 21.
+
+---
+
 ## v1.1.10 — 2026-09-20
 
 A fresher reading-insights screen, and three small reader and console
