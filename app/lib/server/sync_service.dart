@@ -200,13 +200,15 @@ class SyncService {
   }) async {
     final db = _db;
     final issues = <SyncIssue>[];
-    final listed = await client.listBooks(cursor: cursor);
+    final requests = _PullRequests(client, cursor)
+      ..sendAll(scope, profile: profile != null);
+    final listed = await requests.books;
     final books = listed.books;
 
     // Apply the server's deletions locally. The server already knows, so pass
     // recordTombstone: false — otherwise we'd re-push this delete forever.
     var deletedLocally = 0;
-    for (final id in await client.listDeletions(since: cursor, kind: 'book')) {
+    for (final id in await requests.bookDeletions) {
       final row = await (db.select(
         db.books,
       )..where((b) => b.id.equals(id))).getSingleOrNull();
@@ -533,19 +535,19 @@ class SyncService {
     // filters). Loans run after copies for the same reason.
     const nothing = (pulled: 0, deletedLocally: 0);
     final shelfResult = scope.books
-        ? await _pullShelves(client, cursor, issues)
+        ? await _pullShelves(requests, issues)
         : nothing;
     final copyResult =
-        scope.copies ? await _pullCopies(client, cursor, issues) : nothing;
+        scope.copies ? await _pullCopies(requests, issues) : nothing;
     final loanResult =
-        scope.loans ? await _pullLoans(client, cursor, issues) : nothing;
+        scope.loans ? await _pullLoans(requests, issues) : nothing;
     // Personal data last: an annotation or a sitting names a book, and its
     // foreign key needs that book already applied above.
     final photoResult = scope.copyPhotos
-        ? await _pullCopyPhotos(client, cursor, issues)
+        ? await _pullCopyPhotos(client, requests, issues)
         : nothing;
-    final personalPulled = await _pullPersonal(client, cursor, issues, scope);
-    await _syncProfile(client, issues);
+    final personalPulled = await _pullPersonal(requests, issues, scope);
+    await _syncProfile(client, requests, issues);
 
     // Advance the cursor to the server's clock so the next pull is a delta.
     // Done last, so a mid-pull failure leaves the old cursor and the next pull
@@ -598,14 +600,13 @@ class SyncService {
   /// that failed its own pull must not make this throw. Adopted shelves have
   /// `needsPush` cleared, same as books' `applied` handling.
   Future<({int pulled, int deletedLocally})> _pullShelves(
-    VellumServerClient client,
-    String? cursor,
+    _PullRequests requests,
     List<SyncIssue> issues,
   ) async {
     final db = _db;
 
     var deletedLocally = 0;
-    for (final id in await client.listDeletions(since: cursor, kind: 'shelf')) {
+    for (final id in await requests.shelfDeletions) {
       final row = await (db.select(
         db.shelves,
       )..where((s) => s.id.equals(id))).getSingleOrNull();
@@ -632,7 +633,7 @@ class SyncService {
         d.bookId,
     };
 
-    final listed = await client.listShelves(cursor: cursor);
+    final listed = await requests.shelves;
     final localShelves = await db.select(db.shelves).get();
     final localUpdatedAt = {for (final s in localShelves) s.id: s.updatedAt};
     final localBookIds = {for (final b in await db.select(db.books).get()) b.id};
@@ -699,14 +700,13 @@ class SyncService {
   /// device for good. Adopted copies have `needsPush` cleared, same as
   /// books'/shelves' handling.
   Future<({int pulled, int deletedLocally})> _pullCopies(
-    VellumServerClient client,
-    String? cursor,
+    _PullRequests requests,
     List<SyncIssue> issues,
   ) async {
     final db = _db;
 
     var deletedLocally = 0;
-    for (final id in await client.listDeletions(since: cursor, kind: 'copy')) {
+    for (final id in await requests.copyDeletions) {
       final row = await (db.select(
         db.physicalCopies,
       )..where((c) => c.id.equals(id))).getSingleOrNull();
@@ -733,7 +733,7 @@ class SyncService {
         d.bookId,
     };
 
-    final listed = await client.listCopies(cursor: cursor);
+    final listed = await requests.copies;
     final localCopies = await db.select(db.physicalCopies).get();
     final localUpdatedAt = {for (final c in localCopies) c.id: c.updatedAt};
     final localBookIds = {for (final b in await db.select(db.books).get()) b.id};
@@ -793,14 +793,13 @@ class SyncService {
   /// permanent-loss risk a silent skip would create). Adopted loans have
   /// `needsPush` cleared, same as copies' handling.
   Future<({int pulled, int deletedLocally})> _pullLoans(
-    VellumServerClient client,
-    String? cursor,
+    _PullRequests requests,
     List<SyncIssue> issues,
   ) async {
     final db = _db;
 
     var deletedLocally = 0;
-    for (final id in await client.listDeletions(since: cursor, kind: 'loan')) {
+    for (final id in await requests.loanDeletions) {
       final row = await (db.select(
         db.loans,
       )..where((l) => l.id.equals(id))).getSingleOrNull();
@@ -833,7 +832,7 @@ class SyncService {
         d.bookId,
     };
 
-    final listed = await client.listLoans(cursor: cursor);
+    final listed = await requests.loans;
     final localLoans = await db.select(db.loans).get();
     final localUpdatedAt = {for (final l in localLoans) l.id: l.updatedAt};
     final localCopyIds = {
@@ -1124,7 +1123,7 @@ class SyncService {
 
   Future<({int pulled, int deletedLocally})> _pullCopyPhotos(
     VellumServerClient client,
-    String? cursor,
+    _PullRequests requests,
     List<SyncIssue> issues,
   ) async {
     final db = _db;
@@ -1132,7 +1131,7 @@ class SyncService {
     var deletedLocally = 0;
     try {
       for (final id
-          in await client.listDeletions(since: cursor, kind: 'copy_photo')) {
+          in await requests.copyPhotoDeletions) {
         final rows = await (db.select(db.copyPhotos)
               ..where((ph) => ph.id.equals(id)))
             .get();
@@ -1155,7 +1154,7 @@ class SyncService {
       final known = {
         for (final c in await db.select(db.physicalCopies).get()) c.id,
       };
-      final remote = await client.listCopyPhotos(cursor: cursor);
+      final remote = await requests.copyPhotos;
       for (final photo in remote.entries) {
         // A copy this device doesn't have — a share it hasn't taken, or a copy
         // whose own pull failed. The foreign key would otherwise abort.
@@ -1290,12 +1289,13 @@ class SyncService {
   /// would mean fetching the profile twice to answer one question.
   Future<void> _syncProfile(
     VellumServerClient client,
+    _PullRequests requests,
     List<SyncIssue> issues,
   ) async {
     final local = profile;
     if (local == null) return;
     try {
-      final remote = await client.fetchProfile();
+      final remote = await requests.profile;
       final localStamp = local.updatedAt;
       final remoteStamp = remote.updatedAt;
       final remoteIsNewer = localStamp == null ||
@@ -1356,8 +1356,7 @@ class SyncService {
       );
 
   Future<int> _pullPersonal(
-    VellumServerClient client,
-    String? cursor,
+    _PullRequests requests,
     List<SyncIssue> issues,
     SyncScope scope,
   ) async {
@@ -1376,7 +1375,7 @@ class SyncService {
     // not my private note on the same book" is a distinction nobody asked for.
     if (scope.annotations) {
       try {
-      final deletions = await client.listAnnotationDeletions(cursor: cursor);
+      final deletions = await requests.annotationDeletions;
       for (final tombstone in deletions.entries) {
         final removed = await (db.delete(db.annotations)
               ..where((a) => a.id.equals(tombstone.id)))
@@ -1384,7 +1383,7 @@ class SyncService {
         if (removed > 0) pulled++;
       }
 
-      final remote = await client.listAnnotations(cursor: cursor);
+      final remote = await requests.annotations;
       for (final a in remote.entries) {
         if (!known.contains(a.bookId)) continue;
         final local = await (db.select(db.annotations)
@@ -1426,7 +1425,7 @@ class SyncService {
 
     if (scope.sessions) {
       try {
-      final remote = await client.listSessions(cursor: cursor);
+      final remote = await requests.sessions;
       for (final s in remote.entries) {
         if (!known.contains(s.bookId)) continue;
         await db.into(db.readingSessions).insertOnConflictUpdate(
@@ -1458,7 +1457,7 @@ class SyncService {
       // same reading `_serverLacksPersonal` makes for every other personal
       // list. The push is the ambiguous one.
       try {
-        final statuses = await client.listBookStatuses(cursor: cursor);
+        final statuses = await requests.statuses;
         for (final remote in statuses.entries) {
           if (!known.contains(remote.bookId)) continue;
           final local = await (db.select(db.books)
@@ -1497,7 +1496,7 @@ class SyncService {
 
     if (scope.annotations) {
       try {
-      final notes = await client.listBookNotes(cursor: cursor);
+      final notes = await requests.notes;
       for (final n in notes.entries) {
         if (!known.contains(n.bookId)) continue;
         await (db.update(db.books)..where((b) => b.id.equals(n.bookId))).write(
@@ -2100,4 +2099,68 @@ class SyncService {
       await pool.close();
     }
   }
+}
+
+/// Every list a pull reads from the server, sent together (performance round
+/// #6).
+///
+/// A pull asked for them one at a time — books, then each kind's deletions
+/// and rows, then annotations, sittings, statuses, notes, the profile —
+/// eighteen round trips back to back even when nothing had changed, which on a
+/// phone's latency is seconds of waiting on nothing. None of them depends on
+/// another's answer (they all take the previous cursor), so they now go out at
+/// once, and the pull still *applies* them in foreign-key order: it awaits each
+/// one where it used to send it. Read together, they are also one consistent
+/// picture of the server rather than one smeared across a long blob download.
+///
+/// Each field is `late`: built — sent — the first time it is read, by
+/// [sendAll] or by the code that uses it.
+class _PullRequests {
+  _PullRequests(this._client, this._cursor);
+
+  final VellumServerClient _client;
+  final String? _cursor;
+
+  late final books = _sent(_client.listBooks(cursor: _cursor));
+  late final bookDeletions = _deletions('book');
+  late final shelves = _sent(_client.listShelves(cursor: _cursor));
+  late final shelfDeletions = _deletions('shelf');
+  late final copies = _sent(_client.listCopies(cursor: _cursor));
+  late final copyDeletions = _deletions('copy');
+  late final loans = _sent(_client.listLoans(cursor: _cursor));
+  late final loanDeletions = _deletions('loan');
+  late final copyPhotos = _sent(_client.listCopyPhotos(cursor: _cursor));
+  late final copyPhotoDeletions = _deletions('copy_photo');
+  late final annotations = _sent(_client.listAnnotations(cursor: _cursor));
+  late final annotationDeletions =
+      _sent(_client.listAnnotationDeletions(cursor: _cursor));
+  late final sessions = _sent(_client.listSessions(cursor: _cursor));
+  late final statuses = _sent(_client.listBookStatuses(cursor: _cursor));
+  late final notes = _sent(_client.listBookNotes(cursor: _cursor));
+  late final profile = _sent(_client.fetchProfile());
+
+  /// Sends every request a pull over [scope] will read — the same conditions
+  /// `_pull` and its parts check before reading them, so nothing is fetched
+  /// only to be thrown away.
+  void sendAll(SyncScope scope, {required bool profile}) {
+    final _ = <Future<Object?>>[
+      books,
+      bookDeletions,
+      if (scope.books) ...[shelves, shelfDeletions, statuses],
+      if (scope.copies) ...[copies, copyDeletions],
+      if (scope.loans) ...[loans, loanDeletions],
+      if (scope.copyPhotos) ...[copyPhotos, copyPhotoDeletions],
+      if (scope.annotations) ...[annotations, annotationDeletions, notes],
+      if (scope.sessions) sessions,
+      if (profile) this.profile,
+    ];
+  }
+
+  Future<List<String>> _deletions(String kind) =>
+      _sent(_client.listDeletions(since: _cursor, kind: kind));
+
+  /// A request whose failure is reported where it is awaited, not as an
+  /// uncaught error the moment it fails — which, sent early, can be before
+  /// anything is listening (or never, if an earlier step ends the pull).
+  static Future<T> _sent<T>(Future<T> request) => request..ignore();
 }

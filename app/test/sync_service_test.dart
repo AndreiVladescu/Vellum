@@ -855,6 +855,28 @@ void main() {
     });
   });
 
+  test('a pull sends its list requests together, not one by one', () async {
+    // Fifteen GETs back to back were most of a no-change sync's time on a
+    // phone (performance round #6). Counted rather than timed: in flight at
+    // once is deterministic where a stopwatch isn't.
+    final repo = await _repo(dir);
+    final fake = _server(books: const []);
+    var inFlight = 0;
+    var most = 0;
+    final client = _client((req) async {
+      most = ++inFlight > most ? inFlight : most;
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      inFlight--;
+      return fake(req);
+    });
+
+    await SyncService(repo).pull(client);
+
+    expect(most, greaterThanOrEqualTo(10),
+        reason: 'books, deletions, shelves, copies, loans, photos and the '
+            'personal lists all go out before any answer comes back');
+  });
+
   test('push sends only books that need pushing, and clears the flag', () async {
     final repo = await _repo(dir);
     final db = repo.db;

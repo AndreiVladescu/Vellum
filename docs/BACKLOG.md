@@ -171,7 +171,7 @@ this order.
   skips identical bytes and uses a content-hash ETag.
 - [x] **5. Push lists the whole library.** Learning which files the server has
   fetches every book; ask only about the books being pushed.
-- [ ] **6. Concurrent pull.** A no-change sync is ~18 sequential GETs; fetch the
+- [x] **6. Concurrent pull.** A no-change sync is ~18 sequential GETs; fetch the
   independent lists together, apply them in foreign-key order.
 - [ ] **7. Gzip on the server's JSON responses.**
 - [ ] **8. Import hashing off the UI isolate.** SHA-256 of every imported file

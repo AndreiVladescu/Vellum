@@ -355,3 +355,26 @@ sync, a bulk import) the one listing is still the cheaper way, and is what runs.
 
 `auto_pusher_test.dart` had used that listing as its count of push runs; it now
 counts `push()` calls directly.
+
+### #6 A pull sends its requests together
+
+A pull asked for each list in turn — books, then each kind's deletions and rows,
+the personal lists, the profile — each waiting for the one before. None depends
+on another's answer (they all take the previous cursor), so `_PullRequests` now
+sends every list the sync's scope will read at once, and the pull awaits each
+where it used to send it: rows are still applied in foreign-key order, books
+before the shelves, copies and annotations that name them.
+
+A no-change pull, full scope, 50 ms of simulated latency per request:
+
+| | Requests | Wall time |
+|---|---|---|
+| One at a time | 15 | 862 ms |
+| Together | 15 | 136 ms |
+
+On a phone's 100 ms or more, that is the difference between a sync that feels
+instant and one that doesn't. `sync_service_test.dart` pins it by counting
+requests in flight at once (10 or more; it was 1). A request that fails before
+the pull reaches it is held until it does, so failures are still reported where
+they were — and a 404 from a server without the personal tables is still read
+as "not supported yet".
