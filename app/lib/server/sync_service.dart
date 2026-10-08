@@ -7,6 +7,7 @@ import 'package:pool/pool.dart';
 
 import '../account/user_profile.dart';
 import '../data/database.dart';
+import '../data/file_hash.dart';
 import '../data/library_repository.dart';
 import '../shelf/spine_style.dart';
 import 'server_client.dart';
@@ -498,7 +499,9 @@ class SyncService {
       final coverFile = File(p.join(_dataDir.path, localCover));
       if (await coverFile.exists()) {
         try {
-          await client.uploadCover(b.id, await coverFile.readAsBytes());
+          final etag =
+              await client.uploadCover(b.id, await coverFile.readAsBytes());
+          await _rememberCoverEtag(b.id, etag);
         } catch (e) {
           // View-only or offline — the cover stays local to this device.
           issues.add(SyncIssue(
@@ -567,6 +570,29 @@ class SyncService {
   /// `shelf_books.book_id` has a foreign key, and a shared library or a book
   /// that failed its own pull must not make this throw. Adopted shelves have
   /// `needsPush` cleared, same as books' `applied` handling.
+  /// Whether the server already holds exactly [cover] for [book] — so pushing
+  /// the book need not send it (performance round #4).
+  ///
+  /// A cover used to go up with every push of its book, whatever had changed.
+  /// The server's cover ETag is the SHA-256 of its bytes, and `coverEtag` holds
+  /// the one we last downloaded or uploaded, so equal hashes mean the server
+  /// has these bytes. An older server's weak ETag never matches a hash, which
+  /// keeps that server on the old always-upload behaviour.
+  Future<bool> _serverHasCover(Book book, File cover) async {
+    final stored = book.coverEtag;
+    if (stored == null) return false;
+    return stored == '"${await sha256OfFileInBackground(cover.path)}"';
+  }
+
+  /// Stores the ETag an upload answered with, so the next push can skip the
+  /// same cover and the next pull revalidates it with a `304` rather than
+  /// downloading our own upload back. Null (an older server) leaves it alone.
+  Future<void> _rememberCoverEtag(String bookId, String? etag) async {
+    if (etag == null) return;
+    await (_db.update(_db.books)..where((x) => x.id.equals(bookId)))
+        .write(BooksCompanion(coverEtag: Value(etag)));
+  }
+
   Future<({int pulled, int deletedLocally})> _pullShelves(
     VellumServerClient client,
     String? cursor,
@@ -993,14 +1019,17 @@ class SyncService {
           );
         }
         final cover = repository.coverFileOf(b);
-        if (cover != null && await cover.exists()) {
-          await client.uploadCover(
+        if (cover != null &&
+            await cover.exists() &&
+            !await _serverHasCover(b, cover)) {
+          final etag = await client.uploadCover(
             b.id,
             await cover.readAsBytes(),
             contentType: p.extension(cover.path).toLowerCase() == '.png'
                 ? 'image/png'
                 : 'image/jpeg',
           );
+          await _rememberCoverEtag(b.id, etag);
         }
 
         // Upload local files the server doesn't already have (dedup by hash).

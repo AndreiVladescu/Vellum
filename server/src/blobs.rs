@@ -3,7 +3,10 @@
 //! hashes. Every endpoint is access-checked against the book the blob belongs
 //! to, exactly like the book metadata.
 
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
+use std::time::SystemTime;
 
 use axum::Json;
 use axum::body::Bytes;
@@ -88,7 +91,17 @@ fn image_ext(sniffed: Sniffed) -> Option<&'static str> {
 // ---- covers ---------------------------------------------------------------
 
 /// Upload (or replace) a book's cover. Raw image bytes in the body; the
-/// `Content-Type` header picks the stored extension. Requires editor access.
+/// stored extension comes from sniffing them. Requires editor access.
+///
+/// Answers `{ cover_path, etag }`, the etag being what a `GET` of the cover
+/// will carry — so the uploader can store it and skip both re-uploading the
+/// same cover and downloading its own upload back on the next pull.
+///
+/// Re-uploading the cover already stored is a no-op (performance round #4):
+/// no write, and above all no `updated_at` bump. An app used to push the
+/// cover with every edit to the book, and the bump made every other device see
+/// a changed book and fetch its cover again — a title fix cost a megabyte per
+/// device.
 pub async fn put_cover(
     State(state): State<AppState>,
     user: AuthUser,
@@ -111,6 +124,12 @@ pub async fn put_cover(
     let previous = previous.flatten();
 
     let rel = format!("covers/{id}.{ext}");
+    let etag = format!("\"{}\"", hex::encode(Sha256::digest(&body)));
+    if previous.as_deref() == Some(rel.as_str())
+        && content_etag(&state, &rel).await.as_deref() == Some(etag.as_str())
+    {
+        return Ok(Json(serde_json::json!({ "cover_path": rel, "etag": etag })));
+    }
     write_blob(&state, &rel, &body).await?;
 
     sqlx::query("UPDATE book SET cover_path = ?, updated_at = datetime('now') WHERE id = ?")
@@ -127,7 +146,7 @@ pub async fn put_cover(
     }
     // The cover changed, so any cached thumbnails are stale.
     invalidate_thumbs(&state, &id).await;
-    Ok(Json(serde_json::json!({ "cover_path": rel })))
+    Ok(Json(serde_json::json!({ "cover_path": rel, "etag": etag })))
 }
 
 /// Thumbnail widths we generate and cache. A whitelist so a caller can't drive
@@ -164,8 +183,7 @@ pub async fn get_cover(
         _ => rel,
     };
 
-    // Covers have no stored hash, so use a weak size+mtime validator.
-    let etag = weak_etag(&state, &serve_rel).await;
+    let etag = content_etag(&state, &serve_rel).await;
     let inm = headers
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
@@ -179,17 +197,44 @@ fn thumb_rel(id: &str, w: u32) -> String {
     format!("covers/thumbs/{id}-w{w}.jpg")
 }
 
-/// A weak size+mtime ETag for the blob at `rel`, or None if it can't be stat'd.
-async fn weak_etag(state: &AppState, rel: &str) -> Option<String> {
-    let m = tokio::fs::metadata(state.data_dir.join(rel)).await.ok()?;
-    let mtime = m
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    Some(format!("W/\"{}-{mtime}\"", m.len()))
+/// A strong ETag for the cover (or cover thumbnail) at `rel`: the SHA-256 of
+/// its bytes, or None if it can't be read.
+///
+/// It used to be a weak size+mtime tag, which changed whenever the file was
+/// rewritten — even with the same bytes — so every re-upload looked like a new
+/// cover to every device. A content hash is the same on every device holding
+/// the same cover, and is what `put_cover` hands back to the uploader.
+///
+/// Covers have many writers (upload, the PDF and EPUB renders, discover) and
+/// no stored hash, so it is computed here — once per version of the file:
+/// remembered against its size and modified time, both of which any rewrite
+/// changes. A `304` therefore still costs only a `stat`.
+async fn content_etag(state: &AppState, rel: &str) -> Option<String> {
+    let full = state.data_dir.join(rel);
+    let meta = tokio::fs::metadata(&full).await.ok()?;
+    let stamp = (meta.len(), meta.modified().ok()?);
+    if let Some((seen, tag)) = COVER_ETAGS.lock().unwrap().get(&full)
+        && *seen == stamp
+    {
+        return Some(tag.clone());
+    }
+    let path = full.clone();
+    let digest = tokio::task::spawn_blocking(move || {
+        std::fs::read(path).map(|bytes| hex::encode(Sha256::digest(&bytes)))
+    })
+    .await
+    .ok()?
+    .ok()?;
+    let tag = format!("\"{digest}\"");
+    COVER_ETAGS.lock().unwrap().insert(full, (stamp, tag.clone()));
+    Some(tag)
 }
+
+/// [`content_etag`]'s memory: one entry per cover file, keyed by full path so
+/// several servers in one process (the tests) can't see each other's.
+type EtagMemo = HashMap<PathBuf, ((u64, SystemTime), String)>;
+
+static COVER_ETAGS: LazyLock<Mutex<EtagMemo>> = LazyLock::new(Default::default);
 
 /// Ensure a cached thumbnail exists for the cover and return its relative path.
 /// Generates it (decode → downscale → JPEG) on first request; on any failure

@@ -3,10 +3,14 @@ library;
 
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/data/sync_clock.dart';
 import 'package:vellum/server/server_client.dart';
 import 'package:vellum/server/sync_service.dart';
 
@@ -25,12 +29,14 @@ void main() {
   // so register once and share the authenticated client across cases. Guarded
   // so it's a no-op when the suite is skipped.
   late final VellumServerClient client;
+  late final String token;
   setUpAll(() async {
     if (url == null) return;
     final email = 'e2e+${DateTime.now().microsecondsSinceEpoch}@lib.test';
     final auth = await VellumServerClient(baseUrl: url)
         .register(email: email, displayName: 'E2E', password: 'password1');
-    client = VellumServerClient(baseUrl: url, token: auth.token);
+    token = auth.token;
+    client = VellumServerClient(baseUrl: url, token: token);
   });
 
   test('push on one device, pull on another: metadata, author, file, delete', () async {
@@ -257,4 +263,69 @@ void main() {
     expect(returnedB.single.returnedAt, isNotNull,
         reason: "A's return must reach B");
   }, skip: skip);
+
+  // Performance round #4, over the real wire: a cover crosses once, and an
+  // edit to the book alone moves no cover bytes in either direction.
+  test('a cover crosses once; a title edit sends no cover either way',
+      () async {
+    final dirA = Directory.systemTemp.createTempSync('vellum_e2e_cover_a');
+    final dirB = Directory.systemTemp.createTempSync('vellum_e2e_cover_b');
+    addTearDown(() {
+      dirA.deleteSync(recursive: true);
+      dirB.deleteSync(recursive: true);
+    });
+    final repoA = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirA);
+    final repoB = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirB);
+    final wireA = _CoverTraffic();
+    final wireB = _CoverTraffic();
+    final clientA = VellumServerClient(baseUrl: url!, token: token, httpClient: wireA);
+    final clientB = VellumServerClient(baseUrl: url, token: token, httpClient: wireB);
+
+    final id = await repoA.createCustomBook(title: 'Dune', author: 'Frank Herbert');
+    await repoA.setCoverBytes(id, img.encodePng(
+        img.Image(width: 20, height: 30)..clear(img.ColorRgb8(200, 100, 0))));
+    await SyncService(repoA).sync(clientA);
+    expect(wireA.uploads, 1, reason: 'the server had no cover');
+
+    await SyncService(repoB).sync(clientB);
+    expect(wireB.downloads, 1, reason: 'B had no cover');
+
+    // B fixes the title. The cover it pushes along with it is the server's own.
+    // Two seconds on: the sync clock counts whole seconds, and an edit inside
+    // the same second as A's would lose last-write-wins to it.
+    await Future<void>.delayed(const Duration(seconds: 2));
+    await (repoB.db.update(repoB.db.books)..where((b) => b.id.equals(id)))
+        .write(const BooksCompanion(title: Value('Dune (1965)')));
+    await stampSyncClock(repoB.db, SyncedRow.book, id); // what an edit does
+    await SyncService(repoB).sync(clientB);
+    expect(wireB.uploads, 0, reason: 'B holds exactly the bytes the server has');
+
+    await SyncService(repoA).sync(clientA);
+    expect((await repoA.watchBook(id).first)?.title, 'Dune (1965)');
+    expect(wireA.downloads, 0,
+        reason: "A revalidates its own upload (304) rather than fetching it");
+    expect(wireA.notModified, greaterThan(0));
+  }, skip: skip);
+}
+
+/// Counts what crosses the wire for covers: uploads, full downloads, and 304
+/// revalidations.
+class _CoverTraffic extends http.BaseClient {
+  final _inner = http.Client();
+  var uploads = 0;
+  var downloads = 0;
+  var notModified = 0;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final response = await _inner.send(request);
+    if (request.url.path.endsWith('/cover')) {
+      if (request.method == 'PUT') uploads++;
+      if (request.method == 'GET' && response.statusCode == 200) downloads++;
+      if (request.method == 'GET' && response.statusCode == 304) notModified++;
+    }
+    return response;
+  }
 }

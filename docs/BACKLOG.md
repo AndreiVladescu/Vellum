@@ -165,7 +165,7 @@ this order.
 - [x] **3. Cover thumbnails.** Spines decode full-size covers (up to 1.7 MB PNG
   at 908×1200). Store covers as JPEG, keep a small shelf thumbnail made off the
   UI isolate, backfill existing covers across cores.
-- [ ] **4. Sync re-uploads unchanged covers.** Every push of a dirty book sends
+- [x] **4. Sync re-uploads unchanged covers.** Every push of a dirty book sends
   its whole cover; the server rewrites it and bumps `updated_at`, so every
   other device downloads it again. Upload only changed covers; the server
   skips identical bytes and uses a content-hash ETag.

@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:path/path.dart' as p;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/server/server_client.dart';
@@ -674,6 +676,84 @@ void main() {
     expect(await repo.watchBook('gone').first, isNull);
     // And it did NOT leave a local tombstone (the server already knows).
     expect(await db.select(db.localDeletions).get(), isEmpty);
+  });
+
+  group('a pushed book sends its cover', () {
+    // It used to go up with every push of its book, whatever had changed —
+    // and the server's rewrite made every other device download it again.
+    late LibraryRepository repo;
+    late File cover;
+    setUp(() async {
+      repo = await _repo(dir);
+      cover = File(p.join(dir.path, 'covers', 'b1.jpg'))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(List.generate(64, (i) => i));
+      await repo.db.into(repo.db.books).insert(BooksCompanion.insert(
+            id: 'b1',
+            title: 'Dune',
+            coverPath: const Value('covers/b1.jpg'),
+          ));
+    });
+
+    Future<void> edit() =>
+        (repo.db.update(repo.db.books)..where((b) => b.id.equals('b1'))).write(
+          const BooksCompanion(
+              title: Value('Dune Messiah'), needsPush: Value(true)),
+        );
+
+    /// Counts cover uploads; answers with the content-hash ETag a current
+    /// server sends, or none at all when [etags] is false.
+    VellumServerClient server(List<int> uploads, {bool etags = true}) =>
+        _client((req) async {
+          final path = req.url.path;
+          if (req.method == 'PUT' && path == '/api/books/b1/cover') {
+            uploads.add(1);
+            return http.Response(
+              jsonEncode({
+                'cover_path': 'covers/b1.png',
+                if (etags) 'etag': '"${sha256.convert(req.bodyBytes)}"',
+              }),
+              200,
+            );
+          }
+          if (req.method == 'PUT' && path.startsWith('/api/books/')) {
+            return http.Response('{}', 200);
+          }
+          return _server(books: const [])(req);
+        });
+
+    test('only when the server lacks those bytes', () async {
+      final uploads = <int>[];
+      final client = server(uploads);
+      final sync = SyncService(repo);
+
+      await sync.push(client);
+      expect(uploads, hasLength(1), reason: 'the server had no cover yet');
+      expect((await repo.watchBook('b1').first)?.coverEtag,
+          '"${sha256.convert(cover.readAsBytesSync())}"',
+          reason: 'kept, so the next pull revalidates instead of downloading');
+
+      await edit();
+      await sync.push(client);
+      expect(uploads, hasLength(1), reason: 'a title edit: same cover');
+
+      cover.writeAsBytesSync(List.generate(64, (i) => 63 - i));
+      await edit();
+      await sync.push(client);
+      expect(uploads, hasLength(2), reason: 'a new cover does go up');
+    });
+
+    test('every time to a server that predates content ETags', () async {
+      final uploads = <int>[];
+      final client = server(uploads, etags: false);
+      final sync = SyncService(repo);
+
+      await sync.push(client);
+      await edit();
+      await sync.push(client);
+      expect(uploads, hasLength(2),
+          reason: 'with no hash to compare, uploading is the safe answer');
+    });
   });
 
   test('push sends only books that need pushing, and clears the flag', () async {

@@ -762,7 +762,10 @@ class VellumServerClient {
   }
 
   /// Upload (replace) a book's cover image.
-  Future<void> uploadCover(
+  /// Uploads [bytes] as the book's cover. Returns the ETag a `GET` of the
+  /// cover will now carry — the SHA-256 of the bytes, quoted — or null from a
+  /// server that predates content-hash cover ETags (performance round #4).
+  Future<String?> uploadCover(
     String bookId,
     Uint8List bytes, {
     String contentType = 'image/jpeg',
@@ -772,7 +775,8 @@ class VellumServerClient {
       headers: {'content-type': contentType, 'authorization': ?_bearer},
       body: bytes,
     );
-    _body(res);
+    final body = _body(res);
+    return body is Map<String, dynamic> ? body['etag'] as String? : null;
   }
 
   // ---- book files ---------------------------------------------------------

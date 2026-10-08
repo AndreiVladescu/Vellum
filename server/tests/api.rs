@@ -4409,6 +4409,84 @@ async fn cover_upload_and_download_round_trips() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
+/// An app used to push a book's cover with every edit to the book. Each push
+/// rewrote the file and bumped the book's `updated_at`, and the weak
+/// size+mtime ETag changed with the rewrite — so a title fix made every other
+/// device re-fetch the book and download its cover again.
+#[tokio::test]
+async fn re_uploading_the_same_cover_changes_nothing() {
+    use sha2::{Digest, Sha256};
+    let (app, db) = test_app_with_db().await;
+    let master = register_master(&app).await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let put = |bytes: &'static [u8]| {
+        Request::builder()
+            .method("PUT")
+            .uri(format!("/api/books/{book}/cover"))
+            .header("authorization", format!("Bearer {master}"))
+            .header("content-type", "image/png")
+            .body(Body::from(bytes.to_vec()))
+            .unwrap()
+    };
+    let etag_of = |bytes: &[u8]| format!("\"{}\"", hex::encode(Sha256::digest(bytes)));
+    let get = |inm: Option<&str>| {
+        let mut b = Request::builder()
+            .uri(format!("/api/books/{book}/cover"))
+            .header("authorization", format!("Bearer {master}"));
+        if let Some(tag) = inm {
+            b = b.header("if-none-match", tag);
+        }
+        b.body(Body::empty()).unwrap()
+    };
+    async fn json_of(res: axum::response::Response) -> Value {
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+    let updated_at = || async {
+        sqlx::query_scalar::<_, String>("SELECT updated_at FROM book WHERE id = ?")
+            .bind(&book)
+            .fetch_one(&db)
+            .await
+            .unwrap()
+    };
+
+    let first: &[u8] = b"\x89PNG\r\n\x1a\n the first cover";
+    let res = app.clone().oneshot(put(first)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let etag = json_of(res).await["etag"].as_str().unwrap().to_string();
+    assert_eq!(etag, etag_of(first), "the upload answers with the content hash");
+
+    // The GET carries the same tag, and revalidating with it is a 304.
+    let res = app.clone().oneshot(get(None)).await.unwrap();
+    assert_eq!(res.headers()["etag"], etag.as_str());
+    let res = app.clone().oneshot(get(Some(&etag))).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_MODIFIED);
+
+    // Pin updated_at somewhere recognisable: it is second-resolution, so a
+    // bump within this test would otherwise be invisible.
+    sqlx::query("UPDATE book SET updated_at = '2000-01-01 00:00:00' WHERE id = ?")
+        .bind(&book)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    let res = app.clone().oneshot(put(first)).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(json_of(res).await["etag"], etag.as_str());
+    assert_eq!(updated_at().await, "2000-01-01 00:00:00", "same bytes: not a change");
+    let res = app.clone().oneshot(get(Some(&etag))).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_MODIFIED, "other devices keep theirs");
+
+    // A cover that really did change still is one.
+    let second: &[u8] = b"\x89PNG\r\n\x1a\n a better cover";
+    let res = app.clone().oneshot(put(second)).await.unwrap();
+    assert_eq!(json_of(res).await["etag"], etag_of(second).as_str());
+    assert_ne!(updated_at().await, "2000-01-01 00:00:00");
+    let res = app.clone().oneshot(get(Some(&etag))).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK, "the old tag no longer matches");
+}
+
 #[tokio::test]
 async fn basic_auth_cache_repeats_and_stays_password_specific() {
     use base64::Engine;

@@ -312,3 +312,30 @@ decodes all of it, so a spine-only thumbnail (the left strip) would cut decoded
 spine memory by another 2–3× on Android, where the image cache is capped at
 48 MB. Left out because a strip that is narrower than a wide spine's aspect
 ratio changes how `BoxFit.cover` crops it.
+
+### #4 Covers stop crossing the wire for nothing
+
+A push sent the cover of every dirty book, whatever had changed about it. The
+server rewrote the file and bumped the book's `updated_at`, and its cover ETag
+was a weak size+mtime tag that the rewrite changed — so a title fix made every
+other device re-fetch the book *and* download the cover again, and the device
+that made the edit downloaded its own upload back on the next pull. The
+development library's covers average 275 KB, a rendered PDF page up to 1.7 MB:
+that much up, and that much down per other device, per edited book.
+
+- **Server:** the cover ETag is the SHA-256 of the bytes (`content_etag`),
+  remembered against the file's size and mtime so a `304` still only `stat`s.
+  `put_cover` answers with it, and re-uploading the stored bytes is a no-op: no
+  write, no `updated_at` bump.
+- **App:** before uploading, the push hashes the cover in a background isolate
+  and skips it when the hash equals `coverEtag` — the server's tag for the copy
+  we last downloaded or uploaded. An upload stores the tag it answers with.
+
+An older server answers without a tag, which keeps that pairing on the old
+always-upload behaviour. The first pull after a server upgrade downloads each
+cover once more, since every stored weak tag stops matching.
+
+`e2e_sync_test.dart` pins it over the real wire: after one device's cover
+upload, a title edit on the other device sends no cover, and the first device
+revalidates with a `304` instead of downloading. With the app-side check
+disabled the test sees the upload.
