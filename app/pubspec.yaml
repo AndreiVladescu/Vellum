@@ -43,16 +43,16 @@ dependencies:
   shared_preferences: ^2.5.5
   file_selector: ^1.1.0
   crypto: ^3.0.7
-  pdfrx: ^2.4.7
-  desktop_drop: ^0.7.1
+  pdfrx: ^2.6.5
+  desktop_drop: ^0.8.4
   flutter_secure_storage: ^10.3.1
-  pool: ^1.5.1
-  archive: ^4.0.9
+  pool: ^1.5.3
+  archive: ^4.3.0
   # Pure-Dart decode/resize/encode, so cover thumbnails can be made in a
   # background isolate (dart:ui's codecs only run on the UI isolate).
-  image: ^4.9.1
-  xml: ^7.0.1
-  flutter_widget_from_html_core: ^0.17.2
+  image: ^4.10.1
+  xml: ^7.1.0
+  flutter_widget_from_html_core: ^0.17.4
   share_plus: ^12.0.2
   image_picker: ^1.2.3
   qr: ^4.0.0
@@ -61,12 +61,12 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
-  home_widget: ^0.9.3
-  workmanager: ^0.9.0+3
+  home_widget: ^0.10.0
+  workmanager: ^0.10.10
   open_filex: ^4.7.0
-  flutter_local_notifications: ^22.3.0
-  google_mlkit_translation: ^0.14.0
-  google_mlkit_language_id: ^0.14.0
+  flutter_local_notifications: ^22.3.1
+  google_mlkit_translation: ^0.15.1
+  google_mlkit_language_id: ^0.15.1
   flutter_zxing: ^2.3.0
   wakelock_plus: ^1.5.2
   package_info_plus: ^9.0.1
@@ -81,7 +81,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  drift_dev: ^2.34.5
+  drift_dev: ^2.35.1
   build_runner: ^2.15.0
 
 # For information on the generic Dart part of this file, see the
