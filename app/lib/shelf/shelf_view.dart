@@ -8,6 +8,7 @@ import '../settings/appearance.dart';
 import '../settings/book_face.dart';
 import '../settings/spine_art.dart';
 import 'book_open_route.dart';
+import 'cover_image.dart';
 import 'cover_color.dart';
 import 'spine_style.dart';
 
@@ -432,16 +433,23 @@ class _FinishedMark extends StatelessWidget {
   }
 }
 
+/// What changes on a book's row when its cover may have: a cover set here
+/// bumps `updatedAt`, one pulled from the server stores a new `coverEtag`. A
+/// [CoverImage] that sees it change re-checks the file (page turns touch
+/// neither, so reading doesn't make the shelf re-resolve its covers).
+Object coverVersionOf(Book book) => (book.updatedAt, book.coverEtag);
+
 /// The decode height a spine of [wantedPx] physical pixels asks its cover for,
 /// rounded up to the next power of two.
 ///
 /// **This is why zooming the physical room used to blank every book.**
-/// `cacheHeight` is part of an `Image`'s cache key: it wraps the file provider
-/// in a `ResizeImage` keyed on that number. In the room the spine's on-screen
-/// height changes on *every frame* of a pinch, so a raw `height * dpr` minted a
-/// new provider per frame — each one a fresh asynchronous decode off the disk,
-/// each one showing nothing until it finished, and each one retained in the
-/// image cache, evicting the rest of the shelf while it was at it.
+/// The decode height is part of an `Image`'s cache key (it was `cacheHeight`;
+/// it is now [CoverImage.height], and a thumbnail on disk too). In the room the
+/// spine's on-screen height changes on *every frame* of a pinch, so a raw
+/// `height * dpr` minted a new provider per frame — each one a fresh
+/// asynchronous decode off the disk, each one showing nothing until it
+/// finished, and each one retained in the image cache, evicting the rest of the
+/// shelf while it was at it.
 ///
 /// Buckets fix the cause: a whole zoom gesture reuses one decoded bitmap, and
 /// the GPU scales it, which is free. Powers of two because they double —
@@ -526,11 +534,14 @@ class SpineFace extends StatelessWidget {
               final h = constraints.maxHeight.isFinite
                   ? constraints.maxHeight
                   : _bookAreaHeight;
-              return Image.file(
-                cover,
+              return Image(
+                image: CoverImage(
+                  cover,
+                  height: spineDecodeHeight(h * dpr),
+                  version: coverVersionOf(book),
+                ),
                 fit: BoxFit.cover,
                 alignment: Alignment.centerLeft,
-                cacheHeight: spineDecodeHeight(h * dpr),
                 // Keep the previous frame on screen while a new decode runs.
                 // Crossing a bucket boundary swaps the provider, and without
                 // this the spine goes blank until the new bitmap arrives —
@@ -711,10 +722,13 @@ class BookCover extends StatelessWidget {
               // so a width budget would leave it soft). Fall back to a generated
               // cover if the file is missing. No filesystem call in build.
               child: cover != null
-                  ? Image.file(
-                      cover,
+                  ? Image(
+                      image: CoverImage(
+                        cover,
+                        height: (_bookAreaHeight * dpr).round(),
+                        version: coverVersionOf(book),
+                      ),
                       fit: BoxFit.cover,
-                      cacheHeight: (_bookAreaHeight * dpr).round(),
                       errorBuilder: (_, _, _) => _generatedCover(),
                     )
                   : _generatedCover(),

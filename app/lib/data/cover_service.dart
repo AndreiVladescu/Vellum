@@ -125,11 +125,11 @@ class CoverService {
       db.bookFiles,
     )..where((f) => f.bookId.equals(bookId) & f.format.equals('pdf'))).get();
     if (files.isEmpty) return false;
-    final png = await renderPdfFirstPagePng(
+    final jpeg = await renderPdfFirstPageJpeg(
       p.join(_dataDir.path, files.first.path),
     );
-    if (png == null) return false;
-    await setCoverBytes(bookId, png);
+    if (jpeg == null) return false;
+    await setCoverBytes(bookId, jpeg);
     return true;
   }
 

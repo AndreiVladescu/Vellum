@@ -274,3 +274,41 @@ one other writer and the reason for the `busy_timeout`. Backups were already
 WAL-safe (`VACUUM INTO`, and a restore deletes the sidecars).
 `database_location_test.dart` opens the real connection and pins all three
 pragmas.
+
+### #3 Cover thumbnails
+
+Spines asked Flutter for the cover at decode height via `cacheHeight`, which
+still reads and inflates the whole file first. A rendered PDF page was stored as
+a 908×1200 PNG of up to 1.7 MB — eleven of them were 13 MB of the development
+library's 25 MB of covers.
+
+Now `CoverImage` (the provider behind every spine, face-out cover and placed
+book in the room) reads `covers/thumbs/<id>-h<height>.jpg` when there is a
+current one. On a miss it decodes the cover exactly as before and has the
+thumbnail made in a background isolate, at most four at a time — so the first
+look at a cold shelf costs what it always did, and every later one is cheaper.
+A thumbnail is current while it is no older than its cover, and the cache key
+carries the cover's modified time and size, so a rewritten cover can't be
+served stale, whichever of the many cover-writing paths rewrote it.
+
+All 92 covers of the development library decoded at 512 px (the 2× spine
+bucket), Flutter's own codecs:
+
+| | Bytes read | Decode, all 92 |
+|---|---|---|
+| Covers, `cacheHeight: 512` | 25.3 MB | 738–755 ms |
+| Thumbnails | 4.7 MB | 201–219 ms |
+
+Making all 92 thumbnails took 3.5 s in a debug-mode test (four isolates), once.
+
+New PDF covers are JPEG (q90) instead of PNG, encoded in an isolate: the
+development library's PNG covers average **1,188 KB as PNG, 287 KB as JPEG**,
+which every sync, backup and server-side thumbnail pays. Existing PNG covers
+are left as they are — rewriting them would change every one of their bytes,
+and with them the server's copy and every other device's.
+
+*Not done, worth knowing:* a spine shows only the left edge of its cover but
+decodes all of it, so a spine-only thumbnail (the left strip) would cut decoded
+spine memory by another 2–3× on Android, where the image cache is capped at
+48 MB. Left out because a strip that is narrower than a wide spine's aspect
+ratio changes how `BoxFit.cover` crops it.

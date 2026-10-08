@@ -162,7 +162,7 @@ this order.
   write (every page turn). 393 ms → 20 ms at 5,000 books.
 - [x] **2. WAL journal for the app database.** Cheaper page-turn writes, reads
   that don't wait on writers. Restore must clear stale `-wal`/`-shm` files.
-- [ ] **3. Cover thumbnails.** Spines decode full-size covers (up to 1.7 MB PNG
+- [x] **3. Cover thumbnails.** Spines decode full-size covers (up to 1.7 MB PNG
   at 908×1200). Store covers as JPEG, keep a small shelf thumbnail made off the
   UI isolate, backfill existing covers across cores.
 - [ ] **4. Sync re-uploads unchanged covers.** Every push of a dirty book sends

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../reader/epub_book.dart';
 import '../shelf/spine_style.dart';
 import 'cover_service.dart';
+import 'cover_thumbnails.dart';
 import 'database.dart';
 import 'sync_clock.dart';
 import 'metadata.dart';
@@ -641,7 +642,10 @@ class BookWriteService {
       await (db.delete(db.books)..where((b) => b.id.equals(book.id))).go();
     });
     final cover = _covers.coverFileOf(book);
-    if (cover != null && await cover.exists()) await cover.delete();
+    if (cover != null) {
+      if (await cover.exists()) await cover.delete();
+      await CoverThumbnails.deleteFor(cover);
+    }
     for (final f in attachedFiles) {
       final file = File(p.join(_dataDir.path, f.path));
       if (await file.exists()) await file.delete();
