@@ -308,10 +308,21 @@ are left as they are — rewriting them would change every one of their bytes,
 and with them the server's copy and every other device's.
 
 *Not done, worth knowing:* a spine shows only the left edge of its cover but
-decodes all of it, so a spine-only thumbnail (the left strip) would cut decoded
-spine memory by another 2–3× on Android, where the image cache is capped at
-48 MB. Left out because a strip that is narrower than a wide spine's aspect
-ratio changes how `BoxFit.cover` crops it.
+decodes all of it. A thumbnail of just the left strip would render identically
+only while the strip is at least as wide, relative to its height, as the spine's
+box — narrower, and `BoxFit.cover` switches to scaling by width and crops the
+top and bottom. So it needs strips in a few widths (a quarter, a half of the
+height), the box's aspect passed down to pick one, the full thumbnail past the
+widest, and a pixel-comparison test to prove the spines unchanged. The gain is
+smaller than it first looks: about 2.8× less decoded memory for a typical spine
+(a quarter-height strip against a 0.7-aspect cover), 1.4× for a wide one, and
+nothing on the first view of a cover, which still decodes the original. Worth
+it if Android's 48 MB image cache turns out to be the limit in practice.
+
+Backup *export* has the shape verify had: with a passphrase it encrypts the
+whole archive on the UI isolate. The zip and encryption could move to an
+isolate; the `VACUUM INTO` snapshot can't, since it goes through the app's own
+database connection.
 
 ### #4 Covers stop crossing the wire for nothing
 
