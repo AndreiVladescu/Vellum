@@ -25,6 +25,7 @@ import 'spine_art.dart';
 import '../notifications/tray.dart';
 import 'shared_shelves_page.dart';
 import 'trash_page.dart';
+import '../onboarding/sample_library.dart';
 import 'wallpaper.dart';
 
 /// Appearance preferences (how books are shown on the shelf, the shelf
@@ -162,6 +163,9 @@ class PreferencesPage extends StatelessWidget {
                   ),
                 ),
               ),
+            const Divider(height: 24),
+            _SectionHeader('Sample books'),
+            _SamplesTile(repository: repository),
             const Divider(height: 24),
             _SectionHeader('Trash'),
             _TrashTile(repository: repository),
@@ -1518,6 +1522,81 @@ class _ScaleSlider extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Adds or removes the bundled sample books. The row says what is there and
+/// does the one thing that makes sense: remove them if they are on the shelf,
+/// add them if not.
+class _SamplesTile extends StatefulWidget {
+  const _SamplesTile({required this.repository});
+
+  final LibraryRepository repository;
+
+  @override
+  State<_SamplesTile> createState() => _SamplesTileState();
+}
+
+class _SamplesTileState extends State<_SamplesTile> {
+  // Made once: a new stream per build would resubscribe, re-hash the assets and
+  // flash the count back to 0 whenever Preferences rebuilds.
+  late final SampleLibrary _samples = SampleLibrary(widget.repository);
+  late final Stream<int> _count = _samples.watchCount();
+
+  Future<void> _tap(int count) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (count == 0) {
+      await addSamplesWithFeedback(messenger, _samples);
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove the sample books?'),
+        content: const Text(
+            'They are deleted from this device, along with any notes '
+            'or reading progress on them. Your own books are not '
+            'touched.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final removed = await _samples.remove();
+      messenger.showSnackBar(
+          appSnackBar(content: Text('Removed $removed sample books.')));
+    } catch (e) {
+      messenger.showSnackBar(appSnackBar(
+          content: Text('Could not remove the sample books: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: _count,
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return ListTile(
+          leading: const Icon(Icons.auto_stories_outlined),
+          title: Text(count == 0 ? 'Add sample books' : 'Remove sample books'),
+          subtitle: Text(count == 0
+              ? 'Four public-domain books to try Vellum with'
+              : '$count on the "${SampleLibrary.shelfName}" shelf, kept on '
+                  'this device only'),
+          onTap: () => _tap(count),
+        );
+      },
     );
   }
 }

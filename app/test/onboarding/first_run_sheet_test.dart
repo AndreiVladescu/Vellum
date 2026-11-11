@@ -75,6 +75,16 @@ void main() {
     expect(t.results.single, FirstRunAction.scan);
   });
 
+  testWidgets('the first card offers sample books and reports the choice',
+      (tester) async {
+    final t = await open(tester);
+
+    await tester.tap(find.text('Try sample books'));
+    await tester.pumpAndSettle();
+
+    expect(t.results.single, FirstRunAction.trySamples);
+  });
+
   testWidgets('Skip closes it without a choice', (tester) async {
     final t = await open(tester);
 

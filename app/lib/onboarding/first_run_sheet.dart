@@ -5,7 +5,14 @@ import '../settings/app_settings.dart';
 /// What the user chose to do from the first-run flow, so the caller can navigate.
 /// The flow itself opens nothing — it only reports, which keeps it free of every
 /// screen it points at.
-enum FirstRunAction { importFolder, scan, addOne, connectServer, createRoom }
+enum FirstRunAction {
+  importFolder,
+  scan,
+  addOne,
+  trySamples,
+  connectServer,
+  createRoom,
+}
 
 /// The first-run introduction (plan 5 #41).
 ///
@@ -84,11 +91,13 @@ class _FirstRunSheetState extends State<FirstRunSheet> {
                   icon: Icons.library_add_outlined,
                   title: 'Get your books in',
                   detail: 'Point Vellum at a folder of PDFs or EPUBs, scan a '
-                      'barcode off a physical book, or add one at a time.',
+                      'barcode off a physical book, or add one at a time. '
+                      'Or look around first with a few sample books.',
                   actions: [
                     _Choice('Import a folder', FirstRunAction.importFolder),
                     _Choice('Scan a barcode', FirstRunAction.scan),
                     _Choice('Add one book', FirstRunAction.addOne),
+                    _Choice('Try sample books', FirstRunAction.trySamples),
                   ],
                 ),
               1 => _Card(

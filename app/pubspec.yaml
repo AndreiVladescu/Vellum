@@ -100,6 +100,8 @@ flutter:
 
   assets:
     - assets/logo.png
+    # A few public-domain EPUBs for the "try it with sample books" action.
+    - assets/samples/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

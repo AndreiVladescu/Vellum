@@ -25,6 +25,7 @@ import 'import/incoming_share.dart';
 import 'navigation_history.dart';
 import 'notifications/sync_tray.dart';
 import 'onboarding/first_run_sheet.dart';
+import 'onboarding/sample_library.dart';
 import 'physical/physical_libraries_page.dart';
 import 'server/auto_pusher.dart';
 import 'server/background_sync.dart';
@@ -673,6 +674,8 @@ class _LibraryPageState extends State<LibraryPage> {
         if (mounted) await _openScan(context);
       case FirstRunAction.addOne:
         if (mounted) await _openAddBook(context);
+      case FirstRunAction.trySamples:
+        await _addSamples();
       case FirstRunAction.connectServer:
         if (!mounted) return;
         await Navigator.of(context).push(MaterialPageRoute(
@@ -689,6 +692,11 @@ class _LibraryPageState extends State<LibraryPage> {
         await promptCreateLibrary(context, repository, widget.settings);
     }
   }
+
+  /// Adds the bundled sample books and says where they went. Safe to repeat:
+  /// the import path skips what is already there.
+  Future<void> _addSamples() =>
+      addSamplesWithFeedback(ScaffoldMessenger.of(context), SampleLibrary(repository));
 
   /// Opens a book's detail page — the same destination a spine tap reaches, so
   /// the header strip and the shelf can't drift apart.
@@ -1453,8 +1461,11 @@ class _LibraryPageState extends State<LibraryPage> {
           ),
         );
       }
+      // Scrollable: at large text scales the extra sample-books button pushes
+      // this past a small screen (test/widgets/large_text_test.dart).
       return Center(
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
@@ -1508,8 +1519,16 @@ class _LibraryPageState extends State<LibraryPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              // For someone who just wants to see what it does.
+              TextButton.icon(
+                onPressed: _addSamples,
+                icon: const Icon(Icons.auto_awesome_outlined),
+                label: const Text('Try it with a few sample books'),
+              ),
             ],
           ],
+        ),
         ),
       );
     }

@@ -941,6 +941,19 @@ opens, so swiping it away is never punished by it returning. Every empty state
 (shelf, no-search-match, physical tab, loans) carries one line of what-to-do-next
 copy **and** a primary action.
 
+**Sample books** are the way to see a populated shelf without owning anything yet:
+"Try sample books" on the first card, "Try it with a few sample books" on the empty
+shelf, and a row in Settings. Four public-domain Standard Ebooks EPUBs are bundled
+(`app/assets/samples/`, ~2.4 MB, no network) and go through the ordinary
+`FolderImportService` path, so hashing, covers and the duplicate check are the
+import's own and a second press adds nothing. **No schema change:** they sit on a
+"Samples" shelf and are marked `syncExcluded` — the existing device-only switch — so
+connecting a server later never publishes them (and the shelf's `needsPush` is
+cleared, since its only members are device-only). A sample is recognised for removal
+by file hash *and* `syncExcluded`, so a user's own copy of the same EPUB is never
+swept up. Removal (Settings, or "Remove" on the confirmation snack bar) deletes the
+books outright, with no tombstone, and the shelf if it is still empty.
+
 **Android background sync, shortcuts and a widget** (app, plan 5 #40) close the
 gap on a phone, where the library used to be stale every time you picked it up.
 

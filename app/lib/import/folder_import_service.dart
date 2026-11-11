@@ -269,6 +269,7 @@ class FolderImportService {
   /// a separate, resumable pass (see [enrich]), so importing 500 books doesn't
   /// depend on 500 network calls succeeding.
   /// Imports [candidates], optionally putting every one of them on [shelfId].
+  /// [localOnly] creates them device-only (`syncExcluded`) from the start.
   ///
   /// The shelf is the one that was open when the import was started. A bulk
   /// import is the one place where that could genuinely surprise someone — 500
@@ -279,6 +280,7 @@ class FolderImportService {
     ImportProgress? onProgress,
     Future<bool> Function()? isCancelled,
     String? shelfId,
+    bool localOnly = false,
   }) async {
     final outcomes = <ImportOutcome>[];
     var cancelled = false;
@@ -290,7 +292,17 @@ class FolderImportService {
       final c = candidates[i];
       onProgress?.call(i, candidates.length, c.meta.title ?? filenameStem(c.path));
       try {
-        final bookId = await _createBook(c);
+        // [localOnly] books are born `syncExcluded`, in the same transaction
+        // as the row, so no sync can ever see them as pushable.
+        final bookId = localOnly
+            ? await repository.db.transaction(() async {
+                final id = await _createBook(c);
+                await (repository.db.update(repository.db.books)
+                      ..where((b) => b.id.equals(id)))
+                    .write(const BooksCompanion(syncExcluded: Value(true)));
+                return id;
+              })
+            : await _createBook(c);
         // A catalogue row may bring no file at all (a CSV export describes
         // books whose bytes live elsewhere); that is a complete import, not a
         // failure, so the attach is conditional rather than assumed.
