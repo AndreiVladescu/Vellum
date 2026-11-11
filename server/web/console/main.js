@@ -36,6 +36,7 @@ import * as mailModule from './mail.js';
 import * as statsModule from './stats.js';
 import * as activityModule from './activity.js';
 import * as searchModule from './search.js';
+import * as routerModule from './router.js';
 import { start } from './boot.js';
 
 // Inline handlers — `onclick="login()"` in console.html and in the markup the
@@ -51,7 +52,7 @@ const modules = [
   tagsModule, bulkModule, detailModule, linksModule,
   certModule, requestsModule, loansModule, remindersModule,
   roomsModule, sharesModule, peopleModule, mailModule,
-  statsModule, activityModule, searchModule,
+  statsModule, activityModule, searchModule, routerModule,
 ];
 for (const mod of modules) {
   for (const [name, value] of Object.entries(mod)) {

@@ -16,19 +16,32 @@ import { render, renderSelectionBar } from './table.js';
 // Modals are kept for what they are good at: an action with a decision in it
 // (create this link, choose these columns, add this book).
 
+// How many pages have been opened, ever. The router compares it across a
+// loader's run to tell "opened its page" from "refused, toasted, opened
+// nothing" without every loader having to report which.
+let openCount = 0;
+export function pageOpens(){ return openCount; }
+
 /// Shows [html] as a page, hiding the library beneath it.
+///
+/// The way back is a link to the books' address rather than a call to
+/// closePage(): the address is what says which page is showing, so leaving a
+/// page has to change it. The heading takes focus on a route change (see
+/// router.js), hence `tabindex="-1"` — focusable by script, not a Tab stop.
 export function openPage(title, subtitle, html){
+  openCount++;
   closeModal();
   const page = document.getElementById('page');
   page.innerHTML = `
     <div class="pagehead">
-      <button class="btn sm quiet" onclick="closePage()">← Library</button>
-      <h2>${esc(title)}</h2>
+      <a class="btn sm quiet" href="#/library/books">← Library</a>
+      <h2 tabindex="-1">${esc(title)}</h2>
       ${subtitle ? `<p class="muted">${esc(subtitle)}</p>` : ''}
     </div>
     <div class="pagebody">${html}</div>`;
   page.classList.remove('hidden');
   document.getElementById('tbl').classList.add('hidden');
+  document.getElementById('books-heading').classList.add('hidden');
   document.getElementById('loadmore').classList.add('hidden');
   // The library's own controls — search, filters, selection — belong to the
   // table that is no longer on screen.
@@ -43,6 +56,7 @@ export function closePage(){
   page.classList.add('hidden');
   page.innerHTML = '';
   document.getElementById('tbl').classList.remove('hidden');
+  document.getElementById('books-heading').classList.remove('hidden');
   for (const bar of document.querySelectorAll('#topbar .toolbar')) {
     bar.classList.remove('hidden');
   }

@@ -2,6 +2,7 @@
 
 import { esc, toast } from './dom.js';
 import { api } from './api.js';
+import { openPage } from './pages.js';
 import { ask } from './dialogs.js';
 
 // ---- published rooms (plan 5 #47/#48) -----------------------------------
@@ -24,17 +25,11 @@ export async function showRooms(){
     </div>`).join('')
     : '<p class="muted">No rooms have been published yet. Arrange one in the app and publish it.</p>';
 
-  document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:min(560px,95vw)">
-      <h2 style="margin:0 0 4px">Rooms</h2>
-      <p class="muted" style="margin:0 0 12px">Published physical layouts. A room
-        carries shelf and book positions only — never titles.</p>
-      <div style="max-height:55vh; overflow:auto">${list}</div>
-      <div class="row" style="justify-content:flex-end; margin-top:12px">
-        <button class="btn" onclick="closeModal()">Close</button>
-      </div>
-    </div></div>`;
+  openPage(
+    'Rooms',
+    'Published physical layouts. A room carries shelf and book positions only — never titles.',
+    list,
+  );
 }
 
 // A public link to a room. The "show titles" tick is deliberately separate and

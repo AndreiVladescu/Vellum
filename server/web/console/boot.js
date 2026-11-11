@@ -5,7 +5,7 @@
 
 import { S } from './state.js';
 import { closeModal } from './dialogs.js';
-import { closePage, pageOpen } from './pages.js';
+import { pageOpen } from './pages.js';
 import { closeMenus } from './menus.js';
 import { ACTIONS, CHANGE_ACTIONS, DBL_ACTIONS, delegate } from './actions.js';
 import { showApp } from './session.js';
@@ -13,6 +13,7 @@ import { checkRegistration } from './first_run.js';
 import { afterCursorMove, syncStickyHead, toggleRow } from './table.js';
 import { dropOn } from './uploads.js';
 import { openDetail } from './detail.js';
+import { closeNav, go, HOME, navOpen } from './router.js';
 
 export function start(){
   delegate('click', ACTIONS, 'data-act');
@@ -28,10 +29,13 @@ export function start(){
   document.addEventListener('keydown', e=>{
     if (!document.getElementById('login').classList.contains('hidden')) return;   // logged out
     const modalOpen = document.getElementById('modal-root').innerHTML !== '';
+    // The collapsed nav is the topmost thing on screen when it is open, so
+    // Escape closes it before it closes anything under it.
+    if (e.key === 'Escape' && !modalOpen && navOpen()){ closeNav(true); return; }
     if (pageOpen() && !modalOpen && e.key !== 'Escape') return;
     if (e.key === 'Escape'){
       if (modalOpen) closeModal();
-      else if (pageOpen()) closePage();
+      else if (pageOpen()) go(HOME);           // through the address, so Back returns
       return;
     }
     if (modalOpen) return;
@@ -39,6 +43,9 @@ export function start(){
     if (tag==='input' || tag==='textarea' || tag==='select' || t.isContentEditable) return;
 
     if (e.key === '/'){ e.preventDefault(); document.getElementById('q').focus(); return; }
+    // Arrows, space and Enter belong to the table — not to a focused nav link,
+    // where Enter has to follow the link rather than also open a book.
+    if (t.closest && t.closest('#nav')) return;
     if (!S.view.length) return;
     if (e.key === 'ArrowDown'){ e.preventDefault(); S.cursor = Math.min(S.view.length-1, S.cursor+1); afterCursorMove(); }
     else if (e.key === 'ArrowUp'){ e.preventDefault(); S.cursor = Math.max(0, S.cursor<0?0:S.cursor-1); afterCursorMove(); }

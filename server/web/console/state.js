@@ -21,7 +21,11 @@ export const S = { token: sessionStorage.getItem('vellum_token'), email: session
             q: '', sort: { col: 'title', dir: 'asc' },
             fTag: null, fMissing: null,
             cols: new Set(JSON.parse(localStorage.getItem('vellum_cols') || 'null') || ['author','year','status']),
-            compact: localStorage.getItem('vellum_density') === '1' };
+            compact: localStorage.getItem('vellum_density') === '1',
+            // Whether this account is the server's master: true, false, or null
+            // when not known (a tab signed in before the console remembered it).
+            // Only decides what the nav offers; the server is the gate.
+            isMaster: roleFrom(sessionStorage.getItem('vellum_master')) };
 
 // Columns the user can show or hide (the checkbox, title, tags and actions
 // columns are always present).
@@ -30,3 +34,13 @@ export const OPT_COLS = [['cover','Cover thumbnail'],['author','Author'],['year'
                   // Off unless asked for: on a library of one it is the same
                   // name on every row.
                   ['owner','Added by']];
+
+function roleFrom(stored){ return stored === '1' ? true : stored === '0' ? false : null; }
+
+/// Keeps the role the sign-in answered with, beside the token and for as long.
+export function rememberRole(user){
+  const m = user && typeof user.is_master === 'boolean' ? user.is_master : null;
+  S.isMaster = m;
+  if (m === null) sessionStorage.removeItem('vellum_master');
+  else sessionStorage.setItem('vellum_master', m ? '1' : '0');
+}

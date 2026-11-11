@@ -2,6 +2,7 @@
 
 import { esc, toast } from './dom.js';
 import { api } from './api.js';
+import { openPage } from './pages.js';
 
 // ---- Server dashboard (plan 5 #37) ----------------------------------------
 // Deliberately small: for a personal server, "how big is my library and how much
@@ -39,19 +40,12 @@ export async function showStats(){
   ].map(([k,v]) => `<div class="row" style="justify-content:space-between; gap:16px;
       padding:6px 0; border-bottom:1px solid var(--line)">
       <span>${esc(k)}</span><strong>${esc(String(v))}</strong></div>`).join('');
-  document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:min(480px,95vw)">
-      <h2 style="margin:0 0 4px">Server</h2>
-      <p class="muted" style="margin:0 0 12px">What this library costs on disk,
-        and what is in it.</p>
-      ${rows}
+  openPage(
+    'Server',
+    'What this library costs on disk, and what is in it.',
+    `${rows}
       <p class="muted" style="margin:12px 0 0">Every response carries an
         <code>X-Request-Id</code>; quote it when reporting a problem and it can be
-        found in the server log.</p>
-      <div class="row" style="justify-content:flex-end; margin-top:12px">
-        <button class="btn primary" onclick="closeModal()">Close</button>
-      </div>
-    </div>
-   </div>`;
+        found in the server log.</p>`,
+  );
 }

@@ -1,10 +1,11 @@
 // Signing in, signing out, and showing the console once signed in.
 
-import { S } from './state.js';
+import { rememberRole, S } from './state.js';
 import { api } from './api.js';
 import { loadAll } from './books.js';
 import { renderViews } from './views.js';
 import { revealContentSearch } from './search.js';
+import { startRouter } from './router.js';
 
 export async function login(){
   const email = document.getElementById('l-email').value.trim();
@@ -16,12 +17,14 @@ export async function login(){
     S.token = r.token; S.email = r.user.email;
     sessionStorage.setItem('vellum_token', S.token);
     sessionStorage.setItem('vellum_email', S.email);
+    rememberRole(r.user);
     showApp();
   } catch(e){ err.textContent = e.message; }
 }
 
 export function logout(){
   S.token=null; sessionStorage.removeItem('vellum_token'); sessionStorage.removeItem('vellum_email');
+  rememberRole(null);
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login').classList.remove('hidden');
 }
@@ -34,4 +37,5 @@ export function showApp(){
   revealContentSearch();
   renderViews();
   loadAll();
+  startRouter();
 }

@@ -62,48 +62,43 @@
 
 <!-- App -->
 <div id="app" class="hidden">
-  <div id="topbar">
-    <header>
+ <div class="shell">
+  <!-- Four groups, one address per page (router.js). On a narrow screen the
+       groups fold behind the Menu button and the bar shows where you are. -->
+  <nav id="nav" aria-label="Console">
+    <div class="nav-head">
       <img class="logo" src="/assets/logo.svg" alt="" width="26" height="26">
-      <h1>Vellum</h1>
-      <span class="eyebrow">Console</span>
-      <span class="muted" id="who"></span>
-      <span class="spacer"></span>
-      <span class="muted" id="count"></span>
-      <button class="btn sm quiet" onclick="loadAll()">Refresh</button>
-      <div class="menu-wrap">
-        <button class="btn sm" onclick="toggleMenu(event,'m-manage')">Manage</button>
-        <div class="menu hidden" id="m-manage">
-          <button onclick="pick(showPeople)">People</button>
-          <button onclick="pick(showStats)">Library server</button>
-          <button onclick="pick(showShares)">Shares</button>
-          <button onclick="pick(showActivity)">Activity</button>
-          <button onclick="pick(showRooms)">Rooms</button>
-          <button onclick="pick(showLoans)">Loans</button>
-          <button onclick="pick(showRequests)">Borrow requests</button>
-          <button onclick="pick(showReminders)">Due-date reminders</button>
-          <hr>
-          <button onclick="pick(showCert)">Certificate</button>
-          <button onclick="pick(logout)">Log out</button>
-        </div>
+      <span class="nav-brand">Vellum <span class="eyebrow">Console</span></span>
+      <span class="nav-current" id="nav-current"></span>
+      <button class="btn sm" id="nav-toggle" type="button" aria-expanded="false"
+              aria-controls="nav-body" onclick="toggleNav()">Menu</button>
+    </div>
+    <div class="nav-body" id="nav-body">
+      <div id="nav-groups"></div>
+      <div class="nav-foot">
+        <span class="muted" id="who"></span>
+        <button class="btn sm quiet" type="button" onclick="refresh()">Refresh</button>
+        <button class="btn sm quiet" type="button" onclick="logout()">Log out</button>
       </div>
-    </header>
+    </div>
+  </nav>
 
+  <main id="main">
+  <div id="topbar">
     <div class="toolbar">
       <button class="btn primary" onclick="openAddBook()">Add book</button>
       <input id="q" type="search" placeholder="Search title, author, ISBN…"
+             aria-label="Search the library"
              oninput="setQ(this.value)" autocomplete="off">
       <!-- Content search (plan 5 #32). Hidden unless this server advertises
            `content_search`: a button that can only 400 is worse than none. -->
       <button class="btn sm hidden" id="contentbtn"
               onclick="searchContents()">Search inside books</button>
       <span class="spacer"></span>
+      <span class="muted" id="count"></span>
       <div class="menu-wrap">
-        <button class="btn sm" onclick="toggleMenu(event,'m-library')">Library</button>
+        <button class="btn sm" onclick="toggleMenu(event,'m-library')">Table</button>
         <div class="menu hidden" id="m-library">
-          <div class="label">Add</div>
-          <button onclick="pick(openImport)">Import books…</button>
-          <button onclick="pick(createTag)">New tag…</button>
           <div class="label">Export</div>
           <button onclick="pick(exportCSV)">Export CSV</button>
           <button onclick="pick(exportJSON)">Export JSON</button>
@@ -130,10 +125,15 @@
     </div>
   </div>
 
-  <table id="tbl">
-    <thead id="thead"></thead>
-    <tbody id="rows"></tbody>
-  </table>
+  <!-- What focus lands on when the books are the page (router.js). -->
+  <h1 id="books-heading" class="sr-only" tabindex="-1">Books</h1>
+  <!-- On a narrow screen the table scrolls sideways in here, not the page. -->
+  <div class="tablewrap">
+    <table id="tbl">
+      <thead id="thead"></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
   <div id="loadmore" class="hidden" style="text-align:center; padding:16px">
     <button class="btn" onclick="loadMoreBooks()"></button>
   </div>
@@ -141,6 +141,8 @@
   <!-- Where Shares, People, Borrow requests and the rest are read. A page in
        the same place the table sits, rather than a box floating over it. -->
   <div id="page" class="hidden"></div>
+  </main>
+ </div>
 </div>
 
 <div id="modal-root"></div>

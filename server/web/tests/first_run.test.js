@@ -41,7 +41,7 @@ function element() {
 /// The ids that carry `class="hidden"` in console.html. Seeded so the stubs
 /// start where the real markup starts — otherwise "did nothing" and "revealed
 /// the form" look identical.
-const HIDDEN_AT_LOAD = ['register', 'r-token', 'l-to-register', 'app'];
+const HIDDEN_AT_LOAD = ['register', 'r-token', 'l-to-register', 'app', 'page'];
 
 /// A fresh sandbox per case: `fetch` answers `/api/auth/registration` with
 /// [reply], and every element id resolves to its own stub.
@@ -67,6 +67,10 @@ function load(reply) {
     localStorage: { getItem: () => null, setItem: () => {} },
     sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
     fetch: async () => reply(),
+    // A successful register() signs in, and signing in draws the page the
+    // address names (router.js).
+    location: { hash: '' },
+    history: { replaceState() {} },
     crypto: {},
     console,
     setTimeout,

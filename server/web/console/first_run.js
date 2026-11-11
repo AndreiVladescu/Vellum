@@ -1,6 +1,6 @@
 // First run: creating the master account on a server with no accounts.
 
-import { S } from './state.js';
+import { rememberRole, S } from './state.js';
 import { api } from './api.js';
 import { showApp } from './session.js';
 
@@ -54,6 +54,7 @@ export async function register(){
     S.token = r.token; S.email = r.user.email;
     sessionStorage.setItem('vellum_token', S.token);
     sessionStorage.setItem('vellum_email', S.email);
+    rememberRole(r.user);
     document.getElementById('register').classList.add('hidden');
     showApp();
   } catch(e){ err.textContent = e.message; }

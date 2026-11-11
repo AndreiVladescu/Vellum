@@ -2,6 +2,7 @@
 
 import { esc, toast } from './dom.js';
 import { api } from './api.js';
+import { openPage } from './pages.js';
 
 // ---- activity log (plan 5 #35) ------------------------------------------
 
@@ -28,18 +29,14 @@ export async function showActivity(before){
         ${esc(r.actor_email || 'unknown')} · ${esc((r.at||'').replace('T',' '))}</span>
     </div>`).join('') || '<p class="muted">Nothing recorded yet.</p>';
 
-  document.getElementById('modal-root').innerHTML = `
-   <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:min(720px,95vw)">
-      <h2 style="margin:0 0 4px">Activity</h2>
-      <p class="muted" style="margin:0 0 12px">Who changed what on this server.
-        The oldest entries are trimmed automatically.</p>
-      <div style="max-height:60vh; overflow:auto">${rows}</div>
-      <div class="row" style="justify-content:space-between; margin-top:12px">
-        ${body.next_before
-          ? `<button class="btn" data-act="activity" data-before="${esc(body.next_before ?? '')}">Older</button>`
-          : '<span></span>'}
-        <button class="btn" onclick="closeModal()">Close</button>
-      </div>
-    </div></div>`;
+  openPage(
+    'Activity',
+    'Who changed what on this server. The oldest entries are trimmed automatically.',
+    `${rows}
+      ${body.next_before
+        ? `<div class="row" style="margin-top:12px">
+             <button class="btn" data-act="activity" data-before="${esc(body.next_before ?? '')}">Older</button>
+           </div>`
+        : ''}`,
+  );
 }

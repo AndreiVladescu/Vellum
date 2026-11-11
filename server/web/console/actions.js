@@ -20,6 +20,7 @@ import { invitePerson, removePerson, renamePerson, resetFor, revokeInvite,
   setRole } from './people.js';
 import { showMailSetup, testMail } from './mail.js';
 import { showActivity } from './activity.js';
+import { runNavAction } from './router.js';
 
 // ---- delegated events ---------------------------------------------------
 //
@@ -89,6 +90,7 @@ export const ACTIONS = {
   grantaccess: () => grantAccess(),
   applyview: el => applyView(el.dataset.name),
   deleteview: el => deleteView(el.dataset.name),
+  navaction: el => runNavAction(el.dataset.id),
 };
 
 export const DBL_ACTIONS = {

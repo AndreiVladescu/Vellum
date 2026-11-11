@@ -157,6 +157,34 @@ working: `main.js` puts every exported function on `window`, because inline
 files joined into one strict classic script (`web/tests/console_source.js`), so
 they still call the console's functions as globals.
 
+**Navigation is four groups, and every page has an address** (`router.js`):
+*Library* (books; import and new tag as dialogs), *Lending* (loans, borrow
+requests, reminders), *People and sharing* (people and invitations, shares and
+links, rooms), *Server* (statistics, activity log; certificate and email setup
+as dialogs). It replaced a Manage menu that held ten unrelated things in the
+order they were built. Addresses are hash routes — `#/lending/loans` — because
+the server serves the console at `/` only, and a hash never reaches it: reload,
+back/forward and bookmarks work with no catch-all route on the server, and a
+bookmark survives having to sign in first. The hash is the source of truth: a
+nav item is a plain link, leaving a page (its back link, Escape) changes the
+address, and the page is drawn from the address, so the two cannot disagree.
+Pages get addresses and dialogs do not; a dialog is a question asked on top of a
+page, and reloading into a half-filled import is not something to bookmark. That
+is also why statistics, activity and rooms, which were dialogs, became pages:
+they are lists you read. An unknown address, or one this account may not open,
+is *replaced* (not pushed, so Back does not bounce) with the books.
+
+The nav hides the four master-only pages (and email setup) from a member, using
+the `is_master` the sign-in already returned, kept in `sessionStorage` beside the
+token. That is a courtesy, not a gate — the endpoints answer 403 regardless —
+and it only ever removes: a tab whose role is unknown is offered everything, as
+before, and a page whose loader is refused falls back to the books. Below 760px
+the nav folds behind a Menu button (`aria-expanded`, Escape closes it and returns
+focus), the toolbars stop being sticky, and the books table scrolls sideways in
+its own box rather than the page; its header then sticks to that box, which is
+the trade for a page that never scrolls sideways. On a route change focus moves
+to the page's heading, so a screen reader says where you landed.
+
 ## Email (optional)
 
 Off unless `VELLUM_SMTP_HOST` and `VELLUM_MAIL_FROM` are set (plan 5 #31), because
