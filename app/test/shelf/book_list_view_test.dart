@@ -31,6 +31,7 @@ Book _book(
       syncExcluded: false,
       readerNotesNeedsPush: false,
       statusNeedsPush: false,
+      statusInferred: false,
       needsProgressPush: false,
       readCount: 0,
     );

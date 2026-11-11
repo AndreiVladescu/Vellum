@@ -236,6 +236,10 @@ void main() {
     expect(dune.readerNotes, 'The best of them.');
     expect(dune.readerNotesNeedsPush, true,
         reason: 'a review travels per-user, never on the book everyone sees');
+    // So do the status and the rating: an imported history should be on your
+    // other devices too, on their own clock rather than the book's.
+    expect(dune.statusNeedsPush, true);
+    expect(dune.statusUpdatedAt, isNotNull);
 
     final wanted = books.firstWhere((b) => b.title == 'The Dispossessed');
     expect(wanted.status, 'wishlist');

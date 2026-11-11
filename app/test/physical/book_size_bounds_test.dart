@@ -19,6 +19,7 @@ Book book({int? pages}) => Book(
       syncExcluded: false,
       readerNotesNeedsPush: false,
       statusNeedsPush: false,
+      statusInferred: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,

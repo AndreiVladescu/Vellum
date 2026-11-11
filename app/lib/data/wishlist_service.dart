@@ -104,6 +104,7 @@ class WishlistService {
           readerNotes: const Value(null),
           statusUpdatedAt: Value(DateTime.now()),
           statusNeedsPush: const Value(true),
+          statusInferred: const Value(false),
         ),
       );
 
@@ -135,6 +136,7 @@ class WishlistService {
         status: Value(ReadingStatus.wishlist.name),
         statusUpdatedAt: Value(DateTime.now()),
         statusNeedsPush: const Value(true),
+        statusInferred: const Value(false),
         // Reading state on a book you haven't got is meaningless; clear it so
         // a re-wished book doesn't claim you're halfway through it.
         readingProgress: const Value(null),

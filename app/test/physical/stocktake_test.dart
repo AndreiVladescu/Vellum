@@ -11,6 +11,7 @@ Book book(String id, String title) => Book(
       needsPush: true, syncExcluded: false,
       readerNotesNeedsPush: false,
       statusNeedsPush: false,
+      statusInferred: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,

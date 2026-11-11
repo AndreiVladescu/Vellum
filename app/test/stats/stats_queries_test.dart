@@ -34,6 +34,7 @@ Book _book({DateTime? finishedAt, String id = 'b1'}) => Book(
       title: 'Book $id',
       readerNotesNeedsPush: false,
       statusNeedsPush: false,
+      statusInferred: false,
       finishedAt: finishedAt,
       status: finishedAt == null ? 'reading' : 'finished',
       readCount: finishedAt == null ? 0 : 1,

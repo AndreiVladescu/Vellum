@@ -44,6 +44,7 @@ PlacedBook placed(String id, String title, {required double x, double y = 1.0}) 
         needsPush: true, syncExcluded: false,
         readerNotesNeedsPush: false,
       statusNeedsPush: false,
+      statusInferred: false,
         needsProgressPush: false,
         status: 'unread',
         readCount: 0,

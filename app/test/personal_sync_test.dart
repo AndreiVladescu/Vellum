@@ -47,6 +47,10 @@ Future<http.Response> Function(http.Request) _server({
   bool bookStatusSupported = true,
   bool inkSupported = true,
   Set<String> unknownAnnotations = const {},
+  // What the server answers a status PUT with: its merged row, as migration
+  // 0038's server does. Null answers `{}`, as the tests above always have.
+  Map<String, dynamic> Function(Map<String, dynamic> pushed)? statusReply,
+  int statusPushCode = 200,
 }) {
   return (req) async {
     final path = req.url.path;
@@ -148,11 +152,16 @@ Future<http.Response> Function(http.Request) _server({
       return http.Response('{}', 200);
     }
     if (req.method == 'PUT' && path.startsWith('/api/statuses/')) {
-      pushedStatuses?.add({
+      if (statusPushCode != 200) {
+        return http.Response('{"error":"no such book"}', statusPushCode);
+      }
+      final pushed = {
         'book_id': path.split('/').last,
         ...jsonDecode(req.body) as Map<String, dynamic>,
-      });
-      return http.Response('{}', 200);
+      };
+      pushedStatuses?.add(pushed);
+      return http.Response(
+          jsonEncode(statusReply == null ? {} : statusReply(pushed)), 200);
     }
     if (req.method == 'PUT' && path.startsWith('/api/notes/')) {
       pushedNotes?.add({
@@ -625,6 +634,282 @@ void main() {
       await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
 
       expect(pushed, isEmpty);
+    });
+
+    Future<Book> b1(LibraryRepository repo) =>
+        (repo.db.select(repo.db.books)..where((b) => b.id.equals('b1')))
+            .getSingle();
+
+    test('a rating is sent with the status, on the status channel', () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+      await repo.readingStatus.setRating('b1', 4);
+
+      await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
+
+      expect(pushed.single['rating'], 4);
+      expect(pushed.single['rating_updated_at'], isNotNull);
+      expect(pushed.single['updated_at'], '1970-01-01 00:00:00',
+          reason: 'the status was never changed here, so it claims the oldest '
+              'clock there is — rating a book must not make "unread" news');
+      expect(pushed.single['inferred'], isFalse);
+      final book = await b1(repo);
+      expect(book.statusNeedsPush, isFalse);
+      expect(book.needsPush, isFalse,
+          reason: 'a rating is not a catalogue edit: it never rides the book');
+    });
+
+    test('a device that never rated a book says nothing about its rating',
+        () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+
+      await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
+
+      expect(pushed.single['rating_updated_at'], isNull,
+          reason: 'an undated rating cannot clear one set on another device');
+    });
+
+    test('taking a rating away is sent as a dated null', () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+      await repo.readingStatus.setRating('b1', 4);
+      await repo.readingStatus.setRating('b1', null);
+
+      await SyncService(repo).push(_client(_server(pushedStatuses: pushed)));
+
+      expect(pushed.single['rating'], isNull);
+      expect(pushed.single['rating_updated_at'], isNotNull,
+          reason: 'the clock is what makes the null a statement');
+    });
+
+    test("another device's rating arrives, and so does its removal", () async {
+      final repo = await _repo();
+      await SyncService(repo).pull(_client(_server(statuses: [
+        {
+          'book_id': 'b1',
+          'status': 'finished',
+          'read_count': 1,
+          'inferred': false,
+          'updated_at': '2026-07-20 22:00:00',
+          'rating': 5,
+          'rating_updated_at': '2026-07-20 22:00:00',
+        }
+      ])));
+      var book = await b1(repo);
+      expect(book.rating, 5);
+      expect(book.statusNeedsPush, isFalse);
+
+      await SyncService(repo).pull(_client(_server(statuses: [
+        {
+          'book_id': 'b1',
+          'status': 'finished',
+          'read_count': 1,
+          'inferred': false,
+          'updated_at': '2026-07-20 22:00:00',
+          'rating': null,
+          'rating_updated_at': '2026-07-21 22:00:00',
+        }
+      ])));
+      book = await b1(repo);
+      expect(book.rating, isNull);
+      expect(book.statusNeedsPush, isFalse);
+    });
+
+    test('a server that predates ratings does not clear one, or loop on it',
+        () async {
+      final repo = await _repo();
+      await repo.readingStatus.setRating('b1', 4);
+      await (repo.db.update(repo.db.books)..where((b) => b.id.equals('b1')))
+          .write(BooksCompanion(
+        statusNeedsPush: const Value(false),
+        statusUpdatedAt: Value(DateTime.utc(2026, 7, 1)),
+      ));
+
+      // Migration 0034's server: no rating keys, no `inferred` key.
+      await SyncService(repo).pull(_client(_server(statuses: [
+        {
+          'book_id': 'b1',
+          'status': 'finished',
+          'read_count': 1,
+          'updated_at': '2026-07-20 22:00:00',
+        }
+      ])));
+
+      final book = await b1(repo);
+      expect(book.status, 'finished', reason: 'the newer status still lands');
+      expect(book.rating, 4, reason: 'silence about a rating is not "unrated"');
+      expect(book.statusNeedsPush, isFalse,
+          reason: 'that server cannot store it, so queueing it would send it '
+              'on every sync forever');
+    });
+
+    test('after the upgrade, a rating held here fills the gap on the server',
+        () async {
+      // The server has this book's status from before migration 0038, so its
+      // rating is unknown. This device rated it long ago; nothing is pending.
+      final repo = await _repo();
+      await repo.readingStatus.setRating('b1', 4);
+      await (repo.db.update(repo.db.books)..where((b) => b.id.equals('b1')))
+          .write(BooksCompanion(
+        statusNeedsPush: const Value(false),
+        statusUpdatedAt: Value(DateTime.utc(2026, 7, 1)),
+      ));
+      final pushed = <Map<String, dynamic>>[];
+
+      await SyncService(repo).sync(_client(_server(
+        statuses: [
+          {
+            'book_id': 'b1',
+            'status': 'finished',
+            'read_count': 1,
+            'inferred': false,
+            'updated_at': '2026-07-20 22:00:00',
+            // 0038's server, on a row written before it: undated, unknown.
+            'rating': null,
+            'rating_updated_at': null,
+          }
+        ],
+        pushedStatuses: pushed,
+      )));
+
+      final book = await b1(repo);
+      expect(book.status, 'finished', reason: "the other device's newer status");
+      expect(book.rating, 4, reason: 'kept, not wiped by an unknown');
+      expect(pushed.single['rating'], 4,
+          reason: 'and published, since the server has never heard it');
+      expect(pushed.single['status'], 'finished',
+          reason: 'carrying the merged status, not the stale local one');
+    });
+
+    test('opening a book offline does not unfinish it everywhere', () async {
+      // This device was offline while the book was finished elsewhere. It
+      // still thinks the book is unread, so opening it guessed "reading" — and
+      // that guess is newer than the finish.
+      final repo = await _repo();
+      await repo.readingStatus.noteOpened('b1');
+      final pushed = <Map<String, dynamic>>[];
+
+      await SyncService(repo).sync(_client(_server(
+        statuses: [
+          {
+            'book_id': 'b1',
+            'status': 'finished',
+            'finished_at': '2020-01-02 00:00:00',
+            'read_count': 1,
+            'inferred': false,
+            'updated_at': '2020-01-02 00:00:00',
+            'rating': 4,
+            'rating_updated_at': '2020-01-02 00:00:00',
+          }
+        ],
+        pushedStatuses: pushed,
+      )));
+
+      final book = await b1(repo);
+      expect(book.status, 'finished', reason: 'a guess yields to a choice');
+      expect(book.statusInferred, isFalse);
+      expect(book.readCount, 1);
+      expect(book.rating, 4,
+          reason: 'this device never rated it, so it has nothing to say');
+      expect(pushed.single['status'], 'finished',
+          reason: 'what goes back is the merge, not the guess');
+      expect(pushed.single['inferred'], isFalse);
+    });
+
+    test("the server's merge is adopted from its answer to the push",
+        () async {
+      // The other order: this device's guess goes out before it has pulled the
+      // finish, and the server — which has it — answers with the merge.
+      final repo = await _repo();
+      await repo.readingStatus.noteOpened('b1');
+      final pushed = <Map<String, dynamic>>[];
+
+      await SyncService(repo).push(_client(_server(
+        pushedStatuses: pushed,
+        statusReply: (p) => {
+          'book_id': 'b1',
+          'status': 'finished',
+          'started_at': null,
+          'finished_at': '2020-01-02 00:00:00',
+          'read_count': 1,
+          'inferred': false,
+          'updated_at': p['updated_at'],
+          'rating': 5,
+          'rating_updated_at': '2020-01-02 00:00:00',
+        },
+      )));
+
+      expect(pushed.single['inferred'], isTrue,
+          reason: 'the server is told it was a guess');
+      final book = await b1(repo);
+      expect(book.status, 'finished');
+      expect(book.statusInferred, isFalse);
+      expect(book.rating, 5, reason: 'the rating it had never heard of, too');
+      expect(book.statusNeedsPush, isFalse,
+          reason: 'it already holds exactly this, so nothing is left to send');
+    });
+
+    test('a finish counted elsewhere is not uncounted here', () async {
+      final repo = await _repo();
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+      await repo.readingStatus.setStatus('b1', ReadingStatus.abandoned);
+      // readCount is 1 here, and this change is newer than the server's row —
+      // which counts two finishes.
+      await SyncService(repo).pull(_client(_server(statuses: [
+        {
+          'book_id': 'b1',
+          'status': 'finished',
+          'read_count': 2,
+          'inferred': false,
+          'updated_at': '2020-01-01 00:00:00',
+          'rating': null,
+          'rating_updated_at': null,
+        }
+      ])));
+
+      final book = await b1(repo);
+      expect(book.status, 'abandoned', reason: 'the newer status wins');
+      expect(book.readCount, 2, reason: 'and the count keeps the larger');
+      expect(book.statusNeedsPush, isTrue);
+    });
+
+    test('a book the server no longer has stops being retried', () async {
+      // Deleted elsewhere, or no longer shared: the server, which has the
+      // feature, answers 404 for the book.
+      final repo = await _repo();
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+
+      final report = await SyncService(repo)
+          .push(_client(_server(statusPushCode: 404)));
+
+      expect(report.issues, isEmpty,
+          reason: 'there is nowhere to send it, which is not a failure');
+      final book = await b1(repo);
+      expect(book.statusNeedsPush, isFalse, reason: 'not one request per sync');
+      expect(book.status, 'finished', reason: 'and it stays on this device');
+    });
+
+    test('a status waits for its book to reach the server first', () async {
+      final repo = await _repo();
+      final pushed = <Map<String, dynamic>>[];
+      await repo.readingStatus.setStatus('b1', ReadingStatus.finished);
+      // The book's own push has not gone through yet.
+      await (repo.db.update(repo.db.books)..where((b) => b.id.equals('b1')))
+          .write(const BooksCompanion(needsPush: Value(true)));
+
+      await SyncService(repo).push(_client((req) async {
+        // Refuse the book itself, as a flaky connection might.
+        if (req.method == 'PUT' && req.url.path == '/api/books/b1') {
+          return http.Response('{"error":"boom"}', 500);
+        }
+        return _server(pushedStatuses: pushed)(req);
+      }));
+
+      expect(pushed, isEmpty,
+          reason: 'its 404 would be read as "gone" and the status dropped');
+      expect((await b1(repo)).statusNeedsPush, isTrue);
     });
   });
 

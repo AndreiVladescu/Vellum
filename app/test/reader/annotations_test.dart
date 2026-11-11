@@ -318,6 +318,7 @@ void main() {
           title: title,
           readerNotesNeedsPush: false,
       statusNeedsPush: false,
+      statusInferred: false,
           createdAt: DateTime(2024),
           updatedAt: DateTime(2024),
           needsPush: false, syncExcluded: false,

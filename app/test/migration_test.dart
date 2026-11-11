@@ -244,6 +244,61 @@ void main() {
     expect(untouched.statusUpdatedAt, isNull);
   });
 
+  // The v39 backfill, for the same reason as the v34 one above: a rating never
+  // set a flag before, so nothing but this step would ever publish the ratings
+  // an existing reader already has.
+  test('upgrading a library with ratings queues them to publish', () async {
+    final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
+    final schema = await verifier.schemaAt(38);
+    addTearDown(schema.close);
+    final sentAt =
+        DateTime.utc(2026, 8, 1, 12).millisecondsSinceEpoch ~/ 1000;
+    // Rated, and its status already published: the flag is clear.
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, rating, status_updated_at, "
+      "status_needs_push, created_at, updated_at, needs_push, "
+      "reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('rated', 'Dune', 'finished', 4, $sentAt, 0, 0, 0, 0, 0, 0)",
+    );
+    // Rated, never touched otherwise: no status clock at all.
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, rating, created_at, updated_at, "
+      "needs_push, reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('rated-unread', 'Piranesi', 'unread', 5, 0, 0, 0, 0, 0)",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, created_at, updated_at, "
+      "needs_push, reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('unrated', 'Emma', 'unread', 0, 0, 0, 0, 0)",
+    );
+
+    final db = VellumDatabase(schema.newConnection());
+    addTearDown(db.close);
+    Future<Book> book(String id) =>
+        (db.select(db.books)..where((b) => b.id.equals(id))).getSingle();
+
+    final rated = await book('rated');
+    expect(rated.statusNeedsPush, isTrue);
+    expect(rated.rating, 4);
+    expect(rated.statusInferred, isFalse);
+    expect(rated.statusUpdatedAt!.toUtc(), DateTime.utc(2026, 8, 1, 12),
+        reason: 'the status clock is untouched, so this is not mistaken for '
+            'a newer status than one made elsewhere since');
+    expect(rated.ratingUpdatedAt!.toUtc(), DateTime.utc(2026, 8, 1, 12),
+        reason: 'the rating is dated from what the row already knew');
+
+    final unread = await book('rated-unread');
+    expect(unread.statusNeedsPush, isTrue);
+    expect(unread.ratingUpdatedAt, isNotNull);
+    expect(unread.statusUpdatedAt, isNull,
+        reason: 'its status was never changed, and still says so');
+
+    final unrated = await book('unrated');
+    expect(unrated.statusNeedsPush, isFalse,
+        reason: 'nothing to say, so nothing is sent');
+    expect(unrated.ratingUpdatedAt, isNull);
+  });
+
   group('every historical schema version migrates cleanly to the latest', () {
     final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
     final latest = versions.GeneratedHelper.versions.last;

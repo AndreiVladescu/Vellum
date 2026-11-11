@@ -32,12 +32,15 @@ until the sweep runs).
 (plan 5 #5) goes through the opt-in per-device `reading_progress` table
 (`server/src/reading.rs`); highlights/notes/bookmarks, reading sittings,
 `readerNotes` and the profile photo go through `server/src/personal.rs`
-(migration 0023). Every one of those tables is keyed by `user_id` taken from the
-token, because a shared library holds several people's marks in the same book —
-putting any of it on `book` would publish it to everyone the library is shared
-with. That is why `readerNotes` is a `book_note` row server-side rather than a
-column, and why it carries its own `readerNotesUpdatedAt`/`readerNotesNeedsPush`
-in the app rather than riding the book's.
+(migration 0023), as do reading status, rating, `startedAt`/`finishedAt` and
+`readCount` (`book_status`, migrations 0034 and 0038). Every one of those tables
+is keyed by `user_id` taken from the token, because a shared library holds
+several people's marks in the same book — putting any of it on `book` would
+publish it to everyone the library is shared with. That is why `readerNotes` is
+a `book_note` row server-side rather than a column, and why it carries its own
+`readerNotesUpdatedAt`/`readerNotesNeedsPush` in the app rather than riding the
+book's; the status fields likewise carry `statusUpdatedAt`/`ratingUpdatedAt`/
+`statusNeedsPush` (DESIGN.md, "Reading status, ratings and dates").
 
 **Copy photos are library data, not personal** (migration 0024): they hang off a
 physical copy, which already syncs, and are visible to whoever the book is

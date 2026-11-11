@@ -722,13 +722,68 @@ interruptions. **Local-only, permanently:** this is behavioural data, it has no
 sync channel and should never get one, it rides backups because those snapshot the
 database file, and *Clear reading history* really deletes it.
 
-**Reading status, ratings and dates** (app, plan 5 #18) add `status`
-(`unread`/`reading`/`finished`/`abandoned`/`reference`), `rating` (1–5),
-`startedAt`/`finishedAt` and `readCount` to the book row. They are **app-local for
-now** and written to be promotable — all additive, nullable-or-defaulted — because
-they are *judgements* rather than reading mechanics and users will eventually want
-them on every device; promoting them is one server migration plus a parity update,
-with no data conversion.
+**Reading status, ratings and dates** (both, plan 5 #18) are `status`
+(`unread`/`reading`/`finished`/`abandoned`/`reference`, plus `wishlist`), `rating`
+(1–5), `startedAt`/`finishedAt` and `readCount`. In the app they are columns on the
+book row; on the wire they are **personal data**, and they travel on the per-user
+channel, never on the shared book payload.
+
+That is not how this paragraph first imagined it. It said promoting them would be
+"one server migration plus a parity update" — putting them on `book`. That was
+written before the personal channel existed, and it is the wrong shape: a library
+can be shared, and a rating or a "finished" is one person's judgement. On `book` it
+would be published to, and overwritten by, everyone the library is shared with —
+the mistake migration 0006 had already undone once. So the server keeps a
+`book_status` row per `(user, book)` (migrations 0034 and 0038,
+`server/src/personal.rs`), with `user_id` from the token and the same
+`access_predicate()` join as the note, and the app gives these fields their own
+dirty flag (`statusNeedsPush`) rather than the book's. Changing a status or a rating
+never moves the book's sync clock.
+
+**Two clocks, one row.** The status and its dates share `statusUpdatedAt`: they are
+one act, and a "finished" without its finish date would be half a fact. The rating
+has its own, `ratingUpdatedAt`. One clock for all five was the obvious design and is
+wrong in both directions: rating a book on a tablet that missed the phone's
+"finished" would publish the tablet's "unread" as the newest status, and changing
+the status there would publish "unrated" over the phone's stars. A device that has
+never rated a book sends no rating clock, and so says nothing about the rating. A
+rating removed is a dated null.
+
+The merge (`merge_status` on the server, `mergeStatus` in the app — the same rules,
+so the two never disagree) is last-write-wins on each clock, with two refinements:
+
+- **A guess yields to a choice.** The one automatic transition (below) is marked
+  `inferred`. A device that has been offline since the book was finished elsewhere
+  still thinks it unread, so opening it says "reading" — with a *newer* clock than
+  the finish. An inferred status therefore never replaces a chosen one that says
+  something (anything but `unread`), and a chosen one replaces a guess whichever is
+  newer. The app sends the flag on push, merges with it on pull, and adopts the
+  server's answer to a push, so a stale guess is corrected even when it reaches the
+  server before the finish does.
+- **The read count only grows**: the merge keeps the larger, not the newer. It
+  counts finishes and nothing lowers it, so a stale device's later "abandoned" must
+  not take back a finish it never heard of. Two devices that each mark the same
+  reading finished offline count it **once** — almost always the truth, since it is
+  one person. A genuine second reading finished on two devices without a sync in
+  between also counts once; nothing on the wire tells those apart, and summing
+  would double-count the common case instead.
+
+**Upgrades in either order.** A server row written before 0038 has no rating clock,
+which means *unknown*, not unrated: any dated rating fills it, and a device pulling
+it keeps its own. App v39 queues every rated book once, so ratings made before the
+upgrade are published; 0038 re-stamps every row so devices pull them again and
+re-queue any rating a pre-0038 server silently dropped. An app older than 0038
+sends no rating keys and cannot clear one. An app against a server without
+`book_status` asks for the capability before pushing and keeps its flags until the
+server has it; a 404 on the list is "not supported yet", as for every personal
+endpoint.
+
+**Visibility.** A status is pushed only for a book the server already has (its own
+push has gone through) and that is neither trashed nor kept on this device. A 404
+then means the book is gone or no longer shared: the flag is cleared and the status
+stays here, rather than failing every sync for good. A book that stops being shared
+stops returning your status on it; deleting the book or the account deletes the
+rows by cascade.
 
 The rule is that **the app never decides for you**. Exactly one transition is
 automatic: opening an unread book makes it `reading` (unambiguous and reversible).
@@ -736,7 +791,8 @@ Reaching the end *offers* "Mark as finished" instead of assuming it — someone 
 skims the last chapter has not finished the book. Finishing stamps `finishedAt` and
 counts a re-read; moving back out of `finished` clears the date so the two can't
 disagree. Status is a facet next to the genre filter (both are predicates on the
-same single shelf query), and neither status nor rating touches the sync clock.
+same single shelf query). An imported reading history (Goodreads and the like) is
+queued like any other change, so it reaches your other devices too.
 
 **Reader comfort** (app, plan 5 #23) is one persisted `ReaderSettings` shared by
 both readers, because theme, measure and distraction-free mode mean the same thing

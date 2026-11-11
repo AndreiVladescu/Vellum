@@ -147,6 +147,56 @@ String? formatServerTime(DateTime? dt) {
       '${two(u.hour)}:${two(u.minute)}:${two(u.second)}';
 }
 
+/// One reader's status for one book as the server holds it (`/api/statuses`,
+/// server migrations 0034 and 0038).
+class RemoteBookStatus {
+  const RemoteBookStatus({
+    required this.bookId,
+    required this.status,
+    this.startedAt,
+    this.finishedAt,
+    this.readCount = 0,
+    this.inferred = false,
+    this.updatedAt,
+    this.rating,
+    this.ratingUpdatedAt,
+    this.hasRating = false,
+  });
+
+  factory RemoteBookStatus.fromJson(Map<String, dynamic> e) => RemoteBookStatus(
+        bookId: e['book_id'] as String,
+        status: e['status'] as String? ?? 'unread',
+        startedAt: ServerBook._parseServerTime(e['started_at'] as String?),
+        finishedAt: ServerBook._parseServerTime(e['finished_at'] as String?),
+        readCount: (e['read_count'] as num?)?.toInt() ?? 0,
+        inferred: e['inferred'] == true || e['inferred'] == 1,
+        updatedAt: ServerBook._parseServerTime(e['updated_at'] as String?),
+        rating: (e['rating'] as num?)?.toInt(),
+        ratingUpdatedAt:
+            ServerBook._parseServerTime(e['rating_updated_at'] as String?),
+        hasRating: e.containsKey('rating_updated_at'),
+      );
+
+  final String bookId;
+  final String status;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+  final int readCount;
+  final bool inferred;
+  final DateTime? updatedAt;
+
+  /// 1–5, or null for unrated — when [ratingUpdatedAt] says it was ever set.
+  final int? rating;
+
+  /// Null for *unknown*: no rating-aware app has written this row's rating.
+  final DateTime? ratingUpdatedAt;
+
+  /// Whether the server knows about ratings at all (migration 0038). One that
+  /// predates it sends no rating keys, and its silence about the rating and
+  /// the inferred flag is not a statement about this book.
+  final bool hasRating;
+}
+
 /// One book's push payload for [VellumServerClient.pushBooksBatch] — the same
 /// fields [VellumServerClient.pushBook] takes, plus the id (a batch request
 /// has no per-item URL to carry it).
@@ -1259,19 +1309,8 @@ class VellumServerClient {
   // "finished". Server migration 0034 and `Books.statusUpdatedAt` say why it is
   // here rather than on the book.
 
-  Future<
-      ({
-        String? serverNow,
-        List<
-            ({
-              String bookId,
-              String status,
-              DateTime? startedAt,
-              DateTime? finishedAt,
-              int readCount,
-              DateTime? updatedAt,
-            })> entries
-      })> listBookStatuses({String? cursor}) async {
+  Future<({String? serverNow, List<RemoteBookStatus> entries})>
+      listBookStatuses({String? cursor}) async {
     final uri =
         _uri('/api/statuses').replace(queryParameters: {'cursor': cursor ?? ''});
     final map =
@@ -1280,25 +1319,32 @@ class VellumServerClient {
       serverNow: map['server_now'] as String?,
       entries: [
         for (final e in (map['entries'] as List? ?? []))
-          (
-            bookId: (e as Map<String, dynamic>)['book_id'] as String,
-            status: e['status'] as String? ?? 'unread',
-            startedAt: ServerBook._parseServerTime(e['started_at'] as String?),
-            finishedAt: ServerBook._parseServerTime(e['finished_at'] as String?),
-            readCount: (e['read_count'] as num?)?.toInt() ?? 0,
-            updatedAt: ServerBook._parseServerTime(e['updated_at'] as String?),
-          ),
+          RemoteBookStatus.fromJson(e as Map<String, dynamic>),
       ],
     );
   }
 
-  Future<void> pushBookStatus({
+  /// Sends this device's status for [bookId] and returns what the server holds
+  /// afterwards — its merge of this push with what it had, which is not always
+  /// what was sent (see `mergeStatus`). Null when the answer carries no row,
+  /// as a server's error-free but empty reply might.
+  ///
+  /// Each half carries its own clock. A null [ratingUpdatedAt] means this
+  /// device has never rated the book, and the push says nothing about the
+  /// rating — so it cannot clear one set elsewhere. A null [updatedAt] (only a
+  /// rating ever changed here) is sent as the epoch, the oldest clock there
+  /// is: the server would otherwise stamp it "now" and this device's "unread"
+  /// would become the newest status there is.
+  Future<RemoteBookStatus?> pushBookStatus({
     required String bookId,
     required String status,
     DateTime? startedAt,
     DateTime? finishedAt,
     int readCount = 0,
+    bool inferred = false,
     DateTime? updatedAt,
+    int? rating,
+    DateTime? ratingUpdatedAt,
   }) async {
     final res = await _http.put(
       _uri('/api/statuses/$bookId'),
@@ -1308,10 +1354,16 @@ class VellumServerClient {
         'started_at': formatServerTime(startedAt),
         'finished_at': formatServerTime(finishedAt),
         'read_count': readCount,
-        'updated_at': formatServerTime(updatedAt),
+        'inferred': inferred,
+        'updated_at': formatServerTime(updatedAt) ?? '1970-01-01 00:00:00',
+        'rating': rating,
+        'rating_updated_at': formatServerTime(ratingUpdatedAt),
       }),
     );
-    _body(res);
+    final body = _body(res);
+    return body is Map<String, dynamic> && body['book_id'] is String
+        ? RemoteBookStatus.fromJson(body)
+        : null;
   }
 
   // ---- profile -------------------------------------------------------------

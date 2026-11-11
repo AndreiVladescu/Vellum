@@ -66,14 +66,14 @@ class Books extends Table {
   BoolColumn get needsProgressPush =>
       boolean().withDefault(const Constant(false))();
   // ---- Reading status and judgements (plan 5 #18) -------------------------
-  // App-local **for now**, and written to be promotable: these are additive
-  // nullable/defaulted columns, so moving them onto the synced payload later is
-  // one server migration plus a parity update, with no data conversion. They are
-  // *judgements* (what you thought, what you mean to read) rather than reading
-  // mechanics, so users will eventually expect them on every device — see the
-  // locality note in plan 5 #18.
+  // Columns on the book row *here*, but personal data on the wire: all five
+  // (status, rating, the two dates, the read count) travel on the per-user
+  // `book_status` channel (server migrations 0034 and 0038) under their own
+  // clocks — [statusUpdatedAt] and [ratingUpdatedAt] — and never on the shared
+  // book payload. In a shared library a rating or a "finished" is one
+  // reader's, not the library's.
   //
-  // 'unread' | 'reading' | 'finished' | 'abandoned' | 'reference'.
+  // 'unread' | 'reading' | 'finished' | 'abandoned' | 'reference' | 'wishlist'.
   TextColumn get status =>
       text().withDefault(const Constant('unread'))();
   /// 1–5, or null for unrated.
@@ -96,8 +96,33 @@ class Books extends Table {
   /// Null means "never changed here": a book that has sat at `unread` since it
   /// was added has nothing to say about its status, and saying it anyway would
   /// let a device that has never opened the book overwrite one that finished it.
+  ///
+  /// [statusNeedsPush] covers the rating too — it is one row on the server —
+  /// but the rating has its own clock, [ratingUpdatedAt].
   DateTimeColumn get statusUpdatedAt => dateTime().nullable()();
   BoolColumn get statusNeedsPush =>
+      boolean().withDefault(const Constant(false))();
+
+  /// When [rating] was last changed here, or null if it never was.
+  ///
+  /// Separate from [statusUpdatedAt] because they are separate acts, and one
+  /// clock lets each overwrite the other from a device that missed the other:
+  /// rating a book on a tablet that never heard of the phone's "finished"
+  /// would publish the tablet's "unread" as the newest status, and changing the
+  /// status there would publish "unrated" over the phone's stars. Null means
+  /// this device has no opinion, so its pushes say nothing about the rating.
+  DateTimeColumn get ratingUpdatedAt => dateTime().nullable()();
+
+  /// Whether [status] was set by the app rather than chosen — the one
+  /// automatic transition, opening an unread book.
+  ///
+  /// It exists for the device that has been offline since the book was
+  /// finished somewhere else: it still thinks the book is unread, so opening it
+  /// says "reading", stamped later than the finish it is wrong about. Marked as
+  /// a guess, it yields to any status someone actually chose (see
+  /// `mergeStatus`); unmarked, plain last-write-wins would unfinish the book
+  /// everywhere. Cleared by every deliberate status change.
+  BoolColumn get statusInferred =>
       boolean().withDefault(const Constant(false))();
   // ---- Trash (plan 5 #52) --------------------------------------------------
   /// When this book was moved to the trash, or null for a live book.
@@ -758,7 +783,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 38;
+  int get schemaVersion => 39;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1218,6 +1243,33 @@ class VellumDatabase extends _$VellumDatabase {
             // shelf's `has_file` check scanned all of book_files once per
             // book on every `books` write — 396 ms → 20 ms at 5,000 books.
             await _ensureIndexes(m);
+          }
+          if (from < 39) {
+            // The rating joins the status on the per-user channel (server
+            // migration 0038), and the automatic "reading" learns to say it
+            // was a guess. Re-read rather than using `bookCols`: earlier steps
+            // in this same upgrade may have added columns since.
+            final cols = await columnsOf('books');
+            if (!cols.contains('status_inferred')) {
+              await m.addColumn(books, books.statusInferred);
+            }
+            if (!cols.contains('rating_updated_at')) {
+              await m.addColumn(books, books.ratingUpdatedAt);
+            }
+            // Publish the ratings this device already holds, once. Nothing
+            // else would: a rating never set a flag before. Dated like the
+            // v34 step dates a status — from what the row already knows, or
+            // the moment of the upgrade — which only matters against another
+            // device's rating of the same book: the server holds none yet, and
+            // fills a rating it has never heard of whatever the clock. The
+            // status clock is left alone, so this is not a newer status.
+            await customStatement(
+              "UPDATE books SET status_needs_push = 1, "
+              "rating_updated_at = COALESCE(rating_updated_at, "
+              "status_updated_at, finished_at, started_at, last_read_at, "
+              "CAST(strftime('%s', 'now') AS INTEGER)) "
+              "WHERE rating IS NOT NULL",
+            );
           }
         },
         beforeOpen: (details) async {

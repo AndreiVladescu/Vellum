@@ -9,6 +9,7 @@ import '../account/user_profile.dart';
 import '../data/database.dart';
 import '../data/file_hash.dart';
 import '../data/library_repository.dart';
+import '../data/reading_status.dart';
 import '../shelf/spine_style.dart';
 import 'server_client.dart';
 import 'sync_scope.dart';
@@ -1355,6 +1356,54 @@ class SyncService {
         message: message,
       );
 
+  /// Combines the server's copy of a book's status with this device's, by the
+  /// same rules the server merges a push with (`mergeStatus`), and writes the
+  /// result here if it differs. Returns whether anything was written.
+  ///
+  /// [pending] says this device has a change the server has not had yet. Then
+  /// the local copy is the one *arriving* — it is about to be pushed, and the
+  /// server will merge it the same way — and it stays queued. Otherwise the
+  /// server's copy is the newcomer, and the flag is set only if the merge kept
+  /// something the server lacks: a rating it has never heard of, or a finish
+  /// it would otherwise not count.
+  Future<bool> _adoptStatus(Book local, RemoteBookStatus remote,
+      {required bool pending}) async {
+    final mine = StatusState.ofBook(local);
+    final theirs = StatusState(
+      status: remote.status,
+      startedAt: remote.startedAt,
+      finishedAt: remote.finishedAt,
+      readCount: remote.readCount,
+      inferred: remote.hasRating && remote.inferred,
+      updatedAt: remote.updatedAt,
+      // A server that predates ratings is silent about this one, not saying
+      // "unrated": undated, so the merge keeps what this device holds.
+      rating: remote.hasRating ? remote.rating : null,
+      ratingUpdatedAt: remote.hasRating ? remote.ratingUpdatedAt : null,
+    );
+    final merged = pending ? mergeStatus(theirs, mine) : mergeStatus(mine, theirs);
+    final needsPush =
+        pending || !merged.sameAs(theirs, withRating: remote.hasRating);
+    final unchanged = merged.sameAs(mine) &&
+        merged.updatedAt == mine.updatedAt &&
+        merged.ratingUpdatedAt == mine.ratingUpdatedAt &&
+        needsPush == local.statusNeedsPush;
+    if (unchanged) return false;
+    await (_db.update(_db.books)..where((b) => b.id.equals(local.id)))
+        .write(BooksCompanion(
+      status: Value(merged.status),
+      startedAt: Value(merged.startedAt),
+      finishedAt: Value(merged.finishedAt),
+      readCount: Value(merged.readCount),
+      statusInferred: Value(merged.inferred),
+      statusUpdatedAt: Value(merged.updatedAt),
+      rating: Value(merged.rating),
+      ratingUpdatedAt: Value(merged.ratingUpdatedAt),
+      statusNeedsPush: Value(needsPush),
+    ));
+    return true;
+  }
+
   Future<int> _pullPersonal(
     _PullRequests requests,
     List<SyncIssue> issues,
@@ -1464,27 +1513,9 @@ class SyncService {
                 ..where((b) => b.id.equals(remote.bookId)))
               .getSingleOrNull();
           if (local == null) continue;
-          // Last-write-wins on the status's own clock, and a local change that
-          // has not been pushed yet is not overwritten by the older row it is
-          // about to replace. A local null means this device has never had an
-          // opinion, so the server's wins.
-          final mine = local.statusUpdatedAt;
-          final theirs = remote.updatedAt;
-          if (mine != null &&
-              (theirs == null || !mine.isBefore(theirs))) {
-            continue;
+          if (await _adoptStatus(local, remote, pending: local.statusNeedsPush)) {
+            pulled++;
           }
-          await (db.update(db.books)..where((b) => b.id.equals(remote.bookId)))
-              .write(BooksCompanion(
-            status: Value(remote.status),
-            startedAt: Value(remote.startedAt),
-            finishedAt: Value(remote.finishedAt),
-            readCount: Value(remote.readCount),
-            statusUpdatedAt: Value(theirs),
-            // It came *from* the server, so it is not waiting to go there.
-            statusNeedsPush: const Value(false),
-          ));
-          pulled++;
         }
       } catch (e) {
         if (!_serverLacksPersonal(e)) {
@@ -1668,10 +1699,16 @@ class SyncService {
     // would PUT against an id the server has never heard of — and a 404 read
     // as "old server" would swallow the error *and* leave the flag set, one
     // doomed request per book on every sync from here on.
+    //
+    // And only for books the server already has (`needsPush` clear — the book
+    // push above runs first): a status for a book whose own push failed this
+    // time waits for it, rather than drawing a 404 for an id the server has
+    // not met yet.
     final dirtyStatuses = scope.books
         ? await (db.select(db.books)
               ..where((b) =>
                   b.statusNeedsPush.equals(true) &
+                  b.needsPush.equals(false) &
                   b.deletedAt.isNull() &
                   b.syncExcluded.equals(false)))
             .get()
@@ -1685,17 +1722,52 @@ class SyncService {
         : const <Book>[];
     for (final b in statusBooks) {
       try {
-        await client.pushBookStatus(
+        final stored = await client.pushBookStatus(
           bookId: b.id,
           status: b.status,
           startedAt: b.startedAt,
           finishedAt: b.finishedAt,
           readCount: b.readCount,
+          inferred: b.statusInferred,
           updatedAt: b.statusUpdatedAt,
+          rating: b.rating,
+          ratingUpdatedAt: b.ratingUpdatedAt,
         );
-        await (db.update(db.books)..where((row) => row.id.equals(b.id)))
-            .write(const BooksCompanion(statusNeedsPush: Value(false)));
+        final now = await (db.select(db.books)
+              ..where((row) => row.id.equals(b.id)))
+            .getSingleOrNull();
+        // Changed again while the request was out: that change is still to
+        // go, so leave the flag and the row alone for the next pass.
+        final untouched = now != null &&
+            now.statusUpdatedAt == b.statusUpdatedAt &&
+            now.ratingUpdatedAt == b.ratingUpdatedAt &&
+            StatusState.ofBook(now).sameAs(StatusState.ofBook(b));
+        if (untouched) {
+          if (stored != null) {
+            // The server answers with its merge, which is not always what was
+            // sent — a guess that lost to a finish from elsewhere, a read count
+            // it already had higher. Taking it now, rather than a pull later,
+            // is what keeps the shelf from showing the guess in the meantime.
+            await _adoptStatus(now, stored, pending: false);
+          } else {
+            await (db.update(db.books)..where((row) => row.id.equals(b.id)))
+                .write(const BooksCompanion(statusNeedsPush: Value(false)));
+          }
+        }
         pushed++;
+      } on ServerException catch (e) {
+        if (e.statusCode == 404) {
+          // The server has the feature (asked above) and the book was pushed,
+          // so a 404 means the book is not one this account can see any more:
+          // deleted elsewhere, or no longer shared. There is nowhere to send
+          // the status, and retrying every sync would only report the same
+          // failure forever. It stays on this device.
+          await (db.update(db.books)..where((row) => row.id.equals(b.id)))
+              .write(const BooksCompanion(statusNeedsPush: Value(false)));
+        } else {
+          issues.add(
+              _personalIssue('push', 'A reading status could not be sent: $e'));
+        }
       } catch (e) {
         issues.add(
             _personalIssue('push', 'A reading status could not be sent: $e'));

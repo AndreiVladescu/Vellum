@@ -128,6 +128,86 @@ void main() {
         reason: "A's next sync pulls B's pushed book");
   }, skip: skip);
 
+  // Status and rating on the per-user channel (server migrations 0034, 0038),
+  // over the real wire — including the server's merge, which the fakes can
+  // only imitate.
+  test('status and rating follow the reader; a stale guess does not unfinish',
+      () async {
+    final dirA = Directory.systemTemp.createTempSync('vellum_e2e_status_a');
+    final dirB = Directory.systemTemp.createTempSync('vellum_e2e_status_b');
+    addTearDown(() {
+      dirA.deleteSync(recursive: true);
+      dirB.deleteSync(recursive: true);
+    });
+    final repoA = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirA);
+    final repoB = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirB);
+
+    final id = await repoA.createCustomBook(title: 'Middlemarch');
+    await SyncService(repoA).sync(client);
+    await SyncService(repoB).sync(client);
+    expect((await repoB.watchBook(id).first)?.status, 'unread');
+
+    // A finishes and rates it; B, offline since, still thinks it is unread.
+    await repoA.readingStatus.setStatus(id, ReadingStatus.finished);
+    await repoA.readingStatus.setRating(id, 4);
+    final pushA = await SyncService(repoA).push(client);
+    expect(pushA.issues, isEmpty);
+    final bookA = await repoA.watchBook(id).first;
+    expect(bookA?.needsPush, isFalse,
+        reason: 'neither the status nor the rating touched the book row');
+
+    // B opens it — the automatic "reading", with a newer clock — and pushes
+    // before it has pulled. The server's merge answers with the finish.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await repoB.readingStatus.noteOpened(id);
+    final pushB = await SyncService(repoB).push(client);
+    expect(pushB.issues, isEmpty);
+    var bookB = await repoB.watchBook(id).first;
+    expect(bookB?.status, 'finished', reason: 'a guess yields to a choice');
+    expect(bookB?.rating, 4);
+    expect(bookB?.readCount, 1);
+    expect(bookB?.statusNeedsPush, isFalse);
+
+    // And A, pulling, still has it finished.
+    await SyncService(repoA).pull(client);
+    expect((await repoA.watchBook(id).first)?.status, 'finished');
+
+    // B rates it differently later; A follows.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await repoB.readingStatus.setRating(id, 2);
+    await SyncService(repoB).sync(client);
+    await SyncService(repoA).sync(client);
+    expect((await repoA.watchBook(id).first)?.rating, 2);
+    bookB = await repoB.watchBook(id).first;
+    expect(bookB?.rating, 2);
+
+    // A third device, stale since before any of this, rates it: the rating
+    // lands, and its stale "unread" does not.
+    final dirC = Directory.systemTemp.createTempSync('vellum_e2e_status_c');
+    addTearDown(() => dirC.deleteSync(recursive: true));
+    final repoC = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase.memory()), dirC);
+    await SyncService(repoC).pull(client);
+    await (repoC.db.update(repoC.db.books)..where((b) => b.id.equals(id)))
+        .write(const BooksCompanion(
+      status: Value('unread'),
+      statusUpdatedAt: Value(null),
+      rating: Value(null),
+      ratingUpdatedAt: Value(null),
+      readCount: Value(0),
+    ));
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await repoC.readingStatus.setRating(id, 5);
+    expect((await SyncService(repoC).push(client)).issues, isEmpty);
+    await SyncService(repoA).pull(client);
+    final finalA = await repoA.watchBook(id).first;
+    expect(finalA?.rating, 5);
+    expect(finalA?.status, 'finished',
+        reason: 'rating a book on a stale device does not unfinish it');
+  }, skip: skip);
+
   // Plan 5 #4: shelves sync too now, over the real wire, with their explicit
   // order preserved — the failure mode a set-replace could hide (books
   // present but scrambled) looks fine until compared against the sender's

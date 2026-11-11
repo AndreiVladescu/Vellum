@@ -27,6 +27,7 @@ Book _book(
       needsPush: false, syncExcluded: false,
       readerNotesNeedsPush: false,
       statusNeedsPush: false,
+      statusInferred: false,
       needsProgressPush: false,
       status: 'unread',
       readCount: 0,

@@ -565,6 +565,33 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _ratingUpdatedAtMeta = const VerificationMeta(
+    'ratingUpdatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> ratingUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'rating_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _statusInferredMeta = const VerificationMeta(
+    'statusInferred',
+  );
+  @override
+  late final GeneratedColumn<bool> statusInferred = GeneratedColumn<bool>(
+    'status_inferred',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("status_inferred" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _deletedAtMeta = const VerificationMeta(
     'deletedAt',
   );
@@ -635,6 +662,8 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     readCount,
     statusUpdatedAt,
     statusNeedsPush,
+    ratingUpdatedAt,
+    statusInferred,
     deletedAt,
     syncExcluded,
     addedBy,
@@ -877,6 +906,24 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         ),
       );
     }
+    if (data.containsKey('rating_updated_at')) {
+      context.handle(
+        _ratingUpdatedAtMeta,
+        ratingUpdatedAt.isAcceptableOrUnknown(
+          data['rating_updated_at']!,
+          _ratingUpdatedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status_inferred')) {
+      context.handle(
+        _statusInferredMeta,
+        statusInferred.isAcceptableOrUnknown(
+          data['status_inferred']!,
+          _statusInferredMeta,
+        ),
+      );
+    }
     if (data.containsKey('deleted_at')) {
       context.handle(
         _deletedAtMeta,
@@ -1031,6 +1078,14 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.bool,
         data['${effectivePrefix}status_needs_push'],
       )!,
+      ratingUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}rating_updated_at'],
+      ),
+      statusInferred: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}status_inferred'],
+      )!,
       deletedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
@@ -1107,8 +1162,32 @@ class Book extends DataClass implements Insertable<Book> {
   /// Null means "never changed here": a book that has sat at `unread` since it
   /// was added has nothing to say about its status, and saying it anyway would
   /// let a device that has never opened the book overwrite one that finished it.
+  ///
+  /// [statusNeedsPush] covers the rating too — it is one row on the server —
+  /// but the rating has its own clock, [ratingUpdatedAt].
   final DateTime? statusUpdatedAt;
   final bool statusNeedsPush;
+
+  /// When [rating] was last changed here, or null if it never was.
+  ///
+  /// Separate from [statusUpdatedAt] because they are separate acts, and one
+  /// clock lets each overwrite the other from a device that missed the other:
+  /// rating a book on a tablet that never heard of the phone's "finished"
+  /// would publish the tablet's "unread" as the newest status, and changing the
+  /// status there would publish "unrated" over the phone's stars. Null means
+  /// this device has no opinion, so its pushes say nothing about the rating.
+  final DateTime? ratingUpdatedAt;
+
+  /// Whether [status] was set by the app rather than chosen — the one
+  /// automatic transition, opening an unread book.
+  ///
+  /// It exists for the device that has been offline since the book was
+  /// finished somewhere else: it still thinks the book is unread, so opening it
+  /// says "reading", stamped later than the finish it is wrong about. Marked as
+  /// a guess, it yields to any status someone actually chose (see
+  /// `mergeStatus`); unmarked, plain last-write-wins would unfinish the book
+  /// everywhere. Cleared by every deliberate status change.
+  final bool statusInferred;
 
   /// When this book was moved to the trash, or null for a live book.
   ///
@@ -1179,6 +1258,8 @@ class Book extends DataClass implements Insertable<Book> {
     required this.readCount,
     this.statusUpdatedAt,
     required this.statusNeedsPush,
+    this.ratingUpdatedAt,
+    required this.statusInferred,
     this.deletedAt,
     required this.syncExcluded,
     this.addedBy,
@@ -1259,6 +1340,10 @@ class Book extends DataClass implements Insertable<Book> {
       map['status_updated_at'] = Variable<DateTime>(statusUpdatedAt);
     }
     map['status_needs_push'] = Variable<bool>(statusNeedsPush);
+    if (!nullToAbsent || ratingUpdatedAt != null) {
+      map['rating_updated_at'] = Variable<DateTime>(ratingUpdatedAt);
+    }
+    map['status_inferred'] = Variable<bool>(statusInferred);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
@@ -1342,6 +1427,10 @@ class Book extends DataClass implements Insertable<Book> {
           ? const Value.absent()
           : Value(statusUpdatedAt),
       statusNeedsPush: Value(statusNeedsPush),
+      ratingUpdatedAt: ratingUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ratingUpdatedAt),
+      statusInferred: Value(statusInferred),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
@@ -1393,6 +1482,8 @@ class Book extends DataClass implements Insertable<Book> {
       readCount: serializer.fromJson<int>(json['readCount']),
       statusUpdatedAt: serializer.fromJson<DateTime?>(json['statusUpdatedAt']),
       statusNeedsPush: serializer.fromJson<bool>(json['statusNeedsPush']),
+      ratingUpdatedAt: serializer.fromJson<DateTime?>(json['ratingUpdatedAt']),
+      statusInferred: serializer.fromJson<bool>(json['statusInferred']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       syncExcluded: serializer.fromJson<bool>(json['syncExcluded']),
       addedBy: serializer.fromJson<String?>(json['addedBy']),
@@ -1435,6 +1526,8 @@ class Book extends DataClass implements Insertable<Book> {
       'readCount': serializer.toJson<int>(readCount),
       'statusUpdatedAt': serializer.toJson<DateTime?>(statusUpdatedAt),
       'statusNeedsPush': serializer.toJson<bool>(statusNeedsPush),
+      'ratingUpdatedAt': serializer.toJson<DateTime?>(ratingUpdatedAt),
+      'statusInferred': serializer.toJson<bool>(statusInferred),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'syncExcluded': serializer.toJson<bool>(syncExcluded),
       'addedBy': serializer.toJson<String?>(addedBy),
@@ -1473,6 +1566,8 @@ class Book extends DataClass implements Insertable<Book> {
     int? readCount,
     Value<DateTime?> statusUpdatedAt = const Value.absent(),
     bool? statusNeedsPush,
+    Value<DateTime?> ratingUpdatedAt = const Value.absent(),
+    bool? statusInferred,
     Value<DateTime?> deletedAt = const Value.absent(),
     bool? syncExcluded,
     Value<String?> addedBy = const Value.absent(),
@@ -1518,6 +1613,10 @@ class Book extends DataClass implements Insertable<Book> {
         ? statusUpdatedAt.value
         : this.statusUpdatedAt,
     statusNeedsPush: statusNeedsPush ?? this.statusNeedsPush,
+    ratingUpdatedAt: ratingUpdatedAt.present
+        ? ratingUpdatedAt.value
+        : this.ratingUpdatedAt,
+    statusInferred: statusInferred ?? this.statusInferred,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     syncExcluded: syncExcluded ?? this.syncExcluded,
     addedBy: addedBy.present ? addedBy.value : this.addedBy,
@@ -1585,6 +1684,12 @@ class Book extends DataClass implements Insertable<Book> {
       statusNeedsPush: data.statusNeedsPush.present
           ? data.statusNeedsPush.value
           : this.statusNeedsPush,
+      ratingUpdatedAt: data.ratingUpdatedAt.present
+          ? data.ratingUpdatedAt.value
+          : this.ratingUpdatedAt,
+      statusInferred: data.statusInferred.present
+          ? data.statusInferred.value
+          : this.statusInferred,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       syncExcluded: data.syncExcluded.present
           ? data.syncExcluded.value
@@ -1627,6 +1732,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('readCount: $readCount, ')
           ..write('statusUpdatedAt: $statusUpdatedAt, ')
           ..write('statusNeedsPush: $statusNeedsPush, ')
+          ..write('ratingUpdatedAt: $ratingUpdatedAt, ')
+          ..write('statusInferred: $statusInferred, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncExcluded: $syncExcluded, ')
           ..write('addedBy: $addedBy')
@@ -1667,6 +1774,8 @@ class Book extends DataClass implements Insertable<Book> {
     readCount,
     statusUpdatedAt,
     statusNeedsPush,
+    ratingUpdatedAt,
+    statusInferred,
     deletedAt,
     syncExcluded,
     addedBy,
@@ -1706,6 +1815,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.readCount == this.readCount &&
           other.statusUpdatedAt == this.statusUpdatedAt &&
           other.statusNeedsPush == this.statusNeedsPush &&
+          other.ratingUpdatedAt == this.ratingUpdatedAt &&
+          other.statusInferred == this.statusInferred &&
           other.deletedAt == this.deletedAt &&
           other.syncExcluded == this.syncExcluded &&
           other.addedBy == this.addedBy);
@@ -1743,6 +1854,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<int> readCount;
   final Value<DateTime?> statusUpdatedAt;
   final Value<bool> statusNeedsPush;
+  final Value<DateTime?> ratingUpdatedAt;
+  final Value<bool> statusInferred;
   final Value<DateTime?> deletedAt;
   final Value<bool> syncExcluded;
   final Value<String?> addedBy;
@@ -1779,6 +1892,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.readCount = const Value.absent(),
     this.statusUpdatedAt = const Value.absent(),
     this.statusNeedsPush = const Value.absent(),
+    this.ratingUpdatedAt = const Value.absent(),
+    this.statusInferred = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncExcluded = const Value.absent(),
     this.addedBy = const Value.absent(),
@@ -1816,6 +1931,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.readCount = const Value.absent(),
     this.statusUpdatedAt = const Value.absent(),
     this.statusNeedsPush = const Value.absent(),
+    this.ratingUpdatedAt = const Value.absent(),
+    this.statusInferred = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.syncExcluded = const Value.absent(),
     this.addedBy = const Value.absent(),
@@ -1854,6 +1971,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<int>? readCount,
     Expression<DateTime>? statusUpdatedAt,
     Expression<bool>? statusNeedsPush,
+    Expression<DateTime>? ratingUpdatedAt,
+    Expression<bool>? statusInferred,
     Expression<DateTime>? deletedAt,
     Expression<bool>? syncExcluded,
     Expression<String>? addedBy,
@@ -1893,6 +2012,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (readCount != null) 'read_count': readCount,
       if (statusUpdatedAt != null) 'status_updated_at': statusUpdatedAt,
       if (statusNeedsPush != null) 'status_needs_push': statusNeedsPush,
+      if (ratingUpdatedAt != null) 'rating_updated_at': ratingUpdatedAt,
+      if (statusInferred != null) 'status_inferred': statusInferred,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (syncExcluded != null) 'sync_excluded': syncExcluded,
       if (addedBy != null) 'added_by': addedBy,
@@ -1932,6 +2053,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<int>? readCount,
     Value<DateTime?>? statusUpdatedAt,
     Value<bool>? statusNeedsPush,
+    Value<DateTime?>? ratingUpdatedAt,
+    Value<bool>? statusInferred,
     Value<DateTime?>? deletedAt,
     Value<bool>? syncExcluded,
     Value<String?>? addedBy,
@@ -1969,6 +2092,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       readCount: readCount ?? this.readCount,
       statusUpdatedAt: statusUpdatedAt ?? this.statusUpdatedAt,
       statusNeedsPush: statusNeedsPush ?? this.statusNeedsPush,
+      ratingUpdatedAt: ratingUpdatedAt ?? this.ratingUpdatedAt,
+      statusInferred: statusInferred ?? this.statusInferred,
       deletedAt: deletedAt ?? this.deletedAt,
       syncExcluded: syncExcluded ?? this.syncExcluded,
       addedBy: addedBy ?? this.addedBy,
@@ -2076,6 +2201,12 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (statusNeedsPush.present) {
       map['status_needs_push'] = Variable<bool>(statusNeedsPush.value);
     }
+    if (ratingUpdatedAt.present) {
+      map['rating_updated_at'] = Variable<DateTime>(ratingUpdatedAt.value);
+    }
+    if (statusInferred.present) {
+      map['status_inferred'] = Variable<bool>(statusInferred.value);
+    }
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
@@ -2125,6 +2256,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('readCount: $readCount, ')
           ..write('statusUpdatedAt: $statusUpdatedAt, ')
           ..write('statusNeedsPush: $statusNeedsPush, ')
+          ..write('ratingUpdatedAt: $ratingUpdatedAt, ')
+          ..write('statusInferred: $statusInferred, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('syncExcluded: $syncExcluded, ')
           ..write('addedBy: $addedBy, ')
@@ -11963,6 +12096,8 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<int> readCount,
       Value<DateTime?> statusUpdatedAt,
       Value<bool> statusNeedsPush,
+      Value<DateTime?> ratingUpdatedAt,
+      Value<bool> statusInferred,
       Value<DateTime?> deletedAt,
       Value<bool> syncExcluded,
       Value<String?> addedBy,
@@ -12001,6 +12136,8 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<int> readCount,
       Value<DateTime?> statusUpdatedAt,
       Value<bool> statusNeedsPush,
+      Value<DateTime?> ratingUpdatedAt,
+      Value<bool> statusInferred,
       Value<DateTime?> deletedAt,
       Value<bool> syncExcluded,
       Value<String?> addedBy,
@@ -12351,6 +12488,16 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<bool> get statusNeedsPush => $composableBuilder(
     column: $table.statusNeedsPush,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get ratingUpdatedAt => $composableBuilder(
+    column: $table.ratingUpdatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get statusInferred => $composableBuilder(
+    column: $table.statusInferred,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12777,6 +12924,16 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get ratingUpdatedAt => $composableBuilder(
+    column: $table.ratingUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get statusInferred => $composableBuilder(
+    column: $table.statusInferred,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
     builder: (column) => ColumnOrderings(column),
@@ -12942,6 +13099,16 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<bool> get statusNeedsPush => $composableBuilder(
     column: $table.statusNeedsPush,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get ratingUpdatedAt => $composableBuilder(
+    column: $table.ratingUpdatedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get statusInferred => $composableBuilder(
+    column: $table.statusInferred,
     builder: (column) => column,
   );
 
@@ -13275,6 +13442,8 @@ class $$BooksTableTableManager
                 Value<int> readCount = const Value.absent(),
                 Value<DateTime?> statusUpdatedAt = const Value.absent(),
                 Value<bool> statusNeedsPush = const Value.absent(),
+                Value<DateTime?> ratingUpdatedAt = const Value.absent(),
+                Value<bool> statusInferred = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<bool> syncExcluded = const Value.absent(),
                 Value<String?> addedBy = const Value.absent(),
@@ -13311,6 +13480,8 @@ class $$BooksTableTableManager
                 readCount: readCount,
                 statusUpdatedAt: statusUpdatedAt,
                 statusNeedsPush: statusNeedsPush,
+                ratingUpdatedAt: ratingUpdatedAt,
+                statusInferred: statusInferred,
                 deletedAt: deletedAt,
                 syncExcluded: syncExcluded,
                 addedBy: addedBy,
@@ -13349,6 +13520,8 @@ class $$BooksTableTableManager
                 Value<int> readCount = const Value.absent(),
                 Value<DateTime?> statusUpdatedAt = const Value.absent(),
                 Value<bool> statusNeedsPush = const Value.absent(),
+                Value<DateTime?> ratingUpdatedAt = const Value.absent(),
+                Value<bool> statusInferred = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<bool> syncExcluded = const Value.absent(),
                 Value<String?> addedBy = const Value.absent(),
@@ -13385,6 +13558,8 @@ class $$BooksTableTableManager
                 readCount: readCount,
                 statusUpdatedAt: statusUpdatedAt,
                 statusNeedsPush: statusNeedsPush,
+                ratingUpdatedAt: ratingUpdatedAt,
+                statusInferred: statusInferred,
                 deletedAt: deletedAt,
                 syncExcluded: syncExcluded,
                 addedBy: addedBy,

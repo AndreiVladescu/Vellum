@@ -371,9 +371,14 @@ class FolderImportService {
   /// Carries across what a reading tracker's export says *you* thought.
   ///
   /// Written straight to the row rather than through the edit paths because
-  /// this is an import: there is no prior value to conflict with, and marking
-  /// four hundred freshly created books as needing a push for a rating they
-  /// were born with would be noise. The review is the exception — see below.
+  /// this is an import: there is no prior value to conflict with, so none of
+  /// `setStatus`'s side effects (stamping dates, bumping the count) apply.
+  ///
+  /// It is still stamped on the status's own clock and queued, because these
+  /// five fields are personal data that follow you between devices (the
+  /// per-user `book_status` channel): a Goodreads history imported on the
+  /// laptop should be on the phone too. Never on the book's clock — that would
+  /// publish it on the shared row.
   Future<void> _applyPersonal(String bookId, CatalogEntry entry) async {
     final db = repository.db;
     final hasAny = entry.status != null ||
@@ -389,6 +394,12 @@ class FolderImportService {
           readCount: entry.readCount == null
               ? const Value.absent()
               : Value(entry.readCount!),
+          statusUpdatedAt: Value(DateTime.now()),
+          ratingUpdatedAt: entry.rating == null
+              ? const Value.absent()
+              : Value(DateTime.now()),
+          statusNeedsPush: const Value(true),
+          statusInferred: const Value(false),
           // A book the export says you finished, with no progress recorded
           // here, is at the end of it — otherwise "finished" and a progress
           // bar at 0% would contradict each other on the book's own page.
