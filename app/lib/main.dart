@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pdfrx/pdfrx.dart' show pdfrxFlutterInitialize;
 import 'l10n/gen/app_localizations.dart';
 
 import 'account/user_profile.dart';
@@ -124,6 +125,13 @@ Future<void> main() async {
     settings: settings,
     connection: connection,
   ));
+  // Warm the PDF engine up now, so the first book opened in a session does not
+  // pay for it (a cache-directory lookup and the platform's PDFium set-up take
+  // real time, and the reader's viewer waits on them before it starts loading).
+  // Not awaited and never allowed to throw: if this fails, the viewer runs the
+  // same initialisation itself and reports its own error. Every platform the
+  // app builds for uses pdfrx, as `pdf_cover.dart` already assumes.
+  unawaited(pdfrxFlutterInitialize().catchError((_) {}));
 }
 
 class VellumApp extends StatelessWidget {

@@ -70,6 +70,29 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageState extends State<ReaderPage>
     with SingleTickerProviderStateMixin {
   final _controller = PdfViewerController();
+
+  /// What the viewer opens, created once and handed to every rebuild.
+  ///
+  /// **Why this is a field and not `PdfViewer.file(path)`.** That constructor
+  /// builds a *new* `PdfDocumentRefFile` each time the parent builds. On its
+  /// first frame the viewer awaits pdfrx's one-time start-up and then checks
+  /// that `widget.documentRef` is still the same object it began with; if the
+  /// reader rebuilt in the meantime (settings, reading pace and the annotation
+  /// stream all `setState` within milliseconds of opening) it is not, the viewer
+  /// concludes it was replaced and quietly never starts the load. The page then
+  /// sat on "Opening…" until you went back and in again, when pdfrx was already
+  /// initialised and nothing rebuilt in time. A ref that keeps its identity
+  /// across rebuilds makes that check pass.
+  late PdfDocumentRefFile _documentRef = _newDocumentRef();
+
+  /// The attempt number is part of the key so that *Try again* gets a fresh
+  /// load. pdfrx shares one loaded-or-failed result per key, and keeps a failure
+  /// for as long as any viewer still listens to it; a new key cannot inherit the
+  /// old viewer's error however the old and new viewers happen to overlap.
+  PdfDocumentRefFile _newDocumentRef() => PdfDocumentRefFile(
+        widget.file.path,
+        key: PdfDocumentRefKey(widget.file.path, [_viewerAttempt]),
+      );
   int? _page;
   int? _pageCount;
 
@@ -112,10 +135,24 @@ class _ReaderPageState extends State<ReaderPage>
 
   /// Draws stored highlights over the page (the "highlighter marker" look).
   /// Owns its own text cache, and asks for a repaint when a page's text lands.
+  ///
+  /// **Repaints the pages, not the reader.** A page's text arriving changes
+  /// nothing but what the page canvas draws, so this asks the viewer to repaint
+  /// itself (`invalidate`) rather than `setState`-ing the whole reader, which
+  /// rebuilds the app bar, the viewer's params and every closure in them. Before
+  /// the viewer has a document there is nothing to repaint, and its first paint
+  /// will read the text anyway.
   late final PdfHighlightPainter _highlights =
-      PdfHighlightPainter(onNeedsRepaint: () {
-    if (mounted) setState(() {});
-  });
+      PdfHighlightPainter(onNeedsRepaint: _repaintPages);
+
+  void _repaintPages() {
+    if (mounted && _controller.isReady) _controller.invalidate();
+  }
+
+  /// A fingerprint of the ink marks the last time the annotations changed, so
+  /// the stream listener can tell a new highlight (pages only) from a change to
+  /// the drawing (the pen toolbar's undo button reads it).
+  int? _inkFingerprint;
   StreamSubscription<List<Annotation>>? _annotationsSub;
 
   /// Writing on the page (8/23 request). The painter holds what is stored; the
@@ -201,7 +238,21 @@ class _ReaderPageState extends State<ReaderPage>
         _annotations.watchForBook(widget.book.id).listen((annotations) {
       _highlights.update(annotations);
       _ink.adopt(annotations);
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      // The toolbar reads the ink (whether there is anything to undo); a
+      // highlight or a note is only ever drawn on the pages. Rebuilding the
+      // whole reader for the second kind repainted everything for no reason.
+      final fingerprint = Object.hashAll([
+        for (final a in annotations)
+          if (AnnotationKind.parse(a.kind) == AnnotationKind.ink)
+            Object.hash(a.id, a.ink),
+      ]);
+      if (fingerprint != _inkFingerprint) {
+        _inkFingerprint = fingerprint;
+        setState(() {});
+      } else {
+        _repaintPages();
+      }
     });
     ReaderSettings.load().then((settings) {
       if (!mounted) return;
@@ -215,12 +266,9 @@ class _ReaderPageState extends State<ReaderPage>
       // These settings arrive asynchronously, and the viewer is built before
       // they do — with the *defaults* (scroll mode, fit width). If the saved
       // mode or fit differs, the page was framed for one arrangement and then
-      // laid out under another, and the viewport could end up off the page:
-      // the reader opened blank. Opening it a second time hid the bug, because
-      // by then the settings were already in memory and the first build had
-      // them. `_applyFit` is a no-op until the document is ready, and
-      // `onViewerReady` calls it too, so whichever of the two happens last is
-      // the one that frames the page.
+      // laid out under another, so it has to be framed again. `_applyFit` is a
+      // no-op until the document is ready, and `onViewerReady` calls it too, so
+      // whichever of the two happens last is the one that frames the page.
       _applyFit();
     });
   }
@@ -232,14 +280,16 @@ class _ReaderPageState extends State<ReaderPage>
     });
   }
 
-  /// Builds the viewer again from scratch.
+  /// Builds the viewer again from scratch, with a fresh document ref.
   ///
-  /// pdfrx keys its document cache by path, so a second attempt is usually
-  /// instant — which is exactly why closing the book and opening it again has
-  /// been the workaround for a page that never arrives.
+  /// A safety net: the known cause of a page that never arrived (the viewer
+  /// being rebuilt under a ref that kept changing, see [_documentRef]) is fixed,
+  /// but a file that genuinely fails to open — or a load that stalls — should
+  /// still have a way out that is not closing the book and opening it again.
   void _retryOpen() {
     setState(() {
       _viewerAttempt++;
+      _documentRef = _newDocumentRef();
       _slowToOpen = false;
     });
     _watchForASlowOpen();
@@ -415,7 +465,8 @@ class _ReaderPageState extends State<ReaderPage>
   bool _axisDecided = false;
 
   /// Bumped to build a fresh viewer, which is what *Try again* does — the same
-  /// thing closing the book and opening it again does, without the trip.
+  /// thing closing the book and opening it again does, without the trip. Also
+  /// the discriminator in [_documentRef]'s key.
   int _viewerAttempt = 0;
 
   /// Set when the document has taken long enough that something is wrong.
@@ -1756,10 +1807,17 @@ class _ReaderPageState extends State<ReaderPage>
             onTap: settings?.immersive == true
                 ? () => _setReadingMode(!_chromeHidden)
                 : null,
-            child: nightModeWrap(
+            // Mitigation, not a proven fix, for pages going soft after a note
+            // is saved. pdfrx repaints its pages on every paint request and
+            // cancels a sharp tile still being rendered when the picture it was
+            // for has changed, and nothing separated the viewer from the rest
+            // of the Scaffold: a SnackBar sliding in repainted every page for
+            // its whole animation. The boundary keeps outside animations out.
+            child: RepaintBoundary(
+              child: nightModeWrap(
               enabled: dark,
-              child: PdfViewer.file(
-        widget.file.path,
+              child: PdfViewer(
+        _documentRef,
         key: ValueKey(_viewerAttempt),
         controller: _controller,
         initialPageNumber: widget.initialPage ?? widget.book.lastReadPage ?? 1,
@@ -1857,6 +1915,7 @@ class _ReaderPageState extends State<ReaderPage>
           ),
         ),
       ),
+            ),
             ),
           ),
           ),

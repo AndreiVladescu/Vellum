@@ -131,10 +131,10 @@ const identityMatrix = <double>[
 /// is off, and that is not a stylistic choice. Returning `child` unwrapped
 /// changes the *shape* of the widget tree, so turning night mode on or off
 /// replaces the element below it: Flutter unmounts the viewer and builds a new
-/// one, which reopens the document and loses your place. That is what made a
-/// book open blank the first time — the reader's settings arrive
-/// asynchronously, so the viewer was built once without them and then thrown
-/// away and rebuilt when they landed. Same matrix, same tree, no rebuild.
+/// one, which reopens the document and loses your place. The reader's settings
+/// arrive asynchronously, so without this the viewer would be built once
+/// without them and then thrown away and rebuilt when they landed. Same matrix,
+/// same tree, no rebuild.
 Widget nightModeWrap({required bool enabled, required Widget child}) =>
     ColorFiltered(
       colorFilter: ColorFilter.matrix(
