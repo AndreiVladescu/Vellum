@@ -374,6 +374,10 @@ exactly this: books whose file is gone, covers that vanished, and files on disk
 no book refers to any more. It tells you what it found and lets you decide
 whether to repair each kind.
 
+**Reporting a bug** — ☰ → *Preferences* → *Library health* → *Copy diagnostics*
+(or *Show* to read it first) and paste the result into your bug report. It holds
+versions, counts and recent errors, never your book titles or server address.
+
 **The app opens to an empty shelf after moving machines** — it looks for the
 database in your Documents folder. Copy `vellum.sqlite` *and* the data folder
 from the table above, or better, restore a backup archive.

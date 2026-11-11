@@ -199,6 +199,17 @@ if you touch it — the span must be attached with `.instrument()`, not
 `span.enter()`, because a guard is dropped at the first `.await` and the id would
 then be missing from exactly the slow requests worth diagnosing.
 
+**Copy diagnostics** (app) is Preferences → *Library health* → *Copy diagnostics*: a short
+plain-text report for a bug report — app version and flavour, platform, schema version,
+*counts* of books, files, shelves, copies, annotations and sessions, whether a server is
+configured (and its advertised version and features, if the app already asked), and the
+last ~30 errors. Those come from an in-memory ring buffer (`diagnostics/error_log.dart`)
+chained onto `FlutterError.onError` and `PlatformDispatcher.onError`, with the previous
+handlers still called; nothing is written to disk or sent. The report is built by a pure
+function, never carries a title, author, file name, server address or account, and has the
+home and data directories scrubbed out of error text — which is free text, so it opens with
+a request to read it before posting.
+
 `GET /api/admin/stats` (master-only) backs the console's **Server** dialog: library
 counts, blob bytes on disk, and database size *including its WAL sidecars* — in WAL
 mode the `-wal` file is part of the database, and reporting only the `.db`

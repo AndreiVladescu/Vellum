@@ -20,6 +20,10 @@ import 'translation_backend.dart';
 /// Everything a caller needs is these three names, and both sides define all
 /// three — which is what keeps the two flavours honestly interchangeable.
 
+/// Which flavour this build is, for the diagnostics report (the mirror in
+/// `proprietary/on_device.dart` says 'full').
+const String buildFlavour = 'free';
+
 /// Whether this build can translate on the device itself.
 bool get onDeviceTranslationAvailable => false;
 

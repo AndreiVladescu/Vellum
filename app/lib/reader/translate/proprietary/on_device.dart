@@ -17,6 +17,10 @@ import 'on_device_backend.dart';
 /// is reached until `ReaderSettings.useOnDeviceTranslation` is on. See
 /// `translate_sheet.dart`, which checks both.
 
+/// Which flavour this build is, for the diagnostics report (the mirror in
+/// `../on_device_stub.dart` says 'free').
+const String buildFlavour = 'full';
+
 bool get onDeviceTranslationAvailable => OnDeviceBackend.available;
 
 TranslationBackend createOnDeviceBackend() => OnDeviceBackend();

@@ -5,11 +5,14 @@ import '../snack_bars.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../data/backup_crypto.dart';
+import '../diagnostics/diagnostics_collector.dart';
+import '../diagnostics/diagnostics_report.dart';
 import '../data/backup_schedule.dart';
 import '../data/backup_service.dart';
 import '../data/library_doctor.dart';
@@ -172,6 +175,7 @@ class PreferencesPage extends StatelessWidget {
             const Divider(height: 24),
             _SectionHeader('Library health'),
             _HealthSection(repository: repository, connection: connection),
+            _DiagnosticsTile(repository: repository, connection: connection),
             const Divider(height: 24),
             _SectionHeader('Backup'),
             _BackupSection(
@@ -480,6 +484,107 @@ class _HealthSectionState extends State<_HealthSection> {
 /// - **Off** deletes this device's rows on the server (best-effort — offline
 ///   must not block the toggle) and clears the local cache, so the opt-in is
 ///   reversible rather than a one-way door.
+/// "Copy diagnostics": a short report for a bug report — versions, counts and
+/// recent errors, never titles, paths or the server address. The text is built
+/// by [buildDiagnosticsReport]; this only collects, shows and copies it.
+class _DiagnosticsTile extends StatelessWidget {
+  const _DiagnosticsTile({required this.repository, required this.connection});
+
+  final LibraryRepository repository;
+  final ServerConnection connection;
+
+  // The context is only read for screen size and text scale, which the
+  // collector does before its first await.
+  Future<String> _build(BuildContext context) async => buildDiagnosticsReport(
+    await collectDiagnostics(
+      context,
+      repository: repository,
+      connection: connection,
+    ),
+  );
+
+  Future<void> _copy(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      appSnackBar(content: const Text('Diagnostics copied')),
+    );
+  }
+
+  Future<void> _copyNow(BuildContext context) async {
+    final text = await _build(context);
+    if (!context.mounted) return;
+    await _copy(context, text);
+  }
+
+  Future<void> _preview(BuildContext context) async {
+    final text = await _build(context);
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Diagnostics'),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              text,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _copy(context, text);
+            },
+            child: const Text('Copy'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Text(
+            'For a bug report: versions, counts and recent errors. No titles, '
+            'file names or server address — read it before you post it.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () => _copyNow(context),
+                icon: const Icon(Icons.copy_outlined),
+                label: const Text('Copy diagnostics'),
+              ),
+              TextButton(
+                onPressed: () => _preview(context),
+                child: const Text('Show'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ReadingPositionSwitch extends StatefulWidget {
   const _ReadingPositionSwitch({
     required this.settings,

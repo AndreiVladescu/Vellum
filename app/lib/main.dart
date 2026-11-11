@@ -13,6 +13,7 @@ import 'add_book/scan_page.dart';
 import 'app_drawer.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
+import 'diagnostics/error_log.dart';
 import 'data/local_text_index.dart';
 import 'data/library_queries.dart';
 import 'data/backup_schedule.dart';
@@ -57,6 +58,8 @@ import 'shelf/new_shelf_dialog.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Remember the last few errors for "Copy diagnostics" (in memory only).
+  ErrorLog.instance.install();
   // Android: true fullscreen. Status and navigation bars are hidden outright
   // rather than drawn translucently over the content — edgeToEdge kept both
   // bars permanently on screen, which is what put the gesture bar over the
