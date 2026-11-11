@@ -1,0 +1,5 @@
+{
+  "//": "Only for Node: it makes `node --check` and the tests read these files as ES modules, which is what the browser loads them as. Not served.",
+  "type": "module",
+  "private": true
+}

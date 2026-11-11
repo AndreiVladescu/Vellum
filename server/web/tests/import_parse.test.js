@@ -13,10 +13,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert');
 
-const source = fs.readFileSync(
-  path.join(__dirname, '..', 'console.js'),
-  'utf8',
-);
+const source = require('./console_source.js')();
 
 // console.js does run a little at load (a few `addEventListener` calls), so the
 // stub covers those too. Values it returns are built inside this context, which

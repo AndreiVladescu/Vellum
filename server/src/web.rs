@@ -1,13 +1,13 @@
 //! The self-hosted web console and the public link landing page, plus the
 //! book↔group membership endpoint the console needs to render tags. The console
-//! is split into html/css/js, all embedded in the binary (no external assets,
-//! no CDN) and served same-origin from `/assets/*`, so `fetch` to `/api/*` and
-//! the stylesheet/script loads just work.
+//! is split into html/css and a folder of ES modules, all embedded in the binary
+//! (no external assets, no CDN) and served same-origin from `/assets/*`, so
+//! `fetch` to `/api/*` and the stylesheet/module loads just work.
 
 use axum::Json;
-use axum::extract::State;
-use axum::http::header;
-use axum::response::{Html, IntoResponse};
+use axum::extract::{Path, State};
+use axum::http::{StatusCode, header};
+use axum::response::{Html, IntoResponse, Response};
 use serde::Serialize;
 
 use crate::AppState;
@@ -45,14 +45,66 @@ pub async fn console_css() -> impl IntoResponse {
     )
 }
 
-pub async fn console_js() -> impl IntoResponse {
-    (
-        [
-            (header::CONTENT_TYPE, "text/javascript; charset=utf-8"),
-            REVALIDATE,
-        ],
-        include_str!("../web/console.js"),
-    )
+/// The console's script, one ES module per page or concern (`web/console/`),
+/// served at `/assets/console/<name>`. Every file is listed here by name and
+/// embedded at compile time, so the binary still carries the whole console and
+/// nothing is read from disk at run time.
+///
+/// An explicit table rather than a directory lookup is also what keeps the
+/// route safe: a request names an entry in this list or gets a 404, so there is
+/// no path to normalise, no `..` to reject, and `package.json` (there for Node,
+/// see the file) or anything else in the folder is never served by accident.
+/// `tests/console_assets.rs` fails if a `.js` file in the folder is missing from
+/// this list — the symptom otherwise is a console that 404s one import and
+/// stops, in production only.
+const CONSOLE_MODULES: &[(&str, &str)] = &[
+    ("actions.js", include_str!("../web/console/actions.js")),
+    ("activity.js", include_str!("../web/console/activity.js")),
+    ("add_book.js", include_str!("../web/console/add_book.js")),
+    ("api.js", include_str!("../web/console/api.js")),
+    ("books.js", include_str!("../web/console/books.js")),
+    ("boot.js", include_str!("../web/console/boot.js")),
+    ("bulk.js", include_str!("../web/console/bulk.js")),
+    ("cert.js", include_str!("../web/console/cert.js")),
+    ("detail.js", include_str!("../web/console/detail.js")),
+    ("dialogs.js", include_str!("../web/console/dialogs.js")),
+    ("dom.js", include_str!("../web/console/dom.js")),
+    ("export.js", include_str!("../web/console/export.js")),
+    ("first_run.js", include_str!("../web/console/first_run.js")),
+    ("import.js", include_str!("../web/console/import.js")),
+    ("links.js", include_str!("../web/console/links.js")),
+    ("loans.js", include_str!("../web/console/loans.js")),
+    ("mail.js", include_str!("../web/console/mail.js")),
+    ("main.js", include_str!("../web/console/main.js")),
+    ("menus.js", include_str!("../web/console/menus.js")),
+    ("pages.js", include_str!("../web/console/pages.js")),
+    ("people.js", include_str!("../web/console/people.js")),
+    ("reminders.js", include_str!("../web/console/reminders.js")),
+    ("requests.js", include_str!("../web/console/requests.js")),
+    ("rooms.js", include_str!("../web/console/rooms.js")),
+    ("search.js", include_str!("../web/console/search.js")),
+    ("session.js", include_str!("../web/console/session.js")),
+    ("shares.js", include_str!("../web/console/shares.js")),
+    ("state.js", include_str!("../web/console/state.js")),
+    ("stats.js", include_str!("../web/console/stats.js")),
+    ("table.js", include_str!("../web/console/table.js")),
+    ("tags.js", include_str!("../web/console/tags.js")),
+    ("uploads.js", include_str!("../web/console/uploads.js")),
+    ("views.js", include_str!("../web/console/views.js")),
+];
+
+pub async fn console_module(Path(name): Path<String>) -> Response {
+    match CONSOLE_MODULES.iter().find(|(n, _)| *n == name) {
+        Some((_, source)) => (
+            [
+                (header::CONTENT_TYPE, "text/javascript; charset=utf-8"),
+                REVALIDATE,
+            ],
+            *source,
+        )
+            .into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 /// The page an emailed reset link opens (plan 5 #31). Served for any

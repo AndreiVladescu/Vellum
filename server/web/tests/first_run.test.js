@@ -14,7 +14,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'console.js'), 'utf8');
+const source = require('./console_source.js')();
 
 /// One stub element, remembering whether it is hidden. `classList.contains` is
 /// what register() reads to decide whether to send a bootstrap token, so it has

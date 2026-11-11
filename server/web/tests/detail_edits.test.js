@@ -15,7 +15,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'console.js'), 'utf8');
+const source = require('./console_source.js')();
 
 /// An input stub with the two values that matter: `defaultValue` is what the
 /// row was rendered with, `value` is what is on screen now — the same pair a

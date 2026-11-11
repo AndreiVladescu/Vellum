@@ -502,7 +502,7 @@ pub fn router(state: AppState) -> Router {
         // Web admin console + public landing page.
         .route("/", get(web::console))
         .route("/assets/console.css", get(web::console_css))
-        .route("/assets/console.js", get(web::console_js))
+        .route("/assets/console/{name}", get(web::console_module))
         .route("/assets/logo.svg", get(web::logo))
         .route("/favicon.svg", get(web::favicon))
         .route("/p/{token}", get(web::public_page))

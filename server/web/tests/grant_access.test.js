@@ -17,7 +17,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'console.js'), 'utf8');
+const source = require('./console_source.js')();
 
 function element(id, value = '') {
   const classes = new Set(id === 'page' ? ['hidden'] : []);

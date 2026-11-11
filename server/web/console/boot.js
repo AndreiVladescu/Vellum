@@ -1,0 +1,61 @@
+// Everything the console does at load: the delegated listeners, the keyboard,
+// and deciding whether to show the console or the sign-in. One function rather
+// than top-level statements so main.js can run it *after* it has put the
+// handlers on `window` (see there), and in the same order the single script did.
+
+import { S } from './state.js';
+import { closeModal } from './dialogs.js';
+import { closePage, pageOpen } from './pages.js';
+import { closeMenus } from './menus.js';
+import { ACTIONS, CHANGE_ACTIONS, DBL_ACTIONS, delegate } from './actions.js';
+import { showApp } from './session.js';
+import { checkRegistration } from './first_run.js';
+import { afterCursorMove, syncStickyHead, toggleRow } from './table.js';
+import { dropOn } from './uploads.js';
+import { openDetail } from './detail.js';
+
+export function start(){
+  delegate('click', ACTIONS, 'data-act');
+  delegate('dblclick', DBL_ACTIONS, 'data-dblact');
+  delegate('change', CHANGE_ACTIONS, 'data-changeact');
+  document.addEventListener('drop', ev => {
+    const el = ev.target.closest('[data-dropbook]');
+    if (el) dropOn(ev, el.dataset.dropbook, el);
+  });
+
+  // ---- keyboard navigation ------------------------------------------------
+
+  document.addEventListener('keydown', e=>{
+    if (!document.getElementById('login').classList.contains('hidden')) return;   // logged out
+    const modalOpen = document.getElementById('modal-root').innerHTML !== '';
+    if (pageOpen() && !modalOpen && e.key !== 'Escape') return;
+    if (e.key === 'Escape'){
+      if (modalOpen) closeModal();
+      else if (pageOpen()) closePage();
+      return;
+    }
+    if (modalOpen) return;
+    const t = e.target, tag = (t.tagName||'').toLowerCase();
+    if (tag==='input' || tag==='textarea' || tag==='select' || t.isContentEditable) return;
+
+    if (e.key === '/'){ e.preventDefault(); document.getElementById('q').focus(); return; }
+    if (!S.view.length) return;
+    if (e.key === 'ArrowDown'){ e.preventDefault(); S.cursor = Math.min(S.view.length-1, S.cursor+1); afterCursorMove(); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); S.cursor = Math.max(0, S.cursor<0?0:S.cursor-1); afterCursorMove(); }
+    else if (e.key === ' ' && S.cursor>=0){ e.preventDefault(); const id=S.view[S.cursor].id; toggleRow(id, !S.selected.has(id)); }
+    else if (e.key === 'Enter' && S.cursor>=0){ openDetail(S.view[S.cursor].id); }
+  });
+
+  window.addEventListener('resize', ()=>{
+    const tb = document.getElementById('topbar');
+    if (tb) document.documentElement.style.setProperty('--thead-top', tb.offsetHeight+'px');
+  });
+
+  // boot
+  if (S.token) showApp(); else checkRegistration();
+
+  document.addEventListener('click', closeMenus);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
+
+  addEventListener('resize', syncStickyHead);
+}

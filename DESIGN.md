@@ -140,6 +140,23 @@ while). It is the primary way to manage the library; the app's Sharing screen
 covers the same
 endpoints for on-device use.
 
+**The console is a folder of ES modules** (`server/web/console/`), one per page
+or concern — the API client, state, dialogs, the books table, import, detail,
+loans, shares, people, mail and so on — with `main.js` as the entry point. It
+was one 3,000-line script, which is how a stored-XSS fix had to touch thirty
+call sites and why finding anything meant searching. Plain modules rather than a
+bundler: the browser already resolves `import`, the CSP's `script-src 'self'`
+already allows same-origin module scripts, and a build step is a toolchain the
+server's single-binary story would then depend on. Each file is listed by name
+in `web.rs` and embedded with `include_str!`; the route serves only names in
+that list (so there is no path to traverse, and `package.json`, there only so
+Node reads the files as modules, is never served), and `tests/console_assets.rs`
+fails if a file in the folder is missing from it. Two seams keep the old shape
+working: `main.js` puts every exported function on `window`, because inline
+`onclick="…"` handlers look names up there; and the Node tests load the same
+files joined into one strict classic script (`web/tests/console_source.js`), so
+they still call the console's functions as globals.
+
 ## Email (optional)
 
 Off unless `VELLUM_SMTP_HOST` and `VELLUM_MAIL_FROM` are set (plan 5 #31), because
