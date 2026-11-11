@@ -1497,8 +1497,14 @@ class _ReaderPageState extends State<ReaderPage>
       if (page == null) return;
       what = 'page';
       passage = await _controller.useDocument(
-            (document) async =>
-                (await document.pages[page - 1].loadStructuredText()).fullText,
+            (document) async {
+              // pdfrx loads pages progressively, and an unloaded page reads as
+              // empty text, so wait for this one before reading it.
+              final loaded = await document.pages[page - 1]
+                  .waitForLoaded(timeout: const Duration(seconds: 5));
+              if (loaded == null) return '';
+              return (await loaded.loadStructuredText()).fullText;
+            },
           ) ??
           '';
       passage = passage.trim();
