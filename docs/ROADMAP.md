@@ -18,6 +18,11 @@ Each task carries a size, which is also who writes it:
 Every task is reviewed before it is committed, one commit per task. Tick a box
 when its commit lands.
 
+**A finished release gets a tag.** When every box under a version is ticked and
+CI is green, a commit titled `Updated for vX.Y.Z` bumps `app/pubspec.yaml`,
+`server/Cargo.toml` and `CHANGELOG.md`, and that commit is tagged `vX.Y.Z`.
+Pushing the tag is what builds the release, and is done by hand.
+
 ---
 
 ## 1.1 — fixes
@@ -63,7 +68,20 @@ that gets posted.**
 - [ ] **M** Strings out of the widgets and into `app_en.arb`
 - [ ] **S** A short `docs/TRANSLATING.md` for contributors
 
-### v1.2.3 — the public release
+### v1.2.3 — a server you can pull
+
+- [ ] **M** Server dependencies updated for the open advisories (`cargo audit`
+      and osv-scanner green again)
+- [ ] **M** Publish the server image on every tag: Docker Hub and GHCR,
+      `linux/amd64` and `linux/arm64` (a Raspberry Pi is a real target), tagged
+      `X.Y.Z`, `X.Y` and `latest`, with OCI labels, provenance and an SBOM
+- [ ] **S** `docker-compose.yml` and `docs/DEPLOYMENT.md` pull the published
+      image instead of building; the Docker Hub page shows the deployment guide
+- [ ] **by hand** A Docker Hub account, the `vellum-server` repository and an
+      access token, stored as the `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`
+      repository secrets
+
+### v1.2.4 — the public release
 
 - [ ] **by hand** The device checks still owed in `BACKLOG.md`
 - [ ] **by hand** Screenshots and a 20-second clip: shelf, reader, physical
@@ -153,6 +171,39 @@ A new kind of book, so it starts with a design note rather than code.
 ### v1.5.3 — in the numbers
 
 - [ ] **M** Listening time in Insights, kept apart from reading time
+
+---
+
+## 1.6 — the server
+
+### v1.6.0 — a console you can find things in
+
+- [ ] **L** `console.js` (3,100 lines in one file) split into one module per
+      page, no build step, same embedded delivery
+- [ ] **M** Navigation in four groups — Library, Lending, People and sharing,
+      Server — each page with its own address, usable on a phone
+- [ ] **M** A landing page: counts, loans due, requests waiting, recent
+      activity
+
+### v1.6.1 — looking after it
+
+- [ ] **M** A *Server* page: version, whether a newer release exists, the
+      configuration in effect (read-only), capabilities, storage, and the
+      backup, sweep and activity-log actions that exist today as endpoints
+- [ ] **M** Scheduled server-side backups to a directory, with rotation
+
+### v1.6.2 — safer access
+
+- [ ] **L** App passwords: per-device tokens for OPDS and e-readers, so the
+      account password is never typed into a Kindle
+- [ ] **M** Short-lived per-resource links for covers and downloads, replacing
+      the session token in a `?token=` query string
+- [ ] **L** Two-factor sign-in (TOTP) for the console
+
+### v1.6.3 — e-readers
+
+- [ ] **L** KOReader progress sync: the server speaks KOReader's sync protocol,
+      feeding the per-device reading-position channel
 
 ---
 
