@@ -1,0 +1,52 @@
+-- The rest of where a book stands with *you*: your rating, and whether the
+-- status was chosen or merely inferred.
+--
+-- 0034 gave reading status a per-user home and left the rating behind, so a
+-- book rated five stars on the phone was unrated on the tablet. It joins the
+-- same row rather than getting a table of its own: a rating is the same kind of
+-- thing as "finished" — one reader's judgement of one book — under the same
+-- access rule. It does **not** go on `book`, for the reason 0006 and 0034 give:
+-- in a shared library that would publish one person's verdict to everyone and
+-- let anyone overwrite it.
+--
+-- ## Its own clock
+--
+-- One row, but two clocks: `updated_at` for the status and its dates, and
+-- `rating_updated_at` for the rating. They are set by separate acts, and a
+-- shared clock makes each one overwrite the other from a stale device. Rate a
+-- book on a tablet that missed the phone's "finished", and one clock would push
+-- the tablet's stale "unread" as the newest status; change the status there,
+-- and it would push "unrated" over the phone's stars. With two, each half is
+-- last-write-wins on its own, and a device that never rated the book says
+-- nothing about the rating at all.
+--
+-- `rating_updated_at` NULL means no rating-aware client has written this row's
+-- rating — every row before now. That is "unknown", not "unrated", so any
+-- rating that arrives with a clock fills it, and a device pulling such a row
+-- keeps the rating it holds. `rating` NULL with a clock is a rating taken away.
+--
+-- ## status_inferred: the one automatic transition
+--
+-- Opening an unread book makes it "reading" without being asked. That is a
+-- guess made from what the device knew, and a device that has been offline
+-- since the book was finished elsewhere guesses wrong — with a newer clock than
+-- the "finished" it is wrong about. Recording that the status was inferred lets
+-- the merge treat it as weaker than a choice: an inference never replaces a
+-- status someone chose, and a chosen one replaces an inference whichever is
+-- newer. See `personal::merge_status`.
+--
+-- No defaults but constants: SQLite rejects a non-constant default on ADD
+-- COLUMN once a table has rows (0023 learned this the hard way). NULL is
+-- exactly the "unknown" the existing rows are, and 0 is right for the flag —
+-- nothing could have been marked inferred before it existed.
+ALTER TABLE book_status ADD COLUMN rating INTEGER;
+ALTER TABLE book_status ADD COLUMN rating_updated_at TEXT;
+ALTER TABLE book_status ADD COLUMN status_inferred INTEGER NOT NULL DEFAULT 0;
+
+-- Hand every device its statuses once more, now with the rating keys in them.
+-- That is what lets a device publish a rating the server never received —
+-- because the app was upgraded before the server, and its push went to a
+-- server that dropped the field: it sees "unknown" for a book it has rated and
+-- queues the rating. The same repair 0034 made for its own columns, at the same
+-- cost: one bulk pull of rows that upsert idempotently.
+UPDATE book_status SET synced_at = datetime('now');

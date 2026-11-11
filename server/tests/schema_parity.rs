@@ -13,7 +13,7 @@
 //! column, present here but not in the app.
 //!
 //! The personal tables (migration 0023: annotation, reading_session, book_note;
-//! migration 0034: book_status) are excluded for the same reason as
+//! migration 0034: book_status, with its rating from 0038) are excluded for the same reason as
 //! `reading_progress` below — they are keyed by `user_id`, which the app has no
 //! column for, and `book_note`/`book_status` are whole tables on this side
 //! against columns on the book row on the other (`books.reader_notes`,

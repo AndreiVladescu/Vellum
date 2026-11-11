@@ -440,19 +440,29 @@ pub async fn list_notes(
     envelope(&state, &q.cursor, entries).await
 }
 
-/// Where a book stands with *you*: unread, reading, finished, wanted.
+/// Where a book stands with *you*: unread, reading, finished, wanted — and what
+/// you thought of it.
 ///
 /// Per user rather than on the book row — migration 0006 took reading state off
 /// `book` and 0034 explains why it stays off. In a shared library "I finished
-/// it" is a fact about the reader, not the book.
-#[derive(Serialize, sqlx::FromRow)]
+/// it" and "five stars" are facts about the reader, not the book.
+///
+/// The rating (migration 0038) has its own clock, `rating_updated_at`: null
+/// means no rating-aware client has written it, so nobody knows; with a clock,
+/// `rating` null is "unrated" and 1–5 is the rating. `inferred` says the status
+/// was guessed by the app (opening an unread book) rather than chosen. See
+/// [`merge_status`] for how both are used.
+#[derive(Serialize, sqlx::FromRow, Clone, Debug, PartialEq)]
 pub struct BookStatusDto {
     pub book_id: String,
     pub status: String,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
     pub read_count: i64,
+    pub inferred: bool,
     pub updated_at: String,
+    pub rating: Option<i64>,
+    pub rating_updated_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -462,9 +472,86 @@ pub struct BookStatusInput {
     pub finished_at: Option<String>,
     #[serde(default)]
     pub read_count: i64,
-    /// The writing device's clock, and the last-write-wins comparison key.
+    /// The status came from the automatic unread → reading transition rather
+    /// than from the reader. Absent means chosen, which is what older apps meant.
+    #[serde(default)]
+    pub inferred: bool,
+    /// The writing device's clock for the status, and the last-write-wins
+    /// comparison key for it.
     pub updated_at: Option<String>,
+    /// 1–5, or null for unrated. Only read when `rating_updated_at` is present.
+    pub rating: Option<i64>,
+    /// When the rating was last changed on the writing device. Absent means the
+    /// push says nothing about the rating — what every app older than migration
+    /// 0038 sends, and what a device that never rated the book sends — and must
+    /// not clear a rating another device set.
+    pub rating_updated_at: Option<String>,
 }
+
+/// How a pushed status combines with the one already stored.
+///
+/// One row, two clocks: the status and its dates on `updated_at`, the rating on
+/// `rating_updated_at`. They are separate acts — tapping a star is not choosing
+/// a status — and one clock would let either overwrite the other from a stale
+/// device: rating a book on a tablet that missed the phone's "finished" would
+/// publish the tablet's "unread" as the newest status. Each half is
+/// last-write-wins on its own clock, and a rating with no clock is unknown, so
+/// any rating that has one fills it.
+///
+/// The status half has two refinements, each for a case plain LWW gets wrong:
+///
+/// - **An inference yields to a choice.** "Reading" set automatically by
+///   opening the book is a guess from what that device knew. A device offline
+///   since before the book was finished elsewhere makes that guess with a
+///   *newer* clock than the finish, and plain LWW would let it win. So an
+///   inferred status never replaces a chosen one that says something (anything
+///   but `unread`), and a chosen one that says something replaces an inference
+///   whichever is newer. Between two choices, or two guesses, the clock decides.
+/// - **The read count only grows.** It counts finishes, and the app never
+///   lowers it — moving back out of `finished` clears the date, not the count.
+///   So the merge takes the larger of the two rather than the newer one: a
+///   stale device's later "abandoned" must not erase a finish it never heard
+///   of. Two devices that each mark the same reading finished while offline
+///   count it once, which is what almost always happened; a genuine second
+///   reading finished on two devices without syncing in between also counts
+///   once, and that is the accepted cost — nothing on the wire tells the two
+///   apart, and summing would double-count the common case instead.
+///
+/// The status clock becomes the later of the two, so a device holding either
+/// copy is never newer than the merged result.
+pub fn merge_status(existing: Option<&BookStatusDto>, incoming: BookStatusDto) -> BookStatusDto {
+    let Some(old) = existing else {
+        return incoming;
+    };
+    let newer = incoming.updated_at >= old.updated_at;
+    let take_status = if incoming.inferred && !old.inferred && old.status != "unread" {
+        false
+    } else if !incoming.inferred && old.inferred && incoming.status != "unread" {
+        true
+    } else {
+        newer
+    };
+    let from = if take_status { &incoming } else { old };
+    // `None < Some(_)` for `Option`, so a rating nobody has dated loses to any
+    // that has been.
+    let take_rating =
+        incoming.rating_updated_at.is_some() && incoming.rating_updated_at >= old.rating_updated_at;
+    let rating_from = if take_rating { &incoming } else { old };
+    BookStatusDto {
+        book_id: old.book_id.clone(),
+        status: from.status.clone(),
+        started_at: from.started_at.clone(),
+        finished_at: from.finished_at.clone(),
+        inferred: from.inferred,
+        read_count: old.read_count.max(incoming.read_count),
+        updated_at: old.updated_at.clone().max(incoming.updated_at.clone()),
+        rating: rating_from.rating,
+        rating_updated_at: rating_from.rating_updated_at.clone(),
+    }
+}
+
+const STATUS_COLUMNS: &str = "book_id, status, started_at, finished_at, read_count, \
+     status_inferred AS inferred, updated_at, rating, rating_updated_at";
 
 pub async fn list_statuses(
     State(state): State<AppState>,
@@ -478,7 +565,7 @@ pub async fn list_statuses(
     };
     let sql = format!(
         "SELECT s.book_id, s.status, s.started_at, s.finished_at, s.read_count, \
-                s.updated_at \
+                s.status_inferred AS inferred, s.updated_at, s.rating, s.rating_updated_at \
          FROM book_status s JOIN book b ON b.id = s.book_id \
          WHERE s.user_id = ? AND {} {filter} \
          ORDER BY s.synced_at",
@@ -496,8 +583,14 @@ pub async fn list_statuses(
     envelope(&state, &q.cursor, entries).await
 }
 
-/// Last-write-wins on the whole row: the status and its dates are one act, and
-/// a "finished" that arrived without its finish date would be half a fact.
+/// Records where a book stands with the caller, merged with what is already
+/// stored by [`merge_status`], and answers with the result. That is not always
+/// what was sent, so a device can adopt the merge at once instead of learning it
+/// a sync later.
+///
+/// The status and its dates still travel as one act — a "finished" that
+/// arrived without its finish date would be half a fact — so they are taken or
+/// left together.
 ///
 /// The status string is not checked against a list. A device that learns a new
 /// state should not need its server upgraded before its own other devices can
@@ -511,40 +604,81 @@ pub async fn upsert_status(
     if input.status.trim().is_empty() {
         return Err(AppError::BadRequest("status must not be empty".into()));
     }
+    if let Some(r) = input.rating
+        && !(1..=5).contains(&r)
+    {
+        return Err(AppError::BadRequest(
+            "rating must be 1-5, or null for unrated".into(),
+        ));
+    }
     require_view(&state, &user, &book_id).await?;
-    sqlx::query(
-        "INSERT INTO book_status \
-            (user_id, book_id, status, started_at, finished_at, read_count, \
-             updated_at, synced_at) \
-         VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now')) \
-         ON CONFLICT(user_id, book_id) DO UPDATE SET \
-            status = excluded.status, \
-            started_at = excluded.started_at, \
-            finished_at = excluded.finished_at, \
-            read_count = excluded.read_count, \
-            updated_at = excluded.updated_at, \
-            synced_at = datetime('now') \
-         WHERE excluded.updated_at >= book_status.updated_at",
-    )
-    .bind(&user.id)
-    .bind(&book_id)
-    .bind(input.status.trim())
-    .bind(&input.started_at)
-    .bind(&input.finished_at)
-    .bind(input.read_count)
-    .bind(&input.updated_at)
-    .execute(&state.db)
-    .await?;
 
-    let row: BookStatusDto = sqlx::query_as(
-        "SELECT book_id, status, started_at, finished_at, read_count, updated_at \
-         FROM book_status WHERE user_id = ? AND book_id = ?",
-    )
+    // Read, merge, write in one immediate transaction, so two pushes for the
+    // same book cannot both merge against the row as it was before either.
+    let mut tx = crate::write_tx(&state.db).await?;
+    let existing: Option<BookStatusDto> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {STATUS_COLUMNS} FROM book_status WHERE user_id = ? AND book_id = ?"
+    )))
     .bind(&user.id)
     .bind(&book_id)
-    .fetch_one(&state.db)
+    .fetch_optional(&mut *tx)
     .await?;
-    Ok(Json(row))
+    let updated_at = match input.updated_at {
+        Some(t) => t,
+        None => {
+            sqlx::query_scalar("SELECT datetime('now')")
+                .fetch_one(&mut *tx)
+                .await?
+        }
+    };
+    let incoming = BookStatusDto {
+        book_id: book_id.clone(),
+        status: input.status.trim().to_string(),
+        started_at: input.started_at,
+        finished_at: input.finished_at,
+        read_count: input.read_count.max(0),
+        inferred: input.inferred,
+        updated_at,
+        // An undated rating says nothing, so it is not even carried.
+        rating: input.rating.filter(|_| input.rating_updated_at.is_some()),
+        rating_updated_at: input.rating_updated_at,
+    };
+    let merged = merge_status(existing.as_ref(), incoming);
+
+    // Nothing changed, nothing written: `synced_at` is what hands a row to the
+    // other devices, and re-sending what they already hold is noise.
+    if existing.as_ref() != Some(&merged) {
+        sqlx::query(
+            "INSERT INTO book_status \
+                (user_id, book_id, status, started_at, finished_at, read_count, \
+                 status_inferred, updated_at, rating, rating_updated_at, synced_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) \
+             ON CONFLICT(user_id, book_id) DO UPDATE SET \
+                status = excluded.status, \
+                started_at = excluded.started_at, \
+                finished_at = excluded.finished_at, \
+                read_count = excluded.read_count, \
+                status_inferred = excluded.status_inferred, \
+                updated_at = excluded.updated_at, \
+                rating = excluded.rating, \
+                rating_updated_at = excluded.rating_updated_at, \
+                synced_at = datetime('now')",
+        )
+        .bind(&user.id)
+        .bind(&book_id)
+        .bind(&merged.status)
+        .bind(&merged.started_at)
+        .bind(&merged.finished_at)
+        .bind(merged.read_count)
+        .bind(merged.inferred)
+        .bind(&merged.updated_at)
+        .bind(merged.rating)
+        .bind(&merged.rating_updated_at)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(merged))
 }
 
 /// Last-write-wins on the note text. Clearing it stores an empty string rather

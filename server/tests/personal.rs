@@ -13,12 +13,18 @@ use tower::ServiceExt;
 use vellum_server::{AppState, connect_db, router};
 
 async fn test_app() -> axum::Router {
+    test_app_with_db().await.0
+}
+
+/// The app plus its pool, for the few tests that must look at rows no endpoint
+/// returns any more — what a cascade left behind.
+async fn test_app_with_db() -> (axum::Router, sqlx::SqlitePool) {
     let id = uuid::Uuid::new_v4();
     let path = std::env::temp_dir().join(format!("vellum_personal_{id}.db"));
     let data_dir = std::env::temp_dir().join(format!("vellum_personal_data_{id}"));
     let db = connect_db(path.to_str().unwrap()).await.unwrap();
-    router(AppState {
-        db,
+    let app = router(AppState {
+        db: db.clone(),
         public_base_url: "http://test.local".into(),
         data_dir,
         http: reqwest::Client::new(),
@@ -45,7 +51,8 @@ async fn test_app() -> axum::Router {
         audit: true,
         text_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
         tls_cert: None,
-    })
+    });
+    (app, db)
 }
 
 async fn call(
@@ -1688,6 +1695,550 @@ async fn a_status_must_say_something() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+// ---- rating, and the merge rules of migration 0038 ------------------------
+
+async fn put_status(
+    app: &axum::Router,
+    token: &str,
+    book: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    call(
+        app,
+        "PUT",
+        &format!("/api/statuses/{book}"),
+        Some(token),
+        Some(body),
+    )
+    .await
+}
+
+async fn my_status(app: &axum::Router, token: &str) -> Value {
+    let (status, body) = call(app, "GET", "/api/statuses?cursor=", Some(token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let list = entries(&body);
+    assert_eq!(list.len(), 1, "one row per reader and book: {body}");
+    list[0].clone()
+}
+
+async fn share_book(app: &axum::Router, master: &str, book: &str, email: &str) -> String {
+    let (status, body) = call(
+        app,
+        "POST",
+        "/api/shares",
+        Some(master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": email, "permission": "editor"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "share: {body}");
+    body["id"].as_str().unwrap().to_string()
+}
+
+#[tokio::test]
+async fn a_rating_travels_with_the_status() {
+    let app = test_app().await;
+    let token = register(&app, "rater@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+
+    let (status, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "updated_at": "2026-08-20 22:15:00",
+               "rating": 5, "rating_updated_at": "2026-08-20 22:15:00"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["rating"], 5, "the answer is the stored row");
+    assert_eq!(my_status(&app, &token).await["rating"], 5);
+
+    // Taking the rating away is a statement too: null *with* a clock.
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "updated_at": "2026-08-20 22:15:00",
+               "rating": null, "rating_updated_at": "2026-08-21 09:00:00"}),
+    )
+    .await;
+    let row = my_status(&app, &token).await;
+    assert!(row["rating"].is_null(), "{row}");
+    assert_eq!(row["rating_updated_at"], "2026-08-21 09:00:00");
+}
+
+#[tokio::test]
+async fn rating_and_status_are_separate_acts_on_separate_clocks() {
+    // One clock for both would let either overwrite the other from a device
+    // that missed the other half. Here the tablet missed the phone's finish
+    // *and* its rating, and does one thing each way.
+    let app = test_app().await;
+    let token = register(&app, "clocks@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    // The phone: finished, five stars.
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "read_count": 1, "updated_at": "2026-08-20 22:00:00",
+               "rating": 5, "rating_updated_at": "2026-08-20 22:00:00"}),
+    )
+    .await;
+
+    // The tablet rates it, still believing it unread (its status clock is old).
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "unread", "updated_at": "2026-08-01 00:00:00",
+               "rating": 3, "rating_updated_at": "2026-08-21 08:00:00"}),
+    )
+    .await;
+    assert_eq!(
+        body["status"], "finished",
+        "rating a book does not unfinish it"
+    );
+    assert_eq!(body["rating"], 3, "the newer rating wins");
+
+    // Then sets a status, never having rated it on this clock's terms: the
+    // push says nothing about the rating, and the rating stays.
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "abandoned", "updated_at": "2026-08-22 08:00:00"}),
+    )
+    .await;
+    assert_eq!(body["status"], "abandoned");
+    assert_eq!(body["rating"], 3, "changing the status does not unrate it");
+}
+
+#[tokio::test]
+async fn a_rating_out_of_range_is_refused() {
+    let app = test_app().await;
+    let token = register(&app, "stars@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    for bad in [0, 6] {
+        let (status, _) = put_status(
+            &app,
+            &token,
+            &book,
+            json!({"status": "reading", "rating": bad,
+                   "rating_updated_at": "2026-08-20 10:00:00"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "rating {bad}");
+    }
+}
+
+#[tokio::test]
+async fn two_readers_of_a_shared_book_keep_their_own_verdicts() {
+    // The case that rules out the `book` row: a rating there would be one
+    // number for everyone the library is shared with, and the last to rate
+    // would overwrite the rest.
+    let app = test_app().await;
+    let master = register(&app, "owner@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+    share_book(&app, &master, &book, "friend@lib.test").await;
+
+    put_status(
+        &app,
+        &master,
+        &book,
+        json!({"status": "finished", "rating": 5, "read_count": 2,
+               "updated_at": "2026-08-20 10:00:00",
+               "rating_updated_at": "2026-08-20 10:00:00"}),
+    )
+    .await;
+    // Later by the clock, and on the same book — but a different reader.
+    let (status, body) = put_status(
+        &app,
+        &friend,
+        &book,
+        json!({"status": "abandoned", "rating": 1, "updated_at": "2026-08-21 10:00:00",
+               "rating_updated_at": "2026-08-21 10:00:00"}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "an editor may keep a status: {body}"
+    );
+    assert_eq!(
+        body["status"], "abandoned",
+        "and the answer is theirs, not a merge with mine"
+    );
+    assert_eq!(body["read_count"], 0);
+
+    let mine = my_status(&app, &master).await;
+    assert_eq!(
+        mine["status"], "finished",
+        "the friend's write did not touch mine"
+    );
+    assert_eq!(mine["rating"], 5);
+    assert_eq!(mine["read_count"], 2);
+    let theirs = my_status(&app, &friend).await;
+    assert_eq!(theirs["status"], "abandoned");
+    assert_eq!(theirs["rating"], 1);
+}
+
+#[tokio::test]
+async fn a_status_needs_a_book_you_can_see_and_goes_when_the_book_does() {
+    let app = test_app().await;
+    let master = register(&app, "owner@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let book = create_book(&app, &master, "Dune").await;
+
+    let (status, _) = put_status(&app, &friend, &book, json!({"status": "finished"})).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a book that is not shared with you is not one you can have a status on"
+    );
+    let (status, _) =
+        put_status(&app, &friend, "no-such-book", json!({"status": "finished"})).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let share = share_book(&app, &master, &book, "friend@lib.test").await;
+    let (status, _) = put_status(
+        &app,
+        &friend,
+        &book,
+        json!({"status": "finished", "rating": 4, "updated_at": "2026-08-20 10:00:00"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/shares/{share}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, body) = call(&app, "GET", "/api/statuses?cursor=", Some(&friend), None).await;
+    assert!(
+        entries(&body).is_empty(),
+        "a book that stops being shared stops returning your status on it: {body}"
+    );
+    let (status, _) = put_status(&app, &friend, &book, json!({"status": "reading"})).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "nor can you write one");
+}
+
+#[tokio::test]
+async fn deleting_the_book_or_the_account_takes_the_status_with_it() {
+    let (app, db) = test_app_with_db().await;
+    let master = register(&app, "owner@lib.test").await;
+    let friend = add_member(&app, &master, "friend@lib.test").await;
+    let kept = create_book(&app, &master, "Kept").await;
+    let doomed = create_book(&app, &master, "Doomed").await;
+    share_book(&app, &master, &kept, "friend@lib.test").await;
+    for (token, book) in [(&master, &kept), (&master, &doomed), (&friend, &kept)] {
+        let (status, body) = put_status(
+            &app,
+            token,
+            book,
+            json!({"status": "finished", "rating": 3}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+    let rows = |book: String| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM book_status WHERE book_id = ?")
+                .bind(book)
+                .fetch_one(&db)
+                .await
+                .unwrap()
+        }
+    };
+
+    let (status, body) = call(
+        &app,
+        "DELETE",
+        &format!("/api/books/{doomed}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        rows(doomed.clone()).await,
+        0,
+        "a deleted book leaves no status behind"
+    );
+    assert_eq!(rows(kept.clone()).await, 2);
+
+    let (_, users) = call(&app, "GET", "/api/users", Some(&master), None).await;
+    let friend_id = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["email"] == "friend@lib.test")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let (status, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/users/{friend_id}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let left: Vec<String> = sqlx::query_scalar("SELECT user_id FROM book_status WHERE book_id = ?")
+        .bind(&kept)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(
+        left.len(),
+        1,
+        "the removed account's status went with it, mine stayed"
+    );
+    assert_ne!(left[0], friend_id);
+}
+
+#[tokio::test]
+async fn an_older_app_that_knows_no_ratings_does_not_erase_one() {
+    // An app from before migration 0038 sends the status without a rating. The
+    // whole-row overwrite it would otherwise trigger is exactly the bug: rate a
+    // book on the new phone, change its status on the old tablet, rating gone.
+    let app = test_app().await;
+    let token = register(&app, "mixed@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "reading", "updated_at": "2026-08-20 10:00:00",
+               "rating": 4, "rating_updated_at": "2026-08-20 10:00:00"}),
+    )
+    .await;
+    // Exactly the body a 0034-era app sends: no rating keys at all.
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "started_at": null, "finished_at": null,
+               "read_count": 1, "updated_at": "2026-08-21 10:00:00"}),
+    )
+    .await;
+    let row = my_status(&app, &token).await;
+    assert_eq!(row["status"], "finished", "the newer status still wins");
+    assert_eq!(
+        row["rating"], 4,
+        "and the rating it said nothing about survives"
+    );
+}
+
+#[tokio::test]
+async fn a_rating_nobody_knew_is_filled_in_whatever_the_clocks_say() {
+    // After the upgrade every existing row's rating is unknown. A device that
+    // rated the book long ago must still be able to put that rating there, even
+    // though another device has since written a newer status.
+    let app = test_app().await;
+    let token = register(&app, "upgrade@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "updated_at": "2026-08-21 10:00:00"}),
+    )
+    .await;
+    assert!(
+        my_status(&app, &token).await["rating_updated_at"].is_null(),
+        "unknown: nobody has dated a rating here"
+    );
+
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "reading", "updated_at": "2026-01-01 00:00:00",
+               "rating": 5, "rating_updated_at": "2026-01-01 00:00:00"}),
+    )
+    .await;
+    assert_eq!(body["rating"], 5, "the rating fills the gap");
+    assert_eq!(body["status"], "finished", "the older status does not");
+    assert_eq!(body["updated_at"], "2026-08-21 10:00:00");
+
+    // Once known, a rating is last-write-wins on its own clock.
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "updated_at": "2026-02-01 00:00:00",
+               "rating": 2, "rating_updated_at": "2025-12-01 00:00:00"}),
+    )
+    .await;
+    assert_eq!(
+        body["rating"], 5,
+        "an older rating does not replace a known one"
+    );
+}
+
+#[tokio::test]
+async fn opening_a_book_on_a_stale_device_does_not_unfinish_it() {
+    // The one automatic transition. The tablet has been offline since before
+    // the book was finished on the phone; it still thinks the book is unread,
+    // so opening it says "reading" — with a newer clock than the finish.
+    let app = test_app().await;
+    let token = register(&app, "twodevices@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "finished_at": "2026-08-20 22:00:00", "read_count": 1,
+               "updated_at": "2026-08-20 22:00:00",
+               "rating": 4, "rating_updated_at": "2026-08-20 22:00:00"}),
+    )
+    .await;
+    // The tablet never rated it either, so it says nothing about the rating.
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "reading", "inferred": true, "rating": null,
+               "rating_updated_at": null, "updated_at": "2026-08-21 08:00:00"}),
+    )
+    .await;
+    assert_eq!(
+        body["status"], "finished",
+        "a guess does not replace a choice"
+    );
+    assert_eq!(body["finished_at"], "2026-08-20 22:00:00");
+    assert_eq!(body["inferred"], false);
+    assert_eq!(body["rating"], 4, "nor does saying nothing unrate it");
+    assert_eq!(body["updated_at"], "2026-08-21 08:00:00");
+}
+
+#[tokio::test]
+async fn a_finish_pushed_after_a_stale_guess_still_lands() {
+    // The other order: the tablet's guess reaches the server first, and the
+    // phone's earlier finish arrives after it.
+    let app = test_app().await;
+    let token = register(&app, "otherorder@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "reading", "inferred": true, "updated_at": "2026-08-21 08:00:00"}),
+    )
+    .await;
+    assert_eq!(my_status(&app, &token).await["inferred"], true);
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "read_count": 1, "updated_at": "2026-08-20 22:00:00"}),
+    )
+    .await;
+    assert_eq!(
+        body["status"], "finished",
+        "a choice replaces a guess, older or not"
+    );
+    assert_eq!(body["inferred"], false);
+
+    // But a deliberate later "unread" is just a choice like any other, and a
+    // guess made after it is newer information, not a stale one.
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "unread", "updated_at": "2026-08-22 08:00:00"}),
+    )
+    .await;
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "reading", "inferred": true, "updated_at": "2026-08-23 08:00:00"}),
+    )
+    .await;
+    assert_eq!(body["status"], "reading");
+}
+
+#[tokio::test]
+async fn a_finish_is_never_uncounted_by_a_stale_device() {
+    // The read count counts finishes and only grows. A device that never heard
+    // of the second finish, changing the status later, must not take it back.
+    let app = test_app().await;
+    let token = register(&app, "counting@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "finished", "read_count": 2, "updated_at": "2026-08-20 22:00:00"}),
+    )
+    .await;
+    let (_, body) = put_status(
+        &app,
+        &token,
+        &book,
+        json!({"status": "abandoned", "read_count": 1, "updated_at": "2026-08-21 22:00:00"}),
+    )
+    .await;
+    assert_eq!(body["status"], "abandoned", "the newer status wins");
+    assert_eq!(
+        body["read_count"], 2,
+        "and the count keeps the finish it did not know about"
+    );
+
+    // Two devices that each marked the same reading finished offline: each says
+    // 3. That is one more finish, not two.
+    for at in ["2026-08-22 10:00:00", "2026-08-22 11:00:00"] {
+        put_status(
+            &app,
+            &token,
+            &book,
+            json!({"status": "finished", "read_count": 3, "updated_at": at}),
+        )
+        .await;
+    }
+    assert_eq!(my_status(&app, &token).await["read_count"], 3);
+}
+
+#[tokio::test]
+async fn a_push_that_changes_nothing_is_not_handed_out_again() {
+    let app = test_app().await;
+    let token = register(&app, "quiet@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    let row = json!({"status": "finished", "updated_at": "2026-08-20 10:00:00",
+                     "rating": 3, "rating_updated_at": "2026-08-20 10:00:00"});
+    put_status(&app, &token, &book, row.clone()).await;
+    // The server's clock has one-second resolution and the delta filter is
+    // inclusive, so step past the first write before taking the cursor.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let (_, first) = call(&app, "GET", "/api/statuses?cursor=", Some(&token), None).await;
+    let cursor = first["server_now"].as_str().unwrap().to_string();
+    put_status(&app, &token, &book, row).await;
+    let (_, body) = call(
+        &app,
+        "GET",
+        &format!("/api/statuses?cursor={}", encode(&cursor)),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert!(
+        entries(&body).is_empty(),
+        "nothing changed, so nothing to pull: {body}"
+    );
 }
 
 #[tokio::test]

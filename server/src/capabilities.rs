@@ -61,7 +61,10 @@ const FEATURES: &[&str] = &[
     // Reading status on the personal channel (migration 0034): "finished",
     // "wishlist" and the dates that go with them, per user. Still not on the
     // `book` row — that is what migration 0006 settled, and this is the same
-    // per-user channel `book_note` uses, for the same reason.
+    // per-user channel `book_note` uses, for the same reason. Migration 0038
+    // adds the rating to the same row, on its own clock; a client tells a
+    // server that has it by the `rating_updated_at` key in each row, so it
+    // needs no feature name of its own.
     "book_status",
     // Writing on the page (migration 0036): annotations of kind 'ink', with
     // their marks in the `ink` column. Advertised because a server without it

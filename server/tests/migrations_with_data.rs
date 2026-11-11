@@ -248,6 +248,60 @@ async fn a_populated_database_upgrades_to_the_latest_schema() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// 0038 adds the rating to rows that already exist. Their rating must come out
+/// *unknown* (no rating clock) rather than "unrated", and each row must be handed to the
+/// devices again so they can publish the ratings they hold.
+#[tokio::test]
+async fn existing_statuses_gain_an_unknown_rating_and_are_redelivered() {
+    let path = std::env::temp_dir().join(format!("vellum_popmig_{}.db", uuid::Uuid::new_v4()));
+    let path = path.to_str().unwrap().to_string();
+    {
+        let pool = migrate_partially(&path, 37).await;
+        for sql in [
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u1', 'someone@lib.test', 'Someone', 'x', 1)",
+            "INSERT INTO book (id, title, updated_at) VALUES ('b1', 'Dune', datetime('now'))",
+            "INSERT INTO book_status (user_id, book_id, status, read_count, updated_at, synced_at) \
+             VALUES ('u1', 'b1', 'finished', 1, '2026-08-20 10:00:00', '2026-08-20 10:00:00')",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+    }
+
+    let db = connect_db(&path)
+        .await
+        .expect("a database with statuses in it must migrate");
+    let row = sqlx::query(
+        "SELECT status, rating_updated_at, status_inferred, updated_at, synced_at \
+         FROM book_status",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(row.get::<String, _>(0), "finished");
+    assert_eq!(
+        row.get::<Option<String>, _>(1),
+        None,
+        "an undated rating: unknown, not unrated"
+    );
+    assert_eq!(
+        row.get::<i64, _>(2),
+        0,
+        "nothing was inferred before it could be"
+    );
+    assert_eq!(
+        row.get::<String, _>(3),
+        "2026-08-20 10:00:00",
+        "the reader's own clock is untouched"
+    );
+    assert!(
+        row.get::<String, _>(4).as_str() > "2026-08-20 10:00:00",
+        "re-stamped so every device pulls it once more"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
 /// A known, deliberate exception, and the only one.
 ///
 /// `0010` carries the same mistake and cannot be fixed: it is applied on every
