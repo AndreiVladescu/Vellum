@@ -26,13 +26,15 @@ when its commit lands.
 
 Fixes from `problems_09_nov.txt`. Nothing else ships in this one.
 
-- [ ] **M** A PDF opens on the first try (pdfrx document reference is created
+- [x] **M** A PDF opens on the first try (pdfrx document reference is created
       once; pdfrx is warmed up at app start)
-- [ ] **M** A highlight or note is still drawn after reopening the book (page
+- [x] **M** A highlight or note is still drawn after reopening the book (page
       text is not read before the page is loaded)
-- [ ] **M** The page no longer goes blurry after *Note on selection*
-- [ ] **M** Ctrl+F puts the caret in the search field, and searches as you type
-- [ ] **S** The search field's text is readable in every reader theme
+- [ ] **M** The page no longer goes blurry after *Note on selection* — cause
+      not confirmed; two mitigations are in (the pages are isolated from outside
+      repaints, a new note repaints less). Needs a check on a real desktop
+- [x] **M** Ctrl+F puts the caret in the search field, and searches as you type
+- [x] **S** The search field's text is readable in every reader theme
 
 ---
 
