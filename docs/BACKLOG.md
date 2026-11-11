@@ -79,6 +79,10 @@ push would carry it past an end and the other side has room, it goes there
 instead. A shelf with no room either way still falls through to the surface
 below (`settle.dart`, pinned in `test/settle_test.dart`).
 
+### ✅ 12. Dominant colour in the physical view
+The room editor passes the spine-artwork preference to `SpineFace` and repaints
+when it changes, so a book is drawn the same way in both views.
+
 ---
 
 ## Manual device checks (CI can't do these)
@@ -205,6 +209,3 @@ this order.
   `test/reader/epub_reader_page_test.dart`), and typography/themes now apply.
   Still open: paged (as opposed to scrolled) mode, and heavy CSS-driven layouts
   rendering approximately (`flutter_widget_from_html_core`).
-- **Dominant colour in the physical view.** The physical editor always draws
-  cover-slice spines; honouring the spine-artwork preference there too would
-  keep the two views identical.

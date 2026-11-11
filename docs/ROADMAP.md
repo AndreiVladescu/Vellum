@@ -54,7 +54,7 @@ that gets posted.**
 
 - [x] **S** Shelf settle bounds: a book pushed sideways out of an overlap stops
       at the shelf's end instead of floating past it
-- [ ] **S** The physical view honours the spine-artwork preference, like the
+- [x] **S** The physical view honours the spine-artwork preference, like the
       digital shelf
 - [x] **S** `BACKLOG.md` clean-up: move what is already fixed to *Resolved*
 
