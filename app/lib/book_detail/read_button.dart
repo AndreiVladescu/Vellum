@@ -8,6 +8,7 @@ import '../data/library_repository.dart';
 import '../reader/epub_book.dart';
 import '../reader/epub_reader_page.dart';
 import '../reader/reader_page.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// The primary Read / Resume-reading action for a book's digital files.
 /// Opens the PDF reader when the book has a PDF, else the EPUB reader.
@@ -41,21 +42,27 @@ class ReadButton extends StatelessWidget {
     final jump = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Resume where you left off?'),
-        content: Text(
-          'You were on ${offer.description}.\n\n'
-          '${here == null ? "You haven't opened it on this device." : 'This '
-              'device is at $localUnit $here '
-              '(${((book.readingProgress ?? 0) * 100).round()}%).'}',
-        ),
+        title: Text(L10n.of(dialogContext).readResumeTitle),
+        content: Text(here == null
+            ? L10n.of(dialogContext).readResumeBodyNever(offer.unit, offer.page,
+                offer.deviceLabel, (offer.progress * 100).round())
+            : L10n.of(dialogContext).readResumeBodyAt(
+                offer.unit,
+                offer.page,
+                offer.deviceLabel,
+                (offer.progress * 100).round(),
+                here,
+                ((book.readingProgress ?? 0) * 100).round())),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(here == null ? 'Start here' : 'Stay at $localUnit $here'),
+            child: Text(here == null
+                ? L10n.of(dialogContext).readStartHere
+                : L10n.of(dialogContext).readStayAt(localUnit, here)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text('Go to $localUnit ${offer.page}'),
+            child: Text(L10n.of(dialogContext).readGoTo(localUnit, offer.page)),
           ),
         ],
       ),
@@ -112,24 +119,22 @@ class ReadButton extends StatelessWidget {
         final take = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Start where you left off?'),
-            content: Text(
-              'You were ${(offer.progress * 100).round()}% through '
-              '${other == null ? 'another file' : 'the ${other.format.toUpperCase()}'}'
-              ' of this book.\n\nThat is about page ${offer.page} here — '
-              'the same fraction of a different file, so it may not be the '
-              'same passage.',
-            ),
+            title: Text(L10n.of(dialogContext).readOfferTitle),
+            content: Text(L10n.of(dialogContext).readOfferBody(
+              (offer.progress * 100).round(),
+              other == null ? 'another' : 'file',
+              other?.format.toUpperCase() ?? '',
+              offer.page,
+            )),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Start at the beginning'),
+                child: Text(L10n.of(dialogContext).readStartAtBeginning),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text('Go to '
-                    '${file.format == 'pdf' ? 'page' : 'chapter'} '
-                    '${offer.page}'),
+                child: Text(L10n.of(dialogContext).readGoTo(
+                    file.format == 'pdf' ? 'page' : 'chapter', offer.page)),
               ),
             ],
           ),
@@ -170,11 +175,11 @@ class ReadButton extends StatelessWidget {
         // The saved position counts PDF pages or EPUB chapters, depending on
         // which reader this book opens into.
         final unit = readingUnitForFormats([for (final f in files) f.format]);
+        final l10n = L10n.of(context);
         final label = !started
-            ? 'Read'
-            : 'Resume reading · '
-                  '${(book.readingProgress! * 100).round()}% '
-                  '($unit ${book.lastReadPage})';
+            ? l10n.readRead
+            : l10n.readResumeLabel((book.readingProgress! * 100).round(), unit,
+                book.lastReadPage ?? 0);
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -221,7 +226,8 @@ class ReadButton extends StatelessWidget {
           ? null
           : () => _openFile(context, readable.single),
       icon: Icon(started ? Icons.play_arrow : Icons.menu_book),
-      label: Text(files.isEmpty ? 'Read (no digital copy yet)' : label),
+      label: Text(
+          files.isEmpty ? L10n.of(context).readNoDigitalCopy : label),
     );
   }
 }
@@ -262,7 +268,7 @@ class _FilePickerButton extends StatelessWidget {
                     ? Icons.picture_as_pdf_outlined
                     : Icons.menu_book_outlined),
                 onPressed: () => onOpen(file),
-                child: Text(_describe(file, places[file.id])),
+                child: Text(_describe(L10n.of(context), file, places[file.id])),
               ),
           ],
           builder: (context, controller, child) => FilledButton.icon(
@@ -278,15 +284,15 @@ class _FilePickerButton extends StatelessWidget {
 
   /// "PDF · page 214 (38%)", or "EPUB · not started". Its own place, not the
   /// book's: that is the whole point of listing them separately.
-  static String _describe(BookFile file, FilePosition? position) {
+  static String _describe(L10n l10n, BookFile file, FilePosition? position) {
     final format = file.format.toUpperCase();
     final progress = position?.progress;
     if (progress == null || position?.lastReadPage == null) {
-      return '$format · not started';
+      return l10n.readFileNotStarted(format);
     }
     final unit = file.format == 'pdf' ? 'page' : 'chapter';
-    return '$format · $unit ${position!.lastReadPage} '
-        '(${(progress * 100).round()}%)';
+    return l10n.readFilePosition(
+        format, unit, position!.lastReadPage!, (progress * 100).round());
   }
 }
 
@@ -310,13 +316,14 @@ class _OpenExternally extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     final file = files.length == 1 ? files.first : await _pick(context);
     if (file == null) return;
 
     final onDisk = repository.fileOf(file);
     if (!onDisk.existsSync()) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('That file is missing from the library.')),
+        SnackBar(content: Text(l10n.readFileMissing)),
       );
       return;
     }
@@ -327,9 +334,7 @@ class _OpenExternally extends StatelessWidget {
     if (!opened) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text(
-            'Nothing on this system is set up to open a ${file.format}.',
-          ),
+          content: Text(l10n.readNoAppForFormat(file.format)),
         ),
       );
     }
@@ -338,7 +343,7 @@ class _OpenExternally extends StatelessWidget {
   Future<BookFile?> _pick(BuildContext context) => showDialog<BookFile>(
         context: context,
         builder: (dialogContext) => SimpleDialog(
-          title: const Text('Open which file?'),
+          title: Text(L10n.of(dialogContext).readOpenWhichFile),
           children: [
             for (final file in files)
               SimpleDialogOption(
@@ -352,7 +357,7 @@ class _OpenExternally extends StatelessWidget {
   @override
   Widget build(BuildContext context) => IconButton.filledTonal(
         icon: const Icon(Icons.open_in_new),
-        tooltip: 'Open in another app',
+        tooltip: L10n.of(context).readOpenElsewhere,
         onPressed: () => _open(context),
       );
 }

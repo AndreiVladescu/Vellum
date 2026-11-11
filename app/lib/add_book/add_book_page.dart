@@ -82,7 +82,7 @@ class _AddBookPageState extends State<AddBookPage> {
   Future<void> _acceptFile(String path, String name) async {
     final kind = await classifyBookFile(path);
     if (!kind.isBook) {
-      setState(() => _error = 'Only PDF or EPUB files can be attached.');
+      setState(() => _error = L10n.of(context).addBookOnlyPdfEpub);
       return;
     }
     setState(() {
@@ -129,7 +129,7 @@ class _AddBookPageState extends State<AddBookPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Search failed — are you online?\n$e');
+      setState(() => _error = L10n.of(context).addBookSearchFailed('$e'));
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -150,7 +150,7 @@ class _AddBookPageState extends State<AddBookPage> {
       if (!mounted) return;
       setState(() {
         _addingWorkKey = null;
-        _error = 'Could not add “${result.title}”: $e';
+        _error = L10n.of(context).addBookCouldNotAdd(result.title, '$e');
       });
     }
   }
@@ -167,7 +167,7 @@ class _AddBookPageState extends State<AddBookPage> {
   Future<void> _create() async {
     final title = _queryController.text.trim();
     if (title.isEmpty) {
-      setState(() => _error = 'Enter a title to create a book.');
+      setState(() => _error = L10n.of(context).addBookEnterTitle);
       return;
     }
     setState(() {
@@ -197,7 +197,7 @@ class _AddBookPageState extends State<AddBookPage> {
       if (!mounted) return;
       setState(() {
         _addingWorkKey = null;
-        _error = 'Could not create “$title”: $e';
+        _error = L10n.of(context).addBookCouldNotCreate(title, '$e');
       });
     }
   }
@@ -342,9 +342,9 @@ class _AddBookPageState extends State<AddBookPage> {
             child: Text(
               _fileName == null
                   ? (_isTouch(theme)
-                      ? 'Attach a file (optional): tap to choose a PDF/EPUB'
-                      : 'Attach a file (optional): drop a PDF/EPUB here or click')
-                  : 'Attached: $_fileName',
+                      ? L10n.of(context).addBookAttachTouch
+                      : L10n.of(context).addBookAttachDesktop)
+                  : L10n.of(context).addBookAttached(_fileName!),
               style: theme.textTheme.bodyMedium,
             ),
           ),
@@ -364,10 +364,7 @@ class _AddBookPageState extends State<AddBookPage> {
     }
     if (results.isEmpty) {
       return Center(
-        child: Text(
-          'No results for “$_lastQuery”.\n'
-          'Use “Create book” above to add it yourself.',
-        ),
+        child: Text(L10n.of(context).addBookNoResults(_lastQuery)),
       );
     }
     return ListView.builder(

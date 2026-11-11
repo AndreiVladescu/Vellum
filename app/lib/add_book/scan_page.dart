@@ -8,6 +8,7 @@ import '../import/import_plan.dart';
 import '../widgets/page_insets.dart';
 import 'barcode_camera.dart';
 import 'isbn.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// One book added during a scanning session, for the running strip and undo.
 class ScannedBook {
@@ -128,7 +129,9 @@ class _ScanPageState extends State<ScanPage> {
     if (isbn13 == null) {
       // Not a book. Say so quietly and keep scanning — this is the common case
       // when a camera is pointed at anything else.
-      if (mounted) setState(() => _message = 'That barcode isn’t a book (${raw.trim()})');
+      if (mounted) {
+        setState(() => _message = L10n.of(context).scanNotABook(raw.trim()));
+      }
       return;
     }
     if (_seen.contains(isbn13)) return;
@@ -147,7 +150,7 @@ class _ScanPageState extends State<ScanPage> {
       if (result == null) {
         if (!mounted) return;
         setState(() => _message =
-            'No online match for ${formatIsbn13(isbn13)} — add it by hand?');
+            L10n.of(context).scanNoOnlineMatch(formatIsbn13(isbn13)));
         return;
       }
       // Flag (don't block) a book that looks like one already here.
@@ -177,7 +180,7 @@ class _ScanPageState extends State<ScanPage> {
       if (!mounted) return;
       // Offline, or the lookup failed: allow a retry of this exact barcode.
       _seen.remove(isbn13);
-      setState(() => _message = 'Lookup failed: $e');
+      setState(() => _message = L10n.of(context).scanLookupFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -236,7 +239,7 @@ class _ScanPageState extends State<ScanPage> {
   Future<void> _submitManual() async {
     final isbn13 = toIsbn13(_manualIsbn.text);
     if (isbn13 == null) {
-      setState(() => _message = 'That doesn’t look like an ISBN');
+      setState(() => _message = L10n.of(context).scanNotAnIsbn);
       return;
     }
     _manualIsbn.clear();
@@ -246,14 +249,15 @@ class _ScanPageState extends State<ScanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan books'),
+        title: Text(l10n.scanTitle),
         actions: [
           if (_added.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Center(child: Text('${_added.length} added')),
+              child: Center(child: Text(l10n.scanAddedCount(_added.length))),
             ),
         ],
       ),
@@ -275,8 +279,8 @@ class _ScanPageState extends State<ScanPage> {
               ),
             )
           else
-            const Positioned.fill(
-              child: _CameraUnavailable(detail: 'No camera on this device.'),
+            Positioned.fill(
+              child: _CameraUnavailable(detail: l10n.scanNoCameraOnDevice),
             ),
           if (_busy)
             const Align(
@@ -311,16 +315,16 @@ class _ScanPageState extends State<ScanPage> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                         child: SegmentedButton<bool>(
-                          segments: const [
+                          segments: [
                             ButtonSegment(
                               value: false,
-                              label: Text('I own it'),
-                              icon: Icon(Icons.library_add_check_outlined),
+                              label: Text(l10n.scanIOwnIt),
+                              icon: const Icon(Icons.library_add_check_outlined),
                             ),
                             ButtonSegment(
                               value: true,
-                              label: Text('I want it'),
-                              icon: Icon(Icons.bookmark_add_outlined),
+                              label: Text(l10n.scanIWantIt),
+                              icon: const Icon(Icons.bookmark_add_outlined),
                             ),
                           ],
                           selected: {_toWishlist},
@@ -337,10 +341,10 @@ class _ScanPageState extends State<ScanPage> {
                                 controller: _manualIsbn,
                                 keyboardType: TextInputType.text,
                                 decoration: InputDecoration(
-                                  labelText: 'ISBN',
+                                  labelText: l10n.scanIsbnLabel,
                                   helperText: _useCamera
-                                      ? 'Or type it, if the barcode won’t scan'
-                                      : 'Type or paste an ISBN-10 or ISBN-13',
+                                      ? l10n.scanIsbnHelperCamera
+                                      : l10n.scanIsbnHelperNoCamera,
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -350,7 +354,7 @@ class _ScanPageState extends State<ScanPage> {
                             const SizedBox(width: 8),
                             FilledButton(
                               onPressed: _busy ? null : _submitManual,
-                              child: const Text('Add'),
+                              child: Text(l10n.scanAdd),
                             ),
                           ],
                         ),
@@ -368,11 +372,11 @@ class _ScanPageState extends State<ScanPage> {
                         ),
                       Flexible(
                         child: _added.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.fromLTRB(24, 8, 24, 12),
+                            ? Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(24, 8, 24, 12),
                                 child: Text(
-                                  'Point the camera at a book’s barcode, or '
-                                  'type an ISBN. Books you add appear here.',
+                                  l10n.scanEmptyHint,
                                   textAlign: TextAlign.center,
                                 ),
                               )
@@ -393,15 +397,15 @@ class _ScanPageState extends State<ScanPage> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis),
                                     subtitle: Text(book.duplicateOf != null
-                                        ? 'Possible duplicate of '
-                                            '“${book.duplicateOf}”'
+                                        ? l10n.scanPossibleDuplicate(
+                                            book.duplicateOf!)
                                         : book.wanted
-                                            ? '${formatIsbn13(book.isbn13)} · '
-                                                'wishlist'
+                                            ? l10n.scanWishlistLine(
+                                                formatIsbn13(book.isbn13))
                                             : formatIsbn13(book.isbn13)),
                                     trailing: TextButton(
                                       onPressed: () => _undo(book),
-                                      child: const Text('Undo'),
+                                      child: Text(l10n.undo),
                                     ),
                                   );
                                 },
@@ -435,14 +439,14 @@ class _CameraUnavailable extends StatelessWidget {
               children: [
                 const Icon(Icons.no_photography_outlined, size: 40),
                 const SizedBox(height: 12),
-                const Text(
-                  'No camera scanning here',
+                Text(
+                  L10n.of(context).scanNoCameraTitle,
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 // The whole point of the fallback: say what happened, then point
                 // at the field below rather than leaving a dead screen.
-                Text('$detail\nYou can still type ISBNs below.',
+                Text(L10n.of(context).scanCameraFallback(detail),
                     textAlign: TextAlign.center),
               ],
             ),

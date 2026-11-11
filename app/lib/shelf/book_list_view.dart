@@ -4,6 +4,8 @@ import '../data/database.dart';
 import '../data/library_queries.dart';
 import '../data/reading_status.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 
 /// The library as a list, one line per book and no artwork.
 ///
@@ -117,13 +119,13 @@ class _BookRow extends StatelessWidget {
           if (book.rating != null) ...[
             Icon(Icons.star, size: 14, color: theme.colorScheme.primary),
             const SizedBox(width: 2),
-            Text('${book.rating}', style: theme.textTheme.labelSmall),
+            Text('${book.rating}', style: theme.textTheme.labelSmall), // i18n-ignore
             const SizedBox(width: 10),
           ],
           // 'unread' is the default and true of most of the library, so saying
           // it on every row would be a column of the same word.
           if (status != null && status != ReadingStatus.unread)
-            Text(status.label, style: theme.textTheme.labelSmall),
+            Text(status.labelOf(L10n.of(context)), style: theme.textTheme.labelSmall),
         ],
       ),
       onTap: selectionMode && toggle != null

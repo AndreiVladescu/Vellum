@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Every series you own, and what is missing from each.
 ///
@@ -21,7 +22,7 @@ class SeriesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Series')),
+      appBar: AppBar(title: Text(L10n.of(context).seriesPageTitle)),
       body: StreamBuilder<List<SeriesPlace>>(
         stream: repository.seriesService.watchAll(),
         builder: (context, snapshot) {
@@ -58,18 +59,20 @@ class _SeriesTile extends StatelessWidget {
 
   Future<void> _wish(BuildContext context, int volume) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     await repository.wishlist.addSeriesGap(
       seriesName: place.name,
       volume: volume,
     );
     messenger.showSnackBar(SnackBar(
-      content: Text('${place.name} vol. $volume added to your wishlist'),
+      content: Text(l10n.seriesVolumeWished(place.name, volume)),
     ));
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final owned = place.owned.map(_volume).join(', ');
     return ListTile(
       leading: Icon(
@@ -81,8 +84,8 @@ class _SeriesTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(owned.isEmpty
-              ? '${place.owned.length} book(s), unnumbered'
-              : 'You have $owned'),
+              ? l10n.seriesUnnumbered(place.owned.length)
+              : l10n.seriesYouHave(owned)),
           if (place.hasGaps)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -90,19 +93,19 @@ class _SeriesTile extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 4,
                 children: [
-                  Text('Missing', style: theme.textTheme.labelMedium),
+                  Text(l10n.seriesMissing, style: theme.textTheme.labelMedium),
                   for (final gap in place.gaps)
                     // A gap already wished for is shown as such rather than
                     // offered again — the wishlist is the record that you have
                     // already decided about that volume.
                     if (place.wanted.contains(gap.toDouble()))
                       Chip(
-                        label: Text('$gap · wanted'),
+                        label: Text(l10n.seriesVolumeWanted(gap)),
                         visualDensity: VisualDensity.compact,
                       )
                     else
                       ActionChip(
-                        label: Text('$gap'),
+                        label: Text('$gap'), // i18n-ignore
                         avatar: const Icon(Icons.add, size: 16),
                         visualDensity: VisualDensity.compact,
                         onPressed: () => _wish(context, gap),
@@ -133,11 +136,10 @@ class _Empty extends StatelessWidget {
                 size: 56,
                 color: theme.colorScheme.primary.withValues(alpha: 0.7)),
             const SizedBox(height: 16),
-            Text('No series yet', style: theme.textTheme.titleMedium),
+            Text(L10n.of(context).seriesEmptyTitle, style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              'Set a series and volume number on a book’s page, and the ones '
-              'you are missing show up here.',
+              L10n.of(context).seriesEmptyBody,
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),

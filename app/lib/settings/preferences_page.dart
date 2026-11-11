@@ -28,6 +28,7 @@ import 'spine_art.dart';
 import '../notifications/tray.dart';
 import 'shared_shelves_page.dart';
 import 'trash_page.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../onboarding/sample_library.dart';
 import 'wallpaper.dart';
 
@@ -1651,8 +1652,9 @@ class _SamplesTileState extends State<_SamplesTile> {
 
   Future<void> _tap(int count) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     if (count == 0) {
-      await addSamplesWithFeedback(messenger, _samples);
+      await addSamplesWithFeedback(messenger, l10n, _samples);
       return;
     }
     final ok = await showDialog<bool>(

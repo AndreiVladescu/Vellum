@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// The "Digital formats" list: attached PDF/EPUB files plus an attach action.
 class DigitalFormatsSection extends StatelessWidget {
@@ -16,20 +17,26 @@ class DigitalFormatsSection extends StatelessWidget {
   final LibraryRepository repository;
 
   Future<void> _attach(BuildContext context) async {
-    const typeGroup = XTypeGroup(label: 'Books', extensions: ['pdf', 'epub']);
-    final picked = await openFile(acceptedTypeGroups: const [typeGroup]);
+    // Read before the await: the group name shows in the system file dialog.
+    final l10n = L10n.of(context);
+    final typeGroup = XTypeGroup(
+      label: l10n.bookFilesTypeGroup,
+      extensions: const ['pdf', 'epub'],
+    );
+    final picked = await openFile(acceptedTypeGroups: [typeGroup]);
     if (picked == null) return;
     await repository.attachFile(book.id, picked.path);
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Attached ${picked.name}')));
+      ).showSnackBar(SnackBar(content: Text(l10n.formatsAttached(picked.name))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return StreamBuilder<List<BookFile>>(
       stream: repository.watchFilesOf(book.id),
       builder: (context, snapshot) {
@@ -41,20 +48,20 @@ class DigitalFormatsSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Digital formats',
+                    l10n.formatsTitle,
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 TextButton.icon(
                   onPressed: () => _attach(context),
                   icon: const Icon(Icons.attach_file),
-                  label: const Text('Attach file'),
+                  label: Text(l10n.formatsAttachFile),
                 ),
               ],
             ),
             if (files.isEmpty)
               Text(
-                'No files yet — attach a PDF or EPUB.',
+                l10n.formatsEmpty,
                 style: theme.textTheme.bodySmall,
               )
             else

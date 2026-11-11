@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../shortcuts.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// The Ctrl+K palette (plan 5 #26): every action in one list, plus every book
 /// by title.
@@ -68,9 +69,9 @@ class _CommandPaletteState extends State<CommandPalette> {
               child: TextField(
                 controller: _controller,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Type a command, or a book title…',
-                  icon: Icon(Icons.search),
+                decoration: InputDecoration(
+                  hintText: L10n.of(context).paletteHint,
+                  icon: const Icon(Icons.search),
                   border: InputBorder.none,
                 ),
                 onChanged: (v) => setState(() => _query = v),
@@ -86,7 +87,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                     return Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        'Nothing matches “$_query”.',
+                        L10n.of(context).paletteNothingMatches(_query),
                         style: TextStyle(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),

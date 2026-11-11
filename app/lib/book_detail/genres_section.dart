@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Editable genre ("tag") chips for a book. Each genre is removable (the ✕),
 /// tapping one filters the shelf by it, and the trailing "＋ Add" chip opens a
@@ -49,7 +50,7 @@ class GenresSection extends StatelessWidget {
               ),
             ActionChip(
               avatar: const Icon(Icons.add, size: 18),
-              label: const Text('Add'),
+              label: Text(L10n.of(context).genresAdd),
               visualDensity: VisualDensity.compact,
               onPressed: () => _openAddSheet(context),
             ),
@@ -108,16 +109,16 @@ class _AddGenreSheetState extends State<_AddGenreSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Add genre', style: Theme.of(context).textTheme.titleLarge),
+          Text(L10n.of(context).genresAddTitle, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           TextField(
             controller: _controller,
             autofocus: true,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              hintText: 'e.g. Engineering',
-              prefixIcon: Icon(Icons.sell_outlined),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              hintText: L10n.of(context).genresAddHint,
+              prefixIcon: const Icon(Icons.sell_outlined),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (v) => setState(() => _query = v),
             onSubmitted: _add,
@@ -166,7 +167,7 @@ class _AddGenreSheetState extends State<_AddGenreSheet> {
             alignment: Alignment.centerRight,
             child: FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
+              child: Text(L10n.of(context).genresDone),
             ),
           ),
         ],

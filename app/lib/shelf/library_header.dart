@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_queries.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Books worth surfacing above the shelf, derived from a [LibraryView].
 ///
@@ -128,7 +129,7 @@ class LibraryHeader extends StatelessWidget {
                 if (onDismiss != null)
                   IconButton(
                     icon: const Icon(Icons.close, size: 18),
-                    tooltip: 'Hide for now',
+                    tooltip: L10n.of(context).headerHideForNow,
                     onPressed: onDismiss,
                   ),
               ],
@@ -145,12 +146,12 @@ class LibraryHeader extends StatelessWidget {
         children: [
           if (highlights.continueReading.isNotEmpty)
             _Section(
-              title: 'Continue reading',
+              title: L10n.of(context).headerContinueReading,
               trailing: onDismiss == null
                   ? null
                   : IconButton(
                       icon: const Icon(Icons.close, size: 18),
-                      tooltip: 'Hide for now',
+                      tooltip: L10n.of(context).headerHideForNow,
                       onPressed: onDismiss,
                     ),
               children: [
@@ -163,11 +164,11 @@ class LibraryHeader extends StatelessWidget {
             ),
           if (highlights.recentlyAdded.isNotEmpty)
             _Section(
-              title: 'Recently added',
+              title: L10n.of(context).headerRecentlyAdded,
               trailing: highlights.continueReading.isEmpty && onDismiss != null
                   ? IconButton(
                       icon: const Icon(Icons.close, size: 18),
-                      tooltip: 'Hide for now',
+                      tooltip: L10n.of(context).headerHideForNow,
                       onPressed: onDismiss,
                     )
                   : null,
@@ -273,7 +274,7 @@ class _ContinueCard extends StatelessWidget {
                         ),
                       ),
                       if (progress > 0)
-                        Text('${(progress * 100).round()}%',
+                        Text('${(progress * 100).round()}%', // i18n-ignore
                             style: theme.textTheme.bodySmall),
                     ],
                   ),
@@ -310,8 +311,10 @@ class _ContinueCard extends StatelessWidget {
                 LinearProgressIndicator(value: progress),
                 const SizedBox(height: 4),
                 Text(
-                  '${(progress * 100).round()}%'
-                  '${book.lastReadPage == null ? '' : ' · page ${book.lastReadPage}'}',
+                  book.lastReadPage == null
+                      ? '${(progress * 100).round()}%'
+                      : L10n.of(context).headerProgressPage(
+                          (progress * 100).round(), book.lastReadPage!),
                   style: theme.textTheme.bodySmall,
                 ),
               ],

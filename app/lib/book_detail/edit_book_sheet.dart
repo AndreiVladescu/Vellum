@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Bottom sheet to edit a book's core details and change its cover.
 class EditBookSheet extends StatefulWidget {
@@ -53,9 +54,7 @@ class EditBookSheetState extends State<EditBookSheet> {
     setState(() => _gettingPages = false);
     if (count == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No PDF attached, or its pages couldn’t be read.'),
-        ),
+        SnackBar(content: Text(L10n.of(context).editNoPdfPages)),
       );
       return;
     }
@@ -100,6 +99,7 @@ class EditBookSheetState extends State<EditBookSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = sheetBottomInset(context);
+    final l10n = L10n.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       child: SingleChildScrollView(
@@ -107,24 +107,24 @@ class EditBookSheetState extends State<EditBookSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Edit details', style: Theme.of(context).textTheme.titleLarge),
+            Text(l10n.editTitle, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             TextField(
               controller: _title,
-              decoration: const InputDecoration(labelText: 'Title'),
+              decoration: InputDecoration(labelText: l10n.editFieldTitle),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _author,
-              decoration: const InputDecoration(
-                labelText: 'Author(s)',
-                helperText: 'Separate multiple authors with commas',
+              decoration: InputDecoration(
+                labelText: l10n.editFieldAuthors,
+                helperText: l10n.editFieldAuthorsHelper,
               ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _subtitle,
-              decoration: const InputDecoration(labelText: 'Subtitle'),
+              decoration: InputDecoration(labelText: l10n.editFieldSubtitle),
             ),
             const SizedBox(height: 10),
             Row(
@@ -133,8 +133,8 @@ class EditBookSheetState extends State<EditBookSheet> {
                   child: TextField(
                     controller: _year,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Published year',
+                    decoration: InputDecoration(
+                      labelText: l10n.editFieldYear,
                     ),
                   ),
                 ),
@@ -143,7 +143,7 @@ class EditBookSheetState extends State<EditBookSheet> {
                   child: TextField(
                     controller: _pages,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Pages'),
+                    decoration: InputDecoration(labelText: l10n.editFieldPages),
                   ),
                 ),
               ],
@@ -159,7 +159,7 @@ class EditBookSheetState extends State<EditBookSheet> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                label: const Text('Get page count from file'),
+                label: Text(l10n.editGetPageCount),
               ),
             ),
             const SizedBox(height: 4),
@@ -167,13 +167,13 @@ class EditBookSheetState extends State<EditBookSheet> {
               controller: _description,
               minLines: 3,
               maxLines: 6,
-              decoration: const InputDecoration(labelText: 'Description'),
+              decoration: InputDecoration(labelText: l10n.editFieldDescription),
             ),
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: () => widget.onPickCover(),
               icon: const Icon(Icons.image_outlined),
-              label: const Text('Change cover…'),
+              label: Text(l10n.editChangeCover),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -182,7 +182,7 @@ class EditBookSheetState extends State<EditBookSheet> {
                 widget.onCoverFromFirstPage();
               },
               icon: const Icon(Icons.picture_as_pdf_outlined),
-              label: const Text('Use first page of the PDF as cover'),
+              label: Text(l10n.editCoverFromPdf),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -191,12 +191,11 @@ class EditBookSheetState extends State<EditBookSheet> {
                 widget.onLookUpOnline();
               },
               icon: const Icon(Icons.travel_explore),
-              label: const Text('Find cover and details online'),
+              label: Text(l10n.editFindOnline),
             ),
             const SizedBox(height: 6),
             Text(
-              'Tip: you can also drag an image, PDF, or EPUB onto the book '
-              'page.',
+l10n.editDragTip,
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
@@ -205,10 +204,10 @@ class EditBookSheetState extends State<EditBookSheet> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text(l10n.cancel),
                 ),
                 const SizedBox(width: 8),
-                FilledButton(onPressed: _save, child: const Text('Save')),
+                FilledButton(onPressed: _save, child: Text(l10n.save)),
               ],
             ),
           ],

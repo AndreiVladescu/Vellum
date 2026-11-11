@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Where a batch of selected books should go, and whether they *leave* where
 /// they are (next features #4).
@@ -32,24 +33,22 @@ class ShelfTargetSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final books = count == 1 ? '1 book' : '$count books';
+    final l10n = L10n.of(context);
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-            child: Text('Put $books on a shelf',
+            child: Text(l10n.shelfTargetTitle(count),
                 style: theme.textTheme.titleMedium),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Text(
               canMove
-                  ? 'Move takes them off the shelf you are viewing; Add leaves '
-                      'them on both.'
-                  : 'You are viewing the whole library, so there is no shelf '
-                      'to move them off.',
+                  ? l10n.shelfTargetMoveHint
+                  : l10n.shelfTargetViewingAll,
               style: theme.textTheme.bodySmall,
             ),
           ),
@@ -71,7 +70,7 @@ class ShelfTargetSheet extends StatelessWidget {
                           context,
                           (shelf: shelf, move: false),
                         ),
-                        child: const Text('Add here'),
+                        child: Text(l10n.shelfTargetAddHere),
                       ),
                       if (canMove) ...[
                         const SizedBox(width: 8),
@@ -80,7 +79,7 @@ class ShelfTargetSheet extends StatelessWidget {
                             context,
                             (shelf: shelf, move: true),
                           ),
-                          child: const Text('Move here'),
+                          child: Text(l10n.shelfTargetMoveHere),
                         ),
                       ],
                     ],

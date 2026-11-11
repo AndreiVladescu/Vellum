@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart' show pdfrxFlutterInitialize;
 import 'l10n/gen/app_localizations.dart';
+import 'l10n/labels.dart';
 
 import 'account/user_profile.dart';
 import 'add_book/add_book_page.dart';
@@ -424,7 +425,13 @@ class _LibraryPageState extends State<LibraryPage> {
     } finally {
       // Paired like a lock: a notification left ongoing, or a service left
       // running, is a phone that says it is syncing forever.
-      await tray.finish('Sync finished.');
+      // After the awaits above `context` is usable, unlike in initState where
+      // this was started; a disposed page has no locale, so it asks for the
+      // template one rather than hanging the notification.
+      await tray.finish(
+        (mounted ? L10n.of(context) : lookupL10n(const Locale('en')))
+            .syncFinished,
+      );
       await SyncForegroundService.stop();
     }
   }
@@ -699,7 +706,11 @@ class _LibraryPageState extends State<LibraryPage> {
   /// Adds the bundled sample books and says where they went. Safe to repeat:
   /// the import path skips what is already there.
   Future<void> _addSamples() =>
-      addSamplesWithFeedback(ScaffoldMessenger.of(context), SampleLibrary(repository));
+      addSamplesWithFeedback(
+        ScaffoldMessenger.of(context),
+        L10n.of(context),
+        SampleLibrary(repository),
+      );
 
   /// Opens a book's detail page — the same destination a spine tap reaches, so
   /// the header strip and the shelf can't drift apart.
@@ -1211,7 +1222,8 @@ class _LibraryPageState extends State<LibraryPage> {
               PopupMenuItem(
                 value: s,
                 child: Text(
-                  L10n.of(context).sortBy(s.label.toLowerCase()),
+                  L10n.of(context).sortBy(
+                    s.labelOf(L10n.of(context)).toLowerCase()),
                 ),
               ),
           ],
@@ -1250,7 +1262,8 @@ class _LibraryPageState extends State<LibraryPage> {
             value: status.name,
             onTap: () => setState(() => _statusFilter = status),
             child: Text(
-              '${status.label}${_statusFilter == status ? ' ✓' : ''}',
+              '${status.labelOf(L10n.of(context))}'
+              '${_statusFilter == status ? ' ✓' : ''}',
             ),
           ),
       ],
@@ -1527,7 +1540,7 @@ class _LibraryPageState extends State<LibraryPage> {
               TextButton.icon(
                 onPressed: _addSamples,
                 icon: const Icon(Icons.auto_awesome_outlined),
-                label: const Text('Try it with a few sample books'),
+                label: Text(L10n.of(context).shelfEmptyTrySamples),
               ),
             ],
           ],
@@ -1652,6 +1665,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<void> _shelfMenu(Shelf shelf) async {
+    final l10n = L10n.of(context);
     final action = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
@@ -1672,10 +1686,12 @@ class _LibraryPageState extends State<LibraryPage> {
                 leading: Icon(shelf.isPersonal
                     ? Icons.group_outlined
                     : Icons.lock_outline),
-                title: Text(shelf.isPersonal ? 'Share this shelf' : 'Make personal'),
+                title: Text(shelf.isPersonal
+                    ? L10n.of(context).shelfShare
+                    : L10n.of(context).shelfMakePersonal),
                 subtitle: Text(shelf.isPersonal
-                    ? 'Everyone the library is shared with will see it'
-                    : 'Only you — it still syncs to your own devices'),
+                    ? L10n.of(context).shelfShareSubtitle
+                    : L10n.of(context).shelfMakePersonalSubtitle),
                 onTap: () => Navigator.pop(context, 'visibility'),
               ),
             ListTile(
@@ -1689,7 +1705,7 @@ class _LibraryPageState extends State<LibraryPage> {
       ),
     );
     if (action == 'rename') {
-      final name = await _promptShelfName('Rename shelf', initial: shelf.name);
+      final name = await _promptShelfName(l10n.renameShelf, initial: shelf.name);
       if (name != null && name.isNotEmpty) {
         await repository.renameShelf(shelf.id, name);
       }

@@ -11,6 +11,7 @@ import 'book_open_route.dart';
 import 'cover_image.dart';
 import 'cover_color.dart';
 import 'spine_style.dart';
+import '../l10n/gen/app_localizations.dart';
 
 const _bookAreaHeight = 175.0;
 const _boardHeight = 14.0;
@@ -331,7 +332,8 @@ class BookSpine extends StatelessWidget {
       // The mark below is painted inside `excludeSemantics`, so the one place
       // a screen reader can hear about it is here.
       label: finished
-          ? '${bookSemanticLabel(book.title, book.subtitle)}, finished'
+          ? L10n.of(context).shelfBookFinishedLabel(
+              bookSemanticLabel(book.title, book.subtitle))
           : bookSemanticLabel(book.title, book.subtitle),
       button: onTap != null,
       onTap: onTap,

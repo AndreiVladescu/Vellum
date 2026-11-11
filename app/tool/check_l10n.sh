@@ -17,7 +17,38 @@ cd "$(dirname "$0")/.."
 
 MIGRATED=(
   lib/main.dart
+  lib/app_drawer.dart
   lib/add_book/add_book_page.dart
+  lib/add_book/barcode_camera.dart
+  lib/add_book/isbn.dart
+  lib/add_book/scan_page.dart
+  lib/book_detail/book_detail_page.dart
+  lib/book_detail/copy_photos.dart
+  lib/book_detail/cover_thumb.dart
+  lib/book_detail/edit_book_sheet.dart
+  lib/book_detail/formats_section.dart
+  lib/book_detail/genres_section.dart
+  lib/book_detail/lend_sheet.dart
+  lib/book_detail/physical_copies_section.dart
+  lib/book_detail/read_button.dart
+  lib/book_detail/reader_notes_section.dart
+  lib/book_detail/send_to_device_sheet.dart
+  lib/onboarding/first_run_sheet.dart
+  lib/onboarding/sample_library.dart
+  lib/shelf/author_page.dart
+  lib/shelf/book_list_view.dart
+  lib/shelf/book_open_route.dart
+  lib/shelf/command_palette.dart
+  lib/shelf/content_search.dart
+  lib/shelf/cover_color.dart
+  lib/shelf/cover_image.dart
+  lib/shelf/library_header.dart
+  lib/shelf/new_shelf_dialog.dart
+  lib/shelf/series_page.dart
+  lib/shelf/shelf_filter.dart
+  lib/shelf/shelf_target_sheet.dart
+  lib/shelf/shelf_view.dart
+  lib/shelf/spine_style.dart
 )
 
 fail=0

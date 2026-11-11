@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/book_detail/cover_thumb.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/shelf/shelf_view.dart';
 
 void main() {
@@ -21,6 +22,8 @@ void main() {
       (tester) async {
     final handle = tester.ensureSemantics();
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Scaffold(body: CoverThumb(cover: null, onTap: () {})),
     ));
     expect(find.bySemanticsLabel('Change cover'), findsOneWidget);
@@ -34,6 +37,8 @@ void main() {
     // keyboard-unusable — there is no other way into a book from here.
     var opened = 0;
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: BookSpine(book: _book('Dune'), onTap: () => opened++),
       ),
@@ -54,6 +59,8 @@ void main() {
   testWidgets('a face-out cover is keyboard-activatable too', (tester) async {
     var opened = 0;
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: BookCover(book: _book('Dune'), onTap: () => opened++),
       ),
@@ -68,6 +75,8 @@ void main() {
   testWidgets('the cover thumbnail is a focusable button', (tester) async {
     final handle = tester.ensureSemantics();
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Scaffold(body: CoverThumb(cover: null, onTap: () {})),
     ));
     await tester.pump();

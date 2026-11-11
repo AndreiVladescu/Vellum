@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/shelf/shelf_view.dart';
 
 void main() {
@@ -39,6 +40,8 @@ void main() {
 
   Future<void> pumpSpine(WidgetTester tester, Book row) async {
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Scaffold(body: Center(child: BookSpine(book: row))),
     ));
     await tester.pump();

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// The book's cover: shows the image and, on hover (desktop), reveals a
 /// "Change cover" overlay. Tapping picks a new image — the same mechanic as the
@@ -32,10 +33,10 @@ class CoverThumbState extends State<CoverThumb> {
     final placeholder = Container(
       color: theme.colorScheme.surfaceContainerHighest,
       alignment: Alignment.center,
-      child: Text('No cover', style: theme.textTheme.bodySmall),
+      child: Text(L10n.of(context).coverNone, style: theme.textTheme.bodySmall),
     );
     return Semantics(
-      label: 'Change cover',
+      label: L10n.of(context).coverChange,
       button: true,
       onTap: widget.onTap,
       excludeSemantics: true,
@@ -73,10 +74,11 @@ class CoverThumbState extends State<CoverThumb> {
                     child: Container(
                       color: Colors.black54,
                       alignment: Alignment.center,
-                      child: const Text(
-                        'Change\ncover',
+                      child: Text(
+                        L10n.of(context).coverChangeOverlay,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white, fontSize: 13),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 13),
                       ),
                     ),
                   ),

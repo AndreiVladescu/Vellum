@@ -17,6 +17,7 @@ import 'package:vellum/add_book/scan_page.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/data/metadata.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 
 /// An Open Library search response for one work, keyed by the ISBN queried.
 /// [known] maps `isbn:<n>` queries to a title; anything else answers empty, the
@@ -82,6 +83,8 @@ void main() {
       );
       codes = StreamController<String>();
       app = MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
         home: ScanPage(
           repository: repo,
           barcodes: codes.stream,

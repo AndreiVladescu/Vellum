@@ -4,6 +4,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import 'copy_photos.dart';
 import 'physical_copies_section.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// A bottom-sheet "mini menu" for lending, reachable straight from the book's
 /// app bar so lending doesn't require scrolling to the Physical-copies section.
@@ -21,6 +22,7 @@ class LendSheet extends StatelessWidget {
   /// book that isn't tracked on paper yet. No-ops if the borrower prompt is
   /// cancelled, so it never leaves an empty copy behind.
   Future<void> _addCopyAndLend(BuildContext context) async {
+    final l10n = L10n.of(context);
     final details = await promptBorrower(context);
     if (details == null) return;
     final copyId = await repository.addPhysicalCopy(book.id);
@@ -32,13 +34,14 @@ class LendSheet extends StatelessWidget {
     );
     if (details.photograph && context.mounted) {
       await addCopyPhoto(context, repository, copyId,
-          caption: 'Lent to ${details.borrower}');
+          caption: l10n.lendSheetPhotoCaption(details.borrower));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return SafeArea(
       child: StreamBuilder<List<PhysicalCopy>>(
         stream: repository.watchCopiesOf(book.id),
@@ -52,7 +55,7 @@ class LendSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Lend “${book.title}”',
+                    l10n.lendSheetTitle(book.title),
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -60,11 +63,8 @@ class LendSheet extends StatelessWidget {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.add),
-                      title: const Text('Lend a copy'),
-                      subtitle: const Text(
-                        'No physical copy on record yet — this adds one, then '
-                        'lends it out.',
-                      ),
+                      title: Text(l10n.lendSheetLendCopy),
+                      subtitle: Text(l10n.lendSheetNoCopy),
                       onTap: () => _addCopyAndLend(context),
                     )
                   else

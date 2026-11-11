@@ -76,24 +76,20 @@ class _NewShelfDialogState extends State<_NewShelfDialog> {
             RadioGroup<bool>(
               groupValue: _personal,
               onChanged: (v) => setState(() => _personal = v ?? false),
-              child: const Column(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   RadioListTile<bool>(
                     value: false,
                     contentPadding: EdgeInsets.zero,
-                    title: Text('Shared'),
-                    subtitle: Text(
-                      'Everyone the library is shared with sees this shelf.',
-                    ),
+                    title: Text(l10n.newShelfShared),
+                    subtitle: Text(l10n.newShelfSharedSubtitle),
                   ),
                   RadioListTile<bool>(
                     value: true,
                     contentPadding: EdgeInsets.zero,
-                    title: Text('Personal'),
-                    subtitle: Text(
-                      'Only you. It still syncs to your own devices.',
-                    ),
+                    title: Text(l10n.newShelfPersonal),
+                    subtitle: Text(l10n.newShelfPersonalSubtitle),
                   ),
                 ],
               ),

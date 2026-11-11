@@ -5,6 +5,7 @@ import '../data/library_repository.dart';
 import '../snack_bars.dart';
 import '../widgets/page_insets.dart';
 import 'copy_photos.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Prompts for a borrower's name. Returns the trimmed name, or null if the user
 /// cancelled or left it blank. Shared by the inline copy tile and the lend sheet
@@ -68,7 +69,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
         }
 
         return AlertDialog(
-          title: const Text('Lend this copy'),
+          title: Text(L10n.of(dialogContext).copiesLendTitle),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -77,28 +78,28 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                 TextField(
                   controller: borrower,
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Borrower',
-                    hintText: "Who's taking it?",
+                  decoration: InputDecoration(
+                    labelText: L10n.of(dialogContext).copiesBorrowerLabel,
+                    hintText: L10n.of(dialogContext).copiesBorrowerHint,
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: contact,
-                  decoration: const InputDecoration(
-                    labelText: 'Contact (optional)',
-                    hintText: 'Phone, email, or how you know them',
+                  decoration: InputDecoration(
+                    labelText: L10n.of(dialogContext).copiesContactLabel,
+                    hintText: L10n.of(dialogContext).copiesContactHint,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('Due back'),
+                Text(L10n.of(dialogContext).copiesDueBack),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
                   children: [
                     for (final (label, days) in [
-                      ('2 weeks', 14),
-                      ('1 month', 30),
+                      (L10n.of(dialogContext).copiesTwoWeeks, 14),
+                      (L10n.of(dialogContext).copiesOneMonth, 30),
                     ])
                       ChoiceChip(
                         label: Text(label),
@@ -106,7 +107,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                         onSelected: (_) => pick(days),
                       ),
                     ChoiceChip(
-                      label: const Text('No date'),
+                      label: Text(L10n.of(dialogContext).copiesNoDate),
                       selected: selectedPreset == null && due == null,
                       onSelected: (_) => pick(null),
                     ),
@@ -115,7 +116,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                       label: Text(due != null && selectedPreset == -1
                           ? '${due!.year}-${due!.month.toString().padLeft(2, '0')}'
                               '-${due!.day.toString().padLeft(2, '0')}'
-                          : 'Pick a date'),
+                          : L10n.of(dialogContext).copiesPickDate),
                       onPressed: () async {
                         final now = DateTime.now();
                         final picked = await showDatePicker(
@@ -144,7 +145,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   dense: true,
-                  title: const Text('Photograph its condition first'),
+                  title: Text(L10n.of(dialogContext).copiesPhotographFirst),
                 ),
                 // Only offered where it could do anything: a reminder needs a
                 // due date to be about and an address to go to. Shown greyed
@@ -159,10 +160,10 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
                     dense: true,
-                    title: const Text('Email a reminder when it is due'),
+                    title: Text(L10n.of(dialogContext).copiesRemind),
                     subtitle: Text(contact.text.trim().isEmpty
-                        ? 'Needs an email address above'
-                        : 'If your server is set up to send mail'),
+                        ? L10n.of(dialogContext).copiesRemindNeedsEmail
+                        : L10n.of(dialogContext).copiesRemindIfMail),
                   ),
               ],
             ),
@@ -170,7 +171,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
+              child: Text(L10n.of(dialogContext).cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -184,7 +185,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                   remind: remind && contact.text.trim().isNotEmpty,
                 ));
               },
-              child: const Text('Lend'),
+              child: Text(L10n.of(dialogContext).copiesLend),
             ),
           ],
         );
@@ -213,33 +214,34 @@ class PhysicalCopiesSection extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Add physical copy'),
+        title: Text(L10n.of(dialogContext).copiesAddTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: location,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Location',
-                hintText: 'e.g. living room, shelf 3',
+              decoration: InputDecoration(
+                labelText: L10n.of(dialogContext).copiesLocationLabel,
+                hintText: L10n.of(dialogContext).copiesLocationHint,
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: notes,
-              decoration: const InputDecoration(labelText: 'Notes'),
+              decoration: InputDecoration(
+                  labelText: L10n.of(dialogContext).copiesNotesLabel),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(L10n.of(dialogContext).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Add'),
+            child: Text(L10n.of(dialogContext).copiesAddConfirm),
           ),
         ],
       ),
@@ -269,20 +271,20 @@ class PhysicalCopiesSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Physical copies',
+                    L10n.of(context).copiesSectionTitle,
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 TextButton.icon(
                   onPressed: () => _addCopy(context),
                   icon: const Icon(Icons.add),
-                  label: const Text('Add copy'),
+                  label: Text(L10n.of(context).copiesAddCopy),
                 ),
               ],
             ),
             if (copies.isEmpty)
               Text(
-                "You don't own this one on paper (yet).",
+                L10n.of(context).copiesNone,
                 style: theme.textTheme.bodySmall,
               )
             else
@@ -297,11 +299,7 @@ class PhysicalCopiesSection extends StatelessWidget {
                   repository: repository,
                 ),
                 icon: const Icon(Icons.inventory_2_outlined),
-                label: Text(
-                  copies.length == 1
-                      ? '1 physical copy'
-                      : '${copies.length} physical copies',
-                ),
+                label: Text(L10n.of(context).copiesCount(copies.length)),
               ),
           ],
         );
@@ -355,7 +353,7 @@ class _CopiesSheet extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                   child: Text(
-                    'Physical copies of “${book.title}”',
+                    L10n.of(context).copiesSheetTitle(book.title),
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
@@ -366,7 +364,7 @@ class _CopiesSheet extends StatelessWidget {
                       ? Padding(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                           child: Text(
-                            "None left — they've all been deleted.",
+                            L10n.of(context).copiesAllDeleted,
                             style: theme.textTheme.bodySmall,
                           ),
                         )
@@ -409,6 +407,7 @@ class _CopyCard extends StatelessWidget {
       '${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _lend(BuildContext context) async {
+    final l10n = L10n.of(context);
     final details = await promptBorrower(context);
     if (details == null) return;
     try {
@@ -430,7 +429,7 @@ class _CopyCard extends StatelessWidget {
     }
     if (details.photograph && context.mounted) {
       await addCopyPhoto(context, repository, copy.id,
-          caption: 'Lent to ${details.borrower}');
+          caption: l10n.lendSheetPhotoCaption(details.borrower));
     }
   }
 
@@ -438,12 +437,13 @@ class _CopyCard extends StatelessWidget {
     await repository.returnLoan(active.id);
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     messenger.showSnackBar(appSnackBar(
-      content: Text('Returned by ${active.borrower}'),
+      content: Text(l10n.copiesReturnedBy(active.borrower)),
       action: SnackBarAction(
-        label: 'Photograph it',
+        label: l10n.copiesPhotographIt,
         onPressed: () => addCopyPhoto(context, repository, copy.id,
-            caption: 'Returned by ${active.borrower}'),
+            caption: l10n.copiesReturnedBy(active.borrower)),
       ),
     ));
   }
@@ -452,28 +452,25 @@ class _CopyCard extends StatelessWidget {
   /// (`PhysicalService.deletePhysicalCopy`), so this asks first and says so,
   /// with a sharper warning when it would also drop an active loan.
   Future<void> _delete(BuildContext context, {required bool hasActiveLoan}) async {
+    final l10n = L10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete this copy?'),
+        title: Text(l10n.copiesDeleteTitle),
         content: Text(
-          hasActiveLoan
-              ? "It's currently on loan — deleting it removes that loan, its "
-                  "history and its condition photos too. This can't be undone."
-              : 'Its loan history and condition photos go with it. '
-                  "This can't be undone.",
+          hasActiveLoan ? l10n.copiesDeleteBodyOnLoan : l10n.copiesDeleteBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -481,7 +478,7 @@ class _CopyCard extends StatelessWidget {
     if (confirmed != true || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     await repository.deletePhysicalCopy(copy.id);
-    messenger.showSnackBar(appSnackBar(content: const Text('Copy deleted.')));
+    messenger.showSnackBar(appSnackBar(content: Text(l10n.copiesDeleted)));
   }
 
   @override
@@ -493,9 +490,10 @@ class _CopyCard extends StatelessWidget {
         final loans = snapshot.data ?? const <Loan>[];
         final active = loans.where((l) => l.returnedAt == null).firstOrNull;
         final past = loans.where((l) => l.returnedAt != null).toList();
+        final l10n = L10n.of(context);
         final status = active != null
-            ? 'On loan to ${active.borrower} since ${_date(active.loanedAt)}'
-            : 'On the shelf';
+            ? l10n.copiesOnLoan(active.borrower, _date(active.loanedAt))
+            : l10n.copiesOnShelf;
         return Card(
           margin: EdgeInsets.zero,
           clipBehavior: Clip.antiAlias,
@@ -543,7 +541,7 @@ class _CopyCard extends StatelessWidget {
                                   ],
                                 );
                               }
-                              return Text(copy.location ?? 'Somewhere…',
+                              return Text(copy.location ?? l10n.copiesSomewhere,
                                   style: theme.textTheme.titleSmall);
                             },
                           ),
@@ -554,7 +552,7 @@ class _CopyCard extends StatelessWidget {
                               // location once a placement supersedes it.
                               if (copy.location != null &&
                                   copy.location!.trim().isNotEmpty)
-                                'Note: ${copy.location}',
+                                l10n.copiesNote(copy.location!),
                               if (copy.notes != null) copy.notes!,
                               status,
                             ].join('\n'),
@@ -564,7 +562,7 @@ class _CopyCard extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Delete this copy',
+                      tooltip: l10n.copiesDeleteTooltip,
                       icon: const Icon(Icons.delete_outline, size: 20),
                       onPressed: () =>
                           _delete(context, hasActiveLoan: active != null),
@@ -576,7 +574,7 @@ class _CopyCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(left: 30, top: 2, bottom: 4),
                     child: Text(
-                      'Previously lent to ${past.map((l) => l.borrower).join(', ')}',
+                      l10n.copiesPreviouslyLent(past.map((l) => l.borrower).join(', ')),
                       style: theme.textTheme.bodySmall,
                     ),
                   ),
@@ -585,11 +583,11 @@ class _CopyCard extends StatelessWidget {
                   child: active != null
                       ? TextButton(
                           onPressed: () => _return(context, active),
-                          child: const Text('Return'),
+                          child: Text(l10n.copiesReturn),
                         )
                       : TextButton(
                           onPressed: () => _lend(context),
-                          child: const Text('Lend'),
+                          child: Text(l10n.copiesLend),
                         ),
                 ),
               ],
@@ -619,6 +617,7 @@ class PhysicalCopyTile extends StatelessWidget {
       '${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _lend(BuildContext context) async {
+    final l10n = L10n.of(context);
     final details = await promptBorrower(context);
     if (details == null) return;
     try {
@@ -643,7 +642,7 @@ class PhysicalCopyTile extends StatelessWidget {
     // borrower — that is what makes a shot from June mean anything in October.
     if (details.photograph && context.mounted) {
       await addCopyPhoto(context, repository, copy.id,
-          caption: 'Lent to ${details.borrower}');
+          caption: l10n.lendSheetPhotoCaption(details.borrower));
     }
   }
 
@@ -654,12 +653,13 @@ class PhysicalCopyTile extends StatelessWidget {
     await repository.returnLoan(active.id);
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     messenger.showSnackBar(appSnackBar(
-      content: Text('Returned by ${active.borrower}'),
+      content: Text(l10n.copiesReturnedBy(active.borrower)),
       action: SnackBarAction(
-        label: 'Photograph it',
+        label: l10n.copiesPhotographIt,
         onPressed: () => addCopyPhoto(context, repository, copy.id,
-            caption: 'Returned by ${active.borrower}'),
+            caption: l10n.copiesReturnedBy(active.borrower)),
       ),
     ));
   }
@@ -673,9 +673,10 @@ class PhysicalCopyTile extends StatelessWidget {
         final loans = snapshot.data ?? const <Loan>[];
         final active = loans.where((l) => l.returnedAt == null).firstOrNull;
         final past = loans.where((l) => l.returnedAt != null).toList();
+        final l10n = L10n.of(context);
         final status = active != null
-            ? 'On loan to ${active.borrower} since ${_date(active.loanedAt)}'
-            : 'On the shelf';
+            ? l10n.copiesOnLoan(active.borrower, _date(active.loanedAt))
+            : l10n.copiesOnShelf;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -703,7 +704,7 @@ class PhysicalCopyTile extends StatelessWidget {
                       ],
                     );
                   }
-                  return Text(copy.location ?? 'Somewhere…');
+                  return Text(copy.location ?? l10n.copiesSomewhere);
                 },
               ),
               subtitle: Text(
@@ -712,7 +713,7 @@ class PhysicalCopyTile extends StatelessWidget {
                   // a placement supersedes it.
                   if (copy.location != null &&
                       copy.location!.trim().isNotEmpty)
-                    'Note: ${copy.location}',
+                    l10n.copiesNote(copy.location!),
                   if (copy.notes != null) copy.notes!,
                   status,
                 ].join('\n'),
@@ -721,11 +722,11 @@ class PhysicalCopyTile extends StatelessWidget {
               trailing: active != null
                   ? TextButton(
                       onPressed: () => _return(context, active),
-                      child: const Text('Return'),
+                      child: Text(l10n.copiesReturn),
                     )
                   : TextButton(
                       onPressed: () => _lend(context),
-                      child: const Text('Lend'),
+                      child: Text(l10n.copiesLend),
                     ),
             ),
             CopyPhotoStrip(copyId: copy.id, repository: repository),
@@ -733,7 +734,7 @@ class PhysicalCopyTile extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 8, bottom: 8),
                 child: Text(
-                  'Previously lent to ${past.map((l) => l.borrower).join(', ')}',
+                  l10n.copiesPreviouslyLent(past.map((l) => l.borrower).join(', ')),
                   style: theme.textTheme.bodySmall,
                 ),
               ),

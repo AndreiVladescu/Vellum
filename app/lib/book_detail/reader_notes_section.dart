@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Personal reader notes for a book — stored locally, never synced to a server.
 class ReaderNotesSection extends StatefulWidget {
@@ -42,13 +43,14 @@ class ReaderNotesSectionState extends State<ReaderNotesSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Expanded(
-              child: Text('My notes', style: theme.textTheme.titleMedium),
+              child: Text(l10n.notesTitle, style: theme.textTheme.titleMedium),
             ),
             if (_dirty)
               TextButton(
@@ -59,12 +61,12 @@ class ReaderNotesSectionState extends State<ReaderNotesSection> {
                   );
                   if (mounted) setState(() => _dirty = false);
                 },
-                child: const Text('Save'),
+                child: Text(l10n.save),
               ),
           ],
         ),
         Text(
-          'Private to this device — never shared with a server.',
+          l10n.notesPrivate,
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
@@ -75,9 +77,9 @@ class ReaderNotesSectionState extends State<ReaderNotesSection> {
           onChanged: (_) {
             if (!_dirty) setState(() => _dirty = true);
           },
-          decoration: const InputDecoration(
-            hintText: 'Thoughts, quotes, where you left off…',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: l10n.notesHint,
+            border: const OutlineInputBorder(),
           ),
         ),
       ],

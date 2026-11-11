@@ -299,5 +299,1854 @@
       "count": { "type": "int" },
       "shelf": { "type": "String" }
     }
+  },
+
+  "syncFinished": "Sync finished.",
+  "@syncFinished": {
+    "description": "Text of the status-bar notification when the sync that ran at launch has ended."
+  },
+
+  "drawerSetUpProfile": "Set up your profile",
+  "@drawerSetUpProfile": {
+    "description": "Drawer header name when the user has not entered a profile yet."
+  },
+
+  "drawerLocalLibrary": "Local library",
+  "@drawerLocalLibrary": {
+    "description": "Drawer header line under the name when there is no profile email and no server account."
+  },
+
+  "drawerMyShelf": "My shelf",
+  "@drawerMyShelf": {
+    "description": "Drawer entry for the main library screen."
+  },
+
+  "drawerLoans": "Loans",
+  "@drawerLoans": {
+    "description": "Drawer entry for the lending screen."
+  },
+
+  "drawerWishlist": "Wishlist",
+  "@drawerWishlist": {
+    "description": "Drawer entry for the list of books the user wants but does not own."
+  },
+
+  "drawerSeries": "Series",
+  "@drawerSeries": {
+    "description": "Drawer entry for the screen listing book series."
+  },
+
+  "drawerFindDuplicates": "Find duplicates",
+  "@drawerFindDuplicates": {
+    "description": "Drawer entry for the duplicate-books screen."
+  },
+
+  "drawerInsights": "Reading insights",
+  "@drawerInsights": {
+    "description": "Drawer entry for the reading statistics screen."
+  },
+
+  "drawerLibraryServer": "Library server",
+  "@drawerLibraryServer": {
+    "description": "Drawer entry for the optional sync server screen."
+  },
+
+  "drawerConnectedAs": "Connected · {email}",
+  "@drawerConnectedAs": {
+    "description": "Drawer subtitle when signed in to a library server; email is the account.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+
+  "drawerNotConnected": "Not connected",
+  "@drawerNotConnected": {
+    "description": "Drawer subtitle when not signed in to a library server."
+  },
+
+  "drawerPreferences": "Preferences",
+  "@drawerPreferences": {
+    "description": "Drawer entry for the settings screen."
+  },
+
+  "drawerAccount": "Account",
+  "@drawerAccount": {
+    "description": "Drawer entry for the profile and account screen."
+  },
+
+  "drawerAbout": "About Vellum",
+  "@drawerAbout": {
+    "description": "Drawer entry that opens the About dialog."
+  },
+
+  "drawerAboutBlurb": "A personal library for your digital and physical books, shown the way books actually look: spine-out on a shelf.",
+  "@drawerAboutBlurb": {
+    "description": "One-sentence description of the app shown in the About dialog."
+  },
+
+  "shelfShare": "Share this shelf",
+  "@shelfShare": {
+    "description": "Bottom-sheet action on a personal shelf: make it visible to everyone the library is shared with."
+  },
+
+  "shelfShareSubtitle": "Everyone the library is shared with will see it",
+  "@shelfShareSubtitle": {
+    "description": "Explains what the \"Share this shelf\" action does."
+  },
+
+  "shelfMakePersonal": "Make personal",
+  "@shelfMakePersonal": {
+    "description": "Bottom-sheet action on a shared shelf: hide it from other people."
+  },
+
+  "shelfMakePersonalSubtitle": "Only you — it still syncs to your own devices",
+  "@shelfMakePersonalSubtitle": {
+    "description": "Explains what the \"Make personal\" action does."
+  },
+
+  "statusUnread": "Unread",
+  "@statusUnread": {
+    "description": "Reading status of a book (a short label in a menu, chip or list)."
+  },
+
+  "statusUnreadDescription": "Not started",
+  "@statusUnreadDescription": {
+    "description": "Explains the \"Unread\" reading status in the status picker."
+  },
+
+  "statusReading": "Reading",
+  "@statusReading": {
+    "description": "Reading status of a book (a short label in a menu, chip or list)."
+  },
+
+  "statusReadingDescription": "In progress",
+  "@statusReadingDescription": {
+    "description": "Explains the \"Reading\" reading status in the status picker."
+  },
+
+  "statusFinished": "Finished",
+  "@statusFinished": {
+    "description": "Reading status of a book (a short label in a menu, chip or list)."
+  },
+
+  "statusFinishedDescription": "Read to the end",
+  "@statusFinishedDescription": {
+    "description": "Explains the \"Finished\" reading status in the status picker."
+  },
+
+  "statusAbandoned": "Abandoned",
+  "@statusAbandoned": {
+    "description": "Reading status of a book (a short label in a menu, chip or list)."
+  },
+
+  "statusAbandonedDescription": "Started, then put down",
+  "@statusAbandonedDescription": {
+    "description": "Explains the \"Abandoned\" reading status in the status picker."
+  },
+
+  "statusReference": "Reference",
+  "@statusReference": {
+    "description": "Reading status of a book (a short label in a menu, chip or list)."
+  },
+
+  "statusReferenceDescription": "Dipped into, never \"finished\"",
+  "@statusReferenceDescription": {
+    "description": "Explains the \"Reference\" reading status in the status picker."
+  },
+
+  "statusWishlist": "Wishlist",
+  "@statusWishlist": {
+    "description": "Status label for a book the user wants but does not own."
+  },
+
+  "statusWishlistDescription": "Wanted, not owned yet",
+  "@statusWishlistDescription": {
+    "description": "Explains the \"Wishlist\" reading status in the status picker."
+  },
+
+  "sortTitle": "Title",
+  "@sortTitle": {
+    "description": "Name of a shelf sort order; it is used in the lowercased phrase \"Sort by title\" (see sortBy)."
+  },
+
+  "sortAuthor": "Author",
+  "@sortAuthor": {
+    "description": "Name of a shelf sort order; it is used in the lowercased phrase \"Sort by title\" (see sortBy)."
+  },
+
+  "sortYear": "Year",
+  "@sortYear": {
+    "description": "Name of a shelf sort order; it is used in the lowercased phrase \"Sort by title\" (see sortBy)."
+  },
+
+  "sortSeries": "Series",
+  "@sortSeries": {
+    "description": "Name of a shelf sort order; it is used in the lowercased phrase \"Sort by title\" (see sortBy)."
+  },
+
+  "authorEmpty": "No books by this author.",
+  "@authorEmpty": {
+    "description": "Empty state on an author page."
+  },
+
+  "authorOnShelf": "{count, plural, other{{count} on your shelf}}",
+  "@authorOnShelf": {
+    "description": "First part of the summary line on an author page: how many of the author's books are owned. Joined with authorOnWishlist by \" · \".",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "authorOnWishlist": "{count, plural, other{{count} on the wishlist}}",
+  "@authorOnWishlist": {
+    "description": "Second part of the summary line on an author page: how many are only wished for.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "authorOnYourWishlist": "On your wishlist",
+  "@authorOnYourWishlist": {
+    "description": "Subtitle on a book row that is on the wishlist rather than owned."
+  },
+
+  "seriesPageTitle": "Series",
+  "@seriesPageTitle": {
+    "description": "Title of the screen listing every series."
+  },
+
+  "seriesVolumeWished": "{series} vol. {volume} added to your wishlist",
+  "@seriesVolumeWished": {
+    "description": "Snack bar after tapping a missing volume number.",
+    "placeholders": {
+      "series": {
+        "type": "String"
+      },
+      "volume": {
+        "type": "int"
+      }
+    }
+  },
+
+  "seriesUnnumbered": "{count, plural, =1{1 book, unnumbered} other{{count} books, unnumbered}}",
+  "@seriesUnnumbered": {
+    "description": "Series row subtitle when the owned books have no volume numbers.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "seriesYouHave": "You have {volumes}",
+  "@seriesYouHave": {
+    "description": "Series row subtitle listing owned volume numbers, e.g. \"You have 1, 2, 4\".",
+    "placeholders": {
+      "volumes": {
+        "type": "String"
+      }
+    }
+  },
+
+  "seriesMissing": "Missing",
+  "@seriesMissing": {
+    "description": "Label before the chips for missing volume numbers."
+  },
+
+  "seriesVolumeWanted": "{volume} · wanted",
+  "@seriesVolumeWanted": {
+    "description": "Chip for a missing volume that is already on the wishlist.",
+    "placeholders": {
+      "volume": {
+        "type": "int"
+      }
+    }
+  },
+
+  "seriesEmptyTitle": "No series yet",
+  "@seriesEmptyTitle": {
+    "description": "Empty state title on the series screen."
+  },
+
+  "seriesEmptyBody": "Set a series and volume number on a book’s page, and the ones you are missing show up here.",
+  "@seriesEmptyBody": {
+    "description": "Empty state body on the series screen."
+  },
+
+  "paletteHint": "Type a command, or a book title…",
+  "@paletteHint": {
+    "description": "Placeholder in the command palette search field."
+  },
+
+  "paletteNothingMatches": "Nothing matches “{query}”.",
+  "@paletteNothingMatches": {
+    "description": "Empty result in the command palette.",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+
+  "contentSearchNotConnected": "Not connected to a server.",
+  "@contentSearchNotConnected": {
+    "description": "Shown in the search-inside-books results when the search needs a server and there is none."
+  },
+
+  "contentSearchServerCannot": "This server can't search inside books.",
+  "@contentSearchServerCannot": {
+    "description": "Shown when the connected server is too old to search book contents."
+  },
+
+  "contentSearchUnreachable": "Couldn't reach the server.",
+  "@contentSearchUnreachable": {
+    "description": "Shown when searching book contents on the server failed to connect."
+  },
+
+  "contentSearchBookNotHere": "That book isn’t on this device yet — sync, then try again.",
+  "@contentSearchBookNotHere": {
+    "description": "Snack bar when a search hit is for a book this device has not synced yet."
+  },
+
+  "contentSearchNoLocalPdf": "No local PDF for “{title}” to open at page {page}.",
+  "@contentSearchNoLocalPdf": {
+    "description": "Snack bar when a search hit cannot be opened because the book has no PDF on this device.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+
+  "contentSearchMinLength": "Type at least two letters to search inside your books.",
+  "@contentSearchMinLength": {
+    "description": "Prompt shown in the contents search before enough letters are typed."
+  },
+
+  "contentSearchNoServerMatch": "No book on the server contains “{query}”.",
+  "@contentSearchNoServerMatch": {
+    "description": "Empty result for a server-side search inside books.",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+
+  "contentSearchNoLocalMatch": "No indexed book contains “{query}”.",
+  "@contentSearchNoLocalMatch": {
+    "description": "Empty result for a search inside books using the on-device index.",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+
+  "contentSearchPage": "p. {page}",
+  "@contentSearchPage": {
+    "description": "Short page marker on a search hit, e.g. \"p. 12\".",
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+
+  "headerHideForNow": "Hide for now",
+  "@headerHideForNow": {
+    "description": "Tooltip on the button that dismisses the Continue reading strip until the next launch."
+  },
+
+  "headerContinueReading": "Continue reading",
+  "@headerContinueReading": {
+    "description": "Heading of the strip of books the user is partway through."
+  },
+
+  "headerRecentlyAdded": "Recently added",
+  "@headerRecentlyAdded": {
+    "description": "Heading of the strip of newest books."
+  },
+
+  "headerProgressPage": "{percent}% · page {page}",
+  "@headerProgressPage": {
+    "description": "Progress line on a Continue reading card: percent read and the page reached.",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+
+  "newShelfShared": "Shared",
+  "@newShelfShared": {
+    "description": "Radio option in the New shelf dialog: the shelf is visible to everyone the library is shared with."
+  },
+
+  "newShelfSharedSubtitle": "Everyone the library is shared with sees this shelf.",
+  "@newShelfSharedSubtitle": {
+    "description": "Explains the Shared option in the New shelf dialog."
+  },
+
+  "newShelfPersonal": "Personal",
+  "@newShelfPersonal": {
+    "description": "Radio option in the New shelf dialog: the shelf is only for the user."
+  },
+
+  "newShelfPersonalSubtitle": "Only you. It still syncs to your own devices.",
+  "@newShelfPersonalSubtitle": {
+    "description": "Explains the Personal option in the New shelf dialog."
+  },
+
+  "shelfTargetTitle": "{count, plural, =1{Put 1 book on a shelf} other{Put {count} books on a shelf}}",
+  "@shelfTargetTitle": {
+    "description": "Title of the sheet for choosing a shelf for the selected books.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "shelfTargetMoveHint": "Move takes them off the shelf you are viewing; Add leaves them on both.",
+  "@shelfTargetMoveHint": {
+    "description": "Explains the two buttons on the shelf chooser sheet."
+  },
+
+  "shelfTargetViewingAll": "You are viewing the whole library, so there is no shelf to move them off.",
+  "@shelfTargetViewingAll": {
+    "description": "Shown instead of the move hint when no shelf is open."
+  },
+
+  "shelfTargetAddHere": "Add here",
+  "@shelfTargetAddHere": {
+    "description": "Button: put the selected books on this shelf as well, keeping them where they are."
+  },
+
+  "shelfTargetMoveHere": "Move here",
+  "@shelfTargetMoveHere": {
+    "description": "Button: put the selected books on this shelf and take them off the current one."
+  },
+
+  "shelfBookFinishedLabel": "{book}, finished",
+  "@shelfBookFinishedLabel": {
+    "description": "Screen-reader label of a finished book on the shelf; book is its title (and subtitle).",
+    "placeholders": {
+      "book": {
+        "type": "String"
+      }
+    }
+  },
+
+  "firstRunWelcome": "Welcome to Vellum",
+  "@firstRunWelcome": {
+    "description": "Heading of the introduction sheet shown on first launch."
+  },
+
+  "firstRunStep": "Step {current} of {total}",
+  "@firstRunStep": {
+    "description": "Progress line of the first-launch introduction.",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+
+  "firstRunBooksTitle": "Get your books in",
+  "@firstRunBooksTitle": {
+    "description": "Title of the first introduction card."
+  },
+
+  "firstRunBooksDetail": "Point Vellum at a folder of PDFs or EPUBs, scan a barcode off a physical book, or add one at a time. Or look around first with a few sample books.",
+  "@firstRunBooksDetail": {
+    "description": "Body of the first introduction card."
+  },
+
+  "firstRunScan": "Scan a barcode",
+  "@firstRunScan": {
+    "description": "Button on the first introduction card."
+  },
+
+  "firstRunAddOne": "Add one book",
+  "@firstRunAddOne": {
+    "description": "Button on the first introduction card."
+  },
+
+  "firstRunServerTitle": "Connect a server?",
+  "@firstRunServerTitle": {
+    "description": "Title of the second introduction card."
+  },
+
+  "firstRunServerDetail": "Optional. Vellum works fully offline — a server just shares one library across your devices. You can skip this forever.",
+  "@firstRunServerDetail": {
+    "description": "Body of the second introduction card."
+  },
+
+  "firstRunSetUpServer": "Set up a server",
+  "@firstRunSetUpServer": {
+    "description": "Button on the second introduction card."
+  },
+
+  "firstRunRoomTitle": "Set up a room?",
+  "@firstRunRoomTitle": {
+    "description": "Title of the third introduction card."
+  },
+
+  "firstRunRoomDetail": "Vellum can draw your real shelves and remember where each physical book sits, and who borrowed it.",
+  "@firstRunRoomDetail": {
+    "description": "Body of the third introduction card."
+  },
+
+  "firstRunCreateRoom": "Create a room",
+  "@firstRunCreateRoom": {
+    "description": "Button on the third introduction card."
+  },
+
+  "firstRunSkip": "Skip",
+  "@firstRunSkip": {
+    "description": "Button that dismisses the first-launch introduction."
+  },
+
+  "firstRunDone": "Done",
+  "@firstRunDone": {
+    "description": "Button on the last introduction card."
+  },
+
+  "firstRunNext": "Next",
+  "@firstRunNext": {
+    "description": "Button that goes to the next introduction card."
+  },
+
+  "addBookOnlyPdfEpub": "Only PDF or EPUB files can be attached.",
+  "@addBookOnlyPdfEpub": {
+    "description": "Error under the Add book form when a dropped or picked file is not a PDF/EPUB."
+  },
+
+  "addBookSearchFailed": "Search failed — are you online?\n{error}",
+  "@addBookSearchFailed": {
+    "description": "Error under the Add book form when the online lookup threw; error is the technical reason.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "addBookCouldNotAdd": "Could not add “{title}”: {error}",
+  "@addBookCouldNotAdd": {
+    "description": "Error when adding a search result failed.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "addBookEnterTitle": "Enter a title to create a book.",
+  "@addBookEnterTitle": {
+    "description": "Error when Create book is pressed with an empty title."
+  },
+
+  "addBookCouldNotCreate": "Could not create “{title}”: {error}",
+  "@addBookCouldNotCreate": {
+    "description": "Error when creating a book by hand failed.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "addBookAttachTouch": "Attach a file (optional): tap to choose a PDF/EPUB",
+  "@addBookAttachTouch": {
+    "description": "File drop pane text on phones and tablets."
+  },
+
+  "addBookAttachDesktop": "Attach a file (optional): drop a PDF/EPUB here or click",
+  "@addBookAttachDesktop": {
+    "description": "File drop pane text on desktop."
+  },
+
+  "addBookAttached": "Attached: {name}",
+  "@addBookAttached": {
+    "description": "File drop pane text once a file is chosen; name is the file name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "addBookNoResults": "No results for “{query}”.\nUse “Create book” above to add it yourself.",
+  "@addBookNoResults": {
+    "description": "Empty result of the online book search. “Create book” is the label of the createBook button.",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+
+  "scanNotABook": "That barcode isn’t a book ({code})",
+  "@scanNotABook": {
+    "description": "Quiet message in the scanner when a barcode is not an ISBN; code is the scanned text.",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+
+  "scanNoOnlineMatch": "No online match for {isbn} — add it by hand?",
+  "@scanNoOnlineMatch": {
+    "description": "Scanner message when the ISBN lookup found nothing; isbn is the formatted ISBN-13.",
+    "placeholders": {
+      "isbn": {
+        "type": "String"
+      }
+    }
+  },
+
+  "scanLookupFailed": "Lookup failed: {error}",
+  "@scanLookupFailed": {
+    "description": "Scanner message when the ISBN lookup threw; error is the technical reason.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "scanNotAnIsbn": "That doesn’t look like an ISBN",
+  "@scanNotAnIsbn": {
+    "description": "Scanner message when the typed ISBN is invalid."
+  },
+
+  "scanTitle": "Scan books",
+  "@scanTitle": {
+    "description": "Title of the barcode-scanning screen."
+  },
+
+  "scanAddedCount": "{count, plural, other{{count} added}}",
+  "@scanAddedCount": {
+    "description": "App bar counter of books added during this scanning session.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "scanNoCameraOnDevice": "No camera on this device.",
+  "@scanNoCameraOnDevice": {
+    "description": "Detail line shown in place of the camera preview when the device has no camera."
+  },
+
+  "scanIOwnIt": "I own it",
+  "@scanIOwnIt": {
+    "description": "Segment in the scanner: scanned books go into the library."
+  },
+
+  "scanIWantIt": "I want it",
+  "@scanIWantIt": {
+    "description": "Segment in the scanner: scanned books go onto the wishlist."
+  },
+
+  "scanIsbnLabel": "ISBN",
+  "@scanIsbnLabel": {
+    "description": "Label of the manual ISBN field in the scanner. ISBN is the International Standard Book Number."
+  },
+
+  "scanIsbnHelperCamera": "Or type it, if the barcode won’t scan",
+  "@scanIsbnHelperCamera": {
+    "description": "Helper text under the ISBN field when a camera is available."
+  },
+
+  "scanIsbnHelperNoCamera": "Type or paste an ISBN-10 or ISBN-13",
+  "@scanIsbnHelperNoCamera": {
+    "description": "Helper text under the ISBN field when there is no camera."
+  },
+
+  "scanAdd": "Add",
+  "@scanAdd": {
+    "description": "Button next to the manual ISBN field."
+  },
+
+  "scanEmptyHint": "Point the camera at a book’s barcode, or type an ISBN. Books you add appear here.",
+  "@scanEmptyHint": {
+    "description": "Shown in the scanner panel before any book has been added."
+  },
+
+  "scanPossibleDuplicate": "Possible duplicate of “{title}”",
+  "@scanPossibleDuplicate": {
+    "description": "Subtitle of a just-scanned book that looks like one already in the library.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+
+  "scanWishlistLine": "{isbn} · wishlist",
+  "@scanWishlistLine": {
+    "description": "Subtitle of a just-scanned book that went onto the wishlist; isbn is formatted.",
+    "placeholders": {
+      "isbn": {
+        "type": "String"
+      }
+    }
+  },
+
+  "scanNoCameraTitle": "No camera scanning here",
+  "@scanNoCameraTitle": {
+    "description": "Title shown in place of the camera preview when scanning is unavailable."
+  },
+
+  "scanCameraFallback": "{detail}\nYou can still type ISBNs below.",
+  "@scanCameraFallback": {
+    "description": "Explanation under the no-camera title; detail says why the camera is unavailable.",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+
+  "create": "Create",
+  "@create": {
+    "description": "Generic button that confirms creating the thing in a dialog."
+  },
+
+  "detailCoverUpdated": "Cover updated",
+  "@detailCoverUpdated": {
+    "description": "Snack bar after an image was dropped on the book page."
+  },
+
+  "detailOnlyPdfEpubImage": "Only PDF, EPUB, or image files are accepted",
+  "@detailOnlyPdfEpubImage": {
+    "description": "Snack bar when something else was dropped on the book page."
+  },
+
+  "detailAttachedFiles": "{count, plural, =1{Attached 1 file} other{Attached {count} files}}",
+  "@detailAttachedFiles": {
+    "description": "Snack bar after PDFs/EPUBs were dropped on the book page.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "detailImagesTypeGroup": "Images",
+  "@detailImagesTypeGroup": {
+    "description": "Name of the image file filter in the system file dialog when choosing a cover."
+  },
+
+  "detailNotAnImage": "That doesn't look like an image.",
+  "@detailNotAnImage": {
+    "description": "Snack bar when the chosen cover file is not an image."
+  },
+
+  "detailCoverFromFirstPage": "Cover set from the first page",
+  "@detailCoverFromFirstPage": {
+    "description": "Snack bar after making the cover from a PDF first page."
+  },
+
+  "detailCoverNeedsPdf": "Attach a PDF first to use its first page",
+  "@detailCoverNeedsPdf": {
+    "description": "Snack bar when there is no PDF to take a cover from."
+  },
+
+  "detailSyncOffSnack": "Kept on this device. Anything already on the server stays there.",
+  "@detailSyncOffSnack": {
+    "description": "Snack bar after turning sync off for one book."
+  },
+
+  "detailSyncOnSnack": "Syncing again with the next sync.",
+  "@detailSyncOnSnack": {
+    "description": "Snack bar after turning sync back on for one book."
+  },
+
+  "detailLookingUp": "Looking it up…",
+  "@detailLookingUp": {
+    "description": "Snack bar while the online catalogues are searched for this book."
+  },
+
+  "detailEnrichFilled": "Filled in what was missing",
+  "@detailEnrichFilled": {
+    "description": "Snack bar: the catalogue lookup added missing details."
+  },
+
+  "detailEnrichComplete": "Nothing to add — it already knows",
+  "@detailEnrichComplete": {
+    "description": "Snack bar: the catalogue lookup had nothing new to add."
+  },
+
+  "detailEnrichNotFound": "No catalogue has this one. An ISBN would help.",
+  "@detailEnrichNotFound": {
+    "description": "Snack bar: no online catalogue knew the book."
+  },
+
+  "detailLookupFailed": "Lookup failed: {error}",
+  "@detailLookupFailed": {
+    "description": "Snack bar when the online lookup threw; error is the technical reason.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "detailAddToShelf": "Add to shelf",
+  "@detailAddToShelf": {
+    "description": "Tooltip of the button, and heading of the sheet, for putting this book on a custom shelf."
+  },
+
+  "detailNoShelvesYet": "No shelves yet — create one below.",
+  "@detailNoShelvesYet": {
+    "description": "Shown in the add-to-shelf sheet when no custom shelf exists."
+  },
+
+  "detailNewShelfItem": "New shelf…",
+  "@detailNewShelfItem": {
+    "description": "Row in the add-to-shelf sheet that opens a dialog to create a shelf."
+  },
+
+  "detailRevertTitle": "Revert to library defaults?",
+  "@detailRevertTitle": {
+    "description": "Title of the confirmation dialog for reverting edited details."
+  },
+
+  "detailRevertBody": "This restores the title, description, year, and cover to the values from the online library. Your reader notes and attached files are kept.",
+  "@detailRevertBody": {
+    "description": "Body of the revert confirmation dialog."
+  },
+
+  "detailRevertConfirm": "Revert",
+  "@detailRevertConfirm": {
+    "description": "Confirm button of the revert dialog."
+  },
+
+  "detailReverted": "Reverted to library defaults",
+  "@detailReverted": {
+    "description": "Snack bar after reverting."
+  },
+
+  "detailRevertButton": "Revert to library defaults",
+  "@detailRevertButton": {
+    "description": "Button on the book page that restores the online metadata."
+  },
+
+  "detailFindMyCopy": "Find my copy",
+  "@detailFindMyCopy": {
+    "description": "Tooltip: locate the physical copy in the room view."
+  },
+
+  "detailLendOrReturn": "Lend or return",
+  "@detailLendOrReturn": {
+    "description": "Tooltip: open the lend/return sheet."
+  },
+
+  "detailSyncOffTooltip": "Not syncing — this device only",
+  "@detailSyncOffTooltip": {
+    "description": "Tooltip of the sync toggle when the book is excluded from sync."
+  },
+
+  "detailSyncOnTooltip": "Syncing with the server",
+  "@detailSyncOnTooltip": {
+    "description": "Tooltip of the sync toggle when the book syncs."
+  },
+
+  "detailEditDetails": "Edit details",
+  "@detailEditDetails": {
+    "description": "Tooltip: open the edit sheet."
+  },
+
+  "detailMore": "More",
+  "@detailMore": {
+    "description": "Tooltip of the overflow menu in the book page app bar."
+  },
+
+  "detailAskToBorrow": "Ask to borrow",
+  "@detailAskToBorrow": {
+    "description": "Menu item: ask the owner of a shared book to lend it."
+  },
+
+  "detailAskToEdit": "Ask to edit",
+  "@detailAskToEdit": {
+    "description": "Menu item: ask the owner of a shared book for edit access."
+  },
+
+  "detailSendToDevice": "Send to a device",
+  "@detailSendToDevice": {
+    "description": "Menu item: email the book file to an e-reader."
+  },
+
+  "detailPages": "{count, plural, =1{1 page} other{{count} pages}}",
+  "@detailPages": {
+    "description": "Page count in the book page byline.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "detailIsbn": "ISBN {isbn}",
+  "@detailIsbn": {
+    "description": "ISBN line on the book page.",
+    "placeholders": {
+      "isbn": {
+        "type": "String"
+      }
+    }
+  },
+
+  "detailAddedBy": "Added by {name}",
+  "@detailAddedBy": {
+    "description": "Who added the book to a shared library.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "detailAbout": "About",
+  "@detailAbout": {
+    "description": "Heading above the book description."
+  },
+
+  "detailTrashTitle": "Move “{title}” to the trash?",
+  "@detailTrashTitle": {
+    "description": "Title of the dialog confirming trashing a book.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+
+  "detailTrashBody": "It leaves your shelf now and is deleted for good after {days, plural, =1{1 day} other{{days} days}}. Until then you can restore it from Preferences → Trash — its cover and files are kept.",
+  "@detailTrashBody": {
+    "description": "Body of the trash confirmation; days is the grace period.",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+
+  "detailMovedToTrash": "“{title}” moved to the trash",
+  "@detailMovedToTrash": {
+    "description": "Snack bar after trashing a book, with an Undo action.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+
+  "detailReadingStatus": "Reading status",
+  "@detailReadingStatus": {
+    "description": "Tooltip of the reading status chip."
+  },
+
+  "detailRatingStars": "{count, plural, =1{1 star} other{{count} stars}}",
+  "@detailRatingStars": {
+    "description": "Tooltip of a star in the 1-5 rating row.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "detailFinishedOn": "Finished {date}",
+  "@detailFinishedOn": {
+    "description": "Line under the status: the date the book was finished.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+
+  "detailFinishedOnTimes": "Finished {date} · read {count, plural, other{{count} times}}",
+  "@detailFinishedOnTimes": {
+    "description": "Same line when the book has been read more than once.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "detailMarkFinished": "Mark as finished",
+  "@detailMarkFinished": {
+    "description": "Button offered when the reader reached the end."
+  },
+
+  "detailWishlistNote": "On your wishlist — you don’t own this yet.",
+  "@detailWishlistNote": {
+    "description": "Note on the book page of a wishlist book."
+  },
+
+  "detailIOwnThisNow": "I own this now",
+  "@detailIOwnThisNow": {
+    "description": "Button that moves a wishlist book into the library."
+  },
+
+  "seriesEditTitle": "Series",
+  "@seriesEditTitle": {
+    "description": "Title of the dialog for setting a book’s series."
+  },
+
+  "seriesNameLabel": "Series name",
+  "@seriesNameLabel": {
+    "description": "Field label in the series dialog."
+  },
+
+  "seriesNameHelper": "Leave blank for no series",
+  "@seriesNameHelper": {
+    "description": "Helper text under the series name field."
+  },
+
+  "seriesVolumeLabel": "Volume",
+  "@seriesVolumeLabel": {
+    "description": "Field label for the volume number in the series dialog."
+  },
+
+  "seriesVolumeHelper": "Decimals are fine — a novella can be 1.5",
+  "@seriesVolumeHelper": {
+    "description": "Helper text under the volume field."
+  },
+
+  "seriesSet": "Set series…",
+  "@seriesSet": {
+    "description": "Button on the book page when it has no series."
+  },
+
+  "seriesPosition": "{series} · book {index} of {owned} you own",
+  "@seriesPosition": {
+    "description": "Where a book sits in its series; index is the volume number as written.",
+    "placeholders": {
+      "series": {
+        "type": "String"
+      },
+      "index": {
+        "type": "String"
+      },
+      "owned": {
+        "type": "int"
+      }
+    }
+  },
+
+  "seriesEditTooltip": "Edit series",
+  "@seriesEditTooltip": {
+    "description": "Tooltip of the edit button next to the series line."
+  },
+
+  "seriesMissingVolumes": "Missing: {volumes}",
+  "@seriesMissingVolumes": {
+    "description": "Missing volume numbers of the series.",
+    "placeholders": {
+      "volumes": {
+        "type": "String"
+      }
+    }
+  },
+
+  "seriesWantVolume": "Want {volume}",
+  "@seriesWantVolume": {
+    "description": "Chip that wishlists a missing volume.",
+    "placeholders": {
+      "volume": {
+        "type": "int"
+      }
+    }
+  },
+
+  "editNoPdfPages": "No PDF attached, or its pages couldn’t be read.",
+  "@editNoPdfPages": {
+    "description": "Snack bar when \"Get page count from file\" cannot work."
+  },
+
+  "editTitle": "Edit details",
+  "@editTitle": {
+    "description": "Heading of the edit-book sheet."
+  },
+
+  "editFieldTitle": "Title",
+  "@editFieldTitle": {
+    "description": "Field label: the book title."
+  },
+
+  "editFieldAuthors": "Author(s)",
+  "@editFieldAuthors": {
+    "description": "Field label: one or more authors."
+  },
+
+  "editFieldAuthorsHelper": "Separate multiple authors with commas",
+  "@editFieldAuthorsHelper": {
+    "description": "Helper under the authors field."
+  },
+
+  "editFieldSubtitle": "Subtitle",
+  "@editFieldSubtitle": {
+    "description": "Field label: the book subtitle."
+  },
+
+  "editFieldYear": "Published year",
+  "@editFieldYear": {
+    "description": "Field label: year of publication."
+  },
+
+  "editFieldPages": "Pages",
+  "@editFieldPages": {
+    "description": "Field label: number of pages."
+  },
+
+  "editGetPageCount": "Get page count from file",
+  "@editGetPageCount": {
+    "description": "Button that reads the page count from the attached PDF."
+  },
+
+  "editFieldDescription": "Description",
+  "@editFieldDescription": {
+    "description": "Field label: the book description."
+  },
+
+  "editChangeCover": "Change cover…",
+  "@editChangeCover": {
+    "description": "Button: pick an image file as the cover."
+  },
+
+  "editCoverFromPdf": "Use first page of the PDF as cover",
+  "@editCoverFromPdf": {
+    "description": "Button: make the cover from the PDF first page."
+  },
+
+  "editFindOnline": "Find cover and details online",
+  "@editFindOnline": {
+    "description": "Button: look the book up in online catalogues."
+  },
+
+  "editDragTip": "Tip: you can also drag an image, PDF, or EPUB onto the book page.",
+  "@editDragTip": {
+    "description": "Hint at the bottom of the edit sheet."
+  },
+
+  "formatsTitle": "Digital formats",
+  "@formatsTitle": {
+    "description": "Heading of the list of attached PDF/EPUB files."
+  },
+
+  "formatsAttached": "Attached {name}",
+  "@formatsAttached": {
+    "description": "Snack bar after attaching a file; name is the file name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "formatsAttachFile": "Attach file",
+  "@formatsAttachFile": {
+    "description": "Button that attaches a PDF or EPUB."
+  },
+
+  "formatsEmpty": "No files yet — attach a PDF or EPUB.",
+  "@formatsEmpty": {
+    "description": "Shown when the book has no files."
+  },
+
+  "genresAdd": "Add",
+  "@genresAdd": {
+    "description": "Chip that opens the sheet for adding a genre to a book."
+  },
+
+  "genresAddTitle": "Add genre",
+  "@genresAddTitle": {
+    "description": "Heading of the add-genre sheet."
+  },
+
+  "genresAddHint": "e.g. Engineering",
+  "@genresAddHint": {
+    "description": "Placeholder in the add-genre field; an example genre."
+  },
+
+  "genresDone": "Done",
+  "@genresDone": {
+    "description": "Button that closes the add-genre sheet."
+  },
+
+  "lendSheetPhotoCaption": "Lent to {borrower}",
+  "@lendSheetPhotoCaption": {
+    "description": "Default caption of the photo taken when lending a copy.",
+    "placeholders": {
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+
+  "lendSheetTitle": "Lend “{title}”",
+  "@lendSheetTitle": {
+    "description": "Heading of the lend sheet.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+
+  "lendSheetLendCopy": "Lend a copy",
+  "@lendSheetLendCopy": {
+    "description": "Row shown when the book has no physical copy yet."
+  },
+
+  "lendSheetNoCopy": "No physical copy on record yet — this adds one, then lends it out.",
+  "@lendSheetNoCopy": {
+    "description": "Explains the Lend a copy row."
+  },
+
+  "notesTitle": "My notes",
+  "@notesTitle": {
+    "description": "Heading of the personal notes box on the book page."
+  },
+
+  "notesPrivate": "Private to this device — never shared with a server.",
+  "@notesPrivate": {
+    "description": "Reassurance under the My notes heading."
+  },
+
+  "notesHint": "Thoughts, quotes, where you left off…",
+  "@notesHint": {
+    "description": "Placeholder in the notes box."
+  },
+
+  "readResumeTitle": "Resume where you left off?",
+  "@readResumeTitle": {
+    "description": "Title of the dialog offering to jump to a position read on another device."
+  },
+
+  "readResumeBodyNever": "You were on {unit, select, chapter{chapter} other{page}} {page} on {device} ({percent}%).\n\nYou haven't opened it on this device.",
+  "@readResumeBodyNever": {
+    "description": "Body of the cross-device resume dialog when this device never opened the book; unit is page or chapter, device is the other device name.",
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      },
+      "page": {
+        "type": "int"
+      },
+      "device": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+
+  "readResumeBodyAt": "You were on {unit, select, chapter{chapter} other{page}} {page} on {device} ({percent}%).\n\nThis device is at {unit, select, chapter{chapter} other{page}} {here} ({herePercent}%).",
+  "@readResumeBodyAt": {
+    "description": "Body of the cross-device resume dialog when this device is also partway through; here is this device position.",
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      },
+      "page": {
+        "type": "int"
+      },
+      "device": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      },
+      "here": {
+        "type": "int"
+      },
+      "herePercent": {
+        "type": "int"
+      }
+    }
+  },
+
+  "readStartHere": "Start here",
+  "@readStartHere": {
+    "description": "Dialog button: keep reading from the start on this device."
+  },
+
+  "readStayAt": "{unit, select, chapter{Stay at chapter {number}} other{Stay at page {number}}}",
+  "@readStayAt": {
+    "description": "Dialog button: stay at this device current position.",
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+
+  "readGoTo": "{unit, select, chapter{Go to chapter {number}} other{Go to page {number}}}",
+  "@readGoTo": {
+    "description": "Dialog button: jump to another position.",
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+
+  "readOfferTitle": "Start where you left off?",
+  "@readOfferTitle": {
+    "description": "Title of the dialog offering to start a second file where the first one ended."
+  },
+
+  "readOfferBody": "You were {percent}% through {source, select, another{another file} other{the {format}}} of this book.\n\nThat is about page {page} here — the same fraction of a different file, so it may not be the same passage.",
+  "@readOfferBody": {
+    "description": "Body of that dialog; source is \"another\" when the other file is unknown, otherwise format is its type, e.g. PDF.",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "source": {
+        "type": "String"
+      },
+      "format": {
+        "type": "String"
+      },
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+
+  "readStartAtBeginning": "Start at the beginning",
+  "@readStartAtBeginning": {
+    "description": "Dialog button: ignore the offer."
+  },
+
+  "readRead": "Read",
+  "@readRead": {
+    "description": "Main button on the book page when the book has not been started."
+  },
+
+  "readResumeLabel": "Resume reading · {percent}% ({unit, select, chapter{chapter} other{page}} {number})",
+  "@readResumeLabel": {
+    "description": "Main button when the book is in progress.",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+
+  "readNoDigitalCopy": "Read (no digital copy yet)",
+  "@readNoDigitalCopy": {
+    "description": "Disabled main button when the book has no file."
+  },
+
+  "readFileNotStarted": "{format} · not started",
+  "@readFileNotStarted": {
+    "description": "Menu row for a file that has not been opened; format is PDF or EPUB.",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+
+  "readFilePosition": "{format} · {unit, select, chapter{chapter} other{page}} {number} ({percent}%)",
+  "@readFilePosition": {
+    "description": "Menu row for a file with a saved place.",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      },
+      "unit": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+
+  "readFileMissing": "That file is missing from the library.",
+  "@readFileMissing": {
+    "description": "Snack bar when the book file cannot be found on disk."
+  },
+
+  "readNoAppForFormat": "Nothing on this system is set up to open a {format}.",
+  "@readNoAppForFormat": {
+    "description": "Snack bar when the system has no app for the file type; format is lowercase, e.g. pdf.",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+
+  "readOpenWhichFile": "Open which file?",
+  "@readOpenWhichFile": {
+    "description": "Title of the dialog choosing between PDF and EPUB."
+  },
+
+  "readOpenElsewhere": "Open in another app",
+  "@readOpenElsewhere": {
+    "description": "Tooltip of the button that hands the file to the system."
+  },
+
+  "delete": "Delete",
+  "@delete": {
+    "description": "Generic destructive button or tooltip that deletes the thing it sits on."
+  },
+
+  "copyPhotosNoPhoto": "Couldn't get a photo: {error}",
+  "@copyPhotosNoPhoto": {
+    "description": "Snack bar when the camera or gallery failed; error is the technical reason.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "copyPhotosTake": "Take a photo",
+  "@copyPhotosTake": {
+    "description": "Sheet row: take a new photo with the camera."
+  },
+
+  "copyPhotosChoose": "Choose an existing one",
+  "@copyPhotosChoose": {
+    "description": "Sheet row: pick a photo from the gallery."
+  },
+
+  "copyPhotosTravel": "Photos travel with the copy — anyone you share this book with can see them.",
+  "@copyPhotosTravel": {
+    "description": "Privacy note in the add-photo sheet."
+  },
+
+  "copyPhotosTitle": "Condition photos",
+  "@copyPhotosTitle": {
+    "description": "Heading above the photos of a physical copy."
+  },
+
+  "copyPhotosTitleCount": "Condition photos ({count})",
+  "@copyPhotosTitleCount": {
+    "description": "Heading above the photos of a physical copy when it has some.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "copyPhotosAdd": "Add",
+  "@copyPhotosAdd": {
+    "description": "Label of the tile that adds a condition photo."
+  },
+
+  "copyPhotosNoCaption": "No caption",
+  "@copyPhotosNoCaption": {
+    "description": "Shown in the photo viewer when the photo has no caption."
+  },
+
+  "copyPhotosCaptionTooltip": "Caption",
+  "@copyPhotosCaptionTooltip": {
+    "description": "Tooltip of the button that edits a photo caption."
+  },
+
+  "copyPhotosCaptionTitle": "Caption",
+  "@copyPhotosCaptionTitle": {
+    "description": "Title of the dialog that edits a photo caption."
+  },
+
+  "copyPhotosCaptionHint": "e.g. tear on the dust jacket",
+  "@copyPhotosCaptionHint": {
+    "description": "Placeholder in the caption field; an example caption."
+  },
+
+  "coverNone": "No cover",
+  "@coverNone": {
+    "description": "Placeholder text on the book page when the book has no cover image."
+  },
+
+  "coverChange": "Change cover",
+  "@coverChange": {
+    "description": "Screen-reader label of the cover picture button."
+  },
+
+  "coverChangeOverlay": "Change\ncover",
+  "@coverChangeOverlay": {
+    "description": "Hover overlay on the cover, broken over two lines."
+  },
+
+  "sendTitle": "Send to a device",
+  "@sendTitle": {
+    "description": "Heading of the send-to-e-reader sheet."
+  },
+
+  "sendSent": "“{title}” sent to {address}",
+  "@sendSent": {
+    "description": "Snack bar after emailing the book; address is where it went.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "address": {
+        "type": "String"
+      }
+    }
+  },
+
+  "sendExplain": "Your server emails the file to your e-reader. The address it sends *from* usually has to be approved with the reader’s service first.",
+  "@sendExplain": {
+    "description": "Explanation under the heading of the send sheet. The asterisks mark emphasis."
+  },
+
+  "sendNoFile": "This book has no digital file to send.",
+  "@sendNoFile": {
+    "description": "Shown when the book has no PDF/EPUB."
+  },
+
+  "sendFormat": "Format",
+  "@sendFormat": {
+    "description": "Field label: which file format to send."
+  },
+
+  "sendToLabel": "Send to",
+  "@sendToLabel": {
+    "description": "Field label: destination email address."
+  },
+
+  "sendSaveAsLabel": "Save as (optional)",
+  "@sendSaveAsLabel": {
+    "description": "Field label: name to remember the address under."
+  },
+
+  "sendSaveAsHint": "My Kindle",
+  "@sendSaveAsHint": {
+    "description": "Placeholder for the name field; an example device name."
+  },
+
+  "sendSending": "Sending…",
+  "@sendSending": {
+    "description": "Label of the Send button while sending."
+  },
+
+  "sendSend": "Send",
+  "@sendSend": {
+    "description": "Button that emails the book."
+  },
+
+  "copiesLendTitle": "Lend this copy",
+  "@copiesLendTitle": {
+    "description": "Title of the dialog for lending a physical copy."
+  },
+
+  "copiesBorrowerLabel": "Borrower",
+  "@copiesBorrowerLabel": {
+    "description": "Field label: who is borrowing the book."
+  },
+
+  "copiesBorrowerHint": "Who's taking it?",
+  "@copiesBorrowerHint": {
+    "description": "Placeholder in the borrower field."
+  },
+
+  "copiesContactLabel": "Contact (optional)",
+  "@copiesContactLabel": {
+    "description": "Field label: how to reach the borrower."
+  },
+
+  "copiesContactHint": "Phone, email, or how you know them",
+  "@copiesContactHint": {
+    "description": "Placeholder in the contact field."
+  },
+
+  "copiesDueBack": "Due back",
+  "@copiesDueBack": {
+    "description": "Label above the choices for the return date."
+  },
+
+  "copiesTwoWeeks": "2 weeks",
+  "@copiesTwoWeeks": {
+    "description": "Chip: due back in two weeks."
+  },
+
+  "copiesOneMonth": "1 month",
+  "@copiesOneMonth": {
+    "description": "Chip: due back in a month."
+  },
+
+  "copiesNoDate": "No date",
+  "@copiesNoDate": {
+    "description": "Chip: no return date agreed."
+  },
+
+  "copiesPickDate": "Pick a date",
+  "@copiesPickDate": {
+    "description": "Chip that opens a date picker for the return date."
+  },
+
+  "copiesPhotographFirst": "Photograph its condition first",
+  "@copiesPhotographFirst": {
+    "description": "Checkbox in the lend dialog."
+  },
+
+  "copiesRemind": "Email a reminder when it is due",
+  "@copiesRemind": {
+    "description": "Checkbox in the lend dialog."
+  },
+
+  "copiesRemindNeedsEmail": "Needs an email address above",
+  "@copiesRemindNeedsEmail": {
+    "description": "Subtitle of the reminder checkbox when no contact was typed."
+  },
+
+  "copiesRemindIfMail": "If your server is set up to send mail",
+  "@copiesRemindIfMail": {
+    "description": "Subtitle of the reminder checkbox when a contact exists."
+  },
+
+  "copiesLend": "Lend",
+  "@copiesLend": {
+    "description": "Button that lends a physical copy (dialog confirm and row button)."
+  },
+
+  "copiesReturn": "Return",
+  "@copiesReturn": {
+    "description": "Button that marks a loaned copy as returned."
+  },
+
+  "copiesAddTitle": "Add physical copy",
+  "@copiesAddTitle": {
+    "description": "Title of the dialog for adding a physical copy."
+  },
+
+  "copiesLocationLabel": "Location",
+  "@copiesLocationLabel": {
+    "description": "Field label: where the copy is kept."
+  },
+
+  "copiesLocationHint": "e.g. living room, shelf 3",
+  "@copiesLocationHint": {
+    "description": "Placeholder in the location field."
+  },
+
+  "copiesNotesLabel": "Notes",
+  "@copiesNotesLabel": {
+    "description": "Field label: free-form notes about a copy."
+  },
+
+  "copiesAddConfirm": "Add",
+  "@copiesAddConfirm": {
+    "description": "Confirm button of the add-copy dialog."
+  },
+
+  "copiesSectionTitle": "Physical copies",
+  "@copiesSectionTitle": {
+    "description": "Heading of the physical copies section on the book page."
+  },
+
+  "copiesAddCopy": "Add copy",
+  "@copiesAddCopy": {
+    "description": "Button that opens the add-copy dialog."
+  },
+
+  "copiesNone": "You don't own this one on paper (yet).",
+  "@copiesNone": {
+    "description": "Shown when the book has no physical copy."
+  },
+
+  "copiesCount": "{count, plural, =1{1 physical copy} other{{count} physical copies}}",
+  "@copiesCount": {
+    "description": "Summary button that opens the list of copies.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "copiesSheetTitle": "Physical copies of “{title}”",
+  "@copiesSheetTitle": {
+    "description": "Heading of the copies sheet.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+
+  "copiesAllDeleted": "None left — they've all been deleted.",
+  "@copiesAllDeleted": {
+    "description": "Shown in the copies sheet after the last copy was deleted."
+  },
+
+  "copiesReturnedBy": "Returned by {borrower}",
+  "@copiesReturnedBy": {
+    "description": "Snack bar after returning a copy, and default caption of the return photo.",
+    "placeholders": {
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+
+  "copiesPhotographIt": "Photograph it",
+  "@copiesPhotographIt": {
+    "description": "Snack bar action after a return: take a condition photo."
+  },
+
+  "copiesDeleteTitle": "Delete this copy?",
+  "@copiesDeleteTitle": {
+    "description": "Title of the confirmation dialog for deleting a copy."
+  },
+
+  "copiesDeleteBodyOnLoan": "It's currently on loan — deleting it removes that loan, its history and its condition photos too. This can't be undone.",
+  "@copiesDeleteBodyOnLoan": {
+    "description": "Body of the delete dialog when the copy is lent out."
+  },
+
+  "copiesDeleteBody": "Its loan history and condition photos go with it. This can't be undone.",
+  "@copiesDeleteBody": {
+    "description": "Body of the delete dialog for a copy on the shelf."
+  },
+
+  "copiesDeleted": "Copy deleted.",
+  "@copiesDeleted": {
+    "description": "Snack bar after deleting a copy."
+  },
+
+  "copiesOnLoan": "On loan to {borrower} since {date}",
+  "@copiesOnLoan": {
+    "description": "Status line of a lent copy; date is yyyy-mm-dd.",
+    "placeholders": {
+      "borrower": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+
+  "copiesOnShelf": "On the shelf",
+  "@copiesOnShelf": {
+    "description": "Status line of a copy that is not lent out."
+  },
+
+  "copiesSomewhere": "Somewhere…",
+  "@copiesSomewhere": {
+    "description": "Location shown when a copy has no location."
+  },
+
+  "copiesNote": "Note: {location}",
+  "@copiesNote": {
+    "description": "Line showing the free-text location of a copy as a note.",
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+
+  "copiesDeleteTooltip": "Delete this copy",
+  "@copiesDeleteTooltip": {
+    "description": "Tooltip of the delete button on a copy card."
+  },
+
+  "copiesPreviouslyLent": "Previously lent to {borrowers}",
+  "@copiesPreviouslyLent": {
+    "description": "Line listing past borrowers; borrowers is a comma-separated list of names.",
+    "placeholders": {
+      "borrowers": {
+        "type": "String"
+      }
+    }
+  },
+  "firstRunTrySamples": "Try sample books",
+  "@firstRunTrySamples": {
+    "description": "First-run choice that adds a few bundled public-domain books."
+  },
+  "shelfEmptyTrySamples": "Try it with a few sample books",
+  "@shelfEmptyTrySamples": {
+    "description": "Button on the empty shelf that adds the bundled sample books."
+  },
+  "samplesAddFailedSnack": "Could not add the sample books: {error}",
+  "@samplesAddFailedSnack": {
+    "description": "Shown when adding the bundled sample books fails.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "samplesAlreadyThereSnack": "The sample books are already on your shelf.",
+  "@samplesAlreadyThereSnack": {
+    "description": "Shown when the sample books were added before."
+  },
+  "samplesAddedSnack": "{count, plural, =1{Added 1 sample book, on a shelf called \"{shelf}\". Remove it any time in Settings.} other{Added {count} sample books, on a shelf called \"{shelf}\". Remove them any time in Settings.}}",
+  "@samplesAddedSnack": {
+    "description": "Shown after the bundled sample books are added.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "shelf": {
+        "type": "String"
+      }
+    }
+  },
+  "samplesRemoveAction": "Remove",
+  "@samplesRemoveAction": {
+    "description": "Snack bar action that removes the sample books again."
   }
 }

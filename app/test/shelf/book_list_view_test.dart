@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_queries.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/settings/book_face.dart';
 import 'package:vellum/shelf/book_list_view.dart';
 
@@ -52,6 +53,8 @@ void main() {
   Future<void> pump(WidgetTester tester, List<LibraryEntry> entries,
       {Set<String> selected = const {}, void Function(Book)? onToggle}) async {
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: BookListView(
           entries: entries,

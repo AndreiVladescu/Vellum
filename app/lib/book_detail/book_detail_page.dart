@@ -25,6 +25,8 @@ import 'read_button.dart';
 import 'reader_notes_section.dart';
 import 'send_to_device_sheet.dart';
 import '../data/shelf_service.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 
 /// Full-page book view: metadata, digital formats, physical copies, and the
 /// Read / Resume reading action.
@@ -114,6 +116,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
   /// Handles files dropped anywhere on the page: images become the cover,
   /// PDFs/EPUBs are attached, anything else is rejected.
   Future<void> _handleDrop(List<XFile> files) async {
+    final l10n = L10n.of(context);
     var attached = 0;
     var coverChanged = false;
     String? message;
@@ -122,17 +125,17 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       if (kind == BookFileKind.image) {
         await repository.setCoverFromFile(book.id, file.path);
         coverChanged = true;
-        message = 'Cover updated';
+        message = l10n.detailCoverUpdated;
       } else if (kind.isBook) {
         await repository.attachFile(book.id, file.path);
         attached++;
       } else {
-        message = 'Only PDF, EPUB, or image files are accepted';
+        message = l10n.detailOnlyPdfEpubImage;
       }
     }
     if (coverChanged) await _evictCover();
     if (attached > 0) {
-      message = 'Attached $attached file${attached == 1 ? '' : 's'}';
+      message = l10n.detailAttachedFiles(attached);
     }
     if (mounted && message != null) {
       ScaffoldMessenger.of(
@@ -142,16 +145,18 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
   }
 
   Future<void> _pickCover() async {
-    const group = XTypeGroup(
-      label: 'Images',
-      extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    // Read before the awaits: the group name shows in the system file dialog.
+    final l10n = L10n.of(context);
+    final group = XTypeGroup(
+      label: l10n.detailImagesTypeGroup,
+      extensions: const ['jpg', 'jpeg', 'png', 'gif', 'webp'],
     );
-    final picked = await openFile(acceptedTypeGroups: const [group]);
+    final picked = await openFile(acceptedTypeGroups: [group]);
     if (picked == null) return;
     if (await classifyBookFile(picked.path) != BookFileKind.image) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("That doesn't look like an image.")),
+          SnackBar(content: Text(l10n.detailNotAnImage)),
         );
       }
       return;
@@ -169,6 +174,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
   }
 
   Future<void> _coverFromFirstPage() async {
+    final l10n = L10n.of(context);
     final ok = await repository.setCoverFromFirstPage(book.id);
     if (ok) await _evictCover();
     if (mounted) {
@@ -176,8 +182,8 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
         SnackBar(
           content: Text(
             ok
-                ? 'Cover set from the first page'
-                : 'Attach a PDF first to use its first page',
+                ? l10n.detailCoverFromFirstPage
+                : l10n.detailCoverNeedsPdf,
           ),
         ),
       );
@@ -191,13 +197,14 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
   Future<void> _toggleSync(Book book) async {
     final excluded = !book.syncExcluded;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     await repository.setSyncExcluded(book.id, excluded);
     if (!mounted) return;
     messenger.showSnackBar(
       appSnackBar(
         content: Text(excluded
-            ? 'Kept on this device. Anything already on the server stays there.'
-            : 'Syncing again with the next sync.'),
+            ? l10n.detailSyncOffSnack
+            : l10n.detailSyncOnSnack),
       ),
     );
   }
@@ -206,22 +213,22 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
   /// gets a cover, since there is no first page to take one from.
   Future<void> _lookUpOnline() async {
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(
-      content: Text('Looking it up…'),
-      duration: Duration(seconds: 2),
+    final l10n = L10n.of(context);
+    messenger.showSnackBar(SnackBar(
+      content: Text(l10n.detailLookingUp),
+      duration: const Duration(seconds: 2),
     ));
     try {
       final outcome = await repository.enrich.fill(book);
       messenger.showSnackBar(SnackBar(
         content: Text(switch (outcome) {
-          EnrichOutcome.filled => 'Filled in what was missing',
-          EnrichOutcome.alreadyComplete => 'Nothing to add — it already knows',
-          EnrichOutcome.notFound =>
-            'No catalogue has this one. An ISBN would help.',
+          EnrichOutcome.filled => l10n.detailEnrichFilled,
+          EnrichOutcome.alreadyComplete => l10n.detailEnrichComplete,
+          EnrichOutcome.notFound => l10n.detailEnrichNotFound,
         }),
       ));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Lookup failed: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.detailLookupFailed('$e'))));
     }
   }
 
@@ -273,17 +280,17 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('Add to shelf'),
+                      child: Text(L10n.of(context).detailAddToShelf),
                     ),
                   ),
                   if (shelves.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text('No shelves yet — create one below.'),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(L10n.of(context).detailNoShelvesYet),
                     ),
                   for (final shelf in shelves)
                     CheckboxListTile(
@@ -295,7 +302,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     ),
                   ListTile(
                     leading: const Icon(Icons.add),
-                    title: const Text('New shelf…'),
+                    title: Text(L10n.of(context).detailNewShelfItem),
                     onTap: () async {
                       final name = await _promptNewShelfName();
                       if (name != null && name.isNotEmpty) {
@@ -318,21 +325,22 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New shelf'),
+        title: Text(L10n.of(context).shelfNew),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Shelf name'),
+          decoration:
+              InputDecoration(hintText: L10n.of(context).shelfNameHint),
           onSubmitted: (v) => Navigator.pop(context, v.trim()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(L10n.of(context).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Create'),
+            child: Text(L10n.of(context).create),
           ),
         ],
       ),
@@ -343,20 +351,16 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Revert to library defaults?'),
-        content: const Text(
-          'This restores the title, description, year, and cover to the '
-          'values from the online library. Your reader notes and attached '
-          'files are kept.',
-        ),
+        title: Text(L10n.of(dialogContext).detailRevertTitle),
+        content: Text(L10n.of(dialogContext).detailRevertBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(L10n.of(dialogContext).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Revert'),
+            child: Text(L10n.of(dialogContext).detailRevertConfirm),
           ),
         ],
       ),
@@ -365,7 +369,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     await repository.revertToDefault(book);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reverted to library defaults')),
+        SnackBar(content: Text(L10n.of(context).detailReverted)),
       );
     }
   }
@@ -373,6 +377,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final cover = repository.coverFileOf(book);
     return Scaffold(
       appBar: AppBar(
@@ -388,7 +393,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
           if (widget.settings != null)
             IconButton(
               icon: const Icon(Icons.travel_explore_outlined),
-              tooltip: 'Find my copy',
+              tooltip: l10n.detailFindMyCopy,
               onPressed: () => findMyCopy(
                 context,
                 repository,
@@ -398,12 +403,12 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
             ),
           IconButton(
             icon: const Icon(Icons.handshake_outlined),
-            tooltip: 'Lend or return',
+            tooltip: l10n.detailLendOrReturn,
             onPressed: _openLendSheet,
           ),
           IconButton(
             icon: const Icon(Icons.bookmark_add_outlined),
-            tooltip: 'Add to shelf',
+            tooltip: l10n.detailAddToShelf,
             onPressed: _openShelfPicker,
           ),
           // Whether this book travels to the server, and the switch for it.
@@ -415,13 +420,13 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                 ? Icons.cloud_off_outlined
                 : Icons.cloud_done_outlined),
             tooltip: book.syncExcluded
-                ? 'Not syncing — this device only'
-                : 'Syncing with the server',
+                ? l10n.detailSyncOffTooltip
+                : l10n.detailSyncOnTooltip,
             onPressed: () => _toggleSync(book),
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit details',
+            tooltip: l10n.detailEditDetails,
             onPressed: _openEditSheet,
           ),
           if (_canRequestBorrow ||
@@ -429,7 +434,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                   book.addedBy != null) ||
               SendToDeviceSheet.availableOn(widget.connection))
             PopupMenuButton<String>(
-              tooltip: 'More',
+              tooltip: l10n.detailMore,
               onSelected: (choice) {
                 switch (choice) {
                   case 'borrow':
@@ -466,9 +471,9 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                 // Only for a book you don't own: asking to borrow your own
                 // book is a button that can only produce an error.
                 if (_canRequestBorrow)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'borrow',
-                    child: Text('Ask to borrow'),
+                    child: Text(l10n.detailAskToBorrow),
                   ),
                 // Offered on a synced library only — `addedBy` is set by a
                 // pull, so it is the app's one signal that this book came
@@ -477,16 +482,16 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                 // does, in a sentence.
                 if (widget.connection?.isConnected == true &&
                     book.addedBy != null)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'edit-request',
-                    child: Text('Ask to edit'),
+                    child: Text(l10n.detailAskToEdit),
                   ),
                 // Only when the server has a mailer (plan 5 #53) — the file
                 // and the outbound email both live there.
                 if (SendToDeviceSheet.availableOn(widget.connection))
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'send',
-                    child: Text('Send to a device'),
+                    child: Text(l10n.detailSendToDevice),
                   ),
               ],
             ),
@@ -575,14 +580,14 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                                     if (book.publishedYear != null)
                                       '${book.publishedYear}',
                                     if (book.pageCount != null)
-                                      '${book.pageCount} pages',
+                                      l10n.detailPages(book.pageCount!),
                                     if (book.publisher != null) book.publisher!,
                                   ].join(' · '),
                                   style: theme.textTheme.bodyMedium,
                                 ),
                                 if (book.isbn != null)
                                   Text(
-                                    'ISBN ${book.isbn}',
+                                    l10n.detailIsbn(book.isbn!),
                                     style: theme.textTheme.bodySmall,
                                   ),
                                 // Known only once a server has said so, so
@@ -593,7 +598,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Text(
-                                      'Added by ${book.addedBy}',
+                                      l10n.detailAddedBy(book.addedBy!),
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: theme.colorScheme.onSurfaceVariant,
                                       ),
@@ -618,7 +623,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               ReadButton(book: book, repository: repository),
               if (book.description != null) ...[
                 const SizedBox(height: 20),
-                Text('About', style: theme.textTheme.titleMedium),
+                Text(l10n.detailAbout, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Text(book.description!, style: theme.textTheme.bodyMedium),
               ],
@@ -664,7 +669,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                   child: TextButton.icon(
                     onPressed: _revert,
                     icon: const Icon(Icons.settings_backup_restore),
-                    label: const Text('Revert to library defaults'),
+                    label: Text(l10n.detailRevertButton),
                   ),
                 ),
               ],
@@ -685,19 +690,14 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (dialogContext) => AlertDialog(
-                        title: Text('Move “${book.title}” to the trash?'),
-                        content: Text(
-                          'It leaves your shelf now and is deleted for good '
-                          'after ${TrashService.graceperiod.inDays} days. '
-                          'Until then you can restore it from '
-                          'Preferences → Trash — its cover and files are '
-                          'kept.',
-                        ),
+                        title: Text(l10n.detailTrashTitle(book.title)),
+                        content: Text(l10n.detailTrashBody(
+                            TrashService.graceperiod.inDays)),
                         actions: [
                           TextButton(
                             onPressed: () =>
                                 Navigator.of(dialogContext).pop(false),
-                            child: const Text('Cancel'),
+                            child: Text(l10n.cancel),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
@@ -707,7 +707,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                             ),
                             onPressed: () =>
                                 Navigator.of(dialogContext).pop(true),
-                            child: const Text('Move to trash'),
+                            child: Text(l10n.moveToTrash),
                           ),
                         ],
                       ),
@@ -720,16 +720,16 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     // from backup.
                     messenger.showSnackBar(
                       appSnackBar(
-                        content: Text('“${book.title}” moved to the trash'),
+                        content: Text(l10n.detailMovedToTrash(book.title)),
                         action: SnackBarAction(
-                          label: 'Undo',
+                          label: l10n.undo,
                           onPressed: () => repository.restoreBook(book.id),
                         ),
                       ),
                     );
                   },
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('Move to trash'),
+                  label: Text(l10n.moveToTrash),
                 ),
               ),
             ],
@@ -756,6 +756,7 @@ class _StatusAndRating extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final status = ReadingStatus.parse(book.status);
     final wanted = WishlistService.isWanted(book);
     final offerFinish =
@@ -768,7 +769,7 @@ class _StatusAndRating extends StatelessWidget {
           Row(
             children: [
               PopupMenuButton<ReadingStatus>(
-                tooltip: 'Reading status',
+                tooltip: l10n.detailReadingStatus,
                 onSelected: (choice) =>
                     repository.readingStatus.setStatus(book.id, choice),
                 itemBuilder: (context) => [
@@ -781,15 +782,15 @@ class _StatusAndRating extends StatelessWidget {
                       child: ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        title: Text(option.label),
-                        subtitle: Text(option.description),
+                        title: Text(option.labelOf(l10n)),
+                        subtitle: Text(option.descriptionOf(l10n)),
                         trailing: option == status ? const Icon(Icons.check) : null,
                       ),
                     ),
                 ],
                 child: Chip(
                   avatar: const Icon(Icons.bookmark_border, size: 18),
-                  label: Text(status.label),
+                  label: Text(status.labelOf(l10n)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -798,7 +799,7 @@ class _StatusAndRating extends StatelessWidget {
               for (var star = 1; star <= 5; star++)
                 IconButton(
                   visualDensity: VisualDensity.compact,
-                  tooltip: '$star star${star == 1 ? '' : 's'}',
+                  tooltip: l10n.detailRatingStars(star),
                   icon: Icon(
                     (book.rating ?? 0) >= star ? Icons.star : Icons.star_border,
                     size: 20,
@@ -814,8 +815,12 @@ class _StatusAndRating extends StatelessWidget {
           ),
           if (book.finishedAt != null)
             Text(
-              'Finished ${book.finishedAt!.toLocal().toString().split(' ').first}'
-              '${book.readCount > 1 ? ' · read ${book.readCount} times' : ''}',
+              book.readCount > 1
+                  ? l10n.detailFinishedOnTimes(
+                      book.finishedAt!.toLocal().toString().split(' ').first,
+                      book.readCount)
+                  : l10n.detailFinishedOn(
+                      book.finishedAt!.toLocal().toString().split(' ').first),
               style: theme.textTheme.bodySmall,
             ),
           if (offerFinish)
@@ -825,7 +830,7 @@ class _StatusAndRating extends StatelessWidget {
                 onPressed: () => repository.readingStatus
                     .setStatus(book.id, ReadingStatus.finished),
                 icon: const Icon(Icons.check),
-                label: const Text('Mark as finished'),
+                label: Text(l10n.detailMarkFinished),
               ),
             ),
           // A wanted book says so plainly, and offers the one transition that
@@ -839,7 +844,7 @@ class _StatusAndRating extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'On your wishlist — you don’t own this yet.',
+                      l10n.detailWishlistNote,
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: theme.colorScheme.tertiary),
                     ),
@@ -847,7 +852,7 @@ class _StatusAndRating extends StatelessWidget {
                   FilledButton.tonalIcon(
                     onPressed: () => repository.wishlist.markOwned(book.id),
                     icon: const Icon(Icons.library_add_check_outlined),
-                    label: const Text('I own this now'),
+                    label: Text(l10n.detailIOwnThisNow),
                   ),
                 ],
               ),
@@ -904,7 +909,7 @@ class _SeriesStripState extends State<_SeriesStrip> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Series'),
+        title: Text(L10n.of(dialogContext).seriesEditTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -925,9 +930,9 @@ class _SeriesStripState extends State<_SeriesStrip> {
                 return TextField(
                   controller: controller,
                   focusNode: focusNode,
-                  decoration: const InputDecoration(
-                    labelText: 'Series name',
-                    helperText: 'Leave blank for no series',
+                  decoration: InputDecoration(
+                    labelText: L10n.of(context).seriesNameLabel,
+                    helperText: L10n.of(context).seriesNameHelper,
                   ),
                 );
               },
@@ -936,9 +941,9 @@ class _SeriesStripState extends State<_SeriesStrip> {
             TextField(
               controller: indexController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Volume',
-                helperText: 'Decimals are fine — a novella can be 1.5',
+              decoration: InputDecoration(
+                labelText: L10n.of(dialogContext).seriesVolumeLabel,
+                helperText: L10n.of(dialogContext).seriesVolumeHelper,
               ),
             ),
           ],
@@ -946,11 +951,11 @@ class _SeriesStripState extends State<_SeriesStrip> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(L10n.of(dialogContext).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
+            child: Text(L10n.of(dialogContext).save),
           ),
         ],
       ),
@@ -972,6 +977,7 @@ class _SeriesStripState extends State<_SeriesStrip> {
     int volume,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     final details = await repository.detailsFor(book.id);
     await repository.wishlist.addSeriesGap(
       seriesName: place.name,
@@ -979,7 +985,7 @@ class _SeriesStripState extends State<_SeriesStrip> {
       author: details.authors.firstOrNull,
     );
     messenger.showSnackBar(SnackBar(
-      content: Text('${place.name} vol. $volume added to your wishlist'),
+      content: Text(l10n.seriesVolumeWished(place.name, volume)),
     ));
     if (mounted) _reload();
   }
@@ -987,6 +993,7 @@ class _SeriesStripState extends State<_SeriesStrip> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return FutureBuilder<SeriesPlace?>(
       future: _place,
       builder: (context, snapshot) {
@@ -997,7 +1004,7 @@ class _SeriesStripState extends State<_SeriesStrip> {
             child: TextButton.icon(
               onPressed: () => _edit(context),
               icon: const Icon(Icons.format_list_numbered, size: 18),
-              label: const Text('Set series…'),
+              label: Text(l10n.seriesSet),
             ),
           );
         }
@@ -1013,9 +1020,10 @@ class _SeriesStripState extends State<_SeriesStrip> {
                     child: Text(
                       index == null
                           ? place.name
-                          : '${place.name} · '
-                              'book ${index % 1 == 0 ? index.toInt() : index}'
-                              ' of ${place.owned.length} you own',
+                          : l10n.seriesPosition(
+                              place.name,
+                              '${index % 1 == 0 ? index.toInt() : index}',
+                              place.owned.length),
                       style: theme.textTheme.bodyMedium,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -1023,14 +1031,14 @@ class _SeriesStripState extends State<_SeriesStrip> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, size: 18),
-                    tooltip: 'Edit series',
+                    tooltip: l10n.seriesEditTooltip,
                     onPressed: () => _edit(context),
                   ),
                 ],
               ),
               if (place.hasGaps) ...[
                 Text(
-                  'Missing: ${place.gaps.join(', ')}',
+                  l10n.seriesMissingVolumes(place.gaps.join(', ')),
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.tertiary),
                 ),
@@ -1046,7 +1054,7 @@ class _SeriesStripState extends State<_SeriesStrip> {
                         ActionChip(
                           avatar: const Icon(Icons.bookmark_add_outlined,
                               size: 16),
-                          label: Text('Want $volume'),
+                          label: Text(l10n.seriesWantVolume(volume)),
                           onPressed: () => _wishVolume(context, place, volume),
                         ),
                     ],

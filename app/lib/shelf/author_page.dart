@@ -6,6 +6,8 @@ import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 
 /// Everything you hold by one author.
 ///
@@ -43,7 +45,7 @@ class AuthorPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (books.isEmpty) {
-            return const Center(child: Text('No books by this author.'));
+            return Center(child: Text(L10n.of(context).authorEmpty));
           }
           final owned = books.where((b) => b.status != 'wishlist').length;
           return ListView.separated(
@@ -56,9 +58,10 @@ class AuthorPage extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   child: Text(
                     [
-                      '$owned on your shelf',
+                      L10n.of(context).authorOnShelf(owned),
                       if (books.length > owned)
-                        '${books.length - owned} on the wishlist',
+                        L10n.of(context)
+                            .authorOnWishlist(books.length - owned),
                     ].join(' · '),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
@@ -105,7 +108,10 @@ class _BookTile extends StatelessWidget {
       title: Text(book.title),
       subtitle: Text([
         if (book.publishedYear != null) '${book.publishedYear}',
-        if (wanted) 'On your wishlist' else if (status != null) status.label,
+        if (wanted)
+          L10n.of(context).authorOnYourWishlist
+        else if (status != null)
+          status.labelOf(L10n.of(context)),
       ].join(' · ')),
       onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => BookDetailPage(

@@ -11,6 +11,7 @@ import '../data/library_repository.dart';
 import '../import/catalog_entry.dart';
 import '../import/folder_import_service.dart';
 import '../import/import_plan.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../snack_bars.dart';
 
 /// One bundled book. The metadata is stated here rather than read back out of
@@ -76,28 +77,28 @@ class SampleLibrary {
   static const books = [
     SampleBook(
       asset: 'assets/samples/the-importance-of-being-earnest.epub',
-      title: 'The Importance of Being Earnest',
+      title: 'The Importance of Being Earnest', // i18n-ignore
       author: 'Oscar Wilde',
       year: 1895,
       description: 'A trivial comedy for serious people.',
     ),
     SampleBook(
       asset: 'assets/samples/the-time-machine.epub',
-      title: 'The Time Machine',
+      title: 'The Time Machine', // i18n-ignore
       author: 'H. G. Wells',
       year: 1895,
       description: 'A Victorian inventor travels to the year 802,701.',
     ),
     SampleBook(
       asset: 'assets/samples/frankenstein.epub',
-      title: 'Frankenstein',
+      title: 'Frankenstein', // i18n-ignore
       author: 'Mary Shelley',
       year: 1818,
       description: 'Or, the Modern Prometheus.',
     ),
     SampleBook(
       asset: 'assets/samples/the-adventures-of-sherlock-holmes.epub',
-      title: 'The Adventures of Sherlock Holmes',
+      title: 'The Adventures of Sherlock Holmes', // i18n-ignore
       author: 'Arthur Conan Doyle',
       year: 1892,
       description: 'Twelve cases from the consulting detective.',
@@ -252,6 +253,7 @@ class SampleLibrary {
 /// awaits.
 Future<void> addSamplesWithFeedback(
   ScaffoldMessengerState messenger,
+  L10n l10n,
   SampleLibrary samples,
 ) async {
   final SampleAddResult result;
@@ -259,15 +261,14 @@ Future<void> addSamplesWithFeedback(
     result = await samples.add();
   } catch (e) {
     messenger.showSnackBar(
-      appSnackBar(content: Text('Could not add the sample books: $e')),
+      appSnackBar(content: Text(l10n.samplesAddFailedSnack('$e'))),
     );
     return;
   }
   messenger.showSnackBar(appSnackBar(
     content: Text(result.added == 0
-        ? 'The sample books are already on your shelf.'
-        : 'Added ${result.added} sample books, on a shelf called '
-            '"${SampleLibrary.shelfName}". Remove them any time in Settings.'),
-    action: SnackBarAction(label: 'Remove', onPressed: () => samples.remove()),
+        ? l10n.samplesAlreadyThereSnack
+        : l10n.samplesAddedSnack(result.added, SampleLibrary.shelfName)),
+    action: SnackBarAction(label: l10n.samplesRemoveAction, onPressed: () => samples.remove()),
   ));
 }

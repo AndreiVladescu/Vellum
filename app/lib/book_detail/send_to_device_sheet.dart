@@ -5,6 +5,7 @@ import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Email a book to an e-reader (plan 5 #53).
 ///
@@ -101,7 +102,9 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('“${widget.book.title}” sent to $sentTo')),
+        SnackBar(
+            content: Text(L10n.of(context)
+                .sendSent(widget.book.title, sentTo))),
       );
     } on ServerException catch (e) {
       if (!mounted) return;
@@ -144,6 +147,7 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -161,24 +165,22 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Send to a device', style: theme.textTheme.titleLarge),
+                  Text(l10n.sendTitle, style: theme.textTheme.titleLarge),
                   const SizedBox(height: 4),
                   Text(
-                    'Your server emails the file to your e-reader. The '
-                    'address it sends *from* usually has to be approved with '
-                    'the reader’s service first.',
+                    l10n.sendExplain,
                     style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
                   if (_files.isEmpty)
-                    const Text('This book has no digital file to send.')
+                    Text(l10n.sendNoFile)
                   else ...[
                     if (_files.length > 1)
                       DropdownButtonFormField<String>(
                         initialValue: _fileId,
-                        decoration: const InputDecoration(
-                          labelText: 'Format',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.sendFormat,
+                          border: const OutlineInputBorder(),
                         ),
                         items: [
                           for (final f in _files)
@@ -208,10 +210,10 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
                     TextField(
                       controller: _address,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Send to',
-                        hintText: 'you@kindle.com',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.sendToLabel,
+                        hintText: 'you@kindle.com', // i18n-ignore: example address
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -220,16 +222,16 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
                         Expanded(
                           child: TextField(
                             controller: _label,
-                            decoration: const InputDecoration(
-                              labelText: 'Save as (optional)',
-                              hintText: 'My Kindle',
+                            decoration: InputDecoration(
+                              labelText: l10n.sendSaveAsLabel,
+                              hintText: l10n.sendSaveAsHint,
                               isDense: true,
                             ),
                           ),
                         ),
                         TextButton(
                           onPressed: _sending ? null : _saveTarget,
-                          child: const Text('Save'),
+                          child: Text(l10n.save),
                         ),
                       ],
                     ),
@@ -259,7 +261,7 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
                                   CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.send),
-                      label: Text(_sending ? 'Sending…' : 'Send'),
+                      label: Text(_sending ? l10n.sendSending : l10n.sendSend),
                     ),
                   ),
                 ],

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/onboarding/first_run_sheet.dart';
 import 'package:vellum/settings/app_settings.dart';
 
@@ -20,6 +21,8 @@ void main() {
     });
     final results = <FirstRunAction?>[];
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Builder(
         builder: (context) => Scaffold(
           body: Center(

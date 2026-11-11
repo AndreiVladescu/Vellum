@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Condition photos for a physical copy (plan 5 #51): the picker, a thumbnail
 /// strip, and a full-size viewer.
@@ -40,7 +41,8 @@ Future<String?> captureCopyPhoto(
   } on Exception catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't get a photo: $e")),
+        SnackBar(
+            content: Text(L10n.of(context).copyPhotosNoPhoto('$e'))),
       );
     }
     return null;
@@ -69,24 +71,23 @@ Future<String?> addCopyPhoto(
         children: [
           ListTile(
             leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Take a photo'),
+            title: Text(L10n.of(sheetContext).copyPhotosTake),
             onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
           ),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Choose an existing one'),
+            title: Text(L10n.of(sheetContext).copyPhotosChoose),
             onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
           ),
           // Said here rather than left to be discovered: a photo of a copy is
           // often a photo of a room, and these travel with the copy to anyone
           // the book is shared with — unlike your highlights and notes, which
           // are yours alone (plan 6 #4).
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: Text(
-              'Photos travel with the copy — anyone you share this book with '
-              'can see them.',
-              style: TextStyle(fontSize: 12),
+              L10n.of(sheetContext).copyPhotosTravel,
+              style: const TextStyle(fontSize: 12),
             ),
           ),
         ],
@@ -130,8 +131,8 @@ class CopyPhotoStrip extends StatelessWidget {
             children: [
               Text(
                 photos.isEmpty
-                    ? 'Condition photos'
-                    : 'Condition photos (${photos.length})',
+                    ? L10n.of(context).copyPhotosTitle
+                    : L10n.of(context).copyPhotosTitleCount(photos.length),
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -186,7 +187,8 @@ class _AddPhotoTile extends StatelessWidget {
               Icon(Icons.add_a_photo_outlined,
                   color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(height: 4),
-              Text('Add', style: theme.textTheme.labelSmall),
+              Text(L10n.of(context).copyPhotosAdd,
+                  style: theme.textTheme.labelSmall),
             ],
           ),
         ),
@@ -246,13 +248,13 @@ class _PhotoThumb extends StatelessWidget {
               ),
             ),
             ListTile(
-              title: Text(photo.caption ?? 'No caption'),
+              title: Text(photo.caption ?? L10n.of(dialogContext).copyPhotosNoCaption),
               subtitle: Text(_stamp(photo.takenAt)),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: 'Caption',
+                    tooltip: L10n.of(dialogContext).copyPhotosCaptionTooltip,
                     icon: const Icon(Icons.edit_outlined),
                     onPressed: () async {
                       final text = await _promptCaption(
@@ -265,7 +267,7 @@ class _PhotoThumb extends StatelessWidget {
                     },
                   ),
                   IconButton(
-                    tooltip: 'Delete',
+                    tooltip: L10n.of(dialogContext).delete,
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () async {
                       await repository.copyPhotos.deletePhoto(photo.id);
@@ -289,23 +291,23 @@ Future<String?> _promptCaption(BuildContext context, String? initial) async {
   final result = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Caption'),
+      title: Text(L10n.of(dialogContext).copyPhotosCaptionTitle),
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: const InputDecoration(
-          hintText: 'e.g. tear on the dust jacket',
+        decoration: InputDecoration(
+          hintText: L10n.of(dialogContext).copyPhotosCaptionHint,
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Cancel'),
+          child: Text(L10n.of(dialogContext).cancel),
         ),
         FilledButton(
           onPressed: () =>
               Navigator.of(dialogContext).pop(controller.text.trim()),
-          child: const Text('Save'),
+          child: Text(L10n.of(dialogContext).save),
         ),
       ],
     ),

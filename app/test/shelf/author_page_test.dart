@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/shelf/author_page.dart';
 
 /// Everything you hold by one author.
@@ -65,6 +66,8 @@ void main() {
       await seed();
     });
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: AuthorPage(author: author, repository: repo),
     ));
     await settle(tester);

@@ -7,6 +7,7 @@ import '../data/local_text_index.dart';
 import '../reader/reader_page.dart';
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Searching inside book contents (plan 5 #32).
 ///
@@ -119,7 +120,7 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
     }
     final client = widget.connection.client;
     if (client == null) {
-      setState(() => _error = 'Not connected to a server.');
+      setState(() => _error = L10n.of(context).contentSearchNotConnected);
       return;
     }
     setState(() {
@@ -139,8 +140,8 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
       setState(() {
         _busy = false;
         _error = e is ServerException
-            ? "This server can't search inside books."
-            : "Couldn't reach the server.";
+            ? L10n.of(context).contentSearchServerCannot
+            : L10n.of(context).contentSearchUnreachable;
       });
     }
   }
@@ -154,14 +155,15 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
     final book = await widget.repository.watchBook(hit.bookId).first;
     if (!mounted) return;
     if (book == null) {
-      _say('That book isn’t on this device yet — sync, then try again.');
+      _say(L10n.of(context).contentSearchBookNotHere);
       return;
     }
     final files = await widget.repository.watchFilesOf(book.id).first;
     if (!mounted) return;
     final pdf = files.where((f) => f.format == 'pdf').firstOrNull;
     if (pdf == null) {
-      _say('No local PDF for “${book.title}” to open at page ${hit.page}.');
+      _say(L10n.of(context)
+          .contentSearchNoLocalPdf(book.title, hit.page));
       return;
     }
     await Navigator.of(context).push(MaterialPageRoute<void>(
@@ -190,17 +192,19 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
       return const Center(child: CircularProgressIndicator());
     }
     if (widget.query.trim().length < 2) {
-      return const _Message(
+      return _Message(
         icon: Icons.search,
-        text: 'Type at least two letters to search inside your books.',
+        text: L10n.of(context).contentSearchMinLength,
       );
     }
     if (hits.isEmpty) {
       return _Message(
         icon: Icons.search_off,
         text: widget.localIndex == null
-            ? 'No book on the server contains “${widget.query.trim()}”.'
-            : 'No indexed book contains “${widget.query.trim()}”.',
+            ? L10n.of(context)
+                .contentSearchNoServerMatch(widget.query.trim())
+            : L10n.of(context)
+                .contentSearchNoLocalMatch(widget.query.trim()),
       );
     }
     return ListView.separated(
@@ -213,7 +217,7 @@ class _ContentSearchResultsState extends State<ContentSearchResults> {
           title: Text(hit.title),
           subtitle: _Snippet(raw: hit.snippet),
           trailing: Text(
-            'p. ${hit.page}',
+            L10n.of(context).contentSearchPage(hit.page),
             style: theme.textTheme.labelMedium,
           ),
           onTap: () => _open(hit),

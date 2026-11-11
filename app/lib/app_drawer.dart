@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_version.dart';
+import 'l10n/gen/app_localizations.dart';
 import 'widgets/page_insets.dart';
 
 import 'account/account_page.dart';
@@ -134,7 +135,9 @@ class AppDrawer extends StatelessWidget {
             builder: (context, _) => UserAccountsDrawerHeader(
               currentAccountPicture: ProfileAvatar(profile: profile, radius: 30),
               accountName:
-                  Text(profile.isSet ? profile.name : 'Set up your profile'),
+                  Text(profile.isSet
+                      ? profile.name
+                      : L10n.of(context).drawerSetUpProfile),
               // Your own email — the one the Account page edits. Connecting
               // used to replace it with the account's, which left the profile
               // email edited on one screen and shown nowhere; the account you
@@ -146,20 +149,20 @@ class AppDrawer extends StatelessWidget {
                     ? profile.email
                     : (connection.isConnected
                         ? connection.email
-                        : 'Local library'),
+                        : L10n.of(context).drawerLocalLibrary),
               ),
               onDetailsPressed: () => _openAccount(context),
             ),
           ),
           ListTile(
             leading: const Icon(Icons.shelves),
-            title: const Text('My shelf'),
+            title: Text(L10n.of(context).drawerMyShelf),
             selected: true,
             onTap: () => Navigator.of(context).pop(),
           ),
           ListTile(
             leading: const Icon(Icons.swap_horiz),
-            title: const Text('Loans'),
+            title: Text(L10n.of(context).drawerLoans),
             // The count of loans wanting attention, so an overdue book is
             // visible without opening the page. Everything else on this
             // screen you go looking for; an overdue loan is the one thing
@@ -182,7 +185,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.folder_open),
-            title: const Text('Import a folder'),
+            title: Text(L10n.of(context).importFolder),
             onTap: () => _openFolderImport(context),
           ),
           StreamBuilder<int>(
@@ -191,25 +194,25 @@ class AppDrawer extends StatelessWidget {
               final count = snapshot.data ?? 0;
               return ListTile(
                 leading: const Icon(Icons.bookmark_border),
-                title: const Text('Wishlist'),
-                trailing: count == 0 ? null : Text('$count'),
+                title: Text(L10n.of(context).drawerWishlist),
+                trailing: count == 0 ? null : Text('$count'), // i18n-ignore
                 onTap: () => _openWishlist(context),
               );
             },
           ),
           ListTile(
             leading: const Icon(Icons.format_list_numbered),
-            title: const Text('Series'),
+            title: Text(L10n.of(context).drawerSeries),
             onTap: () => _openSeries(context),
           ),
           ListTile(
             leading: const Icon(Icons.content_copy_outlined),
-            title: const Text('Find duplicates'),
+            title: Text(L10n.of(context).drawerFindDuplicates),
             onTap: () => _openDuplicates(context),
           ),
           ListTile(
             leading: const Icon(Icons.insights_outlined),
-            title: const Text('Reading insights'),
+            title: Text(L10n.of(context).drawerInsights),
             onTap: () => _openInsights(context),
           ),
           ListenableBuilder(
@@ -218,27 +221,27 @@ class AppDrawer extends StatelessWidget {
               leading: Icon(connection.isConnected
                   ? Icons.cloud_done_outlined
                   : Icons.cloud_outlined),
-              title: const Text('Library server'),
+              title: Text(L10n.of(context).drawerLibraryServer),
               subtitle: Text(connection.isConnected
-                  ? 'Connected · ${connection.email}'
-                  : 'Not connected'),
+                  ? L10n.of(context).drawerConnectedAs(connection.email)
+                  : L10n.of(context).drawerNotConnected),
               onTap: () => _openServer(context),
             ),
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.tune),
-            title: const Text('Preferences'),
+            title: Text(L10n.of(context).drawerPreferences),
             onTap: () => _openPreferences(context),
           ),
           ListTile(
             leading: const Icon(Icons.person_outline),
-            title: const Text('Account'),
+            title: Text(L10n.of(context).drawerAccount),
             onTap: () => _openAccount(context),
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('About Vellum'),
+            title: Text(L10n.of(context).drawerAbout),
             onTap: () async {
               Navigator.of(context).pop();
               // Read from the package itself rather than typed in here: this
@@ -246,17 +249,14 @@ class AppDrawer extends StatelessWidget {
               // written twice is a number that stops agreeing with itself.
               final version = await appVersion();
               if (!context.mounted) return;
+              final l10n = L10n.of(context);
               showAboutDialog(
                 context: context,
-                applicationName: 'Vellum',
+                applicationName: 'Vellum', // i18n-ignore: brand name
                 applicationVersion: version,
                 applicationIcon:
                     Image.asset('assets/logo.png', width: 48, height: 48),
-                children: const [
-                  Text('A personal library for your digital and physical '
-                      'books, shown the way books actually look: '
-                      'spine-out on a shelf.'),
-                ],
+                children: [Text(l10n.drawerAboutBlurb)],
               );
             },
           ),

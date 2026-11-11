@@ -61,6 +61,37 @@ void main() {
     );
   });
 
+  testWidgets('counted nouns agree with their number', (tester) async {
+    final l10n = await _l10n(tester);
+    expect(l10n.detailAttachedFiles(1), 'Attached 1 file');
+    expect(l10n.detailAttachedFiles(3), 'Attached 3 files');
+    expect(l10n.copiesCount(1), '1 physical copy');
+    expect(l10n.copiesCount(2), '2 physical copies');
+    expect(l10n.seriesUnnumbered(1), '1 book, unnumbered');
+    expect(l10n.seriesUnnumbered(4), '4 books, unnumbered');
+    expect(l10n.detailRatingStars(1), '1 star');
+    expect(l10n.detailRatingStars(5), '5 stars');
+  });
+
+  testWidgets('a word chosen by a value is a select, not a ternary',
+      (tester) async {
+    final l10n = await _l10n(tester);
+    expect(l10n.readGoTo('page', 12), 'Go to page 12');
+    expect(l10n.readGoTo('chapter', 3), 'Go to chapter 3');
+    expect(
+      l10n.readFilePosition('PDF', 'page', 214, 38),
+      'PDF · page 214 (38%)',
+    );
+    expect(
+      l10n.readOfferBody(40, 'another', '', 7),
+      contains('through another file of this book'),
+    );
+    expect(
+      l10n.readOfferBody(40, 'file', 'PDF', 7),
+      contains('through the PDF of this book'),
+    );
+  });
+
   testWidgets('an unsupported locale falls back to English rather than failing',
       (tester) async {
     // A phone set to Romanian must not show a blank app while Vellum ships one

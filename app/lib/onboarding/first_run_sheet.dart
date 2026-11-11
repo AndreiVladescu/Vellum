@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../settings/app_settings.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// What the user chose to do from the first-run flow, so the caller can navigate.
 /// The flow itself opens nothing — it only reports, which keeps it free of every
@@ -67,6 +68,7 @@ class _FirstRunSheetState extends State<FirstRunSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
@@ -79,44 +81,39 @@ class _FirstRunSheetState extends State<FirstRunSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Text('Welcome to Vellum', style: theme.textTheme.headlineSmall),
+            Text(l10n.firstRunWelcome, style: theme.textTheme.headlineSmall),
             const SizedBox(height: 4),
             Text(
-              'Step ${_card + 1} of $_cards',
+              l10n.firstRunStep(_card + 1, _cards),
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             switch (_card) {
               0 => _Card(
                   icon: Icons.library_add_outlined,
-                  title: 'Get your books in',
-                  detail: 'Point Vellum at a folder of PDFs or EPUBs, scan a '
-                      'barcode off a physical book, or add one at a time. '
-                      'Or look around first with a few sample books.',
+                  title: l10n.firstRunBooksTitle,
+                  detail: l10n.firstRunBooksDetail,
                   actions: [
-                    _Choice('Import a folder', FirstRunAction.importFolder),
-                    _Choice('Scan a barcode', FirstRunAction.scan),
-                    _Choice('Add one book', FirstRunAction.addOne),
-                    _Choice('Try sample books', FirstRunAction.trySamples),
+                    _Choice(l10n.importFolder, FirstRunAction.importFolder),
+                    _Choice(l10n.firstRunScan, FirstRunAction.scan),
+                    _Choice(l10n.firstRunAddOne, FirstRunAction.addOne),
+                    _Choice(l10n.firstRunTrySamples, FirstRunAction.trySamples),
                   ],
                 ),
               1 => _Card(
                   icon: Icons.cloud_outlined,
-                  title: 'Connect a server?',
-                  detail: 'Optional. Vellum works fully offline — a server just '
-                      'shares one library across your devices. You can skip '
-                      'this forever.',
+                  title: l10n.firstRunServerTitle,
+                  detail: l10n.firstRunServerDetail,
                   actions: [
-                    _Choice('Set up a server', FirstRunAction.connectServer),
+                    _Choice(l10n.firstRunSetUpServer, FirstRunAction.connectServer),
                   ],
                 ),
               _ => _Card(
                   icon: Icons.grid_view_outlined,
-                  title: 'Set up a room?',
-                  detail: 'Vellum can draw your real shelves and remember where '
-                      'each physical book sits, and who borrowed it.',
+                  title: l10n.firstRunRoomTitle,
+                  detail: l10n.firstRunRoomDetail,
                   actions: [
-                    _Choice('Create a room', FirstRunAction.createRoom),
+                    _Choice(l10n.firstRunCreateRoom, FirstRunAction.createRoom),
                   ],
                 ),
             },
@@ -125,12 +122,12 @@ class _FirstRunSheetState extends State<FirstRunSheet> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Skip'),
+                  child: Text(l10n.firstRunSkip),
                 ),
                 const Spacer(),
                 FilledButton(
                   onPressed: _next,
-                  child: Text(_card == _cards - 1 ? 'Done' : 'Next'),
+                  child: Text(_card == _cards - 1 ? l10n.firstRunDone : l10n.firstRunNext),
                 ),
               ],
             ),
