@@ -62,8 +62,16 @@ class ReaderHotkeys {
   /// worse bug than the one this fixes.
   final bool Function() isTextFieldFocused;
 
-  static bool _editableHasFocus() =>
-      FocusManager.instance.primaryFocus?.context?.widget is EditableText;
+  /// **Looks upward as well as at the node's own widget.** Depending on the
+  /// Flutter version, the focused node's context is the `Focus` that
+  /// `EditableText` builds inside itself rather than the `EditableText`, and
+  /// testing only the latter let the arrow keys through while typing a search.
+  static bool _editableHasFocus() {
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context == null) return false;
+    return context.widget is EditableText ||
+        context.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
 
   void attach() => HardwareKeyboard.instance.addHandler(handle);
   void detach() => HardwareKeyboard.instance.removeHandler(handle);

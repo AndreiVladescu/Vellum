@@ -25,6 +25,7 @@ import 'chapter_markup.dart';
 import 'epub_book.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
+import 'reader_search_field.dart';
 import 'page_metric.dart';
 import 'reader_actions.dart';
 import 'reader_settings.dart';
@@ -260,6 +261,11 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   /// so [searchEpub] does it over the chapters' plain text.
   bool _searching = false;
   final _searchController = TextEditingController();
+
+  /// Owned here so Ctrl+F can focus the box explicitly: `autofocus` does
+  /// nothing once something else in the scope has focus, which is the case as
+  /// soon as the page has been clicked.
+  final _searchFocus = FocusNode();
   List<EpubSearchHit> _hits = const [];
   bool _hitsTruncated = false;
   int _hitIndex = 0;
@@ -314,6 +320,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     _selectionNotifier.dispose();
     _settings?.removeListener(_onSettingsChanged);
     _searchController.dispose();
+    _searchFocus.dispose();
     _session.end(page: _chapter + 1);
     _scroll.dispose();
     super.dispose();
@@ -594,13 +601,26 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     return saved == true ? controller.text : null;
   }
 
+  /// Opens the search, or — if it is already open — puts the caret back in it
+  /// with the old query selected.
   void _openSearch() {
-    if (_searching || _loaded == null) return;
-    setState(() => _searching = true);
+    if (_loaded == null) return;
+    if (!_searching) {
+      // Reading mode hides the bar the box lives in.
+      if (_chromeHidden) _setReadingMode(false);
+      setState(() => _searching = true);
+    }
+    // After the frame, because on the first press the field does not exist yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _searching) {
+        focusSearchField(_searchFocus, _searchController);
+      }
+    });
   }
 
   void _closeSearch() {
     if (!_searching) return;
+    _searchFocus.unfocus();
     _searchController.clear();
     setState(() {
       _searching = false;
@@ -920,14 +940,10 @@ class _EpubReaderPageState extends State<EpubReaderPage>
             backgroundColor: readerTheme.background,
             foregroundColor: readerTheme.foreground,
             title: _searching
-                ? TextField(
+                ? ReaderSearchField(
                     controller: _searchController,
-                    autofocus: true,
-                    style: TextStyle(color: readerTheme.foreground),
-                    decoration: const InputDecoration(
-                      hintText: 'Search in this book',
-                      border: InputBorder.none,
-                    ),
+                    focusNode: _searchFocus,
+                    foreground: readerTheme.foreground,
                     onSubmitted: _runSearch,
                   )
                 : Text(widget.book.title),
@@ -935,22 +951,28 @@ class _EpubReaderPageState extends State<EpubReaderPage>
               if (_searching) ...[
                 if (_hits.isNotEmpty)
                   Center(
-                    child: Text('${_hitIndex + 1}/${_hits.length}'
-                        '${_hitsTruncated ? '+' : ''}'),
+                    child: Text(
+                      '${_hitIndex + 1}/${_hits.length}'
+                      '${_hitsTruncated ? '+' : ''}',
+                      style: TextStyle(color: readerTheme.foreground),
+                    ),
                   ),
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_up),
                   tooltip: 'Previous match',
+                  style: readerSearchIconStyle(readerTheme.foreground),
                   onPressed: _hits.isEmpty ? null : () => _stepHit(-1),
                 ),
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_down),
                   tooltip: 'Next match',
+                  style: readerSearchIconStyle(readerTheme.foreground),
                   onPressed: _hits.isEmpty ? null : () => _stepHit(1),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: 'Close search (Esc)',
+                  style: readerSearchIconStyle(readerTheme.foreground),
                   onPressed: _closeSearch,
                 ),
               ],

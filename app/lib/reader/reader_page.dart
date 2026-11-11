@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -31,6 +32,7 @@ import 'page_metric.dart';
 import 'edge_turn.dart';
 import 'reader_gestures.dart';
 import 'reader_hotkeys.dart';
+import 'reader_search_field.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
@@ -170,6 +172,20 @@ class _ReaderPageState extends State<ReaderPage>
   /// every point. Only the overlay listens, and only the overlay repaints.
   final ValueNotifier<List<Offset>> _livePoints = ValueNotifier(const []);
   final _searchController = TextEditingController();
+
+  /// Owned here so Ctrl+F can focus the box explicitly. `autofocus` only
+  /// applies when nothing else in the focus scope has focus, and once you have
+  /// clicked the page the viewer does — hence "you need to click there first".
+  final _searchFocus = FocusNode();
+
+  /// Search as you type: a pause in typing, not every keystroke, starts a run.
+  final _searchDebounce = Debouncer(const Duration(milliseconds: 300));
+
+  /// The query the searcher was last given. Kept because pdfrx cancels a
+  /// running search when handed the *same* pattern again (and then does not
+  /// restart it), so Enter on an unchanged query must step to the next match
+  /// rather than "search again".
+  String _searchedFor = '';
   bool _searching = false;
 
   /// Ctrl+F / Ctrl+G, which have to work before the page is clicked.
@@ -310,7 +326,9 @@ class _ReaderPageState extends State<ReaderPage>
     _highlights.dispose();
     _searcher?.removeListener(_onSearchChanged);
     _searcher?.dispose();
+    _searchDebounce.cancel();
     _searchController.dispose();
+    _searchFocus.dispose();
     _settings?.removeListener(_onSettingsChanged);
     super.dispose();
   }
@@ -1680,17 +1698,12 @@ class _ReaderPageState extends State<ReaderPage>
         backgroundColor: readerTheme.background,
         foregroundColor: readerTheme.foreground,
         title: _searching
-            ? TextField(
+            ? ReaderSearchField(
                 controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Search in this book',
-                  border: InputBorder.none,
-                ),
-                onSubmitted: (query) {
-                  if (query.trim().isEmpty) return;
-                  _searcher?.startTextSearch(query.trim());
-                },
+                focusNode: _searchFocus,
+                foreground: readerTheme.foreground,
+                onChanged: _onSearchTextChanged,
+                onSubmitted: _onSearchSubmitted,
               )
             : Text(widget.book.title),
         actions: [
@@ -1700,23 +1713,27 @@ class _ReaderPageState extends State<ReaderPage>
                 child: Text(
                   '${(_searcher!.currentIndex ?? 0) + 1}'
                   '/${_searcher!.matches.length}',
+                  style: TextStyle(color: readerTheme.foreground),
                 ),
               ),
             IconButton(
               icon: const Icon(Icons.keyboard_arrow_up),
               tooltip: 'Previous match',
+              style: readerSearchIconStyle(readerTheme.foreground),
               onPressed:
                   (_searcher?.hasMatches ?? false) ? _searcher!.goToPrevMatch : null,
             ),
             IconButton(
               icon: const Icon(Icons.keyboard_arrow_down),
               tooltip: 'Next match',
+              style: readerSearchIconStyle(readerTheme.foreground),
               onPressed:
                   (_searcher?.hasMatches ?? false) ? _searcher!.goToNextMatch : null,
             ),
             IconButton(
               icon: const Icon(Icons.close),
               tooltip: 'Close search (Esc)',
+              style: readerSearchIconStyle(readerTheme.foreground),
               onPressed: _closeSearch,
             ),
           ],
@@ -2135,17 +2152,85 @@ class _ReaderPageState extends State<ReaderPage>
     );
   }
 
-  /// Opens the in-book search, if the document is loaded enough to have one.
+  /// Opens the in-book search, if the document is loaded enough to have one —
+  /// or, if it is already open, puts the caret back in it with the old query
+  /// selected.
   void _openSearch() {
-    if (_searcher == null || _searching) return;
-    setState(() => _searching = true);
+    if (_searcher == null) return;
+    if (!_searching) {
+      // Reading mode hides the bar the box lives in; asking to search is asking
+      // to see it.
+      if (_chromeHidden) _setReadingMode(false);
+      setState(() => _searching = true);
+    }
+    // After the frame, because on the first press the field does not exist yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _searching) {
+        focusSearchField(_searchFocus, _searchController);
+      }
+    });
+  }
+
+  void _onSearchTextChanged(String text) {
+    final query = text.trim();
+    if (query.isEmpty) {
+      // Clearing the box clears the search, at once.
+      _searchDebounce.cancel();
+      _searchedFor = '';
+      _searcher?.resetTextSearch();
+      return;
+    }
+    if (query == _searchedFor) {
+      _searchDebounce.cancel(); // typed back to what is already showing
+      return;
+    }
+    _searchDebounce.run(() => _startSearch(query));
+  }
+
+  /// Hands the query to pdfrx right away (its own half-second delay is turned
+  /// off: the debounce above has already waited).
+  void _startSearch(String query) {
+    if (!mounted || !_searching) return;
+    _searchedFor = query;
+    _searcher?.startTextSearch(query, searchImmediately: true);
+  }
+
+  /// Enter goes to the next match, Shift+Enter to the previous one. Enter on a
+  /// query that has not been searched yet (typed and submitted inside the
+  /// debounce) searches it now.
+  void _onSearchSubmitted(String text) {
+    final query = text.trim();
+    if (query.isEmpty) return;
+    if (query != _searchedFor) {
+      _searchDebounce.cancel();
+      _startSearch(query);
+      return;
+    }
+    final searcher = _searcher;
+    if (searcher == null || !searcher.hasMatches) return;
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      searcher.goToPrevMatch();
+    } else {
+      searcher.goToNextMatch();
+    }
   }
 
   void _closeSearch() {
     if (!_searching) return;
+    _searchDebounce.cancel();
+    _searchedFor = '';
     _searcher?.resetTextSearch();
     _searchController.clear();
     setState(() => _searching = false);
+    // Hand focus back to the page: with it left on the departed field the
+    // arrow keys and Page Up/Down stay disabled (see `ReaderHotkeys`), which
+    // looks like the reader having stopped listening.
+    _searchFocus.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controller.isReady) {
+        _controller.focusNode?.requestFocus();
+      }
+    });
   }
 }
 
