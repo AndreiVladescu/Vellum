@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -21,34 +22,48 @@ import 'highlight_palette.dart';
 /// frame and asks for a repaint when it has. That is why a highlight can appear
 /// a moment after the page does — the alternative is blocking the frame on a
 /// text extraction.
+///
+/// **Text is only ever read from a loaded page.** pdfrx opens a document
+/// progressively: right after opening, every page but the first is a
+/// placeholder that knows its size and nothing else. Asking a placeholder for
+/// its text does not fail — it returns an *empty* text — and an empty text
+/// cached for the session means that page never shows a highlight again. A
+/// book reopens on the page you were reading, which is the page you annotated,
+/// and that page is painted before it has loaded: the mark was "gone" after
+/// leaving the book and coming back. So the painter waits for the loaded
+/// instance of the page first (see [_loadedInstance]).
 class PdfHighlightPainter {
-  PdfHighlightPainter({required this.onNeedsRepaint});
-
-  /// Called when a page's text finishes loading, so the viewer repaints and
-  /// the highlights actually show up.
-  final VoidCallback onNeedsRepaint;
+  PdfHighlightPainter({required VoidCallback onNeedsRepaint})
+      : _texts = PageTextCache(onLoaded: onNeedsRepaint);
 
   /// Highlights by page, rebuilt whenever the annotation stream emits.
   final Map<int, List<_Mark>> _byPage = {};
 
-  /// Page text, once loaded. A page with no text maps to null so it is asked
-  /// for exactly once rather than on every frame.
+  /// Page text, once loaded.
   ///
   /// **Structured, not raw.** `loadText()` returns the raw extraction;
   /// `loadStructuredText()` returns the reflowed one, with lines and words
   /// composed — and the ranges `getSelectedTextRanges()` hands back index into
   /// *that*. Painting raw rects at structured offsets is why a highlight used to
   /// cover part of the phrase and then drift off it.
-  final Map<int, PdfPageText?> _text = {};
-  final Set<int> _loading = {};
+  ///
+  /// Not dropped when pdfrx reports a page status change: that is how a page
+  /// *becomes* loaded, and since nothing is cached before then there is nothing
+  /// stale to drop. A different document (the reader's *Try again* builds one)
+  /// does start over, see [paint].
+  final PageTextCache _texts;
 
-  bool _disposed = false;
+  /// The document the cached text belongs to.
+  PdfDocument? _document;
 
-  void dispose() => _disposed = true;
+  void dispose() => _texts.dispose();
 
   /// Re-reads the annotations. Only highlights and notes carry a locator worth
   /// painting; a bookmark marks a page, not a passage.
   void update(List<Annotation> annotations) {
+    // A page whose text failed to extract is given another chance whenever the
+    // marks change, instead of on every paint.
+    _texts.retryFailed();
     _byPage.clear();
     for (final a in annotations) {
       if (a.kind != AnnotationKind.highlight.name &&
@@ -72,11 +87,12 @@ class PdfHighlightPainter {
     final marks = _byPage[page.pageNumber];
     if (marks == null || marks.isEmpty) return;
 
-    final text = _text[page.pageNumber];
-    if (text == null) {
-      _ensureText(page);
-      return; // repaints once the text is in
+    if (!identical(_document, page.document)) {
+      _document = page.document;
+      _texts.reset();
     }
+    final text = _texts.textFor(page.pageNumber, () => _extract(page));
+    if (text == null) return; // repaints once the text is in
 
     for (final mark in marks) {
       final paint = Paint()
@@ -99,21 +115,115 @@ class PdfHighlightPainter {
     }
   }
 
-  void _ensureText(PdfPage page) {
-    final number = page.pageNumber;
-    if (_text.containsKey(number) || _loading.contains(number)) return;
-    _loading.add(number);
-    page.loadStructuredText().then((text) {
-      _loading.remove(number);
-      if (_disposed) return;
-      _text[number] = text;
-      onNeedsRepaint();
-    }).catchError((_) {
-      _loading.remove(number);
-      // A page whose text can't be extracted (a scan) simply shows no
-      // highlights — there was nothing to select on it in the first place.
-    });
+  /// The page's structured text, or null if the document went away first.
+  Future<PdfPageText?> _extract(PdfPage page) async {
+    final loaded = await _loadedInstance(page);
+    return loaded?.loadStructuredText();
   }
+
+  /// The loaded instance of [page], waiting for it if need be; null if the
+  /// document is closed before that happens.
+  ///
+  /// pdfrx's own `ensureLoaded()` would do, but it waits on a stream that is
+  /// simply closed when the document is disposed, so it never finishes and the
+  /// caller hangs on a document that no longer exists. This listens for the
+  /// stream ending as well.
+  Future<PdfPage?> _loadedInstance(PdfPage page) {
+    final number = page.pageNumber;
+    final document = page.document;
+    final latest = document.pages[number - 1];
+    if (latest.isLoaded) return Future.value(latest);
+
+    final done = Completer<PdfPage?>();
+    late final StreamSubscription<PdfDocumentEvent> subscription;
+    subscription = document.events.listen(
+      (event) {
+        if (event is! PdfDocumentPageStatusChangedEvent) return;
+        final changed = event.changes[number]?.page;
+        if (changed == null || !changed.isLoaded) return;
+        subscription.cancel();
+        if (!done.isCompleted) done.complete(changed);
+      },
+      onDone: () {
+        if (!done.isCompleted) done.complete(null);
+      },
+    );
+    return done.future;
+  }
+}
+
+/// Text that arrives asynchronously, keyed by page, loaded at most once per
+/// page and never retried on every paint.
+///
+/// Kept apart from [PdfHighlightPainter] because the rules are the part worth
+/// testing and they need no PDF: the painter hands in *how* to load a page, and
+/// this decides when to ask, what to remember, and when to give up.
+class PageTextCache {
+  PageTextCache({required this.onLoaded});
+
+  /// Called when a page's text arrives, so the viewer repaints and the
+  /// highlights actually show up.
+  final VoidCallback onLoaded;
+
+  final Map<int, PdfPageText> _text = {};
+  final Set<int> _loading = {};
+
+  /// Pages whose load threw or came back null. Not asked again until
+  /// [retryFailed] or [reset]: a page that cannot be read (a scan, a broken
+  /// font table) would otherwise be re-extracted on every frame it is painted.
+  final Set<int> _failed = {};
+
+  /// Bumped by [reset], so a load that was in flight for the old document
+  /// cannot land in the new one's cache.
+  int _epoch = 0;
+  bool _disposed = false;
+
+  /// The text for [pageNumber] if it is here; otherwise null, and a load is
+  /// started (once) through [load].
+  ///
+  /// [load] returns null for "cannot be had" — nothing is cached then, and the
+  /// page is marked failed rather than retried.
+  PdfPageText? textFor(int pageNumber, Future<PdfPageText?> Function() load) {
+    final cached = _text[pageNumber];
+    if (cached != null) return cached;
+    if (_disposed || _loading.contains(pageNumber) || _failed.contains(pageNumber)) {
+      return null;
+    }
+    _loading.add(pageNumber);
+    unawaited(_fetch(pageNumber, load));
+    return null;
+  }
+
+  Future<void> _fetch(int pageNumber, Future<PdfPageText?> Function() load) async {
+    final epoch = _epoch;
+    PdfPageText? text;
+    try {
+      text = await load();
+    } catch (_) {
+      text = null;
+    }
+    if (_disposed || epoch != _epoch) return; // reset() already cleared _loading
+    _loading.remove(pageNumber);
+    if (text == null) {
+      _failed.add(pageNumber);
+      return;
+    }
+    _text[pageNumber] = text;
+    onLoaded();
+  }
+
+  /// Allows pages that failed to be asked for again.
+  void retryFailed() => _failed.clear();
+
+  /// Forgets everything, for a different document.
+  void reset() {
+    _epoch++;
+    _text.clear();
+    _loading.clear();
+    _failed.clear();
+  }
+
+  void dispose() => _disposed = true;
 }
 
 /// One rectangle per line of the range `[start, end)` — the shape a marker
