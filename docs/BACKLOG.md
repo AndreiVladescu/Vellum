@@ -62,6 +62,17 @@ Done (August 2026): dragging a bookcase carries its contents. The editor tracks
 the shelf and settle against it on release rather than staying behind at their
 old world positions. Confirmed by hand.
 
+### ✅ 9. Console import header stranded mid-list
+The `thead th` sticky offset (`--thead-top`, sized for the page's top bar) was
+applied inside dialogs too, so the import review's header stuck 104px down its
+own scroll box. `server/web/console.css` now has `.modal thead th { top:0; }`.
+
+### ✅ 10. Bulk console import stopped on a network error
+The enrichment after each upload ran `lopdf::Document::load` on whole PDFs with
+no limit, so a large folder import held dozens of parses in memory at once and
+the Raspberry Pi ran out. Enrichment now takes a one-permit `enrich_semaphore`
+held for the whole task, separate from the render semaphore.
+
 ---
 
 ## Manual device checks (CI can't do these)
@@ -182,57 +193,6 @@ this order.
 ---
 
 ## Open / possible follow-ups
-
-- **The console's import list has a header stranded in the middle of it.**
-  Reported 2026-08-11 with a screenshot: reviewing an 87-book folder import,
-  the `Title` header sits as a dark band a third of the way down the list,
-  covering two rows.
-
-  *Cause, already traced:* `console.css` makes **every** `thead th` sticky at
-  `top: var(--thead-top, 104px)`, and `--thead-top` is set from the page's top
-  bar height. That is right for tables that scroll with the page and wrong
-  inside a dialog: `#imp-review` is its own scroll container
-  (`max-height:44vh; overflow:auto`) inside `.modal`, so the header sticks
-  104px down from *that* box's top rather than at its top edge.
-
-  *Fix:* scope the offset, e.g. `.modal thead th { top: 0 }` — the dialog has
-  no top bar to clear. Worth checking the other dialogs with tables at the same
-  time, since they share the rule.
-
-- **A bulk console import stopped partway with a network error.** Reported
-  2026-08-11: importing 87 books from a folder, it stalled around the 68th with
-  *"Last error: NetworkError when attempting to fetch resource"* and went no
-  further.
-
-  *What is known:* that wording is the browser's `fetch()` failure, so the call
-  that failed is `POST /api/books/from-search` — **not** the file upload, which
-  is XHR and reports "Network error during upload". A NetworkError means the
-  connection failed rather than the server answering with an error status, so
-  the server either died, was restarted, or something between the two dropped
-  the connection. The import loop is sequential, so it is not a flood of
-  parallel requests.
-
-  *Ruled out:* for a *folder* import the handler makes no outbound calls —
-  `fetch_description` returns early on an empty `work_key` and `download_cover`
-  needs a cover URL the console does not send. (A *catalogue* import with work
-  keys does call Open Library twice per book, which is why the missing HTTP
-  timeout was fixed alongside this — but it cannot be this failure.)
-
-  **Cause found (2026-08-11), and fixed.** The reporter's Raspberry Pi locked
-  up entirely, which pointed at memory. Uploads themselves stream to disk and
-  hold nothing — but the *enrichment* spawned after each upload calls
-  `lopdf::Document::load`, which reads a whole PDF into memory, and those tasks
-  were detached and unbounded. The HTTP reply is sent before enrichment runs
-  (on purpose, so a large upload is not held open), so the console starts the
-  next book immediately and the parses accumulate: 87 books, 87 concurrent
-  whole-PDF loads. On a small machine that is an out-of-memory kill, and it
-  surfaces as the *next* request failing with a dropped connection rather than
-  as anything the log attributes to the parse.
-
-  Enrichment now takes a one-permit `enrich_semaphore`, held across the whole
-  task rather than just the render — the page count is the memory-hungry half.
-  Kept separate from `render_semaphore` so a bulk import cannot make reading a
-  book slow, and vice versa.
 
 - **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
   then floats at that height). Could clamp to shelf bounds.
