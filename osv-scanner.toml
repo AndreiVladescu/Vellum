@@ -1,21 +1,21 @@
 # Advisories that are known, understood, and cannot be acted on. Everything
 # else — in any of the four ecosystems — fails CI.
 #
-# Kept in step with the two `--ignore` flags on `cargo audit` in ci.yml; if one
+# Kept in step with the `--ignore` flag on `cargo audit` in ci.yml; if one
 # list changes, change both.
+#
+# The older `rsa` (RUSTSEC-2023-0071) and `ttf-parser` (RUSTSEC-2026-0192)
+# ignores were dropped: neither crate is in `server/Cargo.lock` any more, so
+# the scanner reported them unused.
 
 [[IgnoredVulns]]
-id = "RUSTSEC-2023-0071"
+id = "RUSTSEC-2026-0459"
 reason = """
-`rsa` "Marvin" timing attack. No fixed release exists, and it is a lockfile-only
-artifact here: `cargo tree -i rsa` is empty, nothing in the compiled tree pulls
-it, and Vellum performs no RSA. Not reachable, so not exploitable.
-"""
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2026-0192"
-reason = """
-`ttf-parser` is unmaintained — a maintenance warning rather than a
-vulnerability. Pulled in by `lopdf` for PDF parsing, so it cannot be dropped
-without dropping PDF support.
+`libsqlite3-sys` bundles SQLite < 3.54.0 (CVE-2026-119375, GHSA-72w2-rjgg-q729):
+a crafted database plus a sibling `-wal` file with a different page size can
+return uninitialised memory. Fixed in `libsqlite3-sys` 0.39, but the newest
+released `sqlx-sqlite` (0.9.0) requires `libsqlite3-sys <0.38`, so it cannot be
+taken without patching sqlx. Exposure is limited: the server opens only its own
+`vellum.db`, never a database or WAL file supplied by a client. Revisit when a
+sqlx release allows 0.39.
 """

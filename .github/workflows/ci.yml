@@ -148,15 +148,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: taiki-e/install-action@cargo-audit
-      # Two advisories are ignored with cause; every *other* (and every new) one
-      # fails the build. Revisit these when upstream moves.
-      #  - RUSTSEC-2023-0071 (rsa "Marvin" timing attack): no fixed release
-      #    exists, and `rsa` is a lockfile-only artifact here — not in the
-      #    compiled tree (`cargo tree -i rsa` is empty) and Vellum performs no
-      #    RSA, so it is not reachable/exploitable.
-      #  - RUSTSEC-2026-0192 (ttf-parser unmaintained): pulled by lopdf for PDF
-      #    parsing; a maintenance warning, not a vulnerability, unfixable here.
-      - run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0192
+      # One advisory is ignored with cause; every *other* (and every new) one
+      # fails the build. Revisit this when upstream moves.
+      #  - RUSTSEC-2026-0459 (bundled SQLite < 3.54.0 in libsqlite3-sys): fixed
+      #    in libsqlite3-sys 0.39, but the newest released sqlx-sqlite (0.9.0)
+      #    requires <0.38. The server only opens its own database, never a
+      #    client-supplied db/-wal pair. See osv-scanner.toml.
+      - run: cargo audit --ignore RUSTSEC-2026-0459
 
   # `cargo audit` covers one of the four dependency sets. This covers all of
   # them from one advisory database (OSV): `app/pubspec.lock` for the Flutter
@@ -165,7 +163,7 @@ jobs:
   # something shipped is known-vulnerable, and unlike Dependabot it can be run
   # locally with the same binary.
   #
-  # The two long-standing Rust exceptions are carried over from `cargo audit`
+  # The Rust exception is carried over from `cargo audit`
   # above with the same reasoning; see osv-scanner.toml for why.
   vulnerabilities:
     runs-on: ubuntu-latest
