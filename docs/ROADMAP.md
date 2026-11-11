@@ -26,6 +26,9 @@ Pushing the tag is what builds the release.
 **Tagged so far:** `v1.2.1` (2026-11-11) — everything ticked under v1.1.12,
 v1.2.0, v1.2.1 and v1.3.0, plus the first slice of v1.2.2 and the dependency
 updates from v1.2.3. The work landed interleaved, so it shipped as one tag.
+`v1.2.2` (2026-11-11) — the published server image (listed under v1.2.3) and
+the second slice of translations. The version headings below are the plan;
+this list is what each tag actually carried.
 
 ---
 

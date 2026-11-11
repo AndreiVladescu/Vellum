@@ -6,6 +6,30 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.2.2 — 2026-11-11
+
+The server can be pulled instead of built.
+
+### Added
+
+- **A published server image.** Every release now pushes the server to Docker
+  Hub and to GitHub's registry (`ghcr.io/andreivladescu/vellum-server`), for
+  `linux/amd64` and `linux/arm64` — so a Raspberry Pi pulls the same tags —
+  as `X.Y.Z`, `X.Y` and `latest`.
+- **Translatable text, part two.** The readers, Preferences, Reading insights
+  and the trash read their strings from the same file as the shelf.
+
+### Changed
+
+- **`docker compose up` pulls the image** rather than compiling the server.
+  Pin a release with `VELLUM_VERSION=1.2.2`; `docker-compose.build.yml` builds
+  from source instead. `docs/DEPLOYMENT.md` covers pulling, pinning and
+  upgrading.
+- Counts in the readers and Preferences are proper plurals now, so "1 sample
+  books" and its relatives are gone.
+
+---
+
 ## v1.2.1 — 2026-11-11
 
 The reader opens a book the first time you ask, a new install has something on
