@@ -119,6 +119,9 @@ SettleResult settle({
   for (final c in candidates) {
     final by = c.top;
     var bx = x;
+    // A shelf bounds the book only if the book fits on it at all; a book wider
+    // than its shelf has nothing sensible to stay inside.
+    final bounded = c.isShelf && w <= c.right - c.left;
     for (var pass = 0; pass < 16; pass++) {
       var moved = false;
       for (final o in obstacles) {
@@ -127,7 +130,20 @@ SettleResult settle({
         if (vOverlap && hOverlap) {
           final pushRight = (o.x + o.w) - bx;
           final pushLeft = (bx + w) - o.x;
-          bx = pushRight <= pushLeft ? o.x + o.w : o.x - w;
+          final rightX = o.x + o.w;
+          final leftX = o.x - w;
+          var goRight = pushRight <= pushLeft;
+          // Prefer the nearer push, but if it would carry the book past an end
+          // of the shelf and the other direction stays on it, take that instead.
+          // If neither stays on the shelf, keep the nearer push; the clamp below
+          // and the overlap check then decide as before.
+          if (bounded) {
+            final rightOk = rightX + w <= c.right + 1e-9;
+            final leftOk = leftX >= c.left - 1e-9;
+            if (goRight && !rightOk && leftOk) goRight = false;
+            if (!goRight && !leftOk && rightOk) goRight = true;
+          }
+          bx = goRight ? rightX : leftX;
           moved = true;
         }
       }

@@ -73,6 +73,12 @@ no limit, so a large folder import held dozens of parses in memory at once and
 the Raspberry Pi ran out. Enrichment now takes a one-permit `enrich_semaphore`
 held for the whole task, separate from the render semaphore.
 
+### ✅ 11. Settle bounds
+A book nudged out of an overlap no longer leaves its shelf: when the nearer
+push would carry it past an end and the other side has room, it goes there
+instead. A shelf with no room either way still falls through to the surface
+below (`settle.dart`, pinned in `test/settle_test.dart`).
+
 ---
 
 ## Manual device checks (CI can't do these)
@@ -194,8 +200,6 @@ this order.
 
 ## Open / possible follow-ups
 
-- **Settle bounds.** The overlap resolver can push a book past a shelf’s end (it
-  then floats at that height). Could clamp to shelf bounds.
 - **EPUB reader polish.** Partly resolved by plan 5 #23: in-chapter scroll
   position **is** saved and restored (the arithmetic is pinned in
   `test/reader/epub_reader_page_test.dart`), and typography/themes now apply.

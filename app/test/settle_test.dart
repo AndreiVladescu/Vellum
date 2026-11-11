@@ -130,6 +130,55 @@ void main() {
     expect(r.y, closeTo(0.5, 1e-9));
   });
 
+  test('a book pushed right past the shelf end goes left instead', () {
+    // Shelf [0, 1]. A book fills [0.6, 0.95]; a 0.1 book dropped at 0.9 is
+    // pushed right, which would put it at [0.95, 1.05] — past the end. It goes
+    // left of the obstacle instead, to [0.5, 0.6].
+    final r = settle(
+      x: 0.9,
+      y: 1.02,
+      w: 0.1,
+      h: 0.2,
+      shelves: [shelfAt(1.0, 0, 1.0)],
+      others: const [SettleBox(x: 0.6, y: 1.0, w: 0.35, h: 0.2)],
+    );
+    expect(r.onSurface, isTrue);
+    expect(r.x, closeTo(0.5, 1e-9));
+    expect(r.x + 0.1, lessThanOrEqualTo(1.0 + 1e-9), reason: 'within the shelf');
+  });
+
+  test('a book pushed left past the shelf start goes right instead', () {
+    // Shelf [0, 1]. A book fills [0.05, 0.4]; a 0.1 book dropped at 0 is pushed
+    // left, which would put it at [-0.05, 0.05] — past the start. It goes right
+    // of the obstacle instead, to [0.4, 0.5].
+    final r = settle(
+      x: 0.0,
+      y: 1.02,
+      w: 0.1,
+      h: 0.2,
+      shelves: [shelfAt(1.0, 0, 1.0)],
+      others: const [SettleBox(x: 0.05, y: 1.0, w: 0.35, h: 0.2)],
+    );
+    expect(r.onSurface, isTrue);
+    expect(r.x, closeTo(0.4, 1e-9));
+    expect(r.x, greaterThanOrEqualTo(0.0 - 1e-9), reason: 'within the shelf');
+  });
+
+  test('a completely full shelf keeps the old fall-through behaviour', () {
+    // One book covers the whole shelf [0, 1]. A 0.1 book has no room either
+    // way: a push right leaves the shelf, a push left leaves it too. The book is
+    // not placed on the shelf (and is not left floating past its end).
+    final r = settle(
+      x: 0.45,
+      y: 1.02,
+      w: 0.1,
+      h: 0.2,
+      shelves: [shelfAt(1.0, 0, 1.0)],
+      others: const [SettleBox(x: 0.0, y: 1.0, w: 1.0, h: 0.2)],
+    );
+    expect(r.onSurface, isFalse);
+  });
+
   group('uprights (a side panel, a divider)', () {
     // Furniture holds nothing up — it is never in `shelves` — but a book slid
     // along a shelf still has to stop at it. Before this, "Divider" was a kind
