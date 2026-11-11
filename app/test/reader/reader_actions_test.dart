@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/reader_actions.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
   group('what fits', () {
@@ -77,6 +78,8 @@ void main() {
     Future<void> pump(WidgetTester tester, double width,
         {int count = 9, List<PopupMenuEntry<VoidCallback?>> extras = const []}) async {
       await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
         home: MediaQuery(
           data: MediaQueryData(size: Size(width, 800)),
           child: Scaffold(
@@ -131,6 +134,8 @@ void main() {
     testWidgets('a disabled action is offered and greyed, not hidden',
         (tester) async {
       await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
         home: MediaQuery(
           data: const MediaQueryData(size: Size(360, 800)),
           child: Scaffold(

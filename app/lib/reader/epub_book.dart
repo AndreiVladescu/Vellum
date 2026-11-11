@@ -6,14 +6,21 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 import 'package:xml/xml.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// One spine entry of an EPUB: its display [title] and the chapter's XHTML,
 /// with images inlined as data URIs so it renders self-contained.
 class EpubChapter {
   const EpubChapter({required this.title, required this.html});
 
+  /// The title the book gives this chapter, or empty when it gives none —
+  /// which is for [titleOf] to name, in the reader's language.
   final String title;
   final String html;
+
+  /// [title], or "Chapter N" when the book has none. [index] is zero-based.
+  String titleOf(L10n l10n, int index) =>
+      title.trim().isEmpty ? l10n.readerChapterTitle(index + 1) : title;
 
   /// The chapter's visible text, with markup removed and whitespace collapsed.
   ///
@@ -110,7 +117,7 @@ class EpubBook {
     }
 
     // container.xml -> the OPF package file.
-    final container = readText('META-INF/container.xml');
+    final container = readText('META-INF/container.xml'); // i18n-ignore
     if (container == null) {
       throw const FormatException('not an EPUB: missing container.xml');
     }
@@ -159,7 +166,7 @@ class EpubBook {
       final html = readText(path);
       if (html == null) continue;
       chapters.add(EpubChapter(
-        title: titles[path] ?? 'Chapter ${chapters.length + 1}',
+        title: titles[path] ?? '',
         html: _inlineImages(html, p.posix.dirname(path), read, resolve),
       ));
     }
@@ -191,7 +198,7 @@ class EpubBook {
       return bytes == null ? null : utf8.decode(bytes, allowMalformed: true);
     }
 
-    final container = readText('META-INF/container.xml');
+    final container = readText('META-INF/container.xml'); // i18n-ignore
     if (container == null) return null;
     String? opfPath;
     for (final rf in XmlDocument.parse(container).findAllElements('rootfile')) {

@@ -14,9 +14,13 @@ directory. Done so far:
 - `app/lib/onboarding/`
 - `app/lib/add_book/`
 - `app/lib/book_detail/`
+- `app/lib/reader/`
+- `app/lib/settings/`
+- `app/lib/stats/`
+- `app/lib/diagnostics/` (its report text stays English on purpose: it is pasted
+  into bug reports the maintainer has to read)
 
-Everything else (reader, settings, stats, physical rooms, server, import, loans,
-wishlist, dedupe, diagnostics, ...) still shows English whatever the locale. A
+Everything else (physical rooms, server, import, loans, wishlist, dedupe, ...) still shows English whatever the locale. A
 translation made today is therefore a partial one; the rest follows as those
 directories are extracted.
 

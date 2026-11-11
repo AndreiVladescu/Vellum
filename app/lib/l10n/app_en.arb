@@ -2148,5 +2148,3063 @@
   "samplesRemoveAction": "Remove",
   "@samplesRemoveAction": {
     "description": "Snack bar action that removes the sample books again."
+  },
+
+  "prefsFaceSpine": "Spine out",
+  "@prefsFaceSpine": {
+    "description": "Bookshelf display mode: books shown spine-out."
+  },
+
+  "prefsFaceCover": "Front cover",
+  "@prefsFaceCover": {
+    "description": "Bookshelf display mode: books shown face-out."
+  },
+
+  "prefsFaceList": "List",
+  "@prefsFaceList": {
+    "description": "Bookshelf display mode: a plain list."
+  },
+
+  "prefsSpineArtCoverSlice": "Cover slice",
+  "@prefsSpineArtCoverSlice": {
+    "description": "Spine artwork choice: a vertical slice of the cover image."
+  },
+
+  "prefsSpineArtDominantColour": "Dominant colour",
+  "@prefsSpineArtDominantColour": {
+    "description": "Spine artwork choice: the cover's dominant colour."
+  },
+
+  "prefsWallpaperParchment": "Warm parchment",
+  "@prefsWallpaperParchment": {
+    "description": "Name of a built-in wallpaper."
+  },
+
+  "prefsWallpaperFern": "Fern on a white wall",
+  "@prefsWallpaperFern": {
+    "description": "Name of a built-in wallpaper."
+  },
+
+  "prefsWallpaperOcean": "Ocean blue",
+  "@prefsWallpaperOcean": {
+    "description": "Name of a built-in wallpaper."
+  },
+
+  "prefsSeedLeather": "Leather",
+  "@prefsSeedLeather": {
+    "description": "Name of a theme colour preset."
+  },
+
+  "prefsSeedInk": "Ink",
+  "@prefsSeedInk": {
+    "description": "Name of a theme colour preset."
+  },
+
+  "prefsSeedForest": "Forest",
+  "@prefsSeedForest": {
+    "description": "Name of a theme colour preset."
+  },
+
+  "prefsSeedSlate": "Slate",
+  "@prefsSeedSlate": {
+    "description": "Name of a theme colour preset."
+  },
+
+  "prefsSeedPlum": "Plum",
+  "@prefsSeedPlum": {
+    "description": "Name of a theme colour preset."
+  },
+
+  "prefsSeedEmber": "Ember",
+  "@prefsSeedEmber": {
+    "description": "Name of a theme colour preset."
+  },
+
+  "prefsMaterialOak": "Oak",
+  "@prefsMaterialOak": {
+    "description": "Name of a shelf board material."
+  },
+
+  "prefsMaterialWalnut": "Walnut",
+  "@prefsMaterialWalnut": {
+    "description": "Name of a shelf board material."
+  },
+
+  "prefsMaterialEbony": "Ebony",
+  "@prefsMaterialEbony": {
+    "description": "Name of a shelf board material."
+  },
+
+  "prefsMaterialPainted": "Painted",
+  "@prefsMaterialPainted": {
+    "description": "Name of a shelf board material."
+  },
+
+  "prefsMaterialMetal": "Metal",
+  "@prefsMaterialMetal": {
+    "description": "Name of a shelf board material."
+  },
+
+  "prefsMaterialGlass": "Glass",
+  "@prefsMaterialGlass": {
+    "description": "Name of a shelf board material."
+  },
+
+  "defectMissingFile": "Books whose file is gone",
+  "@defectMissingFile": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectMissingFileRepair": "Detach the file record",
+  "@defectMissingFileRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectMissingCover": "Books whose cover image is gone",
+  "@defectMissingCover": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectMissingCoverRepair": "Clear the cover so a new one can be set",
+  "@defectMissingCoverRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectOrphanBlob": "Files on disk no book refers to",
+  "@defectOrphanBlob": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectOrphanBlobRepair": "Delete the file from disk",
+  "@defectOrphanBlobRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectDanglingPlacement": "Placements of copies that no longer exist",
+  "@defectDanglingPlacement": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectDanglingPlacementRepair": "Remove the placement",
+  "@defectDanglingPlacementRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectDuplicateFileRow": "The same file attached twice to one book",
+  "@defectDuplicateFileRow": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectDuplicateFileRowRepair": "Keep one record, drop the duplicates",
+  "@defectDuplicateFileRowRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectStaleTombstone": "Old delete markers with no server to tell",
+  "@defectStaleTombstone": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectStaleTombstoneRepair": "Forget the marker",
+  "@defectStaleTombstoneRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectDuplicateBook": "Books that look like the same book",
+  "@defectDuplicateBook": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectDuplicateBookRepair": "Open them and merge or trash one yourself",
+  "@defectDuplicateBookRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectNoCover": "Books with no cover at all",
+  "@defectNoCover": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectNoCoverRepair": "Set one from the book’s page",
+  "@defectNoCoverRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "defectIncompleteMetadata": "Books missing an author or a year",
+  "@defectIncompleteMetadata": {
+    "description": "Library health: heading of a category of problem found by the library check."
+  },
+
+  "defectIncompleteMetadataRepair": "Fill it in on the book’s page",
+  "@defectIncompleteMetadataRepair": {
+    "description": "Library health: what repairing (or doing by hand) this category does."
+  },
+
+  "prefsBackupNotABackup": "That file isn't a Vellum backup.",
+  "@prefsBackupNotABackup": {
+    "description": "Verify dialog: the chosen file could not be read as a backup."
+  },
+
+  "prefsBackupNoDatabase": "No library database in this archive.",
+  "@prefsBackupNoDatabase": {
+    "description": "Verify dialog."
+  },
+
+  "prefsBackupDamagedCount": "{count} damaged",
+  "@prefsBackupDamagedCount": {
+    "description": "Phrase in the verify dialog: files whose checksum no longer matches.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsBackupMissingCount": "{count} missing",
+  "@prefsBackupMissingCount": {
+    "description": "Phrase in the verify dialog: files listed but absent.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsBackupNotIntact": "Backup is not intact: {parts}.",
+  "@prefsBackupNotIntact": {
+    "description": "Verify dialog; `parts` is a comma-separated list of the damaged / missing counts.",
+    "placeholders": {
+      "parts": { "type": "String" }
+    }
+  },
+
+  "prefsBackupNoChecksums": "Readable, but written before Vellum recorded checksums — the contents could not be verified.",
+  "@prefsBackupNoChecksums": {
+    "description": "Verify dialog for an old backup."
+  },
+
+  "prefsBackupIntact": "Backup is intact: {checked, plural, =1{1 file} other{{checked} files}} checked.",
+  "@prefsBackupIntact": {
+    "description": "Verify dialog for a good backup.",
+    "placeholders": {
+      "checked": { "type": "int" }
+    }
+  },
+
+  "prefsBackupIntactBooks": "Backup is intact: {checked, plural, =1{1 file} other{{checked} files}} checked, {books, plural, =1{1 book} other{{books} books}}.",
+  "@prefsBackupIntactBooks": {
+    "description": "Verify dialog for a good backup that records its book count.",
+    "placeholders": {
+      "checked": { "type": "int" },
+      "books": { "type": "int" }
+    }
+  },
+
+  "prefsTitle": "Preferences",
+  "@prefsTitle": {
+    "description": "App bar title of the Preferences page."
+  },
+
+  "prefsSectionAppearance": "Appearance",
+  "@prefsSectionAppearance": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionBooks": "Books on the shelf",
+  "@prefsSectionBooks": {
+    "description": "Section header: how books are drawn on the shelf."
+  },
+
+  "prefsSectionWallpaper": "Wallpaper",
+  "@prefsSectionWallpaper": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionGenres": "Genres",
+  "@prefsSectionGenres": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionSearch": "Search inside books",
+  "@prefsSectionSearch": {
+    "description": "Section header for the on-device full-text index."
+  },
+
+  "prefsSectionSync": "Sync",
+  "@prefsSectionSync": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionSamples": "Sample books",
+  "@prefsSectionSamples": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionTrash": "Trash",
+  "@prefsSectionTrash": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionHealth": "Library health",
+  "@prefsSectionHealth": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionBackup": "Backup",
+  "@prefsSectionBackup": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSectionDanger": "Danger zone",
+  "@prefsSectionDanger": {
+    "description": "Section header on Preferences."
+  },
+
+  "prefsSpineArtLabel": "Spine artwork for books with a cover",
+  "@prefsSpineArtLabel": {
+    "description": "Label above the spine-artwork choice (cover slice or dominant colour)."
+  },
+
+  "prefsGenresImportTitle": "Import genres from Open Library",
+  "@prefsGenresImportTitle": {
+    "description": "Switch title."
+  },
+
+  "prefsGenresImportSubtitle": "Auto-tag new books with Open Library’s subjects. Off by default — those are noisy; assign your own genres instead",
+  "@prefsGenresImportSubtitle": {
+    "description": "Switch subtitle."
+  },
+
+  "prefsAutoPushTitle": "Push changes automatically",
+  "@prefsAutoPushTitle": {
+    "description": "Switch title."
+  },
+
+  "prefsAutoPushSubtitle": "Send edits to the server in the background while connected",
+  "@prefsAutoPushSubtitle": {
+    "description": "Switch subtitle."
+  },
+
+  "prefsSharedShelvesTitle": "Shelves from others",
+  "@prefsSharedShelvesTitle": {
+    "description": "Row title that opens the shared-shelves page; shown only when connected to a server."
+  },
+
+  "prefsSharedShelvesSubtitle": "Choose which shared shelves show in your library",
+  "@prefsSharedShelvesSubtitle": {
+    "description": "Row subtitle."
+  },
+
+  "prefsIndexTitle": "Index the text of my books",
+  "@prefsIndexTitle": {
+    "description": "Switch title for the on-device text index."
+  },
+
+  "prefsIndexSubtitle": "Lets search look inside books, not just at titles and authors. Off by default: the index is about as big as the text it holds",
+  "@prefsIndexSubtitle": {
+    "description": "Switch subtitle."
+  },
+
+  "prefsIndexedCount": "{count} indexed",
+  "@prefsIndexedCount": {
+    "description": "First phrase of the index status line; phrases are joined with commas.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsIndexWaitingCount": "{count} waiting",
+  "@prefsIndexWaitingCount": {
+    "description": "Phrase of the index status line: books still queued.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsIndexNoTextCount": "{count} with no text (scanned)",
+  "@prefsIndexNoTextCount": {
+    "description": "Phrase of the index status line: books that have no text layer.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsIndexing": "Indexing…",
+  "@prefsIndexing": {
+    "description": "Button label while the index is being built."
+  },
+
+  "prefsIndexNow": "Index now",
+  "@prefsIndexNow": {
+    "description": "Button that builds the text index."
+  },
+
+  "prefsIndexRebuild": "Rebuild",
+  "@prefsIndexRebuild": {
+    "description": "Button that throws away the text index and builds it again."
+  },
+
+  "prefsRepairConfirmBody": "{action} for {count, plural, =1{1 item} other{{count} items}}. This can’t be undone.",
+  "@prefsRepairConfirmBody": {
+    "description": "Confirmation before a destructive repair. `action` is the repair description, such as \"Delete the file from disk\".",
+    "placeholders": {
+      "action": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsContinue": "Continue",
+  "@prefsContinue": {
+    "description": "Confirm button of the repair dialog."
+  },
+
+  "prefsRepaired": "{count, plural, =1{Repaired 1 item} other{Repaired {count} items}}",
+  "@prefsRepaired": {
+    "description": "Snack bar after a library repair.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsHealthIntro": "Checks that every book still has its file and cover, and that no stray data is left behind. Nothing is changed until you ask.",
+  "@prefsHealthIntro": {
+    "description": "Explanation under the Library health header."
+  },
+
+  "prefsHealthChecking": "Checking…",
+  "@prefsHealthChecking": {
+    "description": "Button label while the library check runs."
+  },
+
+  "prefsHealthCheck": "Check library",
+  "@prefsHealthCheck": {
+    "description": "Button that scans the library for inconsistencies."
+  },
+
+  "prefsHealthStop": "Stop",
+  "@prefsHealthStop": {
+    "description": "Button that cancels the running library check."
+  },
+
+  "prefsHealthAllGood": "Everything checks out.",
+  "@prefsHealthAllGood": {
+    "description": "Shown when the library check found nothing wrong."
+  },
+
+  "prefsHealthReclaim": "{count} · {size} to reclaim",
+  "@prefsHealthReclaim": {
+    "description": "Result row for orphaned files: how many, and how much disk space deleting them frees. `size` is already formatted, e.g. \"3.2 MB\".",
+    "placeholders": {
+      "count": { "type": "int" },
+      "size": { "type": "String" }
+    }
+  },
+
+  "prefsHealthFound": "{count} found · {action}",
+  "@prefsHealthFound": {
+    "description": "Result row for a repairable problem: how many were found and what the repair does.",
+    "placeholders": {
+      "count": { "type": "int" },
+      "action": { "type": "String" }
+    }
+  },
+
+  "prefsHealthRepair": "Repair",
+  "@prefsHealthRepair": {
+    "description": "Button that repairs one category of problem."
+  },
+
+  "prefsHealthAdviceHeader": "Worth tidying",
+  "@prefsHealthAdviceHeader": {
+    "description": "Heading above advisory findings that are untidy rather than broken."
+  },
+
+  "prefsHealthAdviceRow": "{count} · {action}",
+  "@prefsHealthAdviceRow": {
+    "description": "Advisory result row: how many, and what to do about it by hand.",
+    "placeholders": {
+      "count": { "type": "int" },
+      "action": { "type": "String" }
+    }
+  },
+
+  "prefsDiagCopied": "Diagnostics copied",
+  "@prefsDiagCopied": {
+    "description": "Snack bar after copying the diagnostics report."
+  },
+
+  "prefsDiagTitle": "Diagnostics",
+  "@prefsDiagTitle": {
+    "description": "Dialog title showing the diagnostics report."
+  },
+
+  "prefsClose": "Close",
+  "@prefsClose": {
+    "description": "Button that closes a dialog."
+  },
+
+  "prefsCopy": "Copy",
+  "@prefsCopy": {
+    "description": "Button that copies text to the clipboard."
+  },
+
+  "prefsDiagIntro": "For a bug report: versions, counts and recent errors. No titles, file names or server address — read it before you post it.",
+  "@prefsDiagIntro": {
+    "description": "Explanation above the Copy diagnostics button."
+  },
+
+  "prefsDiagCopyButton": "Copy diagnostics",
+  "@prefsDiagCopyButton": {
+    "description": "Button that copies the diagnostics report."
+  },
+
+  "prefsDiagShow": "Show",
+  "@prefsDiagShow": {
+    "description": "Button that shows the diagnostics report before copying."
+  },
+
+  "prefsReadingPositionOffFailed": "Turned off here, but the server couldn't be reached to remove the positions it already has. Turn it off again while connected.",
+  "@prefsReadingPositionOffFailed": {
+    "description": "Snack bar when the sync-reading-position switch was turned off while the server was unreachable."
+  },
+
+  "prefsReadingPositionTitle": "Sync reading position",
+  "@prefsReadingPositionTitle": {
+    "description": "Switch title."
+  },
+
+  "prefsReadingPositionSubtitle": "Let your other devices offer to resume where you left off. Off by default: unlike your catalogue, this tells the server what you read and how far. This device appears as “{device}”.",
+  "@prefsReadingPositionSubtitle": {
+    "description": "Switch subtitle; `device` is this device's name.",
+    "placeholders": {
+      "device": { "type": "String" }
+    }
+  },
+
+  "prefsEncryptTitle": "Encrypt this backup?",
+  "@prefsEncryptTitle": {
+    "description": "Dialog title when exporting a backup."
+  },
+
+  "prefsEncryptBody": "A backup holds your whole library, including your private reader notes. Encrypting it means only someone with the passphrase can read it.\n\nVellum does not store the passphrase anywhere. If you lose it, the backup is gone — there is no recovery.\n\nEncrypting is real work for the processor, so a large library takes noticeably longer to export than a plain zip.",
+  "@prefsEncryptBody": {
+    "description": "Body of the encrypt-backup dialog."
+  },
+
+  "prefsPassphraseLabel": "Passphrase",
+  "@prefsPassphraseLabel": {
+    "description": "Field label."
+  },
+
+  "prefsPassphraseRepeatLabel": "Repeat it",
+  "@prefsPassphraseRepeatLabel": {
+    "description": "Label of the second passphrase field."
+  },
+
+  "prefsEncryptPlain": "No, plain .zip",
+  "@prefsEncryptPlain": {
+    "description": "Button that exports an unencrypted .zip."
+  },
+
+  "prefsPassphraseMissing": "Enter a passphrase, or choose plain.",
+  "@prefsPassphraseMissing": {
+    "description": "Validation error in the encrypt dialog."
+  },
+
+  "prefsPassphraseMismatch": "Those two do not match.",
+  "@prefsPassphraseMismatch": {
+    "description": "Validation error: the two passphrases differ."
+  },
+
+  "prefsEncryptAction": "Encrypt",
+  "@prefsEncryptAction": {
+    "description": "Button that exports an encrypted backup."
+  },
+
+  "prefsBackupEncryptedTitle": "This backup is encrypted",
+  "@prefsBackupEncryptedTitle": {
+    "description": "Dialog title asking for the passphrase of a backup being opened."
+  },
+
+  "prefsOpen": "Open",
+  "@prefsOpen": {
+    "description": "Button that submits the passphrase."
+  },
+
+  "prefsBackupTypeGroup": "Vellum backup",
+  "@prefsBackupTypeGroup": {
+    "description": "Name of the backup file type in file pickers, and the subject of the shared backup."
+  },
+
+  "prefsBackupTypeEncrypted": "Encrypted Vellum backup",
+  "@prefsBackupTypeEncrypted": {
+    "description": "Name of the encrypted backup file type in the save dialog."
+  },
+
+  "prefsBackupTypeZip": "Zip archive",
+  "@prefsBackupTypeZip": {
+    "description": "Name of the plain zip file type in the save dialog."
+  },
+
+  "prefsVerifyOk": "Backup checks out",
+  "@prefsVerifyOk": {
+    "description": "Dialog title when a verified backup is fine."
+  },
+
+  "prefsVerifyProblems": "Backup has problems",
+  "@prefsVerifyProblems": {
+    "description": "Dialog title when a verified backup has problems."
+  },
+
+  "prefsVerifyWritten": "Written {date}",
+  "@prefsVerifyWritten": {
+    "description": "Line in the verify dialog; `date` is the time the backup was made.",
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+
+  "prefsBackupSaved": "Backup saved to {path}",
+  "@prefsBackupSaved": {
+    "description": "Snack bar after a backup export.",
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+
+  "prefsBackupFailed": "Backup failed: {error}",
+  "@prefsBackupFailed": {
+    "description": "Snack bar when a backup export fails.",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "prefsRestoreWaitSync": "Wait for the sync to finish, then try again.",
+  "@prefsRestoreWaitSync": {
+    "description": "Snack bar: a restore was attempted during a sync."
+  },
+
+  "prefsRestoreTitle": "Restore from backup?",
+  "@prefsRestoreTitle": {
+    "description": "Confirmation dialog title."
+  },
+
+  "prefsRestoreBody": "This replaces your whole library — every book, cover, file, and reading position — with the backup's contents. Vellum will close when the restore finishes; open it again to see the restored library.\n\nThere is no undo.",
+  "@prefsRestoreBody": {
+    "description": "Confirmation dialog body."
+  },
+
+  "prefsRestoreReplace": "Replace & restart",
+  "@prefsRestoreReplace": {
+    "description": "Destructive confirm button of the restore dialog."
+  },
+
+  "prefsRestoreNotBackup": "That file doesn't look like a Vellum backup.",
+  "@prefsRestoreNotBackup": {
+    "description": "Snack bar when the chosen file is not a backup."
+  },
+
+  "prefsRestoreFailedTitle": "Restore failed",
+  "@prefsRestoreFailedTitle": {
+    "description": "Dialog title."
+  },
+
+  "prefsRestoreFailedBody": "The restore did not complete: {error}\n\nVellum will close now; open it again and check your library (your previous backup file is untouched).",
+  "@prefsRestoreFailedBody": {
+    "description": "Dialog body after a failed restore.",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "prefsRestoreCloseApp": "Close Vellum",
+  "@prefsRestoreCloseApp": {
+    "description": "Button that quits the app after a failed restore."
+  },
+
+  "prefsExportTitle": "Export library…",
+  "@prefsExportTitle": {
+    "description": "Row title."
+  },
+
+  "prefsExportSubtitle": "Everything — database, covers, and book files — in one .zip",
+  "@prefsExportSubtitle": {
+    "description": "Row subtitle."
+  },
+
+  "prefsVerifyTitle": "Verify a backup…",
+  "@prefsVerifyTitle": {
+    "description": "Row title."
+  },
+
+  "prefsVerifySubtitle": "Re-checks every file against its checksum, without restoring",
+  "@prefsVerifySubtitle": {
+    "description": "Row subtitle."
+  },
+
+  "prefsRestoreTile": "Restore from backup…",
+  "@prefsRestoreTile": {
+    "description": "Row title."
+  },
+
+  "prefsRestoreTileSubtitle": "Replaces the current library, then restarts",
+  "@prefsRestoreTileSubtitle": {
+    "description": "Row subtitle."
+  },
+
+  "prefsTrayDenied": "Android refused permission to post notifications. You can grant it in the system settings for Vellum.",
+  "@prefsTrayDenied": {
+    "description": "Snack bar when the notification permission was refused."
+  },
+
+  "prefsTrayDailySet": "Background sync set to daily, so there is something to check with.",
+  "@prefsTrayDailySet": {
+    "description": "Snack bar after turning on notifications switched the background sync to daily."
+  },
+
+  "prefsTrayTitle": "Borrowing notifications",
+  "@prefsTrayTitle": {
+    "description": "Switch title."
+  },
+
+  "prefsTraySubtitle": "Put requests and answers in the status bar, checked when background sync runs",
+  "@prefsTraySubtitle": {
+    "description": "Switch subtitle on Android."
+  },
+
+  "prefsTrayUnavailable": "Android only — a desktop window is already in front of you",
+  "@prefsTrayUnavailable": {
+    "description": "Switch subtitle where notifications are unavailable."
+  },
+
+  "prefsBgTitle": "Background sync",
+  "@prefsBgTitle": {
+    "description": "Expansion tile title."
+  },
+
+  "prefsAndroidOnly": "Android only",
+  "@prefsAndroidOnly": {
+    "description": "Subtitle of a setting that exists only on Android."
+  },
+
+  "prefsOff": "Off",
+  "@prefsOff": {
+    "description": "Value of a setting that is switched off."
+  },
+
+  "prefsIntervalLast": "{interval} · last {date}",
+  "@prefsIntervalLast": {
+    "description": "Summary: the schedule interval and when it last ran.",
+    "placeholders": {
+      "interval": { "type": "String" },
+      "date": { "type": "String" }
+    }
+  },
+
+  "prefsBgDesktopNote": "A desktop app is already running when you use it. This is for a phone, where the library would otherwise be stale every time you pick it up.",
+  "@prefsBgDesktopNote": {
+    "description": "Explanation on desktop why background sync is unavailable."
+  },
+
+  "prefsBgConditions": "Runs only on Wi-Fi while charging, so it can never spend your mobile data or your last few per cent. Syncing by hand ignores both conditions.",
+  "@prefsBgConditions": {
+    "description": "Explanation of the background sync conditions."
+  },
+
+  "prefsHowOften": "How often",
+  "@prefsHowOften": {
+    "description": "Label of a schedule interval dropdown."
+  },
+
+  "prefsEvery6Hours": "Every 6 hours",
+  "@prefsEvery6Hours": {
+    "description": "Background sync interval option."
+  },
+
+  "prefsDaily": "Daily",
+  "@prefsDaily": {
+    "description": "Schedule option."
+  },
+
+  "prefsWeekly": "Weekly",
+  "@prefsWeekly": {
+    "description": "Schedule option."
+  },
+
+  "prefsSchedTitle": "Scheduled backups",
+  "@prefsSchedTitle": {
+    "description": "Expansion tile title."
+  },
+
+  "prefsDesktopOnly": "Desktop only",
+  "@prefsDesktopOnly": {
+    "description": "Subtitle of a setting that exists only on desktop."
+  },
+
+  "prefsSchedSummary": "{frequency}, keeping {keep}",
+  "@prefsSchedSummary": {
+    "description": "Summary of scheduled backups: how often and how many are kept.",
+    "placeholders": {
+      "frequency": { "type": "String" },
+      "keep": { "type": "int" }
+    }
+  },
+
+  "prefsSchedSummaryLast": "{frequency}, keeping {keep} · last {date}",
+  "@prefsSchedSummaryLast": {
+    "description": "Summary of scheduled backups with the time of the last one.",
+    "placeholders": {
+      "frequency": { "type": "String" },
+      "keep": { "type": "int" },
+      "date": { "type": "String" }
+    }
+  },
+
+  "prefsSchedPhoneNote": "A phone has no folder to write to unattended and no moment to run in. Use “Export library…” and save it wherever you keep things.",
+  "@prefsSchedPhoneNote": {
+    "description": "Explanation on phones why scheduled backups are unavailable."
+  },
+
+  "prefsSchedHow": "Runs when Vellum starts, if the last backup is older than the interval — no background service. Scheduled archives are plain .zip: encrypting them would mean storing the passphrase, which is the same as not encrypting them.",
+  "@prefsSchedHow": {
+    "description": "Explanation of scheduled backups."
+  },
+
+  "prefsFolder": "Folder",
+  "@prefsFolder": {
+    "description": "Row title: the folder scheduled backups are written to."
+  },
+
+  "prefsFolderNone": "Not chosen yet",
+  "@prefsFolderNone": {
+    "description": "Subtitle when no backup folder is chosen."
+  },
+
+  "prefsKeep": "Keep",
+  "@prefsKeep": {
+    "description": "Label of the dropdown choosing how many scheduled backups to keep."
+  },
+
+  "prefsCustomColourTitle": "Custom colour",
+  "@prefsCustomColourTitle": {
+    "description": "Dialog title for the custom theme colour picker."
+  },
+
+  "prefsSeedSwatch": "Seed colour swatch",
+  "@prefsSeedSwatch": {
+    "description": "Screen-reader label of a colour swatch in the picker."
+  },
+
+  "prefsThemeSystem": "System",
+  "@prefsThemeSystem": {
+    "description": "Theme mode option: follow the system."
+  },
+
+  "prefsThemeLight": "Light",
+  "@prefsThemeLight": {
+    "description": "Theme mode option."
+  },
+
+  "prefsThemeDark": "Dark",
+  "@prefsThemeDark": {
+    "description": "Theme mode option."
+  },
+
+  "prefsDynamicColourTitle": "Use the system colours",
+  "@prefsDynamicColourTitle": {
+    "description": "Switch title (Android)."
+  },
+
+  "prefsDynamicColourSubtitle": "Material You, from your Android wallpaper. Overrides the colour below",
+  "@prefsDynamicColourSubtitle": {
+    "description": "Switch subtitle."
+  },
+
+  "prefsColour": "Colour",
+  "@prefsColour": {
+    "description": "Label above the theme colour swatches."
+  },
+
+  "prefsSeedCustom": "Custom",
+  "@prefsSeedCustom": {
+    "description": "Swatch that opens the custom colour picker."
+  },
+
+  "prefsShelfMaterial": "Shelf material",
+  "@prefsShelfMaterial": {
+    "description": "Label above the shelf material choice."
+  },
+
+  "prefsSpineSize": "Spine size",
+  "@prefsSpineSize": {
+    "description": "Label above the spine size sliders."
+  },
+
+  "prefsSpineTitleScale": "Title",
+  "@prefsSpineTitleScale": {
+    "description": "Slider label: size of the title on the spine."
+  },
+
+  "prefsSpineThickness": "Thickness",
+  "@prefsSpineThickness": {
+    "description": "Slider label: thickness of the spine."
+  },
+
+  "prefsSamplesRemoveTitle": "Remove the sample books?",
+  "@prefsSamplesRemoveTitle": {
+    "description": "Dialog title."
+  },
+
+  "prefsSamplesRemoveBody": "They are deleted from this device, along with any notes or reading progress on them. Your own books are not touched.",
+  "@prefsSamplesRemoveBody": {
+    "description": "Dialog body."
+  },
+
+  "prefsSamplesRemoved": "{count, plural, =1{Removed 1 sample book.} other{Removed {count} sample books.}}",
+  "@prefsSamplesRemoved": {
+    "description": "Snack bar after removing the sample books.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsSamplesRemoveFailed": "Could not remove the sample books: {error}",
+  "@prefsSamplesRemoveFailed": {
+    "description": "Snack bar.",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "prefsSamplesAdd": "Add sample books",
+  "@prefsSamplesAdd": {
+    "description": "Row title when there are no samples."
+  },
+
+  "prefsSamplesRemove": "Remove sample books",
+  "@prefsSamplesRemove": {
+    "description": "Row title when the samples are on the shelf."
+  },
+
+  "prefsSamplesAddSubtitle": "Four public-domain books to try Vellum with",
+  "@prefsSamplesAddSubtitle": {
+    "description": "Row subtitle."
+  },
+
+  "prefsSamplesRemoveSubtitle": "{count} on the \"{shelf}\" shelf, kept on this device only",
+  "@prefsSamplesRemoveSubtitle": {
+    "description": "Row subtitle; `shelf` is the sample shelf's name.",
+    "placeholders": {
+      "count": { "type": "int" },
+      "shelf": { "type": "String" }
+    }
+  },
+
+  "prefsTrashTitle": "Trash",
+  "@prefsTrashTitle": {
+    "description": "Row title that opens the trash."
+  },
+
+  "prefsTrashNone": "Nothing waiting to be deleted",
+  "@prefsTrashNone": {
+    "description": "Row subtitle when the trash is empty."
+  },
+
+  "prefsTrashCount": "{count, plural, =1{1 book, deleted for good after {days} days} other{{count} books, deleted for good after {days} days}}",
+  "@prefsTrashCount": {
+    "description": "Row subtitle: books in the trash and the grace period.",
+    "placeholders": {
+      "count": { "type": "int" },
+      "days": { "type": "int" }
+    }
+  },
+
+  "prefsClearEmpty": "Your library is already empty.",
+  "@prefsClearEmpty": {
+    "description": "Snack bar when there is nothing to remove."
+  },
+
+  "prefsClearEmptyTrash": "Empty trash",
+  "@prefsClearEmptyTrash": {
+    "description": "Snack bar action that permanently deletes everything in the trash."
+  },
+
+  "prefsClearTitle": "Remove every book from this device",
+  "@prefsClearTitle": {
+    "description": "Row title of the danger-zone action."
+  },
+
+  "prefsClearSubtitle": "Moves your whole library to the trash. The server keeps its copy.",
+  "@prefsClearSubtitle": {
+    "description": "Row subtitle."
+  },
+
+  "prefsClearDialogTitle": "{count, plural, other{Remove all {count} books?}}",
+  "@prefsClearDialogTitle": {
+    "description": "Dialog title.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "prefsClearDialogBody": "Every book goes to the trash on this device, where it stays for {days} days. Nothing is deleted on your server — if you sync again, your library comes back.",
+  "@prefsClearDialogBody": {
+    "description": "Dialog body.",
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+
+  "prefsClearDialogDiskNote": "Disk space is not freed until the trash is emptied, which you can do from the Trash section above.",
+  "@prefsClearDialogDiskNote": {
+    "description": "Dialog note."
+  },
+
+  "prefsClearTypeToConfirm": "Type {word} to confirm",
+  "@prefsClearTypeToConfirm": {
+    "description": "Field label; `word` is the word to type.",
+    "placeholders": {
+      "word": { "type": "String" }
+    }
+  },
+
+  "prefsClearConfirm": "Move all to trash",
+  "@prefsClearConfirm": {
+    "description": "Destructive confirm button."
+  },
+
+  "trashTitle": "Trash",
+  "@trashTitle": {
+    "description": "App bar title of the trash page."
+  },
+
+  "trashEmptyTitle": "The trash is empty",
+  "@trashEmptyTitle": {
+    "description": "Empty state heading of the trash page."
+  },
+
+  "trashEmptyBody": "Books you remove wait here for {days} days.",
+  "@trashEmptyBody": {
+    "description": "Empty state text; `days` is the grace period.",
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+
+  "trashEmptyAllTitle": "{count, plural, =1{Delete 1 book for good?} other{Delete {count} books for good?}}",
+  "@trashEmptyAllTitle": {
+    "description": "Dialog title for emptying the whole trash.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "trashEmptyAllBody": "Their covers and attached files are deleted from this device, and the deletion is sent to your server on the next sync. This can’t be undone.",
+  "@trashEmptyAllBody": {
+    "description": "Dialog body for emptying the whole trash."
+  },
+
+  "trashEmptyAllDone": "{count, plural, =1{Deleted 1 book} other{Deleted {count} books}}",
+  "@trashEmptyAllDone": {
+    "description": "Snack bar after emptying the trash.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "trashHeaderNote": "Deleted for good {days} days after you remove them. Until then nothing has been deleted and your server hasn’t been told.",
+  "@trashHeaderNote": {
+    "description": "Explanation at the top of the trash list; `days` is the grace period.",
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+
+  "trashEmptyButton": "Empty",
+  "@trashEmptyButton": {
+    "description": "Button that deletes everything in the trash for good."
+  },
+
+  "trashDeleteOneTitle": "Delete “{title}” for good?",
+  "@trashDeleteOneTitle": {
+    "description": "Dialog title for deleting one trashed book.",
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+
+  "trashDeleteOneBody": "Its cover and any attached files are deleted from this device, and the deletion is sent to your server on the next sync. This can’t be undone.",
+  "@trashDeleteOneBody": {
+    "description": "Dialog body for deleting one trashed book."
+  },
+
+  "trashDeleteOneDone": "“{title}” deleted",
+  "@trashDeleteOneDone": {
+    "description": "Snack bar after deleting one trashed book.",
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+
+  "trashRestoreTooltip": "Restore",
+  "@trashRestoreTooltip": {
+    "description": "Tooltip: take a book out of the trash."
+  },
+
+  "trashDeleteNowTooltip": "Delete now",
+  "@trashDeleteNowTooltip": {
+    "description": "Tooltip: delete a trashed book immediately."
+  },
+
+  "trashRemainingLaunch": "Deleted on the next launch",
+  "@trashRemainingLaunch": {
+    "description": "Subtitle of a trashed book whose grace period is over."
+  },
+
+  "trashRemainingDays": "{count, plural, =1{Deleted in 1 day} other{Deleted in {count} days}}",
+  "@trashRemainingDays": {
+    "description": "Subtitle of a trashed book: time left.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "trashRemainingHours": "{count, plural, =1{Deleted in 1 hour} other{Deleted in {count} hours}}",
+  "@trashRemainingHours": {
+    "description": "Subtitle of a trashed book: time left.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "trashRemainingSoon": "Deleted within the hour",
+  "@trashRemainingSoon": {
+    "description": "Subtitle of a trashed book that goes within the hour."
+  },
+
+  "sharedShelvesTitle": "Shelves from others",
+  "@sharedShelvesTitle": {
+    "description": "App bar title of the shared-shelves page."
+  },
+
+  "sharedShelvesAcceptTitle": "Show new shelves from others",
+  "@sharedShelvesAcceptTitle": {
+    "description": "Switch title."
+  },
+
+  "sharedShelvesAcceptSubtitle": "What happens to a shelf you have not ruled on, including ones that arrive later. Your answers below are kept either way.",
+  "@sharedShelvesAcceptSubtitle": {
+    "description": "Switch subtitle."
+  },
+
+  "sharedShelvesNone": "Nobody else has shared a shelf with this library yet.",
+  "@sharedShelvesNone": {
+    "description": "Empty state."
+  },
+
+  "sharedShelvesCount": "{count, plural, =1{1 shelf from others} other{{count} shelves from others}}",
+  "@sharedShelvesCount": {
+    "description": "Heading above the list of other people's shelves.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "sharedShelvesHideAll": "Hide all",
+  "@sharedShelvesHideAll": {
+    "description": "Button."
+  },
+
+  "sharedShelvesShowAll": "Show all",
+  "@sharedShelvesShowAll": {
+    "description": "Button."
+  },
+
+  "sharedShelvesFollowing": "Following the setting above",
+  "@sharedShelvesFollowing": {
+    "description": "Subtitle of a shelf with no individual ruling."
+  },
+
+  "sharedShelvesShown": "Shown in your library",
+  "@sharedShelvesShown": {
+    "description": "Subtitle of a shelf that was accepted."
+  },
+
+  "sharedShelvesHidden": "Hidden on this device",
+  "@sharedShelvesHidden": {
+    "description": "Subtitle of a shelf that was declined."
+  },
+
+  "sharedShelvesFollowTooltip": "Follow the setting above",
+  "@sharedShelvesFollowTooltip": {
+    "description": "Tooltip of the button that clears an individual ruling."
+  },
+
+  "insightsTitle": "Reading insights",
+  "@insightsTitle": {
+    "description": "App bar title of the reading insights page."
+  },
+
+  "insightsClearTooltip": "Clear reading history",
+  "@insightsClearTooltip": {
+    "description": "Tooltip of the app bar button that deletes recorded reading sessions."
+  },
+
+  "insightsClearTitle": "Clear reading history?",
+  "@insightsClearTitle": {
+    "description": "Confirmation dialog title."
+  },
+
+  "insightsClearBody": "Deletes every recorded reading session on this device. Your books, positions, and annotations are untouched. This can’t be undone.",
+  "@insightsClearBody": {
+    "description": "Confirmation dialog body."
+  },
+
+  "insightsClearAction": "Clear",
+  "@insightsClearAction": {
+    "description": "Destructive confirm button."
+  },
+
+  "insightsCleared": "{count, plural, =1{Cleared 1 session} other{Cleared {count} sessions}}",
+  "@insightsCleared": {
+    "description": "Snack bar after clearing the reading history.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "insightsEmptyTitle": "Nothing to show yet",
+  "@insightsEmptyTitle": {
+    "description": "Empty state heading."
+  },
+
+  "insightsEmptyBody": "Read a few pages and this fills in. Everything here stays on this device.",
+  "@insightsEmptyBody": {
+    "description": "Empty state text."
+  },
+
+  "insightsHabits": "Habits",
+  "@insightsHabits": {
+    "description": "Heading of the first group of figures."
+  },
+
+  "insightsDaysShort": "{count}d",
+  "@insightsDaysShort": {
+    "description": "A number of days in a compact stat tile, e.g. \"12d\".",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "insightsCurrentStreak": "Current streak",
+  "@insightsCurrentStreak": {
+    "description": "Label of a stat tile: consecutive days read up to today."
+  },
+
+  "insightsLongestStreak": "Longest streak",
+  "@insightsLongestStreak": {
+    "description": "Label of a stat tile."
+  },
+
+  "insightsDaysRead": "Days read",
+  "@insightsDaysRead": {
+    "description": "Label of a stat tile: number of distinct days with reading."
+  },
+
+  "insightsTotals": "Totals",
+  "@insightsTotals": {
+    "description": "Heading of the second group of figures."
+  },
+
+  "insightsPagesPerSession": "Pages / session",
+  "@insightsPagesPerSession": {
+    "description": "Label of a stat tile: average pages per reading session."
+  },
+
+  "insightsPagesRead": "Pages read",
+  "@insightsPagesRead": {
+    "description": "Label of a stat tile."
+  },
+
+  "insightsTimeReading": "Time reading",
+  "@insightsTimeReading": {
+    "description": "Label of a stat tile."
+  },
+
+  "insightsBooksFinished": "Books finished",
+  "@insightsBooksFinished": {
+    "description": "Label of a stat tile, and heading of the finished-per-month list."
+  },
+
+  "insightsThisWeek": "This week",
+  "@insightsThisWeek": {
+    "description": "Label of a stat tile: pages read this week."
+  },
+
+  "insightsMinutesShort": "{minutes}m",
+  "@insightsMinutesShort": {
+    "description": "A duration under an hour in a compact form, e.g. \"45m\".",
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+
+  "insightsHoursShort": "{hours}h",
+  "@insightsHoursShort": {
+    "description": "A whole number of hours in a compact form, e.g. \"3h\".",
+    "placeholders": {
+      "hours": {"type": "int"}
+    }
+  },
+
+  "insightsHoursMinutesShort": "{hours}h {minutes}m",
+  "@insightsHoursMinutesShort": {
+    "description": "Hours and minutes in a compact form, e.g. \"3h 20m\".",
+    "placeholders": {
+      "hours": {"type": "int"},
+      "minutes": {"type": "int"}
+    }
+  },
+
+  "insightsWeekVs": "vs last week",
+  "@insightsWeekVs": {
+    "description": "Under the This week tile when neither week has any reading."
+  },
+
+  "insightsWeekUpFromZero": "up from 0 last week",
+  "@insightsWeekUpFromZero": {
+    "description": "Under the This week tile when last week had no reading."
+  },
+
+  "insightsWeekSame": "same as last week",
+  "@insightsWeekSame": {
+    "description": "Under the This week tile when both weeks match."
+  },
+
+  "insightsWeekDelta": "{delta} vs last week",
+  "@insightsWeekDelta": {
+    "description": "Under the This week tile; `delta` is a signed difference in pages, e.g. \"+12\" or \"-4\".",
+    "placeholders": {
+      "delta": {"type": "String"}
+    }
+  },
+
+  "insightsBestDay": "{count, plural, =1{Your best day: 1 page} other{Your best day: {count} pages}}",
+  "@insightsBestDay": {
+    "description": "Title of the personal-best card.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "insightsBestDayDate": "{date}",
+  "@insightsBestDayDate": {
+    "description": "Date of the personal-best day, e.g. \"Mar 4, 2026\".",
+    "placeholders": {
+      "date": {"type": "DateTime", "format": "yMMMd"}
+    }
+  },
+
+  "insightsPagesADay": "Pages a day (last 30)",
+  "@insightsPagesADay": {
+    "description": "Chart title."
+  },
+
+  "insightsWhenYouRead": "When you read",
+  "@insightsWhenYouRead": {
+    "description": "Chart title."
+  },
+
+  "insightsWhenYouReadSub": "Minutes spent reading, by the hour a sitting began",
+  "@insightsWhenYouReadSub": {
+    "description": "Chart subtitle."
+  },
+
+  "insightsHourMidnight": "12a",
+  "@insightsHourMidnight": {
+    "description": "Chart axis label: midnight, 12 am."
+  },
+
+  "insightsHourSix": "6a",
+  "@insightsHourSix": {
+    "description": "Chart axis label: 6 am."
+  },
+
+  "insightsHourNoon": "12p",
+  "@insightsHourNoon": {
+    "description": "Chart axis label: noon, 12 pm."
+  },
+
+  "insightsHourEighteen": "6p",
+  "@insightsHourEighteen": {
+    "description": "Chart axis label: 6 pm."
+  },
+
+  "insightsReadingDays": "Reading days (last 12 weeks)",
+  "@insightsReadingDays": {
+    "description": "Chart title (heat map)."
+  },
+
+  "insightsWhereYouRead": "Where you read",
+  "@insightsWhereYouRead": {
+    "description": "Chart title: time per device."
+  },
+
+  "insightsUnknownDevice": "Unknown device",
+  "@insightsUnknownDevice": {
+    "description": "Device name used for sessions recorded without a device name."
+  },
+
+  "insightsWhatYouFinish": "What you finish",
+  "@insightsWhatYouFinish": {
+    "description": "List title: finished books per genre."
+  },
+
+  "insightsPaperOrScreen": "On paper or on screen",
+  "@insightsPaperOrScreen": {
+    "description": "List title: finished books per format."
+  },
+
+  "insightsLocalOnly": "Reading history never leaves this device and is not synced.",
+  "@insightsLocalOnly": {
+    "description": "Footnote on the insights page."
+  },
+
+  "readerGoToPageTitle": "Go to page (1–{count})",
+  "@readerGoToPageTitle": {
+    "description": "Dialog title of the PDF reader's page jump; `count` is the number of pages.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "readerPageNumberHint": "Page number",
+  "@readerPageNumberHint": {
+    "description": "Hint of the page-number field."
+  },
+
+  "readerGo": "Go",
+  "@readerGo": {
+    "description": "Confirm button of the go-to-page and go-to-chapter dialogs."
+  },
+
+  "readerGoToChapterTitle": "Go to chapter (1–{count})",
+  "@readerGoToChapterTitle": {
+    "description": "Dialog title of the EPUB reader's chapter jump; `count` is the number of chapters.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "readerChapterNumberHint": "Chapter number",
+  "@readerChapterNumberHint": {
+    "description": "Hint of the chapter-number field."
+  },
+
+  "readerActHighlightIn": "Highlight in {colour}",
+  "@readerActHighlightIn": {
+    "description": "Reader toolbar action; `colour` is the highlighter colour name.",
+    "placeholders": {
+      "colour": {"type": "String"}
+    }
+  },
+
+  "readerActHighlighterColour": "Highlighter colour — {colour}",
+  "@readerActHighlighterColour": {
+    "description": "Reader toolbar action and tooltip: change the highlighter colour; `colour` is the current one.",
+    "placeholders": {
+      "colour": {"type": "String"}
+    }
+  },
+
+  "readerActNoteOnSelection": "Note on selection",
+  "@readerActNoteOnSelection": {
+    "description": "Reader toolbar action: attach a note to the selected text."
+  },
+
+  "readerActLookUp": "Look up “{word}”",
+  "@readerActLookUp": {
+    "description": "Reader toolbar action: dictionary lookup of the selected word.",
+    "placeholders": {
+      "word": {"type": "String"}
+    }
+  },
+
+  "readerActAskModel": "Ask a model about this",
+  "@readerActAskModel": {
+    "description": "Reader toolbar action: send the selection to a language model."
+  },
+
+  "readerActAskModelPage": "Ask a model about this page",
+  "@readerActAskModelPage": {
+    "description": "Reader toolbar action (menu): ask a model about the whole page."
+  },
+
+  "readerActAskModelChapter": "Ask a model about this chapter",
+  "@readerActAskModelChapter": {
+    "description": "Reader toolbar action: ask a model about the whole chapter."
+  },
+
+  "readerActTranslate": "Translate selection",
+  "@readerActTranslate": {
+    "description": "Reader toolbar action."
+  },
+
+  "readerActPdfModeSwitch": "{current} — switch to {other}",
+  "@readerActPdfModeSwitch": {
+    "description": "Reader toolbar action: the PDF viewing mode now in use and the one it would switch to.",
+    "placeholders": {
+      "current": {"type": "String"},
+      "other": {"type": "String"}
+    }
+  },
+
+  "readerActBookmarkPage": "Bookmark this page",
+  "@readerActBookmarkPage": {
+    "description": "Reader toolbar action."
+  },
+
+  "readerActBookmarkChapter": "Bookmark this chapter",
+  "@readerActBookmarkChapter": {
+    "description": "Reader toolbar action."
+  },
+
+  "readerActRemoveBookmark": "Remove bookmark",
+  "@readerActRemoveBookmark": {
+    "description": "Reader toolbar action."
+  },
+
+  "readerActAutoScrollStop": "Stop scrolling by itself",
+  "@readerActAutoScrollStop": {
+    "description": "Reader toolbar action and tooltip: stop the automatic scrolling."
+  },
+
+  "readerActAutoScroll": "Scroll by itself",
+  "@readerActAutoScroll": {
+    "description": "Reader toolbar action: start the automatic scrolling."
+  },
+
+  "readerActPenStop": "Stop writing",
+  "@readerActPenStop": {
+    "description": "Reader toolbar action: leave pen mode."
+  },
+
+  "readerActPenStart": "Write on the page",
+  "@readerActPenStart": {
+    "description": "Reader toolbar action: enter pen mode."
+  },
+
+  "readerActReadingMode": "Reading mode — swipe down from the top to come back",
+  "@readerActReadingMode": {
+    "description": "Reader toolbar action: hide the toolbar."
+  },
+
+  "readerActAnnotations": "Annotations",
+  "@readerActAnnotations": {
+    "description": "Reader toolbar action: open the annotations list."
+  },
+
+  "readerActSearch": "Search in this book ({modifier}F)",
+  "@readerActSearch": {
+    "description": "Reader toolbar action; `modifier` is the keyboard modifier, such as \"Ctrl+\".",
+    "placeholders": {
+      "modifier": {"type": "String"}
+    }
+  },
+
+  "readerActChapters": "Chapters",
+  "@readerActChapters": {
+    "description": "Reader toolbar action: pick a chapter."
+  },
+
+  "readerActReadingOptions": "Reading options",
+  "@readerActReadingOptions": {
+    "description": "Reader toolbar action: open the reading options sheet."
+  },
+
+  "readerMore": "More",
+  "@readerMore": {
+    "description": "Tooltip of the reader toolbar's overflow menu button."
+  },
+
+  "readerMenuGoToPage": "Go to page…  {modifier}G",
+  "@readerMenuGoToPage": {
+    "description": "Menu item; `modifier` is the keyboard modifier, such as \"Ctrl+\".",
+    "placeholders": {
+      "modifier": {"type": "String"}
+    }
+  },
+
+  "readerMenuAskPage": "Ask a model about this page…",
+  "@readerMenuAskPage": {
+    "description": "Menu item."
+  },
+
+  "readerMenuReadingOptions": "Reading options…",
+  "@readerMenuReadingOptions": {
+    "description": "Menu item."
+  },
+
+  "readerSearchHint": "Search in this book",
+  "@readerSearchHint": {
+    "description": "Placeholder of the in-book search field."
+  },
+
+  "readerSearchPrevious": "Previous match",
+  "@readerSearchPrevious": {
+    "description": "Tooltip."
+  },
+
+  "readerSearchNext": "Next match",
+  "@readerSearchNext": {
+    "description": "Tooltip."
+  },
+
+  "readerSearchClose": "Close search (Esc)",
+  "@readerSearchClose": {
+    "description": "Tooltip."
+  },
+
+  "readerNoMatch": "No match for “{query}”",
+  "@readerNoMatch": {
+    "description": "Snack bar when an in-book search finds nothing.",
+    "placeholders": {
+      "query": {"type": "String"}
+    }
+  },
+
+  "readerOpening": "Opening…",
+  "@readerOpening": {
+    "description": "Shown while a PDF loads."
+  },
+
+  "readerSlowToOpen": "This book is taking longer than it should.",
+  "@readerSlowToOpen": {
+    "description": "Shown when a PDF is slow to open."
+  },
+
+  "readerTryAgain": "Try again",
+  "@readerTryAgain": {
+    "description": "Button that retries opening the PDF."
+  },
+
+  "readerBackPage": "Back a page",
+  "@readerBackPage": {
+    "description": "Tooltip of the left page-turn strip."
+  },
+
+  "readerForwardPage": "Forward a page",
+  "@readerForwardPage": {
+    "description": "Tooltip of the right page-turn strip."
+  },
+
+  "readerPenTitle": "Write on the page",
+  "@readerPenTitle": {
+    "description": "Dialog title for typing text onto a PDF page."
+  },
+
+  "readerPenHint": "A word in the margin",
+  "@readerPenHint": {
+    "description": "Hint of the text field."
+  },
+
+  "readerPenWrite": "Write",
+  "@readerPenWrite": {
+    "description": "Confirm button."
+  },
+
+  "readerBookmarkedPage": "Bookmarked page {page}",
+  "@readerBookmarkedPage": {
+    "description": "Snack bar.",
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+
+  "readerBookmarkedChapter": "Bookmarked chapter {number}",
+  "@readerBookmarkedChapter": {
+    "description": "Snack bar.",
+    "placeholders": {
+      "number": {"type": "int"}
+    }
+  },
+
+  "readerSelectWord": "Select a single word to look it up.",
+  "@readerSelectWord": {
+    "description": "Snack bar."
+  },
+
+  "readerSelectTextFirst": "Select some text first.",
+  "@readerSelectTextFirst": {
+    "description": "Snack bar."
+  },
+
+  "readerNoTextScan": "There is no text here to send — this page may be a scan.",
+  "@readerNoTextScan": {
+    "description": "Snack bar when a PDF page has no text layer."
+  },
+
+  "readerNoTextToSend": "There is no text here to send.",
+  "@readerNoTextToSend": {
+    "description": "Snack bar."
+  },
+
+  "readerNoteSaved": "Note saved",
+  "@readerNoteSaved": {
+    "description": "Snack bar."
+  },
+
+  "readerHighlighted": "Highlighted",
+  "@readerHighlighted": {
+    "description": "Snack bar after highlighting in an EPUB."
+  },
+
+  "readerHighlightedPassages": "{count, plural, =1{Highlighted passage} other{Highlighted {count} passages}}",
+  "@readerHighlightedPassages": {
+    "description": "Snack bar after highlighting in a PDF.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "readerNoteOnPassageTitle": "Note on this passage",
+  "@readerNoteOnPassageTitle": {
+    "description": "Dialog title."
+  },
+
+  "readerNoteHint": "Your note",
+  "@readerNoteHint": {
+    "description": "Hint of the note field."
+  },
+
+  "readerEpubOpenFailed": "This EPUB couldn't be opened: {error}",
+  "@readerEpubOpenFailed": {
+    "description": "Shown in place of the book when an EPUB fails to load.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "readerChapterTitle": "Chapter {number}",
+  "@readerChapterTitle": {
+    "description": "Name given to an EPUB chapter that has no title of its own.",
+    "placeholders": {
+      "number": {"type": "int"}
+    }
+  },
+
+  "readerMetricPagesOf": "Page and total",
+  "@readerMetricPagesOf": {
+    "description": "Name of a choice for what the reader's page counter shows."
+  },
+
+  "readerMetricPercent": "Percent read",
+  "@readerMetricPercent": {
+    "description": "Name of a choice for what the reader's page counter shows."
+  },
+
+  "readerMetricPagesRead": "Pages read",
+  "@readerMetricPagesRead": {
+    "description": "Name of a choice for what the reader's page counter shows."
+  },
+
+  "readerMetricPagesLeft": "Pages left",
+  "@readerMetricPagesLeft": {
+    "description": "Name of a choice for what the reader's page counter shows."
+  },
+
+  "readerMetricTimeLeft": "Time left",
+  "@readerMetricTimeLeft": {
+    "description": "Name of a choice for what the reader's page counter shows."
+  },
+
+  "readerCounterPagesOf": "{page} / {count}",
+  "@readerCounterPagesOf": {
+    "description": "Reader page counter: current page and total.",
+    "placeholders": {
+      "page": {"type": "int"},
+      "count": {"type": "int"}
+    }
+  },
+
+  "readerCounterPercent": "{percent}%",
+  "@readerCounterPercent": {
+    "description": "Reader page counter: percent read.",
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+
+  "readerCounterPage": "page {page}",
+  "@readerCounterPage": {
+    "description": "Reader page counter: current page only.",
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+
+  "readerCounterLastPage": "last page",
+  "@readerCounterLastPage": {
+    "description": "Reader page counter on the last page."
+  },
+
+  "readerCounterLeft": "{count} left",
+  "@readerCounterLeft": {
+    "description": "Reader page counter: pages left.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "readerCounterNearlyDone": "nearly done",
+  "@readerCounterNearlyDone": {
+    "description": "Reader page counter: almost no time left."
+  },
+
+  "readerCounterAboutMinutes": "about {minutes} min left",
+  "@readerCounterAboutMinutes": {
+    "description": "Reader page counter: estimated time left, under an hour.",
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+
+  "readerCounterAboutHours": "about {hours} h left",
+  "@readerCounterAboutHours": {
+    "description": "Reader page counter: estimated time left, whole hours.",
+    "placeholders": {
+      "hours": {"type": "int"}
+    }
+  },
+
+  "readerCounterAboutHoursMinutes": "about {hours} h {minutes} min left",
+  "@readerCounterAboutHoursMinutes": {
+    "description": "Reader page counter: estimated time left.",
+    "placeholders": {
+      "hours": {"type": "int"},
+      "minutes": {"type": "int"}
+    }
+  },
+
+  "readerStatusMinutes": "{minutes} min left",
+  "@readerStatusMinutes": {
+    "description": "Reading-mode status line: time left, under an hour.",
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+
+  "readerStatusHours": "{hours} h left",
+  "@readerStatusHours": {
+    "description": "Reading-mode status line: time left, whole hours.",
+    "placeholders": {
+      "hours": {"type": "int"}
+    }
+  },
+
+  "readerStatusHoursMinutes": "{hours} h {minutes} min left",
+  "@readerStatusHoursMinutes": {
+    "description": "Reading-mode status line: time left.",
+    "placeholders": {
+      "hours": {"type": "int"},
+      "minutes": {"type": "int"}
+    }
+  },
+
+  "readerStatusOnly": "{unit, select, chapter{chapter {position}} other{page {position}}}",
+  "@readerStatusOnly": {
+    "description": "Reading-mode status line when the length is unknown. `unit` is \"chapter\" or anything else for a page.",
+    "placeholders": {
+      "unit": {"type": "String"},
+      "position": {"type": "int"}
+    }
+  },
+
+  "readerStatusOf": "{unit, select, chapter{chapter {position} of {count}} other{page {position} of {count}}}",
+  "@readerStatusOf": {
+    "description": "Reading-mode status line: where you are in the book.",
+    "placeholders": {
+      "unit": {"type": "String"},
+      "position": {"type": "int"},
+      "count": {"type": "int"}
+    }
+  },
+
+  "readerStatusPercent": "{percent}%",
+  "@readerStatusPercent": {
+    "description": "Reading-mode status line: percent read.",
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+
+  "readerAutoSpeedPages": "{speed} pages/min",
+  "@readerAutoSpeedPages": {
+    "description": "Auto-scroll speed readout in a PDF; `speed` is already formatted.",
+    "placeholders": {
+      "speed": {"type": "String"}
+    }
+  },
+
+  "readerAutoSpeedLines": "{speed} lines/min",
+  "@readerAutoSpeedLines": {
+    "description": "Auto-scroll speed readout in an EPUB; `speed` is already formatted.",
+    "placeholders": {
+      "speed": {"type": "String"}
+    }
+  },
+
+  "readerAutoSlower": "Slower",
+  "@readerAutoSlower": {
+    "description": "Tooltip."
+  },
+
+  "readerAutoFaster": "Faster",
+  "@readerAutoFaster": {
+    "description": "Tooltip."
+  },
+
+  "readerThemeLight": "Light",
+  "@readerThemeLight": {
+    "description": "Name of a reader page colour."
+  },
+
+  "readerThemeSepia": "Sepia",
+  "@readerThemeSepia": {
+    "description": "Name of a reader page colour."
+  },
+
+  "readerThemeGrey": "Grey",
+  "@readerThemeGrey": {
+    "description": "Name of a reader page colour."
+  },
+
+  "readerThemeDark": "Dark",
+  "@readerThemeDark": {
+    "description": "Name of a reader page colour."
+  },
+
+  "readerFontSerif": "Serif",
+  "@readerFontSerif": {
+    "description": "Name of a reader typeface choice."
+  },
+
+  "readerFontSans": "Sans",
+  "@readerFontSans": {
+    "description": "Name of a reader typeface choice."
+  },
+
+  "readerFontMono": "Monospace",
+  "@readerFontMono": {
+    "description": "Name of a reader typeface choice."
+  },
+
+  "readerFitWidth": "Fit width",
+  "@readerFitWidth": {
+    "description": "PDF page fit choice."
+  },
+
+  "readerFitPage": "Fit page",
+  "@readerFitPage": {
+    "description": "PDF page fit choice."
+  },
+
+  "readerModePaged": "Pages",
+  "@readerModePaged": {
+    "description": "PDF movement choice: one page at a time."
+  },
+
+  "readerModeScroll": "Scrolling",
+  "@readerModeScroll": {
+    "description": "PDF movement choice: continuous scroll."
+  },
+
+  "readerModePagedDescription": "One page at a time",
+  "@readerModePagedDescription": {
+    "description": "Explanation under the PDF movement choice."
+  },
+
+  "readerModeScrollDescription": "Continuous, with a scrollbar",
+  "@readerModeScrollDescription": {
+    "description": "Explanation under the PDF movement choice."
+  },
+
+  "readerColourYellow": "Yellow",
+  "@readerColourYellow": {
+    "description": "Name of a highlighter colour."
+  },
+
+  "readerColourGreen": "Green",
+  "@readerColourGreen": {
+    "description": "Name of a highlighter colour."
+  },
+
+  "readerColourBlue": "Blue",
+  "@readerColourBlue": {
+    "description": "Name of a highlighter colour."
+  },
+
+  "readerColourPink": "Pink",
+  "@readerColourPink": {
+    "description": "Name of a highlighter colour."
+  },
+
+  "readerHighlighterSwatch": "{colour} highlighter",
+  "@readerHighlighterSwatch": {
+    "description": "Screen-reader label of a highlighter colour swatch.",
+    "placeholders": {
+      "colour": {"type": "String"}
+    }
+  },
+
+  "inkToolSelect": "Select",
+  "@inkToolSelect": {
+    "description": "Tooltip of a writing-on-the-page tool."
+  },
+
+  "inkToolPen": "Pen",
+  "@inkToolPen": {
+    "description": "Tooltip of a writing-on-the-page tool."
+  },
+
+  "inkToolEraser": "Eraser",
+  "@inkToolEraser": {
+    "description": "Tooltip of a writing-on-the-page tool."
+  },
+
+  "inkToolText": "Text",
+  "@inkToolText": {
+    "description": "Tooltip of a writing-on-the-page tool."
+  },
+
+  "inkSmaller": "Smaller",
+  "@inkSmaller": {
+    "description": "Tooltip: make the selected text smaller."
+  },
+
+  "inkBigger": "Bigger",
+  "@inkBigger": {
+    "description": "Tooltip: make the selected text bigger."
+  },
+
+  "inkTurnLeft": "Turn left",
+  "@inkTurnLeft": {
+    "description": "Tooltip: rotate the selected text."
+  },
+
+  "inkTurnRight": "Turn right",
+  "@inkTurnRight": {
+    "description": "Tooltip: rotate the selected text."
+  },
+
+  "inkEditWords": "Edit the words",
+  "@inkEditWords": {
+    "description": "Tooltip: edit the selected text."
+  },
+
+  "inkDragToMove": "Drag to move",
+  "@inkDragToMove": {
+    "description": "Hint shown while a pen mark is selected."
+  },
+
+  "inkDone": "Done writing",
+  "@inkDone": {
+    "description": "Tooltip: leave pen mode."
+  },
+
+  "inkColour": "Ink colour",
+  "@inkColour": {
+    "description": "Tooltip of an ink colour swatch."
+  },
+
+  "inkNib": "Nib",
+  "@inkNib": {
+    "description": "Tooltip of a pen thickness choice."
+  },
+
+  "annotationKindBookmark": "Bookmark",
+  "@annotationKindBookmark": {
+    "description": "Name of a kind of annotation (also a heading in the Markdown export)."
+  },
+
+  "annotationKindHighlight": "Highlight",
+  "@annotationKindHighlight": {
+    "description": "Name of a kind of annotation (also a heading in the Markdown export)."
+  },
+
+  "annotationKindNote": "Note",
+  "@annotationKindNote": {
+    "description": "Name of a kind of annotation (also a heading in the Markdown export)."
+  },
+
+  "annotationKindInk": "Writing",
+  "@annotationKindInk": {
+    "description": "Name of a kind of annotation (also a heading in the Markdown export)."
+  },
+
+  "dictionaryPosNoun": "noun",
+  "@dictionaryPosNoun": {
+    "description": "Part of speech shown beside a dictionary definition."
+  },
+
+  "dictionaryPosVerb": "verb",
+  "@dictionaryPosVerb": {
+    "description": "Part of speech shown beside a dictionary definition."
+  },
+
+  "dictionaryPosAdjective": "adjective",
+  "@dictionaryPosAdjective": {
+    "description": "Part of speech shown beside a dictionary definition."
+  },
+
+  "dictionaryPosAdverb": "adverb",
+  "@dictionaryPosAdverb": {
+    "description": "Part of speech shown beside a dictionary definition."
+  },
+
+  "translateLangAuto": "Detect",
+  "@translateLangAuto": {
+    "description": "Source-language choice: work the language out automatically."
+  },
+
+  "translateLangEn": "English",
+  "@translateLangEn": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangAr": "Arabic",
+  "@translateLangAr": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangZh": "Chinese",
+  "@translateLangZh": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangCs": "Czech",
+  "@translateLangCs": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangNl": "Dutch",
+  "@translateLangNl": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangFr": "French",
+  "@translateLangFr": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangDe": "German",
+  "@translateLangDe": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangEl": "Greek",
+  "@translateLangEl": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangHe": "Hebrew",
+  "@translateLangHe": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangHi": "Hindi",
+  "@translateLangHi": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangHu": "Hungarian",
+  "@translateLangHu": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangIt": "Italian",
+  "@translateLangIt": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangJa": "Japanese",
+  "@translateLangJa": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangKo": "Korean",
+  "@translateLangKo": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangFa": "Persian",
+  "@translateLangFa": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangPl": "Polish",
+  "@translateLangPl": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangPt": "Portuguese",
+  "@translateLangPt": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangRo": "Romanian",
+  "@translateLangRo": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangRu": "Russian",
+  "@translateLangRu": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangEs": "Spanish",
+  "@translateLangEs": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangSv": "Swedish",
+  "@translateLangSv": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangTr": "Turkish",
+  "@translateLangTr": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "translateLangUk": "Ukrainian",
+  "@translateLangUk": {
+    "description": "Name of a language offered for translation."
+  },
+
+  "readerSettingsPageColour": "Page colour",
+  "@readerSettingsPageColour": {
+    "description": "Heading of the page colour choice in the reading options."
+  },
+
+  "readerSettingsNightMode": "Night mode",
+  "@readerSettingsNightMode": {
+    "description": "Switch title."
+  },
+
+  "readerSettingsNightModeSub": "Black pages, white type, pictures in grey",
+  "@readerSettingsNightModeSub": {
+    "description": "Switch subtitle."
+  },
+
+  "readerSettingsTypeface": "Typeface",
+  "@readerSettingsTypeface": {
+    "description": "Heading of the typeface choice."
+  },
+
+  "readerSettingsTextSize": "Text size",
+  "@readerSettingsTextSize": {
+    "description": "Slider label."
+  },
+
+  "readerSettingsLineSpacing": "Line spacing",
+  "@readerSettingsLineSpacing": {
+    "description": "Slider label."
+  },
+
+  "readerSettingsLineLength": "Line length",
+  "@readerSettingsLineLength": {
+    "description": "Slider label."
+  },
+
+  "readerSettingsMoving": "Moving through the book",
+  "@readerSettingsMoving": {
+    "description": "Heading of the PDF paged/scrolling choice."
+  },
+
+  "readerSettingsPageFit": "Page fit",
+  "@readerSettingsPageFit": {
+    "description": "Heading of the PDF fit choice."
+  },
+
+  "readerSettingsCounter": "The counter",
+  "@readerSettingsCounter": {
+    "description": "Heading of the choice of what the page counter shows."
+  },
+
+  "readerSettingsCounterHelper": "Or hold the counter in the reader to cycle it",
+  "@readerSettingsCounterHelper": {
+    "description": "Helper text under the counter choice."
+  },
+
+  "readerSettingsHideControls": "Hide controls while reading",
+  "@readerSettingsHideControls": {
+    "description": "Switch title."
+  },
+
+  "readerSettingsHideControlsSub": "Tap the page to bring them back",
+  "@readerSettingsHideControlsSub": {
+    "description": "Switch subtitle."
+  },
+
+  "readerTranslateOnDeviceTitle": "Translate on this device",
+  "@readerTranslateOnDeviceTitle": {
+    "description": "Switch title (full build only)."
+  },
+
+  "readerTranslateOnDeviceSub": "Uses Google ML Kit — closed-source, and part of this build only. Nothing is sent anywhere; languages download once, about 30 MB each.",
+  "@readerTranslateOnDeviceSub": {
+    "description": "Switch subtitle (full build only)."
+  },
+
+  "readerTranslateServerTitle": "Translation server",
+  "@readerTranslateServerTitle": {
+    "description": "Heading of the translation server sheet."
+  },
+
+  "readerTranslateServerBody": "Vellum sends nothing anywhere until you name a server here. A passage you translate is sent to it — so a LibreTranslate you run yourself keeps your reading on machines you own, the same bargain as the sync server.",
+  "@readerTranslateServerBody": {
+    "description": "Explanation in the translation server sheet."
+  },
+
+  "readerTranslateAddress": "LibreTranslate address",
+  "@readerTranslateAddress": {
+    "description": "Field label."
+  },
+
+  "readerTranslateApiKey": "API key (only if it asks for one)",
+  "@readerTranslateApiKey": {
+    "description": "Field label."
+  },
+
+  "readerTranslateTurnOff": "Turn off",
+  "@readerTranslateTurnOff": {
+    "description": "Button that clears the translation server."
+  },
+
+  "readerCopy": "Copy",
+  "@readerCopy": {
+    "description": "Button / tooltip that copies text."
+  },
+
+  "readerCopied": "Copied",
+  "@readerCopied": {
+    "description": "Snack bar after copying text."
+  },
+
+  "readerSaveAsNote": "Save as a note",
+  "@readerSaveAsNote": {
+    "description": "Button that keeps a lookup result or model answer as a note on the book."
+  },
+
+  "readerSavedAsNote": "Saved as a note",
+  "@readerSavedAsNote": {
+    "description": "Button state after the result was kept as a note."
+  },
+
+  "dictionaryTitle": "Dictionary",
+  "@dictionaryTitle": {
+    "description": "Row title in the reading options."
+  },
+
+  "dictionaryInstalledSub": "WordNet, on this device · {megabytes} MB",
+  "@dictionaryInstalledSub": {
+    "description": "Row subtitle when the dictionary is installed.",
+    "placeholders": {
+      "megabytes": {"type": "int"}
+    }
+  },
+
+  "dictionaryNotInstalledSub": "Not installed · a {megabytes} MB download",
+  "@dictionaryNotInstalledSub": {
+    "description": "Row subtitle when the dictionary is not installed.",
+    "placeholders": {
+      "megabytes": {"type": "int"}
+    }
+  },
+
+  "dictionaryRemove": "Remove",
+  "@dictionaryRemove": {
+    "description": "Button that deletes the downloaded dictionary."
+  },
+
+  "dictionaryDownload": "Download",
+  "@dictionaryDownload": {
+    "description": "Button that downloads the dictionary."
+  },
+
+  "dictionaryUnpacking": "Unpacking…",
+  "@dictionaryUnpacking": {
+    "description": "Progress text while the dictionary is unpacked."
+  },
+
+  "dictionaryDownloading": "Downloading… {percent}%",
+  "@dictionaryDownloading": {
+    "description": "Progress text while the dictionary downloads.",
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+
+  "dictionaryNoEntry": "No entry for “{word}”. The dictionary covers nouns, verbs, adjectives and adverbs — not names, and not words like “the”.",
+  "@dictionaryNoEntry": {
+    "description": "Shown when a looked-up word has no entry.",
+    "placeholders": {
+      "word": {"type": "String"}
+    }
+  },
+
+  "dictionaryNotOnDevice": "The dictionary is not on this device yet. It is a {megabytes} MB download, and once it is here every lookup happens on the device — no word you read is ever sent anywhere.",
+  "@dictionaryNotOnDevice": {
+    "description": "Offer to download the dictionary.",
+    "placeholders": {
+      "megabytes": {"type": "int"}
+    }
+  },
+
+  "dictionaryLicence": "WordNet 3.0, Princeton University. Free to use and redistribute; see the licence inside the download.",
+  "@dictionaryLicence": {
+    "description": "Licence notice shown with the dictionary download offer."
+  },
+
+  "dictionaryDownloadButton": "Download the dictionary",
+  "@dictionaryDownloadButton": {
+    "description": "Button."
+  },
+
+  "dictionaryDownloadFailed": "The dictionary could not be downloaded: {error}",
+  "@dictionaryDownloadFailed": {
+    "description": "Error shown when the dictionary download fails.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "dictionarySense": "({pos}) {definition}",
+  "@dictionarySense": {
+    "description": "First line of a definition in the copied/saved text; `pos` is the part of speech.",
+    "placeholders": {
+      "pos": {"type": "String"},
+      "definition": {"type": "String"}
+    }
+  },
+
+  "dictionaryAlso": "also: {synonyms}",
+  "@dictionaryAlso": {
+    "description": "Second line of a definition in the copied/saved text; `synonyms` is a comma-separated list.",
+    "placeholders": {
+      "synonyms": {"type": "String"}
+    }
+  },
+
+  "dictionaryErrorStatus": "The download answered {status}.",
+  "@dictionaryErrorStatus": {
+    "description": "Error: the dictionary server answered with an HTTP status.",
+    "placeholders": {
+      "status": {"type": "int"}
+    }
+  },
+
+  "dictionaryErrorNotWordnet": "That file is not a WordNet database.",
+  "@dictionaryErrorNotWordnet": {
+    "description": "Error: the downloaded archive is not a dictionary."
+  },
+
+  "aiAskTitle": "Ask a model",
+  "@aiAskTitle": {
+    "description": "Title of the ask-a-model sheet and of its setup sheet."
+  },
+
+  "aiWhereTooltip": "Where the model is",
+  "@aiWhereTooltip": {
+    "description": "Tooltip of the button that opens the model setup."
+  },
+
+  "aiGoesLocal": "This {what, select, page{page} chapter{chapter} other{passage}} goes to {model} on this machine.",
+  "@aiGoesLocal": {
+    "description": "Says where the text goes when the model runs on this machine. `what` is page, chapter or passage.",
+    "placeholders": {
+      "what": {"type": "String"},
+      "model": {"type": "String"}
+    }
+  },
+
+  "aiWillBeSent": "This {what, select, page{page} chapter{chapter} other{passage}} will be sent to {host}.",
+  "@aiWillBeSent": {
+    "description": "Warns that the text leaves the device. `what` is page, chapter or passage.",
+    "placeholders": {
+      "what": {"type": "String"},
+      "host": {"type": "String"}
+    }
+  },
+
+  "aiTruncated": "Only the first {count}k characters are sent.",
+  "@aiTruncated": {
+    "description": "Shown when the passage is cut before sending; `count` is thousands of characters.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "aiPresetExplain": "Explain this in plain language.",
+  "@aiPresetExplain": {
+    "description": "A ready-made question for the model. Also shown, without its final punctuation, on a chip."
+  },
+
+  "aiPresetSummarise": "Summarise it in a sentence.",
+  "@aiPresetSummarise": {
+    "description": "A ready-made question for the model. Also shown, without its final punctuation, on a chip."
+  },
+
+  "aiPresetContext": "What is the context here?",
+  "@aiPresetContext": {
+    "description": "A ready-made question for the model. Also shown, without its final punctuation, on a chip."
+  },
+
+  "aiOrAsk": "Or ask something else",
+  "@aiOrAsk": {
+    "description": "Hint of the question field."
+  },
+
+  "aiAskTooltip": "Ask",
+  "@aiAskTooltip": {
+    "description": "Tooltip of the send button."
+  },
+
+  "aiCanBeWrong": "A model can be wrong. The book is the one that knows.",
+  "@aiCanBeWrong": {
+    "description": "Said under every answer."
+  },
+
+  "aiNotSetUp": "No model named yet. Any server speaking the OpenAI chat API will do — one running on this machine, or a paid one.",
+  "@aiNotSetUp": {
+    "description": "Shown before a model is configured."
+  },
+
+  "aiNameModel": "Name a model",
+  "@aiNameModel": {
+    "description": "Button that opens the model setup."
+  },
+
+  "aiSetupBody": "Any server that speaks the OpenAI chat API: one you run yourself, or a paid one. The passage you ask about is sent to this address, and nowhere else.",
+  "@aiSetupBody": {
+    "description": "Explanation in the model setup sheet."
+  },
+
+  "aiAddressLabel": "Address",
+  "@aiAddressLabel": {
+    "description": "Field label."
+  },
+
+  "aiAddressHelper": "http://localhost:11434 for Ollama · https://api.openai.com/v1",
+  "@aiAddressHelper": {
+    "description": "Helper text with example addresses."
+  },
+
+  "aiModelLabel": "Model",
+  "@aiModelLabel": {
+    "description": "Field label."
+  },
+
+  "aiModelHelper": "llama3.2, mistral, gpt-4o-mini — whatever that server has",
+  "@aiModelHelper": {
+    "description": "Helper text with example model names."
+  },
+
+  "aiKeyLabel": "Key (optional)",
+  "@aiKeyLabel": {
+    "description": "Field label."
+  },
+
+  "aiKeyHelper": "A model on your own machine needs none.",
+  "@aiKeyHelper": {
+    "description": "Helper text."
+  },
+
+  "aiKeyShow": "Show",
+  "@aiKeyShow": {
+    "description": "Tooltip: reveal the key."
+  },
+
+  "aiKeyHide": "Hide",
+  "@aiKeyHide": {
+    "description": "Tooltip: hide the key."
+  },
+
+  "aiKeyInsecure": "This device has no secure store, so the key is kept in plain settings.",
+  "@aiKeyInsecure": {
+    "description": "Warning shown when the key cannot be stored securely."
+  },
+
+  "aiErrorUnreachable": "Could not reach {target} — {error}",
+  "@aiErrorUnreachable": {
+    "description": "Error: the model server could not be contacted.",
+    "placeholders": {
+      "target": {"type": "String"},
+      "error": {"type": "String"}
+    }
+  },
+
+  "aiErrorEmpty": "The model answered with nothing.",
+  "@aiErrorEmpty": {
+    "description": "Error."
+  },
+
+  "aiErrorRefusedKey": "The server refused the key.",
+  "@aiErrorRefusedKey": {
+    "description": "Error."
+  },
+
+  "aiErrorNoEndpoint": "No model endpoint at that address.",
+  "@aiErrorNoEndpoint": {
+    "description": "Error."
+  },
+
+  "aiErrorStatus": "The server answered {status}.",
+  "@aiErrorStatus": {
+    "description": "Error: unexpected HTTP status.",
+    "placeholders": {
+      "status": {"type": "int"}
+    }
+  },
+
+  "translateTitle": "Translate",
+  "@translateTitle": {
+    "description": "Title of the translate sheet."
+  },
+
+  "translateFrom": "From",
+  "@translateFrom": {
+    "description": "Label of the source-language picker."
+  },
+
+  "translateTo": "To",
+  "@translateTo": {
+    "description": "Label of the target-language picker."
+  },
+
+  "translateDetected": "Detected {language}",
+  "@translateDetected": {
+    "description": "Helper text under the source-language picker: the language that was guessed.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "translateSetupOnDevice": "This build can translate on the device using Google ML Kit. It is proprietary, so it stays off until you turn it on in the reader’s settings.",
+  "@translateSetupOnDevice": {
+    "description": "Shown in the translate sheet when on-device translation is available but switched off."
+  },
+
+  "translateSetupLocal": "No translator is installed on this machine. Languages says what to install — it runs here, and nothing is sent anywhere.",
+  "@translateSetupLocal": {
+    "description": "Shown in the translate sheet on a desktop with no translator. \"Languages\" is the name of a button on the same sheet."
+  },
+
+  "translateSetupNone": "No translator here yet. Set a LibreTranslate address in the reader’s settings, and passages go to that server — yours, if you run one.",
+  "@translateSetupNone": {
+    "description": "Shown in the translate sheet where no translator can be installed."
+  },
+
+  "translateNothingWith": "nothing to translate with",
+  "@translateNothingWith": {
+    "description": "Footer of the translate sheet when there is no translator."
+  },
+
+  "translateVia": "via {name}",
+  "@translateVia": {
+    "description": "Footer of the translate sheet: which translator answered; `name` is its name.",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "translateLanguages": "Languages",
+  "@translateLanguages": {
+    "description": "Title of the languages sheet, and the button that opens it."
+  },
+
+  "translateCopied": "Translation copied",
+  "@translateCopied": {
+    "description": "Snack bar."
+  },
+
+  "translateSaved": "Saved",
+  "@translateSaved": {
+    "description": "Button state after the translation was kept as a note."
+  },
+
+  "translateSaveAsNote": "Save as note",
+  "@translateSaveAsNote": {
+    "description": "Button that keeps the translation as a note."
+  },
+
+  "translateLocalBody": "Translation happens on this machine. Nothing is sent anywhere, so it needs a translator installed here.",
+  "@translateLocalBody": {
+    "description": "Explanation in the languages sheet on a desktop."
+  },
+
+  "translateInstalledNoPairs": "Installed, but with no language pairs yet",
+  "@translateInstalledNoPairs": {
+    "description": "Subtitle of an installed translator that has no language packs."
+  },
+
+  "translateInstalledRuns": "Installed — translations run here",
+  "@translateInstalledRuns": {
+    "description": "Subtitle of an installed translator."
+  },
+
+  "translateNothingFound": "Nothing found. Either of these works, and both keep the passage on this machine:",
+  "@translateNothingFound": {
+    "description": "Shown when no translator is installed, above the install instructions."
+  },
+
+  "translateArgosNote": "Argos is the neural one — the same engine LibreTranslate runs, without the server around it. Apertium is older and rule-based, but it is one apt away.",
+  "@translateArgosNote": {
+    "description": "Comparison of the two installable translators."
+  },
+
+  "translateLookAgain": "Look again",
+  "@translateLookAgain": {
+    "description": "Button that checks again for installed translators."
+  },
+
+  "translateDone": "Done",
+  "@translateDone": {
+    "description": "Button that closes the languages sheet."
+  },
+
+  "translateCommandCopied": "Command copied",
+  "@translateCommandCopied": {
+    "description": "Snack bar after copying an install command."
+  },
+
+  "translatePacksBody": "Downloaded languages translate on this device — no server, and nothing leaves the machine. About 30 MB each, kept until you remove them.",
+  "@translatePacksBody": {
+    "description": "Explanation in the on-device language packs sheet."
+  },
+
+  "translatePacksWifiOnly": "Download over Wi-Fi only",
+  "@translatePacksWifiOnly": {
+    "description": "Switch title."
+  },
+
+  "translatePackOnDevice": "On this device",
+  "@translatePackOnDevice": {
+    "description": "Subtitle of a downloaded language."
+  },
+
+  "translatePackNotDownloaded": "Not downloaded",
+  "@translatePackNotDownloaded": {
+    "description": "Subtitle of a language that is not downloaded."
+  },
+
+  "translatePackRemoveTooltip": "Remove {language}",
+  "@translatePackRemoveTooltip": {
+    "description": "Tooltip.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "translatePackDownloadTooltip": "Download {language}",
+  "@translatePackDownloadTooltip": {
+    "description": "Tooltip.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "translatePacksNone": "Nothing downloaded yet — a translation needs the language it is coming *from* and the one it is going *to*.",
+  "@translatePacksNone": {
+    "description": "Footer when no language is downloaded."
+  },
+
+  "translatePacksCount": "{count, plural, =1{1 language on this device.} other{{count} languages on this device.}}",
+  "@translatePacksCount": {
+    "description": "Footer: how many languages are downloaded.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "translateErrorNothingSelected": "There is nothing selected to translate.",
+  "@translateErrorNothingSelected": {
+    "description": "Error."
+  },
+
+  "translateErrorUnreachable": "Could not reach {target} — {error}",
+  "@translateErrorUnreachable": {
+    "description": "Error: the translation server could not be contacted.",
+    "placeholders": {
+      "target": {"type": "String"},
+      "error": {"type": "String"}
+    }
+  },
+
+  "translateErrorUnexpected": "That server answered something this app does not understand.",
+  "@translateErrorUnexpected": {
+    "description": "Error."
+  },
+
+  "translateErrorServerStatus": "The translation server answered {status}.",
+  "@translateErrorServerStatus": {
+    "description": "Error: unexpected HTTP status.",
+    "placeholders": {
+      "status": {"type": "int"}
+    }
+  },
+
+  "translateErrorPickFrom": "Pick the language it is coming *from* — a translator on this machine cannot work it out on its own.",
+  "@translateErrorPickFrom": {
+    "description": "Error."
+  },
+
+  "translateErrorEngineRun": "{engine} could not be run — {error}",
+  "@translateErrorEngineRun": {
+    "description": "Error: a local translator program failed to start.",
+    "placeholders": {
+      "engine": {"type": "String"},
+      "error": {"type": "String"}
+    }
+  },
+
+  "translateErrorEnginePair": "{engine} could not translate {from} to {to}. Its language pack for that pair may not be installed.",
+  "@translateErrorEnginePair": {
+    "description": "Error: a local translator failed and said nothing.",
+    "placeholders": {
+      "engine": {"type": "String"},
+      "from": {"type": "String"},
+      "to": {"type": "String"}
+    }
+  },
+
+  "translateErrorEngineEmpty": "{engine} returned nothing.",
+  "@translateErrorEngineEmpty": {
+    "description": "Error.",
+    "placeholders": {
+      "engine": {"type": "String"}
+    }
+  },
+
+  "translateErrorNoneInstalled": "No translator is installed on this machine.",
+  "@translateErrorNoneInstalled": {
+    "description": "Error."
+  },
+
+  "translateEngineName": "{engine}, on this machine",
+  "@translateEngineName": {
+    "description": "Name of a local translator, shown as \"via …\".",
+    "placeholders": {
+      "engine": {"type": "String"}
+    }
+  },
+
+  "translateEnginesName": "{engine} and {count, plural, =1{1 other} other{{count} others}}, on this machine",
+  "@translateEnginesName": {
+    "description": "Name of several local translators, shown as \"via …\"; `count` is how many besides the first.",
+    "placeholders": {
+      "engine": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+
+  "translateDeviceName": "this device",
+  "@translateDeviceName": {
+    "description": "Name of the on-device translator, shown as \"via …\"."
+  },
+
+  "translateErrorOnlyPhone": "On-device translation is only available on a phone or tablet.",
+  "@translateErrorOnlyPhone": {
+    "description": "Error."
+  },
+
+  "translateErrorUndetected": "Could not tell what language that is — pick one under From.",
+  "@translateErrorUndetected": {
+    "description": "Error. \"From\" is the label of the source-language picker."
+  },
+
+  "translateErrorUnsupported": "{language} is not one of the languages this device can translate.",
+  "@translateErrorUnsupported": {
+    "description": "Error.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "translateErrorDownloadOne": "Download {language} under Languages to translate this without a server.",
+  "@translateErrorDownloadOne": {
+    "description": "Error: a language pack is missing. \"Languages\" is the name of a button.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "translateErrorDownloadTwo": "Download {first} and {second} under Languages to translate this without a server.",
+  "@translateErrorDownloadTwo": {
+    "description": "Error: two language packs are missing. \"Languages\" is the name of a button.",
+    "placeholders": {
+      "first": {"type": "String"},
+      "second": {"type": "String"}
+    }
+  },
+
+  "translateErrorOnDevice": "That could not be translated here — {error}",
+  "@translateErrorOnDevice": {
+    "description": "Error.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "translateErrorPackWifi": "Could not download {language}. On mobile data, turn off Wi-Fi only and try again.",
+  "@translateErrorPackWifi": {
+    "description": "Error.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "translateErrorPack": "Could not download {language}.",
+  "@translateErrorPack": {
+    "description": "Error.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "translateErrorPackRemove": "Could not remove {language}.",
+  "@translateErrorPackRemove": {
+    "description": "Error.",
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+
+  "annotationsNone": "No annotations yet",
+  "@annotationsNone": {
+    "description": "Heading of the annotations list when it is empty."
+  },
+
+  "annotationsCount": "{count, plural, =1{1 annotation} other{{count} annotations}}",
+  "@annotationsCount": {
+    "description": "Heading of the annotations list.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "annotationsCopyTooltip": "Copy as Markdown",
+  "@annotationsCopyTooltip": {
+    "description": "Tooltip of the button that copies all annotations as Markdown."
+  },
+
+  "annotationsCopied": "Annotations copied as Markdown",
+  "@annotationsCopied": {
+    "description": "Snack bar."
+  },
+
+  "annotationsEmptyHint": "Bookmark a page, or select text and highlight it, while reading.",
+  "@annotationsEmptyHint": {
+    "description": "Explanation in the empty annotations list."
+  },
+
+  "annotationsShowAll": "{count, plural, other{Show all {count} annotations}}",
+  "@annotationsShowAll": {
+    "description": "Row that opens the full list of annotations.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "annotationsPage": "Page {page}",
+  "@annotationsPage": {
+    "description": "Where an annotation is.",
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+
+  "annotationsChapter": "Chapter {number}",
+  "@annotationsChapter": {
+    "description": "Where an annotation is.",
+    "placeholders": {
+      "number": {"type": "int"}
+    }
+  },
+
+  "annotationsNoteTitle": "Note",
+  "@annotationsNoteTitle": {
+    "description": "Dialog title for editing the note of a bookmark or note."
+  },
+
+  "annotationsNoteOnHighlight": "Note on highlight",
+  "@annotationsNoteOnHighlight": {
+    "description": "Dialog title for editing the note of a highlight."
+  },
+
+  "annotationsNoteHint": "What did you want to remember?",
+  "@annotationsNoteHint": {
+    "description": "Hint of the note field."
+  },
+
+  "annotationsEditNote": "Edit note…",
+  "@annotationsEditNote": {
+    "description": "Menu item."
+  },
+
+  "annotationsCopyText": "Copy text",
+  "@annotationsCopyText": {
+    "description": "Menu item."
+  },
+
+  "markdownNothingYet": "_No highlights, notes, or bookmarks yet._",
+  "@markdownNothingYet": {
+    "description": "Line in the Markdown export of a book with no annotations. Markdown: keep the underscores."
+  },
+
+  "markdownWritingBody": "_Pen marks on the page — open the book to see them._",
+  "@markdownWritingBody": {
+    "description": "Line in the Markdown export for pen marks. Markdown: keep the underscores."
+  },
+
+  "markdownHeadingWithLocation": "{kind} — {location}",
+  "@markdownHeadingWithLocation": {
+    "description": "Heading of an annotation in the Markdown export; `location` is like \"page 4\".",
+    "placeholders": {
+      "kind": {"type": "String"},
+      "location": {"type": "String"}
+    }
+  },
+
+  "markdownLocationPage": "page {page}",
+  "@markdownLocationPage": {
+    "description": "Location of an annotation in the Markdown export.",
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+
+  "markdownLocationChapter": "chapter {number}",
+  "@markdownLocationChapter": {
+    "description": "Location of an annotation in the Markdown export.",
+    "placeholders": {
+      "number": {"type": "int"}
+    }
+  },
+
+  "markdownLibraryTitle": "Vellum highlights",
+  "@markdownLibraryTitle": {
+    "description": "Title of the Markdown export of the whole library."
+  },
+
+  "markdownLibraryNothing": "_Nothing highlighted yet._",
+  "@markdownLibraryNothing": {
+    "description": "Line in the library Markdown export when there are no annotations. Markdown: keep the underscores."
+  },
+
+  "markdownLibraryCount": "{count, plural, =1{1 book with annotations.} other{{count} books with annotations.}}",
+  "@markdownLibraryCount": {
+    "description": "Line in the library Markdown export.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
   }
 }

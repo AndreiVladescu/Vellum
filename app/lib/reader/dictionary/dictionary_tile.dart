@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dictionary_store.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 /// The dictionary's row in the reader's options: whether it is here, how much
 /// room it takes, and the way to get it or give the space back.
@@ -61,7 +62,9 @@ class _DictionaryTileState extends State<DictionaryTile> {
       });
     } catch (e) {
       if (mounted) {
-        setState(() => _error = e is DictionaryInstallException ? e.message : '$e');
+        setState(() => _error = e is DictionaryInstallException
+            ? e.messageOf(L10n.of(context))
+            : '$e');
       }
     } finally {
       if (mounted) setState(() => _working = false);
@@ -76,6 +79,7 @@ class _DictionaryTileState extends State<DictionaryTile> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final store = _store;
     if (_busy || store == null) return const SizedBox.shrink();
     final installed = store.isInstalled;
@@ -88,10 +92,10 @@ class _DictionaryTileState extends State<DictionaryTile> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.menu_book_outlined),
-          title: const Text('Dictionary'),
+          title: Text(l10n.dictionaryTitle),
           subtitle: Text(installed
-              ? 'WordNet, on this device · $megabytes MB'
-              : 'Not installed · a $megabytes MB download'),
+              ? l10n.dictionaryInstalledSub(megabytes)
+              : l10n.dictionaryNotInstalledSub(megabytes)),
           trailing: _working
               ? SizedBox(
                   width: 24,
@@ -101,7 +105,8 @@ class _DictionaryTileState extends State<DictionaryTile> {
                 )
               : TextButton(
                   onPressed: installed ? _remove : _download,
-                  child: Text(installed ? 'Remove' : 'Download'),
+                  child: Text(
+                      installed ? l10n.dictionaryRemove : l10n.dictionaryDownload),
                 ),
         ),
         if (_error != null)

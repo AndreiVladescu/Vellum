@@ -13,6 +13,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// What the leading control (the back arrow) and its padding cost.
 const kLeadingWidth = 64.0;
@@ -118,7 +119,7 @@ class ReaderActionBar extends StatelessWidget {
               ),
         if (hidden.isNotEmpty || menuExtras.isNotEmpty)
           PopupMenuButton<VoidCallback?>(
-            tooltip: 'More',
+            tooltip: L10n.of(context).readerMore,
             // The value *is* the thing to do: an enum of choices here would be
             // a second list to keep in step with the first.
             onSelected: (run) => run?.call(),

@@ -37,6 +37,8 @@ import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
 import 'reader_settings_sheet.dart';
 import 'translate/translate_sheet.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 
 /// The integrated PDF reader. Persists the current page as the user reads,
 /// which drives the "Resume reading" state on the book's detail page, and lets
@@ -393,27 +395,28 @@ class _ReaderPageState extends State<ReaderPage>
 
   Future<void> _promptPageJump() async {
     final controller = TextEditingController();
+    final l10n = L10n.of(context);
     final target = await showDialog<int>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Go to page (1–${_pageCount ?? 1})'),
+        title: Text(l10n.readerGoToPageTitle(_pageCount ?? 1)),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.number,
           onSubmitted: (value) =>
               Navigator.pop(dialogContext, int.tryParse(value)),
-          decoration: const InputDecoration(hintText: 'Page number'),
+          decoration: InputDecoration(hintText: l10n.readerPageNumberHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.pop(dialogContext, int.tryParse(controller.text)),
-            child: const Text('Go'),
+            child: Text(l10n.readerGo),
           ),
         ],
       ),
@@ -679,18 +682,21 @@ class _ReaderPageState extends State<ReaderPage>
   /// Selection actions come first on purpose: while text is selected they are
   /// the only reason the bar is being looked at, and the reading controls can
   /// wait in the menu for a moment.
-  List<ReaderAction> _barActions(ReaderSettings? settings) => [
+  List<ReaderAction> _barActions(ReaderSettings? settings) {
+    final l10n = L10n.of(context);
+    return [
         if (_hasSelection) ...[
           ReaderAction(
             icon: Icons.format_color_text,
             color: _highlightColour.color,
-            label: 'Highlight in ${_highlightColour.label}',
+            label: l10n.readerActHighlightIn(_highlightColour.labelOf(l10n)),
             onPressed: _highlightSelection,
           ),
           if (settings != null)
             ReaderAction(
               icon: Icons.palette_outlined,
-              label: 'Highlighter colour — ${_highlightColour.label}',
+              label: l10n.readerActHighlighterColour(
+                  _highlightColour.labelOf(l10n)),
               onPressed: () => showHighlightColorSheet(
                 context,
                 selected: _highlightColour,
@@ -703,24 +709,24 @@ class _ReaderPageState extends State<ReaderPage>
             ),
           ReaderAction(
             icon: Icons.sticky_note_2_outlined,
-            label: 'Note on selection',
+            label: l10n.readerActNoteOnSelection,
             onPressed: () => _highlightSelection(withNote: true),
           ),
           if (_selectedWord != null)
             ReaderAction(
               icon: Icons.menu_book_outlined,
-              label: 'Look up “${_selectedWord!}”',
+              label: l10n.readerActLookUp(_selectedWord!),
               onPressed: _defineSelection,
             ),
           ReaderAction(
             icon: Icons.auto_awesome_outlined,
-            label: 'Ask a model about this',
+            label: l10n.readerActAskModel,
             onPressed: _askAi,
           ),
           if (settings != null)
             ReaderAction(
               icon: Icons.translate,
-              label: 'Translate selection',
+              label: l10n.readerActTranslate,
               onPressed: _translateSelection,
             ),
         ],
@@ -729,8 +735,13 @@ class _ReaderPageState extends State<ReaderPage>
             icon: settings.pdfMode == PdfPageMode.paged
                 ? Icons.auto_stories_outlined
                 : Icons.swap_vert,
-            label: '${settings.pdfMode.label} — switch to '
-                '${settings.pdfMode == PdfPageMode.paged ? PdfPageMode.scroll.label : PdfPageMode.paged.label}',
+            label: l10n.readerActPdfModeSwitch(
+              settings.pdfMode.labelOf(l10n),
+              (settings.pdfMode == PdfPageMode.paged
+                      ? PdfPageMode.scroll
+                      : PdfPageMode.paged)
+                  .labelOf(l10n),
+            ),
             onPressed: () => settings.setPdfMode(
               settings.pdfMode == PdfPageMode.paged
                   ? PdfPageMode.scroll
@@ -740,8 +751,8 @@ class _ReaderPageState extends State<ReaderPage>
         ReaderAction(
           icon: _bookmarkOnPage == null ? Icons.bookmark_outline : Icons.bookmark,
           label: _bookmarkOnPage == null
-              ? 'Bookmark this page'
-              : 'Remove bookmark',
+              ? l10n.readerActBookmarkPage
+              : l10n.readerActRemoveBookmark,
           onPressed: _page == null ? null : _toggleBookmark,
         ),
         if (_mode == PdfPageMode.scroll)
@@ -750,35 +761,36 @@ class _ReaderPageState extends State<ReaderPage>
                 ? Icons.pause_circle_outline
                 : Icons.play_circle_outline,
             label: _autoScrolling
-                ? 'Stop scrolling by itself'
-                : 'Scroll by itself',
+                ? l10n.readerActAutoScrollStop
+                : l10n.readerActAutoScroll,
             onPressed: _controller.isReady ? _toggleAutoScroll : null,
           ),
         ReaderAction(
           icon: _penMode ? Icons.edit : Icons.edit_outlined,
-          label: _penMode ? 'Stop writing' : 'Write on the page',
+          label: _penMode ? l10n.readerActPenStop : l10n.readerActPenStart,
           selected: _penMode,
           onPressed: _controller.isReady ? () => _setPenMode(!_penMode) : null,
         ),
         ReaderAction(
           icon: Icons.fullscreen,
-          label: 'Reading mode — swipe down from the top to come back',
+          label: l10n.readerActReadingMode,
           onPressed: () => _setReadingMode(true),
         ),
         ReaderAction(
           icon: Icons.list_alt,
-          label: 'Annotations',
+          label: l10n.readerActAnnotations,
           onPressed: _openPanel,
         ),
         ReaderAction(
           icon: Icons.search,
-          label: 'Search in this book (${commandModifierLabel()}F)',
+          label: l10n.readerActSearch(commandModifierLabel()),
           // Disabled until the document is loaded, which is also when the
           // searcher exists — a search box that silently does nothing is worse
           // than one that is visibly not ready yet.
           onPressed: _searcher == null ? null : _openSearch,
         ),
       ];
+  }
 
   /// The page under a point in the viewer's own coordinates, and where on that
   /// page it falls — 0,0 its top-left corner, 1,1 its bottom-right.
@@ -1193,26 +1205,27 @@ class _ReaderPageState extends State<ReaderPage>
   /// The words for a note, new or being changed. Null when nothing was typed.
   Future<String?> _promptForText(String initial) async {
     final controller = TextEditingController(text: initial);
+    final l10n = L10n.of(context);
     final text = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Write on the page'),
+        title: Text(l10n.readerPenTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLines: 3,
           minLines: 1,
-          decoration: const InputDecoration(hintText: 'A word in the margin'),
+          decoration: InputDecoration(hintText: l10n.readerPenHint),
           onSubmitted: (value) => Navigator.pop(dialogContext, value),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Write'),
+            child: Text(l10n.readerPenWrite),
           ),
         ],
       ),
@@ -1425,7 +1438,7 @@ class _ReaderPageState extends State<ReaderPage>
     if (!mounted) return;
     setState(() => _bookmarkOnPage = id);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Bookmarked page $page')),
+      SnackBar(content: Text(L10n.of(context).readerBookmarkedPage(page))),
     );
   }
 
@@ -1448,8 +1461,8 @@ class _ReaderPageState extends State<ReaderPage>
   Future<void> _defineSelection() async {
     final word = _selectedWord;
     if (word == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Select a single word to look it up.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(L10n.of(context).readerSelectWord),
       ));
       return;
     }
@@ -1511,9 +1524,8 @@ class _ReaderPageState extends State<ReaderPage>
     }
     if (!mounted) return;
     if (passage.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('There is no text here to send — this page may be a '
-            'scan.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(L10n.of(context).readerNoTextScan),
       ));
       return;
     }
@@ -1555,7 +1567,7 @@ class _ReaderPageState extends State<ReaderPage>
     if (settings == null) return;
     if (ranges.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+          .showSnackBar(SnackBar(content: Text(L10n.of(context).readerSelectTextFirst)));
       return;
     }
     final passage = ranges.map((r) => r.text).join(' ').trim();
@@ -1589,7 +1601,7 @@ class _ReaderPageState extends State<ReaderPage>
     final ranges = _selectedRanges;
     if (ranges.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+          .showSnackBar(SnackBar(content: Text(L10n.of(context).readerSelectTextFirst)));
       return;
     }
 
@@ -1617,21 +1629,23 @@ class _ReaderPageState extends State<ReaderPage>
       );
     }
     if (!mounted) return;
+    final l10n = L10n.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(withNote
-            ? 'Note saved'
-            : 'Highlighted ${ranges.length == 1 ? 'passage' : '${ranges.length} passages'}'),
+            ? l10n.readerNoteSaved
+            : l10n.readerHighlightedPassages(ranges.length)),
       ),
     );
   }
 
   Future<String?> _promptNote(String quote) async {
     final controller = TextEditingController();
+    final l10n = L10n.of(context);
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Note on this passage'),
+        title: Text(l10n.readerNoteOnPassageTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1646,18 +1660,18 @@ class _ReaderPageState extends State<ReaderPage>
               autofocus: true,
               minLines: 2,
               maxLines: 5,
-              decoration: const InputDecoration(hintText: 'Your note'),
+              decoration: InputDecoration(hintText: l10n.readerNoteHint),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -1693,6 +1707,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     final settings = _settings;
     final dark = settings?.nightMode ?? false;
     final readerTheme = settings?.effectiveTheme ?? ReaderTheme.light;
@@ -1724,21 +1739,21 @@ class _ReaderPageState extends State<ReaderPage>
               ),
             IconButton(
               icon: const Icon(Icons.keyboard_arrow_up),
-              tooltip: 'Previous match',
+              tooltip: l10n.readerSearchPrevious,
               style: readerSearchIconStyle(readerTheme.foreground),
               onPressed:
                   (_searcher?.hasMatches ?? false) ? _searcher!.goToPrevMatch : null,
             ),
             IconButton(
               icon: const Icon(Icons.keyboard_arrow_down),
-              tooltip: 'Next match',
+              tooltip: l10n.readerSearchNext,
               style: readerSearchIconStyle(readerTheme.foreground),
               onPressed:
                   (_searcher?.hasMatches ?? false) ? _searcher!.goToNextMatch : null,
             ),
             IconButton(
               icon: const Icon(Icons.close),
-              tooltip: 'Close search (Esc)',
+              tooltip: l10n.readerSearchClose,
               style: readerSearchIconStyle(readerTheme.foreground),
               onPressed: _closeSearch,
             ),
@@ -1761,7 +1776,7 @@ class _ReaderPageState extends State<ReaderPage>
                     s.setPageMetric(next);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(next.label),
+                        content: Text(next.labelOf(l10n)),
                         duration: const Duration(milliseconds: 900),
                       ),
                     );
@@ -1774,6 +1789,7 @@ class _ReaderPageState extends State<ReaderPage>
                     ),
                     child: Text(
                       pageMetricLabel(
+                        l10n,
                         settings?.pageMetric ?? PageMetric.pagesOf,
                         page: _page!,
                         count: _pageCount!,
@@ -1796,11 +1812,11 @@ class _ReaderPageState extends State<ReaderPage>
               menuExtras: [
                 PopupMenuItem(
                   value: _promptPageJump,
-                  child: Text('Go to page…  ${commandModifierLabel()}G'),
+                  child: Text(l10n.readerMenuGoToPage(commandModifierLabel())),
                 ),
                 PopupMenuItem(
                   value: () => _askAi(wholePage: true),
-                  child: const Text('Ask a model about this page…'),
+                  child: Text(l10n.readerMenuAskPage),
                 ),
                 PopupMenuItem(
                   value: () {
@@ -1808,7 +1824,7 @@ class _ReaderPageState extends State<ReaderPage>
                     if (s == null) return;
                     ReaderSettingsSheet.show(context, settings: s, pdf: true);
                   },
-                  child: const Text('Reading options…'),
+                  child: Text(l10n.readerMenuReadingOptions),
                 ),
               ],
             ),
@@ -2062,6 +2078,7 @@ class _ReaderPageState extends State<ReaderPage>
               child: IgnorePointer(
                 child: Text(
                   readingModeStatus(
+                    l10n,
                     page: _page!,
                     count: _pageCount!,
                     pagesPerMinute: _pace,
@@ -2084,7 +2101,7 @@ class _ReaderPageState extends State<ReaderPage>
               child: Center(
                 child: AutoScrollBar(
                   speed: _autoSpeed,
-                  unit: 'pages',
+                  unit: AutoScrollUnit.pages,
                   min: minAutoScrollPagesPerMinute,
                   max: maxAutoScrollPagesPerMinute,
                   onSpeed: _setAutoSpeed,
@@ -2108,21 +2125,21 @@ class _ReaderPageState extends State<ReaderPage>
                         if (!_slowToOpen) ...[
                           const CircularProgressIndicator(),
                           const SizedBox(height: 16),
-                          Text('Opening…',
+                          Text(l10n.readerOpening,
                               style: TextStyle(color: readerTheme.foreground)),
                         ] else ...[
                           Icon(Icons.hourglass_disabled,
                               size: 40, color: readerTheme.foreground),
                           const SizedBox(height: 12),
                           Text(
-                            'This book is taking longer than it should.',
+                            l10n.readerSlowToOpen,
                             style: TextStyle(color: readerTheme.foreground),
                           ),
                           const SizedBox(height: 12),
                           FilledButton.icon(
                             onPressed: _retryOpen,
                             icon: const Icon(Icons.refresh),
-                            label: const Text('Try again'),
+                            label: Text(l10n.readerTryAgain),
                           ),
                         ],
                       ],
@@ -2140,7 +2157,7 @@ class _ReaderPageState extends State<ReaderPage>
               width: strip,
               alignment: Alignment.centerLeft,
               icon: Icons.chevron_left,
-              tooltip: 'Back a page',
+              tooltip: l10n.readerBackPage,
               colour: readerTheme.foreground,
               onTap: () => _step(-1),
             ),
@@ -2148,7 +2165,7 @@ class _ReaderPageState extends State<ReaderPage>
               width: strip,
               alignment: Alignment.centerRight,
               icon: Icons.chevron_right,
-              tooltip: 'Forward a page',
+              tooltip: l10n.readerForwardPage,
               colour: readerTheme.foreground,
               onTap: () => _step(1),
             ),

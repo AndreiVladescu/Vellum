@@ -5,6 +5,7 @@ import '../../widgets/page_insets.dart';
 import 'ai_client.dart';
 import 'ai_settings.dart';
 import 'ai_setup_sheet.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 /// Asking a model about what you are reading (request 8/19 #10).
 ///
@@ -48,11 +49,11 @@ class _AskAiSheetState extends State<AskAiSheet> {
 
   /// The questions worth a button. Everything else is typed — these are the
   /// three anyone asks of a paragraph they did not follow.
-  static const _presets = [
-    'Explain this in plain language.',
-    'Summarise it in a sentence.',
-    'What is the context here?',
-  ];
+  static List<String> _presets(L10n l10n) => [
+        l10n.aiPresetExplain,
+        l10n.aiPresetSummarise,
+        l10n.aiPresetContext,
+      ];
 
   @override
   void dispose() {
@@ -88,7 +89,7 @@ class _AskAiSheetState extends State<AskAiSheet> {
     } on AiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        _error = e.messageOf(L10n.of(context));
         _busy = false;
       });
     } finally {
@@ -119,6 +120,7 @@ class _AskAiSheetState extends State<AskAiSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final settings = widget.settings;
     final trimmed = trimPassage(widget.passage);
     return Padding(
@@ -135,11 +137,11 @@ class _AskAiSheetState extends State<AskAiSheet> {
           Row(
             children: [
               Expanded(
-                child: Text('Ask a model', style: theme.textTheme.titleMedium),
+                child: Text(l10n.aiAskTitle, style: theme.textTheme.titleMedium),
               ),
               IconButton(
                 icon: const Icon(Icons.settings_outlined),
-                tooltip: 'Where the model is',
+                tooltip: l10n.aiWhereTooltip,
                 onPressed: _configure,
               ),
             ],
@@ -148,9 +150,8 @@ class _AskAiSheetState extends State<AskAiSheet> {
             const SizedBox(height: 2),
             Text(
               settings.isLocal
-                  ? 'This ${widget.what} goes to ${settings.model} on this '
-                      'machine.'
-                  : 'This ${widget.what} will be sent to ${settings.host}.',
+                  ? l10n.aiGoesLocal(widget.what, settings.model)
+                  : l10n.aiWillBeSent(widget.what, settings.host),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: settings.isLocal
                     ? theme.colorScheme.onSurfaceVariant
@@ -173,8 +174,7 @@ class _AskAiSheetState extends State<AskAiSheet> {
           if (trimmed.length < widget.passage.length) ...[
             const SizedBox(height: 4),
             Text(
-              'Only the first ${maxPassageCharacters ~/ 1000}k characters are '
-              'sent.',
+              l10n.aiTruncated(maxPassageCharacters ~/ 1000),
               style: theme.textTheme.bodySmall,
             ),
           ],
@@ -186,9 +186,9 @@ class _AskAiSheetState extends State<AskAiSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final preset in _presets)
+                for (final preset in _presets(l10n))
                   ActionChip(
-                    label: Text(preset.replaceFirst(RegExp(r'[.?]$'), '')),
+                    label: Text(preset.replaceFirst(RegExp(r'[.?。？]$'), '')),
                     onPressed: _busy ? null : () => _ask(preset),
                   ),
               ],
@@ -201,12 +201,12 @@ class _AskAiSheetState extends State<AskAiSheet> {
               textInputAction: TextInputAction.send,
               onSubmitted: _busy ? null : _ask,
               decoration: InputDecoration(
-                hintText: 'Or ask something else',
+                hintText: l10n.aiOrAsk,
                 border: const OutlineInputBorder(),
                 isDense: true,
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.send),
-                  tooltip: 'Ask',
+                  tooltip: l10n.aiAskTooltip,
                   onPressed: _busy ? null : () => _ask(_question.text),
                 ),
               ),
@@ -236,7 +236,7 @@ class _AskAiSheetState extends State<AskAiSheet> {
               // Said once, under every answer: these things are confidently
               // wrong sometimes, and the book on screen is the authority.
               Text(
-                'A model can be wrong. The book is the one that knows.',
+                l10n.aiCanBeWrong,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -248,18 +248,19 @@ class _AskAiSheetState extends State<AskAiSheet> {
                       await Clipboard.setData(ClipboardData(text: _answer!));
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Copied')),
+                        SnackBar(content: Text(l10n.readerCopied)),
                       );
                     },
                     icon: const Icon(Icons.copy_all_outlined),
-                    label: const Text('Copy'),
+                    label: Text(l10n.readerCopy),
                   ),
                   if (widget.onSaveAsNote != null)
                     TextButton.icon(
                       onPressed: _saved ? null : _save,
                       icon: Icon(
                           _saved ? Icons.check : Icons.sticky_note_2_outlined),
-                      label: Text(_saved ? 'Saved as a note' : 'Save as a note'),
+                      label: Text(
+                          _saved ? l10n.readerSavedAsNote : l10n.readerSaveAsNote),
                     ),
                 ],
               ),
@@ -279,19 +280,19 @@ class _NotSetUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'No model named yet. Any server speaking the OpenAI chat API will '
-          'do — one running on this machine, or a paid one.',
+          l10n.aiNotSetUp,
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: onConfigure,
           icon: const Icon(Icons.settings_outlined),
-          label: const Text('Name a model'),
+          label: Text(l10n.aiNameModel),
         ),
       ],
     );

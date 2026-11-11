@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// The trash (plan 5 #52): books removed from the library but not yet deleted.
 ///
@@ -18,7 +19,7 @@ class TrashPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trash')),
+      appBar: AppBar(title: Text(L10n.of(context).trashTitle)),
       body: StreamBuilder<List<Book>>(
         stream: repository.watchTrashedBooks(),
         builder: (context, snapshot) {
@@ -50,6 +51,7 @@ class _EmptyTrash extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -60,11 +62,10 @@ class _EmptyTrash extends StatelessWidget {
             color: theme.colorScheme.primary.withValues(alpha: 0.7),
           ),
           const SizedBox(height: 16),
-          Text('The trash is empty', style: theme.textTheme.titleMedium),
+          Text(l10n.trashEmptyTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
-            'Books you remove wait here for '
-            '${TrashService.graceperiod.inDays} days.',
+            l10n.trashEmptyBody(TrashService.graceperiod.inDays),
             style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
@@ -85,27 +86,23 @@ class _TrashHeader extends StatelessWidget {
     final books = await repository.watchTrashedBooks().first;
     if (books.isEmpty || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete ${books.length} book'
-            '${books.length == 1 ? '' : 's'} for good?'),
-        content: const Text(
-          'Their covers and attached files are deleted from this device, and '
-          'the deletion is sent to your server on the next sync. This can’t '
-          'be undone.',
-        ),
+        title: Text(l10n.trashEmptyAllTitle(books.length)),
+        content: Text(l10n.trashEmptyAllBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -115,8 +112,7 @@ class _TrashHeader extends StatelessWidget {
       await repository.trash.deleteNow(book);
     }
     messenger.showSnackBar(
-      SnackBar(content: Text('Deleted ${books.length} book'
-          '${books.length == 1 ? '' : 's'}')),
+      SnackBar(content: Text(l10n.trashEmptyAllDone(books.length))),
     );
   }
 
@@ -129,9 +125,8 @@ class _TrashHeader extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'Deleted for good ${TrashService.graceperiod.inDays} days after '
-              'you remove them. Until then nothing has been deleted and your '
-              'server hasn’t been told.',
+              L10n.of(context)
+                  .trashHeaderNote(TrashService.graceperiod.inDays),
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
@@ -141,7 +136,7 @@ class _TrashHeader extends StatelessWidget {
               foregroundColor: theme.colorScheme.error,
             ),
             onPressed: () => _emptyAll(context),
-            child: const Text('Empty'),
+            child: Text(L10n.of(context).trashEmptyButton),
           ),
         ],
       ),
@@ -157,26 +152,23 @@ class _TrashTile extends StatelessWidget {
 
   Future<void> _deleteNow(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete “${book.title}” for good?'),
-        content: const Text(
-          'Its cover and any attached files are deleted from this device, and '
-          'the deletion is sent to your server on the next sync. This can’t be '
-          'undone.',
-        ),
+        title: Text(l10n.trashDeleteOneTitle(book.title)),
+        content: Text(l10n.trashDeleteOneBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -184,13 +176,14 @@ class _TrashTile extends StatelessWidget {
     if (confirmed != true) return;
     await repository.trash.deleteNow(book);
     messenger.showSnackBar(
-      SnackBar(content: Text('“${book.title}” deleted')),
+      SnackBar(content: Text(l10n.trashDeleteOneDone(book.title))),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final cover = repository.coverFileOf(book);
+    final l10n = L10n.of(context);
     return ListTile(
       leading: SizedBox(
         width: 40,
@@ -207,18 +200,18 @@ class _TrashTile extends StatelessWidget {
         ),
       ),
       title: Text(book.title),
-      subtitle: Text(_remainingLabel()),
+      subtitle: Text(_remainingLabel(l10n)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             icon: const Icon(Icons.restore_from_trash_outlined),
-            tooltip: 'Restore',
+            tooltip: l10n.trashRestoreTooltip,
             onPressed: () => repository.restoreBook(book.id),
           ),
           IconButton(
             icon: const Icon(Icons.delete_forever_outlined),
-            tooltip: 'Delete now',
+            tooltip: l10n.trashDeleteNowTooltip,
             onPressed: () => _deleteNow(context),
           ),
         ],
@@ -229,18 +222,14 @@ class _TrashTile extends StatelessWidget {
   /// How long this book has left, in the units a person would use. Counted from
   /// the purge date rather than shown as an absolute one: "3 days left" is the
   /// question being asked, not "which Tuesday".
-  String _remainingLabel() {
+  String _remainingLabel(L10n l10n) {
     final purge = TrashService.purgeDateOf(book);
     if (purge == null) return '';
     final left = purge.difference(DateTime.now());
-    if (left.isNegative) return 'Deleted on the next launch';
-    if (left.inDays >= 1) {
-      return 'Deleted in ${left.inDays} day${left.inDays == 1 ? '' : 's'}';
-    }
-    if (left.inHours >= 1) {
-      return 'Deleted in ${left.inHours} hour${left.inHours == 1 ? '' : 's'}';
-    }
-    return 'Deleted within the hour';
+    if (left.isNegative) return l10n.trashRemainingLaunch;
+    if (left.inDays >= 1) return l10n.trashRemainingDays(left.inDays);
+    if (left.inHours >= 1) return l10n.trashRemainingHours(left.inHours);
+    return l10n.trashRemainingSoon;
   }
 }
 

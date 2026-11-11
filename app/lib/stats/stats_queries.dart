@@ -262,6 +262,10 @@ class ReadingStats {
   /// before this device sent a label of itself (or synced from one that never
   /// will) is folded into one honest "Unknown device" rather than dropped or
   /// mislabelled.
+  /// The key sessions without a device name are folded under. The page shows
+  /// its own translated name for it instead of this text.
+  static const unknownDevice = 'Unknown device'; // i18n-ignore
+
   static List<({String device, int minutes})> minutesByDevice(
     List<ReadingSession> sessions,
   ) {
@@ -270,7 +274,7 @@ class ReadingStats {
       final minutes = s.endedAt.difference(s.startedAt).inMinutes;
       if (minutes <= 0) continue;
       final label = s.deviceLabel?.trim();
-      final key = (label == null || label.isEmpty) ? 'Unknown device' : label;
+      final key = (label == null || label.isEmpty) ? unknownDevice : label;
       totals[key] = (totals[key] ?? 0) + minutes;
     }
     final out = [

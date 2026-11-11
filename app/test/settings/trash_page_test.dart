@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/settings/trash_page.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
   late Directory dir;
@@ -47,7 +48,10 @@ void main() {
           .insert(BooksCompanion.insert(id: 'b1', title: 'Dune'));
       await repo.trashBook('b1');
     });
-    await tester.pumpWidget(MaterialApp(home: TrashPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
+      home: TrashPage(repository: repo)));
     await settle(tester);
     return repo;
   }

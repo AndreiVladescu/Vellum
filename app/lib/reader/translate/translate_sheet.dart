@@ -7,6 +7,8 @@ import 'on_device.dart';
 import 'translation_backend.dart';
 import 'translator_setup_sheet.dart';
 import '../../widgets/page_insets.dart';
+import '../../l10n/gen/app_localizations.dart';
+import '../../l10n/labels.dart';
 
 /// The passage, what it was translated from and to, and the result.
 ///
@@ -128,7 +130,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
     } on TranslationException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        _error = e.messageOf(L10n.of(context));
         _busy = false;
       });
     }
@@ -159,6 +161,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -170,7 +173,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Translate', style: theme.textTheme.titleMedium),
+          Text(l10n.translateTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
           // The passage first: what you selected is what this is about, and a
           // mis-drag is quicker to spot here than in the translation.
@@ -189,7 +192,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
             children: [
               Expanded(
                 child: _LanguagePicker(
-                  label: 'From',
+                  label: l10n.translateFrom,
                   value: _from,
                   includeAuto: true,
                   detected: _detected,
@@ -208,7 +211,7 @@ class _TranslateSheetState extends State<TranslateSheet> {
               ),
               Expanded(
                 child: _LanguagePicker(
-                  label: 'To',
+                  label: l10n.translateTo,
                   value: _to,
                   includeAuto: false,
                   onChanged: (value) {
@@ -236,16 +239,10 @@ class _TranslateSheetState extends State<TranslateSheet> {
                   child: Text(
                     onDeviceTranslationAvailable &&
                             !widget.settings.useOnDeviceTranslation
-                        ? 'This build can translate on the device using Google '
-                            'ML Kit. It is proprietary, so it stays off until '
-                            'you turn it on in the reader’s settings.'
+                        ? l10n.translateSetupOnDevice
                         : localEngineSupportedHere
-                        ? 'No translator is installed on this machine. '
-                            'Languages says what to install — it runs here, and '
-                            'nothing is sent anywhere.'
-                        : 'No translator here yet. Set a LibreTranslate address '
-                            'in the reader’s settings, and passages go to that '
-                            'server — yours, if you run one.',
+                        ? l10n.translateSetupLocal
+                        : l10n.translateSetupNone,
                   ),
                 ),
               ],
@@ -276,8 +273,8 @@ class _TranslateSheetState extends State<TranslateSheet> {
             children: [
               Text(
                 _backend == null
-                    ? 'nothing to translate with'
-                    : 'via ${_backend!.name}',
+                    ? l10n.translateNothingWith
+                    : l10n.translateVia(_backend!.displayNameOf(l10n)),
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -289,28 +286,31 @@ class _TranslateSheetState extends State<TranslateSheet> {
               TextButton.icon(
                 onPressed: _openLanguages,
                 icon: const Icon(Icons.download_outlined, size: 18),
-                label: const Text('Languages'),
+                label: Text(l10n.translateLanguages),
               ),
               if (_error != null)
-                TextButton(onPressed: _busy ? null : _run, child: const Text('Try again')),
+                TextButton(
+                    onPressed: _busy ? null : _run,
+                    child: Text(l10n.readerTryAgain)),
               if (_result != null) ...[
                 TextButton.icon(
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: _result!));
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Translation copied')),
+                      SnackBar(content: Text(l10n.translateCopied)),
                     );
                   },
                   icon: const Icon(Icons.copy, size: 18),
-                  label: const Text('Copy'),
+                  label: Text(l10n.readerCopy),
                 ),
                 if (widget.onSaveAsNote != null)
                   FilledButton.icon(
                     onPressed: _saved ? null : _save,
                     icon: Icon(_saved ? Icons.check : Icons.sticky_note_2_outlined,
                         size: 18),
-                    label: Text(_saved ? 'Saved' : 'Save as note'),
+                    label: Text(
+                        _saved ? l10n.translateSaved : l10n.translateSaveAsNote),
                   ),
               ],
             ],
@@ -338,6 +338,7 @@ class _LanguagePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     final options = [
       if (includeAuto) TranslationLanguage.auto,
       ...TranslationLanguage.all,
@@ -351,11 +352,14 @@ class _LanguagePicker extends StatelessWidget {
         isDense: true,
         // The guess, said out loud. Without this a wrong detection is invisible
         // until the translation reads like nonsense.
-        helperText: detected == null ? null : 'Detected ${detected!.name}',
+        helperText: detected == null
+            ? null
+            : l10n.translateDetected(detected!.nameOf(l10n)),
       ),
       items: [
         for (final language in options)
-          DropdownMenuItem(value: language, child: Text(language.name)),
+          DropdownMenuItem(
+              value: language, child: Text(language.nameOf(l10n))),
       ],
       onChanged: (selected) {
         if (selected != null && selected != value) onChanged(selected);

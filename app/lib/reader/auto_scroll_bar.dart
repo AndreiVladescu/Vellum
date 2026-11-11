@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'auto_scroll.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// The floating speed control for the self-scroller, shared by both readers.
 ///
@@ -21,8 +22,8 @@ class AutoScrollBar extends StatelessWidget {
 
   final double speed;
 
-  /// What one unit of speed is here: 'pages' in a PDF, 'lines' in an EPUB.
-  final String unit;
+  /// What one unit of speed is here: pages in a PDF, lines in an EPUB.
+  final AutoScrollUnit unit;
 
   final double min;
   final double max;
@@ -33,6 +34,7 @@ class AutoScrollBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = L10n.of(context);
     return Material(
       color: scheme.inverseSurface.withValues(alpha: 0.85),
       shape: const StadiumBorder(),
@@ -44,7 +46,7 @@ class AutoScrollBar extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.remove),
               color: scheme.onInverseSurface,
-              tooltip: 'Slower',
+              tooltip: l10n.readerAutoSlower,
               onPressed: speed <= min
                   ? null
                   : () => onSpeed(
@@ -57,13 +59,13 @@ class AutoScrollBar extends StatelessWidget {
                     ),
             ),
             Text(
-              autoScrollSpeedLabel(speed, unit),
+              autoScrollSpeedLabel(l10n, speed, unit),
               style: TextStyle(color: scheme.onInverseSurface),
             ),
             IconButton(
               icon: const Icon(Icons.add),
               color: scheme.onInverseSurface,
-              tooltip: 'Faster',
+              tooltip: l10n.readerAutoFaster,
               onPressed: speed >= max
                   ? null
                   : () => onSpeed(
@@ -78,7 +80,7 @@ class AutoScrollBar extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.stop),
               color: scheme.onInverseSurface,
-              tooltip: 'Stop scrolling by itself',
+              tooltip: l10n.readerActAutoScrollStop,
               onPressed: onStop,
             ),
           ],

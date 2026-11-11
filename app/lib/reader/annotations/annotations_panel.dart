@@ -7,6 +7,7 @@ import '../../data/database.dart';
 import 'annotation_locator.dart';
 import 'annotation_store.dart';
 import 'markdown_export.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 /// The per-book annotations list (plan 5 #22): jump to, edit, delete, export.
 ///
@@ -64,6 +65,7 @@ class AnnotationsPanel extends StatelessWidget {
       stream: store.watchForBook(book.id),
       builder: (context, snapshot) {
         final annotations = snapshot.data ?? const <Annotation>[];
+        final l10n = L10n.of(context);
         final limit = maxInline;
         final shown =
             limit == null ? null : annotations.take(limit).toList();
@@ -78,19 +80,19 @@ class AnnotationsPanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       annotations.isEmpty
-                          ? 'No annotations yet'
-                          : '${annotations.length} annotation'
-                              '${annotations.length == 1 ? '' : 's'}',
+                          ? l10n.annotationsNone
+                          : l10n.annotationsCount(annotations.length),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
                   if (annotations.isNotEmpty)
                     IconButton(
                       icon: const Icon(Icons.copy_all_outlined),
-                      tooltip: 'Copy as Markdown',
+                      tooltip: l10n.annotationsCopyTooltip,
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(
                           text: MarkdownExport.forBook(
+                            l10n: l10n,
                             book: book,
                             annotations: annotations,
                             authors: authors,
@@ -98,8 +100,7 @@ class AnnotationsPanel extends StatelessWidget {
                         ));
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Annotations copied as Markdown')),
+                          SnackBar(content: Text(l10n.annotationsCopied)),
                         );
                       },
                     ),
@@ -107,12 +108,9 @@ class AnnotationsPanel extends StatelessWidget {
               ),
             ),
             if (annotations.isEmpty)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 16),
-                child: Text(
-                  'Bookmark a page, or select text and highlight it, while '
-                  'reading.',
-                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                child: Text(l10n.annotationsEmptyHint),
               )
             else if (shown != null) ...[
               for (final annotation in shown)
@@ -124,9 +122,7 @@ class AnnotationsPanel extends StatelessWidget {
               if (shown.length < annotations.length)
                 ListTile(
                   leading: const Icon(Icons.more_horiz),
-                  title: Text(
-                    'Show all ${annotations.length} annotations',
-                  ),
+                  title: Text(l10n.annotationsShowAll(annotations.length)),
                   onTap: () => _openAll(context),
                 ),
             ] else
@@ -171,35 +167,40 @@ class AnnotationTile extends StatelessWidget {
         null => Icons.label_outline,
       };
 
-  String get _where {
-    if (annotation.page != null) return 'Page ${annotation.page}';
-    if (annotation.chapter != null) return 'Chapter ${annotation.chapter! + 1}';
+  String _where(L10n l10n) {
+    if (annotation.page != null) return l10n.annotationsPage(annotation.page!);
+    if (annotation.chapter != null) {
+      return l10n.annotationsChapter(annotation.chapter! + 1);
+    }
     return '';
   }
 
   Future<void> _editNote(BuildContext context) async {
     final controller = TextEditingController(text: annotation.note ?? '');
+    final l10n = L10n.of(context);
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(annotation.quotedText == null ? 'Note' : 'Note on highlight'),
+        title: Text(annotation.quotedText == null
+            ? l10n.annotationsNoteTitle
+            : l10n.annotationsNoteOnHighlight),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLines: 5,
           minLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'What did you want to remember?',
+          decoration: InputDecoration(
+            hintText: l10n.annotationsNoteHint,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -210,6 +211,7 @@ class AnnotationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final locator = AnnotationLocator.decode(annotation.locator);
     final quote = annotation.quotedText;
     final note = annotation.note;
@@ -217,7 +219,7 @@ class AnnotationTile extends StatelessWidget {
       leading: Icon(_icon,
           color: annotation.color == null ? null : Color(annotation.color!)),
       title: Text(
-        quote ?? note ?? _where,
+        quote ?? note ?? _where(l10n),
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
         style: quote != null
@@ -226,7 +228,7 @@ class AnnotationTile extends StatelessWidget {
             : theme.textTheme.bodyMedium,
       ),
       subtitle: Text([
-        _where,
+        _where(l10n),
         if (quote != null && note != null && note.isNotEmpty) note,
       ].where((s) => s.isNotEmpty).join(' · '),
           maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -247,10 +249,10 @@ class AnnotationTile extends StatelessWidget {
           }
         },
         itemBuilder: (context) => [
-          const PopupMenuItem(value: 'note', child: Text('Edit note…')),
+          PopupMenuItem(value: 'note', child: Text(l10n.annotationsEditNote)),
           if (quote != null || note != null)
-            const PopupMenuItem(value: 'copy', child: Text('Copy text')),
-          const PopupMenuItem(value: 'delete', child: Text('Delete')),
+            PopupMenuItem(value: 'copy', child: Text(l10n.annotationsCopyText)),
+          PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
         ],
       ),
     );

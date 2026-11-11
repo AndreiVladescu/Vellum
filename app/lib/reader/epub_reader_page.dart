@@ -31,6 +31,8 @@ import 'reader_actions.dart';
 import 'reader_settings.dart';
 import 'translate/translate_sheet.dart';
 import 'reader_settings_sheet.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 
 /// Where in a book a saved position points: a chapter and how far down it.
 ///
@@ -386,7 +388,8 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     if (!mounted) return;
     setState(() => _bookmarkOnChapter = id);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Bookmarked chapter ${_chapter + 1}')),
+      SnackBar(
+          content: Text(L10n.of(context).readerBookmarkedChapter(_chapter + 1))),
     );
   }
 
@@ -408,7 +411,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final quote = plain.substring(start, end).trim();
     if (quote.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+          .showSnackBar(SnackBar(content: Text(L10n.of(context).readerSelectTextFirst)));
       return;
     }
 
@@ -430,7 +433,10 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(withNote ? 'Note saved' : 'Highlighted')),
+      SnackBar(
+          content: Text(withNote
+              ? L10n.of(context).readerNoteSaved
+              : L10n.of(context).readerHighlighted)),
     );
   }
 
@@ -450,8 +456,8 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     if (range == null) return;
     final word = singleWord(_selectedText(epub));
     if (word == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Select a single word to look it up.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(L10n.of(context).readerSelectWord),
       ));
       return;
     }
@@ -493,7 +499,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final what = selected.isEmpty ? 'chapter' : 'passage';
     if (passage.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('There is no text here to send.')),
+        SnackBar(content: Text(L10n.of(context).readerNoTextToSend)),
       );
       return;
     }
@@ -538,7 +544,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final quote = plain.substring(start, end).trim();
     if (quote.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Select some text first.')));
+          .showSnackBar(SnackBar(content: Text(L10n.of(context).readerSelectTextFirst)));
       return;
     }
     await showModalBottomSheet<void>(
@@ -564,10 +570,11 @@ class _EpubReaderPageState extends State<EpubReaderPage>
 
   Future<String?> _promptNote(String quote) async {
     final controller = TextEditingController();
+    final l10n = L10n.of(context);
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Note on this passage'),
+        title: Text(l10n.readerNoteOnPassageTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -582,18 +589,18 @@ class _EpubReaderPageState extends State<EpubReaderPage>
               autofocus: true,
               minLines: 2,
               maxLines: 5,
-              decoration: const InputDecoration(hintText: 'Your note'),
+              decoration: InputDecoration(hintText: l10n.readerNoteHint),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -646,7 +653,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     });
     if (_hits.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No match for “${query.trim()}”')),
+        SnackBar(content: Text(L10n.of(context).readerNoMatch(query.trim()))),
       );
       return;
     }
@@ -679,27 +686,28 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final count = _count;
     if (count <= 0) return; // the book hasn't opened yet
     final controller = TextEditingController();
+    final l10n = L10n.of(context);
     final target = await showDialog<int>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Go to chapter (1–$count)'),
+        title: Text(l10n.readerGoToChapterTitle(count)),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.number,
           onSubmitted: (value) =>
               Navigator.pop(dialogContext, int.tryParse(value)),
-          decoration: const InputDecoration(hintText: 'Chapter number'),
+          decoration: InputDecoration(hintText: l10n.readerChapterNumberHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.pop(dialogContext, int.tryParse(controller.text)),
-            child: const Text('Go'),
+            child: Text(l10n.readerGo),
           ),
         ],
       ),
@@ -873,7 +881,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
         itemCount: epub.chapters.length,
         itemBuilder: (context, i) => ListTile(
           selected: i == _chapter,
-          title: Text(epub.chapters[i].title,
+          title: Text(epub.chapters[i].titleOf(L10n.of(context), i),
               maxLines: 1, overflow: TextOverflow.ellipsis),
           onTap: () => Navigator.pop(sheetContext, i),
         ),
@@ -884,6 +892,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return FutureBuilder<EpubBook>(
       future: _epub,
       builder: (context, snapshot) {
@@ -893,7 +902,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text("This EPUB couldn't be opened: ${snapshot.error}"),
+                child: Text(l10n.readerEpubOpenFailed('${snapshot.error}')),
               ),
             ),
           );
@@ -959,19 +968,19 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   ),
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_up),
-                  tooltip: 'Previous match',
+                  tooltip: l10n.readerSearchPrevious,
                   style: readerSearchIconStyle(readerTheme.foreground),
                   onPressed: _hits.isEmpty ? null : () => _stepHit(-1),
                 ),
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_down),
-                  tooltip: 'Next match',
+                  tooltip: l10n.readerSearchNext,
                   style: readerSearchIconStyle(readerTheme.foreground),
                   onPressed: _hits.isEmpty ? null : () => _stepHit(1),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  tooltip: 'Close search (Esc)',
+                  tooltip: l10n.readerSearchClose,
                   style: readerSearchIconStyle(readerTheme.foreground),
                   onPressed: _closeSearch,
                 ),
@@ -996,7 +1005,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                     s.setPageMetric(next);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(next.label),
+                        content: Text(next.labelOf(l10n)),
                         duration: const Duration(milliseconds: 900),
                       ),
                     );
@@ -1009,6 +1018,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                     ),
                     child: Text(
                       pageMetricLabel(
+                        l10n,
                         settings?.pageMetric ?? PageMetric.pagesOf,
                         page: _chapter + 1,
                         count: count,
@@ -1029,14 +1039,15 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                     ReaderAction(
                       icon: Icons.format_color_text,
                       color: _highlightColour.color,
-                      label: 'Highlight in ${_highlightColour.label}',
+                      label: l10n.readerActHighlightIn(
+                          _highlightColour.labelOf(l10n)),
                       onPressed: () => _highlightSelection(epub),
                     ),
                     if (settings != null)
                       ReaderAction(
                         icon: Icons.palette_outlined,
-                        label:
-                            'Highlighter colour — ${_highlightColour.label}',
+                        label: l10n.readerActHighlighterColour(
+                            _highlightColour.labelOf(l10n)),
                         onPressed: () => showHighlightColorSheet(
                           context,
                           selected: _highlightColour,
@@ -1051,25 +1062,26 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                       ),
                     ReaderAction(
                       icon: Icons.sticky_note_2_outlined,
-                      label: 'Note on selection',
+                      label: l10n.readerActNoteOnSelection,
                       onPressed: () => _highlightSelection(epub, withNote: true),
                     ),
                     // A word, not a phrase — the same rule as the PDF reader.
                     if (_selectionIsWord)
                       ReaderAction(
                         icon: Icons.menu_book_outlined,
-                        label: 'Look up “${singleWord(_selectedText(epub))}”',
+                        label: l10n
+                            .readerActLookUp(singleWord(_selectedText(epub))!),
                         onPressed: () => _defineSelection(epub),
                       ),
                     ReaderAction(
                       icon: Icons.auto_awesome_outlined,
-                      label: 'Ask a model about this',
+                      label: l10n.readerActAskModel,
                       onPressed: () => _askAi(epub),
                     ),
                     if (settings != null)
                       ReaderAction(
                         icon: Icons.translate,
-                        label: 'Translate selection',
+                        label: l10n.readerActTranslate,
                         onPressed: () => _translateSelection(epub),
                       ),
                   ],
@@ -1078,8 +1090,8 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                         ? Icons.bookmark_outline
                         : Icons.bookmark,
                     label: _bookmarkOnChapter == null
-                        ? 'Bookmark this chapter'
-                        : 'Remove bookmark',
+                        ? l10n.readerActBookmarkChapter
+                        : l10n.readerActRemoveBookmark,
                     onPressed: _toggleBookmark,
                   ),
                   ReaderAction(
@@ -1087,40 +1099,39 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                         ? Icons.pause_circle_outline
                         : Icons.play_circle_outline,
                     label: _autoScrolling
-                        ? 'Stop scrolling by itself'
-                        : 'Scroll by itself',
+                        ? l10n.readerActAutoScrollStop
+                        : l10n.readerActAutoScroll,
                     onPressed: _toggleAutoScroll,
                   ),
                   ReaderAction(
                     icon: Icons.fullscreen,
-                    label:
-                        'Reading mode — swipe down from the top to come back',
+                    label: l10n.readerActReadingMode,
                     onPressed: () => _setReadingMode(true),
                   ),
                   ReaderAction(
                     icon: Icons.list_alt,
-                    label: 'Annotations',
+                    label: l10n.readerActAnnotations,
                     onPressed: () => _openPanel(epub),
                   ),
                   ReaderAction(
                     icon: Icons.search,
-                    label: 'Search in this book (${commandModifierLabel()}F)',
+                    label: l10n.readerActSearch(commandModifierLabel()),
                     onPressed: _openSearch,
                   ),
                   ReaderAction(
                     icon: Icons.toc,
-                    label: 'Chapters',
+                    label: l10n.readerActChapters,
                     onPressed: () => _pickChapter(epub),
                   ),
                   ReaderAction(
                     icon: Icons.auto_awesome,
-                    label: 'Ask a model about this chapter',
+                    label: l10n.readerActAskModelChapter,
                     onPressed: () => _askAi(epub, wholeChapter: true),
                   ),
                   if (settings != null)
                     ReaderAction(
                       icon: Icons.text_fields,
-                      label: 'Reading options',
+                      label: l10n.readerActReadingOptions,
                       onPressed: () => ReaderSettingsSheet.show(
                         context,
                         settings: settings,
@@ -1230,6 +1241,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   child: IgnorePointer(
                     child: Text(
                       readingModeStatus(
+                        l10n,
                         page: _chapter + 1,
                         count: count,
                         unit: 'chapter',
@@ -1252,7 +1264,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   child: Center(
                     child: AutoScrollBar(
                       speed: _autoSpeed,
-                      unit: 'lines',
+                      unit: AutoScrollUnit.lines,
                       min: minAutoScrollLinesPerMinute,
                       max: maxAutoScrollLinesPerMinute,
                       onSpeed: _setAutoSpeed,
@@ -1267,7 +1279,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                 width: strip,
                 alignment: Alignment.centerLeft,
                 icon: Icons.chevron_left,
-                tooltip: 'Back a page',
+                tooltip: l10n.readerBackPage,
                 colour: readerTheme.foreground,
                 onTap: () => _pageBack(count),
               ),
@@ -1275,7 +1287,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                 width: strip,
                 alignment: Alignment.centerRight,
                 icon: Icons.chevron_right,
-                tooltip: 'Forward a page',
+                tooltip: l10n.readerForwardPage,
                 colour: readerTheme.foreground,
                 onTap: () => _pageForward(count),
               ),
@@ -1301,7 +1313,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      chapter.title,
+                      chapter.titleOf(l10n, _chapter),
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

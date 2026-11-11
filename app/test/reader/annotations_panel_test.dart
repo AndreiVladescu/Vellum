@@ -14,6 +14,7 @@ import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/reader/annotations/annotation_locator.dart';
 import 'package:vellum/reader/annotations/annotations_panel.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
   late Directory dir;
@@ -66,6 +67,8 @@ void main() {
       book = (await repo.watchBook('b1').first)!;
     });
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: ListView(
           children: [

@@ -4,6 +4,7 @@ import '../widgets/page_insets.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import 'stats_queries.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Reading insights (plan 5 #19, plan 6 refresh).
 ///
@@ -54,22 +55,20 @@ class _InsightsPageState extends State<InsightsPage> {
   }
 
   Future<void> _clearHistory() async {
+    final l10n = L10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Clear reading history?'),
-        content: const Text(
-          'Deletes every recorded reading session on this device. Your books, '
-          'positions, and annotations are untouched. This can’t be undone.',
-        ),
+        title: Text(l10n.insightsClearTitle),
+        content: Text(l10n.insightsClearBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Clear'),
+            child: Text(l10n.insightsClearAction),
           ),
         ],
       ),
@@ -80,19 +79,20 @@ class _InsightsPageState extends State<InsightsPage> {
     if (!mounted) return;
     setState(() => _insights = _load());
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Cleared $removed session(s)')),
+      SnackBar(content: Text(l10n.insightsCleared(removed))),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reading insights'),
+        title: Text(l10n.insightsTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'Clear reading history',
+            tooltip: l10n.insightsClearTooltip,
             onPressed: _clearHistory,
           ),
         ],
@@ -105,19 +105,18 @@ class _InsightsPageState extends State<InsightsPage> {
           }
           final data = snapshot.data!;
           if (data.sessions.isEmpty && data.finishedPerMonth.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.insights_outlined, size: 48),
-                    SizedBox(height: 12),
-                    Text('Nothing to show yet'),
-                    SizedBox(height: 8),
+                    const Icon(Icons.insights_outlined, size: 48),
+                    const SizedBox(height: 12),
+                    Text(l10n.insightsEmptyTitle),
+                    const SizedBox(height: 8),
                     Text(
-                      'Read a few pages and this fills in. Everything here stays '
-                      'on this device.',
+                      l10n.insightsEmptyBody,
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -129,37 +128,54 @@ class _InsightsPageState extends State<InsightsPage> {
           return ListView(
             padding: pageInsets(context, const EdgeInsets.all(16)),
             children: [
-              Text('Habits', style: theme.textTheme.labelLarge),
-              const SizedBox(height: 8),
-              _StatRow(stats: [
-                (label: 'Current streak', value: '${data.currentStreak}d', sub: null),
-                (label: 'Longest streak', value: '${data.longestStreak}d', sub: null),
-                (label: 'Days read', value: '${data.readingDays.length}', sub: null),
-              ]),
-              const SizedBox(height: 20),
-              Text('Totals', style: theme.textTheme.labelLarge),
+              Text(l10n.insightsHabits, style: theme.textTheme.labelLarge),
               const SizedBox(height: 8),
               _StatRow(stats: [
                 (
-                  label: 'Pages / session',
+                  label: l10n.insightsCurrentStreak,
+                  value: l10n.insightsDaysShort(data.currentStreak),
+                  sub: null,
+                ),
+                (
+                  label: l10n.insightsLongestStreak,
+                  value: l10n.insightsDaysShort(data.longestStreak),
+                  sub: null,
+                ),
+                (
+                  label: l10n.insightsDaysRead,
+                  value: '${data.readingDays.length}', // i18n-ignore
+                  sub: null,
+                ),
+              ]),
+              const SizedBox(height: 20),
+              Text(l10n.insightsTotals, style: theme.textTheme.labelLarge),
+              const SizedBox(height: 8),
+              _StatRow(stats: [
+                (
+                  label: l10n.insightsPagesPerSession,
                   value: data.averagePages.toStringAsFixed(0),
                   sub: null,
                 ),
-                (label: 'Pages read', value: _compact(data.totalPages), sub: null),
                 (
-                  label: 'Time reading',
-                  value: _formatMinutes(data.totalMinutes),
+                  label: l10n.insightsPagesRead,
+                  value: _compact(data.totalPages),
                   sub: null,
                 ),
                 (
-                  label: 'Books finished',
-                  value: '${data.totalFinished}',
+                  label: l10n.insightsTimeReading,
+                  value: _formatMinutes(l10n, data.totalMinutes),
                   sub: null,
                 ),
                 (
-                  label: 'This week',
-                  value: '${data.thisWeekPages}',
-                  sub: _weekDeltaLabel(data.thisWeekPages, data.lastWeekPages),
+                  label: l10n.insightsBooksFinished,
+                  value: '${data.totalFinished}', // i18n-ignore
+                  sub: null,
+                ),
+                (
+                  label: l10n.insightsThisWeek,
+                  value: '${data.thisWeekPages}', // i18n-ignore
+                  sub: _weekDeltaLabel(
+                      l10n, data.thisWeekPages, data.lastWeekPages),
                 ),
               ]),
               if (data.best != null) ...[
@@ -168,7 +184,7 @@ class _InsightsPageState extends State<InsightsPage> {
               ],
               const SizedBox(height: 24),
               _Section(
-                title: 'Pages a day (last 30)',
+                title: l10n.insightsPagesADay,
                 child: SizedBox(
                   height: 90,
                   child: CustomPaint(
@@ -182,8 +198,8 @@ class _InsightsPageState extends State<InsightsPage> {
               ),
               const SizedBox(height: 20),
               _Section(
-                title: 'When you read',
-                subtitle: 'Minutes spent reading, by the hour a sitting began',
+                title: l10n.insightsWhenYouRead,
+                subtitle: l10n.insightsWhenYouReadSub,
                 child: SizedBox(
                   height: 110,
                   child: CustomPaint(
@@ -192,6 +208,12 @@ class _InsightsPageState extends State<InsightsPage> {
                       color: theme.colorScheme.primary,
                       empty: theme.colorScheme.surfaceContainerHighest,
                       labelStyle: theme.textTheme.bodySmall,
+                      quarterNames: [
+                        l10n.insightsHourMidnight,
+                        l10n.insightsHourSix,
+                        l10n.insightsHourNoon,
+                        l10n.insightsHourEighteen,
+                      ],
                     ),
                     child: const SizedBox.expand(),
                   ),
@@ -199,7 +221,7 @@ class _InsightsPageState extends State<InsightsPage> {
               ),
               const SizedBox(height: 20),
               _Section(
-                title: 'Reading days (last 12 weeks)',
+                title: l10n.insightsReadingDays,
                 child: SizedBox(
                   height: 108,
                   child: CustomPaint(
@@ -215,13 +237,15 @@ class _InsightsPageState extends State<InsightsPage> {
               if (data.deviceSeries.length > 1) ...[
                 const SizedBox(height: 20),
                 _Section(
-                  title: 'Where you read',
+                  title: l10n.insightsWhereYouRead,
                   child: Column(
                     children: [
                       for (final d in data.deviceSeries)
                         _BarListRow(
-                          label: d.device,
-                          value: _formatMinutes(d.minutes),
+                          label: d.device == ReadingStats.unknownDevice
+                              ? l10n.insightsUnknownDevice
+                              : d.device,
+                          value: _formatMinutes(l10n, d.minutes),
                           fraction: d.minutes / data.deviceSeries.first.minutes,
                           color: theme.colorScheme.primary,
                         ),
@@ -232,16 +256,16 @@ class _InsightsPageState extends State<InsightsPage> {
               if (data.finishedPerMonth.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 _Section(
-                  title: 'Books finished',
+                  title: l10n.insightsBooksFinished,
                   child: Column(
                     children: [
                       for (final entry in data.finishedMonthsNewestFirst)
                         ListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
-                          title: Text('${entry.key.year}-'
+                          title: Text('${entry.key.year}-' // i18n-ignore
                               '${entry.key.month.toString().padLeft(2, '0')}'),
-                          trailing: Text('${entry.value}'),
+                          trailing: Text('${entry.value}'), // i18n-ignore
                         ),
                     ],
                   ),
@@ -250,7 +274,7 @@ class _InsightsPageState extends State<InsightsPage> {
               if (data.genreSplit.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 _Section(
-                  title: 'What you finish',
+                  title: l10n.insightsWhatYouFinish,
                   child: Column(
                     children: [
                       for (final slice in data.genreSplit.take(6))
@@ -258,7 +282,7 @@ class _InsightsPageState extends State<InsightsPage> {
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                           title: Text(slice.genre),
-                          trailing: Text('${slice.count}'),
+                          trailing: Text('${slice.count}'), // i18n-ignore
                         ),
                     ],
                   ),
@@ -267,7 +291,7 @@ class _InsightsPageState extends State<InsightsPage> {
               if (data.formatSplit.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 _Section(
-                  title: 'On paper or on screen',
+                  title: l10n.insightsPaperOrScreen,
                   child: Column(
                     children: [
                       for (final slice in data.formatSplit)
@@ -275,7 +299,7 @@ class _InsightsPageState extends State<InsightsPage> {
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                           title: Text(_formatLabel(slice.format)),
-                          trailing: Text('${slice.count}'),
+                          trailing: Text('${slice.count}'), // i18n-ignore
                         ),
                     ],
                   ),
@@ -283,7 +307,7 @@ class _InsightsPageState extends State<InsightsPage> {
               ],
               const SizedBox(height: 24),
               Text(
-                'Reading history never leaves this device and is not synced.',
+                l10n.insightsLocalOnly,
                 style: theme.textTheme.bodySmall,
               ),
             ],
@@ -308,11 +332,13 @@ String _compact(int value) {
 
 /// "3h 20m" — minutes alone stop being readable well before a lifetime total
 /// does.
-String _formatMinutes(int minutes) {
-  if (minutes < 60) return '${minutes}m';
+String _formatMinutes(L10n l10n, int minutes) {
+  if (minutes < 60) return l10n.insightsMinutesShort(minutes);
   final hours = minutes ~/ 60;
   final rest = minutes % 60;
-  return rest == 0 ? '${hours}h' : '${hours}h ${rest}m';
+  return rest == 0
+      ? l10n.insightsHoursShort(hours)
+      : l10n.insightsHoursMinutesShort(hours, rest);
 }
 
 String _formatLabel(String format) => switch (format.toLowerCase()) {
@@ -323,14 +349,14 @@ String _formatLabel(String format) => switch (format.toLowerCase()) {
 
 /// What goes under the "This week" tile — a plain comparison, not a verdict:
 /// this is a personal record, not a target to have missed.
-String _weekDeltaLabel(int thisWeek, int lastWeek) {
+String _weekDeltaLabel(L10n l10n, int thisWeek, int lastWeek) {
   if (lastWeek == 0) {
-    return thisWeek == 0 ? 'vs last week' : 'up from 0 last week';
+    return thisWeek == 0 ? l10n.insightsWeekVs : l10n.insightsWeekUpFromZero;
   }
   final delta = thisWeek - lastWeek;
-  if (delta == 0) return 'same as last week';
+  if (delta == 0) return l10n.insightsWeekSame;
   final sign = delta > 0 ? '+' : '';
-  return '$sign$delta vs last week';
+  return l10n.insightsWeekDelta('$sign$delta');
 }
 
 /// Everything the page shows, computed once from one fetch.
@@ -476,14 +502,10 @@ class _BestDayCard extends StatelessWidget {
 
   final ({DateTime day, int pages}) best;
 
-  static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Card(
       margin: EdgeInsets.zero,
       color: theme.colorScheme.primaryContainer,
@@ -499,14 +521,13 @@ class _BestDayCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Your best day: ${best.pages} pages',
+                    l10n.insightsBestDay(best.pages),
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                   Text(
-                    '${_months[best.day.month - 1]} ${best.day.day}, '
-                    '${best.day.year}',
+                    l10n.insightsBestDayDate(best.day),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onPrimaryContainer,
                     ),
@@ -665,6 +686,7 @@ class _HourBarsPainter extends CustomPainter {
     required this.color,
     required this.empty,
     required this.labelStyle,
+    required this.quarterNames,
   });
 
   final List<int> minutesByHour;
@@ -672,9 +694,11 @@ class _HourBarsPainter extends CustomPainter {
   final Color empty;
   final TextStyle? labelStyle;
 
+  /// Labels for hours 0, 6, 12 and 18, already localised.
+  final List<String> quarterNames;
+
   static const _labelHeight = 16.0;
   static const _quarters = [0, 6, 12, 18];
-  static const _quarterNames = ['12a', '6a', '12p', '6p'];
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -713,7 +737,7 @@ class _HourBarsPainter extends CustomPainter {
       final hour = _quarters[i];
       final centre = hour * cell + cell / 2;
       final painter = TextPainter(
-        text: TextSpan(text: _quarterNames[i], style: style),
+        text: TextSpan(text: quarterNames[i], style: style),
         textDirection: TextDirection.ltr,
       )..layout();
       // Clamped so the first and last labels don't run past the chart's own

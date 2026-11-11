@@ -8,6 +8,7 @@
 // and invisible at the fast one.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/auto_scroll.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 
 void main() {
   group('speed in pixels', () {
@@ -124,7 +125,7 @@ void main() {
       var speed = 4.0;
       for (var i = 0; i < 6; i++) {
         speed = stepAutoScrollSpeed(speed, faster: true, min: 0.5, max: 30);
-        expect(autoScrollSpeedLabel(speed, 'pages').length, lessThan(16),
+        expect(autoScrollSpeedLabel(L10nEn(), speed, AutoScrollUnit.pages).length, lessThan(16),
             reason: 'a readout of "7.8125 pages/min" helps nobody');
       }
     });
@@ -132,18 +133,18 @@ void main() {
 
   group('the readout', () {
     test('names the unit each reader counts in', () {
-      expect(autoScrollSpeedLabel(6, 'pages'), '6 pages/min');
-      expect(autoScrollSpeedLabel(25, 'lines'), '25 lines/min');
+      expect(autoScrollSpeedLabel(L10nEn(), 6, AutoScrollUnit.pages), '6 pages/min');
+      expect(autoScrollSpeedLabel(L10nEn(), 25, AutoScrollUnit.lines), '25 lines/min');
     });
 
     test('keeps the detail that matters at the slow end', () {
-      expect(autoScrollSpeedLabel(0.75, 'pages'), '0.75 pages/min');
-      expect(autoScrollSpeedLabel(1.5, 'pages'), '1.5 pages/min');
+      expect(autoScrollSpeedLabel(L10nEn(), 0.75, AutoScrollUnit.pages), '0.75 pages/min');
+      expect(autoScrollSpeedLabel(L10nEn(), 1.5, AutoScrollUnit.pages), '1.5 pages/min');
     });
 
     test('drops trailing zeros', () {
-      expect(autoScrollSpeedLabel(12.0, 'pages'), '12 pages/min');
-      expect(autoScrollSpeedLabel(1.50, 'pages'), '1.5 pages/min');
+      expect(autoScrollSpeedLabel(L10nEn(), 12.0, AutoScrollUnit.pages), '12 pages/min');
+      expect(autoScrollSpeedLabel(L10nEn(), 1.50, AutoScrollUnit.pages), '1.5 pages/min');
     });
   });
 

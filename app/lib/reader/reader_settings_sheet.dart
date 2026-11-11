@@ -5,6 +5,8 @@ import 'page_metric.dart';
 import 'reader_settings.dart';
 import '../widgets/page_insets.dart';
 import 'translate/on_device.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 
 /// The reader's appearance controls (plan 5 #23).
 ///
@@ -46,6 +48,7 @@ class ReaderSettingsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return ListenableBuilder(
       listenable: settings,
       builder: (context, _) => SafeArea(
@@ -56,14 +59,14 @@ class ReaderSettingsSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _Label('Page colour'),
+                _Label(l10n.readerSettingsPageColour),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
                     for (final theme in ReaderTheme.choices)
                       ChoiceChip(
-                        label: Text(theme.label),
+                        label: Text(theme.labelOf(l10n)),
                         selected: !settings.nightMode && settings.theme == theme,
                         // Greyed out while night mode is on, rather than
                         // hidden: it should be obvious *why* the page is black
@@ -82,26 +85,25 @@ class ReaderSettingsSheet extends StatelessWidget {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Night mode'),
-                  subtitle: const Text(
-                      'Black pages, white type, pictures in grey'),
+                  title: Text(l10n.readerSettingsNightMode),
+                  subtitle: Text(l10n.readerSettingsNightModeSub),
                   value: settings.nightMode,
                   onChanged: settings.setNightMode,
                 ),
                 if (showTypography) ...[
                   const SizedBox(height: 16),
-                  _Label('Typeface'),
+                  _Label(l10n.readerSettingsTypeface),
                   SegmentedButton<ReaderFont>(
                     segments: [
                       for (final font in ReaderFont.values)
-                        ButtonSegment(value: font, label: Text(font.label)),
+                        ButtonSegment(value: font, label: Text(font.labelOf(l10n))),
                     ],
                     selected: {settings.font},
                     onSelectionChanged: (s) => settings.setFont(s.first),
                   ),
                   const SizedBox(height: 8),
                   _Slider(
-                    label: 'Text size',
+                    label: l10n.readerSettingsTextSize,
                     value: settings.fontSize,
                     min: ReaderSettings.minFontSize,
                     max: ReaderSettings.maxFontSize,
@@ -109,7 +111,7 @@ class ReaderSettingsSheet extends StatelessWidget {
                     onChanged: settings.setFontSize,
                   ),
                   _Slider(
-                    label: 'Line spacing',
+                    label: l10n.readerSettingsLineSpacing,
                     value: settings.lineHeight,
                     min: ReaderSettings.minLineHeight,
                     max: ReaderSettings.maxLineHeight,
@@ -117,7 +119,7 @@ class ReaderSettingsSheet extends StatelessWidget {
                     onChanged: settings.setLineHeight,
                   ),
                   _Slider(
-                    label: 'Line length',
+                    label: l10n.readerSettingsLineLength,
                     value: settings.measure,
                     min: ReaderSettings.minMeasure,
                     max: ReaderSettings.maxMeasure,
@@ -127,11 +129,12 @@ class ReaderSettingsSheet extends StatelessWidget {
                 ],
                 if (showPdfOptions) ...[
                   const SizedBox(height: 16),
-                  _Label('Moving through the book'),
+                  _Label(l10n.readerSettingsMoving),
                   SegmentedButton<PdfPageMode>(
                     segments: [
                       for (final mode in PdfPageMode.values)
-                        ButtonSegment(value: mode, label: Text(mode.label)),
+                        ButtonSegment(
+                            value: mode, label: Text(mode.labelOf(l10n))),
                     ],
                     selected: {settings.pdfMode},
                     onSelectionChanged: (s) => settings.setPdfMode(s.first),
@@ -139,34 +142,35 @@ class ReaderSettingsSheet extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 8),
                     child: Text(
-                      settings.pdfMode.description,
+                      settings.pdfMode.descriptionOf(l10n),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
-                  _Label('Page fit'),
+                  _Label(l10n.readerSettingsPageFit),
                   SegmentedButton<PdfFit>(
                     segments: [
                       for (final fit in PdfFit.values)
-                        ButtonSegment(value: fit, label: Text(fit.label)),
+                        ButtonSegment(value: fit, label: Text(fit.labelOf(l10n))),
                     ],
                     selected: {settings.pdfFit},
                     onSelectionChanged: (s) => settings.setPdfFit(s.first),
                   ),
                 ],
-                const _Label('The counter'),
+                _Label(l10n.readerSettingsCounter),
                 // The same list the long-press cycles. Both exist because the
                 // gesture is quick once you know it and invisible until you do.
                 DropdownButtonFormField<PageMetric>(
                   initialValue: settings.pageMetric,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
                     isDense: true,
-                    helperText: 'Or hold the counter in the reader to cycle it',
+                    helperText: l10n.readerSettingsCounterHelper,
                   ),
                   items: [
                     for (final metric in PageMetric.values)
-                      DropdownMenuItem(value: metric, child: Text(metric.label)),
+                      DropdownMenuItem(
+                          value: metric, child: Text(metric.labelOf(l10n))),
                   ],
                   onChanged: (metric) {
                     if (metric != null) settings.setPageMetric(metric);
@@ -175,8 +179,8 @@ class ReaderSettingsSheet extends StatelessWidget {
                 const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Hide controls while reading'),
-                  subtitle: const Text('Tap the page to bring them back'),
+                  title: Text(l10n.readerSettingsHideControls),
+                  subtitle: Text(l10n.readerSettingsHideControlsSub),
                   value: settings.immersive,
                   onChanged: settings.setImmersive,
                 ),
@@ -222,6 +226,7 @@ class _TranslateServerSheetState extends State<TranslateServerSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -243,22 +248,15 @@ class _TranslateServerSheetState extends State<TranslateServerSheet> {
                 await widget.settings.setUseOnDeviceTranslation(v);
                 if (context.mounted) setState(() {});
               },
-              title: const Text('Translate on this device'),
-              subtitle: const Text(
-                'Uses Google ML Kit — closed-source, and part of this build '
-                'only. Nothing is sent anywhere; languages download once, '
-                'about 30 MB each.',
-              ),
+              title: Text(l10n.readerTranslateOnDeviceTitle),
+              subtitle: Text(l10n.readerTranslateOnDeviceSub),
             ),
             const Divider(height: 24),
           ],
-          Text('Translation server', style: theme.textTheme.titleMedium),
+          Text(l10n.readerTranslateServerTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
-            'Vellum sends nothing anywhere until you name a server here. A '
-            'passage you translate is sent to it — so a LibreTranslate you run '
-            'yourself keeps your reading on machines you own, the same bargain '
-            'as the sync server.',
+            l10n.readerTranslateServerBody,
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -267,19 +265,19 @@ class _TranslateServerSheetState extends State<TranslateServerSheet> {
             controller: _url,
             keyboardType: TextInputType.url,
             autocorrect: false,
-            decoration: const InputDecoration(
-              labelText: 'LibreTranslate address',
-              hintText: 'http://192.168.1.20:5000',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.readerTranslateAddress,
+              hintText: 'http://192.168.1.20:5000', // i18n-ignore
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _key,
             autocorrect: false,
-            decoration: const InputDecoration(
-              labelText: 'API key (only if it asks for one)',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.readerTranslateApiKey,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 16),
@@ -290,7 +288,7 @@ class _TranslateServerSheetState extends State<TranslateServerSheet> {
                   await widget.settings.setTranslateServer(url: '', apiKey: '');
                   if (context.mounted) Navigator.of(context).pop();
                 },
-                child: const Text('Turn off'),
+                child: Text(l10n.readerTranslateTurnOff),
               ),
               const Spacer(),
               FilledButton(
@@ -301,7 +299,7 @@ class _TranslateServerSheetState extends State<TranslateServerSheet> {
                   );
                   if (context.mounted) Navigator.of(context).pop();
                 },
-                child: const Text('Save'),
+                child: Text(l10n.save),
               ),
             ],
           ),

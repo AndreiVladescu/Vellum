@@ -14,6 +14,7 @@ import 'package:vellum/reader/annotations/annotation_locator.dart';
 import 'package:vellum/reader/annotations/ink_markup.dart';
 import 'package:vellum/reader/annotations/markdown_export.dart';
 import 'package:vellum/reader/epub_book.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 
 Future<LibraryRepository> _repo(Directory dir) async =>
     LibraryRepository.forTesting(VellumDatabase(NativeDatabase.memory()), dir);
@@ -348,7 +349,7 @@ void main() {
         );
 
     test('a book exports as headed, quoted Markdown', () {
-      final out = MarkdownExport.forBook(
+      final out = MarkdownExport.forBook(l10n: L10nEn(), 
         book: book('Dune'),
         authors: ['Frank Herbert'],
         annotations: [
@@ -383,7 +384,7 @@ chapter two drags
     });
 
     test('a multi-line quote stays fully quoted', () {
-      final out = MarkdownExport.forBook(
+      final out = MarkdownExport.forBook(l10n: L10nEn(), 
         book: book('Dune'),
         annotations: [
           annotation(kind: 'highlight', page: 1, quote: 'first line\nsecond line'),
@@ -394,12 +395,12 @@ chapter two drags
 
     test('a book with nothing says so rather than exporting a bare title', () {
       final out =
-          MarkdownExport.forBook(book: book('Dune'), annotations: const []);
+          MarkdownExport.forBook(l10n: L10nEn(), book: book('Dune'), annotations: const []);
       expect(out, contains('_No highlights, notes, or bookmarks yet._'));
     });
 
     test('the library export counts books and demotes their headings', () {
-      final out = MarkdownExport.forLibrary(
+      final out = MarkdownExport.forLibrary(l10n: L10nEn(), 
         books: [book('Dune')],
         byBook: {
           'b1': [annotation(kind: 'highlight', page: 1, quote: 'A line')],
@@ -412,7 +413,7 @@ chapter two drags
     });
 
     test('books without annotations are omitted from the library export', () {
-      final out = MarkdownExport.forLibrary(
+      final out = MarkdownExport.forLibrary(l10n: L10nEn(), 
         books: [book('Dune')],
         byBook: const {},
       );

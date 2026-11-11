@@ -35,6 +35,35 @@ MIGRATED=(
   lib/book_detail/send_to_device_sheet.dart
   lib/onboarding/first_run_sheet.dart
   lib/onboarding/sample_library.dart
+  lib/reader/ai/ai_client.dart
+  lib/reader/ai/ai_setup_sheet.dart
+  lib/reader/ai/ask_ai_sheet.dart
+  lib/reader/annotations/annotation_store.dart
+  lib/reader/annotations/annotations_panel.dart
+  lib/reader/annotations/highlight_palette.dart
+  lib/reader/annotations/markdown_export.dart
+  lib/reader/auto_scroll.dart
+  lib/reader/auto_scroll_bar.dart
+  lib/reader/dictionary/dictionary_sheet.dart
+  lib/reader/dictionary/dictionary_store.dart
+  lib/reader/dictionary/dictionary_tile.dart
+  lib/reader/epub_book.dart
+  lib/reader/epub_reader_page.dart
+  lib/reader/ink_tools.dart
+  lib/reader/page_metric.dart
+  lib/reader/reader_actions.dart
+  lib/reader/reader_page.dart
+  lib/reader/reader_search_field.dart
+  lib/reader/reader_settings_sheet.dart
+  lib/reader/translate/local_engine_backend.dart
+  lib/reader/translate/proprietary/language_packs_sheet.dart
+  lib/reader/translate/proprietary/on_device_backend.dart
+  lib/reader/translate/translate_sheet.dart
+  lib/reader/translate/translation_backend.dart
+  lib/reader/translate/translator_setup_sheet.dart
+  lib/settings/preferences_page.dart
+  lib/settings/shared_shelves_page.dart
+  lib/settings/trash_page.dart
   lib/shelf/author_page.dart
   lib/shelf/book_list_view.dart
   lib/shelf/book_open_route.dart
@@ -49,6 +78,7 @@ MIGRATED=(
   lib/shelf/shelf_target_sheet.dart
   lib/shelf/shelf_view.dart
   lib/shelf/spine_style.dart
+  lib/stats/insights_page.dart
 )
 
 fail=0

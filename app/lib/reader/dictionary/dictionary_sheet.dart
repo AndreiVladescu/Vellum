@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../../widgets/page_insets.dart';
 import 'dictionary_store.dart';
 import 'wordnet.dart';
+import '../../l10n/gen/app_localizations.dart';
+import '../../l10n/labels.dart';
 
 /// What a word means, without leaving the book (request 8/19 #9).
 ///
@@ -101,9 +103,10 @@ class _DictionarySheetState extends State<DictionarySheet> {
       if (!mounted) return;
       setState(() {
         _downloading = false;
+        final l10n = L10n.of(context);
         _error = e is DictionaryInstallException
-            ? e.message
-            : 'The dictionary could not be downloaded: $e';
+            ? e.messageOf(l10n)
+            : l10n.dictionaryDownloadFailed('$e');
       });
     }
   }
@@ -112,12 +115,14 @@ class _DictionarySheetState extends State<DictionarySheet> {
   /// note wants, and what the clipboard wants.
   String get _asText {
     final senses = _senses ?? const <WordSense>[];
+    final l10n = L10n.of(context);
     return [
       widget.word,
       for (final sense in senses)
         [
-          '(${sense.partOfSpeech}) ${sense.definition}',
-          if (sense.synonyms.isNotEmpty) 'also: ${sense.synonyms.join(', ')}',
+          l10n.dictionarySense(sense.partOfSpeechOf(l10n), sense.definition),
+          if (sense.synonyms.isNotEmpty)
+            l10n.dictionaryAlso(sense.synonyms.join(', ')),
         ].join('\n'),
     ].join('\n\n');
   }
@@ -153,12 +158,12 @@ class _DictionarySheetState extends State<DictionarySheet> {
               if (senses != null && senses.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.copy_all_outlined),
-                  tooltip: 'Copy',
+                  tooltip: L10n.of(context).readerCopy,
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: _asText));
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Copied')),
+                      SnackBar(content: Text(L10n.of(context).readerCopied)),
                     );
                   },
                 ),
@@ -175,8 +180,9 @@ class _DictionarySheetState extends State<DictionarySheet> {
             const SizedBox(height: 8),
             Text(
               _progress == null
-                  ? 'Unpacking…'
-                  : 'Downloading… ${((_progress ?? 0) * 100).round()}%',
+                  ? L10n.of(context).dictionaryUnpacking
+                  : L10n.of(context)
+                      .dictionaryDownloading(((_progress ?? 0) * 100).round()),
               style: theme.textTheme.bodySmall,
             ),
           ] else if (_error != null)
@@ -192,9 +198,7 @@ class _DictionarySheetState extends State<DictionarySheet> {
             _Message(
               icon: Icons.search_off,
               colour: theme.colorScheme.onSurfaceVariant,
-              text: 'No entry for “${widget.word}”. The dictionary covers '
-                  'nouns, verbs, adjectives and adverbs — not names, and not '
-                  'words like “the”.',
+              text: L10n.of(context).dictionaryNoEntry(widget.word),
             )
           else
             Flexible(
@@ -214,7 +218,9 @@ class _DictionarySheetState extends State<DictionarySheet> {
               child: TextButton.icon(
                 onPressed: _saved ? null : _save,
                 icon: Icon(_saved ? Icons.check : Icons.sticky_note_2_outlined),
-                label: Text(_saved ? 'Saved as a note' : 'Save as a note'),
+                label: Text(_saved
+                    ? L10n.of(context).readerSavedAsNote
+                    : L10n.of(context).readerSaveAsNote),
               ),
             ),
           ],
@@ -237,7 +243,7 @@ class _Sense extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          sense.partOfSpeech,
+          sense.partOfSpeechOf(L10n.of(context)),
           style: theme.textTheme.labelMedium?.copyWith(
             color: theme.colorScheme.primary,
             fontStyle: FontStyle.italic,
@@ -287,18 +293,17 @@ class _NotInstalled extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final megabytes = (wordNetDownloadBytes / (1 << 20)).round();
+    final l10n = L10n.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'The dictionary is not on this device yet. It is a $megabytes MB '
-          'download, and once it is here every lookup happens on the device — '
-          'no word you read is ever sent anywhere.',
+          l10n.dictionaryNotOnDevice(megabytes),
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 8),
         Text(
-          wordNetLicence,
+          l10n.dictionaryLicence,
           style: theme.textTheme.bodySmall
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
@@ -306,7 +311,7 @@ class _NotInstalled extends StatelessWidget {
         FilledButton.icon(
           onPressed: onDownload,
           icon: const Icon(Icons.download_outlined),
-          label: const Text('Download the dictionary'),
+          label: Text(l10n.dictionaryDownloadButton),
         ),
       ],
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'local_engine_backend.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 
 
@@ -53,17 +54,17 @@ class _TranslatorSetupSheetState extends State<TranslatorSetupSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Languages', style: theme.textTheme.titleMedium),
+          Text(l10n.translateLanguages, style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
-            'Translation happens on this machine. Nothing is sent anywhere, so '
-            'it needs a translator installed here.',
+            l10n.translateLocalBody,
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -85,8 +86,8 @@ class _TranslatorSetupSheetState extends State<TranslatorSetupSheet> {
                 title: Text(backend.engine.label),
                 subtitle: Text(
                   (_pairs[backend.engine] ?? const []).isEmpty
-                      ? 'Installed, but with no language pairs yet'
-                      : 'Installed — translations run here',
+                      ? l10n.translateInstalledNoPairs
+                      : l10n.translateInstalledRuns,
                 ),
               ),
               if ((_pairs[backend.engine] ?? const []).isEmpty)
@@ -119,8 +120,7 @@ class _TranslatorSetupSheetState extends State<TranslatorSetupSheet> {
           ]
           else ...[
             Text(
-              'Nothing found. Either of these works, and both keep the passage '
-              'on this machine:',
+              l10n.translateNothingFound,
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
@@ -128,9 +128,7 @@ class _TranslatorSetupSheetState extends State<TranslatorSetupSheet> {
               _InstallCard(engine: engine),
             const SizedBox(height: 4),
             Text(
-              'Argos is the neural one — the same engine LibreTranslate runs, '
-              'without the server around it. Apertium is older and rule-based, '
-              'but it is one apt away.',
+              l10n.translateArgosNote,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -141,12 +139,12 @@ class _TranslatorSetupSheetState extends State<TranslatorSetupSheet> {
               TextButton.icon(
                 onPressed: _looking ? null : _look,
                 icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Look again'),
+                label: Text(l10n.translateLookAgain),
               ),
               const Spacer(),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Done'),
+                child: Text(l10n.translateDone),
               ),
             ],
           ),
@@ -188,11 +186,11 @@ class _InstallCard extends StatelessWidget {
                       ClipboardData(text: engine.installHint));
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Command copied')),
+                    SnackBar(content: Text(L10n.of(context).translateCommandCopied)),
                   );
                 },
                 icon: const Icon(Icons.copy, size: 16),
-                label: const Text('Copy'),
+                label: Text(L10n.of(context).readerCopy),
               ),
             ),
           ],

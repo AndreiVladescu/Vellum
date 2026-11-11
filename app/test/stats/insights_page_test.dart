@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/stats/insights_page.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
   late Directory dir;
@@ -82,7 +83,10 @@ void main() {
             ));
       }
     });
-    await tester.pumpWidget(MaterialApp(home: InsightsPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
+      home: InsightsPage(repository: repo)));
     await tester.pumpAndSettle();
     return repo;
   }
@@ -147,7 +151,10 @@ void main() {
             endPage: const Value(30),
           ));
     });
-    await tester.pumpWidget(MaterialApp(home: InsightsPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
+      home: InsightsPage(repository: repo)));
     await tester.pumpAndSettle();
     expect(find.text('Where you read'), findsNothing);
   });

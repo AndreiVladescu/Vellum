@@ -5,19 +5,21 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
+
 import 'annotations/ink_markup.dart';
 
 enum InkTool {
   /// Pick a mark up: tap to select, drag to move, and — for a piece of text —
   /// drag the corner to turn and resize it.
-  select('Select', Icons.back_hand_outlined),
-  pen('Pen', Icons.edit_outlined),
-  eraser('Eraser', Icons.cleaning_services_outlined),
-  text('Text', Icons.title);
+  select(Icons.back_hand_outlined),
+  pen(Icons.edit_outlined),
+  eraser(Icons.cleaning_services_outlined),
+  text(Icons.title);
 
-  const InkTool(this.label, this.icon);
+  const InkTool(this.icon);
 
-  final String label;
   final IconData icon;
 }
 
@@ -80,6 +82,7 @@ class InkSelectionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = L10n.of(context);
     return Material(
       color: scheme.inverseSurface.withValues(alpha: 0.92),
       shape: const StadiumBorder(),
@@ -91,31 +94,31 @@ class InkSelectionBar extends StatelessWidget {
             if (isText) ...[
               IconButton(
                 icon: const Icon(Icons.text_decrease),
-                tooltip: 'Smaller',
+                tooltip: l10n.inkSmaller,
                 color: scheme.onInverseSurface,
                 onPressed: onSmaller,
               ),
               IconButton(
                 icon: const Icon(Icons.text_increase),
-                tooltip: 'Bigger',
+                tooltip: l10n.inkBigger,
                 color: scheme.onInverseSurface,
                 onPressed: onBigger,
               ),
               IconButton(
                 icon: const Icon(Icons.rotate_left),
-                tooltip: 'Turn left',
+                tooltip: l10n.inkTurnLeft,
                 color: scheme.onInverseSurface,
                 onPressed: onTurnLeft,
               ),
               IconButton(
                 icon: const Icon(Icons.rotate_right),
-                tooltip: 'Turn right',
+                tooltip: l10n.inkTurnRight,
                 color: scheme.onInverseSurface,
                 onPressed: onTurnRight,
               ),
               IconButton(
                 icon: const Icon(Icons.edit_note),
-                tooltip: 'Edit the words',
+                tooltip: l10n.inkEditWords,
                 color: scheme.onInverseSurface,
                 onPressed: onEdit,
               ),
@@ -123,13 +126,13 @@ class InkSelectionBar extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
-                  'Drag to move',
+                  l10n.inkDragToMove,
                   style: TextStyle(color: scheme.onInverseSurface),
                 ),
               ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete',
+              tooltip: l10n.delete,
               color: scheme.onInverseSurface,
               onPressed: onDelete,
             ),
@@ -168,6 +171,7 @@ class InkToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = L10n.of(context);
     return Material(
       color: scheme.inverseSurface.withValues(alpha: 0.92),
       shape: const StadiumBorder(),
@@ -179,7 +183,7 @@ class InkToolbar extends StatelessWidget {
             for (final option in InkTool.values)
               IconButton(
                 icon: Icon(option.icon),
-                tooltip: option.label,
+                tooltip: option.labelOf(l10n),
                 isSelected: tool == option,
                 color: tool == option ? scheme.inversePrimary : scheme.onInverseSurface,
                 onPressed: () => onTool(option),
@@ -209,13 +213,13 @@ class InkToolbar extends StatelessWidget {
             ],
             IconButton(
               icon: const Icon(Icons.undo),
-              tooltip: 'Undo',
+              tooltip: l10n.undo,
               color: scheme.onInverseSurface,
               onPressed: canUndo ? onUndo : null,
             ),
             IconButton(
               icon: const Icon(Icons.check),
-              tooltip: 'Done writing',
+              tooltip: l10n.inkDone,
               color: scheme.onInverseSurface,
               onPressed: onDone,
             ),
@@ -259,7 +263,7 @@ class _Swatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: 'Ink colour',
+      tooltip: L10n.of(context).inkColour,
       onPressed: onTap,
       icon: Container(
         width: 18,
@@ -298,7 +302,7 @@ class _Nib extends StatelessWidget {
     // three options look like what they do.
     final size = 4 + width * 900;
     return IconButton(
-      tooltip: 'Nib',
+      tooltip: L10n.of(context).inkNib,
       onPressed: onTap,
       icon: Container(
         width: size,

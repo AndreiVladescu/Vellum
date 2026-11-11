@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../l10n/gen/app_localizations.dart';
+import '../../l10n/labels.dart';
 import 'translation_backend.dart';
 
 /// Whether a translator *could* be installed on this platform at all.
@@ -99,7 +101,8 @@ enum LocalEngine {
 }
 
 /// Translation by a locally installed engine.
-class LocalEngineBackend implements TranslationBackend {
+class LocalEngineBackend
+    implements TranslationBackend, LocalizedBackendName {
   LocalEngineBackend(this.engine, {ProcessRunner? runner})
       : _runner = runner ?? _run;
 
@@ -108,6 +111,9 @@ class LocalEngineBackend implements TranslationBackend {
 
   @override
   String get name => '${engine.label}, on this machine';
+
+  @override
+  String displayName(L10n l10n) => l10n.translateEngineName(engine.label);
 
   /// Every engine installed here, best first.
   ///
@@ -185,14 +191,18 @@ class LocalEngineBackend implements TranslationBackend {
     required TranslationLanguage to,
   }) async {
     if (text.trim().isEmpty) {
-      throw const TranslationException('There is nothing selected to translate.');
+      throw TranslationException(
+        'There is nothing selected to translate.',
+        localized: (l10n) => l10n.translateErrorNothingSelected,
+      );
     }
     if (from == TranslationLanguage.auto) {
       // Neither command detects a language, and guessing wrong here produces
       // confident nonsense. Better to ask.
-      throw const TranslationException(
+      throw TranslationException(
         'Pick the language it is coming *from* — a translator on this machine '
         'cannot work it out on its own.',
+        localized: (l10n) => l10n.translateErrorPickFrom,
       );
     }
     if (from == to) return Translation(text: text);
@@ -213,7 +223,11 @@ class LocalEngineBackend implements TranslationBackend {
     try {
       result = await _runner(executable, arguments, input: text);
     } on ProcessException catch (e) {
-      throw TranslationException('${engine.label} could not be run — ${e.message}');
+      throw TranslationException(
+        '${engine.label} could not be run — ${e.message}',
+        localized: (l10n) =>
+            l10n.translateErrorEngineRun(engine.label, e.message),
+      );
     }
 
     if (result.exitCode != 0) {
@@ -223,11 +237,18 @@ class LocalEngineBackend implements TranslationBackend {
             ? '${engine.label} could not translate ${from.name} to ${to.name}. '
                 'Its language pack for that pair may not be installed.'
             : said,
+        localized: said.isEmpty
+            ? (l10n) => l10n.translateErrorEnginePair(
+                engine.label, from.nameOf(l10n), to.nameOf(l10n))
+            : null,
       );
     }
     final out = (result.stdout as String).trim();
     if (out.isEmpty) {
-      throw TranslationException('${engine.label} returned nothing.');
+      throw TranslationException(
+        '${engine.label} returned nothing.',
+        localized: (l10n) => l10n.translateErrorEngineEmpty(engine.label),
+      );
     }
     return Translation(text: out);
   }
@@ -253,7 +274,8 @@ class LocalEngineBackend implements TranslationBackend {
 /// failure from the best one is a reason to ask the next, not a reason to stop:
 /// what the reader wants is the passage translated, not a particular program
 /// run.
-class LocalTranslators implements TranslationBackend {
+class LocalTranslators
+    implements TranslationBackend, LocalizedBackendName {
   const LocalTranslators(this.engines);
 
   final List<LocalEngineBackend> engines;
@@ -269,7 +291,13 @@ class LocalTranslators implements TranslationBackend {
   String get name => engines.length == 1
       ? engines.single.name
       : '${engines.first.engine.label} and ${engines.length - 1} other'
-          '${engines.length == 2 ? '' : 's'}, on this machine';
+          '${engines.length == 2 ? '' : 's'}, on this machine'; // i18n-ignore
+
+  @override
+  String displayName(L10n l10n) => engines.length == 1
+      ? engines.single.displayName(l10n)
+      : l10n.translateEnginesName(
+          engines.first.engine.label, engines.length - 1);
 
   @override
   Future<Translation> translate(
@@ -289,6 +317,9 @@ class LocalTranslators implements TranslationBackend {
       }
     }
     throw last ??
-        const TranslationException('No translator is installed on this machine.');
+        TranslationException(
+          'No translator is installed on this machine.',
+          localized: (l10n) => l10n.translateErrorNoneInstalled,
+        );
   }
 }

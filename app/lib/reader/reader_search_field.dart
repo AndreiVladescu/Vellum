@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// The query box in a reader's app bar, drawn in the *reader's* colours.
 ///
@@ -19,7 +20,7 @@ class ReaderSearchField extends StatelessWidget {
     required this.foreground,
     required this.onSubmitted,
     this.onChanged,
-    this.hint = 'Search in this book',
+    this.hint,
   });
 
   final TextEditingController controller;
@@ -34,7 +35,7 @@ class ReaderSearchField extends StatelessWidget {
 
   final ValueChanged<String>? onChanged;
   final ValueChanged<String> onSubmitted;
-  final String hint;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +56,7 @@ class ReaderSearchField extends StatelessWidget {
         cursorColor: foreground,
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
-          hintText: hint,
+          hintText: hint ?? L10n.of(context).readerSearchHint,
           hintStyle: TextStyle(color: foreground.withValues(alpha: 0.6)),
           border: InputBorder.none,
           filled: false,

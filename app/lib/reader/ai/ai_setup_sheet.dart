@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/page_insets.dart';
 import 'ai_settings.dart';
+import '../../l10n/gen/app_localizations.dart';
 
 /// Where the model is named.
 ///
@@ -44,6 +45,7 @@ class _AiSetupSheetState extends State<AiSetupSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -56,12 +58,10 @@ class _AiSetupSheetState extends State<AiSetupSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Ask a model', style: theme.textTheme.titleMedium),
+            Text(l10n.aiAskTitle, style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              'Any server that speaks the OpenAI chat API: one you run '
-              'yourself, or a paid one. The passage you ask about is sent to '
-              'this address, and nowhere else.',
+              l10n.aiSetupBody,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -70,24 +70,22 @@ class _AiSetupSheetState extends State<AiSetupSheet> {
               controller: _url,
               autofocus: true,
               keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'Address',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.aiAddressLabel,
+                border: const OutlineInputBorder(),
                 isDense: true,
-                helperText: 'http://localhost:11434 for Ollama · '
-                    'https://api.openai.com/v1',
+                helperText: l10n.aiAddressHelper,
                 helperMaxLines: 2,
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _model,
-              decoration: const InputDecoration(
-                labelText: 'Model',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.aiModelLabel,
+                border: const OutlineInputBorder(),
                 isDense: true,
-                helperText: 'llama3.2, mistral, gpt-4o-mini — whatever that '
-                    'server has',
+                helperText: l10n.aiModelHelper,
                 helperMaxLines: 2,
               ),
             ),
@@ -96,14 +94,14 @@ class _AiSetupSheetState extends State<AiSetupSheet> {
               controller: _key,
               obscureText: !_showKey,
               decoration: InputDecoration(
-                labelText: 'Key (optional)',
+                labelText: l10n.aiKeyLabel,
                 border: const OutlineInputBorder(),
                 isDense: true,
-                helperText: 'A model on your own machine needs none.',
+                helperText: l10n.aiKeyHelper,
                 suffixIcon: IconButton(
                   icon: Icon(
                       _showKey ? Icons.visibility_off : Icons.visibility),
-                  tooltip: _showKey ? 'Hide' : 'Show',
+                  tooltip: _showKey ? l10n.aiKeyHide : l10n.aiKeyShow,
                   onPressed: () => setState(() => _showKey = !_showKey),
                 ),
               ),
@@ -111,8 +109,7 @@ class _AiSetupSheetState extends State<AiSetupSheet> {
             if (widget.settings.keyInsecure) ...[
               const SizedBox(height: 8),
               Text(
-                'This device has no secure store, so the key is kept in plain '
-                'settings.',
+                l10n.aiKeyInsecure,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.error),
               ),
@@ -123,10 +120,10 @@ class _AiSetupSheetState extends State<AiSetupSheet> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text(l10n.cancel),
                 ),
                 const SizedBox(width: 8),
-                FilledButton(onPressed: _save, child: const Text('Save')),
+                FilledButton(onPressed: _save, child: Text(l10n.save)),
               ],
             ),
           ],

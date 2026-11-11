@@ -6,6 +6,7 @@ import '../data/shelf_service.dart';
 import '../server/connection_store.dart';
 import '../widgets/page_insets.dart';
 import 'app_settings.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Which of other people's shelves this device shows.
 ///
@@ -36,8 +37,9 @@ class SharedShelvesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Shelves from others')),
+      appBar: AppBar(title: Text(l10n.sharedShelvesTitle)),
       body: ListenableBuilder(
         listenable: settings,
         builder: (context, _) => StreamBuilder<List<Shelf>>(
@@ -54,19 +56,15 @@ class SharedShelvesPage extends StatelessWidget {
                 SwitchListTile(
                   value: settings.acceptSharedShelves,
                   onChanged: settings.setAcceptSharedShelves,
-                  title: const Text('Show new shelves from others'),
-                  subtitle: const Text(
-                    'What happens to a shelf you have not ruled on, including '
-                    'ones that arrive later. Your answers below are kept '
-                    'either way.',
-                  ),
+                  title: Text(l10n.sharedShelvesAcceptTitle),
+                  subtitle: Text(l10n.sharedShelvesAcceptSubtitle),
                 ),
                 const Divider(),
                 if (theirs.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 24, 16, 0),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
                     child: Text(
-                      'Nobody else has shared a shelf with this library yet.',
+                      l10n.sharedShelvesNone,
                       textAlign: TextAlign.center,
                     ),
                   )
@@ -77,8 +75,7 @@ class SharedShelvesPage extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '${theirs.length} shelf'
-                            '${theirs.length == 1 ? '' : 'ves'} from others',
+                            l10n.sharedShelvesCount(theirs.length),
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
                         ),
@@ -90,14 +87,14 @@ class SharedShelvesPage extends StatelessWidget {
                             [for (final s in theirs) s.id],
                             false,
                           ),
-                          child: const Text('Hide all'),
+                          child: Text(l10n.sharedShelvesHideAll),
                         ),
                         TextButton(
                           onPressed: () => repository.setAllShelvesAccepted(
                             [for (final s in theirs) s.id],
                             true,
                           ),
-                          child: const Text('Show all'),
+                          child: Text(l10n.sharedShelvesShowAll),
                         ),
                       ],
                     ),
@@ -110,10 +107,10 @@ class SharedShelvesPage extends StatelessWidget {
                       title: Text(shelf.name),
                       subtitle: Text(
                         shelf.accepted == null
-                            ? 'Following the setting above'
+                            ? l10n.sharedShelvesFollowing
                             : (shelf.accepted!
-                                ? 'Shown in your library'
-                                : 'Hidden on this device'),
+                                ? l10n.sharedShelvesShown
+                                : l10n.sharedShelvesHidden),
                       ),
                       secondary: shelf.accepted == null
                           ? null
@@ -121,7 +118,7 @@ class SharedShelvesPage extends StatelessWidget {
                           // way back to "just follow the setting".
                           : IconButton(
                               icon: const Icon(Icons.settings_backup_restore),
-                              tooltip: 'Follow the setting above',
+                              tooltip: l10n.sharedShelvesFollowTooltip,
                               onPressed: () =>
                                   repository.setShelfAccepted(shelf.id, null),
                             ),

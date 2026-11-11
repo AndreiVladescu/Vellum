@@ -6,6 +6,8 @@
 /// control, so the thing you want to change is the thing you press.
 library;
 
+import '../l10n/gen/app_localizations.dart';
+
 enum PageMetric {
   /// `128 / 340` — where you are and how long the book is.
   pagesOf('Page and total'),
@@ -41,35 +43,40 @@ enum PageMetric {
 /// back to the percentage: an honest coarser answer beats a confident wrong
 /// one, and the reader can see it is not a time.
 String pageMetricLabel(
+  L10n l10n,
   PageMetric metric, {
   required int page,
   required int count,
   double? pagesPerMinute,
 }) {
-  if (count <= 0) return '$page';
+  if (count <= 0) return '$page'; // i18n-ignore
   final clamped = page.clamp(1, count);
   switch (metric) {
     case PageMetric.pagesOf:
-      return '$clamped / $count';
+      return l10n.readerCounterPagesOf(clamped, count);
     case PageMetric.percent:
-      return '${_percent(clamped, count)}%';
+      return l10n.readerCounterPercent(_percent(clamped, count));
     case PageMetric.pagesRead:
-      return 'page $clamped';
+      return l10n.readerCounterPage(clamped);
     case PageMetric.pagesLeft:
       final left = count - clamped;
-      return left == 0 ? 'last page' : '$left left';
+      return left == 0
+          ? l10n.readerCounterLastPage
+          : l10n.readerCounterLeft(left);
     case PageMetric.timeLeft:
       final pace = pagesPerMinute;
-      if (pace == null || pace <= 0) return '${_percent(clamped, count)}%';
+      if (pace == null || pace <= 0) {
+        return l10n.readerCounterPercent(_percent(clamped, count));
+      }
       final minutes = ((count - clamped) / pace).round();
-      if (minutes <= 0) return 'nearly done';
-      if (minutes < 60) return 'about $minutes min left';
+      if (minutes <= 0) return l10n.readerCounterNearlyDone;
+      if (minutes < 60) return l10n.readerCounterAboutMinutes(minutes);
       final hours = minutes ~/ 60;
       final rest = minutes % 60;
       // "about 2 h left" rather than "about 2 h 0 min left".
       return rest == 0
-          ? 'about $hours h left'
-          : 'about $hours h $rest min left';
+          ? l10n.readerCounterAboutHours(hours)
+          : l10n.readerCounterAboutHoursMinutes(hours, rest);
   }
 }
 
@@ -83,29 +90,37 @@ int _percent(int page, int count) => ((page / count) * 100).round();
 /// toolbar is gone: where you are, how far through, and — when the reader's own
 /// pace has been measured — how much is left. Nothing here is invented: with no
 /// measured pace the line is simply shorter.
-String readingModeStatus({
+///
+/// [unit] is `'chapter'` for an EPUB and anything else for a page.
+String readingModeStatus(
+  L10n l10n, {
   required int page,
   required int count,
   double? pagesPerMinute,
   String unit = 'page',
 }) {
-  if (count <= 0) return '$unit $page';
+  if (count <= 0) return l10n.readerStatusOnly(unit, page);
   final clamped = page.clamp(1, count);
   final parts = <String>[
-    '$unit $clamped of $count',
-    '${_percent(clamped, count)}%',
+    l10n.readerStatusOf(unit, clamped, count),
+    l10n.readerStatusPercent(_percent(clamped, count)),
   ];
   final pace = pagesPerMinute;
   if (pace != null && pace > 0) {
-    final left = pageMetricLabel(
-      PageMetric.timeLeft,
-      page: clamped,
-      count: count,
-      pagesPerMinute: pace,
-    );
-    // The metric's own words, minus the "about" that reads as padding in a
-    // line this short.
-    parts.add(left.startsWith('about ') ? left.substring(6) : left);
+    // The same wording as the counter, minus the "about" that reads as padding
+    // in a line this short.
+    final minutes = ((count - clamped) / pace).round();
+    if (minutes <= 0) {
+      parts.add(l10n.readerCounterNearlyDone);
+    } else if (minutes < 60) {
+      parts.add(l10n.readerStatusMinutes(minutes));
+    } else {
+      final hours = minutes ~/ 60;
+      final rest = minutes % 60;
+      parts.add(rest == 0
+          ? l10n.readerStatusHours(hours)
+          : l10n.readerStatusHoursMinutes(hours, rest));
+    }
   }
   return parts.join('  ·  ');
 }

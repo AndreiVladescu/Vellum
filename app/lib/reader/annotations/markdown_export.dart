@@ -1,4 +1,6 @@
 import '../../data/database.dart';
+import '../../l10n/gen/app_localizations.dart';
+import '../../l10n/labels.dart';
 import 'annotation_store.dart';
 
 /// Exports annotations as Markdown (plan 5 #22).
@@ -16,6 +18,7 @@ class MarkdownExport {
   /// the coarse `page`/`chapter` columns, which is what a human wants to see
   /// (the JSON locator is for jumping back inside the app, not for reading).
   static String forBook({
+    required L10n l10n,
     required Book book,
     required List<Annotation> annotations,
     List<String> authors = const [],
@@ -29,7 +32,7 @@ class MarkdownExport {
         ..writeln();
     }
     if (annotations.isEmpty) {
-      out.writeln('_No highlights, notes, or bookmarks yet._');
+      out.writeln(l10n.markdownNothingYet);
       return out.toString();
     }
 
@@ -39,17 +42,20 @@ class MarkdownExport {
       // export and an empty heading would be a lie about what is there. Said
       // in words instead, so the export doesn't imply the page is unmarked.
       if (kind == AnnotationKind.ink) {
-        final where = _location(a);
+        final where = _location(l10n, a);
+        final heading = AnnotationKind.ink.labelOf(l10n);
         out
-          ..writeln('## Writing${where == null ? '' : ' — $where'}')
+          ..writeln(
+              '## ${where == null ? heading : l10n.markdownHeadingWithLocation(heading, where)}')
           ..writeln()
-          ..writeln('_Pen marks on the page — open the book to see them._')
+          ..writeln(l10n.markdownWritingBody)
           ..writeln();
         continue;
       }
-      final location = _location(a);
-      out.writeln('## ${kind?.label ?? a.kind}'
-          '${location == null ? '' : ' — $location'}');
+      final location = _location(l10n, a);
+      final heading = kind?.labelOf(l10n) ?? a.kind;
+      out.writeln(
+          '## ${location == null ? heading : l10n.markdownHeadingWithLocation(heading, location)}');
       out.writeln();
       final quote = a.quotedText;
       if (quote != null && quote.isNotEmpty) {
@@ -75,6 +81,7 @@ class MarkdownExport {
   /// [byBook] is keyed by book id. Books are emitted in the order given, so the
   /// caller decides (title, recently read, …) rather than this imposing one.
   static String forLibrary({
+    required L10n l10n,
     required List<Book> books,
     required Map<String, List<Annotation>> byBook,
     Map<String, List<String>> authorsByBook = const {},
@@ -84,23 +91,24 @@ class MarkdownExport {
       final annotations = byBook[book.id] ?? const [];
       if (annotations.isEmpty) continue;
       sections.add(forBook(
+        l10n: l10n,
         book: book,
         annotations: annotations,
         authors: authorsByBook[book.id] ?? const [],
       ).trim());
     }
     final out = StringBuffer()
-      ..writeln('# Vellum highlights')
+      ..writeln('# ${l10n.markdownLibraryTitle}')
       ..writeln();
     if (sections.isEmpty) {
-      out.writeln('_Nothing highlighted yet._');
+      out.writeln(l10n.markdownLibraryNothing);
       return out.toString();
     }
     // A count up front, because the first useful question about an export of
     // this kind is "did it get everything?".
     final total = sections.length;
     out
-      ..writeln('$total book${total == 1 ? '' : 's'} with annotations.')
+      ..writeln(l10n.markdownLibraryCount(total))
       ..writeln();
     // Demote the per-book `#` to `##` so the document has one root heading.
     for (final section in sections) {
@@ -113,9 +121,9 @@ class MarkdownExport {
 
   /// A human-readable location, or null when the annotation has none (an
   /// import from a source that didn't record one).
-  static String? _location(Annotation a) {
-    if (a.page != null) return 'page ${a.page}';
-    if (a.chapter != null) return 'chapter ${a.chapter! + 1}';
+  static String? _location(L10n l10n, Annotation a) {
+    if (a.page != null) return l10n.markdownLocationPage(a.page!);
+    if (a.chapter != null) return l10n.markdownLocationChapter(a.chapter! + 1);
     return null;
   }
 

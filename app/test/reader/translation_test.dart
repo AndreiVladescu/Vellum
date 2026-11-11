@@ -17,6 +17,7 @@ import 'package:vellum/reader/reader_settings.dart';
 import 'package:vellum/reader/translate/local_engine_backend.dart';
 import 'package:vellum/reader/translate/translate_sheet.dart';
 import 'package:vellum/reader/translate/translation_backend.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 
 /// A LibreTranslate that answers [reply] and records what it was asked.
 MockClient _server(
@@ -494,6 +495,8 @@ void main() {
       String? saved;
 
       await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: TranslateSheet(
             passage: 'Guten Morgen',
@@ -531,6 +534,8 @@ void main() {
       final settings = await ReaderSettings.load();
 
       await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: TranslateSheet(
             passage: 'Guten Morgen',
@@ -555,6 +560,8 @@ void main() {
       final settings = await ReaderSettings.load();
 
       await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: TranslateSheet(
             passage: 'Guten Morgen',

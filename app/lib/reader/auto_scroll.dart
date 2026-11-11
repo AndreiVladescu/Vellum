@@ -10,6 +10,8 @@
 /// settings know exactly. Nothing here guesses a pace and calls it measured.
 library;
 
+import '../l10n/gen/app_localizations.dart';
+
 /// Where a PDF starts when there is no measured pace to start from.
 ///
 /// A page every quarter of a minute is a slow, comfortable read. Guessing is
@@ -72,13 +74,19 @@ double stepAutoScrollSpeed(
   return clampAutoScrollSpeed(rounded, min: min, max: max);
 }
 
+/// What one unit of auto-scroll speed is: a PDF counts pages, an EPUB lines.
+enum AutoScrollUnit { pages, lines }
+
 /// The speed as it is shown on the control: "6 pages/min", "0.75 pages/min".
-String autoScrollSpeedLabel(double speed, String unit) {
+String autoScrollSpeedLabel(L10n l10n, double speed, AutoScrollUnit unit) {
   final fixed = speed < 2 ? speed.toStringAsFixed(2) : speed.toStringAsFixed(1);
   final trimmed = fixed.contains('.')
       ? fixed.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '')
       : fixed;
-  return '$trimmed $unit/min';
+  return switch (unit) {
+    AutoScrollUnit.pages => l10n.readerAutoSpeedPages(trimmed),
+    AutoScrollUnit.lines => l10n.readerAutoSpeedLines(trimmed),
+  };
 }
 
 /// How many frames of no movement mean the document has run out, rather than a

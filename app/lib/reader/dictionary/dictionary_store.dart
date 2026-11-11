@@ -17,6 +17,7 @@ import 'package:archive/archive_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import 'wordnet.dart';
 
 /// The published archive. Princeton has served this exact path since 2007.
@@ -34,10 +35,6 @@ const wordNetDownloadBytes = 11537239;
 
 /// Roughly what it takes once unpacked, for the same reason.
 const wordNetInstalledBytes = 20 << 20;
-
-const wordNetLicence =
-    'WordNet 3.0, Princeton University. Free to use and redistribute; see the '
-    'licence inside the download.';
 
 /// Progress of an install, from 0 to 1, or null while the work has no
 /// measurable length (unpacking, which is fast and gives no callbacks).
@@ -85,8 +82,10 @@ class DictionaryStore {
       final request = http.Request('GET', Uri.parse(wordNetArchiveUrl));
       final response = await fetcher.send(request);
       if (response.statusCode != 200) {
+        final status = response.statusCode;
         throw DictionaryInstallException(
-          'The download answered ${response.statusCode}.',
+          'The download answered $status.',
+          localized: (l10n) => l10n.dictionaryErrorStatus(status),
         );
       }
       final total = response.contentLength ?? wordNetDownloadBytes;
@@ -156,8 +155,9 @@ class DictionaryStore {
         await tarInput.close();
       }
       if (written == 0 || !isInstalled) {
-        throw const DictionaryInstallException(
+        throw DictionaryInstallException(
           'That file is not a WordNet database.',
+          localized: (l10n) => l10n.dictionaryErrorNotWordnet,
         );
       }
     } finally {
@@ -182,8 +182,14 @@ class DictionaryStore {
 }
 
 class DictionaryInstallException implements Exception {
-  const DictionaryInstallException(this.message);
+  const DictionaryInstallException(this.message, {this.localized});
+
+  /// A plain-English sentence for logs and tests. What the reader sees is
+  /// [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
   @override
   String toString() => message;
 }

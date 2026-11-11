@@ -29,6 +29,7 @@ import '../notifications/tray.dart';
 import 'shared_shelves_page.dart';
 import 'trash_page.dart';
 import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 import '../onboarding/sample_library.dart';
 import 'wallpaper.dart';
 
@@ -52,16 +53,18 @@ class PreferencesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Preferences')),
+      appBar: AppBar(title: Text(L10n.of(context).prefsTitle)),
       body: ListenableBuilder(
         listenable: settings,
-        builder: (context, _) => ListView(
+        builder: (context, _) {
+          final l10n = L10n.of(context);
+          return ListView(
           padding: pageInsets(context, EdgeInsets.symmetric(vertical: 8)),
           children: [
-            _SectionHeader('Appearance'),
+            _SectionHeader(l10n.prefsSectionAppearance),
             _AppearanceSection(settings: settings),
             const Divider(height: 24),
-            _SectionHeader('Books on the shelf'),
+            _SectionHeader(l10n.prefsSectionBooks),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: SegmentedButton<BookFace>(
@@ -69,7 +72,7 @@ class PreferencesPage extends StatelessWidget {
                   for (final face in BookFace.values)
                     ButtonSegment(
                       value: face,
-                      label: Text(face.label),
+                      label: Text(face.labelOf(l10n)),
                       icon: Icon(face.icon),
                     ),
                 ],
@@ -81,9 +84,9 @@ class PreferencesPage extends StatelessWidget {
             // Spine artwork only matters spine-out; face-out always shows the
             // cover itself.
             if (settings.bookFace == BookFace.spine) ...[
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Text('Spine artwork for books with a cover'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text(l10n.prefsSpineArtLabel),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -92,7 +95,7 @@ class PreferencesPage extends StatelessWidget {
                     for (final art in SpineArt.values)
                       ButtonSegment(
                         value: art,
-                        label: Text(art.label),
+                        label: Text(art.labelOf(l10n)),
                         icon: Icon(art == SpineArt.coverSlice
                             ? Icons.image_outlined
                             : Icons.palette_outlined),
@@ -105,7 +108,7 @@ class PreferencesPage extends StatelessWidget {
               ),
             ],
             const Divider(height: 24),
-            _SectionHeader('Wallpaper'),
+            _SectionHeader(l10n.prefsSectionWallpaper),
             for (final wallpaper in Wallpaper.values)
               _WallpaperTile(
                 wallpaper: wallpaper,
@@ -113,31 +116,28 @@ class PreferencesPage extends StatelessWidget {
                 onTap: () => settings.setWallpaper(wallpaper),
               ),
             const Divider(height: 24),
-            _SectionHeader('Genres'),
+            _SectionHeader(l10n.prefsSectionGenres),
             SwitchListTile(
               secondary: const Icon(Icons.sell_outlined),
-              title: const Text('Import genres from Open Library'),
-              subtitle: const Text(
-                  'Auto-tag new books with Open Library’s subjects. Off by '
-                  'default — those are noisy; assign your own genres instead'),
+              title: Text(l10n.prefsGenresImportTitle),
+              subtitle: Text(l10n.prefsGenresImportSubtitle),
               value: settings.importOpenLibraryGenres,
               onChanged: settings.setImportOpenLibraryGenres,
             ),
             if (textIndexSupportedHere) ...[
               const Divider(height: 24),
-              _SectionHeader('Search inside books'),
+              _SectionHeader(l10n.prefsSectionSearch),
               _ContentIndexSection(
                 repository: repository,
                 settings: settings,
               ),
             ],
             const Divider(height: 24),
-            _SectionHeader('Sync'),
+            _SectionHeader(l10n.prefsSectionSync),
             SwitchListTile(
               secondary: const Icon(Icons.cloud_sync_outlined),
-              title: const Text('Push changes automatically'),
-              subtitle: const Text(
-                  'Send edits to the server in the background while connected'),
+              title: Text(l10n.prefsAutoPushTitle),
+              subtitle: Text(l10n.prefsAutoPushSubtitle),
               value: settings.autoPush,
               onChanged: settings.setAutoPush,
             ),
@@ -153,9 +153,8 @@ class PreferencesPage extends StatelessWidget {
             if (connection.isConnected)
               ListTile(
                 leading: const Icon(Icons.shelves),
-                title: const Text('Shelves from others'),
-                subtitle: const Text(
-                    'Choose which shared shelves show in your library'),
+                title: Text(l10n.prefsSharedShelvesTitle),
+                subtitle: Text(l10n.prefsSharedShelvesSubtitle),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -168,17 +167,17 @@ class PreferencesPage extends StatelessWidget {
                 ),
               ),
             const Divider(height: 24),
-            _SectionHeader('Sample books'),
+            _SectionHeader(l10n.prefsSectionSamples),
             _SamplesTile(repository: repository),
             const Divider(height: 24),
-            _SectionHeader('Trash'),
+            _SectionHeader(l10n.prefsSectionTrash),
             _TrashTile(repository: repository),
             const Divider(height: 24),
-            _SectionHeader('Library health'),
+            _SectionHeader(l10n.prefsSectionHealth),
             _HealthSection(repository: repository, connection: connection),
             _DiagnosticsTile(repository: repository, connection: connection),
             const Divider(height: 24),
-            _SectionHeader('Backup'),
+            _SectionHeader(l10n.prefsSectionBackup),
             _BackupSection(
               repository: repository,
               connection: connection,
@@ -186,10 +185,11 @@ class PreferencesPage extends StatelessWidget {
               settings: settings,
             ),
             const Divider(height: 24),
-            _SectionHeader('Danger zone'),
+            _SectionHeader(l10n.prefsSectionDanger),
             _ClearLibraryTile(repository: repository),
           ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -252,6 +252,7 @@ class _ContentIndexSectionState extends State<_ContentIndexSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final pending = _counts['pending'] ?? 0;
     final ok = _counts['ok'] ?? 0;
     final noText = _counts['no_text'] ?? 0;
@@ -260,10 +261,8 @@ class _ContentIndexSectionState extends State<_ContentIndexSection> {
       children: [
         SwitchListTile(
           secondary: const Icon(Icons.manage_search_outlined),
-          title: const Text('Index the text of my books'),
-          subtitle: const Text(
-              'Lets search look inside books, not just at titles and authors. '
-              'Off by default: the index is about as big as the text it holds'),
+          title: Text(l10n.prefsIndexTitle),
+          subtitle: Text(l10n.prefsIndexSubtitle),
           value: widget.settings.indexBookText,
           onChanged: (on) async {
             await widget.settings.setIndexBookText(on);
@@ -282,9 +281,9 @@ class _ContentIndexSectionState extends State<_ContentIndexSection> {
                   // and someone wondering why it never turns up in results
                   // deserves to see that it has no text to search.
                   [
-                    '$ok indexed',
-                    if (pending > 0) '$pending waiting',
-                    if (noText > 0) '$noText with no text (scanned)',
+                    l10n.prefsIndexedCount(ok),
+                    if (pending > 0) l10n.prefsIndexWaitingCount(pending),
+                    if (noText > 0) l10n.prefsIndexNoTextCount(noText),
                   ].join(', '),
                   style: theme.textTheme.bodySmall,
                 ),
@@ -294,7 +293,7 @@ class _ContentIndexSectionState extends State<_ContentIndexSection> {
                   children: [
                     FilledButton.tonal(
                       onPressed: _busy ? null : _indexNow,
-                      child: Text(_busy ? 'Indexing…' : 'Index now'),
+                      child: Text(_busy ? l10n.prefsIndexing : l10n.prefsIndexNow),
                     ),
                     TextButton(
                       onPressed: _busy
@@ -303,7 +302,7 @@ class _ContentIndexSectionState extends State<_ContentIndexSection> {
                               await _index.reindexAll();
                               await _indexNow();
                             },
-                      child: const Text('Rebuild'),
+                      child: Text(l10n.prefsIndexRebuild),
                     ),
                   ],
                 ),
@@ -352,21 +351,22 @@ class _HealthSectionState extends State<_HealthSection> {
   }
 
   Future<void> _repair(DefectKind kind, List<Defect> defects) async {
+    final l10n = L10n.of(context);
     if (kind.isDestructive) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(kind.label),
-          content: Text('${kind.repairLabel} for ${defects.length} item'
-              '${defects.length == 1 ? '' : 's'}. This can’t be undone.'),
+          title: Text(kind.labelOf(l10n)),
+          content: Text(
+              l10n.prefsRepairConfirmBody(kind.repairLabelOf(l10n), defects.length)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Continue'),
+              child: Text(l10n.prefsContinue),
             ),
           ],
         ),
@@ -379,7 +379,7 @@ class _HealthSectionState extends State<_HealthSection> {
     await _scan();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Repaired $fixed item${fixed == 1 ? '' : 's'}')),
+      SnackBar(content: Text(l10n.prefsRepaired(fixed))),
     );
   }
 
@@ -394,6 +394,7 @@ class _HealthSectionState extends State<_HealthSection> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     final report = _report;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,8 +402,7 @@ class _HealthSectionState extends State<_HealthSection> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'Checks that every book still has its file and cover, and that no '
-            'stray data is left behind. Nothing is changed until you ask.',
+            l10n.prefsHealthIntro,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
@@ -413,27 +413,27 @@ class _HealthSectionState extends State<_HealthSection> {
               FilledButton.tonalIcon(
                 onPressed: _busy ? null : _scan,
                 icon: const Icon(Icons.health_and_safety_outlined),
-                label: Text(_busy ? 'Checking…' : 'Check library'),
+                label: Text(_busy ? l10n.prefsHealthChecking : l10n.prefsHealthCheck),
               ),
               if (_busy)
                 Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: TextButton(
                     onPressed: () => setState(() => _cancelRequested = true),
-                    child: const Text('Stop'),
+                    child: Text(l10n.prefsHealthStop),
                   ),
                 ),
             ],
           ),
         ),
         if (report != null && report.isHealthy)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               children: [
-                Icon(Icons.check_circle_outline, size: 18),
-                SizedBox(width: 8),
-                Text('Everything checks out.'),
+                const Icon(Icons.check_circle_outline, size: 18),
+                const SizedBox(width: 8),
+                Text(l10n.prefsHealthAllGood),
               ],
             ),
           ),
@@ -441,33 +441,36 @@ class _HealthSectionState extends State<_HealthSection> {
           for (final entry in report.repairableCounts.entries)
             ListTile(
               dense: true,
-              title: Text(entry.key.label),
+              title: Text(entry.key.labelOf(l10n)),
               subtitle: Text(entry.key == DefectKind.orphanBlob
-                  ? '${entry.value} · ${_bytes(report.reclaimableBytes)} to reclaim'
-                  : '${entry.value} found · ${entry.key.repairLabel}'),
+                  ? l10n.prefsHealthReclaim(
+                      entry.value, _bytes(report.reclaimableBytes))
+                  : l10n.prefsHealthFound(
+                      entry.value, entry.key.repairLabelOf(l10n))),
               trailing: TextButton(
                 onPressed: _busy
                     ? null
                     : () => _repair(entry.key, report.of(entry.key)),
-                child: const Text('Repair'),
+                child: Text(l10n.prefsHealthRepair),
               ),
             ),
         // Kept below, and under its own heading, because these are not damage:
         // a book with no year is untidy, not broken, and mixing the two would
         // make a perfectly sound library look faulty every time it is scanned.
         if (report != null && report.adviceCounts.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Text('Worth tidying'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Text(l10n.prefsHealthAdviceHeader),
           ),
           for (final entry in report.adviceCounts.entries)
             ListTile(
               dense: true,
-              title: Text(entry.key.label),
+              title: Text(entry.key.labelOf(l10n)),
               // No button: which of two near-identical books to keep, or what
               // the missing author is called, is not something the app can
               // answer, and an inert "Repair" is worse than none.
-              subtitle: Text('${entry.value} · ${entry.key.repairLabel}'),
+              subtitle: Text(
+                  l10n.prefsHealthAdviceRow(entry.value, entry.key.repairLabelOf(l10n))),
             ),
         ],
       ],
@@ -508,7 +511,7 @@ class _DiagnosticsTile extends StatelessWidget {
     await Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      appSnackBar(content: const Text('Diagnostics copied')),
+      appSnackBar(content: Text(L10n.of(context).prefsDiagCopied)),
     );
   }
 
@@ -524,7 +527,7 @@ class _DiagnosticsTile extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Diagnostics'),
+        title: Text(L10n.of(context).prefsDiagTitle),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
@@ -537,14 +540,14 @@ class _DiagnosticsTile extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
+            child: Text(L10n.of(context).prefsClose),
           ),
           FilledButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
               await _copy(context, text);
             },
-            child: const Text('Copy'),
+            child: Text(L10n.of(context).prefsCopy),
           ),
         ],
       ),
@@ -553,14 +556,14 @@ class _DiagnosticsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Text(
-            'For a bug report: versions, counts and recent errors. No titles, '
-            'file names or server address — read it before you post it.',
+            l10n.prefsDiagIntro,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
@@ -572,11 +575,11 @@ class _DiagnosticsTile extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: () => _copyNow(context),
                 icon: const Icon(Icons.copy_outlined),
-                label: const Text('Copy diagnostics'),
+                label: Text(l10n.prefsDiagCopyButton),
               ),
               TextButton(
                 onPressed: () => _preview(context),
-                child: const Text('Show'),
+                child: Text(l10n.prefsDiagShow),
               ),
             ],
           ),
@@ -630,11 +633,8 @@ class _ReadingPositionSwitchState extends State<_ReadingPositionSwitch> {
     }
     if (!mounted || !serverUnreachable) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Turned off here, but the server couldn't be reached to remove "
-          'the positions it already has. Turn it off again while connected.',
-        ),
+      SnackBar(
+        content: Text(L10n.of(context).prefsReadingPositionOffFailed),
       ),
     );
   }
@@ -643,11 +643,10 @@ class _ReadingPositionSwitchState extends State<_ReadingPositionSwitch> {
   Widget build(BuildContext context) {
     return SwitchListTile(
       secondary: const Icon(Icons.auto_stories_outlined),
-      title: const Text('Sync reading position'),
+      title: Text(L10n.of(context).prefsReadingPositionTitle),
       subtitle: Text(
-        'Let your other devices offer to resume where you left off. Off by '
-        'default: unlike your catalogue, this tells the server what you read '
-        'and how far. This device appears as “${widget.settings.deviceLabel}”.',
+        L10n.of(context)
+            .prefsReadingPositionSubtitle(widget.settings.deviceLabel),
       ),
       value: widget.settings.syncReadingPosition,
       onChanged: _busy ? null : _toggle,
@@ -694,36 +693,31 @@ class _BackupSectionState extends State<_BackupSection> {
     final first = TextEditingController();
     final second = TextEditingController();
     String? error;
+    final l10n = L10n.of(context);
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setLocal) => AlertDialog(
-          title: const Text('Encrypt this backup?'),
+          title: Text(l10n.prefsEncryptTitle),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'A backup holds your whole library, including your private '
-                  'reader notes. Encrypting it means only someone with the '
-                  'passphrase can read it.\n\n'
-                  'Vellum does not store the passphrase anywhere. If you lose '
-                  'it, the backup is gone — there is no recovery.\n\n'
-                  'Encrypting is real work for the processor, so a large '
-                  'library takes noticeably longer to export than a plain zip.',
-                ),
+                Text(l10n.prefsEncryptBody),
                 const SizedBox(height: 12),
                 TextField(
                   controller: first,
                   autofocus: true,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Passphrase'),
+                  decoration:
+                      InputDecoration(labelText: l10n.prefsPassphraseLabel),
                 ),
                 TextField(
                   controller: second,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Repeat it'),
+                  decoration:
+                      InputDecoration(labelText: l10n.prefsPassphraseRepeatLabel),
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 8),
@@ -737,25 +731,25 @@ class _BackupSectionState extends State<_BackupSection> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(''),
-              child: const Text('No, plain .zip'),
+              child: Text(l10n.prefsEncryptPlain),
             ),
             FilledButton(
               onPressed: () {
                 if (first.text.isEmpty) {
-                  setLocal(() => error = 'Enter a passphrase, or choose plain.');
+                  setLocal(() => error = l10n.prefsPassphraseMissing);
                   return;
                 }
                 if (first.text != second.text) {
-                  setLocal(() => error = 'Those two do not match.');
+                  setLocal(() => error = l10n.prefsPassphraseMismatch);
                   return;
                 }
                 Navigator.of(dialogContext).pop(first.text);
               },
-              child: const Text('Encrypt'),
+              child: Text(l10n.prefsEncryptAction),
             ),
           ],
         ),
@@ -769,25 +763,26 @@ class _BackupSectionState extends State<_BackupSection> {
   /// Asks for the passphrase of an existing archive.
   Future<String?> _promptExistingPassphrase() async {
     final controller = TextEditingController();
+    final l10n = L10n.of(context);
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('This backup is encrypted'),
+        title: Text(l10n.prefsBackupEncryptedTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'Passphrase'),
+          decoration: InputDecoration(labelText: l10n.prefsPassphraseLabel),
           onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: const Text('Open'),
+            child: Text(l10n.prefsOpen),
           ),
         ],
       ),
@@ -798,11 +793,12 @@ class _BackupSectionState extends State<_BackupSection> {
 
   /// Checks an archive without restoring it (plan 5 #13).
   Future<void> _verify() async {
-    const group = XTypeGroup(
-      label: 'Vellum backup',
-      extensions: ['zip', 'vbk'],
+    final l10n = L10n.of(context);
+    final group = XTypeGroup(
+      label: l10n.prefsBackupTypeGroup,
+      extensions: const ['zip', 'vbk'],
     );
-    final picked = await openFile(acceptedTypeGroups: const [group]);
+    final picked = await openFile(acceptedTypeGroups: [group]);
     if (picked == null || !mounted) return;
     final file = File(picked.path);
     String? passphrase;
@@ -819,26 +815,26 @@ class _BackupSectionState extends State<_BackupSection> {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(check.ok ? 'Backup checks out' : 'Backup has problems'),
+          title: Text(check.ok ? l10n.prefsVerifyOk : l10n.prefsVerifyProblems),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(check.describe()),
+                Text(check.describeOf(l10n)),
                 if (check.created != null) ...[
                   const SizedBox(height: 8),
-                  Text('Written ${check.created!.toLocal()}'),
+                  Text(l10n.prefsVerifyWritten('${check.created!.toLocal()}')),
                 ],
                 for (final name in [...check.corrupt, ...check.missing].take(10))
-                  Text('• $name'),
+                  Text('• $name'), // i18n-ignore
               ],
             ),
           ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Close'),
+              child: Text(l10n.prefsClose),
             ),
           ],
         ),
@@ -862,11 +858,14 @@ class _BackupSectionState extends State<_BackupSection> {
       await _exportViaShare(passphrase);
       return;
     }
+    final l10n = L10n.of(context);
     final location = await getSaveLocation(
       suggestedName: _suggestedName(encrypted: encrypted),
       acceptedTypeGroups: [
         XTypeGroup(
-          label: encrypted ? 'Encrypted Vellum backup' : 'Zip archive',
+          label: encrypted
+              ? l10n.prefsBackupTypeEncrypted
+              : l10n.prefsBackupTypeZip,
           extensions: [encrypted ? 'vbk' : 'zip'],
         ),
       ],
@@ -878,13 +877,13 @@ class _BackupSectionState extends State<_BackupSection> {
           .exportTo(File(location.path), passphrase: passphrase);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Backup saved to ${location.path}')),
+          SnackBar(content: Text(l10n.prefsBackupSaved(location.path))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Backup failed: $e')));
+            .showSnackBar(SnackBar(content: Text(l10n.prefsBackupFailed('$e'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -892,6 +891,7 @@ class _BackupSectionState extends State<_BackupSection> {
   }
 
   Future<void> _exportViaShare(String passphrase) async {
+    final l10n = L10n.of(context);
     setState(() => _busy = true);
     try {
       final encrypted = passphrase.isNotEmpty;
@@ -905,12 +905,12 @@ class _BackupSectionState extends State<_BackupSection> {
               mimeType:
                   encrypted ? 'application/octet-stream' : 'application/zip'),
         ],
-        subject: 'Vellum backup',
+        subject: l10n.prefsBackupTypeGroup,
       ));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Backup failed: $e')));
+            .showSnackBar(SnackBar(content: Text(l10n.prefsBackupFailed('$e'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -918,17 +918,18 @@ class _BackupSectionState extends State<_BackupSection> {
   }
 
   Future<void> _restore() async {
+    final l10n = L10n.of(context);
     // A restore closes the database; doing that under a live launch/manual sync
     // would throw mid-transaction. Export is safe (VACUUM INTO is a snapshot).
     if (widget.sync.isRunning) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Wait for the sync to finish, then try again.')),
+        SnackBar(content: Text(l10n.prefsRestoreWaitSync)),
       );
       return;
     }
-    const group =
-        XTypeGroup(label: 'Vellum backup', extensions: ['zip', 'vbk']);
-    final picked = await openFile(acceptedTypeGroups: const [group]);
+    final group = XTypeGroup(
+        label: l10n.prefsBackupTypeGroup, extensions: const ['zip', 'vbk']);
+    final picked = await openFile(acceptedTypeGroups: [group]);
     if (picked == null || !mounted) return;
     String? passphrase;
     if (await BackupCrypto.isEncrypted(File(picked.path))) {
@@ -942,24 +943,19 @@ class _BackupSectionState extends State<_BackupSection> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Restore from backup?'),
-        content: const Text(
-          'This replaces your whole library — every book, cover, file, and '
-          'reading position — with the backup\'s contents. Vellum will close '
-          'when the restore finishes; open it again to see the restored '
-          'library.\n\nThere is no undo.',
-        ),
+        title: Text(l10n.prefsRestoreTitle),
+        content: Text(l10n.prefsRestoreBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Replace & restart'),
+            child: Text(l10n.prefsRestoreReplace),
           ),
         ],
       ),
@@ -973,8 +969,7 @@ class _BackupSectionState extends State<_BackupSection> {
         if (mounted) {
           setState(() => _busy = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text("That file doesn't look like a Vellum backup.")),
+            SnackBar(content: Text(l10n.prefsRestoreNotBackup)),
           );
         }
         return;
@@ -993,15 +988,12 @@ class _BackupSectionState extends State<_BackupSection> {
         await showDialog<void>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Restore failed'),
-            content: Text(
-                'The restore did not complete: $e\n\nVellum will close now; '
-                'open it again and check your library (your previous backup '
-                'file is untouched).'),
+            title: Text(l10n.prefsRestoreFailedTitle),
+            content: Text(l10n.prefsRestoreFailedBody('$e')),
             actions: [
               FilledButton(
                 onPressed: () => exit(0),
-                child: const Text('Close Vellum'),
+                child: Text(l10n.prefsRestoreCloseApp),
               ),
             ],
           ),
@@ -1013,13 +1005,13 @@ class _BackupSectionState extends State<_BackupSection> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Column(
       children: [
         ListTile(
           leading: const Icon(Icons.archive_outlined),
-          title: const Text('Export library…'),
-          subtitle: const Text(
-              'Everything — database, covers, and book files — in one .zip'),
+          title: Text(l10n.prefsExportTitle),
+          subtitle: Text(l10n.prefsExportSubtitle),
           enabled: !_busy,
           onTap: _export,
           trailing: _busy
@@ -1031,16 +1023,15 @@ class _BackupSectionState extends State<_BackupSection> {
         ),
         ListTile(
           leading: const Icon(Icons.fact_check_outlined),
-          title: const Text('Verify a backup…'),
-          subtitle: const Text(
-              'Re-checks every file against its checksum, without restoring'),
+          title: Text(l10n.prefsVerifyTitle),
+          subtitle: Text(l10n.prefsVerifySubtitle),
           enabled: !_busy,
           onTap: _verify,
         ),
         ListTile(
           leading: const Icon(Icons.unarchive_outlined),
-          title: const Text('Restore from backup…'),
-          subtitle: const Text('Replaces the current library, then restarts'),
+          title: Text(l10n.prefsRestoreTile),
+          subtitle: Text(l10n.prefsRestoreTileSubtitle),
           enabled: !_busy,
           onTap: _restore,
         ),
@@ -1092,11 +1083,8 @@ class _TrayNotificationsTileState extends State<_TrayNotificationsTile> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (!granted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-          'Android refused permission to post notifications. You can grant it '
-          'in the system settings for Vellum.',
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(L10n.of(context).prefsTrayDenied),
       ));
       return;
     }
@@ -1114,9 +1102,8 @@ class _TrayNotificationsTileState extends State<_TrayNotificationsTile> {
         isAndroid: true,
       ));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Background sync set to daily, so there is something '
-            'to check with.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(L10n.of(context).prefsTrayDailySet),
       ));
     }
   }
@@ -1129,11 +1116,10 @@ class _TrayNotificationsTileState extends State<_TrayNotificationsTile> {
               width: 18, height: 18,
               child: CircularProgressIndicator(strokeWidth: 2))
           : const Icon(Icons.notifications_active_outlined),
-      title: const Text('Borrowing notifications'),
+      title: Text(L10n.of(context).prefsTrayTitle),
       subtitle: Text(_supported
-          ? 'Put requests and answers in the status bar, checked when '
-              'background sync runs'
-          : 'Android only — a desktop window is already in front of you'),
+          ? L10n.of(context).prefsTraySubtitle
+          : L10n.of(context).prefsTrayUnavailable),
       value: _supported && widget.settings.trayNotifications,
       onChanged: _supported && !_busy ? _toggle : null,
     );
@@ -1157,34 +1143,31 @@ class _BackgroundSyncTile extends StatelessWidget {
     final interval =
         BackgroundSyncInterval.parse(settings.backgroundSyncInterval);
     final last = settings.lastBackgroundSyncAt;
+    final l10n = L10n.of(context);
     return ExpansionTile(
       leading: const Icon(Icons.schedule_send_outlined),
-      title: const Text('Background sync'),
+      title: Text(l10n.prefsBgTitle),
       subtitle: Text(
         !_supported
-            ? 'Android only'
+            ? l10n.prefsAndroidOnly
             : interval == BackgroundSyncInterval.off
-                ? 'Off'
-                : '${interval.label}'
-                    '${last == null ? '' : ' · last ${last.toLocal()}'}',
+                ? l10n.prefsOff
+                : last == null
+                    ? interval.labelOf(l10n)
+                    : l10n.prefsIntervalLast(
+                        interval.labelOf(l10n), '${last.toLocal()}'),
       ),
       children: [
         if (!_supported)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              'A desktop app is already running when you use it. This is for '
-              'a phone, where the library would otherwise be stale every time '
-              'you pick it up.',
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(l10n.prefsBgDesktopNote),
           )
         else ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
-              'Runs only on Wi-Fi while charging, so it can never spend your '
-              'mobile data or your last few per cent. Syncing by hand ignores '
-              'both conditions.',
+              l10n.prefsBgConditions,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -1192,7 +1175,7 @@ class _BackgroundSyncTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                const Text('How often'),
+                Text(l10n.prefsHowOften),
                 const Spacer(),
                 DropdownButton<BackgroundSyncInterval>(
                   value: interval,
@@ -1212,7 +1195,7 @@ class _BackgroundSyncTile extends StatelessWidget {
                     for (final option in BackgroundSyncInterval.values)
                       DropdownMenuItem(
                         value: option,
-                        child: Text(option.label),
+                        child: Text(option.labelOf(l10n)),
                       ),
                   ],
                 ),
@@ -1254,35 +1237,32 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
       builder: (context, _) {
         final frequency = BackupFrequency.parse(settings.backupFrequency);
         final last = settings.lastBackupAt;
+        final l10n = L10n.of(context);
         return ExpansionTile(
           leading: const Icon(Icons.schedule),
-          title: const Text('Scheduled backups'),
+          title: Text(l10n.prefsSchedTitle),
           subtitle: Text(
             !_supported
-                ? 'Desktop only'
+                ? l10n.prefsDesktopOnly
                 : frequency == BackupFrequency.off
-                    ? 'Off'
-                    : '${frequency.label}, keeping ${settings.backupKeep}'
-                        '${last == null ? '' : ' · last ${last.toLocal()}'}',
+                    ? l10n.prefsOff
+                    : last == null
+                        ? l10n.prefsSchedSummary(
+                            frequency.labelOf(l10n), settings.backupKeep)
+                        : l10n.prefsSchedSummaryLast(frequency.labelOf(l10n),
+                            settings.backupKeep, '${last.toLocal()}'),
           ),
           children: [
             if (!_supported)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Text(
-                  'A phone has no folder to write to unattended and no moment '
-                  'to run in. Use “Export library…” and save it wherever you '
-                  'keep things.',
-                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(l10n.prefsSchedPhoneNote),
               )
             else ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                  'Runs when Vellum starts, if the last backup is older than '
-                  'the interval — no background service. Scheduled archives '
-                  'are plain .zip: encrypting them would mean storing the '
-                  'passphrase, which is the same as not encrypting them.',
+                  l10n.prefsSchedHow,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -1290,7 +1270,7 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    const Text('How often'),
+                    Text(l10n.prefsHowOften),
                     const Spacer(),
                     DropdownButton<BackupFrequency>(
                       value: frequency,
@@ -1301,7 +1281,7 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
                         for (final option in BackupFrequency.values)
                           DropdownMenuItem(
                             value: option,
-                            child: Text(option.label),
+                            child: Text(option.labelOf(l10n)),
                           ),
                       ],
                     ),
@@ -1309,8 +1289,8 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
                 ),
               ),
               ListTile(
-                title: const Text('Folder'),
-                subtitle: Text(settings.backupFolder ?? 'Not chosen yet'),
+                title: Text(l10n.prefsFolder),
+                subtitle: Text(settings.backupFolder ?? l10n.prefsFolderNone),
                 trailing: const Icon(Icons.folder_open),
                 onTap: _pickFolder,
               ),
@@ -1318,7 +1298,7 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Row(
                   children: [
-                    const Text('Keep'),
+                    Text(l10n.prefsKeep),
                     const Spacer(),
                     DropdownButton<int>(
                       value: settings.backupKeep,
@@ -1326,7 +1306,7 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
                           value == null ? null : settings.setBackupKeep(value),
                       items: [
                         for (final n in [1, 3, 5, 10, 20])
-                          DropdownMenuItem(value: n, child: Text('$n')),
+                          DropdownMenuItem(value: n, child: Text('$n')), // i18n-ignore
                       ],
                     ),
                   ],
@@ -1382,7 +1362,7 @@ class _AppearanceSection extends StatelessWidget {
     final picked = await showDialog<Color>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Custom colour'),
+        title: Text(L10n.of(context).prefsCustomColourTitle),
         content: SizedBox(
           width: 280,
           child: Wrap(
@@ -1394,7 +1374,7 @@ class _AppearanceSection extends StatelessWidget {
                   onTap: () => Navigator.pop(dialogContext, colour),
                   customBorder: const CircleBorder(),
                   child: Semantics(
-                    label: 'Seed colour swatch',
+                    label: L10n.of(context).prefsSeedSwatch,
                     button: true,
                     child: Container(
                       width: 48,
@@ -1415,7 +1395,7 @@ class _AppearanceSection extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(L10n.of(context).cancel),
           ),
         ],
       ),
@@ -1426,6 +1406,7 @@ class _AppearanceSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final typography = settings.spineTypography;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1433,21 +1414,21 @@ class _AppearanceSection extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: SegmentedButton<ThemeMode>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: ThemeMode.system,
-                label: Text('System'),
-                icon: Icon(Icons.brightness_auto_outlined),
+                label: Text(l10n.prefsThemeSystem),
+                icon: const Icon(Icons.brightness_auto_outlined),
               ),
               ButtonSegment(
                 value: ThemeMode.light,
-                label: Text('Light'),
-                icon: Icon(Icons.light_mode_outlined),
+                label: Text(l10n.prefsThemeLight),
+                icon: const Icon(Icons.light_mode_outlined),
               ),
               ButtonSegment(
                 value: ThemeMode.dark,
-                label: Text('Dark'),
-                icon: Icon(Icons.dark_mode_outlined),
+                label: Text(l10n.prefsThemeDark),
+                icon: const Icon(Icons.dark_mode_outlined),
               ),
             ],
             selected: {settings.themeMode},
@@ -1459,16 +1440,14 @@ class _AppearanceSection extends StatelessWidget {
         if (defaultTargetPlatform == TargetPlatform.android)
           SwitchListTile(
             secondary: const Icon(Icons.colorize_outlined),
-            title: const Text('Use the system colours'),
-            subtitle: const Text(
-                'Material You, from your Android wallpaper. Overrides the '
-                'colour below'),
+            title: Text(l10n.prefsDynamicColourTitle),
+            subtitle: Text(l10n.prefsDynamicColourSubtitle),
             value: settings.useDynamicColor,
             onChanged: settings.setUseDynamicColor,
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Text('Colour', style: theme.textTheme.bodyMedium),
+          child: Text(l10n.prefsColour, style: theme.textTheme.bodyMedium),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -1479,13 +1458,13 @@ class _AppearanceSection extends StatelessWidget {
               for (final preset in SeedPreset.values)
                 _SeedSwatch(
                   color: preset.color,
-                  label: preset.label,
+                  label: preset.labelOf(l10n),
                   selected: settings.seedPreset == preset,
                   onTap: () => settings.setSeedPreset(preset),
                 ),
               _SeedSwatch(
                 color: settings.seedColor,
-                label: 'Custom',
+                label: l10n.prefsSeedCustom,
                 selected: settings.seedPreset == null,
                 custom: true,
                 onTap: () => _pickCustomSeed(context),
@@ -1495,7 +1474,7 @@ class _AppearanceSection extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Text('Shelf material', style: theme.textTheme.bodyMedium),
+          child: Text(l10n.prefsShelfMaterial, style: theme.textTheme.bodyMedium),
         ),
         RadioGroup<ShelfMaterial>(
           groupValue: settings.shelfMaterial,
@@ -1507,7 +1486,7 @@ class _AppearanceSection extends StatelessWidget {
               for (final material in ShelfMaterial.values)
                 RadioListTile<ShelfMaterial>(
                   value: material,
-                  title: Text(material.label),
+                  title: Text(material.labelOf(l10n)),
                   secondary: Container(
                     width: 44,
                     height: 16,
@@ -1520,17 +1499,17 @@ class _AppearanceSection extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Text('Spine size', style: theme.textTheme.bodyMedium),
+          child: Text(l10n.prefsSpineSize, style: theme.textTheme.bodyMedium),
         ),
         _ScaleSlider(
-          label: 'Title',
+          label: l10n.prefsSpineTitleScale,
           value: typography.clampedTitle,
           onChanged: (v) => settings.setSpineTypography(
             SpineTypography(titleScale: v, widthScale: typography.widthScale),
           ),
         ),
         _ScaleSlider(
-          label: 'Thickness',
+          label: l10n.prefsSpineThickness,
           value: typography.clampedWidth,
           onChanged: (v) => settings.setSpineTypography(
             SpineTypography(titleScale: typography.titleScale, widthScale: v),
@@ -1622,7 +1601,7 @@ class _ScaleSlider extends StatelessWidget {
               max: SpineTypography.max,
               divisions: 12,
               value: value,
-              label: '${(value * 100).round()}%',
+              label: '${(value * 100).round()}%', // i18n-ignore
               onChanged: onChanged,
             ),
           ),
@@ -1660,19 +1639,16 @@ class _SamplesTileState extends State<_SamplesTile> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove the sample books?'),
-        content: const Text(
-            'They are deleted from this device, along with any notes '
-            'or reading progress on them. Your own books are not '
-            'touched.'),
+        title: Text(l10n.prefsSamplesRemoveTitle),
+        content: Text(l10n.prefsSamplesRemoveBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text(l10n.samplesRemoveAction),
           ),
         ],
       ),
@@ -1681,10 +1657,10 @@ class _SamplesTileState extends State<_SamplesTile> {
     try {
       final removed = await _samples.remove();
       messenger.showSnackBar(
-          appSnackBar(content: Text('Removed $removed sample books.')));
+          appSnackBar(content: Text(l10n.prefsSamplesRemoved(removed))));
     } catch (e) {
       messenger.showSnackBar(appSnackBar(
-          content: Text('Could not remove the sample books: $e')));
+          content: Text(l10n.prefsSamplesRemoveFailed('$e'))));
     }
   }
 
@@ -1694,13 +1670,14 @@ class _SamplesTileState extends State<_SamplesTile> {
       stream: _count,
       builder: (context, snapshot) {
         final count = snapshot.data ?? 0;
+        final l10n = L10n.of(context);
         return ListTile(
           leading: const Icon(Icons.auto_stories_outlined),
-          title: Text(count == 0 ? 'Add sample books' : 'Remove sample books'),
+          title: Text(count == 0 ? l10n.prefsSamplesAdd : l10n.prefsSamplesRemove),
           subtitle: Text(count == 0
-              ? 'Four public-domain books to try Vellum with'
-              : '$count on the "${SampleLibrary.shelfName}" shelf, kept on '
-                  'this device only'),
+              ? l10n.prefsSamplesAddSubtitle
+              : l10n.prefsSamplesRemoveSubtitle(
+                  count, SampleLibrary.shelfName)),
           onTap: () => _tap(count),
         );
       },
@@ -1721,13 +1698,13 @@ class _TrashTile extends StatelessWidget {
       stream: repository.trash.watchTrashCount(),
       builder: (context, snapshot) {
         final count = snapshot.data ?? 0;
+        final l10n = L10n.of(context);
         return ListTile(
           leading: const Icon(Icons.delete_outline),
-          title: const Text('Trash'),
+          title: Text(l10n.prefsTrashTitle),
           subtitle: Text(count == 0
-              ? 'Nothing waiting to be deleted'
-              : '$count book${count == 1 ? '' : 's'}, deleted for good after '
-                  '${TrashService.graceperiod.inDays} days'),
+              ? l10n.prefsTrashNone
+              : l10n.prefsTrashCount(count, TrashService.graceperiod.inDays)),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
@@ -1766,7 +1743,7 @@ class _WallpaperTile extends StatelessWidget {
           ),
         ),
       ),
-      title: Text(wallpaper.label),
+      title: Text(wallpaper.labelOf(L10n.of(context))),
       trailing: selected
           ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
           : null,
@@ -1796,9 +1773,10 @@ class _ClearLibraryTile extends StatelessWidget {
     final books = await repository.watchAllBooks().first;
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     if (books.isEmpty) {
       messenger.showSnackBar(
-        appSnackBar(content: const Text('Your library is already empty.')),
+        appSnackBar(content: Text(l10n.prefsClearEmpty)),
       );
       return;
     }
@@ -1814,11 +1792,11 @@ class _ClearLibraryTile extends StatelessWidget {
     }
     if (!context.mounted) return;
     messenger.showSnackBar(appSnackBar(
-      content: Text('Moved ${books.length} books to the trash'),
+      content: Text(l10n.trashedBooks(books.length)),
       // Straight afterwards, because the disk space is the usual reason for
       // doing this at all and a second trip to find it is a poor reward.
       action: SnackBarAction(
-        label: 'Empty trash',
+        label: l10n.prefsClearEmptyTrash,
         onPressed: () async {
           final trashed = await repository.watchTrashedBooks().first;
           for (final book in trashed) {
@@ -1834,11 +1812,9 @@ class _ClearLibraryTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return ListTile(
       leading: Icon(Icons.delete_forever, color: scheme.error),
-      title: Text('Remove every book from this device',
+      title: Text(L10n.of(context).prefsClearTitle,
           style: TextStyle(color: scheme.error)),
-      subtitle: const Text(
-        'Moves your whole library to the trash. The server keeps its copy.',
-      ),
+      subtitle: Text(L10n.of(context).prefsClearSubtitle),
       onTap: () => _run(context),
     );
   }
@@ -1864,31 +1840,25 @@ class _ConfirmClearDialogState extends State<_ConfirmClearDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     final ok = _typed.text.trim().toUpperCase() == _ClearLibraryTile._word;
     return AlertDialog(
-      title: Text('Remove all ${widget.count} books?'),
+      title: Text(l10n.prefsClearDialogTitle(widget.count)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Every book goes to the trash on this device, where it stays for '
-            '${TrashService.graceperiod.inDays} days. Nothing is deleted on '
-            'your server — if you sync again, your library comes back.',
-          ),
+          Text(l10n.prefsClearDialogBody(TrashService.graceperiod.inDays)),
           const SizedBox(height: 12),
-          const Text(
-            'Disk space is not freed until the trash is emptied, which you can '
-            'do from the Trash section above.',
-          ),
+          Text(l10n.prefsClearDialogDiskNote),
           const SizedBox(height: 16),
           TextField(
             controller: _typed,
             autofocus: true,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'Type ${_ClearLibraryTile._word} to confirm',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.prefsClearTypeToConfirm(_ClearLibraryTile._word),
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -1897,14 +1867,14 @@ class _ConfirmClearDialogState extends State<_ConfirmClearDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
           onPressed: ok ? () => Navigator.pop(context, true) : null,
-          child: const Text('Move all to trash'),
+          child: Text(l10n.prefsClearConfirm),
         ),
       ],
     );

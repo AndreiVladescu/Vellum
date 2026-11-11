@@ -16,6 +16,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../l10n/gen/app_localizations.dart';
+
 /// Where the chat endpoint is, given whatever the reader typed.
 ///
 /// People paste what their tool showed them: `http://localhost:11434`,
@@ -43,8 +45,14 @@ String trimPassage(String passage) => passage.length <= maxPassageCharacters
     : '${passage.substring(0, maxPassageCharacters)}…';
 
 class AiException implements Exception {
-  const AiException(this.message);
+  const AiException(this.message, {this.localized});
+
+  /// A plain-English sentence for logs and tests, or the far end's own words.
+  /// What the reader sees is [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
   @override
   String toString() => message;
 }
@@ -100,15 +108,21 @@ class AiClient {
         }),
       );
     } catch (e) {
-      throw AiException('Could not reach $baseUrl — $e');
+      throw AiException(
+        'Could not reach $baseUrl — $e',
+        localized: (l10n) => l10n.aiErrorUnreachable(baseUrl, '$e'),
+      );
     }
 
     if (response.statusCode != 200) {
-      throw AiException(_errorFrom(response));
+      throw _errorFrom(response);
     }
     final answer = _answerFrom(response.body);
     if (answer == null || answer.trim().isEmpty) {
-      throw const AiException('The model answered with nothing.');
+      throw AiException(
+        'The model answered with nothing.',
+        localized: (l10n) => l10n.aiErrorEmpty,
+      );
     }
     return answer.trim();
   }
@@ -118,23 +132,33 @@ class AiClient {
   /// The far end's own words where it gives any — `{"error":{"message":…}}` is
   /// what every one of these servers returns, and it usually says exactly what
   /// is wrong ("model not found", "invalid api key").
-  static String _errorFrom(http.Response response) {
+  static AiException _errorFrom(http.Response response) {
     try {
       final body = jsonDecode(response.body);
       if (body is Map) {
         final error = body['error'];
         final message = error is Map ? error['message'] : error;
         if (message is String && message.trim().isNotEmpty) {
-          return message.trim();
+          return AiException(message.trim());
         }
       }
     } catch (_) {
       // Not JSON — fall through to the status line.
     }
-    return switch (response.statusCode) {
-      401 || 403 => 'The server refused the key.',
-      404 => 'No model endpoint at that address.',
-      _ => 'The server answered ${response.statusCode}.',
+    final status = response.statusCode;
+    return switch (status) {
+      401 || 403 => AiException(
+          'The server refused the key.',
+          localized: (l10n) => l10n.aiErrorRefusedKey,
+        ),
+      404 => AiException(
+          'No model endpoint at that address.',
+          localized: (l10n) => l10n.aiErrorNoEndpoint,
+        ),
+      _ => AiException(
+          'The server answered $status.',
+          localized: (l10n) => l10n.aiErrorStatus(status),
+        ),
     };
   }
 

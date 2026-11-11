@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../local_engine_backend.dart';
 import 'on_device_backend.dart';
 import '../translation_backend.dart';
+import '../../../l10n/gen/app_localizations.dart';
+import '../../../l10n/labels.dart';
 
 /// The languages kept on this device, and the switch for each.
 ///
@@ -54,6 +56,7 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
   Future<void> _toggle(TranslationLanguage language, bool install) async {
     setState(() => _working = language);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     try {
       if (install) {
         await _packs.install(language, wifiOnly: _wifiOnly);
@@ -63,7 +66,7 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
       if (!mounted) return;
       setState(() => _installed = {..._installed, language: install});
     } on TranslationException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+      messenger.showSnackBar(SnackBar(content: Text(e.messageOf(l10n))));
     } finally {
       if (mounted) setState(() => _working = null);
     }
@@ -77,6 +80,7 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
     if (!OnDeviceBackend.available) return const _LocalEngineHelp();
 
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final here = _installed.values.where((v) => v).length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -84,12 +88,10 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Languages', style: theme.textTheme.titleMedium),
+          Text(l10n.translateLanguages, style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
-            'Downloaded languages translate on this device — no server, and '
-            'nothing leaves the machine. About 30 MB each, kept until you '
-            'remove them.',
+            l10n.translatePacksBody,
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -97,7 +99,7 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             dense: true,
-            title: const Text('Download over Wi-Fi only'),
+            title: Text(l10n.translatePacksWifiOnly),
             value: _wifiOnly,
             onChanged: (v) => setState(() => _wifiOnly = v),
           ),
@@ -115,8 +117,10 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
                   for (final entry in _installed.entries)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(entry.key.name),
-                      subtitle: Text(entry.value ? 'On this device' : 'Not downloaded'),
+                      title: Text(entry.key.nameOf(l10n)),
+                      subtitle: Text(entry.value
+                          ? l10n.translatePackOnDevice
+                          : l10n.translatePackNotDownloaded),
                       trailing: _working == entry.key
                           ? const SizedBox(
                               height: 20,
@@ -125,8 +129,10 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
                             )
                           : IconButton(
                               tooltip: entry.value
-                                  ? 'Remove ${entry.key.name}'
-                                  : 'Download ${entry.key.name}',
+                                  ? l10n.translatePackRemoveTooltip(
+                                      entry.key.nameOf(l10n))
+                                  : l10n.translatePackDownloadTooltip(
+                                      entry.key.nameOf(l10n)),
                               icon: Icon(entry.value
                                   ? Icons.delete_outline
                                   : Icons.download_outlined),
@@ -141,9 +147,8 @@ class _LanguagePacksSheetState extends State<LanguagePacksSheet> {
           const SizedBox(height: 8),
           Text(
             here == 0
-                ? 'Nothing downloaded yet — a translation needs the language it '
-                    'is coming *from* and the one it is going *to*.'
-                : '$here language${here == 1 ? '' : 's'} on this device.',
+                ? l10n.translatePacksNone
+                : l10n.translatePacksCount(here),
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -196,17 +201,17 @@ class _LocalEngineHelpState extends State<_LocalEngineHelp> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Languages', style: theme.textTheme.titleMedium),
+          Text(l10n.translateLanguages, style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
-            'Translation happens on this machine. Nothing is sent anywhere, so '
-            'it needs a translator installed here.',
+            l10n.translateLocalBody,
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -228,8 +233,8 @@ class _LocalEngineHelpState extends State<_LocalEngineHelp> {
                 title: Text(backend.engine.label),
                 subtitle: Text(
                   (_pairs[backend.engine] ?? const []).isEmpty
-                      ? 'Installed, but with no language pairs yet'
-                      : 'Installed — translations run here',
+                      ? l10n.translateInstalledNoPairs
+                      : l10n.translateInstalledRuns,
                 ),
               ),
               if ((_pairs[backend.engine] ?? const []).isEmpty)
@@ -262,8 +267,7 @@ class _LocalEngineHelpState extends State<_LocalEngineHelp> {
           ]
           else ...[
             Text(
-              'Nothing found. Either of these works, and both keep the passage '
-              'on this machine:',
+              l10n.translateNothingFound,
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
@@ -271,9 +275,7 @@ class _LocalEngineHelpState extends State<_LocalEngineHelp> {
               _InstallCard(engine: engine),
             const SizedBox(height: 4),
             Text(
-              'Argos is the neural one — the same engine LibreTranslate runs, '
-              'without the server around it. Apertium is older and rule-based, '
-              'but it is one apt away.',
+              l10n.translateArgosNote,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -284,12 +286,12 @@ class _LocalEngineHelpState extends State<_LocalEngineHelp> {
               TextButton.icon(
                 onPressed: _looking ? null : _look,
                 icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Look again'),
+                label: Text(l10n.translateLookAgain),
               ),
               const Spacer(),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Done'),
+                child: Text(l10n.translateDone),
               ),
             ],
           ),
@@ -331,11 +333,11 @@ class _InstallCard extends StatelessWidget {
                       ClipboardData(text: engine.installHint));
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Command copied')),
+                    SnackBar(content: Text(L10n.of(context).translateCommandCopied)),
                   );
                 },
                 icon: const Icon(Icons.copy, size: 16),
-                label: const Text('Copy'),
+                label: Text(L10n.of(context).readerCopy),
               ),
             ),
           ],

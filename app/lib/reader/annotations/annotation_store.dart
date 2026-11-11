@@ -17,13 +17,6 @@ enum AnnotationKind {
 
   static AnnotationKind? parse(String raw) =>
       AnnotationKind.values.where((k) => k.name == raw).firstOrNull;
-
-  String get label => switch (this) {
-        AnnotationKind.bookmark => 'Bookmark',
-        AnnotationKind.highlight => 'Highlight',
-        AnnotationKind.note => 'Note',
-        AnnotationKind.ink => 'Writing',
-      };
 }
 
 /// Bookmarks, highlights and notes (plan 5 #22).

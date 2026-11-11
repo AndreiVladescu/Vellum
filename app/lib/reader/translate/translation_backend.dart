@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../l10n/gen/app_localizations.dart';
+
 /// A language a passage can be translated from or to.
 ///
 /// `auto` is only ever a *source*: it means "work it out", and the answer comes
@@ -86,11 +88,23 @@ class Translation {
 /// a person, and "LibreTranslate does not have German→Romanian" is more use
 /// than 400.
 class TranslationException implements Exception {
-  const TranslationException(this.message);
+  const TranslationException(this.message, {this.localized});
+
+  /// A plain-English sentence for logs and tests, or the server's own words.
+  /// What the reader sees is [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
 
   @override
   String toString() => message;
+}
+
+/// A backend whose [TranslationBackend.name] is a phrase, so it can also say it
+/// in the reader's language. A brand name ("LibreTranslate") needs none.
+abstract interface class LocalizedBackendName {
+  String displayName(L10n l10n);
 }
 
 /// Where translations come from.
@@ -168,7 +182,10 @@ class LibreTranslateBackend implements TranslationBackend {
     required TranslationLanguage to,
   }) async {
     if (text.trim().isEmpty) {
-      throw const TranslationException('There is nothing selected to translate.');
+      throw TranslationException(
+        'There is nothing selected to translate.',
+        localized: (l10n) => l10n.translateErrorNothingSelected,
+      );
     }
     final http.Response res;
     try {
@@ -184,17 +201,21 @@ class LibreTranslateBackend implements TranslationBackend {
         }),
       );
     } catch (e) {
-      throw TranslationException('Could not reach $baseUrl — $e');
+      throw TranslationException(
+        'Could not reach $baseUrl — $e',
+        localized: (l10n) => l10n.translateErrorUnreachable(baseUrl, '$e'),
+      );
     }
 
     if (res.statusCode != 200) {
-      throw TranslationException(_errorFrom(res));
+      throw _errorFrom(res);
     }
 
     final body = jsonDecode(res.body);
     if (body is! Map<String, dynamic> || body['translatedText'] is! String) {
-      throw const TranslationException(
+      throw TranslationException(
         'That server answered something this app does not understand.',
+        localized: (l10n) => l10n.translateErrorUnexpected,
       );
     }
     return Translation(
@@ -211,15 +232,19 @@ class LibreTranslateBackend implements TranslationBackend {
 
   /// The server's own words where it gave any, since they name the actual
   /// problem ("es is not supported").
-  static String _errorFrom(http.Response res) {
+  static TranslationException _errorFrom(http.Response res) {
     try {
       final body = jsonDecode(res.body);
       if (body is Map<String, dynamic> && body['error'] is String) {
-        return body['error'] as String;
+        return TranslationException(body['error'] as String);
       }
     } catch (_) {
       // Not JSON. Fall through to the status code.
     }
-    return 'The translation server answered ${res.statusCode}.';
+    final status = res.statusCode;
+    return TranslationException(
+      'The translation server answered $status.',
+      localized: (l10n) => l10n.translateErrorServerStatus(status),
+    );
   }
 }

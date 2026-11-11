@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/gen/app_localizations.dart';
+import '../../l10n/labels.dart';
+
 /// The highlighter colours, and how to draw with them.
 ///
 /// **Four, not a colour wheel.** A highlighter is a physical object with a
@@ -12,14 +15,12 @@ import 'package:flutter/material.dart';
 /// they are stored and drawn at low alpha over the text rather than as opaque
 /// fills — a marker stains the page, it doesn't cover the words.
 enum HighlightColor {
-  yellow('Yellow', 0xFFF6D75B),
-  green('Green', 0xFF8FD48A),
-  blue('Blue', 0xFF86BEF0),
-  pink('Pink', 0xFFEF9BC0);
+  yellow(0xFFF6D75B),
+  green(0xFF8FD48A),
+  blue(0xFF86BEF0),
+  pink(0xFFEF9BC0);
 
-  const HighlightColor(this.label, this.argb);
-
-  final String label;
+  const HighlightColor(this.argb);
 
   /// The stored value: a full-opacity ARGB int, so the database keeps the
   /// *identity* of the colour and every surface decides its own opacity.
@@ -64,6 +65,7 @@ Future<void> showHighlightColorSheet(
   required HighlightColor selected,
   required ValueChanged<HighlightColor> onChanged,
 }) async {
+  final l10n = L10n.of(context);
   final choice = await showModalBottomSheet<HighlightColor>(
     context: context,
     showDragHandle: true,
@@ -74,7 +76,7 @@ Future<void> showHighlightColorSheet(
           for (final option in HighlightColor.values)
             ListTile(
               leading: _Swatch(choice: option, size: 22),
-              title: Text(option.label),
+              title: Text(option.labelOf(l10n)),
               trailing: option == selected ? const Icon(Icons.check) : null,
               onTap: () => Navigator.pop(sheetContext, option),
             ),
@@ -97,8 +99,9 @@ class HighlightColorButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return PopupMenuButton<HighlightColor>(
-      tooltip: 'Highlighter colour — ${selected.label}',
+      tooltip: l10n.readerActHighlighterColour(selected.labelOf(l10n)),
       onSelected: onChanged,
       // A row of swatches rather than a list of names: the thing being chosen
       // is a colour, so the colour is the label.
@@ -110,7 +113,7 @@ class HighlightColorButton extends StatelessWidget {
               children: [
                 _Swatch(choice: choice, size: 22),
                 const SizedBox(width: 12),
-                Text(choice.label),
+                Text(choice.labelOf(l10n)),
                 if (choice == selected) ...[
                   const Spacer(),
                   const Icon(Icons.check, size: 18),
@@ -120,7 +123,7 @@ class HighlightColorButton extends StatelessWidget {
           ),
       ],
       child: Tooltip(
-        message: 'Highlighter colour — ${selected.label}',
+        message: l10n.readerActHighlighterColour(selected.labelOf(l10n)),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: _Swatch(choice: selected, size: 20),
@@ -139,7 +142,8 @@ class _Swatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '${choice.label} highlighter',
+      label: L10n.of(context)
+          .readerHighlighterSwatch(choice.labelOf(L10n.of(context))),
       child: Container(
         width: size,
         height: size,

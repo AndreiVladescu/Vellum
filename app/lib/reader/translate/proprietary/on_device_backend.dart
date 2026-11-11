@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:google_mlkit_language_id/google_mlkit_language_id.dart';
 import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 
+import '../../../l10n/gen/app_localizations.dart';
+import '../../../l10n/labels.dart';
 import '../translation_backend.dart';
 
 /// Translation that happens on the device, with no server anywhere.
@@ -16,7 +18,8 @@ import '../translation_backend.dart';
 /// build of it. [available] is how everything above this decides whether to
 /// offer it, and the desktop keeps the optional LibreTranslate address until
 /// the engine described in docs/NEXT_FEATURES.md #12 exists.
-class OnDeviceBackend implements TranslationBackend {
+class OnDeviceBackend
+    implements TranslationBackend, LocalizedBackendName {
   OnDeviceBackend({LanguagePacks? packs}) : packs = packs ?? LanguagePacks();
 
   final LanguagePacks packs;
@@ -28,17 +31,24 @@ class OnDeviceBackend implements TranslationBackend {
   String get name => 'this device';
 
   @override
+  String displayName(L10n l10n) => l10n.translateDeviceName;
+
+  @override
   Future<Translation> translate(
     String text, {
     required TranslationLanguage from,
     required TranslationLanguage to,
   }) async {
     if (text.trim().isEmpty) {
-      throw const TranslationException('There is nothing selected to translate.');
+      throw TranslationException(
+        'There is nothing selected to translate.',
+        localized: (l10n) => l10n.translateErrorNothingSelected,
+      );
     }
     if (!available) {
-      throw const TranslationException(
+      throw TranslationException(
         'On-device translation is only available on a phone or tablet.',
+        localized: (l10n) => l10n.translateErrorOnlyPhone,
       );
     }
 
@@ -49,8 +59,9 @@ class OnDeviceBackend implements TranslationBackend {
     if (from == TranslationLanguage.auto) {
       detected = await identify(text);
       if (detected == null) {
-        throw const TranslationException(
+        throw TranslationException(
           'Could not tell what language that is — pick one under From.',
+          localized: (l10n) => l10n.translateErrorUndetected,
         );
       }
       source = detected;
@@ -64,9 +75,12 @@ class OnDeviceBackend implements TranslationBackend {
     final sourceModel = _model(source);
     final targetModel = _model(to);
     if (sourceModel == null || targetModel == null) {
+      final unsupported = sourceModel == null ? source : to;
       throw TranslationException(
-        '${sourceModel == null ? source.name : to.name} is not one of the '
+        '${unsupported.name} is not one of the '
         'languages this device can translate.',
+        localized: (l10n) =>
+            l10n.translateErrorUnsupported(unsupported.nameOf(l10n)),
       );
     }
 
@@ -78,6 +92,10 @@ class OnDeviceBackend implements TranslationBackend {
       throw TranslationException(
         'Download ${missing.map((l) => l.name).join(' and ')} under Languages '
         'to translate this without a server.',
+        localized: (l10n) => missing.length == 1
+            ? l10n.translateErrorDownloadOne(missing.first.nameOf(l10n))
+            : l10n.translateErrorDownloadTwo(
+                missing.first.nameOf(l10n), missing.last.nameOf(l10n)),
       );
     }
 
@@ -88,7 +106,10 @@ class OnDeviceBackend implements TranslationBackend {
     try {
       return Translation(text: await translator.translateText(text), detected: detected);
     } catch (e) {
-      throw TranslationException('That could not be translated here — $e');
+      throw TranslationException(
+        'That could not be translated here — $e',
+        localized: (l10n) => l10n.translateErrorOnDevice('$e'),
+      );
     } finally {
       await translator.close();
     }
@@ -154,6 +175,9 @@ class LanguagePacks {
             ? 'Could not download ${language.name}. On mobile data, turn off '
                 'Wi-Fi only and try again.'
             : 'Could not download ${language.name}.',
+        localized: (l10n) => wifiOnly
+            ? l10n.translateErrorPackWifi(language.nameOf(l10n))
+            : l10n.translateErrorPack(language.nameOf(l10n)),
       );
     }
   }
@@ -161,7 +185,10 @@ class LanguagePacks {
   Future<void> remove(TranslationLanguage language) async {
     final ok = await _manager.deleteModel(language.code);
     if (!ok) {
-      throw TranslationException('Could not remove ${language.name}.');
+      throw TranslationException(
+        'Could not remove ${language.name}.',
+        localized: (l10n) => l10n.translateErrorPackRemove(language.nameOf(l10n)),
+      );
     }
   }
 

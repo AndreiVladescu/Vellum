@@ -7,10 +7,11 @@
 // than a coarser answer.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/page_metric.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 
 void main() {
   String label(PageMetric m, {int page = 128, int count = 340, double? pace}) =>
-      pageMetricLabel(m, page: page, count: count, pagesPerMinute: pace);
+      pageMetricLabel(L10nEn(), m, page: page, count: count, pagesPerMinute: pace);
 
   group('each metric says its own thing', () {
     test('page and total', () {
@@ -105,14 +106,14 @@ void _readingModeStatus() {
   group('the reading-mode line', () {
     test('says where you are, how far through, and how much is left', () {
       expect(
-        readingModeStatus(page: 128, count: 340, pagesPerMinute: 4),
+        readingModeStatus(L10nEn(), page: 128, count: 340, pagesPerMinute: 4),
         'page 128 of 340  ·  38%  ·  53 min left',
       );
     });
 
     test('is shorter rather than invented when no pace is known', () {
       expect(
-        readingModeStatus(page: 128, count: 340),
+        readingModeStatus(L10nEn(), page: 128, count: 340),
         'page 128 of 340  ·  38%',
         reason: 'the same honesty the counter keeps',
       );
@@ -120,13 +121,13 @@ void _readingModeStatus() {
 
     test('counts in the unit the book turns in', () {
       expect(
-        readingModeStatus(page: 3, count: 12, unit: 'chapter'),
+        readingModeStatus(L10nEn(), page: 3, count: 12, unit: 'chapter'),
         'chapter 3 of 12  ·  25%',
       );
     });
 
     test('a document with no length still says where you are', () {
-      expect(readingModeStatus(page: 7, count: 0), 'page 7');
+      expect(readingModeStatus(L10nEn(), page: 7, count: 0), 'page 7');
     });
   });
 }

@@ -12,6 +12,7 @@ import 'package:vellum/server/connection_store.dart';
 import 'package:vellum/server/sync_service.dart';
 import 'package:vellum/settings/app_settings.dart';
 import 'package:vellum/settings/preferences_page.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
   late Directory dir;
@@ -52,6 +53,8 @@ void main() {
     });
     await tester.pumpWidget(
       MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
         home: PreferencesPage(
           repository: repo,
           settings: settings,

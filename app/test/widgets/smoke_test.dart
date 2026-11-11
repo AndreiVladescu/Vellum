@@ -138,6 +138,8 @@ void main() {
     };
 
     Widget shelf(List<Book> shown) => MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
           home: Scaffold(
             body: ShelfView(books: shown, detailBuilder: (_) => const SizedBox()),
           ),
@@ -205,6 +207,8 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: PreferencesPage(
         settings: settings,
         repository: repo,
@@ -246,6 +250,8 @@ void main() {
     expect(connection.isConnected, true);
 
     await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: ServerPage(
         connection: connection,
         repository: repo,
