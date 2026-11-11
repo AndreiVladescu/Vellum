@@ -76,10 +76,10 @@ that gets posted.**
 
 ### v1.3.0 — your reading state follows you
 
-- [ ] **L** Reading status, rating and dates sync between devices. They are
-      judgements about a book, so on a shared library they must be per-person:
-      their own table keyed by the account, the way `book_note` is, never
-      columns on the shared book row
+- [x] **L** Your rating syncs between devices, per person, on the same
+      `book_status` row the status already used (it has its own clock, so a
+      stale device can neither clear a rating nor un-finish a book). Opening a
+      book on a device that missed a "finished" no longer overwrites it
 
 ### v1.3.1 — goals and per-book numbers
 
