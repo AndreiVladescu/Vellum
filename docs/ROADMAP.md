@@ -21,7 +21,11 @@ when its commit lands.
 **A finished release gets a tag.** When every box under a version is ticked and
 CI is green, a commit titled `Updated for vX.Y.Z` bumps `app/pubspec.yaml`,
 `server/Cargo.toml` and `CHANGELOG.md`, and that commit is tagged `vX.Y.Z`.
-Pushing the tag is what builds the release, and is done by hand.
+Pushing the tag is what builds the release.
+
+**Tagged so far:** `v1.2.1` (2026-11-11) — everything ticked under v1.1.12,
+v1.2.0, v1.2.1 and v1.3.0, plus the first slice of v1.2.2 and the dependency
+updates from v1.2.3. The work landed interleaved, so it shipped as one tag.
 
 ---
 
@@ -70,7 +74,7 @@ that gets posted.**
 
 ### v1.2.3 — a server you can pull
 
-- [ ] **M** Server dependencies updated for the open advisories (`cargo audit`
+- [x] **M** Server dependencies updated for the open advisories (`cargo audit`
       and osv-scanner green again)
 - [ ] **M** Publish the server image on every tag: Docker Hub and GHCR,
       `linux/amd64` and `linux/arm64` (a Raspberry Pi is a real target), tagged

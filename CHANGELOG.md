@@ -6,6 +6,72 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.2.1 — 2026-11-11
+
+The reader opens a book the first time you ask, a new install has something on
+the shelf, and your ratings follow you between devices.
+
+### Fixed
+
+- **A PDF opens on the first try.** The first book opened after starting the
+  app could sit on "Opening…" until you went back and tried again. The viewer
+  was being handed a new document reference on every rebuild while the PDF
+  engine was still starting up; it now keeps one, and the engine starts with
+  the app.
+- **A highlight or note is still there when you reopen the book.** A page's
+  text was being read before the page had loaded, which came back empty and
+  was remembered for the rest of the session.
+- **Ctrl+F puts the caret in the search box**, even after you have clicked on
+  the page, and pressing it again selects the old query.
+- **The search box is readable in every reader theme.** Its text, hint and
+  caret take the page's own foreground colour instead of the app theme's.
+- **Arrow keys work while typing a search.** The reader was taking them for
+  page turns.
+- **"Ask a model about this page" works straight after opening a book**
+  instead of reporting that the page may be a scan.
+- **A book nudged out of an overlap stays on its shelf**: it tries the other
+  side before sliding past the shelf's end.
+- A page going soft after *Note on selection* has two mitigations in — the
+  pages no longer repaint for animations outside them, and saving a note
+  repaints less — but the cause is not confirmed. Reports welcome.
+
+### Added
+
+- **Sample books.** *Try it with a few sample books* on the first-run sheet
+  and the empty shelf adds four public-domain books from Standard Ebooks to a
+  "Samples" shelf. They stay on this device, never reach a server, and are
+  removed from Preferences in one tap.
+- **Search as you type in PDFs**, with Enter for the next match and
+  Shift+Enter for the previous one.
+- **Copy diagnostics** in Preferences: versions, platform, counts and the last
+  few errors on the clipboard for a bug report — no titles, authors, file
+  names, server address or account details. Errors are kept in memory only.
+- **Translatable text, part one.** The shelf, first-run, add-book and book
+  pages read their strings from one file; `docs/TRANSLATING.md` says how to
+  add a language. The readers and Preferences follow.
+
+### Sync
+
+- **Your rating syncs**, per person, alongside your reading status. It has its
+  own clock, so a device that missed a "finished" can neither clear a rating
+  nor un-finish the book. Needs server migration 0038; an older server simply
+  keeps receiving statuses without ratings.
+- **Opening a book no longer overwrites "finished" from another device.** The
+  automatic "reading" is recorded as a guess, and a guess never replaces a
+  status you chose.
+- A reading history brought in by an import is now uploaded.
+
+### Security
+
+- Server: `zip` 9, and patch releases of rustls, rustls-webpki, webpki-roots,
+  tokio, quinn-proto, rustix and ctutils, for sixteen advisories. The server
+  never extracts archives, so the `zip` ones were not reachable.
+- RUSTSEC-2026-0459 (bundled SQLite) is knowingly ignored until a `sqlx`
+  release accepts the fixed `libsqlite3-sys`; the server only ever opens its
+  own database.
+
+---
+
 ## v1.1.11 — 2026-10-08
 
 A speed release: a big library opens, scrolls and syncs much faster, and the
