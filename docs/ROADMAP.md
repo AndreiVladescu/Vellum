@@ -76,10 +76,10 @@ that gets posted.**
 
 - [x] **M** Server dependencies updated for the open advisories (`cargo audit`
       and osv-scanner green again)
-- [ ] **M** Publish the server image on every tag: Docker Hub and GHCR,
+- [x] **M** Publish the server image on every tag: Docker Hub and GHCR,
       `linux/amd64` and `linux/arm64` (a Raspberry Pi is a real target), tagged
       `X.Y.Z`, `X.Y` and `latest`, with OCI labels, provenance and an SBOM
-- [ ] **S** `docker-compose.yml` and `docs/DEPLOYMENT.md` pull the published
+- [x] **S** `docker-compose.yml` and `docs/DEPLOYMENT.md` pull the published
       image instead of building; the Docker Hub page shows the deployment guide
 - [ ] **by hand** A Docker Hub account, the `vellum-server` repository and an
       access token, stored as the `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`
