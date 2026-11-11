@@ -55,7 +55,7 @@ copies so lending history is preserved (active loan = `returned_at IS NULL`).
 
 ## Commands
 
-Flutter SDK is at `~/development/flutter` (on PATH in new shells).
+Flutter SDK is at `~/Documents/tools/flutter` (add its `bin/` to PATH).
 
 ### App (`app/`)
 

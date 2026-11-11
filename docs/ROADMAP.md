@@ -1,0 +1,160 @@
+# Roadmap
+
+What is planned, release by release, written 2026-11-11 ahead of the public
+(Reddit) release. Architecture lives in [`DESIGN.md`](../DESIGN.md); known
+issues and device checks live in [`BACKLOG.md`](BACKLOG.md).
+
+**Releases are small on purpose.** A minor version (`1.3`) is a theme; each
+patch under it (`1.3.1`, `1.3.2`) is one or two things that can be finished,
+reviewed and shipped on their own. A bug found after a release takes the next
+free patch number and pushes the rest down by one.
+
+Each task carries a size, which is also who writes it:
+
+- **S** — elementary, mechanical, cause already known (Haiku)
+- **M** — a contained feature in code that already has a pattern for it (Sonnet)
+- **L** — new architecture, schema on both sides, or a layout engine (Opus)
+
+Every task is reviewed before it is committed, one commit per task. Tick a box
+when its commit lands.
+
+---
+
+## 1.1 — fixes
+
+### v1.1.12 — the reader works the first time
+
+Fixes from `problems_09_nov.txt`. Nothing else ships in this one.
+
+- [ ] **M** A PDF opens on the first try (pdfrx document reference is created
+      once; pdfrx is warmed up at app start)
+- [ ] **M** A highlight or note is still drawn after reopening the book (page
+      text is not read before the page is loaded)
+- [ ] **M** The page no longer goes blurry after *Note on selection*
+- [ ] **M** Ctrl+F puts the caret in the search field, and searches as you type
+- [ ] **S** The search field's text is readable in every reader theme
+
+---
+
+## 1.2 — ready to show people
+
+Everything here is about a stranger's first ten minutes. **v1.2.3 is the one
+that gets posted.**
+
+### v1.2.0 — a shelf that is not empty
+
+- [ ] **M** Sample library on first run: a "try it with a few books" action
+      that adds a handful of bundled public-domain books
+- [ ] **M** *Copy diagnostics* in Preferences: version, platform, schema version
+      and recent errors on the clipboard, with nothing personal in it
+
+### v1.2.1 — physical view polish
+
+- [x] **S** Shelf settle bounds: a book pushed sideways out of an overlap stops
+      at the shelf's end instead of floating past it
+- [ ] **S** The physical view honours the spine-artwork preference, like the
+      digital shelf
+- [x] **S** `BACKLOG.md` clean-up: move what is already fixed to *Resolved*
+
+### v1.2.2 — translatable
+
+- [ ] **M** Strings out of the widgets and into `app_en.arb`
+- [ ] **S** A short `docs/TRANSLATING.md` for contributors
+
+### v1.2.3 — the public release
+
+- [ ] **by hand** The device checks still owed in `BACKLOG.md`
+- [ ] **by hand** Screenshots and a 20-second clip: shelf, reader, physical
+      room, phone
+- [ ] **S** README and store listing updated around them
+
+---
+
+## 1.3 — statistics
+
+### v1.3.0 — your reading state follows you
+
+- [ ] **L** Reading status, rating and dates sync between devices. They are
+      judgements about a book, so on a shared library they must be per-person:
+      their own table keyed by the account, the way `book_note` is, never
+      columns on the shared book row
+
+### v1.3.1 — goals and per-book numbers
+
+- [ ] **M** Reading goals: books a year and minutes a day, with progress on the
+      Insights page
+- [ ] **M** Per-book statistics on the book's page: time spent, sittings, pace,
+      estimated time left
+
+### v1.3.2 — month by month
+
+- [ ] **M** A review page per month (books finished, pages, minutes, best day,
+      longest sitting, compared with the month before), and a list to step back
+      through earlier months
+- [ ] **M** Insights you can explore: a range picker (30 days / year / all
+      time) and heat-map days you can tap
+
+### v1.3.3 — the year, and the library
+
+- [ ] **M** Year in review, with a picture you can save and share
+- [ ] **M** Library statistics: the collection by genre, year, format and
+      author; the unread pile; books added per month
+
+---
+
+## 1.4 — reader and interface
+
+### v1.4.0 — pages you can turn
+
+- [ ] **L** Paged EPUB mode, rather than a chapter you scroll
+
+### v1.4.1 — finding your way around
+
+- [ ] **M** Preferences split into sections, with a search box
+- [ ] **M** Shelf grouping headers: by author, series or genre
+
+### v1.4.2 — loans that remind you
+
+- [ ] **M** System notifications for loan due dates (the decision logic exists;
+      this is scheduling and permissions)
+
+### v1.4.3 — read aloud
+
+- [ ] **M** Text to speech in both readers
+
+---
+
+## 1.5 — audiobooks
+
+A new kind of book, so it starts with a design note rather than code.
+
+### v1.5.0 — an audiobook is a book
+
+- [ ] **L** Design note: which formats (`.m4b`, a folder of `.mp3`), which
+      player library on five platforms and whether the F-Droid flavour can ship
+      it, how position is stored (seconds, not pages) and how it reaches the
+      existing per-device reading-position channel
+- [ ] **L** Import and model: an audiobook is a `book_file` with a duration and
+      chapters; a book can have text and audio both
+- [ ] **L** A basic player: play, pause, skip, chapters, position remembered
+
+### v1.5.1 — a player you can live with
+
+- [ ] **L** Background playback and lock-screen controls
+- [ ] **M** Playback speed and a sleep timer
+
+### v1.5.2 — on the shelf
+
+- [ ] **M** An *Audiobooks* section on the shelf, and *Continue listening* next
+      to *Continue reading*
+
+### v1.5.3 — in the numbers
+
+- [ ] **M** Listening time in Insights, kept apart from reading time
+
+---
+
+## Not planned
+
+- Field-level merge for books (rejected; see `DESIGN.md`).
+- OCR for scanned PDFs.
