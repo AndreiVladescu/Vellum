@@ -344,7 +344,11 @@ cargo run
 Over a network — especially to a phone — you need HTTPS, and there are real
 decisions to make about certificates, backups and running it as a service.
 That is all in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**, including Docker
-and Docker Compose with automatic TLS.
+and Docker Compose with automatic TLS. With Docker, no clone or build is needed:
+
+```sh
+docker run -d -p 3000:3000 -v vellum-data:/var/lib/vellum ghcr.io/andreivladescu/vellum-server
+```
 
 ---
 

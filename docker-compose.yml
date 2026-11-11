@@ -16,6 +16,12 @@
 # Caddy obtains and renews a Let's Encrypt certificate for $DOMAIN by itself.
 # Use this if you have a public domain and no existing proxy.
 #
+# ── Building from source ───────────────────────────────────────────────────
+#
+# By default the published image is pulled. To build this checkout instead:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
 # ── Either way ─────────────────────────────────────────────────────────────
 #
 #   1. Copy server/.env.example to .env beside this file and edit it.
@@ -24,10 +30,14 @@
 
 services:
   vellum:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: vellum-server:latest
+    # The published image: GHCR rather than Docker Hub because it needs no
+    # account or secret to exist (it is tied to this repository and always
+    # published first), and it is not subject to Docker Hub's pull limits. Docker Hub
+    # carries the same tags if you prefer it. Pin a release with
+    # VELLUM_VERSION=1.2.3 in .env; upgrade with `docker compose pull`.
+    #
+    # To build from this checkout instead, see docker-compose.build.yml.
+    image: "ghcr.io/andreivladescu/vellum-server:${VELLUM_VERSION:-latest}"
     restart: unless-stopped
     environment:
       # The address people actually reach, because public share links embed it.

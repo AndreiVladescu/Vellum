@@ -1,0 +1,16 @@
+# Build the server image from this checkout instead of pulling the published one.
+# For developers and anyone running unreleased changes:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# A separate file rather than a `build:` beside `image:` in the main one, because
+# with both present compose may quietly pull instead of building (or the other
+# way round, depending on version) — "which image am I running?" should not
+# depend on that. The distinct tag also keeps a local build from replacing the
+# pulled `:latest` on the same machine.
+services:
+  vellum:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vellum-server:local

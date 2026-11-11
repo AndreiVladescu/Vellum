@@ -77,6 +77,141 @@ jobs:
           name: server-${{ matrix.target }}
           path: server/dist/*.tar.gz*
 
+  # The server as a container image, so running it is `docker pull` rather than
+  # clone-and-build. Pushed to GHCR (always available, authenticated by the
+  # workflow's own token) and to Docker Hub (where most people look first, but
+  # which needs an account and secrets the repository may not have yet).
+  #
+  # A rehearsal builds both platforms and pushes nothing, so the arm64 half of
+  # the Dockerfile stays exercised without tagging.
+  #
+  # Its own permissions: `packages: write` is the only thing that lets this job
+  # publish, and nothing else in the file should be able to.
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Secrets cannot be tested in an `if:`, but the env they are mapped to can.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      # Registry names must be lowercase and the owner may not be. Derived rather
+      # than hardcoded so a fork publishes to its own namespace.
+      - name: Work out where to push
+        id: where
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "ghcr=ghcr.io/${owner}/vellum-server" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Rehearsal (no tag): building linux/amd64 and linux/arm64, pushing nothing."
+          fi
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "dockerhub=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dockerhub=false" >> "$GITHUB_OUTPUT"
+            # A release must not fail because Docker Hub is not set up yet, but
+            # it must also not silently skip it: nobody reads a log of a job that
+            # succeeded, so the summary says it too.
+            echo "::notice::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are not set, so Docker Hub is skipped. Publishing to GHCR only."
+            echo 'Docker Hub was **skipped**: `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are not set. GHCR only.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # arm64 is built by cross-compiling (see the Dockerfile), so QEMU is only
+      # needed for the few `apt-get` commands in the arm64 runtime stage.
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Log in to GHCR
+        if: steps.where.outputs.push == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: steps.where.outputs.push == 'true' && steps.where.outputs.dockerhub == 'true'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+      # `latest=auto` gives `latest` to a plain vX.Y.Z tag and not to a
+      # prerelease (v1.2.3-rc1), which is what keeps `:latest` meaning "the
+      # newest real release". `X.Y` is likewise skipped for prereleases. The
+      # `rehearsal` tag only exists so a no-push build has a name.
+      - name: Tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ steps.where.outputs.ghcr }}
+            ${{ steps.where.outputs.dockerhub == 'true' && format('{0}/vellum-server', env.DOCKERHUB_USERNAME) || '' }}
+          flavor: latest=auto
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=rehearsal,enable=${{ github.ref_type != 'tag' }}
+          labels: |
+            org.opencontainers.image.title=Vellum server
+            org.opencontainers.image.description=Self-hosted sync server for the Vellum personal library manager
+            org.opencontainers.image.licenses=AGPL-3.0
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ steps.where.outputs.push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Attestations ride in the same image index as extra manifests. Both
+          # registries store them; Docker Hub's tag page lists them as an
+          # "unknown/unknown" platform, which is expected rather than a fault.
+          provenance: true
+          sbom: true
+          # Own scope: ci.yml's docker job caches a single-platform build under
+          # the default one, and the two would overwrite each other.
+          cache-from: type=gha,scope=release-image
+          cache-to: type=gha,scope=release-image,mode=max
+      - name: Summary
+        if: steps.where.outputs.push == 'true'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### Image published"
+            echo
+            echo "Digest: \`$DIGEST\`"
+            echo
+            echo '```'
+            echo "$TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # The Docker Hub page is a separate piece of state from the image, kept in
+      # the repository so it is reviewed like anything else. `continue-on-error`
+      # because the API wants a token with more than push rights: an
+      # under-scoped one should cost the page text, not the release.
+      #
+      # The checked-in page names the account with a placeholder, because the
+      # account is a secret-adjacent value that does not belong in the repo.
+      - name: Fill in the Docker Hub account name
+        if: steps.where.outputs.push == 'true' && steps.where.outputs.dockerhub == 'true'
+        run: sed -i "s|VELLUM_DOCKERHUB_NAMESPACE|${DOCKERHUB_USERNAME,,}|g" docs/DOCKERHUB.md
+      - name: Docker Hub description
+        if: steps.where.outputs.push == 'true' && steps.where.outputs.dockerhub == 'true'
+        continue-on-error: true
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+          repository: ${{ env.DOCKERHUB_USERNAME }}/vellum-server
+          short-description: Self-hosted sync server for the Vellum personal library manager
+          readme-filepath: docs/DOCKERHUB.md
+
   # The desktop app (plan 6 #2). Without these, every desktop user has to
   # install Flutter and a C++ toolchain before they can open a book — the
   # difference between a product and a source tree.

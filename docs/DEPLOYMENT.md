@@ -25,13 +25,33 @@ needs one of the TLS options.
 ## Docker
 
 ```sh
-docker build -t vellum-server .
 docker run -d --name vellum \
   -p 3000:3000 \
   -v vellum-data:/var/lib/vellum \
   -e VELLUM_PUBLIC_URL=http://localhost:3000 \
-  vellum-server
+  ghcr.io/andreivladescu/vellum-server
 ```
+
+The image is published for `linux/amd64` and `linux/arm64` (a Raspberry Pi 4/5
+pulls the right one by itself) on both registries, with the same tags:
+
+| Registry | Image |
+|---|---|
+| GitHub Container Registry | `ghcr.io/andreivladescu/vellum-server` |
+| Docker Hub | `<account>/vellum-server` |
+
+Tags are `X.Y.Z` (exactly that release), `X.Y` (the newest patch of it) and
+`latest` (the newest non-prerelease). Pin an exact version for anything you
+would be unhappy to see change under you — the server's migrations are
+forward-only, so an unattended jump to a newer release is not undoable:
+
+```sh
+docker pull ghcr.io/andreivladescu/vellum-server:1.2.3
+```
+
+To build the image yourself instead, `docker build -t vellum-server .` from the
+repository root (the Dockerfile cross-compiles, so building `arm64` on an
+`amd64` machine needs `--platform linux/arm64` but no emulated Rust build).
 
 The image runs as an unprivileged user (uid 10001) and keeps the database *and*
 the blobs under one volume, `/var/lib/vellum` — they must be backed up together,
@@ -48,7 +68,18 @@ silently lose that. `poppler-utils` is installed for exactly that reason.
 ### Docker Compose
 
 One `docker-compose.yml`, two shapes. Which you want depends on whether you
-already run a reverse proxy.
+already run a reverse proxy. It pulls the published image from GHCR — which
+needs no account and is not subject to Docker Hub's pull limits — so there is
+nothing to build. To pin a release, put `VELLUM_VERSION=1.2.3` in `.env`
+(unset means `latest`). To use the Docker Hub copy instead, change the
+`image:` line.
+
+To build from a checkout rather than pull — for unreleased changes — add the
+override file:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
 
 **Just the server, behind your own proxy** — nginx, HAProxy, Traefik, a Caddy
 you manage yourself:
@@ -112,7 +143,7 @@ docker run -d --name vellum \
   -e VELLUM_TLS=1 \
   -e VELLUM_TLS_SANS=192.168.1.50 \
   -e VELLUM_PUBLIC_URL=https://192.168.1.50:3000 \
-  vellum-server
+  ghcr.io/andreivladescu/vellum-server
 ```
 
 Put every address you'll connect from in `VELLUM_TLS_SANS`. The certificate is
@@ -455,7 +486,7 @@ easier route for a single-user library.
 Migrations run automatically at startup and are forward-only:
 
 ```sh
-docker compose pull && docker compose up -d   # compose
+docker compose pull && docker compose up -d   # compose (pulls the new image)
 sudo systemctl restart vellum-server          # systemd
 ```
 
@@ -470,6 +501,29 @@ Tagging `v*` builds server binaries for Linux (`x86_64`/`aarch64`, musl-static),
 Windows and macOS, plus the Android app bundle and per-ABI APKs, and attaches
 them to a GitHub Release with SHA-256 checksums
 (`.github/workflows/release.yml`).
+
+### Publishing
+
+The same tag also builds the server image for `linux/amd64` and `linux/arm64`
+and pushes it to GHCR and, when configured, Docker Hub (the `image` job). The
+arm64 half is cross-compiled rather than emulated. Running the workflow by hand
+(`workflow_dispatch`) builds both platforms and pushes nothing.
+
+One-time setup by the repository owner:
+
+1. Create a Docker Hub account (or use an existing one) and a repository named
+   `vellum-server` in it.
+2. Create a Docker Hub access token. Read/write scope is enough to push; the
+   repository description is only synced if the token may also delete (Docker
+   Hub's API requires it), and a token without that still publishes the image,
+   with a warning on that one step.
+3. Add repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
+   (*Settings → Secrets and variables → Actions*). Until both exist the job
+   still succeeds, pushes to GHCR only, and says so in the log and job summary.
+4. After the first push, make the GHCR package public (*your profile →
+   Packages → vellum-server → Package settings → Change visibility*). A package
+   created by a workflow starts private, so `docker pull` fails for everybody
+   else until this is done.
 
 The Linux desktop app is still built from source
 (`flutter build linux`, then `scripts/install-dev.sh`); Flatpak/AppImage/MSIX
