@@ -47,7 +47,7 @@ that gets posted.**
 
 - [x] **M** Sample library on first run: a "try it with a few books" action
       that adds a handful of bundled public-domain books
-- [ ] **M** *Copy diagnostics* in Preferences: version, platform, schema version
+- [x] **M** *Copy diagnostics* in Preferences: version, platform, schema version
       and recent errors on the clipboard, with nothing personal in it
 
 ### v1.2.1 — physical view polish
