@@ -3,7 +3,11 @@ import '../widgets/page_insets.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import 'duration_label.dart';
+import 'goals_dialog.dart';
+import 'reading_goals.dart';
 import 'stats_queries.dart';
+import '../settings/app_settings.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// Reading insights (plan 5 #19, plan 6 refresh).
@@ -19,9 +23,16 @@ import '../l10n/gen/app_localizations.dart';
 /// series competing for the same axis — so none of them needs a legend: the
 /// section title already says what is plotted.
 class InsightsPage extends StatefulWidget {
-  const InsightsPage({super.key, required this.repository});
+  const InsightsPage({
+    super.key,
+    required this.repository,
+    required this.settings,
+  });
 
   final LibraryRepository repository;
+
+  /// Where the reading goals live (per device, like other preferences).
+  final AppSettingsStore settings;
 
   @override
   State<InsightsPage> createState() => _InsightsPageState();
@@ -128,6 +139,12 @@ class _InsightsPageState extends State<InsightsPage> {
           return ListView(
             padding: pageInsets(context, const EdgeInsets.all(16)),
             children: [
+              _GoalsCard(
+                settings: widget.settings,
+                books: data.books,
+                minutesPerDay: ReadingStats.minutesPerDay(data.sessions),
+              ),
+              const SizedBox(height: 20),
               Text(l10n.insightsHabits, style: theme.textTheme.labelLarge),
               const SizedBox(height: 8),
               _StatRow(stats: [
@@ -163,7 +180,7 @@ class _InsightsPageState extends State<InsightsPage> {
                 ),
                 (
                   label: l10n.insightsTimeReading,
-                  value: _formatMinutes(l10n, data.totalMinutes),
+                  value: formatMinutes(l10n, data.totalMinutes),
                   sub: null,
                 ),
                 (
@@ -245,7 +262,7 @@ class _InsightsPageState extends State<InsightsPage> {
                           label: d.device == ReadingStats.unknownDevice
                               ? l10n.insightsUnknownDevice
                               : d.device,
-                          value: _formatMinutes(l10n, d.minutes),
+                          value: formatMinutes(l10n, d.minutes),
                           fraction: d.minutes / data.deviceSeries.first.minutes,
                           color: theme.colorScheme.primary,
                         ),
@@ -328,17 +345,6 @@ String _compact(int value) {
     out.write(s[i]);
   }
   return out.toString();
-}
-
-/// "3h 20m" — minutes alone stop being readable well before a lifetime total
-/// does.
-String _formatMinutes(L10n l10n, int minutes) {
-  if (minutes < 60) return l10n.insightsMinutesShort(minutes);
-  final hours = minutes ~/ 60;
-  final rest = minutes % 60;
-  return rest == 0
-      ? l10n.insightsHoursShort(hours)
-      : l10n.insightsHoursMinutesShort(hours, rest);
 }
 
 String _formatLabel(String format) => switch (format.toLowerCase()) {
@@ -751,4 +757,158 @@ class _HourBarsPainter extends CustomPainter {
   @override
   bool shouldRepaint(_HourBarsPainter old) =>
       old.minutesByHour != minutesByHour || old.color != color;
+}
+
+/// The reading goals (v1.3.1): both optional, off until the reader sets one.
+///
+/// Listens to the settings store so a change made in the dialog redraws the
+/// card at once. The wording is neutral on purpose: "behind" is a fact about
+/// the calendar, not a reprimand, and a goal that is off says nothing at all.
+class _GoalsCard extends StatelessWidget {
+  const _GoalsCard({
+    required this.settings,
+    required this.books,
+    required this.minutesPerDay,
+  });
+
+  final AppSettingsStore settings;
+  final List<Book> books;
+  final Map<DateTime, int> minutesPerDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    final theme = Theme.of(context);
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        final bookGoal = settings.readingGoalBooks;
+        final minuteGoal = settings.readingGoalMinutes;
+        final now = DateTime.now();
+        return Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.insightsGoalsTitle,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: l10n.insightsGoalsEditTooltip,
+                      onPressed: () => showGoalsDialog(context, settings),
+                    ),
+                  ],
+                ),
+                if (bookGoal == null && minuteGoal == null) ...[
+                  Text(l10n.insightsGoalsEmpty),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => showGoalsDialog(context, settings),
+                    child: Text(l10n.insightsGoalsSetAction),
+                  ),
+                ],
+                if (bookGoal != null)
+                  _yearGoal(context, l10n, bookGoal, now),
+                if (bookGoal != null && minuteGoal != null)
+                  const SizedBox(height: 16),
+                if (minuteGoal != null)
+                  _dayGoal(context, l10n, minuteGoal, now),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _yearGoal(BuildContext context, L10n l10n, int target, DateTime now) {
+    final finished = ReadingGoals.finishedInYear(books, now.year);
+    final pace = ReadingGoals.yearPace(
+        finished: finished, target: target, today: now);
+    final progress = l10n.insightsGoalBooksProgress(finished, target);
+    final status = pace.reached
+        ? l10n.insightsGoalBooksReached
+        : pace.difference == 0
+            ? l10n.insightsGoalBooksOnPace
+            : pace.difference > 0
+                ? l10n.insightsGoalBooksAhead(pace.difference)
+                : l10n.insightsGoalBooksBehind(-pace.difference);
+    return _GoalRow(
+      title: l10n.insightsGoalBooksTitle('${now.year}'), // i18n-ignore
+      progressText: progress,
+      fraction: finished / target,
+      status: status,
+    );
+  }
+
+  Widget _dayGoal(BuildContext context, L10n l10n, int target, DateTime now) {
+    final today = ReadingGoals.minutesToday(minutesPerDay, now);
+    final met = ReadingGoals.daysMet(minutesPerDay, target: target, today: now);
+    return _GoalRow(
+      title: l10n.insightsGoalMinutesTitle,
+      progressText: l10n.insightsGoalMinutesProgress(
+        formatMinutes(l10n, today),
+        formatMinutes(l10n, target),
+      ),
+      fraction: today / target,
+      status: l10n.insightsGoalMinutesDays(met),
+    );
+  }
+}
+
+/// One goal: a title, a drawn bar with a spoken label, and a line of status.
+class _GoalRow extends StatelessWidget {
+  const _GoalRow({
+    required this.title,
+    required this.progressText,
+    required this.fraction,
+    required this.status,
+  });
+
+  final String title;
+  final String progressText;
+  final double fraction;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Text(progressText, style: theme.textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        // A bar alone says nothing to a screen reader, so it carries the same
+        // sentence the text above shows.
+        Semantics(
+          label: progressText,
+          child: ExcludeSemantics(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: fraction.clamp(0.0, 1.0),
+                minHeight: 8,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          status,
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.outline),
+        ),
+      ],
+    );
+  }
 }

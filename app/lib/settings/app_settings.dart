@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../server/sync_scope.dart';
+import '../stats/reading_goals.dart';
 import 'package:uuid/uuid.dart';
 
 import 'appearance.dart';
@@ -49,10 +50,45 @@ class AppSettingsStore extends ChangeNotifier {
   static const _spineTitleScaleKey = 'settings.spineTitleScale';
   static const _spineWidthScaleKey = 'settings.spineWidthScale';
 
+  // Reading goals (v1.3.1), per device.
+  static const _goalBooksKey = 'settings.readingGoalBooks';
+  static const _goalMinutesKey = 'settings.readingGoalMinutes';
+
   final SharedPreferences _prefs;
 
   static Future<AppSettingsStore> load() async =>
       AppSettingsStore._(await SharedPreferences.getInstance());
+
+  // ---- Reading goals (v1.3.1) ----------------------------------------------
+
+  /// Books to finish this calendar year, or null for no goal (the default).
+  /// Per device for now: see DESIGN.md, "Reading insights".
+  int? get readingGoalBooks => ReadingGoals.normalise(
+      _prefs.getInt(_goalBooksKey),
+      max: ReadingGoals.maxBooks);
+
+  /// Minutes to read each day, or null for no goal (the default).
+  int? get readingGoalMinutes => ReadingGoals.normalise(
+      _prefs.getInt(_goalMinutesKey),
+      max: ReadingGoals.maxMinutes);
+
+  /// Sets both goals at once; null (or zero) clears one. They are edited
+  /// together in one dialog, so they are saved together.
+  Future<void> setReadingGoals({int? books, int? minutes}) async {
+    final b = ReadingGoals.normalise(books, max: ReadingGoals.maxBooks);
+    final m = ReadingGoals.normalise(minutes, max: ReadingGoals.maxMinutes);
+    if (b == null) {
+      await _prefs.remove(_goalBooksKey);
+    } else {
+      await _prefs.setInt(_goalBooksKey, b);
+    }
+    if (m == null) {
+      await _prefs.remove(_goalMinutesKey);
+    } else {
+      await _prefs.setInt(_goalMinutesKey, m);
+    }
+    notifyListeners();
+  }
 
   // ---- Appearance (plan 5 #39) --------------------------------------------
 

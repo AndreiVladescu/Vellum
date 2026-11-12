@@ -9,6 +9,8 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vellum/settings/app_settings.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/stats/insights_page.dart';
@@ -16,6 +18,7 @@ import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
   late Directory dir;
+  late AppSettingsStore settings;
   setUp(() => dir = Directory.systemTemp.createTempSync('vellum_insights_ui'));
   tearDown(() => dir.deleteSync(recursive: true));
 
@@ -38,6 +41,9 @@ void main() {
     growView(tester);
     late LibraryRepository repo;
     await tester.runAsync(() async {
+      // A fresh settings store per test, so one test's goals never leak.
+      SharedPreferences.setMockInitialValues({});
+      settings = await AppSettingsStore.load();
       repo = await LibraryRepository.forTesting(
         VellumDatabase(NativeDatabase.memory()),
         dir,
@@ -86,7 +92,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: L10n.localizationsDelegates,
       supportedLocales: L10n.supportedLocales,
-      home: InsightsPage(repository: repo)));
+      home: InsightsPage(repository: repo, settings: settings)));
     await tester.pumpAndSettle();
     return repo;
   }
@@ -154,8 +160,58 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: L10n.localizationsDelegates,
       supportedLocales: L10n.supportedLocales,
-      home: InsightsPage(repository: repo)));
+      home: InsightsPage(repository: repo, settings: settings)));
     await tester.pumpAndSettle();
     expect(find.text('Where you read'), findsNothing);
+  });
+
+  testWidgets('with no goal set the card offers one and shows no progress',
+      (tester) async {
+    await pumpInsights(tester, seed: true);
+    expect(find.text('Goals'), findsOneWidget);
+    expect(find.text('Set a goal'), findsOneWidget);
+    expect(find.text('Reading today'), findsNothing);
+    expect(find.text('Books in ${DateTime.now().year}'), findsNothing);
+  });
+
+  testWidgets('goals are set from the card and shown as progress',
+      (tester) async {
+    await pumpInsights(tester, seed: true);
+    await tester.tap(find.text('Set a goal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reading goals'), findsOneWidget);
+    final dialog = find.byType(AlertDialog);
+    await tester.tap(find.descendant(of: dialog, matching: find.text('24')));
+    await tester.tap(find.descendant(of: dialog, matching: find.text('30m')));
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(settings.readingGoalBooks, 24);
+    expect(settings.readingGoalMinutes, 30);
+    expect(find.text('Books in ${DateTime.now().year}'), findsOneWidget);
+    expect(find.text('Reading today'), findsOneWidget);
+
+    // And "no goal" takes them off again in one tap each.
+    await tester.tap(find.byTooltip('Edit goals'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No goal').first);
+    await tester.tap(find.text('No goal').last);
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(settings.readingGoalBooks, isNull);
+    expect(settings.readingGoalMinutes, isNull);
+    expect(find.text('Reading today'), findsNothing);
+    expect(find.text('Set a goal'), findsOneWidget);
+  });
+
+  testWidgets('a free number can be typed', (tester) async {
+    await pumpInsights(tester, seed: true);
+    await tester.tap(find.byTooltip('Edit goals'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Other').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '40');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(settings.readingGoalBooks, 40);
   });
 }

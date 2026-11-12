@@ -205,7 +205,10 @@ MIGRATED=(
   lib/shelf/shelf_target_sheet.dart
   lib/shelf/shelf_view.dart
   lib/shelf/spine_style.dart
+  lib/stats/duration_label.dart
+  lib/stats/goals_dialog.dart
   lib/stats/insights_page.dart
+  lib/stats/reading_goals.dart
   lib/stats/session_recorder.dart
   lib/stats/stats_queries.dart
   lib/widgets/page_insets.dart

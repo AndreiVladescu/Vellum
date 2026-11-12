@@ -767,6 +767,28 @@ interruptions. **Local-only, permanently:** this is behavioural data, it has no
 sync channel and should never get one, it rides backups because those snapshot the
 database file, and *Clear reading history* really deletes it.
 
+**Reading goals** (v1.3.1) are two optional numbers, both off until someone sets
+one: books finished this calendar year, and minutes read per day. They are set from
+the Insights page and nowhere else, and they are **per device**, in
+`AppSettingsStore` like the theme: no schema change, no sync. That is acceptable
+for now because a goal is an intention rather than a fact. Nothing is lost if two
+devices disagree, since the progress is always recomputed from the sittings and
+finish dates, which do sync, so each device shows true progress against its own
+target. The cost is retyping a number on a second device; moving them onto the
+personal channel later is additive.
+
+The arithmetic is pure (`reading_goals.dart`) and follows the rules the page
+already had. A day is the *local* day a sitting **started** in, so a sitting past
+midnight is not split. "Last 7 days" includes today. The year goal counts books
+whose `finishedAt` falls in the year, once each. `finishedAt` is overwritten when a
+book is finished again and cleared when it moves back out of finished, so a re-read
+finished this year counts for this year (and a re-read still in progress does not
+yet); the price is that an earlier year loses a book that has since been re-read,
+which the monthly list already does too. Pace is `target * day-of-year /
+days-in-year`, rounded down, so 1 January expects nothing and 31 December expects
+the target; the page says "on pace", "N ahead" or "N behind" and, once the target
+is met, only that it was reached.
+
 **Reading status, ratings and dates** (both, plan 5 #18) are `status`
 (`unread`/`reading`/`finished`/`abandoned`/`reference`, plus `wishlist`), `rating`
 (1–5), `startedAt`/`finishedAt` and `readCount`. In the app they are columns on the

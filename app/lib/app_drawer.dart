@@ -111,7 +111,7 @@ class AppDrawer extends StatelessWidget {
   void _openInsights(BuildContext context) {
     Navigator.of(context).pop(); // close the drawer first
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => InsightsPage(repository: repository),
+      builder: (_) => InsightsPage(repository: repository, settings: settings),
     ));
   }
 

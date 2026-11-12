@@ -9202,5 +9202,151 @@
     "placeholders": {
       "count": {"type": "int"}
     }
+  },
+
+  "insightsGoalsTitle": "Goals",
+  "@insightsGoalsTitle": {
+    "description": "Title of the reading goals card on the insights page."
+  },
+
+  "insightsGoalsEditTooltip": "Edit goals",
+  "@insightsGoalsEditTooltip": {
+    "description": "Tooltip of the button that opens the reading goals dialog."
+  },
+
+  "insightsGoalsEmpty": "Set a goal for books finished this year or minutes read each day. Both are optional.",
+  "@insightsGoalsEmpty": {
+    "description": "Shown in the goals card while no goal is set."
+  },
+
+  "insightsGoalsSetAction": "Set a goal",
+  "@insightsGoalsSetAction": {
+    "description": "Button in the goals card while no goal is set; opens the reading goals dialog."
+  },
+
+  "insightsGoalBooksTitle": "Books in {year}",
+  "@insightsGoalBooksTitle": {
+    "description": "Heading of the yearly goal; year is the calendar year, already formatted without a thousands separator.",
+    "placeholders": {
+      "year": {
+        "type": "String"
+      }
+    }
+  },
+
+  "insightsGoalBooksProgress": "{finished, plural, =1{1 of {target} books finished} other{{finished} of {target} books finished}}",
+  "@insightsGoalBooksProgress": {
+    "description": "Progress toward the yearly goal; finished is how many books were finished this year and target the goal.",
+    "placeholders": {
+      "finished": {
+        "type": "int"
+      },
+      "target": {
+        "type": "int"
+      }
+    }
+  },
+
+  "insightsGoalBooksReached": "Goal reached",
+  "@insightsGoalBooksReached": {
+    "description": "Shown under the yearly goal once it is met."
+  },
+
+  "insightsGoalBooksOnPace": "On pace",
+  "@insightsGoalBooksOnPace": {
+    "description": "Shown under the yearly goal when the number of books finished matches an even pace through the year."
+  },
+
+  "insightsGoalBooksAhead": "{count, plural, =1{1 book ahead of an even pace} other{{count} books ahead of an even pace}}",
+  "@insightsGoalBooksAhead": {
+    "description": "Shown under the yearly goal when ahead of an even pace through the year.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "insightsGoalBooksBehind": "{count, plural, =1{1 book behind an even pace} other{{count} books behind an even pace}}",
+  "@insightsGoalBooksBehind": {
+    "description": "Shown under the yearly goal when behind an even pace through the year. Keep the tone neutral.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "insightsGoalMinutesTitle": "Reading today",
+  "@insightsGoalMinutesTitle": {
+    "description": "Heading of the daily goal."
+  },
+
+  "insightsGoalMinutesProgress": "{today} of {goal} today",
+  "@insightsGoalMinutesProgress": {
+    "description": "Progress toward the daily goal; both values are durations already formatted, e.g. \"20m of 30m today\".",
+    "placeholders": {
+      "today": {
+        "type": "String"
+      },
+      "goal": {
+        "type": "String"
+      }
+    }
+  },
+
+  "insightsGoalMinutesDays": "{count, plural, =1{Met on 1 of the last 7 days} other{Met on {count} of the last 7 days}}",
+  "@insightsGoalMinutesDays": {
+    "description": "Under the daily goal; on how many of the last seven days, today included, the goal was met.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "goalsDialogTitle": "Reading goals",
+  "@goalsDialogTitle": {
+    "description": "Title of the dialog where the reading goals are set."
+  },
+
+  "goalsBooksLabel": "Books finished this year",
+  "@goalsBooksLabel": {
+    "description": "Heading of the yearly goal choices in the goals dialog."
+  },
+
+  "goalsMinutesLabel": "Minutes read per day",
+  "@goalsMinutesLabel": {
+    "description": "Heading of the daily goal choices in the goals dialog."
+  },
+
+  "goalsNone": "No goal",
+  "@goalsNone": {
+    "description": "Choice that switches a goal off."
+  },
+
+  "goalsOther": "Other",
+  "@goalsOther": {
+    "description": "Choice that lets the reader type their own number."
+  },
+
+  "goalsBooksCustomLabel": "Number of books",
+  "@goalsBooksCustomLabel": {
+    "description": "Label of the text field for a custom yearly goal."
+  },
+
+  "goalsMinutesCustomLabel": "Minutes a day",
+  "@goalsMinutesCustomLabel": {
+    "description": "Label of the text field for a custom daily goal."
+  },
+
+  "goalsCustomHelper": "Up to {max}",
+  "@goalsCustomHelper": {
+    "description": "Helper text under a goal text field; max is the largest number accepted.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
   }
 }
