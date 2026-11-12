@@ -12018,8 +12018,10 @@ class $$SeriesTableTableManager
               }) => SeriesCompanion.insert(id: id, name: name, rowid: rowid),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$SeriesTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable<$SeriesTable, Sery>(table),
+                  $$SeriesTableReferences(db, table, e),
+                ),
               )
               .toList(),
           prefetchHooksCallback: ({booksRefs = false}) {
@@ -12030,15 +12032,20 @@ class $$SeriesTableTableManager
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (booksRefs)
-                    await $_getPrefetchedData<Sery, $SeriesTable, Book>(
+                    await $_getPrefetchedDataByColumns<
+                      Sery,
+                      $SeriesTable,
+                      Book,
+                      $BooksTable
+                    >(
                       currentTable: table,
                       referencedTable: $$SeriesTableReferences._booksRefsTable(
                         db,
                       ),
                       managerFromTypedResult: (p0) =>
                           $$SeriesTableReferences(db, table, p0).booksRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.seriesId == item.id),
+                      currentColumn: 'id',
+                      referencedColumn: 'series_id',
                       typedResults: items,
                     ),
                 ];
@@ -13567,8 +13574,10 @@ class $$BooksTableTableManager
               ),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$BooksTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable<$BooksTable, Book>(table),
+                  $$BooksTableReferences(db, table, e),
+                ),
               )
               .toList(),
           prefetchHooksCallback:
@@ -13632,10 +13641,11 @@ class $$BooksTableTableManager
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (bookAuthorsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           Book,
                           $BooksTable,
-                          BookAuthor
+                          BookAuthor,
+                          $BookAuthorsTable
                         >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
@@ -13646,14 +13656,17 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).bookAuthorsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (bookGenresRefs)
-                        await $_getPrefetchedData<Book, $BooksTable, BookGenre>(
+                        await $_getPrefetchedDataByColumns<
+                          Book,
+                          $BooksTable,
+                          BookGenre,
+                          $BookGenresTable
+                        >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
                               ._bookGenresRefsTable(db),
@@ -13663,14 +13676,17 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).bookGenresRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (bookFilesRefs)
-                        await $_getPrefetchedData<Book, $BooksTable, BookFile>(
+                        await $_getPrefetchedDataByColumns<
+                          Book,
+                          $BooksTable,
+                          BookFile,
+                          $BookFilesTable
+                        >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
                               ._bookFilesRefsTable(db),
@@ -13680,17 +13696,16 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).bookFilesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (filePositionsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           Book,
                           $BooksTable,
-                          FilePosition
+                          FilePosition,
+                          $FilePositionsTable
                         >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
@@ -13701,17 +13716,16 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).filePositionsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (physicalCopiesRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           Book,
                           $BooksTable,
-                          PhysicalCopy
+                          PhysicalCopy,
+                          $PhysicalCopiesTable
                         >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
@@ -13722,14 +13736,17 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).physicalCopiesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (shelfBooksRefs)
-                        await $_getPrefetchedData<Book, $BooksTable, ShelfBook>(
+                        await $_getPrefetchedDataByColumns<
+                          Book,
+                          $BooksTable,
+                          ShelfBook,
+                          $ShelfBooksTable
+                        >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
                               ._shelfBooksRefsTable(db),
@@ -13739,17 +13756,16 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).shelfBooksRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (annotationsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           Book,
                           $BooksTable,
-                          Annotation
+                          Annotation,
+                          $AnnotationsTable
                         >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
@@ -13760,17 +13776,16 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).annotationsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (readingSessionsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           Book,
                           $BooksTable,
-                          ReadingSession
+                          ReadingSession,
+                          $ReadingSessionsTable
                         >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
@@ -13781,14 +13796,17 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).readingSessionsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                       if (bookTextsRefs)
-                        await $_getPrefetchedData<Book, $BooksTable, BookText>(
+                        await $_getPrefetchedDataByColumns<
+                          Book,
+                          $BooksTable,
+                          BookText,
+                          $BookTextsTable
+                        >(
                           currentTable: table,
                           referencedTable: $$BooksTableReferences
                               ._bookTextsRefsTable(db),
@@ -13798,10 +13816,8 @@ class $$BooksTableTableManager
                                 table,
                                 p0,
                               ).bookTextsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.bookId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'book_id',
                           typedResults: items,
                         ),
                     ];
@@ -14020,7 +14036,7 @@ class $$AuthorsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$AuthorsTable, Author>(table),
                   $$AuthorsTableReferences(db, table, e),
                 ),
               )
@@ -14033,10 +14049,11 @@ class $$AuthorsTableTableManager
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (bookAuthorsRefs)
-                    await $_getPrefetchedData<
+                    await $_getPrefetchedDataByColumns<
                       Author,
                       $AuthorsTable,
-                      BookAuthor
+                      BookAuthor,
+                      $BookAuthorsTable
                     >(
                       currentTable: table,
                       referencedTable: $$AuthorsTableReferences
@@ -14046,8 +14063,8 @@ class $$AuthorsTableTableManager
                         table,
                         p0,
                       ).bookAuthorsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.authorId == item.id),
+                      currentColumn: 'id',
+                      referencedColumn: 'author_id',
                       typedResults: items,
                     ),
                 ];
@@ -14360,7 +14377,7 @@ class $$BookAuthorsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$BookAuthorsTable, BookAuthor>(table),
                   $$BookAuthorsTableReferences(db, table, e),
                 ),
               )
@@ -14619,8 +14636,10 @@ class $$GenresTableTableManager
               }) => GenresCompanion.insert(id: id, name: name, rowid: rowid),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$GenresTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable<$GenresTable, Genre>(table),
+                  $$GenresTableReferences(db, table, e),
+                ),
               )
               .toList(),
           prefetchHooksCallback: ({bookGenresRefs = false}) {
@@ -14631,14 +14650,19 @@ class $$GenresTableTableManager
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (bookGenresRefs)
-                    await $_getPrefetchedData<Genre, $GenresTable, BookGenre>(
+                    await $_getPrefetchedDataByColumns<
+                      Genre,
+                      $GenresTable,
+                      BookGenre,
+                      $BookGenresTable
+                    >(
                       currentTable: table,
                       referencedTable: $$GenresTableReferences
                           ._bookGenresRefsTable(db),
                       managerFromTypedResult: (p0) =>
                           $$GenresTableReferences(db, table, p0).bookGenresRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.genreId == item.id),
+                      currentColumn: 'id',
+                      referencedColumn: 'genre_id',
                       typedResults: items,
                     ),
                 ];
@@ -14932,7 +14956,7 @@ class $$BookGenresTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$BookGenresTable, BookGenre>(table),
                   $$BookGenresTableReferences(db, table, e),
                 ),
               )
@@ -15440,7 +15464,7 @@ class $$BookFilesTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$BookFilesTable, BookFile>(table),
                   $$BookFilesTableReferences(db, table, e),
                 ),
               )
@@ -15492,10 +15516,11 @@ class $$BookFilesTableTableManager
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (filePositionsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           BookFile,
                           $BookFilesTable,
-                          FilePosition
+                          FilePosition,
+                          $FilePositionsTable
                         >(
                           currentTable: table,
                           referencedTable: $$BookFilesTableReferences
@@ -15506,17 +15531,16 @@ class $$BookFilesTableTableManager
                                 table,
                                 p0,
                               ).filePositionsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.fileId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'file_id',
                           typedResults: items,
                         ),
                       if (bookTextsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           BookFile,
                           $BookFilesTable,
-                          BookText
+                          BookText,
+                          $BookTextsTable
                         >(
                           currentTable: table,
                           referencedTable: $$BookFilesTableReferences
@@ -15527,10 +15551,8 @@ class $$BookFilesTableTableManager
                                 table,
                                 p0,
                               ).bookTextsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.fileId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'file_id',
                           typedResults: items,
                         ),
                     ];
@@ -15915,7 +15937,7 @@ class $$FilePositionsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$FilePositionsTable, FilePosition>(table),
                   $$FilePositionsTableReferences(db, table, e),
                 ),
               )
@@ -16501,7 +16523,7 @@ class $$PhysicalCopiesTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$PhysicalCopiesTable, PhysicalCopy>(table),
                   $$PhysicalCopiesTableReferences(db, table, e),
                 ),
               )
@@ -16557,10 +16579,11 @@ class $$PhysicalCopiesTableTableManager
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (loansRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           PhysicalCopy,
                           $PhysicalCopiesTable,
-                          Loan
+                          Loan,
+                          $LoansTable
                         >(
                           currentTable: table,
                           referencedTable: $$PhysicalCopiesTableReferences
@@ -16571,17 +16594,16 @@ class $$PhysicalCopiesTableTableManager
                                 table,
                                 p0,
                               ).loansRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.copyId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'copy_id',
                           typedResults: items,
                         ),
                       if (copyPhotosRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           PhysicalCopy,
                           $PhysicalCopiesTable,
-                          CopyPhoto
+                          CopyPhoto,
+                          $CopyPhotosTable
                         >(
                           currentTable: table,
                           referencedTable: $$PhysicalCopiesTableReferences
@@ -16592,17 +16614,16 @@ class $$PhysicalCopiesTableTableManager
                                 table,
                                 p0,
                               ).copyPhotosRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.copyId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'copy_id',
                           typedResults: items,
                         ),
                       if (bookPlacementsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           PhysicalCopy,
                           $PhysicalCopiesTable,
-                          BookPlacement
+                          BookPlacement,
+                          $BookPlacementsTable
                         >(
                           currentTable: table,
                           referencedTable: $$PhysicalCopiesTableReferences
@@ -16613,10 +16634,8 @@ class $$PhysicalCopiesTableTableManager
                                 table,
                                 p0,
                               ).bookPlacementsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.copyId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'copy_id',
                           typedResults: items,
                         ),
                     ];
@@ -17037,8 +17056,10 @@ class $$LoansTableTableManager
               ),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$LoansTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable<$LoansTable, Loan>(table),
+                  $$LoansTableReferences(db, table, e),
+                ),
               )
               .toList(),
           prefetchHooksCallback: ({copyId = false}) {
@@ -17392,7 +17413,7 @@ class $$CopyPhotosTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$CopyPhotosTable, CopyPhoto>(table),
                   $$CopyPhotosTableReferences(db, table, e),
                 ),
               )
@@ -17763,7 +17784,7 @@ class $$ShelvesTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ShelvesTable, Shelf>(table),
                   $$ShelvesTableReferences(db, table, e),
                 ),
               )
@@ -17776,7 +17797,12 @@ class $$ShelvesTableTableManager
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (shelfBooksRefs)
-                    await $_getPrefetchedData<Shelf, $ShelvesTable, ShelfBook>(
+                    await $_getPrefetchedDataByColumns<
+                      Shelf,
+                      $ShelvesTable,
+                      ShelfBook,
+                      $ShelfBooksTable
+                    >(
                       currentTable: table,
                       referencedTable: $$ShelvesTableReferences
                           ._shelfBooksRefsTable(db),
@@ -17785,8 +17811,8 @@ class $$ShelvesTableTableManager
                         table,
                         p0,
                       ).shelfBooksRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.shelfId == item.id),
+                      currentColumn: 'id',
+                      referencedColumn: 'shelf_id',
                       typedResults: items,
                     ),
                 ];
@@ -18099,7 +18125,7 @@ class $$ShelfBooksTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ShelfBooksTable, ShelfBook>(table),
                   $$ShelfBooksTableReferences(db, table, e),
                 ),
               )
@@ -18775,7 +18801,9 @@ class $$PhysicalEnvironmentsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$PhysicalEnvironmentsTable, PhysicalEnvironment>(
+                    table,
+                  ),
                   $$PhysicalEnvironmentsTableReferences(db, table, e),
                 ),
               )
@@ -18797,10 +18825,11 @@ class $$PhysicalEnvironmentsTableTableManager
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (physicalShelvesRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           PhysicalEnvironment,
                           $PhysicalEnvironmentsTable,
-                          PhysicalShelf
+                          PhysicalShelf,
+                          $PhysicalShelvesTable
                         >(
                           currentTable: table,
                           referencedTable: $$PhysicalEnvironmentsTableReferences
@@ -18811,17 +18840,16 @@ class $$PhysicalEnvironmentsTableTableManager
                                 table,
                                 p0,
                               ).physicalShelvesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.environmentId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'environment_id',
                           typedResults: items,
                         ),
                       if (bookPlacementsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           PhysicalEnvironment,
                           $PhysicalEnvironmentsTable,
-                          BookPlacement
+                          BookPlacement,
+                          $BookPlacementsTable
                         >(
                           currentTable: table,
                           referencedTable: $$PhysicalEnvironmentsTableReferences
@@ -18832,17 +18860,16 @@ class $$PhysicalEnvironmentsTableTableManager
                                 table,
                                 p0,
                               ).bookPlacementsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.environmentId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'environment_id',
                           typedResults: items,
                         ),
                       if (roomPropsRefs)
-                        await $_getPrefetchedData<
+                        await $_getPrefetchedDataByColumns<
                           PhysicalEnvironment,
                           $PhysicalEnvironmentsTable,
-                          RoomProp
+                          RoomProp,
+                          $RoomPropsTable
                         >(
                           currentTable: table,
                           referencedTable: $$PhysicalEnvironmentsTableReferences
@@ -18853,10 +18880,8 @@ class $$PhysicalEnvironmentsTableTableManager
                                 table,
                                 p0,
                               ).roomPropsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.environmentId == item.id,
-                              ),
+                          currentColumn: 'id',
+                          referencedColumn: 'environment_id',
                           typedResults: items,
                         ),
                     ];
@@ -19263,7 +19288,7 @@ class $$PhysicalShelvesTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$PhysicalShelvesTable, PhysicalShelf>(table),
                   $$PhysicalShelvesTableReferences(db, table, e),
                 ),
               )
@@ -19766,7 +19791,7 @@ class $$BookPlacementsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$BookPlacementsTable, BookPlacement>(table),
                   $$BookPlacementsTableReferences(db, table, e),
                 ),
               )
@@ -20178,7 +20203,7 @@ class $$RoomPropsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$RoomPropsTable, RoomProp>(table),
                   $$RoomPropsTableReferences(db, table, e),
                 ),
               )
@@ -20386,7 +20411,16 @@ class $$LocalDeletionsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$LocalDeletionsTable, LocalDeletion>(table),
+                  BaseReferences<
+                    _$VellumDatabase,
+                    $LocalDeletionsTable,
+                    LocalDeletion
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -20660,7 +20694,19 @@ class $$RemoteReadingPositionsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $RemoteReadingPositionsTable,
+                    RemoteReadingPosition
+                  >(table),
+                  BaseReferences<
+                    _$VellumDatabase,
+                    $RemoteReadingPositionsTable,
+                    RemoteReadingPosition
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -21095,7 +21141,7 @@ class $$AnnotationsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$AnnotationsTable, Annotation>(table),
                   $$AnnotationsTableReferences(db, table, e),
                 ),
               )
@@ -21501,7 +21547,7 @@ class $$ReadingSessionsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$ReadingSessionsTable, ReadingSession>(table),
                   $$ReadingSessionsTableReferences(db, table, e),
                 ),
               )
@@ -21895,7 +21941,7 @@ class $$BookTextsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable(table),
+                  e.readTable<$BookTextsTable, BookText>(table),
                   $$BookTextsTableReferences(db, table, e),
                 ),
               )
