@@ -6,6 +6,37 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.3.2 — 2026-11-12
+
+A month at a time, and Reading insights you can poke at.
+
+### Added
+
+- **Month by month.** Reading insights opens a page per calendar month: pages,
+  time, days read, the average for a reading day, your longest sitting and
+  best day, a calendar of the month, the books you finished, and — if you set
+  a daily goal — how many days met it. It says how the month compares with
+  the one before in a plain sentence, measuring an unfinished month against
+  the same days of the previous one. Arrows and a list step back through
+  earlier months.
+- **A range for Reading insights**: Last 30 days, This year or All time, next
+  to *Default*, which is the page as it has always been. Streaks, the 12-week
+  map and goals keep their own windows, and the page says so.
+- **Days you can tap.** A square on either heat map opens that day's pages,
+  time and books. The grid takes arrow keys and reads out day by day to a
+  screen reader.
+
+### Changed
+
+- The 12-week heat map is taller: its squares grew so a finger can hit one.
+
+### Maintenance
+
+- Server: patch and minor updates to serde_json, uuid, sha2, tokio-util,
+  rcgen, flate2 and libc.
+
+---
+
 ## v1.3.1 — 2026-11-12
 
 Reading goals, and what a single book has cost you in hours.
