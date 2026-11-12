@@ -21,6 +21,7 @@ import { invitePerson, removePerson, renamePerson, resetFor, revokeInvite,
 import { showMailSetup, testMail } from './mail.js';
 import { showActivity } from './activity.js';
 import { showOverview } from './overview.js';
+import { checkOrphans, deleteOrphans, downloadBackup } from './server.js';
 import { openAddBook } from './add_book.js';
 import { runNavAction } from './router.js';
 
@@ -95,6 +96,9 @@ export const ACTIONS = {
   navaction: el => runNavAction(el.dataset.id),
   addbook: () => openAddBook(),
   refreshoverview: () => showOverview(),
+  downloadbackup: () => downloadBackup(),
+  sweepcheck: () => checkOrphans(),
+  sweepdelete: () => deleteOrphans(),
 };
 
 export const DBL_ACTIONS = {

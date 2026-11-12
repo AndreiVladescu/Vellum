@@ -91,11 +91,19 @@ export function hydrateImages(root){
 // triggering a save from the resulting object URL, so the token stays out of
 // the `<a href>`.
 export async function downloadFile(fileId, filename){
+  return downloadPath('/api/files/'+fileId, filename);
+}
+
+/// The same for any authenticated GET — a book file, or the server's backup.
+/// The whole response is held in memory as a blob before the save starts, which
+/// is fine for a book and worth knowing for a backup of a very large library.
+export async function downloadPath(path, filename){
   try {
-    const url = await authBlobUrl('/api/files/'+fileId);
+    const url = await authBlobUrl(path);
     const a = document.createElement('a');
     a.href = url; a.download = filename || 'download';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url), 10000);
-  } catch(e){ toast('Download failed'); }
+    return true;
+  } catch(e){ toast('Download failed'); return false; }
 }

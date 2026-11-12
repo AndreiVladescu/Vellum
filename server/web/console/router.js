@@ -22,8 +22,8 @@ import { showReminders } from './reminders.js';
 import { showPeople } from './people.js';
 import { showShares } from './shares.js';
 import { showRooms } from './rooms.js';
-import { showStats } from './stats.js';
 import { showOverview } from './overview.js';
+import { showServer } from './server.js';
 import { showActivity } from './activity.js';
 import { showCert } from './cert.js';
 import { showMailSetup } from './mail.js';
@@ -36,6 +36,10 @@ export const NAV_GROUPS = [
 ];
 
 export const HOME = '/library/books';
+
+/// Addresses that moved. Statistics became the Server page; the old address is
+/// kept working because it may be in someone's bookmarks.
+export const ALIASES = { '/server/stats': '/server/about' };
 
 /// Every page with an address. `master: true` marks the ones whose endpoints
 /// answer 403 to anyone else — the same pages that used to toast "Only the
@@ -53,7 +57,7 @@ export const ROUTES = [
   { path: '/people/users', group: 'people', label: 'People', master: true, show: () => showPeople() },
   { path: '/people/shares', group: 'people', label: 'Shares and links', show: () => showShares() },
   { path: '/people/rooms', group: 'people', label: 'Rooms', show: () => showRooms() },
-  { path: '/server/stats', group: 'server', label: 'Statistics', master: true, show: () => showStats() },
+  { path: '/server/about', group: 'server', label: 'Server', master: true, show: () => showServer() },
   { path: '/server/activity', group: 'server', label: 'Activity log', master: true,
     show: () => showActivity() },
 ];
@@ -87,7 +91,7 @@ export function routePath(hash){
 /// so. An unknown address, or one this account may not open, falls back to the
 /// books — the one page every account has — rather than to an empty screen.
 export function resolveRoute(hash, isMaster){
-  const path = routePath(hash);
+  const path = ALIASES[routePath(hash)] || routePath(hash);
   const route = ROUTES.find(r => r.path === path);
   if (route && allowed(route, isMaster)) {
     return { route, redirect: '#' + route.path !== String(hash || '') };

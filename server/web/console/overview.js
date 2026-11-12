@@ -5,7 +5,7 @@ import { S } from './state.js';
 import { esc } from './dom.js';
 import { api, settle } from './api.js';
 import { openPage } from './pages.js';
-import { fmtBytes } from './stats.js';
+import { fmtBytes } from './server.js';
 import { stamp } from './loans.js';
 
 // ---- overview ------------------------------------------------------------

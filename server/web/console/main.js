@@ -33,8 +33,8 @@ import * as roomsModule from './rooms.js';
 import * as sharesModule from './shares.js';
 import * as peopleModule from './people.js';
 import * as mailModule from './mail.js';
-import * as statsModule from './stats.js';
 import * as overviewModule from './overview.js';
+import * as serverModule from './server.js';
 import * as activityModule from './activity.js';
 import * as searchModule from './search.js';
 import * as routerModule from './router.js';
@@ -53,7 +53,7 @@ const modules = [
   tagsModule, bulkModule, detailModule, linksModule,
   certModule, requestsModule, loansModule, remindersModule,
   roomsModule, sharesModule, peopleModule, mailModule,
-  statsModule, overviewModule, activityModule, searchModule, routerModule,
+  overviewModule, serverModule, activityModule, searchModule, routerModule,
 ];
 for (const mod of modules) {
   for (const [name, value] of Object.entries(mod)) {

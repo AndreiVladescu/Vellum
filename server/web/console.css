@@ -335,6 +335,7 @@ a.ov-tile:hover { border-color:var(--accent); }
 .ov-sub { margin:10px 0 2px; font-size:.82rem; color:var(--muted); }
 .ov-sub.late { color:var(--red-ink); }
 .ov-empty { padding:14px 16px; border:1px dashed var(--line); border-radius:var(--radius); }
+.pathlist { margin:2px 0 0; padding-left:18px; font-size:.85rem; overflow-wrap:anywhere; }
 
 /* ---- shares ---- */
 .shareline {

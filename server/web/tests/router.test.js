@@ -106,7 +106,7 @@ async function check(name, fn) {
 /// What the old Manage menu offered a member, as a list of page names. The
 /// four master-only ones are the ones whose endpoints answer 403 to anyone
 /// else; the role filter may take those away and nothing more.
-const MASTER_ONLY = ['/lending/reminders', '/people/users', '/server/stats', '/server/activity'];
+const MASTER_ONLY = ['/lending/reminders', '/people/users', '/server/about', '/server/activity'];
 
 async function main() {
   const { sandbox } = load();
@@ -222,18 +222,31 @@ async function main() {
     assert.deepEqual(replaced, ['#/library/books']);
   });
   await check('a page whose loader refuses falls back to the books', async () => {
-    // fetch rejects in this sandbox, so showStats toasts and opens nothing —
-    // which is what a 403 looks like from here.
-    const { sandbox: sb, replaced, get } = load({ hash: '#/server/stats', master: true });
+    // A 403 from the server's numbers: showServer toasts and opens nothing.
+    const { sandbox: sb, replaced, get } = load({ hash: '#/server/about', master: true });
+    sb.fetch = async () => ({ status: 403, ok: false, json: async () => ({ error: 'master only' }) });
     await sb.renderRoute();
     assert.deepEqual(replaced, ['#/library/books']);
     assert.strictEqual(get('page').hidden(), true, 'the books are what is on screen');
+  });
+  await check('the old statistics address opens the Server page and is corrected to it', async () => {
+    const { sandbox: sb, replaced } = load({ hash: '#/server/stats', master: true });
+    sb.fetch = async () => ({ status: 200, ok: true, json: async () => ({}) });
+    await sb.renderRoute();
+    assert.deepEqual(replaced, ['#/server/about']);
+  });
+  await check('a member asking for the old statistics address lands on the books', () => {
+    const { sandbox: sb } = load({ master: false });
+    const r = sb.resolveRoute('#/server/stats', false);
+    assert.strictEqual(r.route.path, '/library/books');
+    assert.strictEqual(r.redirect, true);
   });
   await check('the overview is for everyone and is the first item of the nav', () => {
     const { sandbox: sb } = load({ master: false });
     const html = sb.navHtml('/library/overview', false);
     assert.ok(html.indexOf('#/library/overview') < html.indexOf('#/library/books'));
     assert.ok(html.includes('aria-current="page">Overview'));
+    assert.ok(!html.includes('/server/about'), 'the Server page is the owner\'s');
   });
   await check('a page that opens keeps its address and takes focus at its heading', async () => {
     const { sandbox: sb, replaced, get } = load({ hash: '#/lending/loans', master: false });
