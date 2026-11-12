@@ -9536,7 +9536,7 @@
     "description": "Title of the calendar heat map of the month."
   },
 
-  "monthCalendarSub": "Darker days had more reading",
+  "monthCalendarSub": "Darker days had more reading. Select a day for its details.",
   "@monthCalendarSub": {
     "description": "Subtitle of the calendar heat map of the month."
   },
@@ -9670,5 +9670,129 @@
         "type": "String"
       }
     }
+  },
+
+  "insightsDayTitle": "{date}",
+  "@insightsDayTitle": {
+    "description": "Heading of the sheet that opens when a day of a heat map is tapped, e.g. \"Wednesday, November 4, 2026\".",
+    "placeholders": {
+      "date": {
+        "type": "DateTime",
+        "format": "yMMMMEEEEd"
+      }
+    }
+  },
+
+  "insightsDayNone": "Nothing was read on this day.",
+  "@insightsDayNone": {
+    "description": "Shown in the day sheet when no sitting began on that day."
+  },
+
+  "insightsDayTime": "{time} read",
+  "@insightsDayTime": {
+    "description": "Time read on the day in the day sheet; time is already formatted, e.g. \"35m\".",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+
+  "insightsDayPages": "{count, plural, =0{No pages recorded} =1{1 page} other{{count} pages}}",
+  "@insightsDayPages": {
+    "description": "Pages read on the day in the day sheet.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "insightsDaySittings": "{count, plural, =1{1 sitting} other{{count} sittings}}",
+  "@insightsDaySittings": {
+    "description": "Number of reading sittings on the day in the day sheet.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "insightsDayBooks": "Books read",
+  "@insightsDayBooks": {
+    "description": "Heading of the list of books read on the day, in the day sheet."
+  },
+
+  "insightsDayBookLine": "{time}, {pages, plural, =0{no pages recorded} =1{1 page} other{{pages} pages}}",
+  "@insightsDayBookLine": {
+    "description": "Subtitle of a book in the day sheet: time and pages on that day; time is already formatted, e.g. \"35m\".",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "pages": {
+        "type": "int"
+      }
+    }
+  },
+
+  "insightsDayUnknownBook": "A book that is no longer in the library",
+  "@insightsDayUnknownBook": {
+    "description": "Title of a row in the day sheet whose book has since been removed."
+  },
+
+  "insightsRangeLabel": "Range",
+  "@insightsRangeLabel": {
+    "description": "Label above the range choices at the top of the insights page."
+  },
+
+  "insightsRangeDefault": "Default",
+  "@insightsRangeDefault": {
+    "description": "Range choice: the insights page as it was before ranges existed (lifetime totals, a 30-day chart)."
+  },
+
+  "insightsRangeLast30": "Last 30 days",
+  "@insightsRangeLast30": {
+    "description": "Range choice: only the last 30 days."
+  },
+
+  "insightsRangeYear": "This year",
+  "@insightsRangeYear": {
+    "description": "Range choice: only the current calendar year."
+  },
+
+  "insightsRangeAll": "All time",
+  "@insightsRangeAll": {
+    "description": "Range choice: everything ever recorded."
+  },
+
+  "insightsRangeNote": "{range, select, last30{Totals, charts and lists below cover the last 30 days.} year{Totals, charts and lists below cover this calendar year.} all{Totals, charts and lists below cover all time, and the daily chart spans your whole history.} other{Totals and lists cover all time; the daily chart shows the last 30 days.}}",
+  "@insightsRangeNote": {
+    "description": "Explains what the chosen range covers; range is default, last30, year or all.",
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
+
+  "insightsRangeFixedNote": "Streaks, goals, this week and the 12-week map always show their own period.",
+  "@insightsRangeFixedNote": {
+    "description": "Under the range choices: which parts of the insights page do not follow the range."
+  },
+
+  "insightsPagesADayYear": "Pages a day (this year)",
+  "@insightsPagesADayYear": {
+    "description": "Title of the pages-a-day chart when the range is this year."
+  },
+
+  "insightsPagesADayAll": "Pages a day (all time)",
+  "@insightsPagesADayAll": {
+    "description": "Title of the pages-a-day chart when the range is all time."
+  },
+
+  "insightsReadingDaysHint": "Select a day for its pages, time and books",
+  "@insightsReadingDaysHint": {
+    "description": "Subtitle of the 12-week heat map: days can be selected."
   }
 }

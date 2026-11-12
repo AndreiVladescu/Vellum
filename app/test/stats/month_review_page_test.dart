@@ -6,6 +6,8 @@ import 'dart:io';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/data/database.dart';
@@ -180,6 +182,86 @@ void main() {
     expect(labels, contains('Thursday, November 5: no reading'));
     // One node per day of the month, plus the grid's own label.
     expect(labels.where((l) => l.contains('November')).length, 30 + 1);
+    handle.dispose();
+    await dispose(tester);
+  });
+
+  // Nov 2026 starts on a Sunday, so 4 November is column 3 of the first row.
+  // The grid is 7 x 44 dp wide at this test width.
+  Offset cellCentre(WidgetTester tester, int col, int row) =>
+      tester.getTopLeft(find.byType(HeatmapGrid)) +
+      Offset(col * 44 + 22, row * 44 + 22);
+
+  testWidgets('tapping a day opens a sheet with its pages, time and books',
+      (tester) async {
+    await pumpPage(tester);
+    await tester.tapAt(cellCentre(tester, 3, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Wednesday, November 4, 2026'), findsOneWidget);
+    expect(find.text('50m read'), findsOneWidget);
+    // (The best-day tile behind the sheet also says "50 pages".)
+    expect(
+        find.descendant(
+            of: find.byType(BottomSheet), matching: find.text('50 pages')),
+        findsOneWidget);
+    expect(find.text('1 sitting'), findsOneWidget);
+    expect(find.text('Books read'), findsOneWidget);
+    expect(find.text('Piranesi'), findsOneWidget);
+    expect(find.text('50m, 50 pages'), findsOneWidget);
+    await dispose(tester);
+  });
+
+  testWidgets('a day with no reading says so', (tester) async {
+    await pumpPage(tester);
+    await tester.tapAt(cellCentre(tester, 4, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Thursday, November 5, 2026'), findsOneWidget);
+    expect(find.text('Nothing was read on this day.'), findsOneWidget);
+    expect(find.text('Books read'), findsNothing);
+    await dispose(tester);
+  });
+
+  testWidgets('the keyboard reaches a day: arrows move, Enter opens',
+      (tester) async {
+    await pumpPage(tester);
+    // Tap a day to put focus in the grid, then close the sheet.
+    await tester.tapAt(cellCentre(tester, 3, 0));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Books read'), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    // From Wed 4th: Thu 5th, then a week down: Thu 12th.
+    expect(find.text('Thursday, November 12, 2026'), findsOneWidget);
+    await dispose(tester);
+  });
+
+  testWidgets('a screen reader can activate a day', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpPage(tester);
+    // SemanticsAction.tap is what a screen reader's double-tap sends.
+    tester.semantics.performAction(
+      find.semantics.byLabel(RegExp('^Wednesday, November 4')),
+      SemanticsAction.tap,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Wednesday, November 4, 2026'), findsOneWidget);
+    handle.dispose();
+    await dispose(tester);
+  });
+
+  testWidgets('every calendar day is a button for assistive technology',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpPage(tester);
+    final node = semanticsDayNode(
+        tester, find.byType(HeatmapGrid), 'Friday, November 6');
+    expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(node.getSemanticsData().flagsCollection.isButton, isTrue);
     handle.dispose();
     await dispose(tester);
   });

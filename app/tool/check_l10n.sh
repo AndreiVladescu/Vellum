@@ -207,10 +207,12 @@ MIGRATED=(
   lib/shelf/shelf_view.dart
   lib/shelf/spine_style.dart
   lib/stats/book_reading_stats.dart
+  lib/stats/day_detail_sheet.dart
   lib/stats/duration_label.dart
   lib/stats/goals_dialog.dart
   lib/stats/heatmap_grid.dart
   lib/stats/insights_page.dart
+  lib/stats/insights_range.dart
   lib/stats/month_review.dart
   lib/stats/month_review_page.dart
   lib/stats/reading_goals.dart

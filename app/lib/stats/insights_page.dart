@@ -3,8 +3,11 @@ import '../widgets/page_insets.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import 'day_detail_sheet.dart';
 import 'duration_label.dart';
 import 'goals_dialog.dart';
+import 'heatmap_grid.dart';
+import 'insights_range.dart';
 import 'month_review_page.dart';
 import 'reading_goals.dart';
 import 'stats_queries.dart';
@@ -40,15 +43,22 @@ class InsightsPage extends StatefulWidget {
 }
 
 class _InsightsPageState extends State<InsightsPage> {
-  late Future<_Insights> _insights;
+  late Future<_Fetched> _insights;
+  late InsightsRange _range;
 
   @override
   void initState() {
     super.initState();
+    _range = widget.settings.insightsRange;
     _insights = _load();
   }
 
-  Future<_Insights> _load() async {
+  void _setRange(InsightsRange range) {
+    setState(() => _range = range);
+    widget.settings.setInsightsRange(range);
+  }
+
+  Future<_Fetched> _load() async {
     final db = widget.repository.db;
     final sessions = await db.select(db.readingSessions).get();
     final books = await db.select(db.books).get();
@@ -58,7 +68,7 @@ class _InsightsPageState extends State<InsightsPage> {
     for (final file in files) {
       (formatsByBook[file.bookId] ??= []).add(file.format);
     }
-    return _Insights(
+    return _Fetched(
       sessions: sessions,
       books: books,
       genresByBook: genresByBook,
@@ -109,14 +119,16 @@ class _InsightsPageState extends State<InsightsPage> {
           ),
         ],
       ),
-      body: FutureBuilder<_Insights>(
+      body: FutureBuilder<_Fetched>(
         future: _insights,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final data = snapshot.data!;
-          if (data.sessions.isEmpty && data.finishedPerMonth.isEmpty) {
+          final fetched = snapshot.data!;
+          final data = _Insights(fetched, _range, DateTime.now());
+          if (data.allSessions.isEmpty &&
+              ReadingStats.finishedPerMonth(fetched.books).isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -140,6 +152,8 @@ class _InsightsPageState extends State<InsightsPage> {
           return ListView(
             padding: pageInsets(context, const EdgeInsets.all(16)),
             children: [
+              _RangeControl(range: _range, onChanged: _setRange),
+              const SizedBox(height: 16),
               Card(
                 margin: EdgeInsets.zero,
                 child: ListTile(
@@ -159,7 +173,7 @@ class _InsightsPageState extends State<InsightsPage> {
               _GoalsCard(
                 settings: widget.settings,
                 books: data.books,
-                minutesPerDay: ReadingStats.minutesPerDay(data.sessions),
+                minutesPerDay: data.allMinutesPerDay,
               ),
               const SizedBox(height: 20),
               Text(l10n.insightsHabits, style: theme.textTheme.labelLarge),
@@ -218,7 +232,11 @@ class _InsightsPageState extends State<InsightsPage> {
               ],
               const SizedBox(height: 24),
               _Section(
-                title: l10n.insightsPagesADay,
+                title: switch (_range) {
+                  InsightsRange.thisYear => l10n.insightsPagesADayYear,
+                  InsightsRange.allTime => l10n.insightsPagesADayAll,
+                  _ => l10n.insightsPagesADay,
+                },
                 child: SizedBox(
                   height: 90,
                   child: CustomPaint(
@@ -256,15 +274,39 @@ class _InsightsPageState extends State<InsightsPage> {
               const SizedBox(height: 20),
               _Section(
                 title: l10n.insightsReadingDays,
-                child: SizedBox(
-                  height: 108,
-                  child: CustomPaint(
-                    painter: _HeatmapPainter(
-                      series: data.heatmapSeries,
-                      color: theme.colorScheme.primary,
-                      empty: theme.colorScheme.surfaceContainerHighest,
+                subtitle: l10n.insightsReadingDaysHint,
+                child: HeatmapGrid(
+                  cells: [
+                    for (final d in data.heatmapSeries)
+                      heatmapCellFor(
+                        l10n,
+                        d.day,
+                        minutes: data.allMinutesPerDay,
+                        pages: data.allPagesPerDay,
+                      ),
+                  ],
+                  rows: 7,
+                  columns: 12,
+                  rowMajor: false,
+                  maxCell: 28,
+                  startAtEnd: true,
+                  color: theme.colorScheme.primary,
+                  empty: theme.colorScheme.surfaceContainerHighest,
+                  onColor: theme.colorScheme.onPrimary,
+                  textColor: theme.colorScheme.onSurface,
+                  focusColor: theme.colorScheme.tertiary,
+                  semanticsLabel: l10n.insightsReadingDays,
+                  onDayTap: (day) => showDayDetailSheet(
+                    context,
+                    day: day,
+                    sessions: data.allSessions,
+                    books: data.books,
+                    onOpenBook: (book) => openBookDetail(
+                      context,
+                      repository: widget.repository,
+                      settings: widget.settings,
+                      book: book,
                     ),
-                    child: const SizedBox.expand(),
                   ),
                 ),
               ),
@@ -382,60 +424,152 @@ String _weekDeltaLabel(L10n l10n, int thisWeek, int lastWeek) {
   return l10n.insightsWeekDelta('$sign$delta');
 }
 
-/// Everything the page shows, computed once from one fetch.
-class _Insights {
-  _Insights({
+/// The range choices at the top of the page, with a plain statement of what
+/// the chosen one covers and which parts ignore it.
+///
+/// Chips rather than a segmented button: they wrap onto a second line at a
+/// phone width or a large text size instead of overflowing, and each is a
+/// focusable, 48 dp-tall control that announces whether it is selected.
+class _RangeControl extends StatelessWidget {
+  const _RangeControl({required this.range, required this.onChanged});
+
+  final InsightsRange range;
+  final ValueChanged<InsightsRange> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    final theme = Theme.of(context);
+    final labels = {
+      InsightsRange.standard: l10n.insightsRangeDefault,
+      InsightsRange.last30Days: l10n.insightsRangeLast30,
+      InsightsRange.thisYear: l10n.insightsRangeYear,
+      InsightsRange.allTime: l10n.insightsRangeAll,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.insightsRangeLabel, style: theme.textTheme.labelLarge),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final entry in labels.entries)
+              ChoiceChip(
+                label: Text(entry.value),
+                selected: range == entry.key,
+                onSelected: (_) => onChanged(entry.key),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          l10n.insightsRangeNote(switch (range) {
+            InsightsRange.standard => 'default', // i18n-ignore
+            InsightsRange.last30Days => 'last30', // i18n-ignore
+            InsightsRange.thisYear => 'year', // i18n-ignore
+            InsightsRange.allTime => 'all', // i18n-ignore
+          }),
+          style: theme.textTheme.bodySmall,
+        ),
+        Text(
+          l10n.insightsRangeFixedNote,
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.outline),
+        ),
+      ],
+    );
+  }
+}
+
+/// What was fetched, before any range is applied.
+class _Fetched {
+  const _Fetched({
     required this.sessions,
     required this.books,
-    required Map<String, List<String>> genresByBook,
-    required Map<String, List<String>> formatsByBook,
-  })  : pagesPerDay = ReadingStats.pagesPerDay(sessions),
-        pagesSeries = ReadingStats.dailySeries(
-          ReadingStats.pagesPerDay(sessions),
-        ),
-        heatmapSeries = ReadingStats.dailySeries(
-          ReadingStats.minutesPerDay(sessions),
-          days: 84,
-        ),
-        readingDays = ReadingStats.readingDays(sessions),
-        averagePages = ReadingStats.averagePagesPerSession(sessions),
-        totalPages = ReadingStats.totalPages(sessions),
-        totalMinutes = ReadingStats.totalMinutes(sessions),
-        totalFinished = ReadingStats.totalFinished(books),
-        hourSeries = ReadingStats.minutesByHour(sessions),
-        deviceSeries = ReadingStats.minutesByDevice(sessions),
-        finishedPerMonth = ReadingStats.finishedPerMonth(books),
-        genreSplit = ReadingStats.finishedByGenre(
-          books: books,
-          genresByBook: genresByBook,
-        ),
-        formatSplit = ReadingStats.finishedByFormat(
-          books: books,
-          formatsByBook: formatsByBook,
-        );
+    required this.genresByBook,
+    required this.formatsByBook,
+  });
 
   final List<ReadingSession> sessions;
   final List<Book> books;
-  final Map<DateTime, int> pagesPerDay;
-  final List<({DateTime day, int value})> pagesSeries;
-  final List<({DateTime day, int value})> heatmapSeries;
-  final Set<DateTime> readingDays;
-  final double averagePages;
-  final int totalPages;
-  final int totalMinutes;
-  final int totalFinished;
-  final List<int> hourSeries;
-  final List<({String device, int minutes})> deviceSeries;
-  final Map<DateTime, int> finishedPerMonth;
-  final List<({String genre, int count})> genreSplit;
-  final List<({String format, int count})> formatSplit;
+  final Map<String, List<String>> genresByBook;
+  final Map<String, List<String>> formatsByBook;
+}
 
-  int get currentStreak => ReadingStats.currentStreak(readingDays);
-  int get longestStreak => ReadingStats.longestStreak(readingDays);
+/// Everything the page shows: one fetch, with a range applied.
+///
+/// **Follow the range:** days read, the totals (pages, time, sessions'
+/// average, books finished), the best day, the pages-a-day chart, when you
+/// read, where you read, and the books-finished, genre and format lists.
+/// **Fixed by nature:** the streaks (a streak is a property of the whole
+/// history), this week against last, the 12-week heat map, and the goals
+/// (a year and a day by definition).
+class _Insights {
+  _Insights(_Fetched f, InsightsRange range, DateTime today)
+      : allSessions = f.sessions,
+        books = f.books,
+        sessions = RangeFilter.sessions(f.sessions, range, today),
+        range = range {
+    final inRange = RangeFilter.finishedBooks(f.books, range, today);
+    pagesPerDay = ReadingStats.pagesPerDay(sessions);
+    allPagesPerDay = ReadingStats.pagesPerDay(allSessions);
+    allMinutesPerDay = ReadingStats.minutesPerDay(allSessions);
+    pagesSeries = ReadingStats.dailySeries(
+      pagesPerDay,
+      days: RangeFilter.chartDays(range, allSessions, today),
+      today: today,
+    );
+    heatmapSeries =
+        ReadingStats.dailySeries(allMinutesPerDay, days: 84, today: today);
+    allReadingDays = ReadingStats.readingDays(allSessions);
+    readingDays = ReadingStats.readingDays(sessions);
+    averagePages = ReadingStats.averagePagesPerSession(sessions);
+    totalPages = ReadingStats.totalPages(sessions);
+    totalMinutes = ReadingStats.totalMinutes(sessions);
+    totalFinished = ReadingStats.totalFinished(inRange);
+    hourSeries = ReadingStats.minutesByHour(sessions);
+    deviceSeries = ReadingStats.minutesByDevice(sessions);
+    finishedPerMonth = ReadingStats.finishedPerMonth(inRange);
+    genreSplit = ReadingStats.finishedByGenre(
+      books: inRange,
+      genresByBook: f.genresByBook,
+    );
+    formatSplit = ReadingStats.finishedByFormat(
+      books: inRange,
+      formatsByBook: f.formatsByBook,
+    );
+  }
+
+  final InsightsRange range;
+  final List<ReadingSession> allSessions;
+  final List<ReadingSession> sessions;
+  final List<Book> books;
+  late final Map<DateTime, int> pagesPerDay;
+  late final Map<DateTime, int> allPagesPerDay;
+  late final Map<DateTime, int> allMinutesPerDay;
+  late final List<({DateTime day, int value})> pagesSeries;
+  late final List<({DateTime day, int value})> heatmapSeries;
+  late final Set<DateTime> allReadingDays;
+  late final Set<DateTime> readingDays;
+  late final double averagePages;
+  late final int totalPages;
+  late final int totalMinutes;
+  late final int totalFinished;
+  late final List<int> hourSeries;
+  late final List<({String device, int minutes})> deviceSeries;
+  late final Map<DateTime, int> finishedPerMonth;
+  late final List<({String genre, int count})> genreSplit;
+  late final List<({String format, int count})> formatSplit;
+
+  int get currentStreak => ReadingStats.currentStreak(allReadingDays);
+  int get longestStreak => ReadingStats.longestStreak(allReadingDays);
   ({DateTime day, int pages})? get best => ReadingStats.bestDay(pagesPerDay);
-  int get thisWeekPages => ReadingStats.sumTrailingDays(pagesPerDay, days: 7);
+  int get thisWeekPages =>
+      ReadingStats.sumTrailingDays(allPagesPerDay, days: 7);
   int get lastWeekPages => ReadingStats.sumTrailingDays(
-        pagesPerDay,
+        allPagesPerDay,
         days: 7,
         endOffsetDays: 7,
       );
@@ -650,53 +784,6 @@ class _SparklinePainter extends CustomPainter {
   @override
   bool shouldRepaint(_SparklinePainter old) =>
       old.values != values || old.color != color;
-}
-
-/// A calendar heat map, weeks as columns.
-class _HeatmapPainter extends CustomPainter {
-  _HeatmapPainter({
-    required this.series,
-    required this.color,
-    required this.empty,
-  });
-
-  final List<({DateTime day, int value})> series;
-  final Color color;
-  final Color empty;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (series.isEmpty) return;
-    const rows = 7;
-    final columns = (series.length / rows).ceil();
-    final cell = (size.width / columns).clamp(4.0, size.height / rows);
-    final gap = cell * 0.15;
-    final max = series.fold<int>(0, (m, e) => e.value > m ? e.value : m);
-    for (var i = 0; i < series.length; i++) {
-      final column = i ~/ rows;
-      final row = i % rows;
-      final value = series[i].value;
-      final intensity = max == 0 ? 0.0 : (value / max).clamp(0.0, 1.0);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            column * cell,
-            row * cell,
-            cell - gap,
-            cell - gap,
-          ),
-          const Radius.circular(2),
-        ),
-        Paint()
-          ..color = value == 0
-              ? empty
-              : color.withValues(alpha: 0.25 + 0.75 * intensity),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_HeatmapPainter old) => old.series != series;
 }
 
 /// Minutes read by hour of day, as 24 columns — one sequential hue, tallest at

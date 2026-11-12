@@ -814,6 +814,29 @@ as one whole sentence per outcome, so a language can reorder it. The month's
 calendar is a `HeatmapGrid`, and its weeks begin on the locale's first day of the
 week.
 
+**Exploring the insights** (v1.3.2) adds a range control and tappable days. The
+range is *Default*, *Last 30 days*, *This year* or *All time*, and *Default* is the
+page as it was (lifetime totals beside a 30-day chart), so the control changes
+nothing for anyone who never touches it; the choice is kept per device in
+`AppSettingsStore`, like the goals. It is a window on **the sittings and finish
+dates, not a re-query**: `RangeFilter` (pure, `insights_range.dart`) trims the rows
+already fetched by the same local-day rule used everywhere else. Following the
+range: days read, the totals, the best day, pages a day (30 days, since 1 January,
+or the whole history), when you read, where you read, and the finished-per-month,
+genre and format lists. Deliberately **fixed**: streaks (a streak is a fact about
+the whole history, and a "current streak" cut at 30 days would be a different
+number), this week against last, the 12-week heat map (a fixed window by nature)
+and the goals (a year and a day by definition); the page says so under the
+control. A day on either heat map opens a sheet with that day's pages, time and
+books, each of which opens its detail page.
+
+The heat maps stay `CustomPaint` but are no longer silent (`HeatmapGrid`): each
+day is its own semantics node with a spoken label and a tap action, the grid is one
+tab stop with arrow keys moving a visible ring and Enter or Space opening the day,
+and a tap resolves to the whole square under it, which is as large as the width
+allows (up to 28 dp on the 12-week map, 44 dp on the month). A list fallback was
+rejected: it would repeat 84 rows to say what 84 labelled nodes already say.
+
 **The unit decides what is shown.** A PDF sitting records page numbers, which is what
 `pageCount` describes. An EPUB sitting records the *chapter* it ended in, and the
 database holds no chapter count, so "pages a minute" would be chapters a minute and

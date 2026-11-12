@@ -13,7 +13,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/settings/app_settings.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/stats/heatmap_grid.dart';
 import 'package:vellum/stats/insights_page.dart';
+import 'package:vellum/stats/insights_range.dart';
+import 'heatmap_test_utils.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
@@ -37,6 +40,7 @@ void main() {
   Future<LibraryRepository> pumpInsights(
     WidgetTester tester, {
     required bool seed,
+    InsightsRange? range,
   }) async {
     growView(tester);
     late LibraryRepository repo;
@@ -44,6 +48,7 @@ void main() {
       // A fresh settings store per test, so one test's goals never leak.
       SharedPreferences.setMockInitialValues({});
       settings = await AppSettingsStore.load();
+      if (range != null) await settings.setInsightsRange(range);
       repo = await LibraryRepository.forTesting(
         VellumDatabase(NativeDatabase.memory()),
         dir,
@@ -213,6 +218,76 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(settings.readingGoalBooks, 40);
+  });
+
+  testWidgets('the default range is the page as it always was',
+      (tester) async {
+    await pumpInsights(tester, seed: true);
+    expect(settings.insightsRange, InsightsRange.standard);
+    final chip = tester.widget<ChoiceChip>(
+        find.widgetWithText(ChoiceChip, 'Default'));
+    expect(chip.selected, isTrue);
+    expect(
+        find.text('Totals and lists cover all time; the daily chart shows '
+            'the last 30 days.'),
+        findsOneWidget);
+    expect(find.text('Pages a day (last 30)'), findsOneWidget);
+    // Lifetime totals, as before the control existed.
+    expect(find.text('1h 10m'), findsOneWidget);
+  });
+
+  testWidgets('choosing a range filters the totals and is remembered',
+      (tester) async {
+    await pumpInsights(tester, seed: true);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Last 30 days'));
+    await tester.pumpAndSettle();
+    expect(settings.insightsRange, InsightsRange.last30Days);
+    // The seeded sittings are from July 2026, outside the last 30 days.
+    expect(find.text('1h 10m'), findsNothing);
+    expect(find.text('0m'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'All time'));
+    await tester.pumpAndSettle();
+    expect(settings.insightsRange, InsightsRange.allTime);
+    expect(find.text('1h 10m'), findsOneWidget);
+    expect(find.text('Pages a day (all time)'), findsOneWidget);
+  });
+
+  testWidgets('a stored range is what the page opens on', (tester) async {
+    await pumpInsights(tester,
+        seed: true, range: InsightsRange.last30Days);
+    final chip = tester.widget<ChoiceChip>(
+        find.widgetWithText(ChoiceChip, 'Last 30 days'));
+    expect(chip.selected, isTrue);
+    expect(find.text('1h 10m'), findsNothing);
+  });
+
+  testWidgets('the streaks and the 12-week map ignore the range',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpInsights(tester, seed: true);
+    int days() => semanticsLabelsUnder(tester, find.byType(HeatmapGrid))
+        .where((l) => l.contains(': '))
+        .length;
+    final before = days();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'This year'));
+    await tester.pumpAndSettle();
+    expect(days(), before);
+    // One labelled node per day of the 12 weeks.
+    expect(before, 84);
+    handle.dispose();
+  });
+
+  testWidgets('the range control and heat map hold up at phone width and 2x text',
+      (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpInsights(tester, seed: true);
+    tester.view.physicalSize = const Size(360, 12000);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.widgetWithText(ChoiceChip, 'Last 30 days'), findsOneWidget);
+    expect(find.byType(HeatmapGrid), findsOneWidget);
   });
 
   testWidgets('the Month by month entry opens the review', (tester) async {

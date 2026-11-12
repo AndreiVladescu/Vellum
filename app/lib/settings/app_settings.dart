@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../server/sync_scope.dart';
+import '../stats/insights_range.dart';
 import '../stats/reading_goals.dart';
 import 'package:uuid/uuid.dart';
 
@@ -54,6 +55,9 @@ class AppSettingsStore extends ChangeNotifier {
   static const _goalBooksKey = 'settings.readingGoalBooks';
   static const _goalMinutesKey = 'settings.readingGoalMinutes';
 
+  // The Insights range control (v1.3.2), per device.
+  static const _insightsRangeKey = 'settings.insightsRange';
+
   final SharedPreferences _prefs;
 
   static Future<AppSettingsStore> load() async =>
@@ -86,6 +90,22 @@ class AppSettingsStore extends ChangeNotifier {
       await _prefs.remove(_goalMinutesKey);
     } else {
       await _prefs.setInt(_goalMinutesKey, m);
+    }
+    notifyListeners();
+  }
+
+  // ---- Insights range (v1.3.2) ---------------------------------------------
+
+  /// The range the Insights page opens on. Defaults to the page's original
+  /// layout; an unknown stored value reads as the default.
+  InsightsRange get insightsRange =>
+      InsightsRange.parse(_prefs.getString(_insightsRangeKey));
+
+  Future<void> setInsightsRange(InsightsRange range) async {
+    if (range == InsightsRange.standard) {
+      await _prefs.remove(_insightsRangeKey);
+    } else {
+      await _prefs.setString(_insightsRangeKey, range.name);
     }
     notifyListeners();
   }

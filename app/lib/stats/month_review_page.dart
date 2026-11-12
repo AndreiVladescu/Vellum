@@ -6,6 +6,7 @@ import '../data/library_repository.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
 import '../widgets/page_insets.dart';
+import 'day_detail_sheet.dart';
 import 'duration_label.dart';
 import 'heatmap_grid.dart';
 import 'month_review.dart';
@@ -143,7 +144,7 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
         else ...[
           _stats(context, review),
           const SizedBox(height: 20),
-          _calendar(context, review),
+          _calendar(context, review, sessions, books),
           const SizedBox(height: 20),
           _comparison(context, sessions, review),
           if (review.goalDaysMet != null) ...[
@@ -308,7 +309,12 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
     );
   }
 
-  Widget _calendar(BuildContext context, MonthReview review) {
+  Widget _calendar(
+    BuildContext context,
+    MonthReview review,
+    List<ReadingSession> sessions,
+    List<Book> books,
+  ) {
     final l10n = L10n.of(context);
     final theme = Theme.of(context);
     final material = MaterialLocalizations.of(context);
@@ -319,8 +325,12 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
     final cells = <HeatmapCell?>[
       for (var i = 0; i < blanks; i++) null,
       for (var d = 1; d <= total; d++)
-        _cell(l10n, DateTime(review.month.year, review.month.month, d),
-            review.minutesByDay, review.pagesByDay),
+        heatmapCellFor(
+          l10n,
+          DateTime(review.month.year, review.month.month, d),
+          minutes: review.minutesByDay,
+          pages: review.pagesByDay,
+        ),
       // Pad to whole weeks so the layout maths never sees a short last row.
       for (var i = blanks + total; i < rows * 7; i++) null,
     ];
@@ -368,6 +378,18 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
                     textColor: theme.colorScheme.onSurface,
                     focusColor: theme.colorScheme.tertiary,
                     semanticsLabel: l10n.monthHeading(review.month),
+                    onDayTap: (day) => showDayDetailSheet(
+                      context,
+                      day: day,
+                      sessions: sessions,
+                      books: books,
+                      onOpenBook: (book) => openBookDetail(
+                        context,
+                        repository: widget.repository,
+                        settings: widget.settings,
+                        book: book,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -375,23 +397,6 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
           ],
         ),
       ),
-    );
-  }
-
-  HeatmapCell _cell(
-    L10n l10n,
-    DateTime day,
-    Map<DateTime, int> minutes,
-    Map<DateTime, int> pages,
-  ) {
-    final m = minutes[day] ?? 0;
-    final p = pages[day] ?? 0;
-    return HeatmapCell(
-      day: day,
-      value: m,
-      label: m == 0 && p == 0
-          ? l10n.insightsDayLabelNone(day)
-          : l10n.insightsDayLabelRead(day, formatMinutes(l10n, m), p),
     );
   }
 

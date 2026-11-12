@@ -30,6 +30,9 @@ this drifts the way the first round did.
   never silently drops a book that is on no shelf
 - large-text (2× `textScaler`) renders the shelf and detail page without
   overflow — `app/test/widgets/large_text_test.dart`
+- the Insights heat maps (12 weeks, and a month) give every day a labelled
+  node with a tap action, take arrow keys and Enter, and open a day sheet —
+  `app/test/stats/month_review_page_test.dart`
 
 ## Manual checks (no test can do these)
 
