@@ -28,6 +28,12 @@ static BOOTSTRAP_TOKEN: std::sync::LazyLock<Option<String>> = std::sync::LazyLoc
         .filter(|s| !s.is_empty())
 });
 
+/// Whether a bootstrap token is configured. Only the fact: the console's
+/// configuration page shows it as a yes/no, never the value.
+pub fn bootstrap_token_set() -> bool {
+    BOOTSTRAP_TOKEN.is_some()
+}
+
 /// Enforce the bootstrap token when one is configured. Compares the SHA-256 of
 /// each side so the equality check runs over fixed-length hex (a timing leak
 /// there reveals nothing about the secret).

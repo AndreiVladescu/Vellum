@@ -196,6 +196,56 @@ pub async fn stats(State(state): State<AppState>, user: AuthUser) -> AppResult<J
     }))
 }
 
+/// What `GET /api/admin/config` returns. A struct with named fields rather than
+/// a dump of the environment, on purpose: the response can only ever contain
+/// what is written here, so a new secret added to the environment later is not
+/// published by accident. Secrets (the SMTP password and user, the bootstrap
+/// token) appear only as yes/no.
+#[derive(Serialize)]
+pub struct ServerConfig {
+    pub port: u16,
+    pub public_url: String,
+    pub data_dir: String,
+    pub database_path: String,
+    pub max_upload_mb: u64,
+    pub tls: bool,
+    pub mail: bool,
+    pub text_indexing: bool,
+    pub audit_log: bool,
+    pub bootstrap_token: bool,
+}
+
+/// `GET /api/admin/config` — the settings in effect, read-only.
+///
+/// Master-only like `stats`: paths and the public URL describe the host, which
+/// is not a member's business. Nothing here can be changed over HTTP; the
+/// environment is the one place configuration lives.
+pub async fn config(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<ServerConfig>> {
+    if !user.is_master {
+        return Err(AppError::Forbidden("master only".into()));
+    }
+    Ok(Json(ServerConfig {
+        // Read the same way `main` reads them, so the page shows what the
+        // process is really using; `AppState` does not carry these two.
+        port: std::env::var("VELLUM_PORT")
+            .ok()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(3000),
+        public_url: state.public_base_url.clone(),
+        data_dir: state.data_dir.to_string_lossy().into_owned(),
+        database_path: std::env::var("VELLUM_DB").unwrap_or_else(|_| "vellum.db".into()),
+        max_upload_mb: (state.max_upload_bytes / (1024 * 1024)) as u64,
+        tls: state.tls_cert.is_some(),
+        mail: state.mailer.is_some(),
+        text_indexing: state.index_text,
+        audit_log: state.audit,
+        bootstrap_token: crate::auth::bootstrap_token_set(),
+    }))
+}
+
 /// Recursive size of a directory, best-effort: an unreadable entry contributes
 /// zero rather than failing the whole endpoint.
 async fn directory_size(root: &std::path::Path) -> u64 {

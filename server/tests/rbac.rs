@@ -507,6 +507,7 @@ async fn a_member_cannot_act_as_the_master() {
             })),
         ),
         ("GET", "/api/admin/stats", None),
+        ("GET", "/api/admin/config", None),
         ("POST", "/api/admin/sweep", None),
         ("GET", "/api/admin/snapshot", None),
     ] {

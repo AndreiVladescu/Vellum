@@ -203,6 +203,8 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Operator dashboard numbers (plan 5 #37). Master-only — see the
         // handler; counts of other people's shares are not a member's business.
         .route("/admin/stats", get(observability::stats))
+        // The settings in effect, as an explicit allowlist (never the secrets).
+        .route("/admin/config", get(observability::config))
         // Integrity sweep and one-command backup (plan 5 #12), both master-only.
         .route("/admin/sweep", post(admin::sweep))
         .route("/admin/reindex", post(text_index::reindex))
