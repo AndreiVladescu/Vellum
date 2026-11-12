@@ -121,10 +121,10 @@ that gets posted.**
 
 ### v1.3.2 — month by month
 
-- [ ] **M** A review page per month (books finished, pages, minutes, best day,
+- [x] **M** A review page per month (books finished, pages, minutes, best day,
       longest sitting, compared with the month before), and a list to step back
       through earlier months
-- [ ] **M** Insights you can explore: a range picker (30 days / year / all
+- [x] **M** Insights you can explore: a range picker (30 days / year / all
       time) and heat-map days you can tap
 
 ### v1.3.3 — the year, and the library
