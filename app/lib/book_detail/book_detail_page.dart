@@ -23,6 +23,7 @@ import 'lend_sheet.dart';
 import 'physical_copies_section.dart';
 import 'read_button.dart';
 import 'reader_notes_section.dart';
+import 'reading_stats_section.dart';
 import 'send_to_device_sheet.dart';
 import '../data/shelf_service.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -634,6 +635,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               const SizedBox(height: 24),
               _SeriesStrip(book: book, repository: repository),
               _StatusAndRating(book: book, repository: repository),
+              ReadingStatsSection(book: book, repository: repository),
               ReaderNotesSection(book: book, repository: repository),
               // The reading record for this book (plan 5 #22). No onJump here:
               // the detail page has nowhere to jump to, so entries are a record

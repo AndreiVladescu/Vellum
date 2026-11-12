@@ -39,6 +39,7 @@ MIGRATED=(
   lib/book_detail/physical_copies_section.dart
   lib/book_detail/read_button.dart
   lib/book_detail/reader_notes_section.dart
+  lib/book_detail/reading_stats_section.dart
   lib/book_detail/send_to_device_sheet.dart
   lib/data/background_work.dart
   lib/data/backup_crypto.dart
@@ -205,6 +206,7 @@ MIGRATED=(
   lib/shelf/shelf_target_sheet.dart
   lib/shelf/shelf_view.dart
   lib/shelf/spine_style.dart
+  lib/stats/book_reading_stats.dart
   lib/stats/duration_label.dart
   lib/stats/goals_dialog.dart
   lib/stats/insights_page.dart

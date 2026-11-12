@@ -789,6 +789,23 @@ days-in-year`, rounded down, so 1 January expects nothing and 31 December expect
 the target; the page says "on pace", "N ahead" or "N behind" and, once the target
 is met, only that it was reached.
 
+**Per-book statistics** (v1.3.1) are a "Your reading" section on the book page,
+present only once the book has a sitting: time spent, number of sittings, the days
+of the first and last, and, only where they mean something, a pace and an estimated
+time left. It is a `.watch()` on that book's sittings (`idx_reading_sessions_book`
+already covers `book_id`, so no schema change), which is why it updates when a
+sitting ends. The numbers reuse `ReadingStats`, so the pace here is the pace the
+reader's counter uses.
+
+**The unit decides what is shown.** A PDF sitting records page numbers, which is what
+`pageCount` describes. An EPUB sitting records the *chapter* it ended in, and the
+database holds no chapter count, so "pages a minute" would be chapters a minute and
+"pages left" would subtract a chapter number from a printed page count. Sittings
+don't record the file they came from, so a book with any EPUB gets time and sittings
+only, and pace and the estimate are for books whose files are all PDFs. The estimate
+is labelled as one and, like the counter, is absent rather than invented when there
+is no measured pace, no page count, no current page, or nothing left to read.
+
 **Reading status, ratings and dates** (both, plan 5 #18) are `status`
 (`unread`/`reading`/`finished`/`abandoned`/`reference`, plus `wishlist`), `rating`
 (1–5), `startedAt`/`finishedAt` and `readCount`. In the app they are columns on the

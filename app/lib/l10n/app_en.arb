@@ -9348,5 +9348,75 @@
         "type": "int"
       }
     }
+  },
+
+  "detailReadingTitle": "Your reading",
+  "@detailReadingTitle": {
+    "description": "Heading of the section on the book page with this book's reading statistics."
+  },
+
+  "detailReadingTimeLabel": "Time spent",
+  "@detailReadingTimeLabel": {
+    "description": "Label: total time spent reading this book."
+  },
+
+  "detailReadingSittingsLabel": "Sittings",
+  "@detailReadingSittingsLabel": {
+    "description": "Label: how many separate reading sittings this book has had."
+  },
+
+  "detailReadingFirstLabel": "First read",
+  "@detailReadingFirstLabel": {
+    "description": "Label: the date of the first reading sitting of this book."
+  },
+
+  "detailReadingLastLabel": "Last read",
+  "@detailReadingLastLabel": {
+    "description": "Label: the date of the most recent reading sitting of this book."
+  },
+
+  "detailReadingDate": "{date}",
+  "@detailReadingDate": {
+    "description": "A date in the reading statistics, e.g. \"Mar 4, 2026\".",
+    "placeholders": {
+      "date": {
+        "type": "DateTime",
+        "format": "yMMMd"
+      }
+    }
+  },
+
+  "detailReadingPaceLabel": "Pace",
+  "@detailReadingPaceLabel": {
+    "description": "Label: how fast this book is read, in pages per minute."
+  },
+
+  "detailReadingPace": "{pace} pages a minute",
+  "@detailReadingPace": {
+    "description": "Reading pace for this book; pace is a number with one decimal.",
+    "placeholders": {
+      "pace": {
+        "type": "double",
+        "format": "decimalPatternDigits",
+        "optionalParameters": {
+          "decimalDigits": 1
+        }
+      }
+    }
+  },
+
+  "detailReadingTimeLeftLabel": "Estimated time left",
+  "@detailReadingTimeLeftLabel": {
+    "description": "Label: an estimate of the reading time left in this book, based on the reader's own pace."
+  },
+
+  "detailReadingTimeLeft": "About {duration}",
+  "@detailReadingTimeLeft": {
+    "description": "The estimated time left; duration is already formatted, e.g. \"About 2h 15m\".",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }
