@@ -195,12 +195,12 @@ A new kind of book, so it starts with a design note rather than code.
       page, no build step, same embedded delivery
 - [x] **M** Navigation in four groups — Library, Lending, People and sharing,
       Server — each page with its own address, usable on a phone
-- [ ] **M** A landing page: counts, loans due, requests waiting, recent
+- [x] **M** A landing page: counts, loans due, requests waiting, recent
       activity
 
 ### v1.6.1 — looking after it
 
-- [ ] **M** A *Server* page: version, whether a newer release exists, the
+- [x] **M** A *Server* page: version, whether a newer release exists, the
       configuration in effect (read-only), capabilities, storage, and the
       backup, sweep and activity-log actions that exist today as endpoints
 - [ ] **M** Scheduled server-side backups to a directory, with rotation
