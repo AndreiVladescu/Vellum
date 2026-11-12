@@ -4,6 +4,8 @@ import '../widgets/page_insets.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 import 'catalog_entry.dart';
 import 'free_catalogues.dart';
 import 'opds_client.dart';
@@ -66,7 +68,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
           : 'https://$text',
     );
     if (uri == null) {
-      setState(() => _error = 'That does not look like a URL.');
+      setState(() => _error = L10n.of(context).opdsBadUrl);
       return;
     }
     setState(() {
@@ -84,7 +86,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
     } on OpdsException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        _error = e.messageOf(L10n.of(context));
         _busy = false;
       });
     } catch (e) {
@@ -108,6 +110,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
   /// one dead link should still import the other nineteen books.
   Future<void> _importSelected() async {
     if (_selected.isEmpty) return;
+    final l10n = L10n.of(context);
     setState(() {
       _busy = true;
       _error = null;
@@ -120,7 +123,8 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
     for (final entry in _selected.values) {
       if (!mounted) return;
       setState(() {
-        _downloadLabel = '${++done} of ${_selected.length}: ${entry.title}';
+        _downloadLabel =
+            l10n.opdsDownloadProgress(++done, _selected.length, entry.title);
       });
       final link = entry.acquisitions.first;
       try {
@@ -138,14 +142,13 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
       setState(() {
         _busy = false;
         _downloadLabel = '';
-        _error = 'Nothing could be downloaded from that catalogue.';
+        _error = l10n.opdsNothingDownloaded;
       });
       return;
     }
     if (failed.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${failed.length} book${failed.length == 1 ? '' : 's'} '
-            'could not be downloaded and were skipped'),
+        content: Text(l10n.opdsSomeSkipped(failed.length)),
       ));
     }
     Navigator.of(context).pop(entries);
@@ -154,14 +157,15 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final feed = _feed;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OPDS catalogue'),
+        title: Text(l10n.opdsTitle),
         leading: _history.length > 1
             ? IconButton(
                 icon: const Icon(Icons.arrow_upward),
-                tooltip: 'Up a level',
+                tooltip: l10n.opdsUpTooltip,
                 onPressed: _busy ? null : _back,
               )
             : null,
@@ -175,9 +179,9 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
                 Expanded(
                   child: TextField(
                     controller: _url,
-                    decoration: const InputDecoration(
-                      labelText: 'Catalogue URL',
-                      hintText: 'https://example.com/opds',
+                    decoration: InputDecoration(
+                      labelText: l10n.opdsUrlLabel,
+                      hintText: 'https://example.com/opds', // i18n-ignore: a URL
                       border: OutlineInputBorder(),
                     ),
                     onSubmitted: (v) => _open(v),
@@ -186,7 +190,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
                 const SizedBox(width: 8),
                 FilledButton(
                   onPressed: _busy ? null : () => _open(_url.text),
-                  child: const Text('Open'),
+                  child: Text(l10n.opdsOpen),
                 ),
               ],
             ),
@@ -206,7 +210,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
           if (_busy && _downloadLabel.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Text('Downloading $_downloadLabel'),
+              child: Text(l10n.opdsDownloading(_downloadLabel)),
             ),
           Expanded(
             child: feed == null
@@ -255,7 +259,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
                             onPressed:
                                 _busy ? null : () => _open(feed.nextHref!),
                             icon: const Icon(Icons.expand_more),
-                            label: const Text('Next page'),
+                            label: Text(l10n.opdsNextPage),
                           ),
                         ),
                     ],
@@ -270,8 +274,7 @@ class _OpdsBrowserPageState extends State<OpdsBrowserPage> {
               child: FilledButton.icon(
                 onPressed: _busy ? null : _importSelected,
                 icon: const Icon(Icons.download),
-                label: Text('Review ${_selected.length} book'
-                    '${_selected.length == 1 ? '' : 's'}'),
+                label: Text(l10n.opdsReview(_selected.length)),
               ),
             ),
     );
@@ -287,6 +290,7 @@ class _OpdsIntro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     // A list rather than a centred block: the whole point of this screen is now
     // that it offers somewhere to go, and a hint that reads "paste an address"
     // over an empty box is the state this replaces.
@@ -300,22 +304,20 @@ class _OpdsIntro extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Center(
-          child: Text('Browse an OPDS catalogue',
+          child: Text(l10n.opdsIntroTitle,
               style: theme.textTheme.titleMedium),
         ),
         const SizedBox(height: 6),
         Text(
-          'Paste the address of any OPDS server — Calibre-Web, Kavita, or '
-          'another Vellum. Pick the books you want and they go through the '
-          'same review as any other import.',
+          l10n.opdsIntroBody,
           textAlign: TextAlign.center,
           style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 24),
-        Text('Or start with a free one', style: theme.textTheme.titleSmall),
+        Text(l10n.opdsFreeTitle, style: theme.textTheme.titleSmall),
         const SizedBox(height: 4),
         Text(
-          'Public-domain books you can download and keep.',
+          l10n.opdsFreeBody,
           style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
@@ -325,7 +327,7 @@ class _OpdsIntro extends StatelessWidget {
             child: ListTile(
               leading: const Icon(Icons.auto_stories_outlined),
               title: Text(catalogue.name),
-              subtitle: Text(catalogue.description),
+              subtitle: Text(catalogue.descriptionOf(l10n)),
               trailing: const Icon(Icons.chevron_right),
               onTap: onPick == null ? null : () => onPick!(catalogue.url),
             ),

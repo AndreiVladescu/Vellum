@@ -645,7 +645,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   void _runSearch(String query) {
     final epub = _loaded;
     if (epub == null) return;
-    final result = searchEpub(epub.chapters, query);
+    final result = searchEpub(L10n.of(context), epub.chapters, query);
     setState(() {
       _hits = result.hits;
       _hitsTruncated = result.truncated;

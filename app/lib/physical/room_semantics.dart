@@ -1,4 +1,5 @@
 import '../data/database.dart';
+import '../l10n/gen/app_localizations.dart';
 import 'layout_repository.dart';
 
 /// The room, as a screen reader hears it (plan 5 #42).
@@ -36,9 +37,9 @@ class ShelfSummary {
   /// The count leads because it is the fact a listener can hold on to; the
   /// titles follow for as long as they last. An empty shelf says so rather
   /// than trailing off after the colon.
-  String get spoken => titles.isEmpty
-      ? '$name: empty'
-      : '$name: $count book${count == 1 ? '' : 's'} — ${titles.join(', ')}';
+  String spokenOf(L10n l10n) => titles.isEmpty
+      ? l10n.roomSpokenEmpty(name)
+      : l10n.roomSpokenBooks(name, count, titles.join(', '));
 }
 
 /// Groups a room's placed books by the shelf they stand on.
@@ -48,7 +49,8 @@ class ShelfSummary {
 /// edit, or not overlapping any plank — are collected last under "Not on a
 /// shelf" rather than being dropped, because a book the canvas shows and the
 /// summary omits is worse than an awkward heading.
-List<ShelfSummary> summarizeRoom({
+List<ShelfSummary> summarizeRoom(
+  L10n l10n, {
   required List<PhysicalShelf> shelves,
   required List<PlacedBook> placed,
 }) {
@@ -64,7 +66,7 @@ List<ShelfSummary> summarizeRoom({
   for (var i = 0; i < ordered.length; i++) {
     final label = ordered[i].label?.trim();
     names[ordered[i].id] =
-        (label == null || label.isEmpty) ? 'Shelf ${i + 1}' : label;
+        (label == null || label.isEmpty) ? l10n.roomShelfPositional(i + 1) : label;
   }
 
   final byShelf = <String, List<PlacedBook>>{};
@@ -94,14 +96,14 @@ List<ShelfSummary> summarizeRoom({
         titles: titlesOf(byShelf[shelf.id] ?? const []),
       ),
     if (loose.isNotEmpty)
-      ShelfSummary(name: 'Not on a shelf', titles: titlesOf(loose)),
+      ShelfSummary(name: l10n.roomNotOnShelf, titles: titlesOf(loose)),
   ];
 }
 
 /// The whole room in one string, for the canvas's `Semantics.label`.
-String roomSemanticLabel(List<ShelfSummary> summaries) {
-  if (summaries.isEmpty) return 'Empty room. Add a shelf, then place books.';
-  return summaries.map((s) => s.spoken).join('. ');
+String roomSemanticLabel(L10n l10n, List<ShelfSummary> summaries) {
+  if (summaries.isEmpty) return l10n.roomSemanticEmpty;
+  return summaries.map((s) => s.spokenOf(l10n)).join('. ');
 }
 
 double _top(PhysicalShelf s) => s.y1 > s.y2 ? s.y1 : s.y2;

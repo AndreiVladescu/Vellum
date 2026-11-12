@@ -82,17 +82,22 @@ class WishlistService {
   /// Adds the missing volume of a series (plan 5 #17's gap detection feeding
   /// #21a). The title is a placeholder the user can correct — the point is the
   /// *slot*, not a guess at what the book is called.
+  ///
+  /// [title] and [note] are the stored text: callers with a screen pass it
+  /// in the reader's language; the English defaults serve tests and tools.
   Future<String> addSeriesGap({
     required String seriesName,
     required int volume,
     String? author,
+    String? title,
+    String? note,
   }) async {
     return add(
-      title: '$seriesName vol. $volume',
+      title: title ?? '$seriesName vol. $volume',
       author: author,
       series: seriesName,
       seriesIndex: volume.toDouble(),
-      note: 'Missing volume $volume of $seriesName',
+      note: note ?? 'Missing volume $volume of $seriesName',
     );
   }
 

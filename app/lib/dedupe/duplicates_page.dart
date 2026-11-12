@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../import/import_plan.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 import '../snack_bars.dart';
 import '../widgets/page_insets.dart';
 import 'duplicate_finder.dart';
@@ -79,20 +81,22 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
       _merged.add(result.toString());
       _pairs = _find();
     });
+    final l10n = L10n.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       appSnackBar(
-        content: const Text('Merged'),
+        content: Text(l10n.duplicatesMergedSnack),
         action: SnackBarAction(
-          label: 'What moved',
+          label: l10n.duplicatesWhatMoved,
           onPressed: () => showDialog<void>(
             context: context,
             builder: (_) => AlertDialog(
-              title: const Text('What the merge moved'),
-              content: SingleChildScrollView(child: Text(result.toString())),
+              title: Text(l10n.duplicatesWhatMovedTitle),
+              content:
+                  SingleChildScrollView(child: Text(result.describe(l10n))),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
+                  child: Text(l10n.duplicatesClose),
                 ),
               ],
             ),
@@ -104,8 +108,9 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Duplicate books')),
+      appBar: AppBar(title: Text(l10n.duplicatesTitle)),
       body: FutureBuilder<List<DuplicatePair>>(
         future: _pairs,
         builder: (context, snapshot) {
@@ -124,14 +129,13 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                     const SizedBox(height: 12),
                     Text(
                       _merged.isEmpty
-                          ? 'No duplicates found'
-                          : 'No duplicates left',
+                          ? l10n.duplicatesNoneFound
+                          : l10n.duplicatesNoneLeft,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Vellum compares file contents, ISBNs, and titles with '
-                      'their authors.',
+                    Text(
+                      l10n.duplicatesHowItWorks,
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -152,7 +156,8 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                 title: Text(pair.a.title,
                     maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                  '${pair.reason.label} · also “${pair.b.title}”',
+                  l10n.duplicatesPairSubtitle(
+                      pair.reason.labelOf(l10n), pair.b.title),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -226,7 +231,7 @@ class _MergeDialogState extends State<_MergeDialog> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Merge failed: $e')),
+        SnackBar(content: Text(L10n.of(context).duplicatesMergeFailed('$e'))),
       );
     }
   }
@@ -234,17 +239,19 @@ class _MergeDialogState extends State<_MergeDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return AlertDialog(
-      title: const Text('Merge these books?'),
+      title: Text(l10n.duplicatesMergeTitle),
       content: SizedBox(
         width: 520,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(widget.reason.label, style: theme.textTheme.labelLarge),
+              Text(widget.reason.labelOf(l10n),
+                  style: theme.textTheme.labelLarge),
               const SizedBox(height: 12),
-              const Text('Which one should survive?'),
+              Text(l10n.duplicatesWhichSurvives),
               RadioGroup<String>(
                 groupValue: _keeperId,
                 onChanged: (String? id) {
@@ -271,7 +278,7 @@ class _MergeDialogState extends State<_MergeDialog> {
               ),
               if (_conflicts.isNotEmpty) ...[
                 const Divider(),
-                Text('These differ — pick what to keep:',
+                Text(l10n.duplicatesDiffer,
                     style: theme.textTheme.labelLarge),
                 for (final conflict in _conflicts)
                   Padding(
@@ -279,7 +286,8 @@ class _MergeDialogState extends State<_MergeDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(conflict.label, style: theme.textTheme.labelMedium),
+                        Text(conflict.labelOf(l10n),
+                            style: theme.textTheme.labelMedium),
                         SegmentedButton<MergeChoice>(
                           segments: [
                             ButtonSegment(
@@ -313,9 +321,7 @@ class _MergeDialogState extends State<_MergeDialog> {
               ],
               const Divider(),
               Text(
-                'Files, physical copies, loans, shelves, authors and genres all '
-                'move to the surviving book. “${_loser.title}” is then deleted '
-                'here and on the server. This can’t be undone.',
+                l10n.duplicatesMoveNote(_loser.title),
                 style: theme.textTheme.bodySmall,
               ),
             ],
@@ -325,11 +331,11 @@ class _MergeDialogState extends State<_MergeDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _busy ? null : _merge,
-          child: Text(_busy ? 'Merging…' : 'Merge'),
+          child: Text(_busy ? l10n.duplicatesMerging : l10n.duplicatesMerge),
         ),
       ],
     );

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/external_open.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../snack_bars.dart';
 
 /// A ready-made catalogue file, which is also the documentation.
@@ -74,10 +75,11 @@ class _SheetBody extends StatelessWidget {
 
   Future<void> _saveTemplate(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     final location = await getSaveLocation(
       suggestedName: 'vellum_import_template.csv',
       acceptedTypeGroups: const [
-        XTypeGroup(label: 'CSV', extensions: ['csv']),
+        XTypeGroup(label: 'CSV', extensions: ['csv']), // i18n-ignore: format name
       ],
     );
     if (location == null) return;
@@ -85,9 +87,9 @@ class _SheetBody extends StatelessWidget {
     await file.writeAsString(catalogTemplateCsv);
     messenger.showSnackBar(
       appSnackBar(
-        content: Text('Saved to ${location.path}'),
+        content: Text(l10n.catalogHelpSaved(location.path)),
         action: SnackBarAction(
-          label: 'Open',
+          label: l10n.catalogHelpOpen,
           onPressed: () => openOrShare(file, mimeType: 'text/csv'),
         ),
       ),
@@ -97,18 +99,16 @@ class _SheetBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final muted = TextStyle(color: theme.colorScheme.onSurfaceVariant);
     return ListView(
       controller: controller,
       padding: pageInsets(context, EdgeInsets.fromLTRB(20, 0, 20, 28)),
       children: [
-        Text('How to structure the file', style: theme.textTheme.titleLarge),
+        Text(l10n.catalogHelpTitle, style: theme.textTheme.titleLarge),
         const SizedBox(height: 8),
         Text(
-          'One header row, one book per row, and a column called title. '
-          'Everything else is optional, unrecognised columns are ignored, and '
-          'the order never matters — so an export from somewhere else usually '
-          'imports without editing.',
+          l10n.catalogHelpIntro,
           style: muted,
         ),
         const SizedBox(height: 16),
@@ -117,23 +117,23 @@ class _SheetBody extends StatelessWidget {
             FilledButton.icon(
               onPressed: () => _saveTemplate(context),
               icon: const Icon(Icons.download),
-              label: const Text('Save a template'),
+              label: Text(l10n.catalogHelpSaveTemplate),
             ),
             const SizedBox(width: 8),
             TextButton.icon(
               onPressed: () {
                 Clipboard.setData(const ClipboardData(text: catalogTemplateCsv));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Template copied')),
+                  SnackBar(content: Text(l10n.catalogHelpCopied)),
                 );
               },
               icon: const Icon(Icons.copy_all_outlined),
-              label: const Text('Copy'),
+              label: Text(l10n.catalogHelpCopy),
             ),
           ],
         ),
         const SizedBox(height: 20),
-        Text('Columns', style: theme.textTheme.titleMedium),
+        Text(l10n.catalogHelpColumns, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         for (final (name, note, aliases) in catalogColumns)
           Padding(
@@ -143,10 +143,11 @@ class _SheetBody extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(name, style: theme.textTheme.bodyMedium),
+                    Text(_columnName(l10n, name),
+                        style: theme.textTheme.bodyMedium),
                     if (note.isNotEmpty) ...[
                       const SizedBox(width: 6),
-                      Text('($note)',
+                      Text('(${note == 'required' ? l10n.catalogHelpRequired : note})', // i18n-ignore: wraps a translated word in parentheses
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.primary,
                           )),
@@ -162,43 +163,39 @@ class _SheetBody extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 12),
-        Text('Getting the values right', style: theme.textTheme.titleMedium),
+        Text(l10n.catalogHelpValuesTitle, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
-        const _Point(
-          'Several authors or tags in one cell',
-          'Separate them with ; or , or &. If you use commas, wrap the cell in '
-              'quotes: "fantasy, humour".',
-        ),
-        const _Point(
-          'ISBNs',
-          'Hyphens and spaces are fine. A value that is not 10 or 13 '
-              'characters once cleaned up is left out rather than stored wrong.',
-        ),
-        const _Point(
-          'Year and pages',
-          'Plain numbers. Anything else is left empty rather than guessed at.',
-        ),
-        const _Point(
-          'JSON works too',
-          'A list of objects, or an object with a "books" list, using the same '
-              'names. The format is read from the contents, not the extension.',
-        ),
-        const _Point(
-          'Files are not part of it',
-          'A catalogue creates books with no PDF or EPUB attached. To bring the '
-              'files, import the folder they are in — matching books are '
-              'recognised rather than duplicated.',
-        ),
+        _Point(l10n.catalogHelpMultiTitle, l10n.catalogHelpMultiBody),
+        _Point(l10n.catalogHelpIsbnTitle, l10n.catalogHelpIsbnBody),
+        _Point(l10n.catalogHelpNumbersTitle, l10n.catalogHelpNumbersBody),
+        _Point(l10n.catalogHelpJsonTitle, l10n.catalogHelpJsonBody),
+        _Point(l10n.catalogHelpFilesTitle, l10n.catalogHelpFilesBody),
         const SizedBox(height: 12),
         Text(
-          'The full guide, including how file names are read during a folder '
-          'import, is in docs/IMPORTING.md.',
+          l10n.catalogHelpGuide,
           style: muted,
         ),
       ],
     );
   }
 }
+
+/// [catalogColumns]' English column names in the reader's language. The
+/// English name is the identity, so the table and its tests stay as they were.
+String _columnName(L10n l10n, String name) => switch (name) {
+      'Title' => l10n.catalogHelpColTitle,
+      'Author(s)' => l10n.catalogHelpColAuthors,
+      'Subtitle' => l10n.catalogHelpColSubtitle,
+      'ISBN' => l10n.catalogHelpColIsbn,
+      'Publisher' => l10n.catalogHelpColPublisher,
+      'Year' => l10n.catalogHelpColYear,
+      'Pages' => l10n.catalogHelpColPages,
+      'Series' => l10n.catalogHelpColSeries,
+      'Number in series' => l10n.catalogHelpColSeriesNumber,
+      'Genres' => l10n.catalogHelpColGenres,
+      'Description' => l10n.catalogHelpColDescription,
+      _ => name,
+    };
 
 class _Point extends StatelessWidget {
   const _Point(this.title, this.body);

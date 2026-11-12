@@ -4,6 +4,7 @@ import '../widgets/page_insets.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import 'physical_metrics.dart';
 
 /// Bottom-sheet picker for choosing library books to place in a room.
@@ -20,17 +21,19 @@ class BookPicker extends StatefulWidget {
   const BookPicker({
     super.key,
     required this.repository,
-    this.title = 'Add books to the room',
-    this.confirmLabel = 'Add',
+    this.title,
+    this.confirmLabel,
     this.alreadyPlacedIds = const {},
   });
 
   final LibraryRepository repository;
-  final String title;
+  /// Defaults to "Add books to the room".
+  final String? title;
 
   /// Verb on the confirm button, followed by the count once anything is
   /// ticked ("Add 12").
-  final String confirmLabel;
+  /// Defaults to "Add".
+  final String? confirmLabel;
 
   /// Books that already have a copy in this room. They stay selectable — you
   /// can genuinely own two copies — but they are marked, and *Select all*
@@ -48,6 +51,8 @@ class _BookPickerState extends State<BookPicker> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
+    final confirmLabel = widget.confirmLabel ?? l10n.bookPickerConfirm;
     return StreamBuilder<List<Book>>(
       stream: widget.repository.watchAllBooks(),
       builder: (context, snap) {
@@ -74,13 +79,14 @@ class _BookPickerState extends State<BookPicker> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Column(
                   children: [
-                    Text(widget.title, style: theme.textTheme.titleMedium),
+                    Text(widget.title ?? l10n.bookPickerTitle,
+                        style: theme.textTheme.titleMedium),
                     const SizedBox(height: 8),
                     TextField(
                       onChanged: (v) => setState(() => _query = v),
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Find books to place…',
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search),
+                        hintText: l10n.bookPickerSearchHint,
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -107,8 +113,8 @@ class _BookPickerState extends State<BookPicker> {
                           : Icons.check_box_outline_blank),
                       label: Text(
                         allSelected
-                            ? 'Clear these ${selectable.length}'
-                            : 'Select these ${selectable.length}',
+                            ? l10n.bookPickerClearThese(selectable.length)
+                            : l10n.bookPickerSelectThese(selectable.length),
                       ),
                     ),
                     const Spacer(),
@@ -116,7 +122,7 @@ class _BookPickerState extends State<BookPicker> {
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: Text(
-                          '${_selected.length} selected',
+                          l10n.bookPickerSelected(_selected.length),
                           style: theme.textTheme.labelLarge,
                         ),
                       ),
@@ -126,7 +132,7 @@ class _BookPickerState extends State<BookPicker> {
               const Divider(height: 1),
               Expanded(
                 child: books.isEmpty
-                    ? const Center(child: Text('No books.'))
+                    ? Center(child: Text(l10n.bookPickerNone))
                     : ListView.builder(
                         itemCount: books.length,
                         itemBuilder: (context, i) {
@@ -154,8 +160,9 @@ class _BookPickerState extends State<BookPicker> {
                                 maxLines: 1, overflow: TextOverflow.ellipsis),
                             subtitle: Text(
                               [
-                                if (here) 'already in this room',
-                                if (b.pageCount != null) '${b.pageCount} pages',
+                                if (here) l10n.bookPickerAlreadyHere,
+                                if (b.pageCount != null)
+                                  l10n.bookPickerPages(b.pageCount!),
                               ].join(' · '),
                               style: here
                                   ? TextStyle(color: theme.colorScheme.primary)
@@ -179,7 +186,7 @@ class _BookPickerState extends State<BookPicker> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                      child: Text(l10n.cancel),
                     ),
                     const Spacer(),
                     FilledButton.icon(
@@ -192,8 +199,9 @@ class _BookPickerState extends State<BookPicker> {
                       icon: const Icon(Icons.library_add),
                       label: Text(
                         _selected.isEmpty
-                            ? widget.confirmLabel
-                            : '${widget.confirmLabel} ${_selected.length}',
+                            ? confirmLabel
+                            : l10n.bookPickerConfirmCount(
+                                confirmLabel, _selected.length),
                       ),
                     ),
                   ],

@@ -15,6 +15,8 @@ import 'package:home_widget/home_widget.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/platform_l10n.dart';
 
 /// What the widget shows.
 class ContinueWidgetData {
@@ -45,7 +47,7 @@ class ContinueWidgetData {
 /// A book at 98% or more is treated as finished and doesn't count as "on the
 /// go", matching the shelf's own continue-reading strip (plan 5 #25) — the two
 /// disagreeing about what you're reading would be worse than either being wrong.
-ContinueWidgetData snapshotFor(Book? book, {String? coverPath}) {
+ContinueWidgetData snapshotFor(L10n l10n, Book? book, {String? coverPath}) {
   if (book == null) return ContinueWidgetData.empty;
   final progress = book.readingProgress;
   if (progress == null || progress >= 0.98) return ContinueWidgetData.empty;
@@ -54,7 +56,8 @@ ContinueWidgetData snapshotFor(Book? book, {String? coverPath}) {
   final page = book.lastReadPage;
   return ContinueWidgetData(
     title: book.title,
-    subtitle: page == null ? '$percent%' : '$percent% · page $page',
+    subtitle:
+        page == null ? '$percent%' : l10n.continueWidgetPage(percent, page),
     coverPath: coverPath,
   );
 }
@@ -82,7 +85,10 @@ Future<void> updateContinueWidget(LibraryRepository repository) async {
     }
 
     final cover = candidate == null ? null : repository.coverFileOf(candidate);
+    // No widget tree here to ask (this also runs from the background sync), so
+    // the platform's language, like the status-bar notifications.
     final data = snapshotFor(
+      platformL10n(),
       candidate,
       coverPath: cover != null && cover.existsSync() ? cover.path : null,
     );

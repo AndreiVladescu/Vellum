@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/database.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../server/server_client.dart';
 import 'layout_doc.dart';
 import 'physical_metrics.dart';
@@ -56,7 +57,12 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
     try {
       final layout = await widget.client.fetchLayout(widget.layoutId);
       final doc = layout.doc;
-      if (doc == null) throw const LayoutDocException('The room is empty.');
+      if (doc == null) {
+        throw LayoutDocException(
+          'The room is empty.',
+          localized: (l10n) => l10n.roomDocEmpty,
+        );
+      }
       final parsed = parseLayoutDoc(doc);
       // Titles are a separate request because the document is geometry only.
       // A failure here is not a failure of the room: it draws unnamed.
@@ -73,7 +79,7 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = e is LayoutDocException ? e.messageOf(L10n.of(context)) : '$e';
         _loading = false;
       });
     }
@@ -107,6 +113,7 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.name),
@@ -117,7 +124,7 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Shared with you · view only',
+              l10n.sharedRoomViewOnly,
               style: theme.textTheme.labelMedium,
             ),
           ),
@@ -139,9 +146,8 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
             children: [
               Icon(Icons.cloud_off, color: theme.colorScheme.outline),
               const SizedBox(height: 12),
-              const Text(
-                'This room is kept on the server, so it needs a connection to '
-                'open.',
+              Text(
+                L10n.of(context).sharedRoomNeedsConnection,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
@@ -156,7 +162,7 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
                   });
                   _load();
                 },
-                child: const Text('Try again'),
+                child: Text(L10n.of(context).sharedRoomRetry),
               ),
             ],
           ),
@@ -230,7 +236,7 @@ class _SharedRoomPageState extends State<SharedRoomPage> {
       width: w,
       height: h,
       child: Tooltip(
-        message: title ?? 'A book you cannot see',
+        message: title ?? L10n.of(context).sharedRoomUnseenBook,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: title == null
@@ -268,13 +274,14 @@ class SharedRoomsList extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-          child: Text('Shared with you', style: theme.textTheme.titleSmall),
+          child: Text(L10n.of(context).sharedRoomListTitle,
+              style: theme.textTheme.titleSmall),
         ),
         for (final room in rooms)
           ListTile(
             leading: const Icon(Icons.visibility_outlined),
             title: Text(room.name),
-            subtitle: const Text('View only — kept on the server'),
+            subtitle: Text(L10n.of(context).sharedRoomListNote),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => SharedRoomPage(

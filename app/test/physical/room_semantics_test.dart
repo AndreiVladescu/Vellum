@@ -3,6 +3,7 @@
 // — which makes "does it describe the room correctly" a correctness question,
 // not a cosmetic one.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/physical/layout_repository.dart';
 import 'package:vellum/physical/room_semantics.dart';
@@ -62,11 +63,11 @@ void main() {
       placed('p2', 'Neuromancer', x: 0.9),
     ];
 
-    final summary = summarizeRoom(shelves: shelves, placed: books);
+    final summary = summarizeRoom(L10nEn(), shelves: shelves, placed: books);
     expect(summary, hasLength(1));
     expect(summary.single.name, 'Top');
     expect(summary.single.titles, ['Dune', 'Neuromancer', 'Solaris']);
-    expect(summary.single.spoken,
+    expect(summary.single.spokenOf(L10nEn()),
         'Top: 3 books — Dune, Neuromancer, Solaris');
   });
 
@@ -78,13 +79,14 @@ void main() {
       shelf('low', y: 0.5),
       shelf('high', y: 2.0),
     ];
-    final summary = summarizeRoom(shelves: shelves, placed: const []);
+    final summary = summarizeRoom(L10nEn(), shelves: shelves, placed: const []);
     expect([for (final s in summary) s.name], ['Shelf 1', 'Shelf 2']);
-    expect(summary.first.spoken, 'Shelf 1: empty');
+    expect(summary.first.spokenOf(L10nEn()), 'Shelf 1: empty');
   });
 
   test('a label wins over the positional name', () {
     final summary = summarizeRoom(
+        L10nEn(),
       shelves: [shelf('a', y: 2.0, label: 'Cookbooks'), shelf('b', y: 1.0)],
       placed: const [],
     );
@@ -95,6 +97,7 @@ void main() {
     // Floating well above the only shelf — the canvas draws it, so the summary
     // has to mention it or the two disagree.
     final summary = summarizeRoom(
+        L10nEn(),
       shelves: [shelf('s1', y: 0.5)],
       placed: [placed('p1', 'Adrift', x: 0.5, y: 3.0)],
     );
@@ -106,6 +109,7 @@ void main() {
   test('a book that overlaps no shelf horizontally is loose, not guessed onto '
       'the nearest one', () {
     final summary = summarizeRoom(
+        L10nEn(),
       shelves: [shelf('s1', y: 1.0, x1: 0, x2: 1)],
       placed: [placed('p1', 'Off to one side', x: 5.0)],
     );
@@ -124,24 +128,25 @@ void main() {
       's1',
     );
     expect(
-      summarizeRoom(shelves: shelves, placed: [book]).single.titles,
+      summarizeRoom(L10nEn(), shelves: shelves, placed: [book]).single.titles,
       ['Dune'],
     );
   });
 
   group('roomSemanticLabel', () {
     test('an empty room says what to do rather than nothing', () {
-      expect(roomSemanticLabel(const []),
+      expect(roomSemanticLabel(L10nEn(), const []),
           'Empty room. Add a shelf, then place books.');
     });
 
     test('joins the shelves into one utterance', () {
       final summary = summarizeRoom(
+        L10nEn(),
         shelves: [shelf('s1', y: 2.0, label: 'Top'), shelf('s2', y: 1.0)],
         placed: [placed('p1', 'Dune', x: 0.5, y: 2.0)],
       );
       expect(
-        roomSemanticLabel(summary),
+        roomSemanticLabel(L10nEn(), summary),
         'Top: 1 book — Dune. Shelf 2: empty',
       );
     });

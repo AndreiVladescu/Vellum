@@ -44,13 +44,11 @@ enum ReaderTheme {
 /// Type family for EPUB body text. Bundled families only — a reader that offers
 /// fonts it can't render is worse than one that offers three that always work.
 enum ReaderFont {
-  serif('Serif', 'serif'),
-  sans('Sans', 'sans-serif'),
-  mono('Monospace', 'monospace');
+  serif('serif'),
+  sans('sans-serif'),
+  mono('monospace');
 
-  const ReaderFont(this.label, this.family);
-
-  final String label;
+  const ReaderFont(this.family);
 
   /// A generic CSS/Flutter family name, resolved by the platform. Deliberately
   /// generic: shipping font files would add megabytes to every build for a
@@ -59,14 +57,7 @@ enum ReaderFont {
 }
 
 /// How a PDF page is fitted to the viewport.
-enum PdfFit {
-  width('Fit width'),
-  page('Fit page');
-
-  const PdfFit(this.label);
-
-  final String label;
-}
+enum PdfFit { width, page }
 
 /// How the PDF viewer moves through the document.
 ///
@@ -75,15 +66,7 @@ enum PdfFit {
 /// for something. Trying to serve both at once is what makes most PDF readers
 /// feel wrong — a continuous scroll that snaps to pages fights your drag, and a
 /// paged view you can nudge half a page leaves you reading across a seam.
-enum PdfPageMode {
-  paged('Pages', 'One page at a time'),
-  scroll('Scrolling', 'Continuous, with a scrollbar');
-
-  const PdfPageMode(this.label, this.description);
-
-  final String label;
-  final String description;
-}
+enum PdfPageMode { paged, scroll }
 
 /// Reader preferences, persisted and shared by both readers (plan 5 #23).
 ///

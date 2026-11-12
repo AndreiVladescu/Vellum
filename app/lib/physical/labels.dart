@@ -15,6 +15,8 @@ import 'dart:convert';
 
 import 'package:qr/qr.dart';
 
+import '../l10n/gen/app_localizations.dart';
+
 import 'locate.dart';
 
 /// One label to print: a shelf's name, the room it's in, and how many books are
@@ -36,9 +38,11 @@ class ShelfLabel {
 
   final int bookCount;
 
-  String get displayName {
+  String displayNameOf(L10n l10n) {
     final trimmed = shelfName?.trim();
-    return (trimmed == null || trimmed.isEmpty) ? 'Unlabelled shelf' : trimmed;
+    return (trimmed == null || trimmed.isEmpty)
+        ? l10n.roomLabelUnlabelled
+        : trimmed;
   }
 }
 
@@ -49,10 +53,12 @@ class ShelfLabel {
 /// A4, which lands at about 60 mm wide: big enough to read across a room,
 /// small enough that a shelf edge can carry one.
 String buildLabelSheetHtml({
+  required L10n l10n,
   required List<ShelfLabel> labels,
-  String title = 'Vellum shelf labels',
+  String? title,
   bool includeQr = true,
 }) {
+  title ??= l10n.roomLabelsDefaultTitle;
   final cards = StringBuffer();
   for (final label in labels) {
     final link = shelfLink(label.shelfId);
@@ -60,9 +66,9 @@ String buildLabelSheetHtml({
     <div class="label">
       ${includeQr ? '<div class="qr">${_qrSvg(link)}</div>' : ''}
       <div class="text">
-        <div class="shelf">${_escape(label.displayName)}</div>
+        <div class="shelf">${_escape(label.displayNameOf(l10n))}</div>
         <div class="room">${_escape(label.environmentName)}</div>
-        <div class="count">${_books(label.bookCount)}</div>
+        <div class="count">${_books(l10n, label.bookCount)}</div>
         <!-- The link in text as well as in the QR: a desktop has no camera,
              and the shelf-label scanner accepts a typed link for exactly that
              reason. -->
@@ -72,7 +78,7 @@ String buildLabelSheetHtml({
   }
 
   return '''<!doctype html>
-<html lang="en">
+<html lang="${l10n.localeName}">
 <head>
 <meta charset="utf-8">
 <title>${_escape(title)}</title>
@@ -128,8 +134,7 @@ String buildLabelSheetHtml({
 <body>
 <h1>${_escape(title)}</h1>
 <p class="hint">
-  Press Ctrl+P (⌘P on a Mac) to print, then cut along the boxes.
-  Scanning a label in Vellum opens that shelf's room.
+  ${_escape(l10n.roomLabelsHint)}
 </p>
 <div class="sheet">
 $cards</div>
@@ -177,11 +182,8 @@ String _qrSvg(String data) {
       '<path d="$path"/></g></svg>';
 }
 
-String _books(int count) => switch (count) {
-      0 => 'No books recorded',
-      1 => '1 book',
-      _ => '$count books',
-    };
+String _books(L10n l10n, int count) =>
+    count == 0 ? l10n.roomLabelBooksNone : l10n.roomLabelBooks(count);
 
 /// Escapes text for HTML. Shelf names and room names are user text and go
 /// straight into the markup, so `Ana & Bob's <shelf>` has to survive intact

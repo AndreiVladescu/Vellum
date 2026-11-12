@@ -5,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
 import 'calibre_import.dart';
 import 'catalog_format_help.dart';
@@ -14,6 +15,7 @@ import 'filename_metadata.dart';
 import 'folder_import_service.dart';
 import 'import_plan.dart';
 import 'opds_browser_page.dart';
+import 'opds_client.dart' show OpdsException;
 
 /// The bulk folder import wizard (plan 5 #15): pick a folder, review what the
 /// import *would* do, then run it.
@@ -105,7 +107,8 @@ class _FolderImportPageState extends State<FolderImportPage> {
   }
 
   Future<void> _pickFolder() async {
-    final picked = await getDirectoryPath(confirmButtonText: 'Scan');
+    final picked = await getDirectoryPath(
+        confirmButtonText: L10n.of(context).importScanConfirm);
     if (picked == null) return;
     await _scan(picked);
   }
@@ -131,8 +134,15 @@ class _FolderImportPageState extends State<FolderImportPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _phase = _Phase.pick);
+      final l10n = L10n.of(context);
+      final message = switch (e) {
+        CalibreImportException() => e.messageOf(l10n),
+        CsvImportException() => e.messageOf(l10n),
+        OpdsException() => e.messageOf(l10n),
+        _ => '$e',
+      };
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+          .showSnackBar(SnackBar(content: Text(message)));
       return;
     }
     if (!mounted) return;
@@ -150,24 +160,27 @@ class _FolderImportPageState extends State<FolderImportPage> {
   }
 
   Future<void> _pickCalibreLibrary() async {
-    final picked = await getDirectoryPath(confirmButtonText: 'Read');
+    final l10n = L10n.of(context);
+    final picked =
+        await getDirectoryPath(confirmButtonText: l10n.importReadConfirm);
     if (picked == null) return;
     await _scanCatalog(
       () => CalibreImport.read(Directory(picked)),
-      sourceLabel: 'Reading the Calibre catalogue…',
+      sourceLabel: l10n.importReadingCalibre,
     );
   }
 
   Future<void> _pickCatalogFile() async {
-    const group = XTypeGroup(
-      label: 'Catalogues',
-      extensions: ['csv', 'json', 'txt'],
+    final l10n = L10n.of(context);
+    final group = XTypeGroup(
+      label: l10n.importCataloguesGroup,
+      extensions: const ['csv', 'json', 'txt'],
     );
-    final picked = await openFile(acceptedTypeGroups: const [group]);
+    final picked = await openFile(acceptedTypeGroups: [group]);
     if (picked == null) return;
     await _scanCatalog(
       () => CsvImport.readFile(File(picked.path)),
-      sourceLabel: 'Reading the catalogue file…',
+      sourceLabel: l10n.importReadingCatalogFile,
     );
   }
 
@@ -178,7 +191,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
     if (entries == null || entries.isEmpty || !mounted) return;
     await _scanCatalog(
       () async => entries,
-      sourceLabel: 'Checking what you already have…',
+      sourceLabel: L10n.of(context).importCheckingHave,
     );
   }
 
@@ -269,16 +282,18 @@ class _FolderImportPageState extends State<FolderImportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    final folder = _folder;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isShare ? 'Import shared books' : 'Import a folder'),
+        title: Text(_isShare ? l10n.importSharedTitle : l10n.importFolder),
         actions: [
           if (_phase == _Phase.scanning || _phase == _Phase.importing)
             TextButton(
               onPressed: _cancelRequested
                   ? null
                   : () => setState(() => _cancelRequested = true),
-              child: Text(_cancelRequested ? 'Stopping…' : 'Cancel'),
+              child: Text(_cancelRequested ? l10n.importStopping : l10n.cancel),
             ),
         ],
       ),
@@ -291,15 +306,17 @@ class _FolderImportPageState extends State<FolderImportPage> {
           ),
         _Phase.scanning => _BusyStep(
             title: _isShare
-                ? 'Checking the shared files…'
-                : 'Looking through ${_folder ?? 'the folder'}…',
+                ? l10n.importCheckingShared
+                : folder == null
+                    ? l10n.importLookingThroughFolder
+                    : l10n.importLookingThrough(folder),
             progress: _progress,
           ),
         _Phase.review => _reviewStep(context),
         _Phase.importing => _BusyStep(
             title: _report == null
-                ? 'Importing…'
-                : 'Fetching metadata (this can be stopped safely)…',
+                ? l10n.importImporting
+                : l10n.importFetching,
             progress: _progress,
           ),
         _Phase.done => _doneStep(context),
@@ -313,13 +330,14 @@ class _FolderImportPageState extends State<FolderImportPage> {
   }
 
   Widget _reviewStep(BuildContext context) {
+    final l10n = L10n.of(context);
     if (_plan.isEmpty) {
       return _EmptyMessage(
         icon: Icons.folder_off_outlined,
-        title: 'No PDFs or EPUBs here',
+        title: l10n.importNoneTitle,
         detail: _folder == null
-            ? 'None of the shared files is a PDF or EPUB.'
-            : 'Vellum looked in $_folder and every folder inside it.',
+            ? l10n.importNoneShared
+            : l10n.importNoneFolder(_folder!),
       );
     }
     final counts = summarize(_plan);
@@ -331,13 +349,15 @@ class _FolderImportPageState extends State<FolderImportPage> {
             alignment: Alignment.centerLeft,
             child: Text(
               [
-                '${_plan.length} file${_plan.length == 1 ? '' : 's'} found',
+                l10n.importFilesFound(_plan.length),
                 if (counts[ImportStatus.duplicateFile]! > 0)
-                  '${counts[ImportStatus.duplicateFile]} already in your library',
+                  l10n.importSummaryAlreadyIn(
+                      counts[ImportStatus.duplicateFile]!),
                 if (counts[ImportStatus.probableDuplicate]! > 0)
-                  '${counts[ImportStatus.probableDuplicate]} look like books you have',
+                  l10n.importSummaryLookLike(
+                      counts[ImportStatus.probableDuplicate]!),
                 if (counts[ImportStatus.skip]! > 0)
-                  "${counts[ImportStatus.skip]} couldn't be read",
+                  l10n.importSummaryUnreadable(counts[ImportStatus.skip]!),
               ].join(' · '),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -367,6 +387,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
   /// Lets the user fix a guessed title/author before it becomes a book — the
   /// file-name heuristic is right most of the time, not always.
   Future<void> _editRow(int index) async {
+    final l10n = L10n.of(context);
     final candidate = _plan[index];
     final title = TextEditingController(
       text: candidate.meta.title ?? filenameStem(candidate.path),
@@ -376,21 +397,21 @@ class _FolderImportPageState extends State<FolderImportPage> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit before importing'),
+        title: Text(l10n.importEditTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: title,
-              decoration: const InputDecoration(labelText: 'Title'),
+              decoration: InputDecoration(labelText: l10n.importFieldTitle),
               autofocus: true,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: authors,
-              decoration: const InputDecoration(
-                labelText: 'Author(s)',
-                helperText: 'Comma-separated',
+              decoration: InputDecoration(
+                labelText: l10n.importFieldAuthors,
+                helperText: l10n.importAuthorsHelper,
               ),
             ),
           ],
@@ -398,11 +419,11 @@ class _FolderImportPageState extends State<FolderImportPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -424,6 +445,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
   }
 
   Widget _reviewBar(BuildContext context) {
+    final l10n = L10n.of(context);
     final count = _selected.length;
     return SafeArea(
       child: Padding(
@@ -436,13 +458,11 @@ class _FolderImportPageState extends State<FolderImportPage> {
               controlAffinity: ListTileControlAffinity.leading,
               value: _fetchMetadata,
               onChanged: (v) => setState(() => _fetchMetadata = v ?? false),
-              title: const Text('Look up covers and descriptions online'),
+              title: Text(l10n.importLookUpOnline),
               subtitle: Text(
                 _fetchMetadata
-                    ? 'One lookup at a time after importing — you can stop it '
-                        'and it will carry on next time'
-                    : 'Import straight from file names now; you can fetch '
-                        'metadata later per book',
+                    ? l10n.importLookUpOnNote
+                    : l10n.importLookUpOffNote,
               ),
             ),
             if (widget.shelfName != null)
@@ -454,8 +474,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'These go on “${widget.shelfName}”, the shelf you had '
-                        'open — as well as into your library.',
+                        l10n.importShelfNote(widget.shelfName!),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -466,7 +485,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
               children: [
                 Expanded(
                   child: Text(
-                    '$count of ${_plan.length} selected',
+                    l10n.importSelectedCount(count, _plan.length),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -481,14 +500,16 @@ class _FolderImportPageState extends State<FolderImportPage> {
                     }
                   }),
                   child: Text(_selected.length == _plan.length
-                      ? 'Select none'
-                      : 'Select all'),
+                      ? l10n.importSelectNone
+                      : l10n.importSelectAll),
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
                   onPressed: count == 0 ? null : _runImport,
                   icon: const Icon(Icons.download_outlined),
-                  label: Text(count == 0 ? 'Import' : 'Import $count'),
+                  label: Text(count == 0
+                      ? l10n.importButton
+                      : l10n.importButtonCount(count)),
                 ),
               ],
             ),
@@ -499,6 +520,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
   }
 
   Widget _doneStep(BuildContext context) {
+    final l10n = L10n.of(context);
     final report = _report!;
     final folder = _folder;
     return ListView(
@@ -506,19 +528,16 @@ class _FolderImportPageState extends State<FolderImportPage> {
       children: [
         Text(
           report.cancelled
-              ? 'Stopped after ${report.imported} book'
-                  '${report.imported == 1 ? '' : 's'}'
-              : 'Imported ${report.imported} book'
-                  '${report.imported == 1 ? '' : 's'}',
+              ? l10n.importDoneStopped(report.imported)
+              : l10n.importDoneImported(report.imported),
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 8),
         if (_fetchMetadata)
-          Text('$_enriched matched online. Books that didn’t match keep their '
-              'file-name details — open one and use “Find online” to try again.'),
+          Text(l10n.importMatchedOnline(_enriched)),
         if (report.failures.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('${report.failures.length} failed',
+          Text(l10n.importFailedCount(report.failures.length),
               style: Theme.of(context).textTheme.titleMedium),
           for (final f in report.failures)
             ListTile(
@@ -535,9 +554,8 @@ class _FolderImportPageState extends State<FolderImportPage> {
             builder: (context, _) => SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.folder_special_outlined),
-              title: const Text('Watch this folder'),
-              subtitle: const Text(
-                  'Offer to import new books from it when Vellum starts'),
+              title: Text(l10n.importWatchTitle),
+              subtitle: Text(l10n.importWatchSubtitle),
               value: widget.settings.watchedImportFolder == folder,
               onChanged: (on) =>
                   widget.settings.setWatchedImportFolder(on ? folder : null),
@@ -547,7 +565,7 @@ class _FolderImportPageState extends State<FolderImportPage> {
         const SizedBox(height: 24),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Back to the shelf'),
+          child: Text(l10n.importBackToShelf),
         ),
       ],
     );
@@ -575,6 +593,7 @@ class _PickStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
@@ -584,47 +603,45 @@ class _PickStep extends StatelessWidget {
           children: [
             const Icon(Icons.library_add_outlined, size: 56),
             const SizedBox(height: 16),
-            Text('Where are your books?',
+            Text(l10n.importPickTitle,
                 style: theme.textTheme.headlineSmall,
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
-              'Whichever you choose, Vellum shows you what it found — and what '
-              'it thinks you already have — before importing anything.',
+              l10n.importPickBody,
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
             _SourceTile(
               icon: Icons.folder_open,
-              title: 'A folder of files',
-              subtitle: 'PDFs and EPUBs, including subfolders',
+              title: l10n.importSourceFolder,
+              subtitle: l10n.importSourceFolderNote,
               onTap: onPick,
             ),
             _SourceTile(
               icon: Icons.local_library_outlined,
-              title: 'A Calibre library',
-              subtitle: 'Keeps your titles, authors, series, tags and covers',
+              title: l10n.importSourceCalibre,
+              subtitle: l10n.importSourceCalibreNote,
               onTap: onCalibre,
             ),
             _SourceTile(
               icon: Icons.table_chart_outlined,
-              title: 'A CSV or JSON catalogue',
-              subtitle: 'A spreadsheet, or an export from Goodreads or the '
-                  'Vellum console',
+              title: l10n.importSourceCsv,
+              subtitle: l10n.importSourceCsvNote,
               onTap: onCatalogFile,
               // The question that follows choosing this is always "how should
               // the file look?", so the answer is next to the choice rather
               // than behind an error message after the first attempt.
               trailing: TextButton(
                 onPressed: () => CatalogFormatSheet.show(context),
-                child: const Text('How?'),
+                child: Text(l10n.importHow),
               ),
             ),
             _SourceTile(
               icon: Icons.rss_feed,
-              title: 'An OPDS catalogue',
-              subtitle: 'Browse another server and pull what you want',
+              title: l10n.importSourceOpds,
+              subtitle: l10n.importSourceOpdsNote,
               onTap: onOpds,
             ),
           ],
@@ -673,6 +690,7 @@ class _BusyStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     final total = progress.total;
     return Center(
       child: ConstrainedBox(
@@ -690,8 +708,9 @@ class _BusyStep extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 total == 0
-                    ? 'Scanning…'
-                    : '${progress.done} of $total · ${progress.label}',
+                    ? l10n.importScanning
+                    : l10n.importProgressLine(
+                        progress.done, total, progress.label),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
@@ -749,12 +768,15 @@ class _CandidateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final (label, color) = switch (candidate.status) {
-      ImportStatus.newBook => ('New', theme.colorScheme.primary),
-      ImportStatus.duplicateFile => ('Already here', theme.colorScheme.outline),
+      ImportStatus.newBook => (l10n.importStatusNew, theme.colorScheme.primary),
+      ImportStatus.duplicateFile =>
+        (l10n.importStatusAlreadyHere, theme.colorScheme.outline),
       ImportStatus.probableDuplicate =>
-        ('Possible duplicate', theme.colorScheme.tertiary),
-      ImportStatus.skip => ('Unreadable', theme.colorScheme.error),
+        (l10n.importStatusPossibleDuplicate, theme.colorScheme.tertiary),
+      ImportStatus.skip =>
+        (l10n.importStatusUnreadable, theme.colorScheme.error),
     };
     final authors = candidate.meta.authors.join(', ');
     return CheckboxListTile(
@@ -777,7 +799,7 @@ class _CandidateTile extends StatelessWidget {
               if (authors.isNotEmpty) authors,
               candidate.format.toUpperCase(),
               if (candidate.matchedTitle != null)
-                'matches “${candidate.matchedTitle}”',
+                l10n.importMatches(candidate.matchedTitle!),
               if (candidate.error != null) candidate.error!,
             ].join(' · '),
             maxLines: 2,
@@ -789,7 +811,7 @@ class _CandidateTile extends StatelessWidget {
       ),
       secondary: IconButton(
         icon: const Icon(Icons.edit_outlined),
-        tooltip: 'Edit title and author',
+        tooltip: l10n.importEditTooltip,
         onPressed: candidate.status == ImportStatus.skip ? null : onEdit,
       ),
     );

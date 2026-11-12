@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../data/database.dart';
 import '../data/sync_clock.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// Which book's value to keep for a field where the two disagree.
 enum MergeChoice { keeper, loser }
@@ -32,9 +33,21 @@ class MergeLog {
 
   final String keeperId;
   final String loserId;
+  /// The plain-English lines, for logs and tests. What the reader sees is
+  /// [describe].
   final List<String> entries = [];
+  final List<String Function(L10n l10n)?> _localized = [];
 
-  void add(String what) => entries.add(what);
+  void add(String what, [String Function(L10n l10n)? localized]) {
+    entries.add(what);
+    _localized.add(localized);
+  }
+
+  /// The log in the reader's language, one line per step.
+  String describe(L10n l10n) => [
+        for (var i = 0; i < entries.length; i++)
+          _localized[i]?.call(l10n) ?? entries[i],
+      ].join('\n');
 
   @override
   String toString() => entries.join('\n');
@@ -120,11 +133,17 @@ class MergeService {
         final wantLoser = choices[field] == MergeChoice.loser;
         final mineEmpty = (mine ?? '').trim().isEmpty;
         if (wantLoser && (theirs ?? '').trim().isNotEmpty) {
-          log.add('$field: took "${theirs!}" from the duplicate');
+          log.add(
+            '$field: took "${theirs!}" from the duplicate',
+            (l10n) => l10n.mergeLogTook(field, theirs),
+          );
           return theirs;
         }
         if (mineEmpty && (theirs ?? '').trim().isNotEmpty) {
-          log.add('$field: filled from the duplicate');
+          log.add(
+            '$field: filled from the duplicate',
+            (l10n) => l10n.mergeLogFilled(field),
+          );
           return theirs;
         }
         return mine;
@@ -133,11 +152,17 @@ class MergeService {
       int? pickInt(String field, int? mine, int? theirs) {
         final wantLoser = choices[field] == MergeChoice.loser;
         if (wantLoser && theirs != null) {
-          log.add('$field: took $theirs from the duplicate');
+          log.add(
+            '$field: took $theirs from the duplicate',
+            (l10n) => l10n.mergeLogTook(field, '$theirs'),
+          );
           return theirs;
         }
         if (mine == null && theirs != null) {
-          log.add('$field: filled from the duplicate');
+          log.add(
+            '$field: filled from the duplicate',
+            (l10n) => l10n.mergeLogFilled(field),
+          );
           return theirs;
         }
         return mine;
@@ -168,7 +193,10 @@ class MergeService {
         variables: [Variable(keeperId), Variable(loserId)],
         updates: {db.bookFiles},
       );
-      if (movedFiles > 0) log.add('moved $movedFiles file(s)');
+      if (movedFiles > 0) {
+        log.add('moved $movedFiles file(s)',
+            (l10n) => l10n.mergeLogFiles(movedFiles));
+      }
 
       // ---- physical copies (placements and loans ride along, keyed by copy) --
       final movedCopies = await db.customUpdate(
@@ -177,8 +205,11 @@ class MergeService {
         updates: {db.physicalCopies},
       );
       if (movedCopies > 0) {
-        log.add('moved $movedCopies physical copy/copies, with their '
-            'placements and loan history');
+        log.add(
+          'moved $movedCopies physical copy/copies, with their '
+          'placements and loan history',
+          (l10n) => l10n.mergeLogCopies(movedCopies),
+        );
       }
 
       // ---- shelf memberships ----
@@ -199,7 +230,10 @@ class MergeService {
             );
       }
       if (shelfRows.isNotEmpty) {
-        log.add('moved ${shelfRows.length} shelf membership(s)');
+        log.add(
+          'moved ${shelfRows.length} shelf membership(s)',
+          (l10n) => l10n.mergeLogShelves(shelfRows.length),
+        );
         // The shelves themselves changed membership, so they need pushing.
         await db.customStatement(
           'UPDATE shelves SET needs_push = 1 WHERE id IN '
@@ -231,7 +265,10 @@ class MergeService {
             );
         addedAuthors++;
       }
-      if (addedAuthors > 0) log.add('added $addedAuthors author(s)');
+      if (addedAuthors > 0) {
+        log.add('added $addedAuthors author(s)',
+            (l10n) => l10n.mergeLogAuthors(addedAuthors));
+      }
 
       final loserGenres = await (db.select(db.bookGenres)
             ..where((g) => g.bookId.equals(loserId)))
@@ -247,7 +284,10 @@ class MergeService {
             );
         if (inserted > 0) addedGenres++;
       }
-      if (addedGenres > 0) log.add('added $addedGenres genre(s)');
+      if (addedGenres > 0) {
+        log.add('added $addedGenres genre(s)',
+            (l10n) => l10n.mergeLogGenres(addedGenres));
+      }
 
       // ---- annotations ----
       // Highlights and notes are about the *book*, so they follow it. Moved
@@ -258,7 +298,10 @@ class MergeService {
         variables: [Variable(keeperId), Variable(loserId)],
         updates: {db.annotations},
       );
-      if (movedNotes > 0) log.add('moved $movedNotes annotation(s)');
+      if (movedNotes > 0) {
+        log.add('moved $movedNotes annotation(s)',
+            (l10n) => l10n.mergeLogAnnotations(movedNotes));
+      }
 
       final movedSessions = await db.customUpdate(
         'UPDATE reading_sessions SET book_id = ? WHERE book_id = ?',
@@ -266,7 +309,8 @@ class MergeService {
         updates: {db.readingSessions},
       );
       if (movedSessions > 0) {
-        log.add('moved $movedSessions reading session(s)');
+        log.add('moved $movedSessions reading session(s)',
+            (l10n) => l10n.mergeLogSessions(movedSessions));
       }
 
       // ---- reading state: keep whichever is further along ----
@@ -282,7 +326,10 @@ class MergeService {
             lastReadAt: Value(loser.lastReadAt),
           ),
         );
-        log.add('kept the duplicate’s reading position (further along)');
+        log.add(
+          'kept the duplicate’s reading position (further along)',
+          (l10n) => l10n.mergeLogReadingPosition,
+        );
       }
 
       // ---- the loser's own rows, and the tombstone ----
@@ -306,7 +353,10 @@ class MergeService {
         [loserId],
       );
       await (db.delete(db.books)..where((b) => b.id.equals(loserId))).go();
-      log.add('deleted the duplicate and tombstoned it so the merge syncs');
+      log.add(
+        'deleted the duplicate and tombstoned it so the merge syncs',
+        (l10n) => l10n.mergeLogDeleted,
+      );
     });
 
     return log;

@@ -94,7 +94,10 @@ class UserProfileStore extends ChangeNotifier {
   Future<void> setPhoto(Uint8List picked) async {
     final dir = _dataDir;
     if (dir == null) {
-      throw const AvatarImageException('There is nowhere to save a photo.');
+      throw AvatarImageException(
+        'There is nowhere to save a photo.',
+        localized: (l10n) => l10n.accountPhotoNowhereToSave,
+      );
     }
     final bytes = await avatarBytes(picked);
     final folder = Directory(p.join(dir.path, photoDirName));

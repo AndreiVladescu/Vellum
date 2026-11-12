@@ -5,6 +5,7 @@
 // rather than on someone with a spreadsheet open.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/import/catalog_format_help.dart';
 import 'package:vellum/import/csv_import.dart';
 
@@ -94,7 +95,10 @@ void main() {
 
   testWidgets('the sheet offers the template and the columns', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: CatalogFormatSheet())),
+      MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: Scaffold(body: CatalogFormatSheet())),
     );
     await tester.pump();
 

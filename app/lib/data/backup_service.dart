@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import 'background_work.dart';
 import 'backup_crypto.dart';
 import 'file_hash.dart';
@@ -29,6 +30,7 @@ class BackupCheck {
     this.schemaVersion,
     this.counts = const {},
     this.problem,
+    this.localizedProblem,
   });
 
   /// The archive could be opened at all (right format, right passphrase).
@@ -62,6 +64,10 @@ class BackupCheck {
 
   /// Why the archive couldn't be read, when [readable] is false.
   final String? problem;
+
+  /// [problem] in the reader's language, when the service knows it; the
+  /// English [problem] stays for logs and tests.
+  final String Function(L10n l10n)? localizedProblem;
 
   bool get ok =>
       readable && hasDatabase && missing.isEmpty && corrupt.isEmpty;
@@ -258,10 +264,11 @@ class BackupService {
     try {
       if (await BackupCrypto.isEncrypted(archive)) {
         if (passphrase == null || passphrase.isEmpty) {
-          return const BackupCheck(
+          return BackupCheck(
             readable: false,
             hasDatabase: false,
             problem: 'This backup is encrypted — enter its passphrase.',
+            localizedProblem: (l10n) => l10n.prefsBackupProblemEncrypted,
           );
         }
         // In the data dir, not the system temp dir: it is always writable,
@@ -283,6 +290,7 @@ class BackupService {
             readable: false,
             hasDatabase: false,
             problem: e.message,
+            localizedProblem: e.messageOf,
           );
         }
         readable = decrypted;
@@ -294,10 +302,11 @@ class BackupService {
         input = InputFileStream(readable.path);
         zip = ZipDecoder().decodeStream(input);
       } catch (_) {
-        return const BackupCheck(
+        return BackupCheck(
           readable: false,
           hasDatabase: false,
           problem: "That file isn't a readable archive.",
+          localizedProblem: (l10n) => l10n.prefsBackupProblemNotArchive,
         );
       }
 

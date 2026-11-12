@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/platform_l10n.dart';
+
 /// Notifications in the Android status bar.
 ///
 /// The bell in the app bar only helps someone who has already opened the app,
@@ -18,18 +21,22 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 /// that carries out that decision, for the same reason `BackgroundSyncPolicy`
 /// is split from the WorkManager call.
 class NotificationTray {
-  NotificationTray({FlutterLocalNotificationsPlugin? plugin})
-      : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+  /// [l10n] defaults to the platform's language: this is also constructed in
+  /// the background isolate, where no widget tree exists to ask.
+  NotificationTray({FlutterLocalNotificationsPlugin? plugin, L10n? l10n})
+      : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+        _l10nOverride = l10n;
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final L10n? _l10nOverride;
+  late final L10n _l10n = _l10nOverride ?? platformL10n();
 
   /// One channel, named for what it is about rather than for the app — Android
   /// shows this name in the system settings, where "Vellum" would tell nobody
   /// anything about what they are turning off.
   static const _channelId = 'vellum.borrowing';
-  static const _channelName = 'Borrowing';
-  static const _channelDescription =
-      'Requests to borrow your books, and answers to yours';
+  String get _channelName => _l10n.borrowTrayChannelName;
+  String get _channelDescription => _l10n.borrowTrayChannelDescription;
 
   /// Fixed id, so a second notification replaces the first rather than
   /// stacking. Someone who has been away for a week wants one line saying what
@@ -71,7 +78,7 @@ class NotificationTray {
       id: _notificationId,
       title: title,
       body: body,
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,
@@ -122,6 +129,7 @@ class TrayDecision {
     required String? newest,
     required DateTime? newestAt,
     required DateTime? lastShownAt,
+    required L10n l10n,
   }) {
     if (unread <= 0 || newest == null) return const TrayDecision.silent();
     if (newestAt != null &&
@@ -131,7 +139,7 @@ class TrayDecision {
     }
     // The newest one as the headline, because it is the sentence the server
     // already wrote for a person; the count only when it adds something.
-    final body = unread == 1 ? newest : '$newest · and ${unread - 1} more';
+    final body = unread == 1 ? newest : l10n.borrowTrayMore(newest, unread - 1);
     return TrayDecision.post('Vellum', body);
   }
 }

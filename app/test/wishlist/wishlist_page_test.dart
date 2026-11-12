@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/wishlist/wishlist_page.dart';
@@ -50,7 +51,10 @@ void main() {
         );
       }
     });
-    await tester.pumpWidget(MaterialApp(home: WishlistPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: WishlistPage(repository: repo)));
     await settle(tester);
     return repo;
   }

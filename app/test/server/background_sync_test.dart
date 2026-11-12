@@ -4,6 +4,7 @@
 // that decides whether someone's phone wakes up on mobile data at 3% battery.
 // So it is pure Dart and tested here rather than only on a device.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/server/background_sync.dart';
 import 'package:vellum/server/continue_widget.dart';
@@ -152,30 +153,30 @@ void main() {
         );
 
     test('shows the title and how far in you are', () {
-      final data = snapshotFor(book(progress: 0.42, page: 214));
+      final data = snapshotFor(L10nEn(), book(progress: 0.42, page: 214));
       expect(data.title, 'Dune');
       expect(data.subtitle, '42% · page 214');
       expect(data.isEmpty, isFalse);
     });
 
     test('a book with no page number still reports a percentage', () {
-      expect(snapshotFor(book(progress: 0.42)).subtitle, '42%');
+      expect(snapshotFor(L10nEn(), book(progress: 0.42)).subtitle, '42%');
     });
 
     test('nothing on the go is an empty state, not a stale book', () {
       // A widget that kept showing a book you finished last month is worse than
       // one that admits there's nothing to continue.
-      expect(snapshotFor(null).isEmpty, isTrue);
-      expect(snapshotFor(book()).isEmpty, isTrue);
-      expect(snapshotFor(book(progress: 0.98)).isEmpty, isTrue,
+      expect(snapshotFor(L10nEn(), null).isEmpty, isTrue);
+      expect(snapshotFor(L10nEn(), book()).isEmpty, isTrue);
+      expect(snapshotFor(L10nEn(), book(progress: 0.98)).isEmpty, isTrue,
           reason: '98% counts as finished, same as the shelf strip');
-      expect(snapshotFor(book(progress: 1.0)).isEmpty, isTrue);
+      expect(snapshotFor(L10nEn(), book(progress: 1.0)).isEmpty, isTrue);
     });
 
     test('the cover path is carried through when there is one', () {
-      final data = snapshotFor(book(progress: 0.1), coverPath: '/tmp/x.jpg');
+      final data = snapshotFor(L10nEn(), book(progress: 0.1), coverPath: '/tmp/x.jpg');
       expect(data.coverPath, '/tmp/x.jpg');
-      expect(snapshotFor(book(progress: 0.1)).coverPath, isNull);
+      expect(snapshotFor(L10nEn(), book(progress: 0.1)).coverPath, isNull);
     });
   });
 }

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/gen/app_localizations.dart';
+
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
 import 'notifications_page.dart';
@@ -81,7 +83,7 @@ class _NotificationsButtonState extends State<NotificationsButton>
   Widget build(BuildContext context) {
     if (!_available || _unread == 0) return const SizedBox.shrink();
     return IconButton(
-      tooltip: '$_unread unread',
+      tooltip: L10n.of(context).notificationsUnreadTooltip(_unread),
       icon: Badge.count(
         count: _unread,
         child: const Icon(Icons.notifications_none),

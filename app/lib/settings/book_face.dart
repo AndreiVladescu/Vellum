@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 /// How books are shown on the shelf.
 enum BookFace {
   /// Spine-out — the space-efficient bookshelf look (the default).
-  spine('Spine out', Icons.menu_book_outlined),
+  spine(Icons.menu_book_outlined),
 
   /// Face-out — the front cover, a clearer preview of each book.
-  cover('Front cover', Icons.image_outlined),
+  cover(Icons.image_outlined),
 
   /// A plain list: no artwork at all, one line per book.
   ///
@@ -16,10 +16,9 @@ enum BookFace {
   /// looking at spines. This is the mode for reading the library as data —
   /// dense, sortable by the same controls, and showing the things a spine
   /// cannot say.
-  list('List', Icons.view_list_outlined);
+  list(Icons.view_list_outlined);
 
-  const BookFace(this.label, this.icon);
+  const BookFace(this.icon);
 
-  final String label;
   final IconData icon;
 }

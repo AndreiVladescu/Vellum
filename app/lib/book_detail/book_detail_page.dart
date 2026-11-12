@@ -983,6 +983,8 @@ class _SeriesStripState extends State<_SeriesStrip> {
       seriesName: place.name,
       volume: volume,
       author: details.authors.firstOrNull,
+      title: l10n.wishlistGapTitle(place.name, volume),
+      note: l10n.wishlistGapNote(volume, place.name),
     );
     messenger.showSnackBar(SnackBar(
       content: Text(l10n.seriesVolumeWished(place.name, volume)),

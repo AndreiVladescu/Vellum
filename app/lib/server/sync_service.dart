@@ -65,8 +65,12 @@ class SyncReport {
   bool get hasIssues => issues.isNotEmpty;
 }
 
+/// What a sync is busy with, for the progress line and the status-bar
+/// notification. Words for each live in `labels.dart` (`SyncPhaseL10n`).
+enum SyncPhase { downloadingCovers, downloadingFiles, pushingBooks }
+
 /// Progress signal: [done] of [total] items processed in the named [phase].
-typedef SyncProgress = void Function(int done, int total, String phase);
+typedef SyncProgress = void Function(int done, int total, SyncPhase phase);
 
 /// Two-way sync between the local library and a Vellum server. Owns no state of
 /// its own beyond a re-entrancy guard; it operates on the [repository]'s
@@ -413,7 +417,8 @@ class SyncService {
           message: '$e',
         ));
       } finally {
-        onProgress?.call(++coverDone, coverBooks.length, 'Downloading covers');
+        onProgress?.call(
+            ++coverDone, coverBooks.length, SyncPhase.downloadingCovers);
       }
     });
 
@@ -471,7 +476,7 @@ class SyncService {
           message: '$e',
         ));
       } finally {
-        onProgress?.call(++fileDone, local.length, 'Downloading files');
+        onProgress?.call(++fileDone, local.length, SyncPhase.downloadingFiles);
       }
     });
 
@@ -1080,7 +1085,7 @@ class SyncService {
           message: e is ServerException ? e.message : '$e',
         ));
       } finally {
-        onProgress?.call(++pushDone, books.length, 'Pushing books');
+        onProgress?.call(++pushDone, books.length, SyncPhase.pushingBooks);
       }
     });
 
@@ -1351,7 +1356,7 @@ class SyncService {
   /// the category rather than pretending to.
   SyncIssue _personalIssue(String stage, String message) => SyncIssue(
         bookId: '',
-        title: 'Personal data',
+        title: 'Personal data', // i18n-ignore: sync diagnostics
         stage: stage,
         message: message,
       );

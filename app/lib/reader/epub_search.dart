@@ -1,3 +1,4 @@
+import '../l10n/gen/app_localizations.dart';
 import 'epub_book.dart';
 
 /// Searching the text of an EPUB.
@@ -44,6 +45,7 @@ class EpubSearchHit {
 /// that there were more, not several seconds of scrolling to build a list
 /// nobody will reach the end of.
 ({List<EpubSearchHit> hits, bool truncated}) searchEpub(
+  L10n l10n,
   List<EpubChapter> chapters,
   String query, {
   int limit = 200,
@@ -63,7 +65,7 @@ class EpubSearchHit {
       final end = at + needle.length;
       hits.add(EpubSearchHit(
         chapter: index,
-        chapterTitle: chapters[index].title,
+        chapterTitle: chapters[index].titleOf(l10n, index),
         start: at,
         end: end,
         snippet: snippetAround(text, at, end),

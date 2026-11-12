@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
 import 'layout_doc.dart';
@@ -81,13 +82,14 @@ class RoomPublisher {
     PhysicalEnvironment environment, {
     bool shareBooks = false,
   }) async {
+    final l10n = L10n.of(context);
     final client = connection.client;
-    if (client == null) return 'Not connected to a server.';
+    if (client == null) return l10n.publishRoomNotConnected;
     final doc = await _docFor(environment);
     String suffix = '';
     if (shareBooks) {
       final tag = await _refreshRoomGroup(client, environment);
-      if (tag != null) suffix = ' Books collected under the “$tag” tag.';
+      if (tag != null) suffix = ' ${l10n.publishRoomFooter(tag)}';
     }
 
     try {
@@ -98,16 +100,16 @@ class RoomPublisher {
         doc: doc,
       );
       await repository.layout.markPublished(environment.id, result.revision);
-      return 'Published “${environment.name}” '
-          '(revision ${result.revision}).$suffix';
+      return '${l10n.publishRoomPublished(environment.name, result.revision)}'
+          '$suffix';
     } on ServerException catch (e) {
       if (e.statusCode != 409) return e.message;
       if (!context.mounted) return e.message;
 
       final choice = await _askConflict(context, environment.name);
-      if (choice == null) return 'Left unpublished.';
+      if (choice == null) return l10n.publishRoomUnpublished;
       if (choice == _Conflict.takeTheirs) {
-        return fetch(environment.id, name: environment.name);
+        return fetch(l10n, environment.id, name: environment.name);
       }
       // Overwrite: re-read the server's revision and publish on top of it. The
       // user has been told plainly that this replaces the other arrangement.
@@ -119,19 +121,18 @@ class RoomPublisher {
         doc: doc,
       );
       await repository.layout.markPublished(environment.id, forced.revision);
-      return 'Replaced the published room with this one '
-          '(revision ${forced.revision}).$suffix';
+      return '${l10n.publishRoomReplaced(forced.revision)}$suffix';
     }
   }
 
   /// Applies the server's copy over the local room.
-  Future<String> fetch(String layoutId, {String? name}) async {
+  Future<String> fetch(L10n l10n, String layoutId, {String? name}) async {
     final client = connection.client;
-    if (client == null) return 'Not connected to a server.';
+    if (client == null) return l10n.publishRoomNotConnected;
     try {
       final remote = await client.fetchLayout(layoutId);
       final doc = remote.doc;
-      if (doc == null) return 'That room has no document.';
+      if (doc == null) return l10n.publishRoomNoDocument;
       final parsed = parseLayoutDoc(doc);
       final skipped = await applyLayoutDoc(
         repository.db,
@@ -143,44 +144,41 @@ class RoomPublisher {
       // yet renders with holes, and "3 books aren't here yet" is the difference
       // between a bug report and a sync.
       return skipped == 0
-          ? 'Updated “$what” from the server.'
-          : 'Updated “$what” — $skipped book${skipped == 1 ? '' : 's'} '
-              "aren't on this device yet; sync and fetch again.";
+          ? l10n.publishRoomUpdated(what)
+          : l10n.publishRoomUpdatedSkipped(skipped, what);
     } on LayoutDocException catch (e) {
-      return e.message;
+      return e.messageOf(l10n);
     } on ServerException catch (e) {
       return e.message;
     }
   }
 
-  Future<_Conflict?> _askConflict(BuildContext context, String name) =>
-      showDialog<_Conflict>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('This room changed elsewhere'),
-          content: Text(
-            '“$name” was published from another device since you last '
-            'fetched it.\n\nA room is one arrangement — there is no sensible '
-            'way to merge two, so one of them has to win.',
+  Future<_Conflict?> _askConflict(BuildContext context, String name) {
+    final l10n = L10n.of(context);
+    return showDialog<_Conflict>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.publishRoomConflictTitle),
+        content: Text(l10n.publishRoomConflictBody(name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.cancel),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(_Conflict.takeTheirs),
-              child: const Text('Take theirs'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(_Conflict.keepMine),
-              child: const Text('Replace with mine'),
-            ),
-          ],
-        ),
-      );
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_Conflict.takeTheirs),
+            child: Text(l10n.publishRoomTakeTheirs),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_Conflict.keepMine),
+            child: Text(l10n.publishRoomReplaceMine),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 enum _Conflict { keepMine, takeTheirs }

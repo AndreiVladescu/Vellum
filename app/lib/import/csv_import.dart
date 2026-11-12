@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../l10n/gen/app_localizations.dart';
 import 'catalog_entry.dart';
 
 /// Reads a CSV or JSON catalogue (plan 5 #21c).
@@ -43,15 +44,20 @@ class CsvImport {
     try {
       decoded = jsonDecode(text);
     } catch (e) {
-      throw CsvImportException('That JSON could not be parsed: $e');
+      throw CsvImportException(
+        'That JSON could not be parsed: $e',
+        localized: (l10n) => l10n.importErrJson('$e'),
+      );
     }
     // The console exports a bare array; a hand-rolled file might wrap it.
     final list = switch (decoded) {
       final List<dynamic> l => l,
       final Map<String, dynamic> m when m['books'] is List =>
         m['books'] as List<dynamic>,
-      _ => throw const CsvImportException(
-          'Expected a list of books, or an object with a "books" list.'),
+      _ => throw CsvImportException(
+          'Expected a list of books, or an object with a "books" list.',
+          localized: (l10n) => l10n.importErrJsonShape,
+        ),
     };
     final entries = <CatalogEntry>[];
     for (final item in list) {
@@ -61,19 +67,28 @@ class CsvImport {
       });
       if (entry != null) entries.add(entry);
     }
-    if (entries.isEmpty) {
-      throw const CsvImportException('No books with a title in that file.');
-    }
+    if (entries.isEmpty) throw _noBooks();
     return entries;
   }
 
+  static CsvImportException _noBooks() => CsvImportException(
+        'No books with a title in that file.',
+        localized: (l10n) => l10n.importErrNoBooks,
+      );
+
   static List<CatalogEntry> _readCsv(String text) {
     final rows = parseCsv(text);
-    if (rows.isEmpty) throw const CsvImportException('That file is empty.');
+    if (rows.isEmpty) {
+      throw CsvImportException(
+        'That file is empty.',
+        localized: (l10n) => l10n.importErrEmptyFile,
+      );
+    }
     final header = [for (final h in rows.first) h.trim().toLowerCase()];
     if (!header.any((h) => _titleKeys.contains(h))) {
-      throw const CsvImportException(
+      throw CsvImportException(
         'No "title" column — the first row must be a header.',
+        localized: (l10n) => l10n.importErrNoTitleColumn,
       );
     }
     final entries = <CatalogEntry>[];
@@ -86,9 +101,7 @@ class CsvImport {
       final entry = _fromMap(map);
       if (entry != null) entries.add(entry);
     }
-    if (entries.isEmpty) {
-      throw const CsvImportException('No books with a title in that file.');
-    }
+    if (entries.isEmpty) throw _noBooks();
     return entries;
   }
 
@@ -271,9 +284,14 @@ List<List<String>> parseCsv(String text) {
 }
 
 class CsvImportException implements Exception {
-  const CsvImportException(this.message);
+  const CsvImportException(this.message, {this.localized});
 
+  /// A plain-English sentence for logs and tests. What the reader sees is
+  /// [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
 
   @override
   String toString() => message;

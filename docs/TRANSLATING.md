@@ -3,26 +3,14 @@
 Every message the app shows lives in one file, `app/lib/l10n/app_en.arb`. A
 language is one more file next to it. You do not need to touch any Dart code.
 
-## Status: only part of the app is extracted
+## Status: the whole app is extracted
 
-The move from inline English strings to `app_en.arb` is being done directory by
-directory. Done so far:
-
-- `app/lib/main.dart`, `app/lib/app_drawer.dart` and the other files directly in
-  `app/lib/`
-- `app/lib/shelf/`
-- `app/lib/onboarding/`
-- `app/lib/add_book/`
-- `app/lib/book_detail/`
-- `app/lib/reader/`
-- `app/lib/settings/`
-- `app/lib/stats/`
-- `app/lib/diagnostics/` (its report text stays English on purpose: it is pasted
-  into bug reports the maintainer has to read)
-
-Everything else (physical rooms, server, import, loans, wishlist, dedupe, ...) still shows English whatever the locale. A
-translation made today is therefore a partial one; the rest follows as those
-directories are extracted.
+Every message the app shows is in `app_en.arb`. A few things stay English on
+purpose: the diagnostics report (it is pasted into bug reports the maintainer has
+to read), the system prompt sent to an AI model, brand and engine names, format
+identifiers, log lines, and the technical detail of an error (the part after
+"Could not reach the server:"). Messages that come from the server itself are
+shown as the server wrote them.
 
 ## Add a language
 

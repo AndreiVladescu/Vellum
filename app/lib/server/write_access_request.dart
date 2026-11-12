@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
 
@@ -27,26 +28,24 @@ Future<void> promptWriteAccessRequest(
 ) async {
   final client = connection.client;
   if (client == null) return;
+  final l10n = L10n.of(context);
   final note = TextEditingController();
   final send = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: Text('Ask to edit “$title”?'),
+      title: Text(l10n.writeAccessTitle(title)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'The owner is told, and can give you write access. Nothing '
-            'changes until they do.',
-          ),
+          Text(l10n.writeAccessBody),
           const SizedBox(height: 12),
           TextField(
             controller: note,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Note (optional)',
-              hintText: 'e.g. I have a better scan of the cover',
+            decoration: InputDecoration(
+              labelText: l10n.writeAccessNoteLabel,
+              hintText: l10n.writeAccessNoteHint,
             ),
           ),
         ],
@@ -54,11 +53,11 @@ Future<void> promptWriteAccessRequest(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Ask'),
+          child: Text(l10n.writeAccessAsk),
         ),
       ],
     ),
@@ -71,14 +70,15 @@ Future<void> promptWriteAccessRequest(
     await client.requestWriteAccess(bookId, note: text);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Asked. The owner has been told.')),
+      SnackBar(content: Text(l10n.writeAccessAsked)),
     );
   } catch (e) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       // The 400 for "you can already edit this" is a useful sentence, not a
       // failure to hide behind a generic message.
-      content: Text(e is ServerException ? e.message : 'That did not work.'),
+      content:
+          Text(e is ServerException ? e.message : l10n.writeAccessDidNotWork),
     ));
   }
 }

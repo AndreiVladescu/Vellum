@@ -8,6 +8,8 @@ import 'package:flutter/semantics.dart';
 
 import '../account/user_profile.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 import '../notifications/sync_tray.dart';
 import '../settings/app_settings.dart';
 import '../snack_bars.dart';
@@ -69,7 +71,7 @@ class _ServerPageState extends State<ServerPage> {
 
   // Live sync progress: [0..1] fraction and the current phase label.
   double? _progress;
-  String _phase = '';
+  SyncPhase? _phase;
 
   // The Android status-bar counterpart to the two fields above: a
   // notification with the same progress, live only while _notifyingSync is
@@ -121,7 +123,7 @@ class _ServerPageState extends State<ServerPage> {
         // The session expired or was revoked — drop to the sign-in screen.
         await widget.connection.clearExpiredSession();
         if (mounted) {
-          setState(() => _error = 'Session expired — please log in again.');
+          setState(() => _error = L10n.of(context).serverSessionExpired);
         }
       } else if (mounted) {
         setState(() => _error = e.message);
@@ -130,25 +132,25 @@ class _ServerPageState extends State<ServerPage> {
       // A sync (usually the launch auto-sync) is already in flight — the server
       // is fine, so don't render the internal "Bad state" message.
       if (mounted) {
-        setState(() => _error = 'A sync is already running — try again in a moment.');
+        setState(() => _error = L10n.of(context).serverSyncRunning);
       }
     } on TlsException {
       // Covers HandshakeException / CertificateException: the imported/pinned
       // server certificate didn't match (rotated, regenerated, or never
       // imported). Point the user at the fix rather than a raw exception.
       if (mounted) {
-        setState(() => _error =
-            "The server's certificate isn't trusted or has changed — "
-            'import the current certificate below.');
+        setState(() => _error = L10n.of(context).serverCertUntrusted);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Could not reach the server.\n$e');
+      if (mounted) {
+        setState(() => _error = L10n.of(context).serverUnreachable('$e'));
+      }
     } finally {
       if (mounted) {
         setState(() {
           _busy = false;
           _progress = null;
-          _phase = '';
+          _phase = null;
         });
       }
     }
@@ -159,7 +161,7 @@ class _ServerPageState extends State<ServerPage> {
   /// and a sync is the app's longest silent operation, so *something* has to
   /// be said (plan 5 #42) — but a 400-book push announcing every increment
   /// would be unusable. Phase changes are the meaningful events.
-  String _announcedPhase = '';
+  SyncPhase? _announcedPhase;
 
   /// Speaks [message] to a screen reader, if this platform can.
   ///
@@ -177,7 +179,7 @@ class _ServerPageState extends State<ServerPage> {
     );
   }
 
-  void _onProgress(int done, int total, String phase) {
+  void _onProgress(int done, int total, SyncPhase phase) {
     // Kept outside the `if (!mounted)` guard below: the whole point of the
     // notification is to still be useful once the app (and this State) is
     // backgrounded, which is exactly when `mounted` stops being a reliable
@@ -186,7 +188,7 @@ class _ServerPageState extends State<ServerPage> {
     if (!mounted) return;
     if (phase != _announcedPhase) {
       _announcedPhase = phase;
-      _announce(phase);
+      _announce(phase.labelOf(L10n.of(context)));
     }
     setState(() {
       _phase = phase;
@@ -195,25 +197,29 @@ class _ServerPageState extends State<ServerPage> {
   }
 
   /// Post-sync feedback: a count, plus a Details action when anything failed.
-  void _showReport(String verb, int count, SyncReport report) {
+  void _showReport(bool pulled, int count, SyncReport report) {
     if (!mounted) return;
-    final n = report.issues.length;
+    final l10n = L10n.of(context);
+    final issues = l10n.syncIssues(report.issues.length);
     final msg = report.hasIssues
-        ? '$verb $count book${count == 1 ? '' : 's'}, '
-              '$n issue${n == 1 ? '' : 's'}'
+        ? (pulled
+            ? l10n.serverPulledBooksIssues(count, issues)
+            : l10n.serverPushedBooksIssues(count, issues))
         : (count == 0
-              ? 'Already up to date.'
-              : '$verb $count book${count == 1 ? '' : 's'}.');
+            ? l10n.serverUpToDate
+            : (pulled
+                ? l10n.serverPulledBooks(count)
+                : l10n.serverPushedBooks(count)));
     // A snackbar is announced by the platform on Android but not reliably on
     // desktop, and this is the one message that says whether the sync worked.
     _announce(msg);
-    _announcedPhase = '';
+    _announcedPhase = null;
     ScaffoldMessenger.of(context).showSnackBar(
       appSnackBar(
         content: Text(msg),
         action: report.hasIssues
             ? SnackBarAction(
-                label: 'Details',
+                label: l10n.serverDetails,
                 onPressed: () => _showIssues(report.issues),
               )
             : null,
@@ -230,7 +236,7 @@ class _ServerPageState extends State<ServerPage> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Sync issues (${issues.length})'),
+        title: Text(L10n.of(context).serverIssuesTitle(issues.length)),
         content: SizedBox(
           width: _dialogWidth(context, 400),
           child: ListView(
@@ -240,7 +246,7 @@ class _ServerPageState extends State<ServerPage> {
                 ListTile(
                   dense: true,
                   title: Text(i.title.isEmpty ? i.bookId : i.title),
-                  subtitle: Text('${i.stage}: ${i.message}'),
+                  subtitle: Text('${i.stage}: ${i.message}'), // i18n-ignore: technical detail
                 ),
             ],
           ),
@@ -248,7 +254,7 @@ class _ServerPageState extends State<ServerPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text(L10n.of(context).serverClose),
           ),
         ],
       ),
@@ -284,36 +290,34 @@ class _ServerPageState extends State<ServerPage> {
   /// sent you an email" would turn this screen into an account-existence
   /// oracle the server took care not to be.
   Future<void> _forgotPassword() async {
+    final l10n = L10n.of(context);
     final email = TextEditingController(text: _email.text.trim());
     final send = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Reset your password'),
+        title: Text(l10n.serverResetTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'The server will email a link that lets you choose a new '
-              'password. Open it on this device or any browser.',
-            ),
+            Text(l10n.serverResetBody),
             const SizedBox(height: 12),
             TextField(
               controller: email,
               autofocus: true,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: InputDecoration(labelText: l10n.serverEmail),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Send the link'),
+            child: Text(l10n.serverSendLink),
           ),
         ],
       ),
@@ -331,8 +335,8 @@ class _ServerPageState extends State<ServerPage> {
       // whether the address is known.
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('If that address has an account, a link is on its way.'),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(l10n.serverResetSent),
     ));
   }
 
@@ -380,23 +384,20 @@ class _ServerPageState extends State<ServerPage> {
       return;
     }
 
+    final l10n = L10n.of(context);
     final keepLocal = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Which name is yours?'),
-        content: Text(
-          'This device calls you “$local”. The account you just signed into is '
-          '“$remote”.\n\nWhichever you keep will be used on every device '
-          'signed into this account.',
-        ),
+        title: Text(l10n.serverWhichNameTitle),
+        content: Text(l10n.serverWhichNameBody(local, remote)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('Use “$remote”'),
+            child: Text(l10n.serverUseName(remote)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text('Keep “$local”'),
+            child: Text(l10n.serverKeepName(local)),
           ),
         ],
       ),
@@ -423,6 +424,7 @@ class _ServerPageState extends State<ServerPage> {
   /// [_error] rather than rethrowing — the two together are how this knows
   /// what the notification should say without [_run] having to change.
   Future<void> _syncNow() async {
+    final l10n = L10n.of(context);
     await SyncForegroundService.start();
     _notifyingSync = true;
     await _syncTray.start();
@@ -456,9 +458,11 @@ class _ServerPageState extends State<ServerPage> {
         final n = report.issues.length;
         final changed = report.pulled + report.pushed;
         final msg = changed == 0 && !report.hasIssues
-            ? 'Already up to date.'
-            : 'Pulled ${report.pulled}, pushed ${report.pushed}'
-                '${report.hasIssues ? ', $n issue${n == 1 ? '' : 's'}' : ''}.';
+            ? l10n.serverUpToDate
+            : report.hasIssues
+                ? l10n.serverSyncResultIssues(
+                    report.pulled, report.pushed, l10n.syncIssues(n))
+                : l10n.serverSyncResult(report.pulled, report.pushed);
         resultMessage = msg;
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -466,7 +470,7 @@ class _ServerPageState extends State<ServerPage> {
             content: Text(msg),
             action: report.hasIssues
                 ? SnackBarAction(
-                    label: 'Details',
+                    label: l10n.serverDetails,
                     onPressed: () => _showIssues(report.issues),
                   )
                 : null,
@@ -474,7 +478,7 @@ class _ServerPageState extends State<ServerPage> {
         );
       });
     } finally {
-      await _syncTray.finish(resultMessage ?? _error ?? 'Sync finished.');
+      await _syncTray.finish(resultMessage ?? _error ?? l10n.syncFinished);
       _notifyingSync = false;
       await SyncForegroundService.stop();
     }
@@ -489,14 +493,14 @@ class _ServerPageState extends State<ServerPage> {
           onCursor: widget.connection.setSyncCursor,
           onProgress: _onProgress,
         );
-        _showReport('Pulled', report.pulled, report);
+        _showReport(true, report.pulled, report);
       });
 
   Future<void> _push() => _run(() async {
         final client = widget.connection.client;
         if (client == null) return;
         final report = await _sync.push(client, onProgress: _onProgress);
-        _showReport('Pushed', report.pushed, report);
+        _showReport(false, report.pushed, report);
       });
 
   /// Certificate status + import control for [url], shown for https URLs (a
@@ -504,6 +508,7 @@ class _ServerPageState extends State<ServerPage> {
   /// succeed). Used on both the sign-in screen and the connected view, so a
   /// rotated certificate can be re-imported without disconnecting.
   Widget _certRow(ThemeData theme, String url) {
+    final l10n = L10n.of(context);
     final isHttps = ServerConnection.normalizeUrl(url).startsWith('https://');
     if (!isHttps) return const SizedBox.shrink();
     final pem = widget.connection.certFor(url);
@@ -523,14 +528,14 @@ class _ServerPageState extends State<ServerPage> {
           Expanded(
             child: Text(
               pem == null
-                  ? 'No certificate trusted — import it for a self-signed server.'
-                  : 'Trusted certificate ${_shortFingerprint(fp!)}',
+                  ? l10n.serverCertNone
+                  : l10n.serverCertTrusted(_shortFingerprint(fp!)),
               style: theme.textTheme.bodySmall,
             ),
           ),
           TextButton(
             onPressed: _busy ? null : () => _importCert(url),
-            child: Text(pem == null ? 'Import' : 'Change'),
+            child: Text(pem == null ? l10n.serverCertImport : l10n.serverCertChange),
           ),
         ],
       ),
@@ -557,6 +562,7 @@ class _ServerPageState extends State<ServerPage> {
   /// Import the server's certificate for [url] — pasted as PEM or read from a
   /// chosen `.pem`/`.crt` file. Passing an empty result forgets it.
   Future<void> _importCert(String url) async {
+    final l10n = L10n.of(context);
     final controller =
         TextEditingController(text: widget.connection.certFor(url) ?? '');
     final result = await showDialog<String?>(
@@ -565,36 +571,32 @@ class _ServerPageState extends State<ServerPage> {
         String? err;
         return StatefulBuilder(
           builder: (context, setLocal) => AlertDialog(
-            title: const Text('Trust server certificate'),
+            title: Text(l10n.serverCertTitle),
             content: SizedBox(
               width: _dialogWidth(context, 460),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Paste the server's certificate, or choose its cert.pem file. "
-                    'Check the fingerprint matches the one the server printed on '
-                    'startup before trusting it.',
-                  ),
+                  Text(l10n.serverCertBody),
                   const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        const group = XTypeGroup(
-                          label: 'Certificate',
-                          extensions: ['pem', 'crt', 'cer'],
+                        final group = XTypeGroup(
+                          label: l10n.serverCertGroup,
+                          extensions: const ['pem', 'crt', 'cer'],
                         );
                         final file =
-                            await openFile(acceptedTypeGroups: const [group]);
+                            await openFile(acceptedTypeGroups: [group]);
                         if (file != null) {
                           controller.text = await File(file.path).readAsString();
                           setLocal(() => err = null);
                         }
                       },
                       icon: const Icon(Icons.folder_open),
-                      label: const Text('Choose file…'),
+                      label: Text(l10n.serverCertChoose),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -604,7 +606,7 @@ class _ServerPageState extends State<ServerPage> {
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '-----BEGIN CERTIFICATE-----',
+                      hintText: '-----BEGIN CERTIFICATE-----', // i18n-ignore: PEM marker
                     ),
                   ),
                   if (err != null) ...[
@@ -620,11 +622,11 @@ class _ServerPageState extends State<ServerPage> {
               if (widget.connection.certFor(url) != null)
                 TextButton(
                   onPressed: () => Navigator.pop(context, ''),
-                  child: const Text('Remove'),
+                  child: Text(l10n.serverCertRemove),
                 ),
               TextButton(
                 onPressed: () => Navigator.pop(context, null),
-                child: const Text('Cancel'),
+                child: Text(l10n.cancel),
               ),
               FilledButton(
                 onPressed: () {
@@ -634,13 +636,12 @@ class _ServerPageState extends State<ServerPage> {
                     return;
                   }
                   if (fingerprintOf(pem) == null) {
-                    setLocal(() =>
-                        err = "That doesn't look like a PEM certificate.");
+                    setLocal(() => err = l10n.serverCertBad);
                     return;
                   }
                   Navigator.pop(context, pem);
                 },
-                child: const Text('Trust'),
+                child: Text(l10n.serverCertTrust),
               ),
             ],
           ),
@@ -655,7 +656,7 @@ class _ServerPageState extends State<ServerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Library server')),
+      appBar: AppBar(title: Text(L10n.of(context).serverTitle)),
       body: ListenableBuilder(
         listenable: widget.connection,
         builder: (context, _) => widget.connection.isConnected
@@ -669,6 +670,7 @@ class _ServerPageState extends State<ServerPage> {
   /// (no OS keyring). Dismissable — tapping "Got it" records the acknowledgement
   /// so it isn't shown again until a new insecure session re-arms it.
   Widget _insecureTokenNotice(ThemeData theme, ServerConnection conn) {
+    final l10n = L10n.of(context);
     return Card(
       color: theme.colorScheme.errorContainer,
       child: Padding(
@@ -683,7 +685,7 @@ class _ServerPageState extends State<ServerPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Secure storage unavailable',
+                    l10n.serverInsecureTitle,
                     style: theme.textTheme.titleSmall
                         ?.copyWith(color: theme.colorScheme.onErrorContainer),
                   ),
@@ -692,10 +694,7 @@ class _ServerPageState extends State<ServerPage> {
             ),
             const SizedBox(height: 6),
             Text(
-              'This device has no OS keyring, so the session token is stored '
-              'unencrypted on disk. Anyone with access to this account can read '
-              'it. Disconnect when you are done, or install a keyring '
-              '(e.g. gnome-keyring) for encrypted storage.',
+              l10n.serverInsecureBody,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onErrorContainer),
             ),
@@ -703,7 +702,7 @@ class _ServerPageState extends State<ServerPage> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: conn.dismissInsecureTokenWarning,
-                child: const Text('Got it'),
+                child: Text(l10n.serverGotIt),
               ),
             ),
           ],
@@ -727,8 +726,7 @@ class _ServerPageState extends State<ServerPage> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'This server is newer than the app — update Vellum to sync '
-                'everything.',
+                L10n.of(context).serverNewer,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
               ),
@@ -741,6 +739,7 @@ class _ServerPageState extends State<ServerPage> {
 
   Widget _buildConnected(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final conn = widget.connection;
     final caps = conn.capabilities;
     return ListView(
@@ -753,11 +752,11 @@ class _ServerPageState extends State<ServerPage> {
             subtitle: Text(
               caps == null
                   ? conn.baseUrl
-                  : '${conn.baseUrl} · server v${caps.serverVersion}',
+                  : l10n.serverVersionLine(conn.baseUrl, caps.serverVersion),
             ),
             trailing: conn.isMaster
                 ? Chip(
-                    label: const Text('Master'),
+                    label: Text(l10n.serverMaster),
                     backgroundColor: theme.colorScheme.primaryContainer,
                   )
                 : null,
@@ -777,12 +776,9 @@ class _ServerPageState extends State<ServerPage> {
         // disconnecting (an https server only).
         _certRow(theme, conn.baseUrl),
         const SizedBox(height: 24),
-        Text('Sync', style: theme.textTheme.titleMedium),
+        Text(l10n.serverSyncHeading, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
-        const Text(
-            'Sync pulls the books shared with you into your local shelf, then '
-            'pushes your local changes up to the server. It also runs '
-            'automatically when the app starts.'),
+        Text(l10n.serverSyncBlurb),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -803,7 +799,7 @@ class _ServerPageState extends State<ServerPage> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.sync),
-                  label: Text(busy ? 'Syncing…' : 'Sync now'),
+                  label: Text(busy ? l10n.serverSyncing : l10n.serverSyncNow),
                 );
               },
             ),
@@ -821,7 +817,7 @@ class _ServerPageState extends State<ServerPage> {
                 ),
               ),
               icon: const Icon(Icons.tune),
-              label: const Text('What syncs'),
+              label: Text(l10n.serverWhatSyncs),
             ),
           ],
         ),
@@ -829,15 +825,16 @@ class _ServerPageState extends State<ServerPage> {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              'Not syncing: ${widget.settings.syncScope.excluded.join(', ')}',
+              l10n.serverNotSyncing(
+                  widget.settings.syncScope.excludedOf(l10n).join(', ')),
               style: theme.textTheme.bodySmall,
             ),
           ),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
           shape: const Border(),
-          title: Text('Advanced', style: theme.textTheme.titleSmall),
-          subtitle: const Text('Run only one direction of the sync'),
+          title: Text(l10n.serverAdvanced, style: theme.textTheme.titleSmall),
+          subtitle: Text(l10n.serverAdvancedNote),
           children: [
             Wrap(
               spacing: 12,
@@ -846,12 +843,12 @@ class _ServerPageState extends State<ServerPage> {
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _pull,
                   icon: const Icon(Icons.download),
-                  label: const Text('Pull library'),
+                  label: Text(l10n.serverPullLibrary),
                 ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _push,
                   icon: const Icon(Icons.upload),
-                  label: const Text('Push my books'),
+                  label: Text(l10n.serverPushBooks),
                 ),
               ],
             ),
@@ -861,9 +858,9 @@ class _ServerPageState extends State<ServerPage> {
         if (_busy) ...[
           const SizedBox(height: 16),
           LinearProgressIndicator(value: _progress),
-          if (_phase.isNotEmpty) ...[
+          if (_phase != null) ...[
             const SizedBox(height: 6),
-            Text(_phase, style: theme.textTheme.bodySmall),
+            Text(_phase!.labelOf(l10n), style: theme.textTheme.bodySmall),
           ],
         ],
         if (_error != null) ...[
@@ -871,10 +868,9 @@ class _ServerPageState extends State<ServerPage> {
           Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
         ],
         const SizedBox(height: 24),
-        Text('Sharing', style: theme.textTheme.titleMedium),
+        Text(l10n.serverSharingHeading, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
-        const Text('Create book groups, share the library or a book with other '
-            'accounts, and mint public links.'),
+        Text(l10n.serverSharingBlurb),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _busy
@@ -884,13 +880,13 @@ class _ServerPageState extends State<ServerPage> {
                         SharingPage(connection: widget.connection),
                   )),
           icon: const Icon(Icons.group_outlined),
-          label: const Text('Manage sharing'),
+          label: Text(l10n.serverManageSharing),
         ),
         const SizedBox(height: 32),
         OutlinedButton.icon(
           onPressed: _busy ? null : () => widget.connection.disconnect(),
           icon: const Icon(Icons.logout),
-          label: const Text('Disconnect'),
+          label: Text(l10n.serverDisconnect),
         ),
       ],
     );
@@ -898,19 +894,19 @@ class _ServerPageState extends State<ServerPage> {
 
   Widget _buildSignIn(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return ListView(
       padding: pageInsets(context, EdgeInsets.all(24)),
       children: [
         Text(
-          _registerMode ? 'Create the master account' : 'Sign in to a server',
+          _registerMode ? l10n.serverSignInRegister : l10n.serverSignInTitle,
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
         Text(
           _registerMode
-              ? 'The first account on a fresh server becomes its master (owner).'
-              : 'Connect to a self-hosted Vellum server to access a shared '
-                  'library.',
+              ? l10n.serverRegisterBlurb
+              : l10n.serverSignInBlurb,
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 20),
@@ -921,9 +917,9 @@ class _ServerPageState extends State<ServerPage> {
             setState(() {});
             _probeMail(value);
           },
-          decoration: const InputDecoration(
-            labelText: 'Server address',
-            hintText: 'https://library.example.com',
+          decoration: InputDecoration(
+            labelText: l10n.serverAddressLabel,
+            hintText: 'https://library.example.com', // i18n-ignore: a URL
             border: OutlineInputBorder(),
           ),
         ),
@@ -936,11 +932,8 @@ class _ServerPageState extends State<ServerPage> {
               Expanded(
                 child: Text(
                   _httpBlockedOnAndroid(theme)
-                      ? 'Android blocks unencrypted connections to a remote '
-                          'server. Enable TLS on the server (VELLUM_TLS=1) and '
-                          'connect over https.'
-                      : 'Unencrypted connection — your password and books are '
-                          'sent in cleartext.',
+                      ? l10n.serverHttpBlocked
+                      : l10n.serverHttpCleartext,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.error),
                 ),
@@ -953,18 +946,18 @@ class _ServerPageState extends State<ServerPage> {
         TextField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: l10n.serverEmail,
+            border: const OutlineInputBorder(),
           ),
         ),
         if (_registerMode) ...[
           const SizedBox(height: 12),
           TextField(
             controller: _displayName,
-            decoration: const InputDecoration(
-              labelText: 'Display name',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.serverDisplayName,
+              border: const OutlineInputBorder(),
             ),
           ),
         ],
@@ -974,9 +967,9 @@ class _ServerPageState extends State<ServerPage> {
           obscureText: true,
           onSubmitted: (_) =>
               (_busy || _httpBlockedOnAndroid(theme)) ? null : _authenticate(),
-          decoration: const InputDecoration(
-            labelText: 'Password',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: l10n.serverPassword,
+            border: const OutlineInputBorder(),
           ),
         ),
         if (_error != null) ...[
@@ -992,7 +985,7 @@ class _ServerPageState extends State<ServerPage> {
                   height: 20,
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(_registerMode ? 'Create account' : 'Log in'),
+              : Text(_registerMode ? l10n.serverCreateAccount : l10n.serverLogIn),
         ),
         // Offered only when the server says it can send mail (plan 5 #31): a
         // "Forgot password?" link on a LAN server with no SMTP would be a
@@ -1000,7 +993,7 @@ class _ServerPageState extends State<ServerPage> {
         if (!_registerMode && _mailAvailable)
           TextButton(
             onPressed: _busy ? null : _forgotPassword,
-            child: const Text('Forgot your password?'),
+            child: Text(l10n.serverForgot),
           ),
         const SizedBox(height: 8),
         TextButton(
@@ -1011,8 +1004,8 @@ class _ServerPageState extends State<ServerPage> {
                     _error = null;
                   }),
           child: Text(_registerMode
-              ? 'Have an account? Log in'
-              : 'Setting up a new server? Create the master account'),
+              ? l10n.serverHaveAccount
+              : l10n.serverNewServer),
         ),
       ],
     );

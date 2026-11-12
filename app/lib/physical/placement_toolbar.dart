@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/gen/app_localizations.dart';
+
 /// The bottom toolbar shown while a placed book is selected: open, rotate,
 /// resize, remove, deselect.
 class SelectionBar extends StatelessWidget {
@@ -23,6 +25,7 @@ class SelectionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Material(
       elevation: 3,
       borderRadius: BorderRadius.circular(12),
@@ -40,29 +43,29 @@ class SelectionBar extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Open book',
+              tooltip: l10n.placementOpenTooltip,
               onPressed: onOpen,
               icon: const Icon(Icons.menu_book_outlined),
             ),
             IconButton.filledTonal(
-              tooltip: 'Rotate 90°',
+              tooltip: l10n.placementRotateTooltip,
               onPressed: onRotate,
               iconSize: 28,
               icon: const Icon(Icons.rotate_90_degrees_cw),
             ),
             const SizedBox(width: 4),
             IconButton(
-              tooltip: 'Resize',
+              tooltip: l10n.placementResizeTooltip,
               onPressed: onResize,
               icon: const Icon(Icons.straighten),
             ),
             IconButton(
-              tooltip: 'Remove',
+              tooltip: l10n.placementRemoveTooltip,
               onPressed: onRemove,
               icon: const Icon(Icons.delete_outline),
             ),
             IconButton(
-              tooltip: 'Done',
+              tooltip: l10n.placementDoneTooltip,
               onPressed: onClose,
               icon: const Icon(Icons.close),
             ),

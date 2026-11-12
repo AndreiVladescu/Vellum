@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../add_book/barcode_camera.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
 import 'locate.dart';
 import 'physical_libraries_page.dart';
@@ -78,7 +79,7 @@ class _ShelfScanPageState extends State<ShelfScanPage> {
       // Not a shelf label. Said once, not per frame — a camera pointed at a
       // book's barcode would otherwise strobe the message.
       if (mounted && _message == null) {
-        setState(() => _message = "That isn't a Vellum shelf label.");
+        setState(() => _message = L10n.of(context).shelfScanNotLabel);
       }
       return;
     }
@@ -89,7 +90,7 @@ class _ShelfScanPageState extends State<ShelfScanPage> {
     if (environment == null) {
       setState(() {
         _handled = false;
-        _message = 'That shelf no longer exists — the label outlived it.';
+        _message = L10n.of(context).shelfScanGone;
       });
       return;
     }
@@ -106,8 +107,9 @@ class _ShelfScanPageState extends State<ShelfScanPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan a shelf label')),
+      appBar: AppBar(title: Text(l10n.shelfScanTitle)),
       body: Column(
         children: [
           if (_useCamera)
@@ -131,11 +133,11 @@ class _ShelfScanPageState extends State<ShelfScanPage> {
                 TextField(
                   controller: _manual,
                   decoration: InputDecoration(
-                    labelText: 'Shelf link',
-                    hintText: 'vellum://shelf/…',
+                    labelText: l10n.shelfScanLinkLabel,
+                    hintText: 'vellum://shelf/…', // i18n-ignore: a link
                     helperText: _useCamera
-                        ? 'Or type the link, if the code won’t scan'
-                        : 'Type or paste the link printed under a label',
+                        ? l10n.shelfScanHelperCamera
+                        : l10n.shelfScanHelperManual,
                   ),
                   onSubmitted: _onCode,
                 ),

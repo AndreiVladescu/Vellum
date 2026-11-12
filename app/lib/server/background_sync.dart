@@ -18,6 +18,7 @@ import 'package:workmanager/workmanager.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/platform_l10n.dart';
 import '../notifications/sync_tray.dart';
 import '../settings/app_settings.dart';
 import '../notifications/tray.dart';
@@ -277,6 +278,9 @@ Future<void> _postTrayNotification(
       newest: newest?.title,
       newestAt: newest?.createdAt,
       lastShownAt: settings.lastTrayShownAt,
+      // No widget tree in this isolate to ask: the platform's language, the
+      // same one the app itself starts in.
+      l10n: platformL10n(),
     );
     final tray = NotificationTray();
     if (decision.silent) {

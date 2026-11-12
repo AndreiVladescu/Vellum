@@ -15,6 +15,8 @@ import '../book_detail/book_detail_page.dart';
 import '../data/database.dart';
 import '../data/external_open.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 import '../settings/app_settings.dart';
 import '../shelf/shelf_view.dart' show SpineFace;
 import 'book_picker.dart';
@@ -828,6 +830,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// the view — the same landing a book gets, so an ornament ends up *on* a
   /// shelf rather than hanging in the air.
   Future<void> _addProp() async {
+    final l10n = L10n.of(context);
     final kind = await showModalBottomSheet<PropKind>(
       context: context,
       showDragHandle: true,
@@ -837,7 +840,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('Put something on a shelf',
+              child: Text(l10n.roomPropSheetTitle,
                   style: Theme.of(sheetContext).textTheme.titleMedium),
             ),
             for (final k in PropKind.values)
@@ -850,7 +853,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                     color: Theme.of(sheetContext).colorScheme.tertiary,
                   ),
                 ),
-                title: Text(k.label),
+                title: Text(k.labelOf(l10n)),
                 subtitle: Text(
                   '${formatDistance(k.width)} × ${formatDistance(k.height)}',
                 ),
@@ -877,7 +880,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       x: settled.pos.dx,
       y: settled.pos.dy,
     );
-    if (mounted) _say('Added a ${kind.label.toLowerCase()}. Drag it to move it.');
+    if (mounted) {
+      _say(l10n.roomPropAdded(kind.labelOf(l10n).toLowerCase()));
+    }
   }
 
   Future<void> _addBookcase() async {
@@ -909,7 +914,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       ),
     );
     if (!mounted) return;
-    _say('Added a bookcase. Drag any part to move it all.');
+    _say(L10n.of(context).roomBookcaseAdded);
   }
 
   /// Re-shapes a bookcase in place: same corner, new numbers.
@@ -960,7 +965,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       groupId: groupId,
     );
     await _applyGravity();
-    if (mounted) _say('Bookcase updated.');
+    if (mounted) _say(L10n.of(context).roomBookcaseUpdated);
   }
 
   Future<void> _finishGrouping() async {
@@ -969,27 +974,25 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     await repo.layout.groupShelves(widget.environmentId, picked.toList());
     if (!mounted) return;
     setState(() => _grouping = null);
-    _say('Grouped ${picked.length} parts into one bookcase.');
+    _say(L10n.of(context).roomGrouped(picked.length));
   }
 
   Future<void> _deleteBookcase(String groupId) async {
+    final l10n = L10n.of(context);
     final parts = _shelves.where((s) => s.groupId == groupId).length;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete the whole bookcase?'),
-        content: Text(
-          'Removes all $parts shelves and panels. Books standing on them drop '
-          'to whatever is beneath — nothing leaves your library.',
-        ),
+        title: Text(l10n.roomDeleteCaseTitle),
+        content: Text(l10n.roomDeleteCaseBody(parts)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -1028,6 +1031,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// much room each one has left, because "will they fit" is the question you
   /// actually have at that moment.
   Future<void> _addBooks({PhysicalShelf? shelf}) async {
+    final l10n = L10n.of(context);
     final placedIds = {for (final pb in _placed) pb.book.id};
     final books = await showModalBottomSheet<List<Book>>(
       context: context,
@@ -1037,8 +1041,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         repository: repo,
         alreadyPlacedIds: placedIds,
         title: shelf == null
-            ? 'Add books to ${widget.environmentName}'
-            : 'Add books to ${shelfName(shelf, _shelves)}',
+            ? l10n.roomAddBooksToRoom(widget.environmentName)
+            : l10n.roomAddBooksToShelf(shelfName(l10n, shelf, _shelves)),
       ),
     );
     if (books == null || books.isEmpty || !mounted) return;
@@ -1056,9 +1060,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       ];
 
   Future<PhysicalShelf?> _askWhichShelf(int count) async {
+    final l10n = L10n.of(context);
     final shelves = _bookShelves;
     if (shelves.isEmpty) {
-      _say('This room has no shelves yet — add one first.');
+      _say(l10n.roomNoShelvesYet);
       return null;
     }
     if (shelves.length == 1) return shelves.single;
@@ -1071,15 +1076,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     return showDialog<PhysicalShelf>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
-        title: Text('Put $count ${count == 1 ? 'book' : 'books'} on…'),
+        title: Text(l10n.roomPutBooksOn(count)),
         children: [
           for (final s in ordered)
             SimpleDialogOption(
               onPressed: () => Navigator.of(dialogContext).pop(s),
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(shelfName(s, _shelves)),
-                subtitle: Text(fillOf(shelf: s, placed: _placed).describe()),
+                title: Text(shelfName(l10n, s, _shelves)),
+                subtitle:
+                    Text(fillOf(shelf: s, placed: _placed).describe(l10n)),
               ),
             ),
         ],
@@ -1089,6 +1095,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   /// Packs [books] into the free space on [shelf] and writes them in one go.
   Future<void> _placeOnShelf(PhysicalShelf shelf, List<Book> books) async {
+    final l10n = L10n.of(context);
     final surface = math.max(shelf.y1, shelf.y2);
     final left = math.min(shelf.x1, shelf.x2);
     final right = math.max(shelf.x1, shelf.x2);
@@ -1127,13 +1134,13 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     );
     if (!mounted) return;
 
-    final where = shelfName(shelf, _shelves);
+    final where = shelfName(l10n, shelf, _shelves);
     if (result.unplaced.isEmpty) {
-      _say('Added $placed ${placed == 1 ? 'book' : 'books'} to $where.');
+      _say(l10n.roomAddedBooks(placed, where));
     } else if (placed == 0) {
-      _say('No room on $where — nothing was added.');
+      _say(l10n.roomNoRoomOn(where));
     } else {
-      _say('Added $placed to $where; ${result.unplaced.length} did not fit.');
+      _say(l10n.roomAddedSome(placed, where, result.unplaced.length));
     }
   }
 
@@ -1274,20 +1281,23 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }
 
   Future<void> _bookMenu(PlacedBook pb, Offset global) async {
+    final l10n = L10n.of(context);
     setState(() => _selectedId = pb.placement.id);
     final choice = await showMenu<String>(
       context: context,
       position: _menuPosition(global),
       items: [
-        const PopupMenuItem(value: 'open', child: Text('Open book')),
+        PopupMenuItem(value: 'open', child: Text(l10n.roomMenuOpenBook)),
         PopupMenuItem(
           value: 'rotate',
-          child: Text(pb.placement.rotation == 0 ? 'Lay flat' : 'Stand up'),
+          child: Text(pb.placement.rotation == 0
+              ? l10n.roomMenuLayFlat
+              : l10n.roomMenuStandUp),
         ),
-        const PopupMenuItem(value: 'resize', child: Text('Resize…')),
-        const PopupMenuItem(
-            value: 'reset', child: Text('Reset size to default')),
-        const PopupMenuItem(value: 'remove', child: Text('Remove from room')),
+        PopupMenuItem(value: 'resize', child: Text(l10n.roomMenuResize)),
+        PopupMenuItem(value: 'reset', child: Text(l10n.roomMenuResetSize)),
+        PopupMenuItem(
+            value: 'remove', child: Text(l10n.roomMenuRemoveFromRoom)),
       ],
     );
     if (choice == null || !mounted) return;
@@ -1306,6 +1316,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }
 
   Future<void> _propMenu(RoomProp prop, Offset global) async {
+    final l10n = L10n.of(context);
     final kind = PropKind.parse(prop.kind);
     final choice = await showMenu<String>(
       context: context,
@@ -1314,13 +1325,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         PopupMenuItem(
           value: 'depth',
           child: Text(prop.inFront
-              ? 'Send behind the books'
-              : 'Bring in front of the books'),
+              ? l10n.roomMenuSendBehind
+              : l10n.roomMenuBringFront),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'remove',
-          child: Text('Remove the ${kind.label.toLowerCase()}'),
+          child:
+              Text(l10n.roomMenuRemoveProp(kind.labelOf(l10n).toLowerCase())),
         ),
       ],
     );
@@ -1335,14 +1347,15 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }
 
   Future<void> _shelfMenu(PhysicalShelf s, Offset global) async {
+    final l10n = L10n.of(context);
     final choice = await showMenu<String>(
       context: context,
       position: _menuPosition(global),
       items: [
         if (ShelfKind.parse(s.kind).holdsBooks)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'fill',
-            child: Text('Add books to this shelf…'),
+            child: Text(l10n.roomMenuAddBooksHere),
           ),
         // First, because it is the reason most people open this menu: nothing
         // in the room can be dragged until it is unanchored.
@@ -1350,31 +1363,36 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           value: 'anchor',
           child: Text(
             s.anchored
-                ? (s.groupId != null ? 'Unlock this bookcase' : 'Unlock')
-                : (s.groupId != null ? 'Lock this bookcase' : 'Lock'),
+                ? (s.groupId != null
+                    ? l10n.roomMenuUnlockCase
+                    : l10n.roomMenuUnlock)
+                : (s.groupId != null
+                    ? l10n.roomMenuLockCase
+                    : l10n.roomMenuLock),
           ),
         ),
         const PopupMenuDivider(),
         if (s.groupId != null) ...[
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'edit-case',
-            child: Text('Edit this bookcase…'),
+            child: Text(l10n.roomMenuEditCase),
           ),
-          const PopupMenuItem(value: 'ungroup', child: Text('Ungroup')),
-          const PopupMenuItem(
+          PopupMenuItem(value: 'ungroup', child: Text(l10n.roomMenuUngroup)),
+          PopupMenuItem(
             value: 'delete-case',
-            child: Text('Delete the whole bookcase'),
+            child: Text(l10n.roomMenuDeleteCase),
           ),
           const PopupMenuDivider(),
         ] else
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'group',
-            child: Text('Group into a bookcase…'),
+            child: Text(l10n.roomMenuGroup),
           ),
-        const PopupMenuItem(value: 'edit', child: Text('Edit this segment…')),
+        PopupMenuItem(value: 'edit', child: Text(l10n.roomMenuEditSegment)),
         if (ShelfKind.parse(s.kind).holdsBooks)
-          const PopupMenuItem(value: 'tidy', child: Text('Tidy this shelf…')),
-        const PopupMenuItem(value: 'delete', child: Text('Delete this segment')),
+          PopupMenuItem(value: 'tidy', child: Text(l10n.roomMenuTidy)),
+        PopupMenuItem(
+            value: 'delete', child: Text(l10n.roomMenuDeleteSegment)),
       ],
     );
     if (choice == null || !mounted) return;
@@ -1389,20 +1407,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           anchored: !s.anchored,
         );
         if (mounted) {
-          _say(s.anchored
-              ? 'Unlocked — drag it to move it.'
-              : 'Locked in place.');
+          _say(s.anchored ? l10n.roomUnlockedSnack : l10n.roomLockedSnack);
         }
       case 'edit-case':
         await _editBookcase(s.groupId!);
       case 'ungroup':
         await repo.layout.ungroup(s.groupId!);
-        if (mounted) _say('Ungrouped — the shelves stay where they are.');
+        if (mounted) _say(l10n.roomUngroupedSnack);
       case 'delete-case':
         await _deleteBookcase(s.groupId!);
       case 'group':
         setState(() => _grouping = {s.id});
-        _say('Tap the other shelves and panels, then press Done.');
+        _say(l10n.roomGroupHintSnack);
       case 'delete':
         await repo.layout.deleteShelf(s.id);
         await _applyGravity();
@@ -1415,10 +1431,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }
 
   Future<void> _editShelf(PhysicalShelf s) async {
+    final l10n = L10n.of(context);
     final result = await showDialog<ShelfSpec>(
       context: context,
       builder: (_) => ShelfDialog(
-        title: 'Edit shelf',
+        title: l10n.roomShelfEditTitle,
         defaultY: math.min(s.y1, s.y2),
         initialLeft: math.min(s.x1, s.x2),
         initialRight: math.max(s.x1, s.x2),
@@ -1520,7 +1537,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     if (picked == null || !mounted) return;
     await _loadEnvironment();
     if (mounted) {
-      _say('Photo added. Calibrate it so the room is drawn to scale.');
+      _say(L10n.of(context).roomPhotoAdded);
     }
   }
 
@@ -1543,7 +1560,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     if (metresPerPixel == null) {
       if (result != null && mounted) {
         // Rejected rather than clamped: a wrong scale looks authoritative.
-        _say("That doesn't give a usable scale — check both numbers.");
+        _say(L10n.of(context).roomCalibrateBad);
       }
       return;
     }
@@ -1553,7 +1570,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     );
     await _loadEnvironment();
     if (mounted) {
-      _say('Calibrated: the photo is now drawn to scale.');
+      _say(L10n.of(context).roomCalibrated);
     }
   }
 
@@ -1564,19 +1581,20 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// room that looks like a room, and a free choice mostly produces one that
   /// fights the spines. "Use the theme" stays available and is the default.
   Future<void> _showRoomDecor() async {
-    const walls = <(String, int?)>[
-      ('Theme', null),
-      ('Warm white', 0xFFF2EDE4),
-      ('Clay', 0xFFD9C3B0),
-      ('Sage', 0xFFBFC9BA),
-      ('Ink', 0xFF2A2E33),
+    final l10n = L10n.of(context);
+    final walls = <(String, int?)>[
+      (l10n.roomSwatchTheme, null),
+      (l10n.roomWallWarmWhite, 0xFFF2EDE4),
+      (l10n.roomWallClay, 0xFFD9C3B0),
+      (l10n.roomWallSage, 0xFFBFC9BA),
+      (l10n.roomWallInk, 0xFF2A2E33),
     ];
-    const floors = <(String, int?)>[
-      ('Theme', null),
-      ('Oak', 0xFFC9A87C),
-      ('Walnut', 0xFF7A5A42),
-      ('Slate', 0xFF6E7278),
-      ('Rug red', 0xFF8C4A3F),
+    final floors = <(String, int?)>[
+      (l10n.roomSwatchTheme, null),
+      (l10n.roomFloorOak, 0xFFC9A87C),
+      (l10n.roomFloorWalnut, 0xFF7A5A42),
+      (l10n.roomFloorSlate, 0xFF6E7278),
+      (l10n.roomFloorRugRed, 0xFF8C4A3F),
     ];
 
     await showModalBottomSheet<void>(
@@ -1649,22 +1667,22 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             child: ListView(
               shrinkWrap: true,
               children: [
-                swatches('Wall', walls, _environment?.wallColor, (v) async {
+                swatches(l10n.roomWallTitle, walls, _environment?.wallColor,
+                    (v) async {
                   await repo.layout
                       .updateRoomLook(widget.environmentId, wallColor: Value(v));
                   await _loadEnvironment();
                 }),
                 const SizedBox(height: 12),
-                swatches('Floor', floors, _environment?.floorColor, (v) async {
+                swatches(l10n.roomFloorTitle, floors, _environment?.floorColor,
+                    (v) async {
                   await repo.layout.updateRoomLook(widget.environmentId,
                       floorColor: Value(v));
                   await _loadEnvironment();
                 }),
                 SwitchListTile(
-                  title: const Text('Floor line, skirting and shadows'),
-                  subtitle: const Text(
-                    'What stops an empty room looking like graph paper',
-                  ),
+                  title: Text(l10n.roomSurfacesTitle),
+                  subtitle: Text(l10n.roomSurfacesNote),
                   value: _environment?.roomSurfaces ?? true,
                   onChanged: (v) async {
                     await repo.layout
@@ -1696,9 +1714,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   /// Re-packs the books resting on [s] in [sort] order, flush from its left end.
   Future<void> _tidyShelf(PhysicalShelf s, TidySort sort) async {
+    final l10n = L10n.of(context);
     final riders = _ridersOf(s);
     if (riders.isEmpty) {
-      _say('Nothing is resting on that shelf.');
+      _say(l10n.roomTidyNothing);
       return;
     }
     // Series *names* live in their own table; the book row only holds the id.
@@ -1726,7 +1745,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       currentX: {for (final pb in riders) pb.placement.id: pb.placement.x},
     );
     if (moves.isEmpty) {
-      _say('That shelf is already tidy.');
+      _say(l10n.roomTidyAlready);
       return;
     }
     for (final move in moves) {
@@ -1734,18 +1753,18 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     }
     // Books that were stacked on top of the ones just moved are now floating.
     await _applyGravity();
-    if (mounted) _say('Tidied ${moves.length} of ${riders.length} books.');
+    if (mounted) _say(l10n.roomTidied(moves.length, riders.length));
   }
 
   Future<TidySort?> _askTidySort() => showDialog<TidySort>(
         context: context,
         builder: (dialogContext) => SimpleDialog(
-          title: const Text('Tidy this shelf'),
+          title: Text(L10n.of(dialogContext).roomTidyTitle),
           children: [
             for (final sort in TidySort.values)
               SimpleDialogOption(
                 onPressed: () => Navigator.of(dialogContext).pop(sort),
-                child: Text(sort.label),
+                child: Text(sort.labelOf(L10n.of(dialogContext))),
               ),
           ],
         ),
@@ -1753,8 +1772,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   /// Generates the printable label sheet and hands it to the system.
   Future<void> _printLabels() async {
+    final l10n = L10n.of(context);
     if (_shelves.isEmpty) {
-      _say('This room has no shelves to label yet.');
+      _say(l10n.roomLabelsNone);
       return;
     }
     final labels = [
@@ -1765,21 +1785,21 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           shelfName: s.label,
           bookCount: _ridersOf(s).length,
         ),
-    ]..sort((a, b) => a.displayName.compareTo(b.displayName));
+    ]..sort((a, b) =>
+        a.displayNameOf(l10n).compareTo(b.displayNameOf(l10n)));
 
     final file = File(p.join(
       (await getTemporaryDirectory()).path,
       'vellum-labels-${DateTime.now().millisecondsSinceEpoch}.html',
     ));
     await file.writeAsString(buildLabelSheetHtml(
+      l10n: l10n,
       labels: labels,
-      title: '${widget.environmentName} — shelf labels',
+      title: l10n.roomLabelsSheetTitle(widget.environmentName),
     ));
     final opened = await openOrShare(file, mimeType: 'text/html');
     if (!mounted) return;
-    _say(opened
-        ? 'Labels opened — print them with Ctrl+P.'
-        : 'Saved the labels to ${file.path}');
+    _say(opened ? l10n.roomLabelsOpened : l10n.roomLabelsSaved(file.path));
   }
 
   /// Saves the room as a PNG.
@@ -1788,10 +1808,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// what the pan and zoom you already have are for, and re-deriving a "whole
   /// room" bounding box would produce a different image from the one you set up.
   Future<void> _saveSnapshot() async {
+    final l10n = L10n.of(context);
     final boundary =
         _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) {
-      _say('Nothing to capture yet.');
+      _say(l10n.roomSnapNothing);
       return;
     }
     // 2× so the picture survives being looked at on a phone or printed small.
@@ -1799,7 +1820,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
     if (bytes == null) {
-      if (mounted) _say("Couldn't render the picture.");
+      if (mounted) _say(l10n.roomSnapFailed);
       return;
     }
     final safeName = widget.environmentName
@@ -1812,7 +1833,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     await file.writeAsBytes(bytes.buffer.asUint8List());
     final opened = await openOrShare(file, mimeType: 'image/png');
     if (!mounted) return;
-    _say(opened ? 'Picture saved and opened.' : 'Saved to ${file.path}');
+    _say(opened ? l10n.roomSnapSaved : l10n.roomSnapSavedTo(file.path));
   }
 
   void _say(String message) {
@@ -1841,17 +1862,17 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// answer "what's on the middle shelf?" with a mouse, too, which is why it
   /// sits in the toolbar rather than behind an accessibility setting.
   void _showRoomContents() {
-    final summaries = summarizeRoom(shelves: _shelves, placed: _placed);
+    final l10n = L10n.of(context);
+    final summaries = summarizeRoom(l10n, shelves: _shelves, placed: _placed);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
         child: summaries.isEmpty
-            ? const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('This room is empty. Add a shelf, then drop in '
-                    'books.'),
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(l10n.roomEmptySheet),
               )
             : ListView(
                 shrinkWrap: true,
@@ -1862,7 +1883,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                       title: Text(shelf.name),
                       subtitle: Text(
                         shelf.titles.isEmpty
-                            ? 'Empty'
+                            ? l10n.roomShelfEmpty
                             : shelf.titles.join(', '),
                       ),
                       // One node per shelf reading exactly like the canvas
@@ -1877,14 +1898,15 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Scaffold(
       appBar: AppBar(
         title: _searchOpen
             ? TextField(
                 controller: _search,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Find a book in this room',
+                decoration: InputDecoration(
+                  hintText: l10n.roomSearchHint,
                   border: InputBorder.none,
                 ),
                 onChanged: (value) => setState(() => _query = value),
@@ -1903,7 +1925,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         actions: _searchOpen
             ? [
                 IconButton(
-                  tooltip: 'Close search',
+                  tooltip: l10n.roomCloseSearchTooltip,
                   onPressed: () => setState(() {
                     _searchOpen = false;
                     _search.clear();
@@ -1914,22 +1936,22 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
               ]
             : [
                 IconButton(
-                  tooltip: 'Search this room',
+                  tooltip: l10n.roomSearchTooltip,
                   onPressed: () => setState(() => _searchOpen = true),
                   icon: const Icon(Icons.search),
                 ),
                 IconButton(
-                  tooltip: 'Add bookcase',
+                  tooltip: l10n.roomAddBookcaseTooltip,
                   onPressed: _addBookcase,
                   icon: const Icon(Icons.shelves),
                 ),
                 IconButton(
-                  tooltip: 'Add one shelf',
+                  tooltip: l10n.roomAddShelfTooltip,
                   onPressed: _addShelf,
                   icon: const Icon(Icons.horizontal_rule),
                 ),
                 PopupMenuButton<String>(
-                  tooltip: 'More',
+                  tooltip: l10n.roomMoreTooltip,
                   onSelected: (choice) async {
                     switch (choice) {
                       case 'prop':
@@ -1965,60 +1987,62 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'prop',
-                      child: Text('Put something on a shelf…'),
+                      child: Text(l10n.roomMenuProp),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'contents',
-                      child: Text('Room contents'),
+                      child: Text(l10n.roomMenuContents),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'zoom-in',
-                      child: Text('Zoom in'),
+                      child: Text(l10n.roomMenuZoomIn),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'zoom-out',
-                      child: Text('Zoom out'),
+                      child: Text(l10n.roomMenuZoomOut),
                     ),
                     const PopupMenuDivider(),
                     PopupMenuItem(
                       value: 'measure',
-                      child: Text(_measuring ? 'Stop measuring' : 'Measure…'),
+                      child: Text(_measuring
+                          ? l10n.roomMenuStopMeasuring
+                          : l10n.roomMenuMeasure),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'decor',
-                      child: Text('Wall and floor…'),
+                      child: Text(l10n.roomMenuDecor),
                     ),
                     PopupMenuItem(
                       value: 'backdrop',
                       child: Text(_environment?.backdropPath == null
-                          ? 'Add a room photo…'
-                          : 'Change the room photo…'),
+                          ? l10n.roomMenuAddPhoto
+                          : l10n.roomMenuChangePhoto),
                     ),
                     if (_environment?.backdropPath != null) ...[
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'calibrate',
-                        child: Text('Calibrate the photo…'),
+                        child: Text(l10n.roomMenuCalibrate),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'backdrop-opacity',
-                        child: Text('Photo strength…'),
+                        child: Text(l10n.roomMenuPhotoStrength),
                       ),
                     ],
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'labels',
-                      child: Text('Print shelf labels…'),
+                      child: Text(l10n.roomMenuLabels),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'snapshot',
-                      child: Text('Save a picture of this room'),
+                      child: Text(l10n.roomMenuSnapshot),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'stocktake',
-                      child: Text('Stocktake this room…'),
+                      child: Text(l10n.roomMenuStocktake),
                     ),
-                    const PopupMenuItem(value: 'help', child: Text('Help')),
+                    PopupMenuItem(value: 'help', child: Text(l10n.roomMenuHelp)),
                   ],
                 ),
               ],
@@ -2055,9 +2079,10 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                     return Semantics(
                       container: true,
                       label: roomSemanticLabel(
-                        summarizeRoom(shelves: _shelves, placed: _placed),
+                        l10n,
+                        summarizeRoom(l10n, shelves: _shelves, placed: _placed),
                       ),
-                      hint: 'Use Room contents for a navigable list',
+                      hint: l10n.roomSemanticsHint,
                       child: ExcludeSemantics(
                         child: RepaintBoundary(
                           key: _canvasKey,
@@ -2086,7 +2111,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           : FloatingActionButton.extended(
               onPressed: _addBooks,
               icon: const Icon(Icons.add),
-              label: const Text('Add books'),
+              label: Text(l10n.roomAddBooksFab),
             ),
     );
   }
@@ -2100,28 +2125,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Arranging the room'),
-        content: const Text(
-          '• Pinch or scroll to zoom; drag empty space to pan.\n'
-          '• “Add book” drops a book in; drag it so it rests on a shelf or '
-          'on top of another book.\n'
-          '• Tap a book to select it (rotate / resize / remove), then\n'
-          '  drag it to move it — only the selected book moves.\n'
-          '• Right-click or long-press a book or shelf to edit it.\n'
-          '• Drag a shelf to move it — the books on it ride along.\n'
-          '• A shelf can be furniture instead: a side panel, divider or label '
-          'draws but holds nothing.\n'
-          '• “Measure” turns the canvas into a ruler; “Add a room photo” lets '
-          'you trace your actual wall once you calibrate it.\n'
-          '• Right-click a shelf to tidy it by author, title or series.\n'
-          '• The search icon dims everything that doesn’t match.\n'
-          '• “Print shelf labels” makes a sheet you can cut up and stick on; '
-          'scanning one opens this room.',
-        ),
+        title: Text(L10n.of(context).roomHelpTitle),
+        content: Text(L10n.of(context).roomHelpBody),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
+            child: Text(L10n.of(context).roomHelpGotIt),
           ),
         ],
       ),
@@ -2130,6 +2139,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   Widget _buildCanvas(BoxConstraints constraints) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final selected = _selectedId == null
         ? null
         : _placed
@@ -2241,8 +2251,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         if (_placed.isEmpty && _shelves.isEmpty)
           Center(
             child: Text(
-              'Add a shelf, then drop in books.\n'
-              'Pinch or scroll to zoom, drag to pan.',
+              l10n.roomEmptyHint,
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -2262,7 +2271,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                 border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
               child: Text(
-                'Right-click or long-press a book or shelf to edit',
+                l10n.roomEditTip,
                 style: theme.textTheme.bodySmall,
               ),
             ),
@@ -2285,18 +2294,17 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   children: [
                     Expanded(
                       child: Text(
-                        '${_grouping!.length} selected — tap the shelves and '
-                        'panels that make up this bookcase',
+                        l10n.roomGroupingBar(_grouping!.length),
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
                     TextButton(
                       onPressed: () => setState(() => _grouping = null),
-                      child: const Text('Cancel'),
+                      child: Text(l10n.cancel),
                     ),
                     FilledButton(
                       onPressed: _grouping!.length < 2 ? null : _finishGrouping,
-                      child: const Text('Group'),
+                      child: Text(l10n.roomGroup),
                     ),
                   ],
                 ),

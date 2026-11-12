@@ -10,6 +10,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/data/database.dart';
@@ -52,6 +53,8 @@ void main() {
   }
 
   Future<Widget> wizard(LibraryRepository repo) async => MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
         home: FolderImportPage(
           repository: repo,
           settings: await AppSettingsStore.load(),

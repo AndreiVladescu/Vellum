@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/gen/app_localizations.dart';
 import 'catalog_entry.dart';
 
 /// Reads a Calibre library's `metadata.db` (plan 5 #21c).
@@ -41,8 +42,11 @@ class CalibreImport {
   }) async {
     final source = File(p.join(root.path, metadataFileName));
     if (!await source.exists()) {
-      throw const CalibreImportException('No metadata.db in that folder — '
-          'pick the folder that contains your Calibre library.');
+      throw CalibreImportException(
+        'No metadata.db in that folder — '
+        'pick the folder that contains your Calibre library.',
+        localized: (l10n) => l10n.importErrCalibreNoDb,
+      );
     }
     final workspace =
         await Directory.systemTemp.createTemp('vellum_calibre_read');
@@ -58,7 +62,10 @@ class CalibreImport {
     } on CalibreImportException {
       rethrow;
     } catch (e) {
-      throw CalibreImportException('Could not read that Calibre library: $e');
+      throw CalibreImportException(
+        'Could not read that Calibre library: $e',
+        localized: (l10n) => l10n.importErrCalibreRead('$e'),
+      );
     } finally {
       try {
         await workspace.delete(recursive: true);
@@ -263,9 +270,14 @@ class CalibreImport {
 }
 
 class CalibreImportException implements Exception {
-  const CalibreImportException(this.message);
+  const CalibreImportException(this.message, {this.localized});
 
+  /// A plain-English sentence for logs and tests. What the reader sees is
+  /// [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
 
   @override
   String toString() => message;

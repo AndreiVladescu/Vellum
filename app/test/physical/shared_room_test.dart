@@ -13,6 +13,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vellum/physical/shared_room_page.dart';
@@ -95,7 +96,9 @@ void main() {
 
   Future<void> pump(WidgetTester tester, VellumServerClient c) async {
     await tester.pumpWidget(MaterialApp(
-      home: SharedRoomPage(client: c, layoutId: 'l1', name: 'The study'),
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: SharedRoomPage(client: c, layoutId: 'l1', name: 'The study'),
     ));
     await tester.pumpAndSettle();
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
 import '../snack_bars.dart';
 import 'connection_store.dart';
@@ -53,27 +54,23 @@ class _SyncScopePageState extends State<SyncScopePage> {
     final client = widget.connection.client;
     if (client == null) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     final go = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Also remove $label from the server?'),
-        content: Text(
-          'Switching this off stops $label syncing from now on. What you have '
-          'already sent stays on the server unless you remove it here.\n\n'
-          'This removes only yours — nothing belonging to anyone you share the '
-          'library with — and it cannot be undone.',
-        ),
+        title: Text(l10n.syncScopeForgetTitle(label)),
+        content: Text(l10n.syncScopeForgetBody(label)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Leave it there'),
+            child: Text(l10n.syncScopeLeave),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove from server'),
+            child: Text(l10n.syncScopeRemove),
           ),
         ],
       ),
@@ -82,11 +79,11 @@ class _SyncScopePageState extends State<SyncScopePage> {
     try {
       final removed = await client.forgetMine(resource);
       messenger.showSnackBar(appSnackBar(
-        content: Text('Removed $removed from the server.'),
+        content: Text(l10n.syncScopeRemoved(removed)),
       ));
     } catch (e) {
       messenger.showSnackBar(
-        appSnackBar(content: Text('Could not remove $label: $e')),
+        appSnackBar(content: Text(l10n.syncScopeRemoveFailed(label, '$e'))),
       );
     }
   }
@@ -105,8 +102,9 @@ class _SyncScopePageState extends State<SyncScopePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('What syncs')),
+      appBar: AppBar(title: Text(l10n.syncScopeTitle)),
       body: ListView(
         padding: EdgeInsets.only(
           bottom: 24 + MediaQuery.viewPaddingOf(context).bottom,
@@ -115,89 +113,83 @@ class _SyncScopePageState extends State<SyncScopePage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
-              'Anything switched off is left alone in both directions — not '
-              'sent to the server, and not fetched from it.',
+              l10n.syncScopeIntro,
               style: theme.textTheme.bodyMedium,
             ),
           ),
           const Divider(height: 24),
           _row(
-            title: 'Books, covers and files',
-            subtitle: 'The catalogue itself, and the shelves it sits on',
+            title: l10n.syncScopeBooksTitle,
+            subtitle: l10n.syncScopeBooksNote,
             value: _scope.books,
             onChanged: (v) => _set(_scope.copyWith(books: v)),
           ),
           _row(
-            title: 'Physical copies',
-            subtitle: 'Which books you own as objects, and where they live',
+            title: l10n.syncScopeCopiesTitle,
+            subtitle: l10n.syncScopeCopiesNote,
             value: _scope.copies,
             onChanged: (v) => _setAndOffer(
               _scope.copyWith(copies: v),
               v,
               resource: 'copies',
-              label: 'physical copies',
+              label: l10n.syncScopeLabelCopies,
             ),
           ),
           _row(
-            title: 'Loans',
-            subtitle: 'Who has what, and the history of who had it',
+            title: l10n.syncScopeLoansTitle,
+            subtitle: l10n.syncScopeLoansNote,
             value: _scope.loans,
             onChanged: (v) => _setAndOffer(
               _scope.copyWith(loans: v),
               v,
               resource: 'loans',
-              label: 'loans',
+              label: l10n.syncScopeLabelLoans,
             ),
           ),
           _row(
-            title: 'Copy photos',
-            subtitle: 'Pictures of your shelves — the heaviest thing here',
+            title: l10n.syncScopePhotosTitle,
+            subtitle: l10n.syncScopePhotosNote,
             value: _scope.copyPhotos,
             onChanged: (v) => _setAndOffer(
               _scope.copyWith(copyPhotos: v),
               v,
               resource: 'copy-photos',
-              label: 'copy photos',
+              label: l10n.syncScopeLabelPhotos,
             ),
           ),
           const Divider(height: 24),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
-              'Personal — kept per account, so a shared library holds several '
-              'people’s marks in the same book without anyone seeing the '
-              'others’.',
+              l10n.syncScopePersonal,
               style: theme.textTheme.bodySmall,
             ),
           ),
           _row(
-            title: 'Highlights, notes and bookmarks',
-            subtitle: 'Everything you mark in a book, and your private notes',
+            title: l10n.syncScopeAnnotationsTitle,
+            subtitle: l10n.syncScopeAnnotationsNote,
             value: _scope.annotations,
             onChanged: (v) => _setAndOffer(
               _scope.copyWith(annotations: v),
               v,
               resource: 'annotations',
-              label: 'highlights and notes',
+              label: l10n.syncScopeLabelAnnotations,
             ),
           ),
           _row(
-            title: 'Reading sittings',
-            subtitle: 'When you read, and for how long',
+            title: l10n.syncScopeSessionsTitle,
+            subtitle: l10n.syncScopeSessionsNote,
             value: _scope.sessions,
             onChanged: (v) => _setAndOffer(
               _scope.copyWith(sessions: v),
               v,
               resource: 'sessions',
-              label: 'reading sittings',
+              label: l10n.syncScopeLabelSessions,
             ),
           ),
           SwitchListTile(
-            title: const Text('Reading position'),
-            subtitle: const Text(
-              'Where you stopped, per device. Has its own switch because it is '
-              'the one thing here that is about a device rather than a library.',
-            ),
+            title: Text(l10n.syncScopePositionTitle),
+            subtitle: Text(l10n.syncScopePositionNote),
             value: widget.settings.syncReadingPosition,
             onChanged: (v) async {
               await widget.settings.setSyncReadingPosition(v);
@@ -211,9 +203,7 @@ class _SyncScopePageState extends State<SyncScopePage> {
               // Books are the exception, and it is deliberate: "un-publish my
               // catalogue" is a different act from "stop syncing it", and it
               // already has its own front door in the console.
-              'Switching something off offers to remove what you have already '
-              'sent. Your books are the exception — deleting those from the '
-              'server is done from the console, on purpose.',
+              l10n.syncScopeFooter,
               style: theme.textTheme.bodySmall,
             ),
           ),

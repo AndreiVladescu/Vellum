@@ -3,6 +3,7 @@ import '../widgets/page_insets.dart';
 import 'package:flutter/services.dart';
 
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../server/connection_store.dart';
 import 'borrow_requests.dart';
 import 'due_dates.dart';
@@ -28,13 +29,14 @@ class LoansPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Loans'),
+        title: Text(l10n.loansTitle),
         actions: [
           if (_requestsAvailable)
             IconButton(
-              tooltip: 'Borrow requests',
+              tooltip: l10n.borrowTitle,
               icon: const Icon(Icons.pan_tool_alt_outlined),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -62,10 +64,11 @@ class LoansPage extends StatelessWidget {
                       size: 56,
                       color: theme.colorScheme.primary.withValues(alpha: 0.7)),
                   const SizedBox(height: 16),
-                  Text('No loans yet', style: theme.textTheme.titleMedium),
+                  Text(l10n.loansEmptyTitle,
+                      style: theme.textTheme.titleMedium),
                   const SizedBox(height: 6),
                   Text(
-                    'Lend a physical copy from its book page to track it here.',
+                    l10n.loansEmptyBody,
                     textAlign: TextAlign.center,
                     style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
@@ -73,7 +76,7 @@ class LoansPage extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.shelves),
-                    label: const Text('Go to your shelf'),
+                    label: Text(l10n.loansGoToShelf),
                   ),
                 ],
               ),
@@ -83,11 +86,11 @@ class LoansPage extends StatelessWidget {
           return ListView(
             padding: pageInsets(context, EdgeInsets.zero),
             children: [
-              _SectionHeader('Out now (${active.length})'),
+              _SectionHeader(l10n.loansOutNow(active.length)),
               if (active.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-                  child: Text('Nothing is lent out.'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: Text(l10n.loansNothingLent),
                 )
               else
                 // Most urgent first (plan 5 #27): overdue, then by due date,
@@ -96,7 +99,7 @@ class LoansPage extends StatelessWidget {
                   _ActiveLoanTile(entry: e, repository: repository),
               if (returned.isNotEmpty)
                 ExpansionTile(
-                  title: Text('History (${returned.length})'),
+                  title: Text(l10n.loansHistory(returned.length)),
                   childrenPadding: EdgeInsets.zero,
                   children: [
                     for (final e in returned)
@@ -105,8 +108,11 @@ class LoansPage extends StatelessWidget {
                         leading: const Icon(Icons.history),
                         title: Text(e.book.title),
                         subtitle: Text(
-                          '${e.loan.borrower} · ${_date(e.loan.loanedAt)} → '
-                          '${_date(e.loan.returnedAt!)}',
+                          l10n.loansHistoryLine(
+                            e.loan.borrower,
+                            _date(e.loan.loanedAt),
+                            _date(e.loan.returnedAt!),
+                          ),
                         ),
                       ),
                   ],
@@ -139,8 +145,9 @@ class _ActiveLoanTile extends StatelessWidget {
   final LibraryRepository repository;
 
   Future<void> _nudge(BuildContext context) async {
+    final l10n = L10n.of(context);
     final message =
-        LoanDue.reminderMessage(entry.loan, entry.book.title);
+        LoanDue.reminderMessage(l10n, entry.loan, entry.book.title);
     await Clipboard.setData(ClipboardData(text: message));
     // Copying rather than sending: Vellum has no idea which app you'd message
     // this person in, and a half-integrated share sheet that fails on desktop
@@ -148,7 +155,7 @@ class _ActiveLoanTile extends StatelessWidget {
     await repository.markReminderSent(entry.loan.id);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reminder copied — paste it to them')),
+      SnackBar(content: Text(l10n.loansReminderCopied)),
     );
   }
 
@@ -172,6 +179,7 @@ class _ActiveLoanTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final urgency = LoanDue.urgencyOf(entry.loan);
     final colour = switch (urgency) {
       LoanUrgency.overdue => theme.colorScheme.error,
@@ -189,11 +197,15 @@ class _ActiveLoanTile extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${entry.loan.borrower}'
-              '${entry.loan.borrowerContact == null ? '' : ' · ${entry.loan.borrowerContact}'}'
-              ' · since ${_date(entry.loan.loanedAt)}'),
+          Text(entry.loan.borrowerContact == null
+              ? l10n.loansSince(entry.loan.borrower, _date(entry.loan.loanedAt))
+              : l10n.loansSinceWithContact(
+                  entry.loan.borrower,
+                  entry.loan.borrowerContact!,
+                  _date(entry.loan.loanedAt),
+                )),
           Text(
-            LoanDue.describe(entry.loan),
+            LoanDue.describe(l10n, entry.loan),
             style: theme.textTheme.bodySmall?.copyWith(
               color: colour,
               fontWeight:
@@ -214,10 +226,10 @@ class _ActiveLoanTile extends StatelessWidget {
               await _editDue(context);
           }
         },
-        itemBuilder: (context) => const [
-          PopupMenuItem(value: 'return', child: Text('Mark returned')),
-          PopupMenuItem(value: 'nudge', child: Text('Copy a reminder')),
-          PopupMenuItem(value: 'due', child: Text('Change due date…')),
+        itemBuilder: (context) => [
+          PopupMenuItem(value: 'return', child: Text(l10n.loansMenuReturned)),
+          PopupMenuItem(value: 'nudge', child: Text(l10n.loansMenuReminder)),
+          PopupMenuItem(value: 'due', child: Text(l10n.loansMenuChangeDue)),
         ],
       ),
     );

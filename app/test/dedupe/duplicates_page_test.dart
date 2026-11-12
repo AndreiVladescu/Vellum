@@ -8,6 +8,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/dedupe/duplicates_page.dart';
@@ -67,7 +68,10 @@ void main() {
       await repo.trash.trash('second');
     });
 
-    await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: DuplicatesPage(repository: repo)));
     await settle(tester);
 
     expect(find.textContaining('Similar title and author'), findsNothing);
@@ -76,7 +80,10 @@ void main() {
 
   testWidgets('a pair is listed with why it matched', (tester) async {
     final repo = await seedPair(tester);
-    await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: DuplicatesPage(repository: repo)));
     await settle(tester);
 
     expect(find.textContaining('Similar title and author'), findsOneWidget);
@@ -84,7 +91,10 @@ void main() {
 
   testWidgets('cancelling the dialog changes nothing', (tester) async {
     final repo = await seedPair(tester);
-    await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: DuplicatesPage(repository: repo)));
     await settle(tester);
 
     await tester.tap(find.byIcon(Icons.chevron_right));
@@ -101,7 +111,10 @@ void main() {
   testWidgets('merging keeps the chosen survivor and the chosen field values',
       (tester) async {
     final repo = await seedPair(tester);
-    await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: DuplicatesPage(repository: repo)));
     await settle(tester);
 
     await tester.tap(find.byIcon(Icons.chevron_right));
@@ -132,7 +145,10 @@ void main() {
 
   testWidgets('the list empties out once the pair is merged', (tester) async {
     final repo = await seedPair(tester);
-    await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: DuplicatesPage(repository: repo)));
     await settle(tester);
     await tester.tap(find.byIcon(Icons.chevron_right));
     await settle(tester);
@@ -156,7 +172,10 @@ void main() {
           BooksCompanion.insert(id: 'b', title: 'Neuromancer'));
     });
 
-    await tester.pumpWidget(MaterialApp(home: DuplicatesPage(repository: repo)));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: DuplicatesPage(repository: repo)));
     await settle(tester);
 
     expect(find.text('No duplicates found'), findsOneWidget);

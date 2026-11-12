@@ -6,6 +6,8 @@ import 'bookcase_template.dart';
 import 'room_measure.dart';
 
 import '../data/database.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
 import 'physical_metrics.dart';
 
 /// What the shelf dialog returns: endpoints, height, and an optional label.
@@ -33,7 +35,7 @@ class ShelfDialog extends StatefulWidget {
   const ShelfDialog({
     super.key,
     required this.defaultY,
-    this.title = 'Add shelf',
+    this.title,
     this.initialLeft,
     this.initialRight,
     this.initialLabel,
@@ -42,7 +44,8 @@ class ShelfDialog extends StatefulWidget {
     this.fill,
   });
   final double defaultY;
-  final String title;
+  /// Defaults to "Add shelf".
+  final String? title;
   final double? initialLeft;
   final double? initialRight;
 
@@ -120,16 +123,17 @@ class _ShelfDialogState extends State<ShelfDialog> {
             ),
           ),
         );
+    final l10n = L10n.of(context);
     return AlertDialog(
-      title: Text(widget.title),
+      title: Text(widget.title ?? l10n.roomShelfAddTitle),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               _isUpright
-                  ? 'An upright runs between two heights at one X (metres).'
-                  : 'A shelf is a flat line between two points (metres).',
+                  ? l10n.roomUprightHint
+                  : l10n.roomShelfHint,
               style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 8),
@@ -138,8 +142,8 @@ class _ShelfDialogState extends State<ShelfDialog> {
             DropdownButtonFormField<ShelfKind>(
               initialValue: _kind,
               isDense: true,
-              decoration: const InputDecoration(
-                labelText: 'Kind',
+              decoration: InputDecoration(
+                labelText: l10n.roomKindLabel,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -147,7 +151,7 @@ class _ShelfDialogState extends State<ShelfDialog> {
                 for (final kind in ShelfKind.values)
                   DropdownMenuItem(
                     value: kind,
-                    child: Text(kind.displayName),
+                    child: Text(kind.labelOf(l10n)),
                   ),
               ],
               onChanged: (value) =>
@@ -158,37 +162,36 @@ class _ShelfDialogState extends State<ShelfDialog> {
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   _isUpright
-                      ? 'Books never rest on this, and none can be slid '
-                          'through it.'
-                      : 'Books never rest on this — it only draws.',
+                      ? l10n.roomKindUprightNote
+                      : l10n.roomKindMarkerNote,
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
             if (_isUpright) ...[
-              field('X (m)', _left),
+              field(l10n.roomFieldX, _left),
               Row(
                 children: [
-                  Expanded(child: field('From Y (m)', _height)),
+                  Expanded(child: field(l10n.roomFieldFromY, _height)),
                   const SizedBox(width: 8),
-                  Expanded(child: field('To Y (m)', _top)),
+                  Expanded(child: field(l10n.roomFieldToY, _top)),
                 ],
               ),
             ] else ...[
               Row(
                 children: [
-                  Expanded(child: field('Left X (m)', _left)),
+                  Expanded(child: field(l10n.roomFieldLeftX, _left)),
                   const SizedBox(width: 8),
-                  Expanded(child: field('Right X (m)', _right)),
+                  Expanded(child: field(l10n.roomFieldRightX, _right)),
                 ],
               ),
-              field('Height Y (m)', _height),
+              field(l10n.roomFieldHeightY, _height),
             ],
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: TextField(
                 controller: _label,
-                decoration: const InputDecoration(
-                  labelText: 'Label (optional)',
+                decoration: InputDecoration(
+                  labelText: l10n.roomFieldLabelOptional,
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
@@ -204,13 +207,13 @@ class _ShelfDialogState extends State<ShelfDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           // Disabled rather than a no-op: pressing Add and having nothing
           // happen, with no reason given, is how a dialog looks broken.
           onPressed: _spec == null ? null : () => Navigator.pop(context, _spec),
-          child: const Text('Add'),
+          child: Text(l10n.roomAdd),
         ),
       ],
     );
@@ -226,6 +229,7 @@ class _FillBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -237,8 +241,7 @@ class _FillBar extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          '${fill.describe()} · ${fill.bookCount} book'
-          '${fill.bookCount == 1 ? '' : 's'}',
+          l10n.roomFillLine(fill.describe(l10n), fill.bookCount),
           style: theme.textTheme.bodySmall,
         ),
       ],
@@ -328,8 +331,9 @@ class _SizeDialogState extends State<SizeDialog> {
             ),
           ),
         );
+    final l10n = L10n.of(context);
     return AlertDialog(
-      title: const Text('Book size'),
+      title: Text(l10n.roomSizeTitle),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -338,36 +342,35 @@ class _SizeDialogState extends State<SizeDialog> {
             DropdownButtonFormField<String?>(
               initialValue: _formatKey,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Format preset',
+              decoration: InputDecoration(
+                labelText: l10n.roomSizePreset,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
               items: [
-                const DropdownMenuItem(value: null, child: Text('Default')),
+                DropdownMenuItem(value: null, child: Text(l10n.roomSizeDefault)),
                 for (final f in BookFormat.presets)
-                  DropdownMenuItem(value: f.key, child: Text(f.label)),
+                  DropdownMenuItem(value: f.key, child: Text(f.labelOf(l10n))),
               ],
               onChanged: _applyFormat,
             ),
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'A preset sizes the book from its page count; tweak the '
-                'numbers below for a manual override.',
-                style: TextStyle(fontSize: 12),
+                l10n.roomSizePresetNote,
+                style: const TextStyle(fontSize: 12),
               ),
             ),
-            field('Thickness (cm)', _thickness),
-            field('Height (cm)', _height),
+            field(l10n.roomSizeThickness, _thickness),
+            field(l10n.roomSizeHeight, _height),
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 _problem ??
-                    'Up to A3 — ${(PhysicalMetrics.maxThickness * 100)
-                        .toStringAsFixed(0)} cm thick and '
-                    '${(PhysicalMetrics.maxHeight * 100).toStringAsFixed(0)} '
-                    'cm tall.',
+                    l10n.roomSizeLimit(
+                      (PhysicalMetrics.maxThickness * 100).toStringAsFixed(0),
+                      (PhysicalMetrics.maxHeight * 100).toStringAsFixed(0),
+                    ),
                 style: TextStyle(
                   fontSize: 12,
                   color: _problem == null
@@ -390,30 +393,28 @@ class _SizeDialogState extends State<SizeDialog> {
               reset: true,
             ),
           ),
-          child: const Text('Reset'),
+          child: Text(l10n.roomSizeReset),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () {
             final t = double.tryParse(_thickness.text);
             final h = double.tryParse(_height.text);
             if (t == null || h == null || t <= 0 || h <= 0) {
-              setState(() => _problem = 'Both sizes have to be numbers '
-                  'greater than zero.');
+              setState(() => _problem = l10n.roomSizeNotNumbers);
               return;
             }
             // A3 is the ceiling; `PhysicalMetrics` enforces it regardless, so
             // this exists to say so rather than to be the only guard.
             if (t > PhysicalMetrics.maxThickness * 100 ||
                 h > PhysicalMetrics.maxHeight * 100) {
-              setState(() => _problem = 'Nothing bigger than A3: at most '
-                  '${(PhysicalMetrics.maxThickness * 100).toStringAsFixed(0)}'
-                  ' cm thick and '
-                  '${(PhysicalMetrics.maxHeight * 100).toStringAsFixed(0)}'
-                  ' cm tall.');
+              setState(() => _problem = l10n.roomSizeTooBig(
+                    (PhysicalMetrics.maxThickness * 100).toStringAsFixed(0),
+                    (PhysicalMetrics.maxHeight * 100).toStringAsFixed(0),
+                  ));
               return;
             }
             Navigator.pop(
@@ -426,7 +427,7 @@ class _SizeDialogState extends State<SizeDialog> {
               ),
             );
           },
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     );
@@ -534,48 +535,49 @@ class _BookcaseDialogState extends State<BookcaseDialog> {
           ),
         );
     final spec = _spec;
+    final l10n = L10n.of(context);
     return AlertDialog(
       title: Text(widget.initialWidth == null
-          ? 'Add a bookcase'
-          : 'Edit this bookcase'),
+          ? l10n.roomBookcaseAddTitle
+          : l10n.roomBookcaseEditTitle),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Writes the shelves and side panels it is made of. They are '
-              'ordinary shelves afterwards — move or delete any of them.',
-              style: TextStyle(fontSize: 12),
+            Text(
+              l10n.roomBookcaseNote,
+              style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<BookcaseStyle>(
               initialValue: _style,
               isDense: true,
-              decoration: const InputDecoration(
-                labelText: 'Style',
+              decoration: InputDecoration(
+                labelText: l10n.roomStyleLabel,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
               items: [
                 for (final style in BookcaseStyle.values)
-                  DropdownMenuItem(value: style, child: Text(style.label)),
+                  DropdownMenuItem(
+                      value: style, child: Text(style.labelOf(l10n))),
               ],
               onChanged: (value) => _applyStyle(value ?? BookcaseStyle.billy),
             ),
             Row(
               children: [
-                Expanded(child: field('Width (m)', _width)),
+                Expanded(child: field(l10n.roomFieldWidth, _width)),
                 const SizedBox(width: 8),
-                Expanded(child: field('Height (m)', _height)),
+                Expanded(child: field(l10n.roomFieldHeight, _height)),
               ],
             ),
-            field('Shelves', _shelves),
+            field(l10n.roomFieldShelves, _shelves),
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: TextField(
                 controller: _label,
-                decoration: const InputDecoration(
-                  labelText: 'Name (optional)',
+                decoration: InputDecoration(
+                  labelText: l10n.roomFieldNameOptional,
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
@@ -585,9 +587,11 @@ class _BookcaseDialogState extends State<BookcaseDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Text(
-                  '${spec.shelves} shelves'
-                  '${_style.hasSides ? ' and 2 side panels' : ''}, '
-                  '${formatDistance(spec.height / spec.shelves)} apart.',
+                  _style.hasSides
+                      ? l10n.roomBookcaseSummarySides(spec.shelves,
+                          formatDistance(spec.height / spec.shelves))
+                      : l10n.roomBookcaseSummary(spec.shelves,
+                          formatDistance(spec.height / spec.shelves)),
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
@@ -597,11 +601,11 @@ class _BookcaseDialogState extends State<BookcaseDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: spec == null ? null : () => Navigator.pop(context, spec),
-          child: Text(widget.initialWidth == null ? 'Add' : 'Save'),
+          child: Text(widget.initialWidth == null ? l10n.roomAdd : l10n.save),
         ),
       ],
     );

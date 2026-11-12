@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import 'room_measure.dart';
 
 /// The room backdrop: picking the photo, and the two-point calibration dialog
@@ -51,7 +52,8 @@ Future<String?> addRoomBackdrop(
   } on Exception catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Couldn't get a photo: $e")));
+          .showSnackBar(SnackBar(
+              content: Text(L10n.of(context).backdropPickFailed('$e'))));
     }
     return null;
   }
@@ -76,7 +78,8 @@ Future<String?> addRoomBackdrop(
     }
     if (context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Couldn't save the photo: $e")));
+          .showSnackBar(SnackBar(
+              content: Text(L10n.of(context).backdropSaveFailed('$e'))));
     }
     return null;
   }
@@ -160,26 +163,24 @@ class _BackdropCalibrationDialogState extends State<BackdropCalibrationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return AlertDialog(
-      title: const Text('Calibrate the photo'),
+      title: Text(l10n.backdropCalibrateTitle),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Pick something in the photo you can measure — a door, a shelf, '
-              'the whole wall — then say how wide it is in the picture and how '
-              'wide it really is.\n\n'
-              'The photo is ${widget.imageWidth} × ${widget.imageHeight} pixels.',
+              l10n.backdropCalibrateBody(widget.imageWidth, widget.imageHeight),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _pixels,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'That length, in photo pixels',
+              decoration: InputDecoration(
+                labelText: l10n.backdropPixelsLabel,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -188,8 +189,8 @@ class _BackdropCalibrationDialogState extends State<BackdropCalibrationDialog> {
             TextField(
               controller: _metres,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'What it really is, in metres',
+              decoration: InputDecoration(
+                labelText: l10n.backdropMetresLabel,
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -200,7 +201,7 @@ class _BackdropCalibrationDialogState extends State<BackdropCalibrationDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(
@@ -209,7 +210,7 @@ class _BackdropCalibrationDialogState extends State<BackdropCalibrationDialog> {
               realMetres: double.tryParse(_metres.text.trim()) ?? 0,
             ),
           ),
-          child: const Text('Apply'),
+          child: Text(l10n.backdropApply),
         ),
       ],
     );
@@ -233,6 +234,7 @@ class BackdropSettingsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
@@ -240,9 +242,10 @@ class BackdropSettingsSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Room photo', style: Theme.of(context).textTheme.titleMedium),
+            Text(l10n.backdropSettingsTitle,
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            const Text('How strongly the photo shows through.'),
+            Text(l10n.backdropSettingsNote),
             Slider(
               value: opacity.clamp(0, 1),
               onChanged: (value) async {
@@ -260,7 +263,7 @@ class BackdropSettingsSheet extends StatelessWidget {
                   if (context.mounted) Navigator.of(context).pop();
                 },
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Remove photo'),
+                label: Text(l10n.backdropRemove),
               ),
             ),
           ],

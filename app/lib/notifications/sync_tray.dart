@@ -2,6 +2,11 @@ import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../l10n/gen/app_localizations.dart';
+import '../l10n/labels.dart';
+import '../l10n/platform_l10n.dart';
+import '../server/sync_service.dart' show SyncPhase;
+
 /// The body line under a sync's progress notification, e.g. "Pushing books —
 /// 12 of 40". Pure so the wording is testable without a device.
 ///
@@ -9,8 +14,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 /// or a phase like "Checking for changes" that has nothing to count) — shown
 /// as just the phase name, since "0 of 0" would look like nothing is
 /// happening rather than like something with no number to give.
-String syncProgressBody(int done, int total, String phase) =>
-    total <= 0 ? phase : '$phase — $done of $total';
+String syncProgressBody(L10n l10n, int done, int total, String phase) =>
+    total <= 0 ? phase : l10n.syncTrayProgress(phase, done, total);
 
 /// A status-bar notification with a progress bar, live for one sync.
 ///
@@ -21,16 +26,20 @@ String syncProgressBody(int done, int total, String phase) =>
 /// this class's first real update rather than sitting next to it as a
 /// second notification.
 class SyncNotificationTray {
-  SyncNotificationTray({FlutterLocalNotificationsPlugin? plugin})
-      : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+  /// [l10n] defaults to the platform's language: this is also constructed in
+  /// the background isolate, where no widget tree exists to ask.
+  SyncNotificationTray({FlutterLocalNotificationsPlugin? plugin, L10n? l10n})
+      : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+        _l10nOverride = l10n;
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final L10n? _l10nOverride;
+  late final L10n _l10n = _l10nOverride ?? platformL10n();
 
   /// Must match `SyncForegroundService.CHANNEL_ID` / `NOTIFICATION_ID`.
   static const _channelId = 'vellum.sync';
-  static const _channelName = 'Syncing';
-  static const _channelDescription =
-      'Progress while your library syncs with the server';
+  String get _channelName => _l10n.syncTrayChannelName;
+  String get _channelDescription => _l10n.syncTrayChannelDescription;
   static const _notificationId = 2;
 
   bool _ready = false;
@@ -52,9 +61,9 @@ class SyncNotificationTray {
     await _init();
     await _plugin.show(
       id: _notificationId,
-      title: 'Vellum',
-      body: 'Starting sync…',
-      notificationDetails: const NotificationDetails(
+      title: 'Vellum', // i18n-ignore: brand
+      body: _l10n.syncTrayStarting,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,
@@ -73,13 +82,13 @@ class SyncNotificationTray {
   /// One update per phase change is plenty — [onlyAlertOnce] keeps a
   /// per-book progress tick from re-alerting on every call, and the system
   /// already throttles identical rapid updates on its own.
-  Future<void> update(int done, int total, String phase) async {
+  Future<void> update(int done, int total, SyncPhase phase) async {
     if (!Platform.isAndroid) return;
     await _init();
     await _plugin.show(
       id: _notificationId,
-      title: 'Vellum',
-      body: syncProgressBody(done, total, phase),
+      title: 'Vellum', // i18n-ignore: brand
+      body: syncProgressBody(_l10n, done, total, phase.labelOf(_l10n)),
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
@@ -106,9 +115,9 @@ class SyncNotificationTray {
     await _init();
     await _plugin.show(
       id: _notificationId,
-      title: 'Vellum',
+      title: 'Vellum', // i18n-ignore: brand
       body: message,
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,

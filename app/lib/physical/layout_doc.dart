@@ -15,6 +15,7 @@ library;
 import 'package:drift/drift.dart';
 
 import '../data/database.dart';
+import '../l10n/gen/app_localizations.dart';
 import 'layout_repository.dart' show PlacedBook;
 import 'physical_metrics.dart';
 
@@ -27,9 +28,14 @@ const String layoutDocKind = 'vellum.layout';
 /// Raised when a document can't be used — wrong kind, or a version from a newer
 /// app. Carries a sentence fit to show a person.
 class LayoutDocException implements Exception {
-  const LayoutDocException(this.message);
+  const LayoutDocException(this.message, {this.localized});
 
+  /// A plain-English sentence for logs and tests. What the reader sees is
+  /// [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
 
   @override
   String toString() => message;
@@ -200,22 +206,32 @@ class ParsedPlacement {
 /// Reads a document, refusing anything it doesn't fully understand.
 ParsedLayout parseLayoutDoc(Map<String, dynamic> doc) {
   if (doc['doc'] != layoutDocKind) {
-    throw const LayoutDocException('That is not a Vellum room document.');
+    throw LayoutDocException(
+      'That is not a Vellum room document.',
+      localized: (l10n) => l10n.roomDocNotARoom,
+    );
   }
   final version = (doc['version'] as num?)?.toInt() ?? 0;
   if (version > layoutDocVersion) {
     throw LayoutDocException(
       'This room was published by a newer version of Vellum (format v$version). '
       'Update the app to open it.',
+      localized: (l10n) => l10n.roomDocNewer(version),
     );
   }
   final environment = doc['environment'];
   if (environment is! Map) {
-    throw const LayoutDocException('That room document is missing its room.');
+    throw LayoutDocException(
+      'That room document is missing its room.',
+      localized: (l10n) => l10n.roomDocNoRoom,
+    );
   }
   final id = environment['id']?.toString();
   if (id == null || id.isEmpty) {
-    throw const LayoutDocException('That room document has no id.');
+    throw LayoutDocException(
+      'That room document has no id.',
+      localized: (l10n) => l10n.roomDocNoId,
+    );
   }
 
   return ParsedLayout(

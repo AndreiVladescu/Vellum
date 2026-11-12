@@ -1,4 +1,5 @@
 import '../data/database.dart';
+import '../l10n/gen/app_localizations.dart';
 
 /// How a loan stands against its due date (plan 5 #27).
 enum LoanUrgency {
@@ -96,34 +97,35 @@ class LoanDue {
   }
 
   /// A human phrase for the badge: "3 days overdue", "due today", "due in 2 days".
-  static String describe(Loan loan, {DateTime? now}) {
+  static String describe(L10n l10n, Loan loan, {DateTime? now}) {
     final at = now ?? DateTime.now();
     switch (urgencyOf(loan, now: at)) {
       case LoanUrgency.returned:
-        return 'Returned';
+        return l10n.loansDueReturned;
       case LoanUrgency.noDate:
-        return 'No due date';
+        return l10n.loansDueNoDate;
       case LoanUrgency.overdue:
-        final days = daysOverdue(loan, now: at);
-        return days == 1 ? '1 day overdue' : '$days days overdue';
+        return l10n.loansDueOverdue(daysOverdue(loan, now: at));
       case LoanUrgency.dueToday:
-        return 'Due today';
+        return l10n.loansDueToday;
       case LoanUrgency.dueSoon:
       case LoanUrgency.dueLater:
         final days = _day(loan.dueAt!).difference(_day(at)).inDays;
-        return days == 1 ? 'Due tomorrow' : 'Due in $days days';
+        return days == 1 ? l10n.loansDueTomorrow : l10n.loansDueInDays(days);
     }
   }
 
   /// A message to send the borrower — the "nudge" action.
-  static String reminderMessage(Loan loan, String bookTitle, {DateTime? now}) {
+  static String reminderMessage(
+    L10n l10n,
+    Loan loan,
+    String bookTitle, {
+    DateTime? now,
+  }) {
     final lent = _dateOnly(loan.loanedAt);
     final due = loan.dueAt;
-    if (due == null) {
-      return 'You borrowed "$bookTitle" on $lent. Could I have it back when '
-          "you're done?";
-    }
-    return 'You borrowed "$bookTitle" on $lent, due ${_dateOnly(due)}.';
+    if (due == null) return l10n.loansReminderNoDue(bookTitle, lent);
+    return l10n.loansReminderWithDue(bookTitle, lent, _dateOnly(due));
   }
 
   /// Local calendar day, so comparisons are about days rather than instants.

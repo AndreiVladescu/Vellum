@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 
+import '../l10n/gen/app_localizations.dart';
+
 /// Optional passphrase encryption for backup archives (plan 5 #13).
 ///
 /// **Why it exists.** A backup is the whole library — including `readerNotes`,
@@ -155,11 +157,15 @@ class BackupCrypto {
       if (head.length < magic.length + 5 ||
           utf8.decode(head.sublist(0, magic.length), allowMalformed: true) !=
               magic) {
-        throw const BackupDecryptException('not an encrypted Vellum backup');
+        throw BackupDecryptException(
+          'not an encrypted Vellum backup',
+          localized: (l10n) => l10n.prefsBackupProblemNotEncrypted,
+        );
       }
       if (head[magic.length] != _version) {
-        throw const BackupDecryptException(
+        throw BackupDecryptException(
           'this backup was written by a newer version of Vellum',
+          localized: (l10n) => l10n.prefsBackupProblemNewerVersion,
         );
       }
       final headerLength = ByteData.sublistView(
@@ -167,27 +173,42 @@ class BackupCrypto {
         magic.length + 1,
       ).getUint32(0);
       if (headerLength <= 0 || headerLength > 4096) {
-        throw const BackupDecryptException('backup header is not readable');
+        throw BackupDecryptException(
+          'backup header is not readable',
+          localized: (l10n) => l10n.prefsBackupProblemHeader,
+        );
       }
       final header = await input.read(headerLength);
       if (header.length != headerLength) {
-        throw const BackupDecryptException('backup header is truncated');
+        throw BackupDecryptException(
+          'backup header is truncated',
+          localized: (l10n) => l10n.prefsBackupProblemHeaderTruncated,
+        );
       }
       final Map<String, dynamic> params;
       try {
         params = jsonDecode(utf8.decode(header)) as Map<String, dynamic>;
       } catch (_) {
-        throw const BackupDecryptException('backup header is not readable');
+        throw BackupDecryptException(
+          'backup header is not readable',
+          localized: (l10n) => l10n.prefsBackupProblemHeader,
+        );
       }
       if (params['kdf'] != 'argon2id') {
-        throw const BackupDecryptException('unsupported key derivation');
+        throw BackupDecryptException(
+          'unsupported key derivation',
+          localized: (l10n) => l10n.prefsBackupProblemHeader,
+        );
       }
 
       final salt = base64.decode(params['salt'] as String);
       final noncePrefix = base64.decode(params['noncePrefix'] as String);
       final chunk = (params['chunk'] as num).toInt();
       if (chunk <= 0 || chunk > 64 * 1024 * 1024) {
-        throw const BackupDecryptException('backup header is not readable');
+        throw BackupDecryptException(
+          'backup header is not readable',
+          localized: (l10n) => l10n.prefsBackupProblemHeader,
+        );
       }
       final key = await _deriveKey(
         passphrase,
@@ -205,7 +226,10 @@ class BackupCrypto {
       do {
         final stored = await input.read(chunk + _macBytes);
         if (stored.length < _macBytes) {
-          throw const BackupDecryptException('backup is truncated');
+          throw BackupDecryptException(
+            'backup is truncated',
+            localized: (l10n) => l10n.prefsBackupProblemTruncated,
+          );
         }
         consumed += stored.length;
         final isLast = consumed >= total;
@@ -219,8 +243,9 @@ class BackupCrypto {
             aad: _aad(header, counter, isLast: isLast),
           );
         } on SecretBoxAuthenticationError {
-          throw const BackupDecryptException(
+          throw BackupDecryptException(
             'wrong passphrase, or the backup has been damaged',
+            localized: (l10n) => l10n.prefsBackupProblemWrongPassphrase,
           );
         }
         output.add(plain);
@@ -263,9 +288,14 @@ class BackupCrypto {
 /// A backup that could not be decrypted: wrong passphrase, tampering, or a
 /// truncated file — see [BackupCrypto.decryptFile] for why they're one type.
 class BackupDecryptException implements Exception {
-  const BackupDecryptException(this.message);
+  const BackupDecryptException(this.message, {this.localized});
 
+  /// A plain-English sentence for logs and tests. What the reader sees is
+  /// [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
 
   @override
   String toString() => message;

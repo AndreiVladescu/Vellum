@@ -8,6 +8,7 @@ library;
 import 'dart:math' as math;
 
 import '../data/database.dart';
+import '../l10n/gen/app_localizations.dart';
 import 'physical_metrics.dart';
 
 /// What a segment in `physical_shelves` actually is (plan 5 #29).
@@ -113,12 +114,12 @@ class ShelfFill {
   double get freeM => math.max(0, lengthM - usedM);
 
   /// "42 cm of 90 cm used" — the sentence, not the number.
-  String describe() {
-    if (lengthM <= 0) return 'No length';
+  String describe(L10n l10n) {
+    if (lengthM <= 0) return l10n.roomFillNoLength;
     final used = formatDistance(usedM);
     final total = formatDistance(lengthM);
-    if (isOverfull) return '$used on a $total shelf — overfull';
-    return '$used of $total used · ${formatDistance(freeM)} free';
+    if (isOverfull) return l10n.roomFillOverfull(used, total);
+    return l10n.roomFillUsed(used, total, formatDistance(freeM));
   }
 }
 
@@ -166,14 +167,18 @@ List<WorldBox> unlockedBoxes(List<PhysicalShelf> shelves) {
 /// "Shelf at 1.4 m" is what you would say pointing at the bookcase. [siblings]
 /// is the rest of the room, used only to decide whether a label is ambiguous:
 /// two shelves both labelled "Cookbooks" get their heights too.
-String shelfName(PhysicalShelf shelf, List<PhysicalShelf> siblings) {
+String shelfName(
+  L10n l10n,
+  PhysicalShelf shelf,
+  List<PhysicalShelf> siblings,
+) {
   final label = shelf.label?.trim();
   final height = formatDistance(math.max(shelf.y1, shelf.y2));
-  if (label == null || label.isEmpty) return 'Shelf at $height';
+  if (label == null || label.isEmpty) return l10n.roomShelfAt(height);
   final sameLabel = siblings
       .where((s) => (s.label?.trim() ?? '') == label)
       .length;
-  return sameLabel > 1 ? '$label ($height)' : label;
+  return sameLabel > 1 ? l10n.roomShelfWithHeight(label, height) : label;
 }
 
 /// Measures how much of [shelf] its resting books take up.

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -109,6 +110,8 @@ void main() {
       ServerConnection conn,
     ) async {
       await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           appBar: AppBar(
             actions: [NotificationsButton(connection: conn, client: client)],
@@ -155,6 +158,8 @@ void main() {
       ServerConnection conn,
     ) async {
       await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
         home: NotificationsPage(connection: conn, client: client),
       ));
       await settle(tester);

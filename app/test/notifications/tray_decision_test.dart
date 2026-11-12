@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/notifications/tray.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 
 /// What the background check puts in the status bar.
 ///
@@ -23,6 +24,7 @@ void main() {
         newest: newest,
         newestAt: newestAt,
         lastShownAt: lastShownAt,
+        l10n: L10nEn(),
       );
 
   test('nothing unread says nothing', () {

@@ -3,6 +3,7 @@ import '../widgets/page_insets.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import 'stocktake.dart';
 
 /// Walk a shelf and check it against the map (plan 5 #30).
@@ -91,22 +92,20 @@ class _StocktakePageState extends State<StocktakePage> {
   /// action offered, and only per row after a confirmation — a stocktake that
   /// bulk-deleted "missing" books would be a very effective way to lose a map.
   Future<void> _removePlacement(PlacedBook entry) async {
+    final l10n = L10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Remove “${entry.book.title}” from the map?'),
-        content: const Text(
-          'The book stays in your library — only its position in this room is '
-          'forgotten.',
-        ),
+        title: Text(l10n.stocktakeRemoveTitle(entry.book.title)),
+        content: Text(l10n.stocktakeRemoveBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
+            child: Text(l10n.stocktakeRemove),
           ),
         ],
       ),
@@ -125,20 +124,21 @@ class _StocktakePageState extends State<StocktakePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     final result = _result;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Stocktake · ${widget.scopeLabel}'),
+        title: Text(l10n.stocktakeTitle(widget.scopeLabel)),
         actions: [
           if (result == null && !_loading)
             TextButton(
               onPressed: _finish,
-              child: const Text('Finish'),
+              child: Text(l10n.stocktakeFinish),
             ),
           if (result != null)
             TextButton(
               onPressed: () => setState(() => _result = null),
-              child: const Text('Back to list'),
+              child: Text(l10n.stocktakeBackToList),
             ),
         ],
       ),
@@ -152,12 +152,13 @@ class _StocktakePageState extends State<StocktakePage> {
 
   Widget _checklist() {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     if (_scope.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
+          padding: const EdgeInsets.all(32),
           child: Text(
-            'Nothing is placed here yet, so there is nothing to count.',
+            l10n.stocktakeNothingHere,
             textAlign: TextAlign.center,
           ),
         ),
@@ -177,8 +178,7 @@ class _StocktakePageState extends State<StocktakePage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Text(
-            'Tick every book you can actually see. ${_found.length} of '
-            '${rows.length} so far.',
+            l10n.stocktakeTickPrompt(_found.length, rows.length),
             style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
           ),
         ),
@@ -210,6 +210,7 @@ class _StocktakePageState extends State<StocktakePage> {
 
   Widget _report(StocktakeResult result) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     if (result.isClean) {
       return Center(
         child: Padding(
@@ -220,12 +221,10 @@ class _StocktakePageState extends State<StocktakePage> {
               Icon(Icons.verified_outlined,
                   size: 56, color: theme.colorScheme.primary),
               const SizedBox(height: 16),
-              Text('Everything matches', style: theme.textTheme.titleMedium),
+              Text(l10n.stocktakeAllMatch, style: theme.textTheme.titleMedium),
               const SizedBox(height: 6),
               Text(
-                '${result.confirmed.length} book'
-                '${result.confirmed.length == 1 ? '' : 's'} found, exactly '
-                'where the map says.',
+                l10n.stocktakeAllMatchBody(result.confirmed.length),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
               ),
@@ -239,8 +238,8 @@ class _StocktakePageState extends State<StocktakePage> {
       children: [
         if (result.missing.isNotEmpty) ...[
           _Header(
-            'Missing (${result.missing.length})',
-            'Placed here, but you didn’t find them.',
+            l10n.stocktakeMissing(result.missing.length),
+            l10n.stocktakeMissingNote,
           ),
           for (final entry in result.missing)
             ListTile(
@@ -248,25 +247,25 @@ class _StocktakePageState extends State<StocktakePage> {
               title: Text(entry.book.title),
               trailing: TextButton(
                 onPressed: () => _removePlacement(entry),
-                child: const Text('Remove from map'),
+                child: Text(l10n.stocktakeRemoveFromMap),
               ),
             ),
         ],
         if (result.unexpected.isNotEmpty) ...[
           _Header(
-            'Not on the map (${result.unexpected.length})',
-            'Found here, but the map puts them somewhere else.',
+            l10n.stocktakeUnexpected(result.unexpected.length),
+            l10n.stocktakeUnexpectedNote,
           ),
           for (final entry in result.unexpected)
             ListTile(
               leading: const Icon(Icons.new_releases_outlined),
               title: Text(entry.book.title),
               subtitle: Text(entry.isUnplaced
-                  ? 'Not placed in any room'
-                  : 'Placed in ${entry.placedElsewhere}'),
+                  ? l10n.stocktakeUnplaced
+                  : l10n.stocktakePlacedIn(entry.placedElsewhere!)),
             ),
         ],
-        _Header('Confirmed (${result.confirmed.length})', ''),
+        _Header(l10n.stocktakeConfirmed(result.confirmed.length), ''),
         for (final entry in result.confirmed)
           ListTile(
             dense: true,

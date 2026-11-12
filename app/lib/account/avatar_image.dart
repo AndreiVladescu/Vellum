@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import '../l10n/gen/app_localizations.dart';
+
 /// Preparing a picked photo to be an avatar.
 ///
 /// **Why not just store the file the user chose.** A photo off a phone is
@@ -29,7 +31,10 @@ Future<Uint8List> avatarBytes(
   try {
     decoded = await _decode(source);
   } catch (e) {
-    throw AvatarImageException("That file isn't an image Vellum can read.");
+    throw AvatarImageException(
+      "That file isn't an image Vellum can read.",
+      localized: (l10n) => l10n.accountPhotoNotAnImage,
+    );
   }
   final longest =
       decoded.width > decoded.height ? decoded.width : decoded.height;
@@ -46,7 +51,10 @@ Future<Uint8List> avatarBytes(
   final data = await scaled.toByteData(format: ui.ImageByteFormat.png);
   scaled.dispose();
   if (data == null) {
-    throw const AvatarImageException("That image couldn't be resized.");
+    throw AvatarImageException(
+      "That image couldn't be resized.",
+      localized: (l10n) => l10n.accountPhotoResizeFailed,
+    );
   }
   return data.buffer.asUint8List();
 }
@@ -67,9 +75,14 @@ Future<ui.Image> _decode(
 }
 
 class AvatarImageException implements Exception {
-  const AvatarImageException(this.message);
+  const AvatarImageException(this.message, {this.localized});
 
+  /// A plain-English sentence for logs and tests. What the reader sees is
+  /// [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
 
   @override
   String toString() => message;

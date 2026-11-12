@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/page_insets.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
 
@@ -87,7 +88,7 @@ class _SharingPageState extends State<SharingPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+            .showSnackBar(SnackBar(content: Text('$e'))); // i18n-ignore: error detail
       }
     }
   }
@@ -95,7 +96,7 @@ class _SharingPageState extends State<SharingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sharing')),
+      appBar: AppBar(title: Text(L10n.of(context).sharingTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -119,20 +120,21 @@ class _SharingPageState extends State<SharingPage> {
   // ---- groups -------------------------------------------------------------
 
   Widget _groupsSection(BuildContext context) {
+    final l10n = L10n.of(context);
     return _Section(
-      title: 'Groups',
+      title: l10n.sharingGroups,
       onAdd: _newGroup,
-      addTooltip: 'New group',
-      empty: _groups.isEmpty ? 'No groups yet.' : null,
+      addTooltip: l10n.sharingNewGroupTooltip,
+      empty: _groups.isEmpty ? l10n.sharingNoGroups : null,
       children: [
         for (final g in _groups)
           ListTile(
             leading: const Icon(Icons.folder_outlined),
             title: Text(g.name),
-            subtitle: Text('${g.bookCount} book${g.bookCount == 1 ? '' : 's'}'),
+            subtitle: Text(l10n.sharingGroupBooks(g.bookCount)),
             trailing: IconButton(
               icon: const Icon(Icons.playlist_add),
-              tooltip: 'Add a book',
+              tooltip: l10n.sharingAddBookTooltip,
               onPressed: () => _addBookToGroup(g),
             ),
           ),
@@ -141,14 +143,17 @@ class _SharingPageState extends State<SharingPage> {
   }
 
   Future<void> _newGroup() async {
-    final name = await _promptText(title: 'New group', label: 'Group name');
+    final l10n = L10n.of(context);
+    final name = await _promptText(
+        title: l10n.sharingNewGroup, label: l10n.sharingGroupName);
     if (name != null && name.isNotEmpty) {
       await _act(() => _client.createGroup(name));
     }
   }
 
   Future<void> _addBookToGroup(ServerGroup group) async {
-    final bookId = await _pickBook(title: 'Add a book to ${group.name}');
+    final bookId = await _pickBook(
+        title: L10n.of(context).sharingAddBookTo(group.name));
     if (bookId != null) {
       await _act(() => _client.addBookToGroup(group.id, bookId));
     }
@@ -158,22 +163,27 @@ class _SharingPageState extends State<SharingPage> {
 
   Widget _sharesSection(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return _Section(
-      title: 'Shared with people',
+      title: l10n.sharingShares,
       onAdd: _newShare,
-      addTooltip: 'New share',
-      empty: _shares.isEmpty ? 'Nothing shared yet.' : null,
+      addTooltip: l10n.sharingNewShareTooltip,
+      empty: _shares.isEmpty ? l10n.sharingNoShares : null,
       children: [
         for (final s in _shares)
           ListTile(
             leading: const Icon(Icons.person_outline),
             title: Text(s.scopeLabel ?? s.scope),
-            subtitle: Text('→ ${s.granteeEmail}'),
+            subtitle: Text(l10n.sharingGrantee(s.granteeEmail)),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Chip(
-                  label: Text(s.permission),
+                  label: Text(switch (s.permission) {
+                    'viewer' => l10n.sharingPermViewer,
+                    'editor' => l10n.sharingPermEditor,
+                    _ => s.permission,
+                  }),
                   visualDensity: VisualDensity.compact,
                   backgroundColor: s.permission == 'editor'
                       ? theme.colorScheme.primaryContainer
@@ -181,7 +191,7 @@ class _SharingPageState extends State<SharingPage> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Revoke',
+                  tooltip: l10n.sharingRevoke,
                   onPressed: () => _act(() => _client.deleteShare(s.id)),
                 ),
               ],
@@ -209,26 +219,27 @@ class _SharingPageState extends State<SharingPage> {
   // ---- public links -------------------------------------------------------
 
   Widget _linksSection(BuildContext context) {
+    final l10n = L10n.of(context);
     return _Section(
-      title: 'Public links',
+      title: l10n.sharingLinks,
       onAdd: _books.isEmpty ? null : _newLink,
-      addTooltip: 'New link',
-      empty: _links.isEmpty ? 'No public links.' : null,
+      addTooltip: l10n.sharingNewLinkTooltip,
+      empty: _links.isEmpty ? l10n.sharingNoLinks : null,
       children: [
         for (final l in _links)
           ListTile(
             leading: Icon(l.revoked ? Icons.link_off : Icons.link),
             title: Text(l.bookTitle),
             subtitle: Text(l.revoked
-                ? 'Revoked'
+                ? l10n.sharingRevoked
                 : l.expiresAt == null
-                    ? 'Never expires'
-                    : 'Expires ${l.expiresAt}'),
+                    ? l10n.sharingNeverExpires
+                    : l10n.sharingExpires('${l.expiresAt}')),
             trailing: l.revoked
                 ? null
                 : IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Revoke',
+                    tooltip: l10n.sharingRevoke,
                     onPressed: () => _act(() => _client.deleteLink(l.id)),
                   ),
           ),
@@ -237,7 +248,8 @@ class _SharingPageState extends State<SharingPage> {
   }
 
   Future<void> _newLink() async {
-    final bookId = await _pickBook(title: 'Public link for which book?');
+    final bookId =
+        await _pickBook(title: L10n.of(context).sharingLinkFor);
     if (bookId == null) return;
     try {
       final url = await _client.createShareLink(bookId);
@@ -246,21 +258,22 @@ class _SharingPageState extends State<SharingPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+            .showSnackBar(SnackBar(content: Text('$e'))); // i18n-ignore: error detail
       }
     }
   }
 
-  Future<void> _showLink(String url) => showDialog<void>(
+  Future<void> _showLink(String url) {
+    final l10n = L10n.of(context);
+    return showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Public link'),
+          title: Text(l10n.sharingLinkTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Anyone with this link can read the book. It is shown '
-                  'once — copy it now.'),
+              Text(l10n.sharingLinkBody),
               const SizedBox(height: 12),
               SelectableText(url, style: const TextStyle(fontFamily: 'monospace')),
             ],
@@ -271,21 +284,23 @@ class _SharingPageState extends State<SharingPage> {
                 Clipboard.setData(ClipboardData(text: url));
                 Navigator.of(dialogContext).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Link copied.')));
+                    SnackBar(content: Text(l10n.sharingLinkCopied)));
               },
-              child: const Text('Copy'),
+              child: Text(l10n.sharingCopy),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Close'),
+              child: Text(l10n.sharingClose),
             ),
           ],
         ),
       );
+  }
 
   // ---- small shared dialogs ----------------------------------------------
 
   Future<String?> _promptText({required String title, required String label}) {
+    final l10n = L10n.of(context);
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -300,12 +315,12 @@ class _SharingPageState extends State<SharingPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('Create'),
+            child: Text(l10n.create),
           ),
         ],
       ),
@@ -324,9 +339,9 @@ class _SharingPageState extends State<SharingPage> {
               child: Text(b.title),
             ),
           if (_books.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No books on the server yet.'),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(L10n.of(dialogContext).sharingNoBooks),
             ),
         ],
       ),
@@ -395,7 +410,9 @@ class _ErrorRetry extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            FilledButton(
+                onPressed: onRetry,
+                child: Text(L10n.of(context).sharingRetry)),
           ],
         ),
       ),
@@ -438,8 +455,9 @@ class _ShareDialogState extends State<_ShareDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return AlertDialog(
-      title: const Text('New share'),
+      title: Text(l10n.sharingNewShare),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -447,11 +465,14 @@ class _ShareDialogState extends State<_ShareDialog> {
           children: [
             DropdownButtonFormField<String>(
               initialValue: _scope,
-              decoration: const InputDecoration(labelText: 'What to share'),
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('Entire library')),
-                DropdownMenuItem(value: 'group', child: Text('A group')),
-                DropdownMenuItem(value: 'book', child: Text('A single book')),
+              decoration: InputDecoration(labelText: l10n.sharingWhatToShare),
+              items: [
+                DropdownMenuItem(
+                    value: 'all', child: Text(l10n.sharingScopeAll)),
+                DropdownMenuItem(
+                    value: 'group', child: Text(l10n.sharingScopeGroup)),
+                DropdownMenuItem(
+                    value: 'book', child: Text(l10n.sharingScopeBook)),
               ],
               onChanged: (v) => setState(() {
                 _scope = v!;
@@ -461,7 +482,7 @@ class _ShareDialogState extends State<_ShareDialog> {
             if (_scope == 'group')
               DropdownButtonFormField<String>(
                 initialValue: _scopeId,
-                decoration: const InputDecoration(labelText: 'Group'),
+                decoration: InputDecoration(labelText: l10n.sharingGroupLabel),
                 items: [
                   for (final g in widget.groups)
                     DropdownMenuItem(value: g.id, child: Text(g.name)),
@@ -471,7 +492,7 @@ class _ShareDialogState extends State<_ShareDialog> {
             if (_scope == 'book')
               DropdownButtonFormField<String>(
                 initialValue: _scopeId,
-                decoration: const InputDecoration(labelText: 'Book'),
+                decoration: InputDecoration(labelText: l10n.sharingBookLabel),
                 items: [
                   for (final b in widget.books)
                     DropdownMenuItem(value: b.id, child: Text(b.title)),
@@ -483,16 +504,17 @@ class _ShareDialogState extends State<_ShareDialog> {
               controller: _email,
               keyboardType: TextInputType.emailAddress,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(labelText: "Recipient's email"),
+              decoration: InputDecoration(labelText: l10n.sharingRecipient),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: _permission,
-              decoration: const InputDecoration(labelText: 'Permission'),
-              items: const [
-                DropdownMenuItem(value: 'viewer', child: Text('Viewer (read)')),
+              decoration: InputDecoration(labelText: l10n.sharingPermission),
+              items: [
                 DropdownMenuItem(
-                    value: 'editor', child: Text('Editor (read + edit)')),
+                    value: 'viewer', child: Text(l10n.sharingViewer)),
+                DropdownMenuItem(
+                    value: 'editor', child: Text(l10n.sharingEditor)),
               ],
               onChanged: (v) => setState(() => _permission = v!),
             ),
@@ -502,14 +524,14 @@ class _ShareDialogState extends State<_ShareDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: (_targetChosen && _email.text.trim().isNotEmpty)
               ? () => Navigator.of(context).pop(_ShareForm(
                   _scope, _scopeId, _email.text.trim(), _permission))
               : null,
-          child: const Text('Share'),
+          child: Text(l10n.sharingShare),
         ),
       ],
     );

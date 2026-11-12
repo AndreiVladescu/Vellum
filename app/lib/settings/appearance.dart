@@ -11,16 +11,15 @@ import 'package:flutter/material.dart';
 /// Curated theme seeds. A picker of arbitrary colours produces mostly bad
 /// schemes, so the presets come first and "custom" is the escape hatch.
 enum SeedPreset {
-  leather('Leather', Color(0xFF7A5C3E)),
-  ink('Ink', Color(0xFF3B4C8F)),
-  forest('Forest', Color(0xFF3C6B4B)),
-  slate('Slate', Color(0xFF56626D)),
-  plum('Plum', Color(0xFF7A3E63)),
-  ember('Ember', Color(0xFFA8482C));
+  leather(Color(0xFF7A5C3E)),
+  ink(Color(0xFF3B4C8F)),
+  forest(Color(0xFF3C6B4B)),
+  slate(Color(0xFF56626D)),
+  plum(Color(0xFF7A3E63)),
+  ember(Color(0xFFA8482C));
 
-  const SeedPreset(this.label, this.color);
+  const SeedPreset(this.color);
 
-  final String label;
   final Color color;
 
   /// The original hardcoded seed, so an existing install looks unchanged until
@@ -31,16 +30,15 @@ enum SeedPreset {
 /// What the shelf boards are made of. Extends the wallpaper mechanism: the
 /// wallpaper is the wall behind the shelf, this is the shelf itself.
 enum ShelfMaterial {
-  oak('Oak', Color(0xFFB09B82), Color(0xFF4A4038)),
-  walnut('Walnut', Color(0xFF8C6A4E), Color(0xFF3A2C22)),
-  ebony('Ebony', Color(0xFF4A443F), Color(0xFF221F1D)),
-  painted('Painted', Color(0xFFE8E2D8), Color(0xFF3E4247)),
-  metal('Metal', Color(0xFFB8BEC4), Color(0xFF52585E)),
-  glass('Glass', Color(0x66C9D6DE), Color(0x593C4A55));
+  oak(Color(0xFFB09B82), Color(0xFF4A4038)),
+  walnut(Color(0xFF8C6A4E), Color(0xFF3A2C22)),
+  ebony(Color(0xFF4A443F), Color(0xFF221F1D)),
+  painted(Color(0xFFE8E2D8), Color(0xFF3E4247)),
+  metal(Color(0xFFB8BEC4), Color(0xFF52585E)),
+  glass(Color(0x66C9D6DE), Color(0x593C4A55));
 
-  const ShelfMaterial(this.label, this._light, this._dark);
+  const ShelfMaterial(this._light, this._dark);
 
-  final String label;
   final Color _light;
   final Color _dark;
 

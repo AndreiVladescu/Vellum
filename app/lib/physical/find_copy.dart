@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
 import 'environment_editor_page.dart';
 import 'locate.dart';
@@ -32,10 +33,9 @@ Future<void> findMyCopy(
   if (!context.mounted) return;
 
   if (sightings.isEmpty) {
+    final l10n = L10n.of(context);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(copyId == null
-          ? "This book isn't placed in any room yet."
-          : "That copy isn't placed in a room yet."),
+      content: Text(copyId == null ? l10n.findCopyNoneBook : l10n.findCopyNoneCopy),
     ));
     return;
   }
@@ -63,7 +63,7 @@ Future<BookSighting?> _pickSighting(
     showDialog<BookSighting>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
-        title: Text('You have ${sightings.length} copies placed'),
+        title: Text(L10n.of(context).findCopyPlacedTitle(sightings.length)),
         children: [
           for (final sighting in sightings)
             SimpleDialogOption(

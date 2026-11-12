@@ -5206,5 +5206,4001 @@
     "placeholders": {
       "count": {"type": "int"}
     }
+  },
+
+  "accountPhotoSaveFailedSnack": "That photo couldn't be saved: {error}",
+  "@accountPhotoSaveFailedSnack": {
+    "description": "Snackbar when saving the profile photo failed for an unexpected reason; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "accountSavedSnack": "Profile saved",
+  "@accountSavedSnack": {
+    "description": "Snackbar after saving the profile."
+  },
+
+  "accountAddPhotoTooltip": "Add a photo",
+  "@accountAddPhotoTooltip": {
+    "description": "Tooltip on the profile photo when none is set."
+  },
+
+  "accountChangePhotoTooltip": "Change photo",
+  "@accountChangePhotoTooltip": {
+    "description": "Tooltip on the profile photo when one is set."
+  },
+
+  "accountRemovePhoto": "Remove photo",
+  "@accountRemovePhoto": {
+    "description": "Button that removes the profile photo."
+  },
+
+  "accountNameLabel": "Name",
+  "@accountNameLabel": {
+    "description": "Label of the profile name field."
+  },
+
+  "accountEmailLabel": "Email",
+  "@accountEmailLabel": {
+    "description": "Label of the profile email field."
+  },
+
+  "accountLocalOnlyNote": "Your profile is stored on this device only. When Vellum gains server sync, this will become the account you sign in with to reach a shared library.",
+  "@accountLocalOnlyNote": {
+    "description": "Note at the bottom of the account page."
+  },
+
+  "accountPhotoNotAnImage": "That file isn't an image Vellum can read.",
+  "@accountPhotoNotAnImage": {
+    "description": "Error when the file picked as the profile photo is not a readable image."
+  },
+
+  "accountPhotoResizeFailed": "That image couldn't be resized.",
+  "@accountPhotoResizeFailed": {
+    "description": "Error when the picked profile photo could not be scaled down."
+  },
+
+  "accountPhotoNowhereToSave": "There is nowhere to save a photo.",
+  "@accountPhotoNowhereToSave": {
+    "description": "Error when the profile has no folder to keep a photo in."
+  },
+
+  "prefsBackupProblemEncrypted": "This backup is encrypted — enter its passphrase.",
+  "@prefsBackupProblemEncrypted": {
+    "description": "Shown when checking an encrypted backup without a passphrase."
+  },
+
+  "prefsBackupProblemNotArchive": "That file isn't a readable archive.",
+  "@prefsBackupProblemNotArchive": {
+    "description": "Shown when the file picked to check is not a zip archive."
+  },
+
+  "prefsBackupProblemNotEncrypted": "not an encrypted Vellum backup",
+  "@prefsBackupProblemNotEncrypted": {
+    "description": "Backup check problem, shown after \"Not intact\"-style lines in lower case: the file does not carry the encrypted-backup header."
+  },
+
+  "prefsBackupProblemNewerVersion": "this backup was written by a newer version of Vellum",
+  "@prefsBackupProblemNewerVersion": {
+    "description": "Backup check problem: the encrypted backup format is newer than this app understands."
+  },
+
+  "prefsBackupProblemHeader": "backup header is not readable",
+  "@prefsBackupProblemHeader": {
+    "description": "Backup check problem: the encrypted backup's header is damaged or uses an unsupported key derivation."
+  },
+
+  "prefsBackupProblemHeaderTruncated": "backup header is truncated",
+  "@prefsBackupProblemHeaderTruncated": {
+    "description": "Backup check problem: the encrypted backup ends inside its header."
+  },
+
+  "prefsBackupProblemTruncated": "backup is truncated",
+  "@prefsBackupProblemTruncated": {
+    "description": "Backup check problem: the encrypted backup ends early."
+  },
+
+  "prefsBackupProblemWrongPassphrase": "wrong passphrase, or the backup has been damaged",
+  "@prefsBackupProblemWrongPassphrase": {
+    "description": "Backup check problem: decryption failed. Deliberately one message for both causes."
+  },
+
+  "wishlistGapTitle": "{series} vol. {volume}",
+  "@wishlistGapTitle": {
+    "description": "Placeholder title of the wishlist entry created for a missing volume of a series.",
+    "placeholders": {
+      "series": {"type": "String"},
+      "volume": {"type": "int"}
+    }
+  },
+
+  "wishlistGapNote": "Missing volume {volume} of {series}",
+  "@wishlistGapNote": {
+    "description": "Note on the wishlist entry created for a missing volume of a series.",
+    "placeholders": {
+      "volume": {"type": "int"},
+      "series": {"type": "String"}
+    }
+  },
+
+  "notificationsUnreadTooltip": "{count} unread",
+  "@notificationsUnreadTooltip": {
+    "description": "Tooltip of the bell in the app bar; `count` is how many notifications are unread.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "notificationsTitle": "Notifications",
+  "@notificationsTitle": {
+    "description": "Title of the notifications page."
+  },
+
+  "notificationsMarkAllRead": "Mark all read",
+  "@notificationsMarkAllRead": {
+    "description": "Button that marks every notification as read."
+  },
+
+  "notificationsServerTooOld": "This server is older than notifications. Everything else works; update the server to be told when someone asks to borrow a book.",
+  "@notificationsServerTooOld": {
+    "description": "Shown on the notifications page when the server does not have the notifications feature yet."
+  },
+
+  "notificationsEmpty": "Nothing has happened yet.",
+  "@notificationsEmpty": {
+    "description": "Empty state of the notifications page."
+  },
+
+  "notificationsAgoJustNow": "just now",
+  "@notificationsAgoJustNow": {
+    "description": "Age of a notification that arrived less than a minute ago."
+  },
+
+  "notificationsAgoMinutes": "{count} min ago",
+  "@notificationsAgoMinutes": {
+    "description": "Age of a notification, in minutes.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "notificationsAgoHours": "{count}h ago",
+  "@notificationsAgoHours": {
+    "description": "Age of a notification, in hours.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "notificationsAgoDays": "{count}d ago",
+  "@notificationsAgoDays": {
+    "description": "Age of a notification, in days.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "syncPhaseCovers": "Downloading covers",
+  "@syncPhaseCovers": {
+    "description": "Phase name of a sync, shown under the progress bar and in the status-bar notification."
+  },
+
+  "syncPhaseFiles": "Downloading files",
+  "@syncPhaseFiles": {
+    "description": "Phase name of a sync, shown under the progress bar and in the status-bar notification."
+  },
+
+  "syncPhasePushing": "Pushing books",
+  "@syncPhasePushing": {
+    "description": "Phase name of a sync, shown under the progress bar and in the status-bar notification."
+  },
+
+  "syncTrayProgress": "{phase} — {done} of {total}",
+  "@syncTrayProgress": {
+    "description": "Body of the sync progress notification, e.g. \"Pushing books — 12 of 40\".",
+    "placeholders": {
+      "phase": {"type": "String"},
+      "done": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+
+  "syncTrayStarting": "Starting sync…",
+  "@syncTrayStarting": {
+    "description": "Body of the sync notification before the first phase has reported."
+  },
+
+  "syncTrayChannelName": "Syncing",
+  "@syncTrayChannelName": {
+    "description": "Name of the Android notification channel for sync progress, shown in the system settings."
+  },
+
+  "syncTrayChannelDescription": "Progress while your library syncs with the server",
+  "@syncTrayChannelDescription": {
+    "description": "Description of the Android notification channel for sync progress."
+  },
+
+  "borrowTrayChannelName": "Borrowing",
+  "@borrowTrayChannelName": {
+    "description": "Name of the Android notification channel for borrow requests, shown in the system settings."
+  },
+
+  "borrowTrayChannelDescription": "Requests to borrow your books, and answers to yours",
+  "@borrowTrayChannelDescription": {
+    "description": "Description of the Android notification channel for borrow requests."
+  },
+
+  "borrowTrayMore": "{count, plural, =1{{newest} · and 1 more} other{{newest} · and {count} more}}",
+  "@borrowTrayMore": {
+    "description": "Body of the status-bar notification when several requests are waiting; `newest` is the latest one's sentence and `count` how many others there are.",
+    "placeholders": {
+      "newest": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+
+  "wishlistTitle": "Wishlist",
+  "@wishlistTitle": {
+    "description": "Title of the wishlist page."
+  },
+
+  "wishlistAddFab": "Add a book you want",
+  "@wishlistAddFab": {
+    "description": "Floating button on the wishlist page."
+  },
+
+  "wishlistEmptyTitle": "Nothing on your wishlist",
+  "@wishlistEmptyTitle": {
+    "description": "Empty state heading of the wishlist."
+  },
+
+  "wishlistEmptyBody": "Books you want but don’t own yet live here — add one by hand, scan a barcode in a shop, or fill a gap in a series you collect.",
+  "@wishlistEmptyBody": {
+    "description": "Empty state explanation of the wishlist."
+  },
+
+  "wishlistMovedSnack": "“{title}” moved to your library",
+  "@wishlistMovedSnack": {
+    "description": "Snackbar after a wishlist book was marked as owned.",
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+
+  "wishlistRemovedSnack": "“{title}” removed",
+  "@wishlistRemovedSnack": {
+    "description": "Snackbar after a book was removed from the wishlist; it has an Undo action.",
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+
+  "wishlistMenuLookUp": "Look up online…",
+  "@wishlistMenuLookUp": {
+    "description": "Menu item on a wishlist entry that searches the online catalogues."
+  },
+
+  "wishlistMenuOwn": "I own this now",
+  "@wishlistMenuOwn": {
+    "description": "Menu item on a wishlist entry that moves it into the library."
+  },
+
+  "wishlistMenuRemove": "Remove from wishlist",
+  "@wishlistMenuRemove": {
+    "description": "Menu item on a wishlist entry."
+  },
+
+  "wishlistAddTitle": "Add to wishlist",
+  "@wishlistAddTitle": {
+    "description": "Title of the dialog that adds a book to the wishlist."
+  },
+
+  "wishlistFieldTitle": "Title",
+  "@wishlistFieldTitle": {
+    "description": "Label of the title field in the add-to-wishlist dialog."
+  },
+
+  "wishlistFieldAuthor": "Author (optional)",
+  "@wishlistFieldAuthor": {
+    "description": "Label of the author field in the add-to-wishlist dialog."
+  },
+
+  "wishlistFieldIsbn": "ISBN (optional)",
+  "@wishlistFieldIsbn": {
+    "description": "Label of the ISBN field in the wishlist dialogs."
+  },
+
+  "wishlistIsbnHint": "978… or the ten-digit form",
+  "@wishlistIsbnHint": {
+    "description": "Hint inside the ISBN field in the wishlist dialogs."
+  },
+
+  "wishlistIsbnHelperAdd": "With one of these, the rest fills itself in",
+  "@wishlistIsbnHelperAdd": {
+    "description": "Helper text under the ISBN field of the add-to-wishlist dialog."
+  },
+
+  "wishlistFieldNote": "Note (optional)",
+  "@wishlistFieldNote": {
+    "description": "Label of the note field in the add-to-wishlist dialog."
+  },
+
+  "wishlistNoteHint": "Why you want it, where you saw it…",
+  "@wishlistNoteHint": {
+    "description": "Hint inside the note field in the add-to-wishlist dialog."
+  },
+
+  "wishlistAddConfirm": "Add",
+  "@wishlistAddConfirm": {
+    "description": "Confirm button of the add-to-wishlist dialog."
+  },
+
+  "wishlistLookUpTitle": "Look up online",
+  "@wishlistLookUpTitle": {
+    "description": "Title of the dialog that looks a wishlist book up in the online catalogues."
+  },
+
+  "wishlistIsbnHelperLookUp": "Leave it empty to search by title and author",
+  "@wishlistIsbnHelperLookUp": {
+    "description": "Helper text under the ISBN field of the look-up dialog."
+  },
+
+  "wishlistLookUpConfirm": "Look up",
+  "@wishlistLookUpConfirm": {
+    "description": "Confirm button of the look-up dialog."
+  },
+
+  "wishlistNotAnIsbn": "That is not an ISBN.",
+  "@wishlistNotAnIsbn": {
+    "description": "Snackbar when the typed ISBN is not valid."
+  },
+
+  "wishlistLookingUp": "Looking it up…",
+  "@wishlistLookingUp": {
+    "description": "Snackbar while a catalogue look-up runs."
+  },
+
+  "wishlistFilled": "Filled in what was missing",
+  "@wishlistFilled": {
+    "description": "Snackbar after the catalogue look-up added missing details."
+  },
+
+  "wishlistAlreadyComplete": "Nothing to add — it already knows",
+  "@wishlistAlreadyComplete": {
+    "description": "Snackbar when the catalogue look-up found nothing new to add."
+  },
+
+  "wishlistNotFound": "No catalogue has this one",
+  "@wishlistNotFound": {
+    "description": "Snackbar when no online catalogue knows the book."
+  },
+
+  "wishlistLookupFailed": "Lookup failed: {error}",
+  "@wishlistLookupFailed": {
+    "description": "Snackbar when the catalogue look-up failed; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "loansTitle": "Loans",
+  "@loansTitle": {
+    "description": "Title of the loans page."
+  },
+
+  "loansEmptyTitle": "No loans yet",
+  "@loansEmptyTitle": {
+    "description": "Empty state heading of the loans page."
+  },
+
+  "loansEmptyBody": "Lend a physical copy from its book page to track it here.",
+  "@loansEmptyBody": {
+    "description": "Empty state explanation of the loans page."
+  },
+
+  "loansGoToShelf": "Go to your shelf",
+  "@loansGoToShelf": {
+    "description": "Button on the empty loans page that returns to the shelf."
+  },
+
+  "loansOutNow": "Out now ({count})",
+  "@loansOutNow": {
+    "description": "Section heading of the loans that are currently lent out; `count` is how many.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "loansNothingLent": "Nothing is lent out.",
+  "@loansNothingLent": {
+    "description": "Shown under \"Out now\" when no loan is active."
+  },
+
+  "loansHistory": "History ({count})",
+  "@loansHistory": {
+    "description": "Heading of the collapsed list of returned loans; `count` is how many.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "loansHistoryLine": "{borrower} · {loaned} → {returned}",
+  "@loansHistoryLine": {
+    "description": "Subtitle of a returned loan; the two dates are formatted dates.",
+    "placeholders": {
+      "borrower": {"type": "String"},
+      "loaned": {"type": "String"},
+      "returned": {"type": "String"}
+    }
+  },
+
+  "loansSince": "{borrower} · since {date}",
+  "@loansSince": {
+    "description": "First line of an active loan when no contact is known; `date` is when it was lent.",
+    "placeholders": {
+      "borrower": {"type": "String"},
+      "date": {"type": "String"}
+    }
+  },
+
+  "loansSinceWithContact": "{borrower} · {contact} · since {date}",
+  "@loansSinceWithContact": {
+    "description": "First line of an active loan; `contact` is the borrower's contact detail.",
+    "placeholders": {
+      "borrower": {"type": "String"},
+      "contact": {"type": "String"},
+      "date": {"type": "String"}
+    }
+  },
+
+  "loansReminderCopied": "Reminder copied — paste it to them",
+  "@loansReminderCopied": {
+    "description": "Snackbar after the reminder message was copied to the clipboard."
+  },
+
+  "loansMenuReturned": "Mark returned",
+  "@loansMenuReturned": {
+    "description": "Menu item that marks a loan as returned."
+  },
+
+  "loansMenuReminder": "Copy a reminder",
+  "@loansMenuReminder": {
+    "description": "Menu item that copies a reminder message for the borrower."
+  },
+
+  "loansMenuChangeDue": "Change due date…",
+  "@loansMenuChangeDue": {
+    "description": "Menu item that opens a date picker for the loan's due date."
+  },
+
+  "loansDueReturned": "Returned",
+  "@loansDueReturned": {
+    "description": "Status line of a loan that has been returned."
+  },
+
+  "loansDueNoDate": "No due date",
+  "@loansDueNoDate": {
+    "description": "Status line of a loan without a due date."
+  },
+
+  "loansDueOverdue": "{count, plural, =1{1 day overdue} other{{count} days overdue}}",
+  "@loansDueOverdue": {
+    "description": "Status line of an overdue loan.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "loansDueToday": "Due today",
+  "@loansDueToday": {
+    "description": "Status line of a loan due today."
+  },
+
+  "loansDueTomorrow": "Due tomorrow",
+  "@loansDueTomorrow": {
+    "description": "Status line of a loan due tomorrow."
+  },
+
+  "loansDueInDays": "{count, plural, other{Due in {count} days}}",
+  "@loansDueInDays": {
+    "description": "Status line of a loan due in two or more days.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "loansReminderWithDue": "You borrowed \"{title}\" on {lent}, due {due}.",
+  "@loansReminderWithDue": {
+    "description": "Reminder message the lender sends to the borrower, for a loan with a due date. Dates are formatted dates.",
+    "placeholders": {
+      "title": {"type": "String"},
+      "lent": {"type": "String"},
+      "due": {"type": "String"}
+    }
+  },
+
+  "loansReminderNoDue": "You borrowed \"{title}\" on {lent}. Could I have it back when you're done?",
+  "@loansReminderNoDue": {
+    "description": "Reminder message the lender sends to the borrower, for a loan without a due date.",
+    "placeholders": {
+      "title": {"type": "String"},
+      "lent": {"type": "String"}
+    }
+  },
+
+  "borrowTitle": "Borrow requests",
+  "@borrowTitle": {
+    "description": "Title of the borrow requests page, and tooltip of the button that opens it."
+  },
+
+  "borrowUnreachable": "Couldn't reach the server.",
+  "@borrowUnreachable": {
+    "description": "Error on the borrow requests page when the server did not answer."
+  },
+
+  "borrowApprovedSnack": "Approved — “{title}” is now on loan to {email}.",
+  "@borrowApprovedSnack": {
+    "description": "Snackbar after approving a borrow request.",
+    "placeholders": {
+      "title": {"type": "String"},
+      "email": {"type": "String"}
+    }
+  },
+
+  "borrowAnsweredSnack": "Answered {email}.",
+  "@borrowAnsweredSnack": {
+    "description": "Snackbar after declining or withdrawing a borrow request.",
+    "placeholders": {
+      "email": {"type": "String"}
+    }
+  },
+
+  "borrowDidNotWork": "That did not work.",
+  "@borrowDidNotWork": {
+    "description": "Generic failure snackbar on the borrow request screens."
+  },
+
+  "borrowDueTitle": "Due back?",
+  "@borrowDueTitle": {
+    "description": "Title of the dialog that asks when a lent book should come back."
+  },
+
+  "borrowDueTwoWeeks": "In 2 weeks",
+  "@borrowDueTwoWeeks": {
+    "description": "Due date choice."
+  },
+
+  "borrowDueMonth": "In a month",
+  "@borrowDueMonth": {
+    "description": "Due date choice."
+  },
+
+  "borrowDueNone": "No date",
+  "@borrowDueNone": {
+    "description": "Due date choice: no due date."
+  },
+
+  "borrowReplyTitle": "Say why (optional)",
+  "@borrowReplyTitle": {
+    "description": "Title of the dialog that asks for a reason when declining a request."
+  },
+
+  "borrowReplyHint": "e.g. it’s already lent out",
+  "@borrowReplyHint": {
+    "description": "Hint in the decline reason field."
+  },
+
+  "borrowDecline": "Decline",
+  "@borrowDecline": {
+    "description": "Button that declines a borrow request."
+  },
+
+  "borrowRefreshTooltip": "Refresh",
+  "@borrowRefreshTooltip": {
+    "description": "Tooltip of the refresh button on the borrow requests page."
+  },
+
+  "borrowToAnswer": "To answer ({count})",
+  "@borrowToAnswer": {
+    "description": "Section heading of the requests waiting for the owner's answer.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "borrowNobodyWaiting": "Nobody is waiting on you.",
+  "@borrowNobodyWaiting": {
+    "description": "Shown when no borrow request is pending."
+  },
+
+  "borrowLendIt": "Lend it",
+  "@borrowLendIt": {
+    "description": "Button that approves a borrow request."
+  },
+
+  "borrowYouAsked": "You asked for ({count})",
+  "@borrowYouAsked": {
+    "description": "Heading of the collapsed list of requests the user made.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "borrowAskedOwner": "asked {name}",
+  "@borrowAskedOwner": {
+    "description": "Part of the status line of a request the user made; `name` is the owner.",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "borrowStatusPending": "pending",
+  "@borrowStatusPending": {
+    "description": "Status word of a borrow request, shown in lower case inside a status line."
+  },
+
+  "borrowStatusApproved": "approved",
+  "@borrowStatusApproved": {
+    "description": "Status word of a borrow request, shown in lower case inside a status line."
+  },
+
+  "borrowStatusDeclined": "declined",
+  "@borrowStatusDeclined": {
+    "description": "Status word of a borrow request, shown in lower case inside a status line."
+  },
+
+  "borrowStatusCancelled": "cancelled",
+  "@borrowStatusCancelled": {
+    "description": "Status word of a borrow request, shown in lower case inside a status line."
+  },
+
+  "borrowWithdraw": "Withdraw",
+  "@borrowWithdraw": {
+    "description": "Button that withdraws a borrow request the user made."
+  },
+
+  "borrowAnswered": "Answered ({count})",
+  "@borrowAnswered": {
+    "description": "Heading of the collapsed list of requests the owner already answered.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "borrowApprovalNote": "Approving creates the loan for you — it appears on the Loans page with the due date you chose.",
+  "@borrowApprovalNote": {
+    "description": "Note at the bottom of the borrow requests page."
+  },
+
+  "borrowAskTitle": "Ask to borrow “{title}”?",
+  "@borrowAskTitle": {
+    "description": "Title of the dialog that asks the owner to lend a book.",
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+
+  "borrowAskBody": "{owner} sees this in their app and can lend it to you. Nothing happens until they say yes, and you are told either way.",
+  "@borrowAskBody": {
+    "description": "Body of the ask-to-borrow dialog when the owner's name is known.",
+    "placeholders": {
+      "owner": {"type": "String"}
+    }
+  },
+
+  "borrowAskBodyUnnamed": "The owner sees this in their app and can lend it to you. Nothing happens until they say yes, and you are told either way.",
+  "@borrowAskBodyUnnamed": {
+    "description": "Body of the ask-to-borrow dialog when the owner's name is not known."
+  },
+
+  "borrowNoteLabel": "Note (optional)",
+  "@borrowNoteLabel": {
+    "description": "Label of the note field of the ask-to-borrow dialog."
+  },
+
+  "borrowNoteHint": "e.g. for the weekend",
+  "@borrowNoteHint": {
+    "description": "Hint of the note field of the ask-to-borrow dialog."
+  },
+
+  "borrowAsk": "Ask",
+  "@borrowAsk": {
+    "description": "Button that sends the borrow request."
+  },
+
+  "borrowAskedSnack": "Asked. You’ll see the answer here.",
+  "@borrowAskedSnack": {
+    "description": "Snackbar after a borrow request was sent."
+  },
+
+  "duplicatesTitle": "Duplicate books",
+  "@duplicatesTitle": {
+    "description": "Title of the duplicates page."
+  },
+
+  "duplicatesMergedSnack": "Merged",
+  "@duplicatesMergedSnack": {
+    "description": "Snackbar after two books were merged."
+  },
+
+  "duplicatesWhatMoved": "What moved",
+  "@duplicatesWhatMoved": {
+    "description": "Snackbar action that shows what the merge moved."
+  },
+
+  "duplicatesWhatMovedTitle": "What the merge moved",
+  "@duplicatesWhatMovedTitle": {
+    "description": "Title of the dialog listing what a merge moved."
+  },
+
+  "duplicatesClose": "Close",
+  "@duplicatesClose": {
+    "description": "Button that closes the merge result dialog."
+  },
+
+  "duplicatesNoneFound": "No duplicates found",
+  "@duplicatesNoneFound": {
+    "description": "Empty state heading of the duplicates page."
+  },
+
+  "duplicatesNoneLeft": "No duplicates left",
+  "@duplicatesNoneLeft": {
+    "description": "Empty state heading after the last duplicate was merged."
+  },
+
+  "duplicatesHowItWorks": "Vellum compares file contents, ISBNs, and titles with their authors.",
+  "@duplicatesHowItWorks": {
+    "description": "Explanation under the empty state of the duplicates page."
+  },
+
+  "duplicatesPairSubtitle": "{reason} · also “{title}”",
+  "@duplicatesPairSubtitle": {
+    "description": "Subtitle of a duplicate pair; `reason` is why they look alike and `title` is the second book.",
+    "placeholders": {
+      "reason": {"type": "String"},
+      "title": {"type": "String"}
+    }
+  },
+
+  "duplicatesMergeFailed": "Merge failed: {error}",
+  "@duplicatesMergeFailed": {
+    "description": "Snackbar when a merge failed; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "duplicatesMergeTitle": "Merge these books?",
+  "@duplicatesMergeTitle": {
+    "description": "Title of the merge dialog."
+  },
+
+  "duplicatesWhichSurvives": "Which one should survive?",
+  "@duplicatesWhichSurvives": {
+    "description": "Heading above the choice of which book to keep in a merge."
+  },
+
+  "duplicatesDiffer": "These differ — pick what to keep:",
+  "@duplicatesDiffer": {
+    "description": "Heading above the per-field choices in the merge dialog."
+  },
+
+  "duplicatesMoveNote": "Files, physical copies, loans, shelves, authors and genres all move to the surviving book. “{title}” is then deleted here and on the server. This can’t be undone.",
+  "@duplicatesMoveNote": {
+    "description": "Warning at the bottom of the merge dialog; `title` is the book that will be deleted.",
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+
+  "duplicatesMerging": "Merging…",
+  "@duplicatesMerging": {
+    "description": "Label of the merge button while the merge runs."
+  },
+
+  "duplicatesMerge": "Merge",
+  "@duplicatesMerge": {
+    "description": "Confirm button of the merge dialog."
+  },
+
+  "duplicatesReasonSameFile": "Same file",
+  "@duplicatesReasonSameFile": {
+    "description": "Why two books look alike: they hold an identical file."
+  },
+
+  "duplicatesReasonSameIsbn": "Same ISBN",
+  "@duplicatesReasonSameIsbn": {
+    "description": "Why two books look alike: equal ISBNs."
+  },
+
+  "duplicatesReasonSimilarTitle": "Similar title and author",
+  "@duplicatesReasonSimilarTitle": {
+    "description": "Why two books look alike: similar title and author."
+  },
+
+  "duplicatesFieldTitle": "Title",
+  "@duplicatesFieldTitle": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "duplicatesFieldSubtitle": "Subtitle",
+  "@duplicatesFieldSubtitle": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "duplicatesFieldDescription": "Description",
+  "@duplicatesFieldDescription": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "duplicatesFieldIsbn": "ISBN",
+  "@duplicatesFieldIsbn": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "duplicatesFieldPublisher": "Publisher",
+  "@duplicatesFieldPublisher": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "duplicatesFieldYear": "Year",
+  "@duplicatesFieldYear": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "duplicatesFieldPages": "Pages",
+  "@duplicatesFieldPages": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "duplicatesFieldCover": "Cover",
+  "@duplicatesFieldCover": {
+    "description": "Name of a book field in the merge dialog's list of differences."
+  },
+
+  "mergeLogTook": "{field}: took \"{value}\" from the duplicate",
+  "@mergeLogTook": {
+    "description": "Line of the merge report; `field` is a technical field name and `value` the value taken from the duplicate.",
+    "placeholders": {
+      "field": {"type": "String"},
+      "value": {"type": "String"}
+    }
+  },
+
+  "mergeLogFilled": "{field}: filled from the duplicate",
+  "@mergeLogFilled": {
+    "description": "Line of the merge report; `field` is a technical field name.",
+    "placeholders": {
+      "field": {"type": "String"}
+    }
+  },
+
+  "mergeLogFiles": "{count, plural, =1{moved 1 file} other{moved {count} files}}",
+  "@mergeLogFiles": {
+    "description": "Line of the merge report.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "mergeLogCopies": "{count, plural, =1{moved 1 physical copy, with its placements and loan history} other{moved {count} physical copies, with their placements and loan history}}",
+  "@mergeLogCopies": {
+    "description": "Line of the merge report.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "mergeLogShelves": "{count, plural, =1{moved 1 shelf membership} other{moved {count} shelf memberships}}",
+  "@mergeLogShelves": {
+    "description": "Line of the merge report.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "mergeLogAuthors": "{count, plural, =1{added 1 author} other{added {count} authors}}",
+  "@mergeLogAuthors": {
+    "description": "Line of the merge report.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "mergeLogGenres": "{count, plural, =1{added 1 genre} other{added {count} genres}}",
+  "@mergeLogGenres": {
+    "description": "Line of the merge report.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "mergeLogAnnotations": "{count, plural, =1{moved 1 annotation} other{moved {count} annotations}}",
+  "@mergeLogAnnotations": {
+    "description": "Line of the merge report.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "mergeLogSessions": "{count, plural, =1{moved 1 reading session} other{moved {count} reading sessions}}",
+  "@mergeLogSessions": {
+    "description": "Line of the merge report.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "mergeLogReadingPosition": "kept the duplicate’s reading position (further along)",
+  "@mergeLogReadingPosition": {
+    "description": "Line of the merge report."
+  },
+
+  "mergeLogDeleted": "deleted the duplicate and tombstoned it so the merge syncs",
+  "@mergeLogDeleted": {
+    "description": "Line of the merge report."
+  },
+
+  "importSharedTitle": "Import shared books",
+  "@importSharedTitle": {
+    "description": "Title of the import page when it was opened from another app's share sheet."
+  },
+
+  "importStopping": "Stopping…",
+  "@importStopping": {
+    "description": "Label of the cancel button after it was pressed, while the import winds down."
+  },
+
+  "importScanConfirm": "Scan",
+  "@importScanConfirm": {
+    "description": "Confirm button of the system folder picker when choosing a folder to scan."
+  },
+
+  "importReadConfirm": "Read",
+  "@importReadConfirm": {
+    "description": "Confirm button of the system folder picker when choosing a Calibre library."
+  },
+
+  "importReadingCalibre": "Reading the Calibre catalogue…",
+  "@importReadingCalibre": {
+    "description": "Progress label while a Calibre library is read."
+  },
+
+  "importReadingCatalogFile": "Reading the catalogue file…",
+  "@importReadingCatalogFile": {
+    "description": "Progress label while a CSV or JSON catalogue is read."
+  },
+
+  "importCheckingHave": "Checking what you already have…",
+  "@importCheckingHave": {
+    "description": "Progress label while selected catalogue entries are compared with the library."
+  },
+
+  "importCataloguesGroup": "Catalogues",
+  "@importCataloguesGroup": {
+    "description": "Name of the file type group in the file picker for CSV and JSON catalogues."
+  },
+
+  "importCheckingShared": "Checking the shared files…",
+  "@importCheckingShared": {
+    "description": "Heading while files shared from another app are checked."
+  },
+
+  "importLookingThrough": "Looking through {folder}…",
+  "@importLookingThrough": {
+    "description": "Heading while a folder is scanned; `folder` is its path.",
+    "placeholders": {
+      "folder": {"type": "String"}
+    }
+  },
+
+  "importLookingThroughFolder": "Looking through the folder…",
+  "@importLookingThroughFolder": {
+    "description": "Heading while a folder is scanned, before its path is known."
+  },
+
+  "importImporting": "Importing…",
+  "@importImporting": {
+    "description": "Heading while books are imported."
+  },
+
+  "importFetching": "Fetching metadata (this can be stopped safely)…",
+  "@importFetching": {
+    "description": "Heading while online metadata is fetched for the imported books."
+  },
+
+  "importNoneTitle": "No PDFs or EPUBs here",
+  "@importNoneTitle": {
+    "description": "Heading when a scan found no importable files."
+  },
+
+  "importNoneShared": "None of the shared files is a PDF or EPUB.",
+  "@importNoneShared": {
+    "description": "Detail when none of the files shared into Vellum can be imported."
+  },
+
+  "importNoneFolder": "Vellum looked in {folder} and every folder inside it.",
+  "@importNoneFolder": {
+    "description": "Detail when a scan found nothing; `folder` is its path.",
+    "placeholders": {
+      "folder": {"type": "String"}
+    }
+  },
+
+  "importFilesFound": "{count, plural, =1{1 file found} other{{count} files found}}",
+  "@importFilesFound": {
+    "description": "First part of the summary line above the import review list.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importSummaryAlreadyIn": "{count, plural, other{{count} already in your library}}",
+  "@importSummaryAlreadyIn": {
+    "description": "Part of the summary line above the import review list.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importSummaryLookLike": "{count, plural, other{{count} look like books you have}}",
+  "@importSummaryLookLike": {
+    "description": "Part of the summary line above the import review list.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importSummaryUnreadable": "{count, plural, other{{count} couldn't be read}}",
+  "@importSummaryUnreadable": {
+    "description": "Part of the summary line above the import review list.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importEditTitle": "Edit before importing",
+  "@importEditTitle": {
+    "description": "Title of the dialog that edits a candidate's title and author before import."
+  },
+
+  "importFieldTitle": "Title",
+  "@importFieldTitle": {
+    "description": "Label of the title field in the edit-before-importing dialog."
+  },
+
+  "importFieldAuthors": "Author(s)",
+  "@importFieldAuthors": {
+    "description": "Label of the authors field in the edit-before-importing dialog."
+  },
+
+  "importAuthorsHelper": "Comma-separated",
+  "@importAuthorsHelper": {
+    "description": "Helper text under the authors field."
+  },
+
+  "importLookUpOnline": "Look up covers and descriptions online",
+  "@importLookUpOnline": {
+    "description": "Checkbox on the import review bar."
+  },
+
+  "importLookUpOnNote": "One lookup at a time after importing — you can stop it and it will carry on next time",
+  "@importLookUpOnNote": {
+    "description": "Subtitle of the online look-up checkbox when it is ticked."
+  },
+
+  "importLookUpOffNote": "Import straight from file names now; you can fetch metadata later per book",
+  "@importLookUpOffNote": {
+    "description": "Subtitle of the online look-up checkbox when it is not ticked."
+  },
+
+  "importShelfNote": "These go on “{shelf}”, the shelf you had open — as well as into your library.",
+  "@importShelfNote": {
+    "description": "Note on the import review bar when the import was started from a shelf.",
+    "placeholders": {
+      "shelf": {"type": "String"}
+    }
+  },
+
+  "importSelectedCount": "{count} of {total} selected",
+  "@importSelectedCount": {
+    "description": "Count on the import review bar.",
+    "placeholders": {
+      "count": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+
+  "importSelectNone": "Select none",
+  "@importSelectNone": {
+    "description": "Button on the import review bar."
+  },
+
+  "importSelectAll": "Select all",
+  "@importSelectAll": {
+    "description": "Button on the import review bar."
+  },
+
+  "importButton": "Import",
+  "@importButton": {
+    "description": "Import button when nothing is selected."
+  },
+
+  "importButtonCount": "Import {count}",
+  "@importButtonCount": {
+    "description": "Import button; `count` is how many are selected.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importDoneImported": "{count, plural, =1{Imported 1 book} other{Imported {count} books}}",
+  "@importDoneImported": {
+    "description": "Heading of the import result.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importDoneStopped": "{count, plural, =1{Stopped after 1 book} other{Stopped after {count} books}}",
+  "@importDoneStopped": {
+    "description": "Heading of the import result when it was cancelled.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importMatchedOnline": "{count} matched online. Books that didn’t match keep their file-name details — open one and use “Find online” to try again.",
+  "@importMatchedOnline": {
+    "description": "Note on the import result; `count` is how many books were matched by the online look-up.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importFailedCount": "{count} failed",
+  "@importFailedCount": {
+    "description": "Heading of the list of files that failed to import.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "importWatchTitle": "Watch this folder",
+  "@importWatchTitle": {
+    "description": "Switch on the import result page."
+  },
+
+  "importWatchSubtitle": "Offer to import new books from it when Vellum starts",
+  "@importWatchSubtitle": {
+    "description": "Subtitle of the watch-this-folder switch."
+  },
+
+  "importBackToShelf": "Back to the shelf",
+  "@importBackToShelf": {
+    "description": "Button on the import result page."
+  },
+
+  "importPickTitle": "Where are your books?",
+  "@importPickTitle": {
+    "description": "Heading of the first step of the import page."
+  },
+
+  "importPickBody": "Whichever you choose, Vellum shows you what it found — and what it thinks you already have — before importing anything.",
+  "@importPickBody": {
+    "description": "Explanation under the heading of the first step of the import page."
+  },
+
+  "importSourceFolder": "A folder of files",
+  "@importSourceFolder": {
+    "description": "Import source choice."
+  },
+
+  "importSourceFolderNote": "PDFs and EPUBs, including subfolders",
+  "@importSourceFolderNote": {
+    "description": "Subtitle of the folder import source."
+  },
+
+  "importSourceCalibre": "A Calibre library",
+  "@importSourceCalibre": {
+    "description": "Import source choice."
+  },
+
+  "importSourceCalibreNote": "Keeps your titles, authors, series, tags and covers",
+  "@importSourceCalibreNote": {
+    "description": "Subtitle of the Calibre import source."
+  },
+
+  "importSourceCsv": "A CSV or JSON catalogue",
+  "@importSourceCsv": {
+    "description": "Import source choice."
+  },
+
+  "importSourceCsvNote": "A spreadsheet, or an export from Goodreads or the Vellum console",
+  "@importSourceCsvNote": {
+    "description": "Subtitle of the CSV/JSON import source."
+  },
+
+  "importHow": "How?",
+  "@importHow": {
+    "description": "Button next to the CSV/JSON source that opens the file format help."
+  },
+
+  "importSourceOpds": "An OPDS catalogue",
+  "@importSourceOpds": {
+    "description": "Import source choice."
+  },
+
+  "importSourceOpdsNote": "Browse another server and pull what you want",
+  "@importSourceOpdsNote": {
+    "description": "Subtitle of the OPDS import source."
+  },
+
+  "importScanning": "Scanning…",
+  "@importScanning": {
+    "description": "Progress line while the total number of files is not yet known."
+  },
+
+  "importProgressLine": "{done} of {total} · {label}",
+  "@importProgressLine": {
+    "description": "Progress line during an import; `label` is the name of the item being processed.",
+    "placeholders": {
+      "done": {"type": "int"},
+      "total": {"type": "int"},
+      "label": {"type": "String"}
+    }
+  },
+
+  "importStatusNew": "New",
+  "@importStatusNew": {
+    "description": "Status tag of an import candidate that is new to the library."
+  },
+
+  "importStatusAlreadyHere": "Already here",
+  "@importStatusAlreadyHere": {
+    "description": "Status tag of an import candidate whose file is already in the library."
+  },
+
+  "importStatusPossibleDuplicate": "Possible duplicate",
+  "@importStatusPossibleDuplicate": {
+    "description": "Status tag of an import candidate that looks like a book already in the library."
+  },
+
+  "importStatusUnreadable": "Unreadable",
+  "@importStatusUnreadable": {
+    "description": "Status tag of an import candidate that could not be read."
+  },
+
+  "importMatches": "matches “{title}”",
+  "@importMatches": {
+    "description": "Part of an import candidate's subtitle; `title` is the library book it resembles.",
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+
+  "importEditTooltip": "Edit title and author",
+  "@importEditTooltip": {
+    "description": "Tooltip of the edit button on an import candidate."
+  },
+
+  "importErrCalibreNoDb": "No metadata.db in that folder — pick the folder that contains your Calibre library.",
+  "@importErrCalibreNoDb": {
+    "description": "Error when the chosen folder is not a Calibre library."
+  },
+
+  "importErrCalibreRead": "Could not read that Calibre library: {error}",
+  "@importErrCalibreRead": {
+    "description": "Error when a Calibre library could not be read; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "importErrJson": "That JSON could not be parsed: {error}",
+  "@importErrJson": {
+    "description": "Error when a JSON catalogue is not valid JSON; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "importErrJsonShape": "Expected a list of books, or an object with a \"books\" list.",
+  "@importErrJsonShape": {
+    "description": "Error when a JSON catalogue has the wrong shape."
+  },
+
+  "importErrNoBooks": "No books with a title in that file.",
+  "@importErrNoBooks": {
+    "description": "Error when a catalogue file contains no usable books."
+  },
+
+  "importErrEmptyFile": "That file is empty.",
+  "@importErrEmptyFile": {
+    "description": "Error when a catalogue file is empty."
+  },
+
+  "importErrNoTitleColumn": "No \"title\" column — the first row must be a header.",
+  "@importErrNoTitleColumn": {
+    "description": "Error when a CSV catalogue has no title column."
+  },
+
+  "opdsErrUnreachable": "Could not reach that catalogue: {error}",
+  "@opdsErrUnreachable": {
+    "description": "Error when an OPDS catalogue could not be reached; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "opdsErrCredentials": "That catalogue needs credentials this app cannot supply yet.",
+  "@opdsErrCredentials": {
+    "description": "Error when an OPDS catalogue answered 401 or 403."
+  },
+
+  "opdsErrStatus": "The catalogue answered {status}.",
+  "@opdsErrStatus": {
+    "description": "Error when an OPDS catalogue answered with an HTTP status other than 200.",
+    "placeholders": {
+      "status": {"type": "int"}
+    }
+  },
+
+  "opdsErrTooLarge": "That feed is implausibly large; refusing it.",
+  "@opdsErrTooLarge": {
+    "description": "Error when an OPDS feed is far larger than any real one."
+  },
+
+  "opdsErrInvalidFeed": "That is not a valid OPDS feed: {error}",
+  "@opdsErrInvalidFeed": {
+    "description": "Error when the answer could not be parsed as an OPDS feed; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "opdsErrNotFeed": "That URL is not an OPDS catalogue (no <feed> element).",
+  "@opdsErrNotFeed": {
+    "description": "Error when the XML answer is not an OPDS feed."
+  },
+
+  "opdsBadUrl": "That does not look like a URL.",
+  "@opdsBadUrl": {
+    "description": "Error under the OPDS address field."
+  },
+
+  "opdsDownloadProgress": "{done} of {total}: {title}",
+  "@opdsDownloadProgress": {
+    "description": "Progress detail while OPDS books are downloaded; `title` is the book being fetched.",
+    "placeholders": {
+      "done": {"type": "int"},
+      "total": {"type": "int"},
+      "title": {"type": "String"}
+    }
+  },
+
+  "opdsDownloading": "Downloading {label}",
+  "@opdsDownloading": {
+    "description": "Line shown while OPDS books are downloaded; `label` is the progress detail.",
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+
+  "opdsNothingDownloaded": "Nothing could be downloaded from that catalogue.",
+  "@opdsNothingDownloaded": {
+    "description": "Error when none of the selected OPDS books could be downloaded."
+  },
+
+  "opdsSomeSkipped": "{count, plural, =1{1 book could not be downloaded and was skipped} other{{count} books could not be downloaded and were skipped}}",
+  "@opdsSomeSkipped": {
+    "description": "Snackbar after some of the selected OPDS books failed to download.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "opdsTitle": "OPDS catalogue",
+  "@opdsTitle": {
+    "description": "Title of the OPDS browser page."
+  },
+
+  "opdsUpTooltip": "Up a level",
+  "@opdsUpTooltip": {
+    "description": "Tooltip of the back button in the OPDS browser."
+  },
+
+  "opdsUrlLabel": "Catalogue URL",
+  "@opdsUrlLabel": {
+    "description": "Label of the OPDS address field."
+  },
+
+  "opdsOpen": "Open",
+  "@opdsOpen": {
+    "description": "Button that opens the typed OPDS address."
+  },
+
+  "opdsNextPage": "Next page",
+  "@opdsNextPage": {
+    "description": "Button that loads the next page of an OPDS feed."
+  },
+
+  "opdsReview": "{count, plural, =1{Review 1 book} other{Review {count} books}}",
+  "@opdsReview": {
+    "description": "Button that sends the selected OPDS books to the import review.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "opdsIntroTitle": "Browse an OPDS catalogue",
+  "@opdsIntroTitle": {
+    "description": "Heading of the OPDS browser's start screen."
+  },
+
+  "opdsIntroBody": "Paste the address of any OPDS server — Calibre-Web, Kavita, or another Vellum. Pick the books you want and they go through the same review as any other import.",
+  "@opdsIntroBody": {
+    "description": "Explanation on the OPDS browser's start screen."
+  },
+
+  "opdsFreeTitle": "Or start with a free one",
+  "@opdsFreeTitle": {
+    "description": "Heading above the list of free catalogues."
+  },
+
+  "opdsFreeBody": "Public-domain books you can download and keep.",
+  "@opdsFreeBody": {
+    "description": "Explanation above the list of free catalogues."
+  },
+
+  "opdsFreeGutenberg": "Around 75,000 public-domain books, as EPUB with covers. The largest of the free catalogues and the one most likely to have a classic you are missing.",
+  "@opdsFreeGutenberg": {
+    "description": "Description of the Project Gutenberg catalogue."
+  },
+
+  "opdsFreeWikisource": "Around 700 English titles proofread by Wikisource volunteers and marked ready for export. Smaller than Gutenberg, and strong on documents and speeches rather than novels.",
+  "@opdsFreeWikisource": {
+    "description": "Description of the Wikisource catalogue."
+  },
+
+  "catalogHelpTitle": "How to structure the file",
+  "@catalogHelpTitle": {
+    "description": "Heading of the catalogue file format help sheet."
+  },
+
+  "catalogHelpIntro": "One header row, one book per row, and a column called title. Everything else is optional, unrecognised columns are ignored, and the order never matters — so an export from somewhere else usually imports without editing.",
+  "@catalogHelpIntro": {
+    "description": "Introduction on the catalogue file format help sheet."
+  },
+
+  "catalogHelpSaveTemplate": "Save a template",
+  "@catalogHelpSaveTemplate": {
+    "description": "Button that saves a sample CSV file."
+  },
+
+  "catalogHelpCopy": "Copy",
+  "@catalogHelpCopy": {
+    "description": "Button that copies the sample CSV to the clipboard."
+  },
+
+  "catalogHelpCopied": "Template copied",
+  "@catalogHelpCopied": {
+    "description": "Snackbar after the sample CSV was copied."
+  },
+
+  "catalogHelpSaved": "Saved to {path}",
+  "@catalogHelpSaved": {
+    "description": "Snackbar after the sample CSV was saved; `path` is the file location.",
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+
+  "catalogHelpOpen": "Open",
+  "@catalogHelpOpen": {
+    "description": "Snackbar action that opens the saved sample file."
+  },
+
+  "catalogHelpColumns": "Columns",
+  "@catalogHelpColumns": {
+    "description": "Heading of the list of recognised columns."
+  },
+
+  "catalogHelpRequired": "required",
+  "@catalogHelpRequired": {
+    "description": "Tag next to a required column name, shown in parentheses."
+  },
+
+  "catalogHelpColTitle": "Title",
+  "@catalogHelpColTitle": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColAuthors": "Author(s)",
+  "@catalogHelpColAuthors": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColSubtitle": "Subtitle",
+  "@catalogHelpColSubtitle": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColIsbn": "ISBN",
+  "@catalogHelpColIsbn": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColPublisher": "Publisher",
+  "@catalogHelpColPublisher": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColYear": "Year",
+  "@catalogHelpColYear": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColPages": "Pages",
+  "@catalogHelpColPages": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColSeries": "Series",
+  "@catalogHelpColSeries": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColSeriesNumber": "Number in series",
+  "@catalogHelpColSeriesNumber": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColGenres": "Genres",
+  "@catalogHelpColGenres": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpColDescription": "Description",
+  "@catalogHelpColDescription": {
+    "description": "Name of a catalogue column."
+  },
+
+  "catalogHelpValuesTitle": "Getting the values right",
+  "@catalogHelpValuesTitle": {
+    "description": "Heading of the tips list on the catalogue file format help sheet."
+  },
+
+  "catalogHelpMultiTitle": "Several authors or tags in one cell",
+  "@catalogHelpMultiTitle": {
+    "description": "Tip heading."
+  },
+
+  "catalogHelpMultiBody": "Separate them with ; or , or &. If you use commas, wrap the cell in quotes: \"fantasy, humour\".",
+  "@catalogHelpMultiBody": {
+    "description": "Tip text."
+  },
+
+  "catalogHelpIsbnTitle": "ISBNs",
+  "@catalogHelpIsbnTitle": {
+    "description": "Tip heading."
+  },
+
+  "catalogHelpIsbnBody": "Hyphens and spaces are fine. A value that is not 10 or 13 characters once cleaned up is left out rather than stored wrong.",
+  "@catalogHelpIsbnBody": {
+    "description": "Tip text."
+  },
+
+  "catalogHelpNumbersTitle": "Year and pages",
+  "@catalogHelpNumbersTitle": {
+    "description": "Tip heading."
+  },
+
+  "catalogHelpNumbersBody": "Plain numbers. Anything else is left empty rather than guessed at.",
+  "@catalogHelpNumbersBody": {
+    "description": "Tip text."
+  },
+
+  "catalogHelpJsonTitle": "JSON works too",
+  "@catalogHelpJsonTitle": {
+    "description": "Tip heading."
+  },
+
+  "catalogHelpJsonBody": "A list of objects, or an object with a \"books\" list, using the same names. The format is read from the contents, not the extension.",
+  "@catalogHelpJsonBody": {
+    "description": "Tip text."
+  },
+
+  "catalogHelpFilesTitle": "Files are not part of it",
+  "@catalogHelpFilesTitle": {
+    "description": "Tip heading."
+  },
+
+  "catalogHelpFilesBody": "A catalogue creates books with no PDF or EPUB attached. To bring the files, import the folder they are in — matching books are recognised rather than duplicated.",
+  "@catalogHelpFilesBody": {
+    "description": "Tip text."
+  },
+
+  "catalogHelpGuide": "The full guide, including how file names are read during a folder import, is in docs/IMPORTING.md.",
+  "@catalogHelpGuide": {
+    "description": "Closing line of the catalogue file format help sheet."
+  },
+
+  "roomShelfAddTitle": "Add shelf",
+  "@roomShelfAddTitle": {
+    "description": "Title of the dialog that adds a shelf to a room."
+  },
+
+  "roomShelfEditTitle": "Edit shelf",
+  "@roomShelfEditTitle": {
+    "description": "Title of the dialog that edits a shelf segment."
+  },
+
+  "roomUprightHint": "An upright runs between two heights at one X (metres).",
+  "@roomUprightHint": {
+    "description": "Explanation at the top of the shelf dialog when the kind is a side panel or divider."
+  },
+
+  "roomShelfHint": "A shelf is a flat line between two points (metres).",
+  "@roomShelfHint": {
+    "description": "Explanation at the top of the shelf dialog when the kind is a shelf."
+  },
+
+  "roomKindLabel": "Kind",
+  "@roomKindLabel": {
+    "description": "Label of the kind picker (shelf, side panel, divider, label) in the shelf dialog."
+  },
+
+  "roomKindUprightNote": "Books never rest on this, and none can be slid through it.",
+  "@roomKindUprightNote": {
+    "description": "Note in the shelf dialog for side panels and dividers."
+  },
+
+  "roomKindMarkerNote": "Books never rest on this — it only draws.",
+  "@roomKindMarkerNote": {
+    "description": "Note in the shelf dialog for a label marker."
+  },
+
+  "roomFieldX": "X (m)",
+  "@roomFieldX": {
+    "description": "Label of a coordinate field in the shelf dialog; metres."
+  },
+
+  "roomFieldFromY": "From Y (m)",
+  "@roomFieldFromY": {
+    "description": "Label of a coordinate field in the shelf dialog; metres."
+  },
+
+  "roomFieldToY": "To Y (m)",
+  "@roomFieldToY": {
+    "description": "Label of a coordinate field in the shelf dialog; metres."
+  },
+
+  "roomFieldLeftX": "Left X (m)",
+  "@roomFieldLeftX": {
+    "description": "Label of a coordinate field in the shelf dialog; metres."
+  },
+
+  "roomFieldRightX": "Right X (m)",
+  "@roomFieldRightX": {
+    "description": "Label of a coordinate field in the shelf dialog; metres."
+  },
+
+  "roomFieldHeightY": "Height Y (m)",
+  "@roomFieldHeightY": {
+    "description": "Label of a coordinate field in the shelf dialog; metres."
+  },
+
+  "roomFieldLabelOptional": "Label (optional)",
+  "@roomFieldLabelOptional": {
+    "description": "Label of the shelf name field in the shelf dialog."
+  },
+
+  "roomAdd": "Add",
+  "@roomAdd": {
+    "description": "Confirm button of the shelf and bookcase dialogs when adding."
+  },
+
+  "roomFillLine": "{fill} · {count, plural, =1{1 book} other{{count} books}}",
+  "@roomFillLine": {
+    "description": "Line under the fill bar of a shelf; `fill` is a sentence such as \"42 cm of 90 cm used\".",
+    "placeholders": {
+      "fill": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+
+  "roomFillNoLength": "No length",
+  "@roomFillNoLength": {
+    "description": "Fill description of a shelf with no length."
+  },
+
+  "roomFillOverfull": "{used} on a {total} shelf — overfull",
+  "@roomFillOverfull": {
+    "description": "Fill description of a shelf that holds more than its length; both values are distances.",
+    "placeholders": {
+      "used": {"type": "String"},
+      "total": {"type": "String"}
+    }
+  },
+
+  "roomFillUsed": "{used} of {total} used · {free} free",
+  "@roomFillUsed": {
+    "description": "Fill description of a shelf; all values are distances such as \"42 cm\".",
+    "placeholders": {
+      "used": {"type": "String"},
+      "total": {"type": "String"},
+      "free": {"type": "String"}
+    }
+  },
+
+  "roomSizeTitle": "Book size",
+  "@roomSizeTitle": {
+    "description": "Title of the dialog that sets the size of a placed book."
+  },
+
+  "roomSizePreset": "Format preset",
+  "@roomSizePreset": {
+    "description": "Label of the book format picker in the book size dialog."
+  },
+
+  "roomSizeDefault": "Default",
+  "@roomSizeDefault": {
+    "description": "Entry of the format picker meaning no preset."
+  },
+
+  "roomSizePresetNote": "A preset sizes the book from its page count; tweak the numbers below for a manual override.",
+  "@roomSizePresetNote": {
+    "description": "Note in the book size dialog."
+  },
+
+  "roomSizeThickness": "Thickness (cm)",
+  "@roomSizeThickness": {
+    "description": "Label of a field in the book size dialog."
+  },
+
+  "roomSizeHeight": "Height (cm)",
+  "@roomSizeHeight": {
+    "description": "Label of a field in the book size dialog."
+  },
+
+  "roomSizeLimit": "Up to A3 — {thickness} cm thick and {height} cm tall.",
+  "@roomSizeLimit": {
+    "description": "Note under the size fields; both values are numbers in centimetres.",
+    "placeholders": {
+      "thickness": {"type": "String"},
+      "height": {"type": "String"}
+    }
+  },
+
+  "roomSizeReset": "Reset",
+  "@roomSizeReset": {
+    "description": "Button that resets the book to its default size."
+  },
+
+  "roomSizeNotNumbers": "Both sizes have to be numbers greater than zero.",
+  "@roomSizeNotNumbers": {
+    "description": "Error in the book size dialog."
+  },
+
+  "roomSizeTooBig": "Nothing bigger than A3: at most {thickness} cm thick and {height} cm tall.",
+  "@roomSizeTooBig": {
+    "description": "Error in the book size dialog; both values are numbers in centimetres.",
+    "placeholders": {
+      "thickness": {"type": "String"},
+      "height": {"type": "String"}
+    }
+  },
+
+  "roomBookcaseAddTitle": "Add a bookcase",
+  "@roomBookcaseAddTitle": {
+    "description": "Title of the bookcase dialog when adding."
+  },
+
+  "roomBookcaseEditTitle": "Edit this bookcase",
+  "@roomBookcaseEditTitle": {
+    "description": "Title of the bookcase dialog when editing."
+  },
+
+  "roomBookcaseNote": "Writes the shelves and side panels it is made of. They are ordinary shelves afterwards — move or delete any of them.",
+  "@roomBookcaseNote": {
+    "description": "Note at the top of the bookcase dialog."
+  },
+
+  "roomStyleLabel": "Style",
+  "@roomStyleLabel": {
+    "description": "Label of the bookcase style picker."
+  },
+
+  "roomFieldWidth": "Width (m)",
+  "@roomFieldWidth": {
+    "description": "Label of a field in the bookcase dialog; metres."
+  },
+
+  "roomFieldHeight": "Height (m)",
+  "@roomFieldHeight": {
+    "description": "Label of a field in the bookcase dialog; metres."
+  },
+
+  "roomFieldShelves": "Shelves",
+  "@roomFieldShelves": {
+    "description": "Label of the number-of-shelves field in the bookcase dialog."
+  },
+
+  "roomFieldNameOptional": "Name (optional)",
+  "@roomFieldNameOptional": {
+    "description": "Label of the bookcase name field."
+  },
+
+  "roomBookcaseSummarySides": "{shelves, plural, =1{1 shelf} other{{shelves} shelves}} and 2 side panels, {spacing} apart.",
+  "@roomBookcaseSummarySides": {
+    "description": "Summary under the bookcase dialog fields; `spacing` is a distance such as \"30 cm\".",
+    "placeholders": {
+      "shelves": {"type": "int"},
+      "spacing": {"type": "String"}
+    }
+  },
+
+  "roomBookcaseSummary": "{shelves, plural, =1{1 shelf} other{{shelves} shelves}}, {spacing} apart.",
+  "@roomBookcaseSummary": {
+    "description": "Summary under the bookcase dialog fields for a bookcase without side panels; `spacing` is a distance.",
+    "placeholders": {
+      "shelves": {"type": "int"},
+      "spacing": {"type": "String"}
+    }
+  },
+
+  "roomStyleBilly": "Billy-style unit",
+  "@roomStyleBilly": {
+    "description": "Bookcase style name."
+  },
+
+  "roomStyleTall": "Tall bookcase",
+  "@roomStyleTall": {
+    "description": "Bookcase style name."
+  },
+
+  "roomStyleLow": "Low bookcase",
+  "@roomStyleLow": {
+    "description": "Bookcase style name."
+  },
+
+  "roomStyleCube": "Cube shelving",
+  "@roomStyleCube": {
+    "description": "Bookcase style name."
+  },
+
+  "roomStyleFloating": "Floating shelves",
+  "@roomStyleFloating": {
+    "description": "Bookcase style name."
+  },
+
+  "roomPropStatuette": "Statuette",
+  "@roomPropStatuette": {
+    "description": "Name of a decorative object that can stand on a shelf."
+  },
+
+  "roomPropPlant": "Small plant",
+  "@roomPropPlant": {
+    "description": "Name of a decorative object that can stand on a shelf."
+  },
+
+  "roomPropVase": "Vase",
+  "@roomPropVase": {
+    "description": "Name of a decorative object that can stand on a shelf."
+  },
+
+  "roomPropClock": "Clock",
+  "@roomPropClock": {
+    "description": "Name of a decorative object that can stand on a shelf."
+  },
+
+  "roomPropBoxes": "Stack of boxes",
+  "@roomPropBoxes": {
+    "description": "Name of a decorative object that can stand on a shelf."
+  },
+
+  "roomPropBookend": "Bookend",
+  "@roomPropBookend": {
+    "description": "Name of a decorative object that can stand on a shelf."
+  },
+
+  "roomKindShelf": "Shelf",
+  "@roomKindShelf": {
+    "description": "Name of a segment kind in the shelf dialog."
+  },
+
+  "roomKindPanel": "Side panel",
+  "@roomKindPanel": {
+    "description": "Name of a segment kind in the shelf dialog."
+  },
+
+  "roomKindDivider": "Divider",
+  "@roomKindDivider": {
+    "description": "Name of a segment kind in the shelf dialog."
+  },
+
+  "roomKindMarker": "Label",
+  "@roomKindMarker": {
+    "description": "Name of a segment kind in the shelf dialog: a text label drawn on the room."
+  },
+
+  "roomTidyByAuthor": "By author",
+  "@roomTidyByAuthor": {
+    "description": "Choice for how to tidy a shelf."
+  },
+
+  "roomTidyByTitle": "By title",
+  "@roomTidyByTitle": {
+    "description": "Choice for how to tidy a shelf."
+  },
+
+  "roomTidyBySeries": "By series",
+  "@roomTidyBySeries": {
+    "description": "Choice for how to tidy a shelf."
+  },
+
+  "roomFormatMass": "Mass-market paperback",
+  "@roomFormatMass": {
+    "description": "Name of a book format preset."
+  },
+
+  "roomFormatTrade": "Trade paperback",
+  "@roomFormatTrade": {
+    "description": "Name of a book format preset."
+  },
+
+  "roomFormatB5": "B5 softcover",
+  "@roomFormatB5": {
+    "description": "Name of a book format preset."
+  },
+
+  "roomFormatHardcover": "Hardcover",
+  "@roomFormatHardcover": {
+    "description": "Name of a book format preset."
+  },
+
+  "roomPropSheetTitle": "Put something on a shelf",
+  "@roomPropSheetTitle": {
+    "description": "Title of the sheet that lists decorative objects."
+  },
+
+  "roomPropAdded": "Added a {prop}. Drag it to move it.",
+  "@roomPropAdded": {
+    "description": "Announcement after a decorative object was added; `prop` is its name in lower case.",
+    "placeholders": {
+      "prop": {"type": "String"}
+    }
+  },
+
+  "roomBookcaseAdded": "Added a bookcase. Drag any part to move it all.",
+  "@roomBookcaseAdded": {
+    "description": "Announcement after a bookcase was added."
+  },
+
+  "roomBookcaseUpdated": "Bookcase updated.",
+  "@roomBookcaseUpdated": {
+    "description": "Announcement after a bookcase was edited."
+  },
+
+  "roomGrouped": "Grouped {count} parts into one bookcase.",
+  "@roomGrouped": {
+    "description": "Announcement after shelves were grouped into a bookcase.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "roomDeleteCaseTitle": "Delete the whole bookcase?",
+  "@roomDeleteCaseTitle": {
+    "description": "Title of the confirmation dialog for deleting a bookcase."
+  },
+
+  "roomDeleteCaseBody": "{count, plural, other{Removes all {count} shelves and panels.}} Books standing on them drop to whatever is beneath — nothing leaves your library.",
+  "@roomDeleteCaseBody": {
+    "description": "Body of the confirmation dialog for deleting a bookcase.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "roomAddBooksToRoom": "Add books to {room}",
+  "@roomAddBooksToRoom": {
+    "description": "Title of the book picker when adding to a whole room.",
+    "placeholders": {
+      "room": {"type": "String"}
+    }
+  },
+
+  "roomAddBooksToShelf": "Add books to {shelf}",
+  "@roomAddBooksToShelf": {
+    "description": "Title of the book picker when adding to one shelf.",
+    "placeholders": {
+      "shelf": {"type": "String"}
+    }
+  },
+
+  "roomNoShelvesYet": "This room has no shelves yet — add one first.",
+  "@roomNoShelvesYet": {
+    "description": "Announcement when books are added to a room without shelves."
+  },
+
+  "roomPutBooksOn": "{count, plural, =1{Put 1 book on…} other{Put {count} books on…}}",
+  "@roomPutBooksOn": {
+    "description": "Title of the dialog that asks which shelf the books go on.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "roomAddedBooks": "{count, plural, =1{Added 1 book to {where}.} other{Added {count} books to {where}.}}",
+  "@roomAddedBooks": {
+    "description": "Announcement after books were placed on a shelf; `where` is the shelf's name.",
+    "placeholders": {
+      "count": {"type": "int"},
+      "where": {"type": "String"}
+    }
+  },
+
+  "roomNoRoomOn": "No room on {where} — nothing was added.",
+  "@roomNoRoomOn": {
+    "description": "Announcement when no book fit on the shelf.",
+    "placeholders": {
+      "where": {"type": "String"}
+    }
+  },
+
+  "roomAddedSome": "Added {placed} to {where}; {unplaced} did not fit.",
+  "@roomAddedSome": {
+    "description": "Announcement when only some of the books fit on the shelf.",
+    "placeholders": {
+      "placed": {"type": "int"},
+      "where": {"type": "String"},
+      "unplaced": {"type": "int"}
+    }
+  },
+
+  "roomMenuOpenBook": "Open book",
+  "@roomMenuOpenBook": {
+    "description": "Context menu entry of a placed book."
+  },
+
+  "roomMenuLayFlat": "Lay flat",
+  "@roomMenuLayFlat": {
+    "description": "Context menu entry of a placed book standing upright."
+  },
+
+  "roomMenuStandUp": "Stand up",
+  "@roomMenuStandUp": {
+    "description": "Context menu entry of a placed book lying flat."
+  },
+
+  "roomMenuResize": "Resize…",
+  "@roomMenuResize": {
+    "description": "Context menu entry of a placed book."
+  },
+
+  "roomMenuResetSize": "Reset size to default",
+  "@roomMenuResetSize": {
+    "description": "Context menu entry of a placed book."
+  },
+
+  "roomMenuRemoveFromRoom": "Remove from room",
+  "@roomMenuRemoveFromRoom": {
+    "description": "Context menu entry of a placed book."
+  },
+
+  "roomMenuSendBehind": "Send behind the books",
+  "@roomMenuSendBehind": {
+    "description": "Context menu entry of a decorative object drawn in front of the books."
+  },
+
+  "roomMenuBringFront": "Bring in front of the books",
+  "@roomMenuBringFront": {
+    "description": "Context menu entry of a decorative object drawn behind the books."
+  },
+
+  "roomMenuRemoveProp": "Remove the {prop}",
+  "@roomMenuRemoveProp": {
+    "description": "Context menu entry of a decorative object; `prop` is its name in lower case.",
+    "placeholders": {
+      "prop": {"type": "String"}
+    }
+  },
+
+  "roomMenuAddBooksHere": "Add books to this shelf…",
+  "@roomMenuAddBooksHere": {
+    "description": "Context menu entry of a shelf."
+  },
+
+  "roomMenuUnlockCase": "Unlock this bookcase",
+  "@roomMenuUnlockCase": {
+    "description": "Context menu entry of a locked shelf that belongs to a bookcase."
+  },
+
+  "roomMenuUnlock": "Unlock",
+  "@roomMenuUnlock": {
+    "description": "Context menu entry of a locked shelf."
+  },
+
+  "roomMenuLockCase": "Lock this bookcase",
+  "@roomMenuLockCase": {
+    "description": "Context menu entry of an unlocked shelf that belongs to a bookcase."
+  },
+
+  "roomMenuLock": "Lock",
+  "@roomMenuLock": {
+    "description": "Context menu entry of an unlocked shelf."
+  },
+
+  "roomMenuEditCase": "Edit this bookcase…",
+  "@roomMenuEditCase": {
+    "description": "Context menu entry of a shelf in a bookcase."
+  },
+
+  "roomMenuUngroup": "Ungroup",
+  "@roomMenuUngroup": {
+    "description": "Context menu entry of a shelf in a bookcase."
+  },
+
+  "roomMenuDeleteCase": "Delete the whole bookcase",
+  "@roomMenuDeleteCase": {
+    "description": "Context menu entry of a shelf in a bookcase."
+  },
+
+  "roomMenuGroup": "Group into a bookcase…",
+  "@roomMenuGroup": {
+    "description": "Context menu entry of a loose shelf."
+  },
+
+  "roomMenuEditSegment": "Edit this segment…",
+  "@roomMenuEditSegment": {
+    "description": "Context menu entry of a shelf segment."
+  },
+
+  "roomMenuTidy": "Tidy this shelf…",
+  "@roomMenuTidy": {
+    "description": "Context menu entry of a shelf."
+  },
+
+  "roomMenuDeleteSegment": "Delete this segment",
+  "@roomMenuDeleteSegment": {
+    "description": "Context menu entry of a shelf segment."
+  },
+
+  "roomUnlockedSnack": "Unlocked — drag it to move it.",
+  "@roomUnlockedSnack": {
+    "description": "Announcement after a shelf was unlocked."
+  },
+
+  "roomLockedSnack": "Locked in place.",
+  "@roomLockedSnack": {
+    "description": "Announcement after a shelf was locked."
+  },
+
+  "roomUngroupedSnack": "Ungrouped — the shelves stay where they are.",
+  "@roomUngroupedSnack": {
+    "description": "Announcement after a bookcase was ungrouped."
+  },
+
+  "roomGroupHintSnack": "Tap the other shelves and panels, then press Done.",
+  "@roomGroupHintSnack": {
+    "description": "Announcement when grouping starts."
+  },
+
+  "roomPhotoAdded": "Photo added. Calibrate it so the room is drawn to scale.",
+  "@roomPhotoAdded": {
+    "description": "Announcement after a room photo was added."
+  },
+
+  "roomCalibrateBad": "That doesn't give a usable scale — check both numbers.",
+  "@roomCalibrateBad": {
+    "description": "Announcement when the entered calibration values give no usable scale."
+  },
+
+  "roomCalibrated": "Calibrated: the photo is now drawn to scale.",
+  "@roomCalibrated": {
+    "description": "Announcement after the room photo was calibrated."
+  },
+
+  "roomSwatchTheme": "Theme",
+  "@roomSwatchTheme": {
+    "description": "Colour choice meaning \"follow the app theme\"."
+  },
+
+  "roomWallWarmWhite": "Warm white",
+  "@roomWallWarmWhite": {
+    "description": "Wall colour name."
+  },
+
+  "roomWallClay": "Clay",
+  "@roomWallClay": {
+    "description": "Wall colour name."
+  },
+
+  "roomWallSage": "Sage",
+  "@roomWallSage": {
+    "description": "Wall colour name."
+  },
+
+  "roomWallInk": "Ink",
+  "@roomWallInk": {
+    "description": "Wall colour name."
+  },
+
+  "roomFloorOak": "Oak",
+  "@roomFloorOak": {
+    "description": "Floor colour name."
+  },
+
+  "roomFloorWalnut": "Walnut",
+  "@roomFloorWalnut": {
+    "description": "Floor colour name."
+  },
+
+  "roomFloorSlate": "Slate",
+  "@roomFloorSlate": {
+    "description": "Floor colour name."
+  },
+
+  "roomFloorRugRed": "Rug red",
+  "@roomFloorRugRed": {
+    "description": "Floor colour name."
+  },
+
+  "roomWallTitle": "Wall",
+  "@roomWallTitle": {
+    "description": "Heading of the wall colour choices."
+  },
+
+  "roomFloorTitle": "Floor",
+  "@roomFloorTitle": {
+    "description": "Heading of the floor colour choices."
+  },
+
+  "roomSurfacesTitle": "Floor line, skirting and shadows",
+  "@roomSurfacesTitle": {
+    "description": "Switch in the wall and floor sheet."
+  },
+
+  "roomSurfacesNote": "What stops an empty room looking like graph paper",
+  "@roomSurfacesNote": {
+    "description": "Subtitle of the floor line switch."
+  },
+
+  "roomTidyNothing": "Nothing is resting on that shelf.",
+  "@roomTidyNothing": {
+    "description": "Announcement when tidying an empty shelf."
+  },
+
+  "roomTidyAlready": "That shelf is already tidy.",
+  "@roomTidyAlready": {
+    "description": "Announcement when tidying changed nothing."
+  },
+
+  "roomTidied": "Tidied {moved} of {total, plural, =1{1 book} other{{total} books}}.",
+  "@roomTidied": {
+    "description": "Announcement after tidying a shelf.",
+    "placeholders": {
+      "moved": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+
+  "roomTidyTitle": "Tidy this shelf",
+  "@roomTidyTitle": {
+    "description": "Title of the dialog that asks how to tidy a shelf."
+  },
+
+  "roomLabelsNone": "This room has no shelves to label yet.",
+  "@roomLabelsNone": {
+    "description": "Announcement when printing shelf labels for a room without shelves."
+  },
+
+  "roomLabelsSheetTitle": "{room} — shelf labels",
+  "@roomLabelsSheetTitle": {
+    "description": "Title of the printable label sheet; `room` is the room's name.",
+    "placeholders": {
+      "room": {"type": "String"}
+    }
+  },
+
+  "roomLabelsOpened": "Labels opened — print them with Ctrl+P.",
+  "@roomLabelsOpened": {
+    "description": "Announcement after the label sheet was opened."
+  },
+
+  "roomLabelsSaved": "Saved the labels to {path}",
+  "@roomLabelsSaved": {
+    "description": "Announcement when the label sheet could not be opened and was saved instead.",
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+
+  "roomSnapNothing": "Nothing to capture yet.",
+  "@roomSnapNothing": {
+    "description": "Announcement when saving a picture of an empty view."
+  },
+
+  "roomSnapFailed": "Couldn't render the picture.",
+  "@roomSnapFailed": {
+    "description": "Announcement when the picture could not be rendered."
+  },
+
+  "roomSnapSaved": "Picture saved and opened.",
+  "@roomSnapSaved": {
+    "description": "Announcement after the picture was saved and opened."
+  },
+
+  "roomSnapSavedTo": "Saved to {path}",
+  "@roomSnapSavedTo": {
+    "description": "Announcement when the picture could not be opened and was saved instead.",
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+
+  "roomEmptySheet": "This room is empty. Add a shelf, then drop in books.",
+  "@roomEmptySheet": {
+    "description": "Text of the room contents sheet when the room has nothing in it."
+  },
+
+  "roomShelfEmpty": "Empty",
+  "@roomShelfEmpty": {
+    "description": "Shown for a shelf with no books in the room contents sheet."
+  },
+
+  "roomSearchHint": "Find a book in this room",
+  "@roomSearchHint": {
+    "description": "Hint of the search field in the room's app bar."
+  },
+
+  "roomCloseSearchTooltip": "Close search",
+  "@roomCloseSearchTooltip": {
+    "description": "Tooltip of the button that closes the room search."
+  },
+
+  "roomSearchTooltip": "Search this room",
+  "@roomSearchTooltip": {
+    "description": "Tooltip of the search button in the room's app bar."
+  },
+
+  "roomAddBookcaseTooltip": "Add bookcase",
+  "@roomAddBookcaseTooltip": {
+    "description": "Tooltip of a button in the room's app bar."
+  },
+
+  "roomAddShelfTooltip": "Add one shelf",
+  "@roomAddShelfTooltip": {
+    "description": "Tooltip of a button in the room's app bar."
+  },
+
+  "roomMoreTooltip": "More",
+  "@roomMoreTooltip": {
+    "description": "Tooltip of the overflow menu in the room's app bar."
+  },
+
+  "roomMenuProp": "Put something on a shelf…",
+  "@roomMenuProp": {
+    "description": "Overflow menu entry that opens the list of decorative objects."
+  },
+
+  "roomMenuContents": "Room contents",
+  "@roomMenuContents": {
+    "description": "Overflow menu entry that lists what is in the room."
+  },
+
+  "roomMenuZoomIn": "Zoom in",
+  "@roomMenuZoomIn": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuZoomOut": "Zoom out",
+  "@roomMenuZoomOut": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuStopMeasuring": "Stop measuring",
+  "@roomMenuStopMeasuring": {
+    "description": "Overflow menu entry while the ruler is active."
+  },
+
+  "roomMenuMeasure": "Measure…",
+  "@roomMenuMeasure": {
+    "description": "Overflow menu entry that turns the canvas into a ruler."
+  },
+
+  "roomMenuDecor": "Wall and floor…",
+  "@roomMenuDecor": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuAddPhoto": "Add a room photo…",
+  "@roomMenuAddPhoto": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuChangePhoto": "Change the room photo…",
+  "@roomMenuChangePhoto": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuCalibrate": "Calibrate the photo…",
+  "@roomMenuCalibrate": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuPhotoStrength": "Photo strength…",
+  "@roomMenuPhotoStrength": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuLabels": "Print shelf labels…",
+  "@roomMenuLabels": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuSnapshot": "Save a picture of this room",
+  "@roomMenuSnapshot": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuStocktake": "Stocktake this room…",
+  "@roomMenuStocktake": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomMenuHelp": "Help",
+  "@roomMenuHelp": {
+    "description": "Overflow menu entry."
+  },
+
+  "roomSemanticsHint": "Use Room contents for a navigable list",
+  "@roomSemanticsHint": {
+    "description": "Screen reader hint on the room canvas."
+  },
+
+  "roomAddBooksFab": "Add books",
+  "@roomAddBooksFab": {
+    "description": "Floating button of the room editor."
+  },
+
+  "roomHelpTitle": "Arranging the room",
+  "@roomHelpTitle": {
+    "description": "Title of the room editor's help dialog."
+  },
+
+  "roomHelpBody": "• Pinch or scroll to zoom; drag empty space to pan.\n• “Add book” drops a book in; drag it so it rests on a shelf or on top of another book.\n• Tap a book to select it (rotate / resize / remove), then\n  drag it to move it — only the selected book moves.\n• Right-click or long-press a book or shelf to edit it.\n• Drag a shelf to move it — the books on it ride along.\n• A shelf can be furniture instead: a side panel, divider or label draws but holds nothing.\n• “Measure” turns the canvas into a ruler; “Add a room photo” lets you trace your actual wall once you calibrate it.\n• Right-click a shelf to tidy it by author, title or series.\n• The search icon dims everything that doesn’t match.\n• “Print shelf labels” makes a sheet you can cut up and stick on; scanning one opens this room.",
+  "@roomHelpBody": {
+    "description": "Body of the room editor's help dialog; a bullet list, one item per line. The quoted words are menu entries of the same screen."
+  },
+
+  "roomHelpGotIt": "Got it",
+  "@roomHelpGotIt": {
+    "description": "Button that closes the help dialog."
+  },
+
+  "roomEmptyHint": "Add a shelf, then drop in books.\nPinch or scroll to zoom, drag to pan.",
+  "@roomEmptyHint": {
+    "description": "Hint in the middle of an empty room canvas; two lines."
+  },
+
+  "roomEditTip": "Right-click or long-press a book or shelf to edit",
+  "@roomEditTip": {
+    "description": "Small tip box in the corner of the room canvas."
+  },
+
+  "roomGroupingBar": "{count} selected — tap the shelves and panels that make up this bookcase",
+  "@roomGroupingBar": {
+    "description": "Text of the bar shown while shelves are being grouped into a bookcase.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "roomGroup": "Group",
+  "@roomGroup": {
+    "description": "Button that finishes grouping shelves into a bookcase."
+  },
+
+  "roomShelfAt": "Shelf at {height}",
+  "@roomShelfAt": {
+    "description": "Name of a shelf that has no label; `height` is a distance such as \"1.45 m\".",
+    "placeholders": {
+      "height": {"type": "String"}
+    }
+  },
+
+  "roomShelfWithHeight": "{label} ({height})",
+  "@roomShelfWithHeight": {
+    "description": "Name of a labelled shelf when another shelf has the same label; `height` is a distance.",
+    "placeholders": {
+      "label": {"type": "String"},
+      "height": {"type": "String"}
+    }
+  },
+
+  "roomShelfPositional": "Shelf {number}",
+  "@roomShelfPositional": {
+    "description": "Name of an unlabelled shelf in the room summary, counted from the top.",
+    "placeholders": {
+      "number": {"type": "int"}
+    }
+  },
+
+  "roomNotOnShelf": "Not on a shelf",
+  "@roomNotOnShelf": {
+    "description": "Heading for placed books that stand on no shelf in the room summary."
+  },
+
+  "roomSpokenEmpty": "{name}: empty",
+  "@roomSpokenEmpty": {
+    "description": "Screen reader sentence for a shelf with no books.",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "roomSpokenBooks": "{name}: {count, plural, =1{1 book} other{{count} books}} — {titles}",
+  "@roomSpokenBooks": {
+    "description": "Screen reader sentence for a shelf; `titles` is a comma-separated list.",
+    "placeholders": {
+      "name": {"type": "String"},
+      "count": {"type": "int"},
+      "titles": {"type": "String"}
+    }
+  },
+
+  "roomSemanticEmpty": "Empty room. Add a shelf, then place books.",
+  "@roomSemanticEmpty": {
+    "description": "Screen reader label of an empty room."
+  },
+
+  "roomLabelUnlabelled": "Unlabelled shelf",
+  "@roomLabelUnlabelled": {
+    "description": "Name of a shelf without a label on the printable label sheet."
+  },
+
+  "roomLabelsDefaultTitle": "Vellum shelf labels",
+  "@roomLabelsDefaultTitle": {
+    "description": "Default title of the printable label sheet."
+  },
+
+  "roomLabelsHint": "Press Ctrl+P (⌘P on a Mac) to print, then cut along the boxes. Scanning a label in Vellum opens that shelf's room.",
+  "@roomLabelsHint": {
+    "description": "Instruction at the top of the printable label sheet; not printed."
+  },
+
+  "roomLabelBooksNone": "No books recorded",
+  "@roomLabelBooksNone": {
+    "description": "Book count line on a printed shelf label when the shelf has no books."
+  },
+
+  "roomLabelBooks": "{count, plural, =1{1 book} other{{count} books}}",
+  "@roomLabelBooks": {
+    "description": "Book count line on a printed shelf label.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "bookPickerTitle": "Add books to the room",
+  "@bookPickerTitle": {
+    "description": "Default title of the sheet that picks books to place in a room."
+  },
+
+  "bookPickerConfirm": "Add",
+  "@bookPickerConfirm": {
+    "description": "Default label of the confirm button of the book picker."
+  },
+
+  "bookPickerSearchHint": "Find books to place…",
+  "@bookPickerSearchHint": {
+    "description": "Hint of the search field in the book picker."
+  },
+
+  "bookPickerClearThese": "Clear these {count}",
+  "@bookPickerClearThese": {
+    "description": "Button that unticks every visible book; `count` is how many.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "bookPickerSelectThese": "Select these {count}",
+  "@bookPickerSelectThese": {
+    "description": "Button that ticks every visible book; `count` is how many.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "bookPickerSelected": "{count} selected",
+  "@bookPickerSelected": {
+    "description": "Count of ticked books in the book picker.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "bookPickerNone": "No books.",
+  "@bookPickerNone": {
+    "description": "Empty state of the book picker."
+  },
+
+  "bookPickerAlreadyHere": "already in this room",
+  "@bookPickerAlreadyHere": {
+    "description": "Part of a book's subtitle in the book picker."
+  },
+
+  "bookPickerPages": "{count, plural, =1{1 page} other{{count} pages}}",
+  "@bookPickerPages": {
+    "description": "Part of a book's subtitle in the book picker.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "bookPickerConfirmCount": "{label} {count}",
+  "@bookPickerConfirmCount": {
+    "description": "Confirm button of the book picker once books are ticked; `label` is the button's normal label such as \"Add\".",
+    "placeholders": {
+      "label": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+
+  "findCopyNoneBook": "This book isn't placed in any room yet.",
+  "@findCopyNoneBook": {
+    "description": "Snackbar when a book has no copy placed in a room."
+  },
+
+  "findCopyNoneCopy": "That copy isn't placed in a room yet.",
+  "@findCopyNoneCopy": {
+    "description": "Snackbar when a copy is not placed in a room."
+  },
+
+  "findCopyPlacedTitle": "{count, plural, other{You have {count} copies placed}}",
+  "@findCopyPlacedTitle": {
+    "description": "Title of the dialog that asks which placed copy to show.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "placementOpenTooltip": "Open book",
+  "@placementOpenTooltip": {
+    "description": "Tooltip of a button in the selected-book bar of the room editor."
+  },
+
+  "placementRotateTooltip": "Rotate 90°",
+  "@placementRotateTooltip": {
+    "description": "Tooltip of a button in the selected-book bar of the room editor."
+  },
+
+  "placementResizeTooltip": "Resize",
+  "@placementResizeTooltip": {
+    "description": "Tooltip of a button in the selected-book bar of the room editor."
+  },
+
+  "placementRemoveTooltip": "Remove",
+  "@placementRemoveTooltip": {
+    "description": "Tooltip of a button in the selected-book bar of the room editor."
+  },
+
+  "placementDoneTooltip": "Done",
+  "@placementDoneTooltip": {
+    "description": "Tooltip of the button that closes the selected-book bar."
+  },
+
+  "backdropPickFailed": "Couldn't get a photo: {error}",
+  "@backdropPickFailed": {
+    "description": "Snackbar when picking the room photo failed; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "backdropSaveFailed": "Couldn't save the photo: {error}",
+  "@backdropSaveFailed": {
+    "description": "Snackbar when saving the room photo failed; `error` is the technical detail.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "backdropCalibrateTitle": "Calibrate the photo",
+  "@backdropCalibrateTitle": {
+    "description": "Title of the room photo calibration dialog."
+  },
+
+  "backdropCalibrateBody": "Pick something in the photo you can measure — a door, a shelf, the whole wall — then say how wide it is in the picture and how wide it really is.\n\nThe photo is {width} × {height} pixels.",
+  "@backdropCalibrateBody": {
+    "description": "Explanation in the calibration dialog; width and height are the photo's size in pixels.",
+    "placeholders": {
+      "width": {"type": "int"},
+      "height": {"type": "int"}
+    }
+  },
+
+  "backdropPixelsLabel": "That length, in photo pixels",
+  "@backdropPixelsLabel": {
+    "description": "Label of a field in the calibration dialog."
+  },
+
+  "backdropMetresLabel": "What it really is, in metres",
+  "@backdropMetresLabel": {
+    "description": "Label of a field in the calibration dialog."
+  },
+
+  "backdropApply": "Apply",
+  "@backdropApply": {
+    "description": "Confirm button of the calibration dialog."
+  },
+
+  "backdropSettingsTitle": "Room photo",
+  "@backdropSettingsTitle": {
+    "description": "Title of the sheet that sets how strongly the room photo shows."
+  },
+
+  "backdropSettingsNote": "How strongly the photo shows through.",
+  "@backdropSettingsNote": {
+    "description": "Explanation above the photo strength slider."
+  },
+
+  "backdropRemove": "Remove photo",
+  "@backdropRemove": {
+    "description": "Button that removes the room photo."
+  },
+
+  "shelfScanTitle": "Scan a shelf label",
+  "@shelfScanTitle": {
+    "description": "Title of the page that scans a printed shelf label, and of the list entry that opens it."
+  },
+
+  "shelfScanNotLabel": "That isn't a Vellum shelf label.",
+  "@shelfScanNotLabel": {
+    "description": "Message when the scanned code is not a shelf label."
+  },
+
+  "shelfScanGone": "That shelf no longer exists — the label outlived it.",
+  "@shelfScanGone": {
+    "description": "Message when the scanned label points to a shelf that was deleted."
+  },
+
+  "shelfScanLinkLabel": "Shelf link",
+  "@shelfScanLinkLabel": {
+    "description": "Label of the field where a shelf link can be typed."
+  },
+
+  "shelfScanHelperCamera": "Or type the link, if the code won’t scan",
+  "@shelfScanHelperCamera": {
+    "description": "Helper text under the shelf link field when the camera is shown."
+  },
+
+  "shelfScanHelperManual": "Type or paste the link printed under a label",
+  "@shelfScanHelperManual": {
+    "description": "Helper text under the shelf link field when there is no camera."
+  },
+
+  "publishRoomFooter": "Books collected under the “{tag}” tag.",
+  "@publishRoomFooter": {
+    "description": "Sentence appended to the result of publishing a room; it starts with a space.",
+    "placeholders": {
+      "tag": {"type": "String"}
+    }
+  },
+
+  "publishRoomNotConnected": "Not connected to a server.",
+  "@publishRoomNotConnected": {
+    "description": "Result of publishing or fetching a room without a server connection."
+  },
+
+  "publishRoomPublished": "Published “{room}” (revision {revision}).",
+  "@publishRoomPublished": {
+    "description": "Result of publishing a room.",
+    "placeholders": {
+      "room": {"type": "String"},
+      "revision": {"type": "int"}
+    }
+  },
+
+  "publishRoomUnpublished": "Left unpublished.",
+  "@publishRoomUnpublished": {
+    "description": "Result when the user cancelled publishing after a conflict."
+  },
+
+  "publishRoomReplaced": "Replaced the published room with this one (revision {revision}).",
+  "@publishRoomReplaced": {
+    "description": "Result of replacing the published room after a conflict.",
+    "placeholders": {
+      "revision": {"type": "int"}
+    }
+  },
+
+  "publishRoomNoDocument": "That room has no document.",
+  "@publishRoomNoDocument": {
+    "description": "Result when the server has no document for the room."
+  },
+
+  "publishRoomUpdated": "Updated “{room}” from the server.",
+  "@publishRoomUpdated": {
+    "description": "Result of updating a room from the server.",
+    "placeholders": {
+      "room": {"type": "String"}
+    }
+  },
+
+  "publishRoomUpdatedSkipped": "{skipped, plural, =1{Updated “{room}” — 1 book isn't on this device yet; sync and fetch again.} other{Updated “{room}” — {skipped} books aren't on this device yet; sync and fetch again.}}",
+  "@publishRoomUpdatedSkipped": {
+    "description": "Result of updating a room when some books are not on this device.",
+    "placeholders": {
+      "skipped": {"type": "int"},
+      "room": {"type": "String"}
+    }
+  },
+
+  "publishRoomConflictTitle": "This room changed elsewhere",
+  "@publishRoomConflictTitle": {
+    "description": "Title of the dialog shown when the room was published from another device."
+  },
+
+  "publishRoomConflictBody": "“{room}” was published from another device since you last fetched it.\n\nA room is one arrangement — there is no sensible way to merge two, so one of them has to win.",
+  "@publishRoomConflictBody": {
+    "description": "Body of the conflict dialog.",
+    "placeholders": {
+      "room": {"type": "String"}
+    }
+  },
+
+  "publishRoomTakeTheirs": "Take theirs",
+  "@publishRoomTakeTheirs": {
+    "description": "Button that keeps the server's version of the room."
+  },
+
+  "publishRoomReplaceMine": "Replace with mine",
+  "@publishRoomReplaceMine": {
+    "description": "Button that overwrites the server's version of the room."
+  },
+
+  "roomDocNotARoom": "That is not a Vellum room document.",
+  "@roomDocNotARoom": {
+    "description": "Error when a published document is not a room."
+  },
+
+  "roomDocNewer": "This room was published by a newer version of Vellum (format v{version}). Update the app to open it.",
+  "@roomDocNewer": {
+    "description": "Error when a room was published in a newer format.",
+    "placeholders": {
+      "version": {"type": "int"}
+    }
+  },
+
+  "roomDocNoRoom": "That room document is missing its room.",
+  "@roomDocNoRoom": {
+    "description": "Error when a published room document has no room."
+  },
+
+  "roomDocNoId": "That room document has no id.",
+  "@roomDocNoId": {
+    "description": "Error when a published room document has no id."
+  },
+
+  "roomDocEmpty": "The room is empty.",
+  "@roomDocEmpty": {
+    "description": "Error when the server has no document for a shared room."
+  },
+
+  "physicalLibsRenameTitle": "Rename library",
+  "@physicalLibsRenameTitle": {
+    "description": "Title of the dialog that renames a physical library."
+  },
+
+  "physicalLibsDeleteTitle": "Delete “{name}”?",
+  "@physicalLibsDeleteTitle": {
+    "description": "Title of the confirmation dialog for deleting a physical library.",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "physicalLibsDeleteBody": "This removes the room and everything arranged in it. The books themselves stay in your library.",
+  "@physicalLibsDeleteBody": {
+    "description": "Body of the confirmation dialog for deleting a physical library."
+  },
+
+  "physicalLibsPublishTitle": "Publish “{name}”?",
+  "@physicalLibsPublishTitle": {
+    "description": "Title of the dialog that publishes a room to the server.",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "physicalLibsPublishBody": "Your other devices — and anyone you share the room with — will see this arrangement. The room itself carries only shelf and book positions, never titles or covers.",
+  "@physicalLibsPublishBody": {
+    "description": "Body of the publish dialog."
+  },
+
+  "physicalLibsCollectTitle": "Also collect its books under a tag",
+  "@physicalLibsCollectTitle": {
+    "description": "Checkbox in the publish dialog."
+  },
+
+  "physicalLibsCollectNote": "Makes a “{tag}” tag you can share, so viewers see titles instead of blank spines",
+  "@physicalLibsCollectNote": {
+    "description": "Subtitle of the collect-books checkbox; `tag` is the tag's name, which stays English (\"Room: \" and the room's name).",
+    "placeholders": {
+      "tag": {"type": "String"}
+    }
+  },
+
+  "physicalLibsPublish": "Publish",
+  "@physicalLibsPublish": {
+    "description": "Confirm button of the publish dialog."
+  },
+
+  "physicalLibsScanTitle": "Scan a shelf label",
+  "@physicalLibsScanTitle": {
+    "description": "List entry that opens the shelf label scanner."
+  },
+
+  "physicalLibsScanNote": "Opens the room that shelf is in",
+  "@physicalLibsScanNote": {
+    "description": "Subtitle of the scan-a-shelf-label list entry."
+  },
+
+  "physicalLibsEmptyTitle": "No physical libraries yet",
+  "@physicalLibsEmptyTitle": {
+    "description": "Empty state heading of the physical libraries tab."
+  },
+
+  "physicalLibsEmptyBody": "Create a room, add shelves, and arrange your books.",
+  "@physicalLibsEmptyBody": {
+    "description": "Empty state explanation of the physical libraries tab."
+  },
+
+  "physicalLibsCreateRoom": "Create a room",
+  "@physicalLibsCreateRoom": {
+    "description": "Button on the empty physical libraries tab."
+  },
+
+  "physicalLibsNotPublished": "Not published",
+  "@physicalLibsNotPublished": {
+    "description": "Subtitle of a room that was never published."
+  },
+
+  "physicalLibsChanged": "Changed since publishing",
+  "@physicalLibsChanged": {
+    "description": "Subtitle of a room edited since it was last published."
+  },
+
+  "physicalLibsPublishedRevision": "Published · revision {revision}",
+  "@physicalLibsPublishedRevision": {
+    "description": "Subtitle of a published room.",
+    "placeholders": {
+      "revision": {"type": "int"}
+    }
+  },
+
+  "physicalLibsMenuRename": "Rename",
+  "@physicalLibsMenuRename": {
+    "description": "Menu entry of a room."
+  },
+
+  "physicalLibsMenuPublish": "Publish to server",
+  "@physicalLibsMenuPublish": {
+    "description": "Menu entry of a room."
+  },
+
+  "physicalLibsMenuFetch": "Update from server",
+  "@physicalLibsMenuFetch": {
+    "description": "Menu entry of a room."
+  },
+
+  "physicalLibsElsewhereTitle": "Your rooms, published elsewhere",
+  "@physicalLibsElsewhereTitle": {
+    "description": "Heading of the list of the user's own rooms that exist only on the server."
+  },
+
+  "physicalLibsElsewhereNote": "Published from another device. Bring one here to arrange it on this one too.",
+  "@physicalLibsElsewhereNote": {
+    "description": "Explanation under the elsewhere heading."
+  },
+
+  "physicalLibsRevision": "Revision {revision}",
+  "@physicalLibsRevision": {
+    "description": "Subtitle of a room in the elsewhere list.",
+    "placeholders": {
+      "revision": {"type": "int"}
+    }
+  },
+
+  "physicalLibsBringHere": "Bring here",
+  "@physicalLibsBringHere": {
+    "description": "Button that downloads a room published from another device."
+  },
+
+  "physicalLibsNewTitle": "New library",
+  "@physicalLibsNewTitle": {
+    "description": "Title of the dialog that creates a physical library."
+  },
+
+  "physicalLibsNameHint": "e.g. Living room",
+  "@physicalLibsNameHint": {
+    "description": "Hint of the room name field."
+  },
+
+  "stocktakeTitle": "Stocktake · {scope}",
+  "@stocktakeTitle": {
+    "description": "Title of the stocktake page; `scope` is the room or shelf name.",
+    "placeholders": {
+      "scope": {"type": "String"}
+    }
+  },
+
+  "stocktakeRemoveTitle": "Remove “{title}” from the map?",
+  "@stocktakeRemoveTitle": {
+    "description": "Title of the confirmation dialog for forgetting a book's position.",
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+
+  "stocktakeRemoveBody": "The book stays in your library — only its position in this room is forgotten.",
+  "@stocktakeRemoveBody": {
+    "description": "Body of the confirmation dialog for forgetting a book's position."
+  },
+
+  "stocktakeRemove": "Remove",
+  "@stocktakeRemove": {
+    "description": "Confirm button of the dialog that forgets a book's position."
+  },
+
+  "stocktakeFinish": "Finish",
+  "@stocktakeFinish": {
+    "description": "Button that ends the stocktake and shows the result."
+  },
+
+  "stocktakeBackToList": "Back to list",
+  "@stocktakeBackToList": {
+    "description": "Button that returns from the result to the checklist."
+  },
+
+  "stocktakeNothingHere": "Nothing is placed here yet, so there is nothing to count.",
+  "@stocktakeNothingHere": {
+    "description": "Empty state of the stocktake checklist."
+  },
+
+  "stocktakeTickPrompt": "Tick every book you can actually see. {found} of {total} so far.",
+  "@stocktakeTickPrompt": {
+    "description": "Instruction above the stocktake checklist.",
+    "placeholders": {
+      "found": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+
+  "stocktakeAllMatch": "Everything matches",
+  "@stocktakeAllMatch": {
+    "description": "Heading of a stocktake result with no differences."
+  },
+
+  "stocktakeAllMatchBody": "{count, plural, =1{1 book found, exactly where the map says.} other{{count} books found, exactly where the map says.}}",
+  "@stocktakeAllMatchBody": {
+    "description": "Detail of a stocktake result with no differences.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "stocktakeMissing": "Missing ({count})",
+  "@stocktakeMissing": {
+    "description": "Heading of the books placed here that were not found.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "stocktakeMissingNote": "Placed here, but you didn’t find them.",
+  "@stocktakeMissingNote": {
+    "description": "Explanation under the missing heading."
+  },
+
+  "stocktakeRemoveFromMap": "Remove from map",
+  "@stocktakeRemoveFromMap": {
+    "description": "Button that forgets the position of a missing book."
+  },
+
+  "stocktakeUnexpected": "Not on the map ({count})",
+  "@stocktakeUnexpected": {
+    "description": "Heading of the books found that the map places elsewhere.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "stocktakeUnexpectedNote": "Found here, but the map puts them somewhere else.",
+  "@stocktakeUnexpectedNote": {
+    "description": "Explanation under the not-on-the-map heading."
+  },
+
+  "stocktakeUnplaced": "Not placed in any room",
+  "@stocktakeUnplaced": {
+    "description": "Subtitle of a found book that is not placed in any room."
+  },
+
+  "stocktakePlacedIn": "Placed in {place}",
+  "@stocktakePlacedIn": {
+    "description": "Subtitle of a found book that the map places elsewhere; `place` names the room and shelf.",
+    "placeholders": {
+      "place": {"type": "String"}
+    }
+  },
+
+  "stocktakeConfirmed": "Confirmed ({count})",
+  "@stocktakeConfirmed": {
+    "description": "Heading of the books found where the map says.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "sharedRoomViewOnly": "Shared with you · view only",
+  "@sharedRoomViewOnly": {
+    "description": "Line in the app bar of a room someone shared with the user."
+  },
+
+  "sharedRoomNeedsConnection": "This room is kept on the server, so it needs a connection to open.",
+  "@sharedRoomNeedsConnection": {
+    "description": "Error text on the shared room page."
+  },
+
+  "sharedRoomRetry": "Try again",
+  "@sharedRoomRetry": {
+    "description": "Button that retries opening a shared room."
+  },
+
+  "sharedRoomUnseenBook": "A book you cannot see",
+  "@sharedRoomUnseenBook": {
+    "description": "Tooltip of a book in a shared room that is not shared with the user."
+  },
+
+  "sharedRoomListTitle": "Shared with you",
+  "@sharedRoomListTitle": {
+    "description": "Heading of the list of rooms shared with the user."
+  },
+
+  "sharedRoomListNote": "View only — kept on the server",
+  "@sharedRoomListNote": {
+    "description": "Subtitle of a shared room in the list."
+  },
+
+  "serverSessionExpired": "Session expired — please log in again.",
+  "@serverSessionExpired": {
+    "description": "Error on the server page when the session is no longer valid."
+  },
+
+  "serverSyncRunning": "A sync is already running — try again in a moment.",
+  "@serverSyncRunning": {
+    "description": "Error on the server page when a sync is already in progress."
+  },
+
+  "serverCertUntrusted": "The server's certificate isn't trusted or has changed — import the current certificate below.",
+  "@serverCertUntrusted": {
+    "description": "Error on the server page when the TLS handshake failed."
+  },
+
+  "serverUnreachable": "Could not reach the server.\n{error}",
+  "@serverUnreachable": {
+    "description": "Error on the server page; `error` is the technical detail on the second line.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "serverUpToDate": "Already up to date.",
+  "@serverUpToDate": {
+    "description": "Result of a sync that changed nothing."
+  },
+
+  "serverPulledBooks": "{count, plural, =1{Pulled 1 book.} other{Pulled {count} books.}}",
+  "@serverPulledBooks": {
+    "description": "Result of pulling the library.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "serverPulledBooksIssues": "{count, plural, =1{Pulled 1 book, {issues}} other{Pulled {count} books, {issues}}}",
+  "@serverPulledBooksIssues": {
+    "description": "Result of pulling the library with problems; `issues` is a phrase such as \"2 issues\".",
+    "placeholders": {
+      "count": {"type": "int"},
+      "issues": {"type": "String"}
+    }
+  },
+
+  "serverPushedBooks": "{count, plural, =1{Pushed 1 book.} other{Pushed {count} books.}}",
+  "@serverPushedBooks": {
+    "description": "Result of pushing the library.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "serverPushedBooksIssues": "{count, plural, =1{Pushed 1 book, {issues}} other{Pushed {count} books, {issues}}}",
+  "@serverPushedBooksIssues": {
+    "description": "Result of pushing the library with problems; `issues` is a phrase such as \"2 issues\".",
+    "placeholders": {
+      "count": {"type": "int"},
+      "issues": {"type": "String"}
+    }
+  },
+
+  "serverSyncResult": "Pulled {pulled}, pushed {pushed}.",
+  "@serverSyncResult": {
+    "description": "Result of a full sync.",
+    "placeholders": {
+      "pulled": {"type": "int"},
+      "pushed": {"type": "int"}
+    }
+  },
+
+  "serverSyncResultIssues": "Pulled {pulled}, pushed {pushed}, {issues}.",
+  "@serverSyncResultIssues": {
+    "description": "Result of a full sync with problems; `issues` is a phrase such as \"2 issues\".",
+    "placeholders": {
+      "pulled": {"type": "int"},
+      "pushed": {"type": "int"},
+      "issues": {"type": "String"}
+    }
+  },
+
+  "serverDetails": "Details",
+  "@serverDetails": {
+    "description": "Snackbar action that lists the sync problems."
+  },
+
+  "serverIssuesTitle": "Sync issues ({count})",
+  "@serverIssuesTitle": {
+    "description": "Title of the dialog listing sync problems.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "serverClose": "Close",
+  "@serverClose": {
+    "description": "Button that closes the sync issues dialog."
+  },
+
+  "serverResetTitle": "Reset your password",
+  "@serverResetTitle": {
+    "description": "Title of the forgot-password dialog."
+  },
+
+  "serverResetBody": "The server will email a link that lets you choose a new password. Open it on this device or any browser.",
+  "@serverResetBody": {
+    "description": "Body of the forgot-password dialog."
+  },
+
+  "serverEmail": "Email",
+  "@serverEmail": {
+    "description": "Label of the email field."
+  },
+
+  "serverSendLink": "Send the link",
+  "@serverSendLink": {
+    "description": "Confirm button of the forgot-password dialog."
+  },
+
+  "serverResetSent": "If that address has an account, a link is on its way.",
+  "@serverResetSent": {
+    "description": "Snackbar after a password reset was requested. Deliberately does not say whether the address is known."
+  },
+
+  "serverWhichNameTitle": "Which name is yours?",
+  "@serverWhichNameTitle": {
+    "description": "Title of the dialog shown when the device and the account have different names."
+  },
+
+  "serverWhichNameBody": "This device calls you “{local}”. The account you just signed into is “{remote}”.\n\nWhichever you keep will be used on every device signed into this account.",
+  "@serverWhichNameBody": {
+    "description": "Body of the name conflict dialog.",
+    "placeholders": {
+      "local": {"type": "String"},
+      "remote": {"type": "String"}
+    }
+  },
+
+  "serverUseName": "Use “{name}”",
+  "@serverUseName": {
+    "description": "Button that adopts the account's name.",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "serverKeepName": "Keep “{name}”",
+  "@serverKeepName": {
+    "description": "Button that keeps this device's name.",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "serverCertNone": "No certificate trusted — import it for a self-signed server.",
+  "@serverCertNone": {
+    "description": "Line under the server address when no certificate is trusted."
+  },
+
+  "serverCertTrusted": "Trusted certificate {fingerprint}",
+  "@serverCertTrusted": {
+    "description": "Line under the server address; `fingerprint` is a shortened fingerprint.",
+    "placeholders": {
+      "fingerprint": {"type": "String"}
+    }
+  },
+
+  "serverCertImport": "Import",
+  "@serverCertImport": {
+    "description": "Button that imports a server certificate."
+  },
+
+  "serverCertChange": "Change",
+  "@serverCertChange": {
+    "description": "Button that replaces the trusted server certificate."
+  },
+
+  "serverCertTitle": "Trust server certificate",
+  "@serverCertTitle": {
+    "description": "Title of the dialog that imports a certificate."
+  },
+
+  "serverCertBody": "Paste the server's certificate, or choose its cert.pem file. Check the fingerprint matches the one the server printed on startup before trusting it.",
+  "@serverCertBody": {
+    "description": "Body of the certificate dialog."
+  },
+
+  "serverCertGroup": "Certificate",
+  "@serverCertGroup": {
+    "description": "Name of the file type group in the certificate file picker."
+  },
+
+  "serverCertChoose": "Choose file…",
+  "@serverCertChoose": {
+    "description": "Button that picks a certificate file."
+  },
+
+  "serverCertRemove": "Remove",
+  "@serverCertRemove": {
+    "description": "Button that removes the trusted certificate."
+  },
+
+  "serverCertBad": "That doesn't look like a PEM certificate.",
+  "@serverCertBad": {
+    "description": "Error in the certificate dialog."
+  },
+
+  "serverCertTrust": "Trust",
+  "@serverCertTrust": {
+    "description": "Confirm button of the certificate dialog."
+  },
+
+  "serverTitle": "Library server",
+  "@serverTitle": {
+    "description": "Title of the server page."
+  },
+
+  "serverInsecureTitle": "Secure storage unavailable",
+  "@serverInsecureTitle": {
+    "description": "Heading of the notice shown when the session token cannot be kept in the OS keyring."
+  },
+
+  "serverInsecureBody": "This device has no OS keyring, so the session token is stored unencrypted on disk. Anyone with access to this account can read it. Disconnect when you are done, or install a keyring (e.g. gnome-keyring) for encrypted storage.",
+  "@serverInsecureBody": {
+    "description": "Body of the insecure token notice."
+  },
+
+  "serverGotIt": "Got it",
+  "@serverGotIt": {
+    "description": "Button that dismisses the insecure token notice."
+  },
+
+  "serverNewer": "This server is newer than the app — update Vellum to sync everything.",
+  "@serverNewer": {
+    "description": "Notice shown when the server speaks a newer sync protocol."
+  },
+
+  "serverVersionLine": "{url} · server v{version}",
+  "@serverVersionLine": {
+    "description": "Subtitle of the connected server card.",
+    "placeholders": {
+      "url": {"type": "String"},
+      "version": {"type": "String"}
+    }
+  },
+
+  "serverMaster": "Master",
+  "@serverMaster": {
+    "description": "Chip on the server card of the master account."
+  },
+
+  "serverSyncHeading": "Sync",
+  "@serverSyncHeading": {
+    "description": "Section heading on the server page."
+  },
+
+  "serverSyncBlurb": "Sync pulls the books shared with you into your local shelf, then pushes your local changes up to the server. It also runs automatically when the app starts.",
+  "@serverSyncBlurb": {
+    "description": "Explanation under the Sync heading."
+  },
+
+  "serverSyncing": "Syncing…",
+  "@serverSyncing": {
+    "description": "Label of the sync button while a sync runs."
+  },
+
+  "serverSyncNow": "Sync now",
+  "@serverSyncNow": {
+    "description": "Label of the sync button."
+  },
+
+  "serverWhatSyncs": "What syncs",
+  "@serverWhatSyncs": {
+    "description": "Button that opens the sync scope page."
+  },
+
+  "serverNotSyncing": "Not syncing: {list}",
+  "@serverNotSyncing": {
+    "description": "Line under the sync button; `list` is a comma-separated list of resources switched off.",
+    "placeholders": {
+      "list": {"type": "String"}
+    }
+  },
+
+  "serverAdvanced": "Advanced",
+  "@serverAdvanced": {
+    "description": "Heading of the collapsed advanced section."
+  },
+
+  "serverAdvancedNote": "Run only one direction of the sync",
+  "@serverAdvancedNote": {
+    "description": "Subtitle of the advanced section."
+  },
+
+  "serverPullLibrary": "Pull library",
+  "@serverPullLibrary": {
+    "description": "Button that only pulls."
+  },
+
+  "serverPushBooks": "Push my books",
+  "@serverPushBooks": {
+    "description": "Button that only pushes."
+  },
+
+  "serverSharingHeading": "Sharing",
+  "@serverSharingHeading": {
+    "description": "Section heading on the server page."
+  },
+
+  "serverSharingBlurb": "Create book groups, share the library or a book with other accounts, and mint public links.",
+  "@serverSharingBlurb": {
+    "description": "Explanation under the Sharing heading."
+  },
+
+  "serverManageSharing": "Manage sharing",
+  "@serverManageSharing": {
+    "description": "Button that opens the sharing page."
+  },
+
+  "serverDisconnect": "Disconnect",
+  "@serverDisconnect": {
+    "description": "Button that signs out of the server."
+  },
+
+  "serverSignInRegister": "Create the master account",
+  "@serverSignInRegister": {
+    "description": "Heading of the registration form."
+  },
+
+  "serverSignInTitle": "Sign in to a server",
+  "@serverSignInTitle": {
+    "description": "Heading of the sign-in form."
+  },
+
+  "serverRegisterBlurb": "The first account on a fresh server becomes its master (owner).",
+  "@serverRegisterBlurb": {
+    "description": "Explanation under the registration heading."
+  },
+
+  "serverSignInBlurb": "Connect to a self-hosted Vellum server to access a shared library.",
+  "@serverSignInBlurb": {
+    "description": "Explanation under the sign-in heading."
+  },
+
+  "serverAddressLabel": "Server address",
+  "@serverAddressLabel": {
+    "description": "Label of the server address field."
+  },
+
+  "serverHttpBlocked": "Android blocks unencrypted connections to a remote server. Enable TLS on the server (VELLUM_TLS=1) and connect over https.",
+  "@serverHttpBlocked": {
+    "description": "Warning under the server address on Android for a plain http address."
+  },
+
+  "serverHttpCleartext": "Unencrypted connection — your password and books are sent in cleartext.",
+  "@serverHttpCleartext": {
+    "description": "Warning under the server address for a plain http address."
+  },
+
+  "serverDisplayName": "Display name",
+  "@serverDisplayName": {
+    "description": "Label of the display name field of the registration form."
+  },
+
+  "serverPassword": "Password",
+  "@serverPassword": {
+    "description": "Label of the password field."
+  },
+
+  "serverCreateAccount": "Create account",
+  "@serverCreateAccount": {
+    "description": "Button that registers the master account."
+  },
+
+  "serverLogIn": "Log in",
+  "@serverLogIn": {
+    "description": "Button that signs in."
+  },
+
+  "serverForgot": "Forgot your password?",
+  "@serverForgot": {
+    "description": "Link under the sign-in form."
+  },
+
+  "serverHaveAccount": "Have an account? Log in",
+  "@serverHaveAccount": {
+    "description": "Link that switches from registration to sign-in."
+  },
+
+  "serverNewServer": "Setting up a new server? Create the master account",
+  "@serverNewServer": {
+    "description": "Link that switches from sign-in to registration."
+  },
+
+  "sharingTitle": "Sharing",
+  "@sharingTitle": {
+    "description": "Title of the sharing page."
+  },
+
+  "sharingGroups": "Groups",
+  "@sharingGroups": {
+    "description": "Section heading of the sharing page."
+  },
+
+  "sharingNewGroupTooltip": "New group",
+  "@sharingNewGroupTooltip": {
+    "description": "Tooltip of the add button of the groups section."
+  },
+
+  "sharingNoGroups": "No groups yet.",
+  "@sharingNoGroups": {
+    "description": "Empty state of the groups section."
+  },
+
+  "sharingAddBookTooltip": "Add a book",
+  "@sharingAddBookTooltip": {
+    "description": "Tooltip of the button that adds a book to a group."
+  },
+
+  "sharingNewGroup": "New group",
+  "@sharingNewGroup": {
+    "description": "Title of the dialog that creates a group."
+  },
+
+  "sharingGroupName": "Group name",
+  "@sharingGroupName": {
+    "description": "Label of the group name field."
+  },
+
+  "sharingAddBookTo": "Add a book to {group}",
+  "@sharingAddBookTo": {
+    "description": "Title of the dialog that picks a book for a group.",
+    "placeholders": {
+      "group": {"type": "String"}
+    }
+  },
+
+  "sharingShares": "Shared with people",
+  "@sharingShares": {
+    "description": "Section heading of the sharing page."
+  },
+
+  "sharingNewShareTooltip": "New share",
+  "@sharingNewShareTooltip": {
+    "description": "Tooltip of the add button of the shares section."
+  },
+
+  "sharingNoShares": "Nothing shared yet.",
+  "@sharingNoShares": {
+    "description": "Empty state of the shares section."
+  },
+
+  "sharingRevoke": "Revoke",
+  "@sharingRevoke": {
+    "description": "Tooltip of the button that revokes a share or a link."
+  },
+
+  "sharingPermViewer": "viewer",
+  "@sharingPermViewer": {
+    "description": "Permission chip of a share; lower case."
+  },
+
+  "sharingPermEditor": "editor",
+  "@sharingPermEditor": {
+    "description": "Permission chip of a share; lower case."
+  },
+
+  "sharingGrantee": "→ {email}",
+  "@sharingGrantee": {
+    "description": "Subtitle of a share; `email` is the recipient.",
+    "placeholders": {
+      "email": {"type": "String"}
+    }
+  },
+
+  "sharingLinks": "Public links",
+  "@sharingLinks": {
+    "description": "Section heading of the sharing page."
+  },
+
+  "sharingNewLinkTooltip": "New link",
+  "@sharingNewLinkTooltip": {
+    "description": "Tooltip of the add button of the links section."
+  },
+
+  "sharingNoLinks": "No public links.",
+  "@sharingNoLinks": {
+    "description": "Empty state of the links section."
+  },
+
+  "sharingRevoked": "Revoked",
+  "@sharingRevoked": {
+    "description": "Subtitle of a revoked public link."
+  },
+
+  "sharingNeverExpires": "Never expires",
+  "@sharingNeverExpires": {
+    "description": "Subtitle of a public link without an expiry."
+  },
+
+  "sharingExpires": "Expires {when}",
+  "@sharingExpires": {
+    "description": "Subtitle of a public link with an expiry; `when` is the date as the server sent it.",
+    "placeholders": {
+      "when": {"type": "String"}
+    }
+  },
+
+  "sharingLinkFor": "Public link for which book?",
+  "@sharingLinkFor": {
+    "description": "Title of the dialog that picks the book for a public link."
+  },
+
+  "sharingLinkTitle": "Public link",
+  "@sharingLinkTitle": {
+    "description": "Title of the dialog that shows a new public link."
+  },
+
+  "sharingLinkBody": "Anyone with this link can read the book. It is shown once — copy it now.",
+  "@sharingLinkBody": {
+    "description": "Body of the dialog that shows a new public link."
+  },
+
+  "sharingLinkCopied": "Link copied.",
+  "@sharingLinkCopied": {
+    "description": "Snackbar after the public link was copied."
+  },
+
+  "sharingCopy": "Copy",
+  "@sharingCopy": {
+    "description": "Button that copies the public link."
+  },
+
+  "sharingClose": "Close",
+  "@sharingClose": {
+    "description": "Button that closes the public link dialog."
+  },
+
+  "sharingNoBooks": "No books on the server yet.",
+  "@sharingNoBooks": {
+    "description": "Shown in the book picker when the server has no books."
+  },
+
+  "sharingRetry": "Retry",
+  "@sharingRetry": {
+    "description": "Button that reloads the sharing page after an error."
+  },
+
+  "sharingNewShare": "New share",
+  "@sharingNewShare": {
+    "description": "Title of the dialog that creates a share."
+  },
+
+  "sharingWhatToShare": "What to share",
+  "@sharingWhatToShare": {
+    "description": "Label of the scope picker."
+  },
+
+  "sharingScopeAll": "Entire library",
+  "@sharingScopeAll": {
+    "description": "Share scope choice."
+  },
+
+  "sharingScopeGroup": "A group",
+  "@sharingScopeGroup": {
+    "description": "Share scope choice."
+  },
+
+  "sharingScopeBook": "A single book",
+  "@sharingScopeBook": {
+    "description": "Share scope choice."
+  },
+
+  "sharingGroupLabel": "Group",
+  "@sharingGroupLabel": {
+    "description": "Label of the group picker."
+  },
+
+  "sharingBookLabel": "Book",
+  "@sharingBookLabel": {
+    "description": "Label of the book picker."
+  },
+
+  "sharingRecipient": "Recipient's email",
+  "@sharingRecipient": {
+    "description": "Label of the recipient email field."
+  },
+
+  "sharingPermission": "Permission",
+  "@sharingPermission": {
+    "description": "Label of the permission picker."
+  },
+
+  "sharingViewer": "Viewer (read)",
+  "@sharingViewer": {
+    "description": "Permission choice."
+  },
+
+  "sharingEditor": "Editor (read + edit)",
+  "@sharingEditor": {
+    "description": "Permission choice."
+  },
+
+  "sharingShare": "Share",
+  "@sharingShare": {
+    "description": "Confirm button of the new share dialog."
+  },
+
+  "syncScopeTitle": "What syncs",
+  "@syncScopeTitle": {
+    "description": "Title of the sync scope page."
+  },
+
+  "syncScopeIntro": "Anything switched off is left alone in both directions — not sent to the server, and not fetched from it.",
+  "@syncScopeIntro": {
+    "description": "Introduction on the sync scope page."
+  },
+
+  "syncScopeBooksTitle": "Books, covers and files",
+  "@syncScopeBooksTitle": {
+    "description": "Switch title on the sync scope page."
+  },
+
+  "syncScopeBooksNote": "The catalogue itself, and the shelves it sits on",
+  "@syncScopeBooksNote": {
+    "description": "Switch subtitle on the sync scope page."
+  },
+
+  "syncScopeCopiesTitle": "Physical copies",
+  "@syncScopeCopiesTitle": {
+    "description": "Switch title on the sync scope page."
+  },
+
+  "syncScopeCopiesNote": "Which books you own as objects, and where they live",
+  "@syncScopeCopiesNote": {
+    "description": "Switch subtitle on the sync scope page."
+  },
+
+  "syncScopeLoansTitle": "Loans",
+  "@syncScopeLoansTitle": {
+    "description": "Switch title on the sync scope page."
+  },
+
+  "syncScopeLoansNote": "Who has what, and the history of who had it",
+  "@syncScopeLoansNote": {
+    "description": "Switch subtitle on the sync scope page."
+  },
+
+  "syncScopePhotosTitle": "Copy photos",
+  "@syncScopePhotosTitle": {
+    "description": "Switch title on the sync scope page."
+  },
+
+  "syncScopePhotosNote": "Pictures of your shelves — the heaviest thing here",
+  "@syncScopePhotosNote": {
+    "description": "Switch subtitle on the sync scope page."
+  },
+
+  "syncScopePersonal": "Personal — kept per account, so a shared library holds several people’s marks in the same book without anyone seeing the others’.",
+  "@syncScopePersonal": {
+    "description": "Heading text above the personal data switches."
+  },
+
+  "syncScopeAnnotationsTitle": "Highlights, notes and bookmarks",
+  "@syncScopeAnnotationsTitle": {
+    "description": "Switch title on the sync scope page."
+  },
+
+  "syncScopeAnnotationsNote": "Everything you mark in a book, and your private notes",
+  "@syncScopeAnnotationsNote": {
+    "description": "Switch subtitle on the sync scope page."
+  },
+
+  "syncScopeSessionsTitle": "Reading sittings",
+  "@syncScopeSessionsTitle": {
+    "description": "Switch title on the sync scope page."
+  },
+
+  "syncScopeSessionsNote": "When you read, and for how long",
+  "@syncScopeSessionsNote": {
+    "description": "Switch subtitle on the sync scope page."
+  },
+
+  "syncScopePositionTitle": "Reading position",
+  "@syncScopePositionTitle": {
+    "description": "Switch title on the sync scope page."
+  },
+
+  "syncScopePositionNote": "Where you stopped, per device. Has its own switch because it is the one thing here that is about a device rather than a library.",
+  "@syncScopePositionNote": {
+    "description": "Switch subtitle on the sync scope page."
+  },
+
+  "syncScopeFooter": "Switching something off offers to remove what you have already sent. Your books are the exception — deleting those from the server is done from the console, on purpose.",
+  "@syncScopeFooter": {
+    "description": "Note at the bottom of the sync scope page."
+  },
+
+  "syncScopeLabelBooks": "books",
+  "@syncScopeLabelBooks": {
+    "description": "Name of a synced resource used inside sentences; lower case."
+  },
+
+  "syncScopeLabelCopies": "physical copies",
+  "@syncScopeLabelCopies": {
+    "description": "Name of a synced resource used inside sentences; lower case."
+  },
+
+  "syncScopeLabelLoans": "loans",
+  "@syncScopeLabelLoans": {
+    "description": "Name of a synced resource used inside sentences; lower case."
+  },
+
+  "syncScopeLabelPhotos": "copy photos",
+  "@syncScopeLabelPhotos": {
+    "description": "Name of a synced resource used inside sentences; lower case."
+  },
+
+  "syncScopeLabelAnnotations": "highlights and notes",
+  "@syncScopeLabelAnnotations": {
+    "description": "Name of a synced resource used inside sentences; lower case."
+  },
+
+  "syncScopeLabelSessions": "reading sittings",
+  "@syncScopeLabelSessions": {
+    "description": "Name of a synced resource used inside sentences; lower case."
+  },
+
+  "syncScopeForgetTitle": "Also remove {label} from the server?",
+  "@syncScopeForgetTitle": {
+    "description": "Title of the dialog offered after switching a resource off; `label` names the resource.",
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+
+  "syncScopeForgetBody": "Switching this off stops {label} syncing from now on. What you have already sent stays on the server unless you remove it here.\n\nThis removes only yours — nothing belonging to anyone you share the library with — and it cannot be undone.",
+  "@syncScopeForgetBody": {
+    "description": "Body of the dialog offered after switching a resource off; `label` names the resource.",
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+
+  "syncScopeLeave": "Leave it there",
+  "@syncScopeLeave": {
+    "description": "Button that keeps the data on the server."
+  },
+
+  "syncScopeRemove": "Remove from server",
+  "@syncScopeRemove": {
+    "description": "Button that deletes the user's data from the server."
+  },
+
+  "syncScopeRemoved": "Removed {count} from the server.",
+  "@syncScopeRemoved": {
+    "description": "Snackbar after data was removed from the server; `count` is how many items.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "syncScopeRemoveFailed": "Could not remove {label}: {error}",
+  "@syncScopeRemoveFailed": {
+    "description": "Snackbar when removal failed; `label` names the resource and `error` is the technical detail.",
+    "placeholders": {
+      "label": {"type": "String"},
+      "error": {"type": "String"}
+    }
+  },
+
+  "writeAccessTitle": "Ask to edit “{title}”?",
+  "@writeAccessTitle": {
+    "description": "Title of the dialog that asks the owner for write access.",
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+
+  "writeAccessBody": "The owner is told, and can give you write access. Nothing changes until they do.",
+  "@writeAccessBody": {
+    "description": "Body of the write access dialog."
+  },
+
+  "writeAccessNoteLabel": "Note (optional)",
+  "@writeAccessNoteLabel": {
+    "description": "Label of the note field."
+  },
+
+  "writeAccessNoteHint": "e.g. I have a better scan of the cover",
+  "@writeAccessNoteHint": {
+    "description": "Hint of the note field."
+  },
+
+  "writeAccessAsk": "Ask",
+  "@writeAccessAsk": {
+    "description": "Confirm button of the write access dialog."
+  },
+
+  "writeAccessAsked": "Asked. The owner has been told.",
+  "@writeAccessAsked": {
+    "description": "Snackbar after write access was requested."
+  },
+
+  "writeAccessDidNotWork": "That did not work.",
+  "@writeAccessDidNotWork": {
+    "description": "Generic failure snackbar of the write access request."
+  },
+
+  "continueWidgetPage": "{percent}% · page {page}",
+  "@continueWidgetPage": {
+    "description": "Second line of the Android home-screen widget; percent is the reading progress and page the last page read.",
+    "placeholders": {
+      "percent": {"type": "int"},
+      "page": {"type": "int"}
+    }
+  },
+
+  "sharingGroupBooks": "{count, plural, =1{1 book} other{{count} books}}",
+  "@sharingGroupBooks": {
+    "description": "Subtitle of a group; how many books it holds.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/gen/app_localizations.dart';
+
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
 import '../widgets/page_insets.dart';
@@ -32,6 +34,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   List<AppNotification>? _items;
   String? _error;
   bool _unsupported = false;
+  bool _notConnected = false;
 
   @override
   void initState() {
@@ -42,7 +45,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _load() async {
     final client = widget.client ?? widget.connection.client;
     if (client == null) {
-      setState(() => _error = 'Not connected to a server.');
+      // A flag, not a message: this runs from `initState`, where there is no
+      // `L10n` to ask yet, and `_error` is shown as written.
+      setState(() => _notConnected = true);
       return;
     }
     try {
@@ -103,23 +108,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$e')));
+          .showSnackBar(SnackBar(content: Text('$e'))); // i18n-ignore: error detail
     }
     await _load();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     final items = _items;
     final unread = items?.where((n) => !n.isRead).length ?? 0;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(l10n.notificationsTitle),
         actions: [
           if (unread > 0)
             TextButton(
               onPressed: _markAllRead,
-              child: const Text('Mark all read'),
+              child: Text(l10n.notificationsMarkAllRead),
             ),
         ],
       ),
@@ -131,6 +137,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Widget _body(List<AppNotification>? items) {
+    final l10n = L10n.of(context);
+    if (_notConnected) return _centered(l10n.contentSearchNotConnected);
     if (_error != null) {
       return _centered(_error!);
     }
@@ -138,13 +146,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_unsupported) {
-      return _centered(
-        'This server is older than notifications. Everything else works; '
-        'update the server to be told when someone asks to borrow a book.',
-      );
+      return _centered(l10n.notificationsServerTooOld);
     }
     if (items.isEmpty) {
-      return _centered('Nothing has happened yet.');
+      return _centered(l10n.notificationsEmpty);
     }
     return ListView.separated(
       padding: pageInsets(context, EdgeInsets.zero),
@@ -168,7 +173,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           subtitle: Text(
             [
               if (n.body != null) n.body!,
-              if (n.createdAt != null) _ago(n.createdAt!),
+              if (n.createdAt != null) _ago(l10n, n.createdAt!),
             ].join('\n'),
           ),
           isThreeLine: n.body != null,
@@ -195,12 +200,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _ => Icons.notifications_none,
       };
 
-  static String _ago(DateTime when) {
+  static String _ago(L10n l10n, DateTime when) {
     final d = DateTime.now().difference(when);
-    if (d.inMinutes < 1) return 'just now';
-    if (d.inHours < 1) return '${d.inMinutes} min ago';
-    if (d.inDays < 1) return '${d.inHours}h ago';
-    if (d.inDays < 7) return '${d.inDays}d ago';
+    if (d.inMinutes < 1) return l10n.notificationsAgoJustNow;
+    if (d.inHours < 1) return l10n.notificationsAgoMinutes(d.inMinutes);
+    if (d.inDays < 1) return l10n.notificationsAgoHours(d.inHours);
+    if (d.inDays < 7) return l10n.notificationsAgoDays(d.inDays);
     return '${when.year}-${when.month.toString().padLeft(2, '0')}-'
         '${when.day.toString().padLeft(2, '0')}';
   }

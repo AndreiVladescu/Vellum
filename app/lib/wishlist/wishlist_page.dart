@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../add_book/isbn.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../book_detail/book_detail_page.dart';
 import '../data/catalogue_enrich.dart';
 import '../data/database.dart';
@@ -34,7 +35,7 @@ class WishlistPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Wishlist')),
+      appBar: AppBar(title: Text(L10n.of(context).wishlistTitle)),
       body: StreamBuilder<List<Book>>(
         stream: repository.wishlist.watchWishlist(),
         builder: (context, snapshot) {
@@ -59,7 +60,7 @@ class WishlistPage extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => promptAddToWishlist(context, repository),
         icon: const Icon(Icons.add),
-        label: const Text('Add a book you want'),
+        label: Text(L10n.of(context).wishlistAddFab),
       ),
     );
   }
@@ -83,12 +84,11 @@ class _EmptyWishlist extends StatelessWidget {
               color: theme.colorScheme.primary.withValues(alpha: 0.7),
             ),
             const SizedBox(height: 16),
-            Text('Nothing on your wishlist', style: theme.textTheme.titleMedium),
+            Text(L10n.of(context).wishlistEmptyTitle,
+                style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(
-              'Books you want but don’t own yet live here — add one by hand, '
-              'scan a barcode in a shop, or fill a gap in a series you '
-              'collect.',
+              L10n.of(context).wishlistEmptyBody,
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -119,7 +119,7 @@ class _WishTile extends StatelessWidget {
       leading: const Icon(Icons.bookmark_border),
       title: Text(book.title),
       subtitle: book.readerNotes == null
-          ? (book.publishedYear == null ? null : Text('${book.publishedYear}'))
+          ? (book.publishedYear == null ? null : Text('${book.publishedYear}')) // i18n-ignore: a year
           : Text(
               book.readerNotes!,
               maxLines: 2,
@@ -137,34 +137,40 @@ class _WishTile extends StatelessWidget {
       trailing: PopupMenuButton<String>(
         onSelected: (action) async {
           final messenger = ScaffoldMessenger.of(context);
+          final l10n = L10n.of(context);
           switch (action) {
             case 'lookup':
               await lookUpWishlistBook(context, repository, book);
             case 'own':
               await repository.wishlist.markOwned(book.id);
               messenger.showSnackBar(SnackBar(
-                content: Text('“${book.title}” moved to your library'),
+                content: Text(l10n.wishlistMovedSnack(book.title)),
               ));
             case 'remove':
               // Through the trash like every other delete (plan 5 #52) — a
               // wishlist entry can be a mis-tap too.
               await repository.trashBook(book.id);
               messenger.showSnackBar(appSnackBar(
-                content: Text('“${book.title}” removed'),
+                content: Text(l10n.wishlistRemovedSnack(book.title)),
                 action: SnackBarAction(
-                  label: 'Undo',
+                  label: l10n.undo,
                   onPressed: () => repository.restoreBook(book.id),
                 ),
               ));
           }
         },
-        itemBuilder: (context) => const [
+        itemBuilder: (context) => [
           // A book jotted down by hand has no cover and no details, and no
           // file to take them from — so it is asked about online, by its ISBN
           // if you have the barcode in front of you.
-          PopupMenuItem(value: 'lookup', child: Text('Look up online…')),
-          PopupMenuItem(value: 'own', child: Text('I own this now')),
-          PopupMenuItem(value: 'remove', child: Text('Remove from wishlist')),
+          PopupMenuItem(
+              value: 'lookup',
+              child: Text(L10n.of(context).wishlistMenuLookUp)),
+          PopupMenuItem(
+              value: 'own', child: Text(L10n.of(context).wishlistMenuOwn)),
+          PopupMenuItem(
+              value: 'remove',
+              child: Text(L10n.of(context).wishlistMenuRemove)),
         ],
       ),
     );
@@ -178,6 +184,7 @@ Future<String?> promptAddToWishlist(
   LibraryRepository repository, {
   String? initialTitle,
 }) async {
+  final l10n = L10n.of(context);
   final titleController = TextEditingController(text: initialTitle ?? '');
   final authorController = TextEditingController();
   final noteController = TextEditingController();
@@ -185,34 +192,34 @@ Future<String?> promptAddToWishlist(
   final added = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Add to wishlist'),
+      title: Text(l10n.wishlistAddTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: titleController,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'Title'),
+            decoration: InputDecoration(labelText: l10n.wishlistFieldTitle),
           ),
           TextField(
             controller: authorController,
-            decoration: const InputDecoration(labelText: 'Author (optional)'),
+            decoration: InputDecoration(labelText: l10n.wishlistFieldAuthor),
           ),
           TextField(
             controller: isbnController,
             keyboardType: TextInputType.text,
-            decoration: const InputDecoration(
-              labelText: 'ISBN (optional)',
-              hintText: '978… or the ten-digit form',
-              helperText: 'With one of these, the rest fills itself in',
+            decoration: InputDecoration(
+              labelText: l10n.wishlistFieldIsbn,
+              hintText: l10n.wishlistIsbnHint,
+              helperText: l10n.wishlistIsbnHelperAdd,
               helperMaxLines: 2,
             ),
           ),
           TextField(
             controller: noteController,
-            decoration: const InputDecoration(
-              labelText: 'Note (optional)',
-              hintText: 'Why you want it, where you saw it…',
+            decoration: InputDecoration(
+              labelText: l10n.wishlistFieldNote,
+              hintText: l10n.wishlistNoteHint,
             ),
           ),
         ],
@@ -220,11 +227,11 @@ Future<String?> promptAddToWishlist(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Add'),
+          child: Text(l10n.wishlistAddConfirm),
         ),
       ],
     ),
@@ -279,21 +286,22 @@ Future<void> lookUpWishlistBook(
   LibraryRepository repository,
   Book book,
 ) async {
+  final l10n = L10n.of(context);
   final controller = TextEditingController(text: book.isbn ?? '');
   final asked = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Look up online'),
+      title: Text(l10n.wishlistLookUpTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'ISBN (optional)',
-              hintText: '978… or the ten-digit form',
-              helperText: 'Leave it empty to search by title and author',
+            decoration: InputDecoration(
+              labelText: l10n.wishlistFieldIsbn,
+              hintText: l10n.wishlistIsbnHint,
+              helperText: l10n.wishlistIsbnHelperLookUp,
               helperMaxLines: 2,
             ),
             onSubmitted: (_) => Navigator.pop(dialogContext, true),
@@ -303,11 +311,11 @@ Future<void> lookUpWishlistBook(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Look up'),
+          child: Text(l10n.wishlistLookUpConfirm),
         ),
       ],
     ),
@@ -320,24 +328,25 @@ Future<void> lookUpWishlistBook(
   final isbn = typed.isEmpty ? null : toIsbn13(typed);
   if (typed.isNotEmpty && isbn == null) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('That is not an ISBN.')),
+      SnackBar(content: Text(l10n.wishlistNotAnIsbn)),
     );
     return;
   }
-  messenger.showSnackBar(const SnackBar(
-    content: Text('Looking it up…'),
+  messenger.showSnackBar(SnackBar(
+    content: Text(l10n.wishlistLookingUp),
     duration: Duration(seconds: 2),
   ));
   try {
     final outcome = await repository.enrich.fill(book, isbn: isbn);
     messenger.showSnackBar(SnackBar(
       content: Text(switch (outcome) {
-        EnrichOutcome.filled => 'Filled in what was missing',
-        EnrichOutcome.alreadyComplete => 'Nothing to add — it already knows',
-        EnrichOutcome.notFound => 'No catalogue has this one',
+        EnrichOutcome.filled => l10n.wishlistFilled,
+        EnrichOutcome.alreadyComplete => l10n.wishlistAlreadyComplete,
+        EnrichOutcome.notFound => l10n.wishlistNotFound,
       }),
     ));
   } catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text('Lookup failed: $e')));
+    messenger.showSnackBar(
+        SnackBar(content: Text(l10n.wishlistLookupFailed('$e'))));
   }
 }

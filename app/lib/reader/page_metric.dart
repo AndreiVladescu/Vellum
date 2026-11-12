@@ -10,23 +10,19 @@ import '../l10n/gen/app_localizations.dart';
 
 enum PageMetric {
   /// `128 / 340` — where you are and how long the book is.
-  pagesOf('Page and total'),
+  pagesOf,
 
   /// `47%` — the vaguest, and what most e-readers show.
-  percent('Percent read'),
+  percent,
 
   /// `page 128` — where you are, without the book looming over it.
-  pagesRead('Pages read'),
+  pagesRead,
 
   /// `96 left` — counts down rather than up.
-  pagesLeft('Pages left'),
+  pagesLeft,
 
   /// `about 40 min left`, at the pace your own sittings were read at.
-  timeLeft('Time left');
-
-  const PageMetric(this.label);
-
-  final String label;
+  timeLeft;
 
   /// The next one along, for the long-press.
   PageMetric get next => PageMetric.values[(index + 1) % PageMetric.values.length];

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../server/connection_store.dart';
 import '../snack_bars.dart';
 import '../settings/app_settings.dart';
@@ -33,7 +34,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
   Future<void> _rename(BuildContext context, PhysicalEnvironment env) async {
     final name = await _promptName(
       context,
-      title: 'Rename library',
+      title: L10n.of(context).physicalLibsRenameTitle,
       initial: env.name,
     );
     if (name == null || name.trim().isEmpty) return;
@@ -41,22 +42,20 @@ class PhysicalLibrariesTab extends StatelessWidget {
   }
 
   Future<void> _delete(BuildContext context, PhysicalEnvironment env) async {
+    final l10n = L10n.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete “${env.name}”?'),
-        content: const Text(
-          'This removes the room and everything arranged in it. '
-          'The books themselves stay in your library.',
-        ),
+        title: Text(l10n.physicalLibsDeleteTitle(env.name)),
+        content: Text(l10n.physicalLibsDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -75,6 +74,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
   Future<void> _publish(BuildContext context, PhysicalEnvironment env) async {
     final publisher = _publisher;
     if (publisher == null) return;
+    final l10n = L10n.of(context);
 
     // Asked, not assumed: publishing a room shares its *shape*; whether the
     // books in it become visible is a separate decision, and one people should
@@ -84,26 +84,23 @@ class PhysicalLibrariesTab extends StatelessWidget {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setLocal) => AlertDialog(
-          title: Text('Publish “${env.name}”?'),
+          title: Text(l10n.physicalLibsPublishTitle(env.name)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Your other devices — and anyone you share the room with — '
-                'will see this arrangement. The room itself carries only '
-                'shelf and book positions, never titles or covers.',
-              ),
+              Text(l10n.physicalLibsPublishBody),
               CheckboxListTile(
                 value: shareBooks,
                 onChanged: (v) => setLocal(() => shareBooks = v ?? false),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
                 dense: true,
-                title: const Text('Also collect its books under a tag'),
+                title: Text(l10n.physicalLibsCollectTitle),
                 subtitle: Text(
-                  'Makes a “Room: ${env.name}” tag you can share, so viewers '
-                  'see titles instead of blank spines',
+                  // The tag's own name stays English: it is data on the
+                  // server, matched by name on the next publish.
+                  l10n.physicalLibsCollectNote('Room: ${env.name}'),
                 ),
               ),
             ],
@@ -111,11 +108,11 @@ class PhysicalLibrariesTab extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Publish'),
+              child: Text(l10n.physicalLibsPublish),
             ),
           ],
         ),
@@ -133,7 +130,8 @@ class PhysicalLibrariesTab extends StatelessWidget {
   Future<void> _fetch(BuildContext context, PhysicalEnvironment env) async {
     final publisher = _publisher;
     if (publisher == null) return;
-    final message = await publisher.fetch(env.id, name: env.name);
+    final message =
+        await publisher.fetch(L10n.of(context), env.id, name: env.name);
     if (context.mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
@@ -143,6 +141,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return StreamBuilder<List<PhysicalEnvironment>>(
       stream: repository.layout.watchEnvironments(),
       builder: (context, snapshot) {
@@ -165,8 +164,8 @@ class PhysicalLibrariesTab extends StatelessWidget {
             // rooms are listed, since what it does is open one of them.
             ListTile(
               leading: const Icon(Icons.qr_code_scanner),
-              title: const Text('Scan a shelf label'),
-              subtitle: const Text('Opens the room that shelf is in'),
+              title: Text(l10n.physicalLibsScanTitle),
+              subtitle: Text(l10n.physicalLibsScanNote),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => ShelfScanPage(
@@ -192,6 +191,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
   }
 
   Widget _emptyState(BuildContext context, ThemeData theme) {
+    final l10n = L10n.of(context);
         {
           return Center(
             child: Column(
@@ -203,11 +203,11 @@ class PhysicalLibrariesTab extends StatelessWidget {
                   color: theme.colorScheme.primary.withValues(alpha: 0.7),
                 ),
                 const SizedBox(height: 16),
-                Text('No physical libraries yet',
+                Text(l10n.physicalLibsEmptyTitle,
                     style: theme.textTheme.titleMedium),
                 const SizedBox(height: 6),
                 Text(
-                  'Create a room, add shelves, and arrange your books.',
+                  l10n.physicalLibsEmptyBody,
                   style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 16),
@@ -217,7 +217,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
                   onPressed: () =>
                       promptCreateLibrary(context, repository, settings),
                   icon: const Icon(Icons.add),
-                  label: const Text('Create a room'),
+                  label: Text(l10n.physicalLibsCreateRoom),
                 ),
               ],
             ),
@@ -226,6 +226,7 @@ class PhysicalLibrariesTab extends StatelessWidget {
   }
 
   Widget _roomTile(BuildContext context, PhysicalEnvironment env) {
+    final l10n = L10n.of(context);
             return ListTile(
               leading: const Icon(Icons.grid_view_rounded),
               title: Text(env.name),
@@ -236,10 +237,11 @@ class PhysicalLibrariesTab extends StatelessWidget {
               subtitle: _publisher == null
                   ? null
                   : Text(env.serverRevision == null
-                      ? 'Not published'
+                      ? l10n.physicalLibsNotPublished
                       : env.needsPublish
-                          ? 'Changed since publishing'
-                          : 'Published · revision ${env.serverRevision}'),
+                          ? l10n.physicalLibsChanged
+                          : l10n.physicalLibsPublishedRevision(
+                              env.serverRevision!)),
               trailing: PopupMenuButton<String>(
                 onSelected: (v) => switch (v) {
                   'rename' => _rename(context, env),
@@ -248,18 +250,19 @@ class PhysicalLibrariesTab extends StatelessWidget {
                   _ => _fetch(context, env),
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                  PopupMenuItem(
+                      value: 'rename', child: Text(l10n.physicalLibsMenuRename)),
                   if (_publisher != null) ...[
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'publish',
-                      child: Text('Publish to server'),
+                      child: Text(l10n.physicalLibsMenuPublish),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'fetch',
-                      child: Text('Update from server'),
+                      child: Text(l10n.physicalLibsMenuFetch),
                     ),
                   ],
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
                 ],
               ),
             );
@@ -360,11 +363,12 @@ class _SharedRoomsState extends State<_SharedRooms> {
     final c = widget.connection;
     if (c == null) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = L10n.of(context);
     setState(() => _busyId = room.id);
     final message = await RoomPublisher(
       repository: widget.repository,
       connection: c,
-    ).fetch(room.id, name: room.name);
+    ).fetch(l10n, room.id, name: room.name);
     if (!mounted) return;
     setState(() => _busyId = null);
     messenger.showSnackBar(appSnackBar(content: Text(message)));
@@ -377,20 +381,20 @@ class _SharedRoomsState extends State<_SharedRooms> {
     final client = widget.connection?.client;
     if (client == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_mineElsewhere.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: Text('Your rooms, published elsewhere',
+            child: Text(l10n.physicalLibsElsewhereTitle,
                 style: theme.textTheme.titleSmall),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
             child: Text(
-              'Published from another device. Bring one here to arrange it on '
-              'this one too.',
+              l10n.physicalLibsElsewhereNote,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -399,7 +403,7 @@ class _SharedRoomsState extends State<_SharedRooms> {
             ListTile(
               leading: const Icon(Icons.cloud_download_outlined),
               title: Text(room.name),
-              subtitle: Text('Revision ${room.revision}'),
+              subtitle: Text(l10n.physicalLibsRevision(room.revision)),
               trailing: _busyId == room.id
                   ? const SizedBox(
                       height: 20,
@@ -408,7 +412,7 @@ class _SharedRoomsState extends State<_SharedRooms> {
                     )
                   : TextButton(
                       onPressed: () => _bringHere(room),
-                      child: const Text('Bring here'),
+                      child: Text(l10n.physicalLibsBringHere),
                     ),
             ),
         ],
@@ -444,7 +448,8 @@ Future<void> promptCreateLibrary(
   LibraryRepository repository,
   AppSettingsStore settings,
 ) async {
-  final name = await _promptName(context, title: 'New library');
+  final name = await _promptName(context,
+      title: L10n.of(context).physicalLibsNewTitle);
   if (name == null || name.trim().isEmpty) return;
   final id = await repository.layout.createEnvironment(name);
   if (!context.mounted) return;
@@ -457,6 +462,7 @@ Future<String?> _promptName(
   required String title,
   String? initial,
 }) {
+  final l10n = L10n.of(context);
   final controller = TextEditingController(text: initial);
   return showDialog<String>(
     context: context,
@@ -465,17 +471,17 @@ Future<String?> _promptName(
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: const InputDecoration(hintText: 'e.g. Living room'),
+        decoration: InputDecoration(hintText: l10n.physicalLibsNameHint),
         onSubmitted: (v) => Navigator.pop(context, v),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('Save'),
+          child: Text(l10n.save),
         ),
       ],
     ),

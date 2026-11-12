@@ -1,5 +1,6 @@
 // Finding a copy, tidying a shelf, and the shelf-label link (plan 5 #28).
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 import 'package:vellum/data/database.dart';
 import 'package:qr/qr.dart';
 import 'package:vellum/physical/labels.dart';
@@ -205,7 +206,7 @@ void main() {
 
   group('label sheet', () {
     test('names every shelf and carries a scannable link for each', () {
-      final html = buildLabelSheetHtml(labels: const [
+      final html = buildLabelSheetHtml(l10n: L10nEn(), labels: const [
         ShelfLabel(
           shelfId: 's1',
           environmentName: 'Living room',
@@ -227,7 +228,7 @@ void main() {
 
     test('user text is escaped, so a name with markup cannot break the sheet',
         () {
-      final html = buildLabelSheetHtml(labels: const [
+      final html = buildLabelSheetHtml(l10n: L10nEn(), labels: const [
         ShelfLabel(
           shelfId: 's1',
           environmentName: 'Ana & Bob',
@@ -241,6 +242,7 @@ void main() {
 
     test('the QR can be turned off for a plain text sheet', () {
       final html = buildLabelSheetHtml(
+        l10n: L10nEn(),
         labels: const [ShelfLabel(shelfId: 's1', environmentName: 'Study')],
         includeQr: false,
       );
@@ -283,7 +285,7 @@ void main() {
     });
 
     test('one book is not "1 books"', () {
-      final html = buildLabelSheetHtml(labels: const [
+      final html = buildLabelSheetHtml(l10n: L10nEn(), labels: const [
         ShelfLabel(shelfId: 's1', environmentName: 'Study', bookCount: 1),
       ]);
       expect(html, contains('1 book<'));

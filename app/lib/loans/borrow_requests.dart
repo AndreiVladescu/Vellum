@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/page_insets.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import '../server/connection_store.dart';
 import '../server/server_client.dart';
 
@@ -27,6 +28,7 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
   List<BorrowRequest>? _incoming;
   List<BorrowRequest>? _outgoing;
   String? _error;
+  bool _notConnected = false;
   bool _busy = false;
 
   @override
@@ -38,7 +40,9 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
   Future<void> _load() async {
     final client = widget.connection.client;
     if (client == null) {
-      setState(() => _error = 'Not connected to a server.');
+      // A flag, not a message: this runs from `initState`, where there is no
+      // `L10n` to ask yet.
+      setState(() => _notConnected = true);
       return;
     }
     setState(() => _busy = true);
@@ -56,7 +60,9 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e is ServerException ? e.message : "Couldn't reach the server.";
+        _error = e is ServerException
+            ? e.message
+            : L10n.of(context).borrowUnreachable;
         _busy = false;
       });
     }
@@ -65,6 +71,7 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
   Future<void> _decide(BorrowRequest request, String decision) async {
     final client = widget.connection.client;
     if (client == null) return;
+    final l10n = L10n.of(context);
 
     DateTime? dueAt;
     String? reply;
@@ -88,15 +95,16 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(decision == 'approved'
-            ? 'Approved — “${request.bookTitle}” is now on loan to '
-                '${request.requesterEmail}.'
-            : 'Answered ${request.requesterEmail}.'),
+            ? l10n.borrowApprovedSnack(
+                request.bookTitle, request.requesterEmail)
+            : l10n.borrowAnsweredSnack(request.requesterEmail)),
       ));
       await _load();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e is ServerException ? e.message : 'That did not work.'),
+        content:
+            Text(e is ServerException ? e.message : l10n.borrowDidNotWork),
       ));
     }
   }
@@ -104,13 +112,17 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
   /// Returns the chosen date, or null for "no agreed date" — which is a real
   /// arrangement, not a blank field.
   Future<DateTime?> _askDueDate() async {
+    final l10n = L10n.of(context);
     final now = DateTime.now();
     return showDialog<DateTime>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
-        title: const Text('Due back?'),
+        title: Text(l10n.borrowDueTitle),
         children: [
-          for (final (label, days) in [('In 2 weeks', 14), ('In a month', 30)])
+          for (final (label, days) in [
+            (l10n.borrowDueTwoWeeks, 14),
+            (l10n.borrowDueMonth, 30),
+          ])
             SimpleDialogOption(
               onPressed: () => Navigator.of(dialogContext)
                   .pop(now.add(Duration(days: days))),
@@ -118,7 +130,7 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
             ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('No date'),
+            child: Text(l10n.borrowDueNone),
           ),
         ],
       ),
@@ -126,27 +138,28 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
   }
 
   Future<String?> _askReply() async {
+    final l10n = L10n.of(context);
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Say why (optional)'),
+        title: Text(l10n.borrowReplyTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'e.g. it’s already lent out',
+          decoration: InputDecoration(
+            hintText: l10n.borrowReplyHint,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('Decline'),
+            child: Text(l10n.borrowDecline),
           ),
         ],
       ),
@@ -155,29 +168,41 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
     return result;
   }
 
+  String _statusLabel(L10n l10n, String status) => switch (status) {
+        'pending' => l10n.borrowStatusPending,
+        'approved' => l10n.borrowStatusApproved,
+        'declined' => l10n.borrowStatusDeclined,
+        'cancelled' => l10n.borrowStatusCancelled,
+        _ => status,
+      };
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final incoming = _incoming ?? const <BorrowRequest>[];
     final outgoing = _outgoing ?? const <BorrowRequest>[];
     final pending = incoming.where((r) => r.isPending).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Borrow requests'),
+        title: Text(l10n.borrowTitle),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: l10n.borrowRefreshTooltip,
             onPressed: _busy ? null : _load,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: _error != null
+      body: _error != null || _notConnected
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
-                child: Text(_error!, textAlign: TextAlign.center),
+                child: Text(
+                  _error ?? l10n.contentSearchNotConnected,
+                  textAlign: TextAlign.center,
+                ),
               ),
             )
           : _incoming == null
@@ -185,11 +210,11 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
               : ListView(
                   padding: pageInsets(context, EdgeInsets.zero),
                   children: [
-                    _Header('To answer (${pending.length})'),
+                    _Header(l10n.borrowToAnswer(pending.length)),
                     if (pending.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-                        child: Text('Nobody is waiting on you.'),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                        child: Text(l10n.borrowNobodyWaiting),
                       )
                     else
                       for (final request in pending)
@@ -206,18 +231,18 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
                             children: [
                               TextButton(
                                 onPressed: () => _decide(request, 'declined'),
-                                child: const Text('Decline'),
+                                child: Text(l10n.borrowDecline),
                               ),
                               FilledButton(
                                 onPressed: () => _decide(request, 'approved'),
-                                child: const Text('Lend it'),
+                                child: Text(l10n.borrowLendIt),
                               ),
                             ],
                           ),
                         ),
                     if (outgoing.isNotEmpty)
                       ExpansionTile(
-                        title: Text('You asked for (${outgoing.length})'),
+                        title: Text(l10n.borrowYouAsked(outgoing.length)),
                         children: [
                           for (final request in outgoing)
                             ListTile(
@@ -232,8 +257,8 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
                               subtitle: Text(
                                 [
                                   if (request.ownerName != null)
-                                    'asked ${request.ownerName}',
-                                  request.status,
+                                    l10n.borrowAskedOwner(request.ownerName!),
+                                  _statusLabel(l10n, request.status),
                                   if (request.reply != null)
                                     '“${request.reply}”',
                                 ].join(' · '),
@@ -242,7 +267,7 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
                                   ? TextButton(
                                       onPressed: () =>
                                           _decide(request, 'cancelled'),
-                                      child: const Text('Withdraw'),
+                                      child: Text(l10n.borrowWithdraw),
                                     )
                                   : null,
                             ),
@@ -253,7 +278,8 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
                     if (incoming.any((r) => !r.isPending))
                       ExpansionTile(
                         title: Text(
-                          'Answered (${incoming.where((r) => !r.isPending).length})',
+                          l10n.borrowAnswered(
+                              incoming.where((r) => !r.isPending).length),
                         ),
                         children: [
                           for (final request
@@ -263,7 +289,8 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
                               leading: const Icon(Icons.history),
                               title: Text(request.bookTitle),
                               subtitle: Text(
-                                '${request.requesterEmail} · ${request.status}',
+                                '${request.requesterEmail} · '
+                                '${_statusLabel(l10n, request.status)}',
                               ),
                             ),
                         ],
@@ -271,8 +298,7 @@ class _BorrowRequestsPageState extends State<BorrowRequestsPage> {
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
-                        'Approving creates the loan for you — it appears on the '
-                        'Loans page with the due date you chose.',
+                        l10n.borrowApprovalNote,
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
@@ -321,27 +347,26 @@ Future<void> promptBorrowRequest(
 }) async {
   final client = connection.client;
   if (client == null) return;
+  final l10n = L10n.of(context);
   final note = TextEditingController();
   final send = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: Text('Ask to borrow “$title”?'),
+      title: Text(l10n.borrowAskTitle(title)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${owner ?? 'The owner'} sees this in their app and can lend it '
-            'to you. Nothing happens until they say yes, and you are told '
-            'either way.',
-          ),
+          Text(owner == null
+              ? l10n.borrowAskBodyUnnamed
+              : l10n.borrowAskBody(owner)),
           const SizedBox(height: 12),
           TextField(
             controller: note,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Note (optional)',
-              hintText: 'e.g. for the weekend',
+            decoration: InputDecoration(
+              labelText: l10n.borrowNoteLabel,
+              hintText: l10n.borrowNoteHint,
             ),
           ),
         ],
@@ -349,11 +374,11 @@ Future<void> promptBorrowRequest(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Ask'),
+          child: Text(l10n.borrowAsk),
         ),
       ],
     ),
@@ -366,12 +391,12 @@ Future<void> promptBorrowRequest(
     await client.requestToBorrow(bookId: bookId, note: text);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Asked. You’ll see the answer here.')),
+      SnackBar(content: Text(l10n.borrowAskedSnack)),
     );
   } catch (e) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(e is ServerException ? e.message : 'That did not work.'),
+      content: Text(e is ServerException ? e.message : l10n.borrowDidNotWork),
     ));
   }
 }

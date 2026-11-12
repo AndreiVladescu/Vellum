@@ -4,13 +4,9 @@ import 'package:flutter/material.dart';
 
 /// Built-in library wallpapers. Each adapts to light/dark theme.
 enum Wallpaper {
-  parchment('Warm parchment'),
-  fern('Fern on a white wall'),
-  ocean('Ocean blue');
-
-  const Wallpaper(this.label);
-
-  final String label;
+  parchment,
+  fern,
+  ocean;
 }
 
 /// Paints the selected wallpaper behind [child].

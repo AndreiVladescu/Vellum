@@ -1,6 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import '../widgets/page_insets.dart';
 import 'package:flutter/material.dart';
+import '../l10n/gen/app_localizations.dart';
 
 import '../snack_bars.dart';
 import 'avatar_image.dart';
@@ -34,9 +35,10 @@ class _AccountPageState extends State<AccountPage> {
   /// and said out loud instead of leaving a blank circle.
   Future<void> _pickPhoto() async {
     final messenger = ScaffoldMessenger.of(context);
-    final picked = await openFile(acceptedTypeGroups: const [
+    final l10n = L10n.of(context);
+    final picked = await openFile(acceptedTypeGroups: [
       XTypeGroup(
-        label: 'Images',
+        label: L10n.of(context).detailImagesTypeGroup,
         extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'],
       ),
     ]);
@@ -44,10 +46,10 @@ class _AccountPageState extends State<AccountPage> {
     try {
       await widget.profile.setPhoto(await picked.readAsBytes());
     } on AvatarImageException catch (e) {
-      messenger.showSnackBar(appSnackBar(content: Text(e.message)));
+      messenger.showSnackBar(appSnackBar(content: Text(e.messageOf(l10n))));
     } catch (e) {
       messenger.showSnackBar(
-        appSnackBar(content: Text("That photo couldn't be saved: $e")),
+        appSnackBar(content: Text(l10n.accountPhotoSaveFailedSnack('$e'))),
       );
     }
   }
@@ -57,15 +59,16 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _save() async {
     await widget.profile.save(name: _name.text, email: _email.text);
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Profile saved')));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(L10n.of(context).accountSavedSnack)));
     Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
+      appBar: AppBar(title: Text(l10n.drawerAccount)),
       body: ListView(
         padding: pageInsets(context, EdgeInsets.all(24)),
         children: [
@@ -81,8 +84,8 @@ class _AccountPageState extends State<AccountPage> {
                 // beside it would be a second thing to explain.
                 Tooltip(
                   message: widget.profile.photoPath == null
-                      ? 'Add a photo'
-                      : 'Change photo',
+                      ? l10n.accountAddPhotoTooltip
+                      : l10n.accountChangePhotoTooltip,
                   child: InkWell(
                     onTap: widget.profile.canSetPhoto ? _pickPhoto : null,
                     customBorder: const CircleBorder(),
@@ -111,7 +114,7 @@ class _AccountPageState extends State<AccountPage> {
                   TextButton.icon(
                     onPressed: _removePhoto,
                     icon: const Icon(Icons.delete_outline, size: 18),
-                    label: const Text('Remove photo'),
+                    label: Text(l10n.accountRemovePhoto),
                   ),
               ],
             ),
@@ -121,8 +124,8 @@ class _AccountPageState extends State<AccountPage> {
           TextField(
             controller: _name,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Name',
+            decoration: InputDecoration(
+              labelText: l10n.accountNameLabel,
               border: OutlineInputBorder(),
             ),
           ),
@@ -130,21 +133,19 @@ class _AccountPageState extends State<AccountPage> {
           TextField(
             controller: _email,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
+            decoration: InputDecoration(
+              labelText: l10n.accountEmailLabel,
               border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 24),
-          FilledButton(onPressed: _save, child: const Text('Save')),
+          FilledButton(onPressed: _save, child: Text(l10n.save)),
           const SizedBox(height: 24),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Your profile is stored on this device only. When Vellum '
-                'gains server sync, this will become the account you sign '
-                'in with to reach a shared library.',
+                l10n.accountLocalOnlyNote,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),

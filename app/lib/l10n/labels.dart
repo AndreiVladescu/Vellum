@@ -3,13 +3,22 @@
 // The enums (`ReadingStatus.label`, `ShelfSort.label`, ...) are plain Dart with
 // no BuildContext, and are used by code that has none, so the lookup sits next
 // to them here instead: the widget that shows the value asks
-// `status.labelOf(L10n.of(context))`. The enum's own English field stays for
-// the screens not yet moved over.
+// `status.labelOf(L10n.of(context))`.
 import '../data/reading_status.dart';
 import '../data/backup_schedule.dart';
 import '../data/backup_service.dart';
 import '../data/library_doctor.dart';
+import '../dedupe/duplicate_finder.dart' show DuplicateReason;
+import '../import/free_catalogues.dart' show FreeCatalogue;
+import '../physical/bookcase_template.dart' show BookcaseStyle;
+import '../physical/locate.dart' show TidySort;
+import '../physical/physical_metrics.dart' show BookFormat;
+import '../physical/room_measure.dart' show ShelfKind;
+import '../physical/room_prop.dart' show PropKind;
+import '../dedupe/merge_service.dart' show MergeConflict;
 import '../server/background_sync.dart';
+import '../server/sync_scope.dart' show SyncScope;
+import '../server/sync_service.dart' show SyncPhase;
 import '../settings/appearance.dart';
 import '../settings/book_face.dart';
 import '../settings/shelf_sort.dart';
@@ -144,7 +153,9 @@ extension BackupCheckL10n on BackupCheck {
   /// [BackupCheck.describe] in the reader's language. [BackupCheck.problem]
   /// comes from the archive reader and is shown as written.
   String describeOf(L10n l10n) {
-    if (!readable) return problem ?? l10n.prefsBackupNotABackup;
+    if (!readable) {
+      return localizedProblem?.call(l10n) ?? problem ?? l10n.prefsBackupNotABackup;
+    }
     if (!hasDatabase) return l10n.prefsBackupNoDatabase;
     if (corrupt.isNotEmpty || missing.isNotEmpty) {
       final parts = [
@@ -159,6 +170,110 @@ extension BackupCheckL10n on BackupCheck {
         ? l10n.prefsBackupIntact(checked)
         : l10n.prefsBackupIntactBooks(checked, books);
   }
+}
+
+extension SyncPhaseL10n on SyncPhase {
+  String labelOf(L10n l10n) => switch (this) {
+        SyncPhase.downloadingCovers => l10n.syncPhaseCovers,
+        SyncPhase.downloadingFiles => l10n.syncPhaseFiles,
+        SyncPhase.pushingBooks => l10n.syncPhasePushing,
+      };
+}
+
+extension DuplicateReasonL10n on DuplicateReason {
+  String labelOf(L10n l10n) => switch (this) {
+        DuplicateReason.sameFile => l10n.duplicatesReasonSameFile,
+        DuplicateReason.sameIsbn => l10n.duplicatesReasonSameIsbn,
+        DuplicateReason.similarTitle => l10n.duplicatesReasonSimilarTitle,
+      };
+}
+
+extension MergeConflictL10n on MergeConflict {
+  /// [label] in the reader's language, chosen by the column the conflict is
+  /// about; an unknown column shows its English label.
+  String labelOf(L10n l10n) => switch (field) {
+        'title' => l10n.duplicatesFieldTitle,
+        'subtitle' => l10n.duplicatesFieldSubtitle,
+        'description' => l10n.duplicatesFieldDescription,
+        'isbn' => l10n.duplicatesFieldIsbn,
+        'publisher' => l10n.duplicatesFieldPublisher,
+        'publishedYear' => l10n.duplicatesFieldYear,
+        'pageCount' => l10n.duplicatesFieldPages,
+        'coverPath' => l10n.duplicatesFieldCover,
+        _ => label,
+      };
+}
+
+extension FreeCatalogueL10n on FreeCatalogue {
+  /// [description] in the reader's language; a catalogue added later without
+  /// a translated blurb shows its English one.
+  String descriptionOf(L10n l10n) => switch (name) {
+        'Project Gutenberg' => l10n.opdsFreeGutenberg,
+        'Wikisource' => l10n.opdsFreeWikisource,
+        _ => description,
+      };
+}
+
+extension BookcaseStyleL10n on BookcaseStyle {
+  String labelOf(L10n l10n) => switch (this) {
+        BookcaseStyle.billy => l10n.roomStyleBilly,
+        BookcaseStyle.tall => l10n.roomStyleTall,
+        BookcaseStyle.low => l10n.roomStyleLow,
+        BookcaseStyle.cube => l10n.roomStyleCube,
+        BookcaseStyle.floating => l10n.roomStyleFloating,
+      };
+}
+
+extension PropKindL10n on PropKind {
+  String labelOf(L10n l10n) => switch (this) {
+        PropKind.statuette => l10n.roomPropStatuette,
+        PropKind.plant => l10n.roomPropPlant,
+        PropKind.vase => l10n.roomPropVase,
+        PropKind.clock => l10n.roomPropClock,
+        PropKind.boxes => l10n.roomPropBoxes,
+        PropKind.bookend => l10n.roomPropBookend,
+      };
+}
+
+extension ShelfKindL10n on ShelfKind {
+  String labelOf(L10n l10n) => switch (this) {
+        ShelfKind.shelf => l10n.roomKindShelf,
+        ShelfKind.panel => l10n.roomKindPanel,
+        ShelfKind.divider => l10n.roomKindDivider,
+        ShelfKind.marker => l10n.roomKindMarker,
+      };
+}
+
+extension TidySortL10n on TidySort {
+  String labelOf(L10n l10n) => switch (this) {
+        TidySort.author => l10n.roomTidyByAuthor,
+        TidySort.title => l10n.roomTidyByTitle,
+        TidySort.series => l10n.roomTidyBySeries,
+      };
+}
+
+extension BookFormatL10n on BookFormat {
+  /// The preset's name in the reader's language. Paper sizes (A5, A4) are
+  /// identifiers and keep their own label.
+  String labelOf(L10n l10n) => switch (key) {
+        'mass' => l10n.roomFormatMass,
+        'trade' => l10n.roomFormatTrade,
+        'b5soft' => l10n.roomFormatB5,
+        'hardcover' => l10n.roomFormatHardcover,
+        _ => label,
+      };
+}
+
+extension SyncScopeL10n on SyncScope {
+  /// [SyncScope.excluded] in the reader's language.
+  List<String> excludedOf(L10n l10n) => [
+        if (!books) l10n.syncScopeLabelBooks,
+        if (!copies) l10n.syncScopeLabelCopies,
+        if (!loans) l10n.syncScopeLabelLoans,
+        if (!annotations) l10n.syncScopeLabelAnnotations,
+        if (!sessions) l10n.syncScopeLabelSessions,
+        if (!copyPhotos) l10n.syncScopeLabelPhotos,
+      ];
 }
 
 extension PageMetricL10n on PageMetric {

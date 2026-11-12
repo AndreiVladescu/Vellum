@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/loans/due_dates.dart';
+import 'package:vellum/l10n/gen/app_localizations_en.dart';
 
 Loan _loan({
   String id = 'l1',
@@ -58,7 +59,7 @@ void main() {
       final nextMorning = DateTime(2026, 7, 11, 8, 0);
       expect(LoanDue.urgencyOf(loan, now: nextMorning), LoanUrgency.overdue);
       expect(LoanDue.daysOverdue(loan, now: nextMorning), 1);
-      expect(LoanDue.describe(loan, now: nextMorning), '1 day overdue');
+      expect(LoanDue.describe(L10nEn(), loan, now: nextMorning), '1 day overdue');
     });
 
     test('soon and later are distinguished', () {
@@ -172,27 +173,28 @@ void main() {
 
   group('wording', () {
     test('describes each state in words a person would use', () {
-      expect(LoanDue.describe(_loan(), now: now), 'No due date');
+      expect(LoanDue.describe(L10nEn(), _loan(), now: now), 'No due date');
       expect(
-        LoanDue.describe(_loan(dueAt: DateTime(2026, 7, 10)), now: now),
+        LoanDue.describe(L10nEn(), _loan(dueAt: DateTime(2026, 7, 10)), now: now),
         'Due today',
       );
       expect(
-        LoanDue.describe(_loan(dueAt: DateTime(2026, 7, 11)), now: now),
+        LoanDue.describe(L10nEn(), _loan(dueAt: DateTime(2026, 7, 11)), now: now),
         'Due tomorrow',
       );
       expect(
-        LoanDue.describe(_loan(dueAt: DateTime(2026, 7, 13)), now: now),
+        LoanDue.describe(L10nEn(), _loan(dueAt: DateTime(2026, 7, 13)), now: now),
         'Due in 3 days',
       );
       expect(
-        LoanDue.describe(_loan(dueAt: DateTime(2026, 7, 8)), now: now),
+        LoanDue.describe(L10nEn(), _loan(dueAt: DateTime(2026, 7, 8)), now: now),
         '2 days overdue',
       );
     });
 
     test('the nudge names the book and the dates', () {
       final message = LoanDue.reminderMessage(
+        L10nEn(),
         _loan(loanedAt: DateTime(2026, 6, 1), dueAt: DateTime(2026, 7, 1)),
         'Dune',
       );
@@ -202,7 +204,8 @@ void main() {
     });
 
     test('an undated loan gets a softer nudge with no invented deadline', () {
-      final message = LoanDue.reminderMessage(_loan(), 'Dune');
+      final message = LoanDue.reminderMessage(
+        L10nEn(),_loan(), 'Dune');
       expect(message, contains('Dune'));
       expect(message, isNot(contains('due')));
     });

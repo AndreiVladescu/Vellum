@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import 'catalog_entry.dart';
 
 /// A minimal OPDS 1.x client (plan 5 #21c).
@@ -158,9 +159,14 @@ class OpdsFeed {
 }
 
 class OpdsException implements Exception {
-  const OpdsException(this.message);
+  const OpdsException(this.message, {this.localized});
 
+  /// A plain-English sentence for logs and tests. What the reader sees is
+  /// [messageOf].
   final String message;
+  final String Function(L10n l10n)? localized;
+
+  String messageOf(L10n l10n) => localized?.call(l10n) ?? message;
 
   @override
   String toString() => message;
@@ -186,18 +192,28 @@ class OpdsClient {
         'Accept': 'application/atom+xml, application/xml;q=0.8, */*;q=0.5',
       });
     } catch (e) {
-      throw OpdsException('Could not reach that catalogue: $e');
+      throw OpdsException(
+        'Could not reach that catalogue: $e',
+        localized: (l10n) => l10n.opdsErrUnreachable('$e'),
+      );
     }
     if (response.statusCode == 401 || response.statusCode == 403) {
-      throw const OpdsException(
+      throw OpdsException(
         'That catalogue needs credentials this app cannot supply yet.',
+        localized: (l10n) => l10n.opdsErrCredentials,
       );
     }
     if (response.statusCode != 200) {
-      throw OpdsException('The catalogue answered ${response.statusCode}.');
+      throw OpdsException(
+        'The catalogue answered ${response.statusCode}.',
+        localized: (l10n) => l10n.opdsErrStatus(response.statusCode),
+      );
     }
     if (response.bodyBytes.length > maxFeedBytes) {
-      throw const OpdsException('That feed is implausibly large; refusing it.');
+      throw OpdsException(
+        'That feed is implausibly large; refusing it.',
+        localized: (l10n) => l10n.opdsErrTooLarge,
+      );
     }
     return parseFeed(response.body, base: url);
   }
@@ -221,12 +237,16 @@ class OpdsClient {
     try {
       document = XmlDocument.parse(xml);
     } catch (e) {
-      throw OpdsException('That is not a valid OPDS feed: $e');
+      throw OpdsException(
+        'That is not a valid OPDS feed: $e',
+        localized: (l10n) => l10n.opdsErrInvalidFeed('$e'),
+      );
     }
     final feed = document.rootElement;
     if (feed.localName != 'feed') {
-      throw const OpdsException(
+      throw OpdsException(
         'That URL is not an OPDS catalogue (no <feed> element).',
+        localized: (l10n) => l10n.opdsErrNotFeed,
       );
     }
 

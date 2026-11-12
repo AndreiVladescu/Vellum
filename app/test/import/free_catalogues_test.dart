@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/import/free_catalogues.dart';
 import 'package:vellum/import/opds_browser_page.dart';
 
@@ -47,7 +48,10 @@ void main() {
   });
 
   testWidgets('the empty browser offers the catalogues', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: OpdsBrowserPage()));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: OpdsBrowserPage()));
     await tester.pump();
 
     // The state this replaces was an empty box with a "https://example.com"
@@ -60,7 +64,10 @@ void main() {
 
   testWidgets('tapping one fills the address and tries to open it',
       (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: OpdsBrowserPage()));
+    await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: OpdsBrowserPage()));
     await tester.pump();
 
     await tester.tap(find.text(freeCatalogues.first.name));
