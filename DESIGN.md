@@ -797,6 +797,23 @@ already covers `book_id`, so no schema change), which is why it updates when a
 sitting ends. The numbers reuse `ReadingStats`, so the pace here is the pace the
 reader's counter uses.
 
+**Month by month** (v1.3.2) is a page reached from Insights that reviews one
+calendar month and steps through the others. It reuses the sitting-to-local-day
+rule and the `finishedAt` rule of the goals, so a month's numbers agree with the
+rest of the page, and its arithmetic is pure (`month_review.dart`). Only months
+from the first recorded sitting to the current one can be reached, and the list
+offers just those with a sitting (plus the current month, so there is always a place
+to land). "Days read" is out of the days of the month, or of the days so far in the
+current one. The comparison with the previous month is deliberately gentle and
+fair: under 5% either way reads "about the same", otherwise a rounded percentage;
+a previous month with nothing says so instead of dividing by zero; and a month still
+in progress is weighed against the *same days* of the previous month ("than by this
+point in October"), because setting nine days against thirty-one would read as a
+shortfall that is only the calendar. Pages and time are compared separately, each
+as one whole sentence per outcome, so a language can reorder it. The month's
+calendar is a `HeatmapGrid`, and its weeks begin on the locale's first day of the
+week.
+
 **The unit decides what is shown.** A PDF sitting records page numbers, which is what
 `pageCount` describes. An EPUB sitting records the *chapter* it ended in, and the
 database holds no chapter count, so "pages a minute" would be chapters a minute and

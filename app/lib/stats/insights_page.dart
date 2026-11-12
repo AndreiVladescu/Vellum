@@ -5,6 +5,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import 'duration_label.dart';
 import 'goals_dialog.dart';
+import 'month_review_page.dart';
 import 'reading_goals.dart';
 import 'stats_queries.dart';
 import '../settings/app_settings.dart';
@@ -139,6 +140,22 @@ class _InsightsPageState extends State<InsightsPage> {
           return ListView(
             padding: pageInsets(context, const EdgeInsets.all(16)),
             children: [
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.calendar_month_outlined),
+                  title: Text(l10n.insightsMonthEntryTitle),
+                  subtitle: Text(l10n.insightsMonthEntrySub),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => MonthReviewPage(
+                      repository: widget.repository,
+                      settings: widget.settings,
+                    ),
+                  )),
+                ),
+              ),
+              const SizedBox(height: 12),
               _GoalsCard(
                 settings: widget.settings,
                 books: data.books,

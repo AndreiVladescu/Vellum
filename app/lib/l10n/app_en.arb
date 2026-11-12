@@ -9418,5 +9418,257 @@
         "type": "String"
       }
     }
+  },
+
+  "insightsMonthEntryTitle": "Month by month",
+  "@insightsMonthEntryTitle": {
+    "description": "Title of the entry on the insights page that opens the month-by-month review."
+  },
+
+  "insightsMonthEntrySub": "Look back over any month of reading",
+  "@insightsMonthEntrySub": {
+    "description": "Subtitle of the month-by-month entry on the insights page."
+  },
+
+  "monthTitle": "Month by month",
+  "@monthTitle": {
+    "description": "App bar title of the month-by-month review page."
+  },
+
+  "monthPreviousTooltip": "Previous month",
+  "@monthPreviousTooltip": {
+    "description": "Tooltip and screen-reader label of the button that shows the month before."
+  },
+
+  "monthNextTooltip": "Next month",
+  "@monthNextTooltip": {
+    "description": "Tooltip and screen-reader label of the button that shows the month after."
+  },
+
+  "monthHeading": "{month}",
+  "@monthHeading": {
+    "description": "Heading of the month being reviewed, e.g. \"November 2026\"; also the entries of the month list. Tapping it opens the month list.",
+    "placeholders": {
+      "month": {
+        "type": "DateTime",
+        "format": "yMMMM"
+      }
+    }
+  },
+
+  "monthPickerTitle": "Jump to a month",
+  "@monthPickerTitle": {
+    "description": "Title of the sheet listing the months that have any reading."
+  },
+
+  "monthEmptyTitle": "No reading in {month}",
+  "@monthEmptyTitle": {
+    "description": "Title shown when the reviewed month has no reading at all.",
+    "placeholders": {
+      "month": {
+        "type": "DateTime",
+        "format": "yMMMM"
+      }
+    }
+  },
+
+  "monthEmptyBody": "Nothing was recorded this month. Use the arrows to look at another one.",
+  "@monthEmptyBody": {
+    "description": "Body shown when the reviewed month has no reading at all."
+  },
+
+  "monthTimeRead": "Time read",
+  "@monthTimeRead": {
+    "description": "Label of the tile with the total reading time of the month."
+  },
+
+  "monthDaysReadValue": "{read} of {total}",
+  "@monthDaysReadValue": {
+    "description": "Value of the days-read tile: days with reading out of the days of the month (or out of the days so far in the current month).",
+    "placeholders": {
+      "read": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+
+  "monthAveragePerDay": "Average per reading day",
+  "@monthAveragePerDay": {
+    "description": "Label of the tile with the average reading time on days that had any reading."
+  },
+
+  "monthLongestSitting": "Longest sitting",
+  "@monthLongestSitting": {
+    "description": "Label of the tile with the longest single reading sitting of the month."
+  },
+
+  "monthBestDay": "Best day",
+  "@monthBestDay": {
+    "description": "Label of the tile with the best reading day of the month."
+  },
+
+  "monthBestDayPages": "{count, plural, =1{1 page} other{{count} pages}}",
+  "@monthBestDayPages": {
+    "description": "Value of the best-day tile: pages read on that day.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "monthDayShort": "{date}",
+  "@monthDayShort": {
+    "description": "Date under a tile, e.g. \"Nov 4\".",
+    "placeholders": {
+      "date": {
+        "type": "DateTime",
+        "format": "MMMd"
+      }
+    }
+  },
+
+  "monthCalendarTitle": "Calendar",
+  "@monthCalendarTitle": {
+    "description": "Title of the calendar heat map of the month."
+  },
+
+  "monthCalendarSub": "Darker days had more reading",
+  "@monthCalendarSub": {
+    "description": "Subtitle of the calendar heat map of the month."
+  },
+
+  "insightsDayLabelRead": "{date}: {time} read, {pages, plural, =0{no pages recorded} =1{1 page} other{{pages} pages}}",
+  "@insightsDayLabelRead": {
+    "description": "Screen-reader label of one day of a heat map on which something was read; time is already formatted, e.g. \"35m\".",
+    "placeholders": {
+      "date": {
+        "type": "DateTime",
+        "format": "MMMMEEEEd"
+      },
+      "time": {
+        "type": "String"
+      },
+      "pages": {
+        "type": "int"
+      }
+    }
+  },
+
+  "insightsDayLabelNone": "{date}: no reading",
+  "@insightsDayLabelNone": {
+    "description": "Screen-reader label of one day of a heat map on which nothing was read.",
+    "placeholders": {
+      "date": {
+        "type": "DateTime",
+        "format": "MMMMEEEEd"
+      }
+    }
+  },
+
+  "monthCompareTitle": "Compared with {month}",
+  "@monthCompareTitle": {
+    "description": "Title of the card comparing the reviewed month with the month before it.",
+    "placeholders": {
+      "month": {
+        "type": "DateTime",
+        "format": "MMMM"
+      }
+    }
+  },
+
+  "monthComparePages": "{trend, select, more{{percent}% more pages than in {month}} less{{percent}% fewer pages than in {month}} same{About the same number of pages as in {month}} other{No pages were recorded in {month} to compare with}}",
+  "@monthComparePages": {
+    "description": "Compares the pages of a finished month with the month before; trend is more, less, same or none.",
+    "placeholders": {
+      "trend": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      },
+      "month": {
+        "type": "DateTime",
+        "format": "MMMM"
+      }
+    }
+  },
+
+  "monthCompareTime": "{trend, select, more{{percent}% more time than in {month}} less{{percent}% less time than in {month}} same{About the same time as in {month}} other{No reading time was recorded in {month} to compare with}}",
+  "@monthCompareTime": {
+    "description": "Compares the reading time of a finished month with the month before; trend is more, less, same or none.",
+    "placeholders": {
+      "trend": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      },
+      "month": {
+        "type": "DateTime",
+        "format": "MMMM"
+      }
+    }
+  },
+
+  "monthComparePagesSoFar": "{trend, select, more{{percent}% more pages than by this point in {month}} less{{percent}% fewer pages than by this point in {month}} same{About the same number of pages as by this point in {month}} other{No pages were recorded early in {month} to compare with}}",
+  "@monthComparePagesSoFar": {
+    "description": "Compares the pages of the current, unfinished month with the same stretch of the month before; trend is more, less, same or none.",
+    "placeholders": {
+      "trend": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      },
+      "month": {
+        "type": "DateTime",
+        "format": "MMMM"
+      }
+    }
+  },
+
+  "monthCompareTimeSoFar": "{trend, select, more{{percent}% more time than by this point in {month}} less{{percent}% less time than by this point in {month}} same{About the same time as by this point in {month}} other{No reading time was recorded early in {month} to compare with}}",
+  "@monthCompareTimeSoFar": {
+    "description": "Compares the reading time of the current, unfinished month with the same stretch of the month before; trend is more, less, same or none.",
+    "placeholders": {
+      "trend": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      },
+      "month": {
+        "type": "DateTime",
+        "format": "MMMM"
+      }
+    }
+  },
+
+  "monthCompareNone": "Nothing was read in {month}, so there is nothing to compare with.",
+  "@monthCompareNone": {
+    "description": "Shown instead of the two comparison lines when the month before has no reading.",
+    "placeholders": {
+      "month": {
+        "type": "DateTime",
+        "format": "MMMM"
+      }
+    }
+  },
+
+  "monthGoalDays": "{count, plural, =1{Met your daily goal of {goal} on 1 day} other{Met your daily goal of {goal} on {count} days}}",
+  "@monthGoalDays": {
+    "description": "How many days of the month reached the daily reading goal; goal is already formatted, e.g. \"30m\".",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "goal": {
+        "type": "String"
+      }
+    }
   }
 }

@@ -214,4 +214,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(settings.readingGoalBooks, 40);
   });
+
+  testWidgets('the Month by month entry opens the review', (tester) async {
+    await pumpInsights(tester, seed: true);
+    await tester.tap(find.text('Month by month'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Previous month'), findsOneWidget);
+    // Drift's stream cleanup posts a zero-duration timer; unmount in-test.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(Duration.zero);
+  });
 }
