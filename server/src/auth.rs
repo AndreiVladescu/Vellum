@@ -1,5 +1,6 @@
 use argon2::Argon2;
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use argon2::password_hash::phc::PasswordHash;
+use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use axum::Json;
 use axum::extract::{FromRequestParts, Path, State};
 use axum::http::HeaderMap;
@@ -278,9 +279,9 @@ pub fn require_master(user: &AuthUser) -> AppResult<()> {
 }
 
 pub fn hash_password(password: &str) -> AppResult<String> {
-    let salt = SaltString::generate(&mut OsRng);
+    // argon2 0.6 draws the salt from the OS RNG itself.
     Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
+        .hash_password(password.as_bytes())
         .map(|h| h.to_string())
         .map_err(|e| AppError::Internal(e.to_string()))
 }
@@ -770,6 +771,29 @@ async fn issue_token(state: &AppState, user_id: &str) -> AppResult<String> {
 #[cfg(test)]
 mod tests {
     use super::require_bootstrap_token;
+
+    /// Produced by `hash_password` under argon2 0.5.3 (before the 0.6 bump).
+    /// Hashes like this are already stored in existing servers' databases and
+    /// must keep verifying.
+    const HASH_FROM_ARGON2_0_5: &str = "$argon2id$v=19$m=19456,t=2,p=1$DY8UxR9i2p4mVQ/7HQh8Dw$bVnQsMC2CIV8IPZH4ZJp2hYTzijGjRdNutdVOhvqkL0";
+
+    #[test]
+    fn hash_stored_by_older_argon2_still_verifies() {
+        assert!(super::verify_password(
+            "correct horse battery",
+            HASH_FROM_ARGON2_0_5
+        ));
+        assert!(!super::verify_password("wrong", HASH_FROM_ARGON2_0_5));
+    }
+
+    #[test]
+    fn new_hashes_keep_the_same_strength_and_roundtrip() {
+        let h = super::hash_password("correct horse battery").unwrap();
+        // Same algorithm, version and cost parameters as the 0.5 default.
+        assert!(h.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"), "{h}");
+        assert!(super::verify_password("correct horse battery", &h));
+        assert!(!super::verify_password("nope", &h));
+    }
 
     #[test]
     fn bootstrap_open_when_env_unset() {
