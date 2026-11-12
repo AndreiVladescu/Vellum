@@ -6,6 +6,25 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.3.1 — 2026-11-12
+
+Reading goals, and what a single book has cost you in hours.
+
+### Added
+
+- **Reading goals.** Reading insights opens on a Goals card with two optional
+  targets: books finished this year and minutes read a day. The year goal says
+  where you stand against an even pace — on pace, ahead or behind, never a
+  telling-off — and the daily one shows today and how many of the last seven
+  days met it. Both are off until you set one, and kept on this device.
+- **Your reading, per book.** A book you have opened shows the time spent on
+  it, the number of sittings and the first and last day, on its own page. For
+  a PDF it adds your pace on that book and an estimate of the time left; an
+  EPUB records chapters rather than pages, so it shows time and sittings and
+  does not invent a pace.
+
+---
+
 ## v1.2.3 — 2026-11-12
 
 The whole app can be translated, and the server's console has been rebuilt

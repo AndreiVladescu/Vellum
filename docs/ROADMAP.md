@@ -32,6 +32,9 @@ this list is what each tag actually carried.
 `v1.2.3` (2026-11-12) — the rest of the translations (v1.2.2 in the plan), and
 from the server track the console split, navigation, Overview and Server
 pages (v1.6.0 and part of v1.6.1).
+`v1.3.1` (2026-11-12) — reading goals and per-book statistics, as planned.
+(`v1.3.0`'s rating sync shipped in `v1.2.1`; `v1.2.4`, the public release, is
+still the hand-made one.)
 
 ---
 
