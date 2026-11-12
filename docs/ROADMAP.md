@@ -111,9 +111,9 @@ that gets posted.**
 
 ### v1.3.1 — goals and per-book numbers
 
-- [ ] **M** Reading goals: books a year and minutes a day, with progress on the
+- [x] **M** Reading goals: books a year and minutes a day, with progress on the
       Insights page
-- [ ] **M** Per-book statistics on the book's page: time spent, sittings, pace,
+- [x] **M** Per-book statistics on the book's page: time spent, sittings, pace,
       estimated time left
 
 ### v1.3.2 — month by month
