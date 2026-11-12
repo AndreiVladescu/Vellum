@@ -233,6 +233,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: an unpinned `stable` moved to 3.50 overnight (2026-11-12),
+          # which deprecates `package:flutter/material.dart`, and `flutter analyze`
+          # went red on 150 infos nobody had written. Move this on purpose.
+          flutter-version: 3.47.9
       # Flutter builds a real native app, so each platform needs its own
       # toolchain. Windows and macOS runners already carry theirs.
       # Windows and macOS runners already carry their toolchains; Linux needs
@@ -317,6 +321,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: an unpinned `stable` moved to 3.50 overnight (2026-11-12),
+          # which deprecates `package:flutter/material.dart`, and `flutter analyze`
+          # went red on 150 infos nobody had written. Move this on purpose.
+          flutter-version: 3.47.9
       # Reconstitutes android/key.properties from repository secrets, when they
       # are set. Four are needed: ANDROID_KEYSTORE_BASE64 (the .jks, base64'd),
       # ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS.

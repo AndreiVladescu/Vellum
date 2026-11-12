@@ -135,6 +135,12 @@ that gets posted.**
 
 - [ ] **L** Paged EPUB mode, rather than a chapter you scroll
 
+### v1.4.0a — keep up with Flutter
+
+- [ ] **M** Move to Flutter 3.50: `package:flutter/material.dart` is deprecated
+      there in favour of `package:material_ui`. CI and releases are pinned to
+      3.47.9 until this is done on purpose
+
 ### v1.4.1 — finding your way around
 
 - [ ] **M** Preferences split into sections, with a search box
