@@ -6,6 +6,47 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.2.3 — 2026-11-12
+
+The whole app can be translated, and the server's console has been rebuilt
+around a sidebar.
+
+### Added
+
+- **The app is translatable.** Every screen, dialog and notification now reads
+  its text from `app/lib/l10n/app_en.arb` — about 1,600 messages, with real
+  plurals — and `docs/TRANSLATING.md` explains how to add a language. Status-bar
+  notifications follow the phone's language too. Vellum still ships in English
+  only; this is what lets that change.
+- **Console: an Overview page.** Counts, loans that are overdue or due this
+  week, borrow requests waiting on you, unread notifications and recent
+  activity. A member sees only what their account may.
+- **Console: a Server page** for the owner — the running version and its
+  features, storage, a backup download, a check for orphaned files (which
+  reports first and deletes only after a separate confirmation), and the
+  configuration in effect, read-only and without secrets.
+
+### Changed
+
+- **The console has a sidebar** in four groups — Library, Lending, People and
+  sharing, Server — and every page has its own address, so reload, Back and
+  bookmarks work. On a phone it folds behind a Menu button. Statistics, the
+  activity log and rooms are pages rather than dialogs; Statistics now lives on
+  the Server page, and its old address still works.
+- Members no longer see owner-only pages in the console's menu. (The server
+  refused them before as well; they are simply not offered now.)
+- A handful of messages read correctly for one item: "1 shelf", "1 book was
+  skipped".
+
+### Internal
+
+- The console's single 3,100-line script is 35 modules, still compiled into the
+  server binary with no build step.
+- CI and release builds are pinned to Flutter 3.47.9. Flutter 3.50 deprecates
+  `package:flutter/material.dart`; moving to it is planned work.
+
+---
+
 ## v1.2.2 — 2026-11-11
 
 The server can be pulled instead of built.

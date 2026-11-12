@@ -29,6 +29,9 @@ updates from v1.2.3. The work landed interleaved, so it shipped as one tag.
 `v1.2.2` (2026-11-11) — the published server image (listed under v1.2.3) and
 the second slice of translations. The version headings below are the plan;
 this list is what each tag actually carried.
+`v1.2.3` (2026-11-12) — the rest of the translations (v1.2.2 in the plan), and
+from the server track the console split, navigation, Overview and Server
+pages (v1.6.0 and part of v1.6.1).
 
 ---
 
