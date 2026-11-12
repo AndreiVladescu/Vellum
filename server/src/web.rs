@@ -77,6 +77,7 @@ const CONSOLE_MODULES: &[(&str, &str)] = &[
     ("mail.js", include_str!("../web/console/mail.js")),
     ("main.js", include_str!("../web/console/main.js")),
     ("menus.js", include_str!("../web/console/menus.js")),
+    ("overview.js", include_str!("../web/console/overview.js")),
     ("pages.js", include_str!("../web/console/pages.js")),
     ("people.js", include_str!("../web/console/people.js")),
     ("reminders.js", include_str!("../web/console/reminders.js")),

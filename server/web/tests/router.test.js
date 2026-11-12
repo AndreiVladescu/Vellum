@@ -229,6 +229,12 @@ async function main() {
     assert.deepEqual(replaced, ['#/library/books']);
     assert.strictEqual(get('page').hidden(), true, 'the books are what is on screen');
   });
+  await check('the overview is for everyone and is the first item of the nav', () => {
+    const { sandbox: sb } = load({ master: false });
+    const html = sb.navHtml('/library/overview', false);
+    assert.ok(html.indexOf('#/library/overview') < html.indexOf('#/library/books'));
+    assert.ok(html.includes('aria-current="page">Overview'));
+  });
   await check('a page that opens keeps its address and takes focus at its heading', async () => {
     const { sandbox: sb, replaced, get } = load({ hash: '#/lending/loans', master: false });
     sb.fetch = async () => ({ status: 200, ok: true, json: async () => [] });

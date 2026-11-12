@@ -23,6 +23,7 @@ import { showPeople } from './people.js';
 import { showShares } from './shares.js';
 import { showRooms } from './rooms.js';
 import { showStats } from './stats.js';
+import { showOverview } from './overview.js';
 import { showActivity } from './activity.js';
 import { showCert } from './cert.js';
 import { showMailSetup } from './mail.js';
@@ -40,6 +41,10 @@ export const HOME = '/library/books';
 /// answer 403 to anyone else — the same pages that used to toast "Only the
 /// library owner can…" when a member opened them.
 export const ROUTES = [
+  // Beside the books, not in place of them: the books table is the working
+  // surface and what every bookmark and habit points at. The overview is one
+  // click away, first in the nav.
+  { path: '/library/overview', group: 'library', label: 'Overview', show: () => showOverview() },
   { path: '/library/books', group: 'library', label: 'Books' },
   { path: '/lending/loans', group: 'lending', label: 'Loans', show: () => showLoans() },
   { path: '/lending/requests', group: 'lending', label: 'Borrow requests', show: () => showRequests() },

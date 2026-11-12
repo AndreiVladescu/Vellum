@@ -24,8 +24,21 @@ export async function api(method, path, body){
     throw new Error((data && data.error) || 'That request was not authorised.');
   }
   const data = res.status===204 ? null : await res.json().catch(()=>null);
-  if (!res.ok) throw new Error((data&&data.error) || ('HTTP '+res.status));
+  if (!res.ok) {
+    // The status rides along so a page that can live without an endpoint (the
+    // overview) can tell "not for you" (403/404) from "broke".
+    const err = new Error((data&&data.error) || ('HTTP '+res.status));
+    err.status = res.status;
+    throw err;
+  }
   return data;
+}
+
+/// A request's outcome kept rather than thrown, for a page made of several
+/// independent requests where one refusal must not cost the others.
+export async function settle(promise){
+  try { return { ok: true, data: await promise }; }
+  catch(e){ return { ok: false, status: e.status || 0, message: e.message }; }
 }
 
 /// Whether the stored token is genuinely no longer accepted.

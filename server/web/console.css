@@ -321,6 +321,21 @@ td .celledit { width:100%; }
 .pagehead .btn { margin-left:-9px; }
 .pagebody { display:block; }
 
+/* ---- overview and server pages ---- */
+.ov-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:8px; }
+.ov-tile {
+  display:flex; flex-direction:column; gap:2px; padding:12px 14px;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  color:var(--fg); text-decoration:none;
+}
+a.ov-tile:hover { border-color:var(--accent); }
+.ov-num { font-size:1.5rem; font-weight:600; line-height:1.2; overflow-wrap:anywhere; }
+.ov-section { margin-top:22px; }
+.ov-section h3 { margin:0 0 6px; font-size:1rem; font-weight:600; }
+.ov-sub { margin:10px 0 2px; font-size:.82rem; color:var(--muted); }
+.ov-sub.late { color:var(--red-ink); }
+.ov-empty { padding:14px 16px; border:1px dashed var(--line); border-radius:var(--radius); }
+
 /* ---- shares ---- */
 .shareline {
   justify-content:space-between; gap:12px; align-items:flex-start;
