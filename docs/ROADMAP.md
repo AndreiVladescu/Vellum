@@ -185,9 +185,9 @@ A new kind of book, so it starts with a design note rather than code.
 
 ### v1.6.0 — a console you can find things in
 
-- [ ] **L** `console.js` (3,100 lines in one file) split into one module per
+- [x] **L** `console.js` (3,100 lines in one file) split into one module per
       page, no build step, same embedded delivery
-- [ ] **M** Navigation in four groups — Library, Lending, People and sharing,
+- [x] **M** Navigation in four groups — Library, Lending, People and sharing,
       Server — each page with its own address, usable on a phone
 - [ ] **M** A landing page: counts, loans due, requests waiting, recent
       activity
