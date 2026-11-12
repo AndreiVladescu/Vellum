@@ -72,8 +72,8 @@ that gets posted.**
 
 ### v1.2.2 — translatable
 
-- [ ] **M** Strings out of the widgets and into `app_en.arb`
-- [ ] **S** A short `docs/TRANSLATING.md` for contributors
+- [x] **M** Strings out of the widgets and into `app_en.arb`
+- [x] **S** A short `docs/TRANSLATING.md` for contributors
 
 ### v1.2.3 — a server you can pull
 
