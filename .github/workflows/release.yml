@@ -314,7 +314,7 @@ jobs:
       - uses: actions/checkout@v7
       # 21, not 17: app/android/gradle/gradle-daemon-jvm.properties asks for a
       # JDK 21 to run Gradle, and this one (JAVA_HOME) is where it finds it.
-      - uses: actions/setup-java@v5.6.0
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: "21"
