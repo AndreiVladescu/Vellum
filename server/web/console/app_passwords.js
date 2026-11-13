@@ -23,6 +23,12 @@ function appPasswordOpdsUrl(){
 /// `2026-11-13 09:41:07` (UTC, as SQLite stores it) → `2026-11-13 09:41`.
 function appPasswordTime(s){ return esc((s || '').slice(0, 16)); }
 
+/// KOReader's *Custom sync server* address (v1.6.3), same origin as the console.
+function appPasswordKosyncUrl(){
+  const origin = typeof location !== 'undefined' && location.origin ? location.origin : '';
+  return origin + '/koreader';
+}
+
 export function appPasswordRow(p){
   const used = p.last_used_at ? 'last used ' + appPasswordTime(p.last_used_at) : 'never used';
   return `
@@ -30,6 +36,7 @@ export function appPasswordRow(p){
       <span>
         <strong>${esc(p.label)}</strong>
         <span class="pill">${esc(p.prefix)}-…</span>
+        ${p.koreader ? '<span class="pill">KOReader sync</span>' : ''}
         <div class="muted sharesub">created ${appPasswordTime(p.created_at)} · ${used}</div>
       </span>
       <button class="btn sm danger" data-act="revokeapppassword"
@@ -66,6 +73,11 @@ export async function showAppPasswords(){
          can browse the catalogue and download books you can see — nothing else.
          It cannot open this console, change anything, or make another app
          password. Revoke it and that device is shut out on its next request.</p>
+       <p class="sharehead" style="margin-top:10px">KOReader progress sync</p>
+       <p class="muted" style="margin:0">Make the app password <em>for KOReader
+         progress sync</em>, then in KOReader open <em>Progress sync → Custom sync
+         server</em>, enter <span class="shareurl">${esc(appPasswordKosyncUrl())}</span>,
+         and log in with your email and that app password.</p>
      </div>
      <div class="row" style="justify-content:flex-end; margin-bottom:8px">
        <button class="btn primary" data-act="newapppassword">New app password…</button>
@@ -78,16 +90,23 @@ export async function newAppPassword(){
   const answer = await ask({
     title: 'New app password',
     body: 'Name it after the device it is for, so you know which one to revoke later.',
-    fields: [{ label: 'Device', placeholder: 'Kobo Clara, KOReader on the tablet…' }],
+    fields: [
+      { label: 'Device', placeholder: 'Kobo Clara, KOReader on the tablet…' },
+      { label: 'Used for', value: 'opds', options: [
+        { value: 'opds', label: 'Catalogue and downloads (OPDS)' },
+        { value: 'koreader', label: 'OPDS and KOReader progress sync' },
+      ], hint: 'KOReader progress sync can only be switched on now, while the password exists.' },
+    ],
     confirmLabel: 'Create',
   });
   if (!answer) return;
   const label = answer[0];
+  const koreader = answer[1] === 'koreader';
   if (!label) { toast('Give it a name, so you can tell which device it is.'); return; }
 
   let made;
   try {
-    made = await api('POST', '/api/app-passwords', { label });
+    made = await api('POST', '/api/app-passwords', koreader ? { label, koreader } : { label });
   } catch(e){ toast(e.message); return; }
 
   // Closing this by any route refreshes the list behind it, so the new entry
@@ -101,8 +120,12 @@ export async function newAppPassword(){
         <strong>This is the only time it is shown</strong> — Vellum keeps only a
         hash, so if you lose it, revoke it and make another.</p>
       <div class="linkout" style="font-size:1.1rem; letter-spacing:.04em">${esc(made.password)}</div>
-      <p class="muted" style="margin:8px 0 0; font-size:.82rem">Capitals, spaces
-        and the dashes don't matter; type it however your keyboard makes easiest.</p>
+      <p class="muted" style="margin:8px 0 0; font-size:.82rem">${made.koreader
+        ? `For KOReader progress sync, type it exactly as shown — or without the
+           dashes, or all in capitals. The sync server address is
+           <span class="shareurl">${esc(appPasswordKosyncUrl())}</span>.`
+        : `Capitals, spaces and the dashes don't matter; type it however your
+           keyboard makes easiest.`}</p>
       <div class="row">
         <button class="btn" data-act="copysecret" data-secret="${esc(made.password)}">Copy</button>
         <button class="btn primary" onclick="appPasswordShown()">Done</button>

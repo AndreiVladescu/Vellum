@@ -173,6 +173,35 @@ check('a new one is shown once, with a way to copy it', async () => {
   assert.ok(!get('page').innerHTML.includes('abcd-efgh'), 'the list never carries it');
 });
 
+check('one made for KOReader asks for sync and says where to point it', async () => {
+  const { sandbox, get, calls } = load(
+    {
+      'POST /api/app-passwords': {
+        id: 'a4', label: 'KOReader', prefix: 'abcd', created_at: '2026-11-13 09:00:00',
+        last_used_at: null, koreader: true, password: 'abcd-efgh-jkmn-pqrs-tvwx-yz01',
+      },
+      'GET /api/app-passwords': [],
+    },
+    [{ 0: 'KOReader', 1: 'koreader' }],
+  );
+  await sandbox.newAppPassword();
+  const post = calls.find((c) => c.method === 'POST');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(post.body)), { label: 'KOReader', koreader: true });
+  const modal = get('modal-root').innerHTML;
+  assert.ok(modal.includes('https://books.example/koreader'), 'the sync server address');
+  assert.ok(/exactly as shown/.test(modal), 'and that spelling matters for this one');
+});
+
+check('the list marks the ones that sync with KOReader', async () => {
+  const { sandbox, get } = load({
+    'GET /api/app-passwords': [{ ...LIST[1], koreader: true }, LIST[0]],
+  });
+  await sandbox.showAppPasswords();
+  const html = get('page').innerHTML;
+  assert.strictEqual((html.match(/KOReader sync<\/span>/g) || []).length, 1);
+  assert.ok(html.includes('https://books.example/koreader'));
+});
+
 check('a nameless one is refused before any request', async () => {
   const { sandbox, calls, toasts } = load({}, [{ 0: '' }]);
   await sandbox.newAppPassword();
