@@ -83,6 +83,100 @@ If either regresses, `library_bench.dart`'s per-query timings (printed even
 when the test passes — run with `-r expanded`) usually point at which query
 grew, before reaching for the profiler.
 
+## The profiling run (before every release)
+
+The recipe above needs someone at DevTools reading a timeline. This is the
+same idea as a job: one command that seeds a large library, drives the real
+app in profile mode through what people actually do, and writes numbers that
+can be diffed against the last release's.
+
+```sh
+cd app
+tool/perf_run.sh                      # Linux desktop: GUI scenarios + cold starts
+tool/perf_run.sh --label before-fix   # name a run
+tool/perf_run.sh --android            # the one connected device or emulator
+tool/perf_run.sh --headless           # in Xephyr; see "the display" below
+PERF_ONLY=shelf,room tool/perf_run.sh --only gui   # iterate on one area
+tool/perf_run.sh diff ~/.cache/vellum-perf/runs/<a> ~/.cache/vellum-perf/runs/<b>
+```
+
+**What it seeds** (`lib/data/seed_profiling.dart`, cached per shape under
+`~/.cache/vellum-perf/seed-<key>/`): 4,000 books, 65% with covers — a tenth
+of those the 900 × 1,200 PNG page renders old PDF imports left, the rest
+~130 KB JPEGs — half with a file (a real EPUB, or a one-page PDF), 4,000
+reading sittings over three years with the last fortnight always read in,
+2,000 highlights/notes/bookmarks, 700 physical copies, 150 loans (a quarter
+still out), and a room of three bookcases holding 400 placed books. Statuses,
+ratings, wishlist entries and a few books in the trash are mixed in; every
+cover's dominant colour is already extracted, as the startup backfill leaves a
+library that has been opened before. `PERF_BOOKS`, `PERF_SESSIONS`, ... change
+the shape. Covers and files are symbolic links to a few dozen source files, so
+a seeded library is ~35 MB on disk; the app reads through them like any file,
+which makes every measurement a warm-page-cache one.
+
+**What it measures.** `integration_test/perf_test.dart`, under
+`flutter drive --profile`, against a fresh copy of the seeded library:
+
+| Scenario | What happens |
+|---|---|
+| `startup` | the four loads, then the app, until a spine is on screen |
+| `shelf_spines_cold/warm/hot` | 12,000 px of shelf at 2,000 px/s: no thumbnails yet, thumbnails but an empty image cache, everything decoded |
+| `shelf_spines_colour` | the same with the dominant-colour spine artwork |
+| `shelf_covers_cold/warm`, `shelf_list` | the other two shelf views |
+| `book_detail_open` | tap a covered spine, the pull-out animation, the detail page |
+| `search_typing` | four queries typed at ~11 characters a second |
+| `insights_open/scroll/range` | Reading insights, scrolled through, every range chip tapped |
+| `month_open/navigate` | the month page, four months back |
+| `room_open/pan/zoom` | the furnished room, dragged and wheel-zoomed |
+| `preferences_open/scroll` | Preferences |
+
+Each gets wall-clock milliseconds (`shown_ms` until it is there, `settled_ms`
+until frames stop), the engine's own frame timings (`FrameTiming`: frames,
+`jank_frames` over the 16.7 ms budget, build and raster p50/p90/p99/max), the
+image cache (peak while it ran, and after) and the resident set. A full
+timeline per scenario is recorded too; with `PERF_KEEP_TIMELINES=1` it is kept
+for Perfetto (ui.perfetto.dev). The timeline buffer is a ring, so for the long
+scrolls it holds only the last frames — the frame numbers above come from
+`FrameTiming`, which sees every frame.
+
+**Cold start** is `integration_test/startup_probe.dart`, built as the app and
+launched six times (the first a warm-up): process start to the first line of
+Dart, to the first frame, to the first frame with a spine on it (built and
+rasterised), and the resident set then and four seconds later.
+
+**Where results go** — never into the repository:
+`~/.cache/vellum-perf/runs/<date>-<commit>[-label]/summary.md` (tables),
+`summary.json` (one flat `scenario.metric` map, what `diff` compares), plus
+the raw `gui/metrics.json`, `startup.jsonl` and logs. `runs/latest` points at
+the newest.
+
+**Safety.** The app is pointed at the run's directory through
+`XDG_DATA_HOME`/`XDG_CONFIG_HOME`, and both entry points refuse to start unless
+`XDG_DATA_HOME` is a profiling directory — and refuse any library holding books
+the seeder did not make — so the real library is never opened. The script
+stops the app however it exits. On Android the test seeds the app's own
+storage on first run (2,000 books), and refuses a device whose library holds
+anything else.
+
+**The display must be awake.** A compositor stops drawing a window it cannot
+show: with the monitor asleep, frames arrive about once a second and every GUI
+number is meaningless. The script refuses to start with the monitor off (a
+locked screen with the monitor on is fine), and the report marks any scenario
+that drew far fewer frames than its length allows, without those frames being
+slow, as **starved — not valid**. `--headless` runs in Xephyr instead, which
+needs no screen but renders with Mesa's llvmpipe: its raster times are the
+CPU's, several times the GPU's, so use it to compare two builds, never to
+quote raster numbers.
+
+**What is in CI and what is not.** GUI timings swing ±25% between runs on the
+same machine (a busy core, the GPU's clock) — too noisy for a pass/fail line,
+so the profiling run is a manual step before a release, in
+[`DEVELOPER.md`](../DEVELOPER.md#cutting-a-release). What CI gets is the cheap
+deterministic part: `library_bench.dart` as before, the seeder's own test
+(`seed_profiling_test.dart`, so a schema change cannot quietly break the run),
+`flutter analyze` over `integration_test/`, and the benchmarks the fixes below
+added, each with a generous budget.
+
 ## §A1 finding: keep reading-state writes cheap on the shelf stream
 
 `saveReadingPosition`/`saveEpubPosition` write to `books` on every page turn,

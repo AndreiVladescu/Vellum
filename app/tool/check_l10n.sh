@@ -67,6 +67,7 @@ MIGRATED=(
   lib/data/reading_status.dart
   lib/data/search_index.dart
   lib/data/seed_library.dart
+  lib/data/seed_profiling.dart
   lib/data/series_service.dart
   lib/data/shelf_service.dart
   lib/data/sync_clock.dart

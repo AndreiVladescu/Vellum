@@ -602,6 +602,22 @@ Bump both versions in the same commit: `app/pubspec.yaml` (`version:`, and its
 `+build` number, which Play requires to increase) and `server/Cargo.toml`
 (reported by `GET /api/capabilities` and shown in the console).
 
+**Run the profiling job before tagging** — on the desktop with the screen
+awake, and on the emulator when the release touched the shelf, the reader or
+start-up:
+
+```sh
+cd app
+tool/perf_run.sh --label vX.Y.Z
+tool/perf_run.sh --android --label vX.Y.Z
+tool/perf_run.sh diff ~/.cache/vellum-perf/runs/<last release> ~/.cache/vellum-perf/runs/latest
+```
+
+It is not in CI because GUI timings are too noisy for a pass/fail line; read
+the diff instead. A cold start, shelf jank or an insights switch that got
+clearly worse is a reason to look before shipping. What each number means:
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md#the-profiling-run-before-every-release).
+
 `workflow_dispatch` is kept on the same workflow so a release can be rehearsed
 without tagging. Desktop artefacts are unsigned; the release notes say so.
 

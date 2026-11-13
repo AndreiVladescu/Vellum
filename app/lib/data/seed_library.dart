@@ -11,12 +11,18 @@ import 'database.dart';
 ///
 /// Runs in batches so a large [count] doesn't hold one giant transaction in
 /// memory, and reports progress via [onProgress] (`done` out of `total`).
+///
+/// [decorate] may fill in more of each book row before it is inserted (the
+/// profiling seeder adds covers, spine styles and reading state this way), so
+/// the rows are written once rather than inserted and then updated — an update
+/// would fire the search index's triggers a second time for every book.
 Future<void> seedLibrary(
   VellumDatabase db, {
   required int count,
   int seed = 1,
   int shelfCount = 12,
   void Function(int done, int total)? onProgress,
+  BooksCompanion Function(int index, BooksCompanion row)? decorate,
 }) async {
   final rng = Random(seed);
   final authorPoolSize = max(20, count ~/ 8);
@@ -55,7 +61,7 @@ Future<void> seedLibrary(
 
     for (var i = start; i < end; i++) {
       final id = 'seed-book-$i';
-      bookRows.add(BooksCompanion.insert(
+      final row = BooksCompanion.insert(
         id: id,
         title: _titleFor(rng),
         subtitle: Value(rng.nextInt(4) == 0 ? _subtitleFor(rng) : null),
@@ -63,7 +69,8 @@ Future<void> seedLibrary(
         publisher: Value(_publishers[rng.nextInt(_publishers.length)]),
         publishedYear: Value(1960 + rng.nextInt(66)),
         pageCount: Value(80 + rng.nextInt(700)),
-      ));
+      );
+      bookRows.add(decorate?.call(i, row) ?? row);
 
       final authorCount = 1 + rng.nextInt(3);
       final pickedAuthors = <int>{
