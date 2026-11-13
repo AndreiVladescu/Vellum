@@ -49,9 +49,10 @@ Fixes from `problems_09_nov.txt`. Nothing else ships in this one.
       once; pdfrx is warmed up at app start)
 - [x] **M** A highlight or note is still drawn after reopening the book (page
       text is not read before the page is loaded)
-- [ ] **M** The page no longer goes blurry after *Note on selection* — cause
-      not confirmed; two mitigations are in (the pages are isolated from outside
-      repaints, a new note repaints less). Needs a check on a real desktop
+- [x] **M** The page no longer goes blurry after *Note on selection* — the
+      highlight was drawn with a multiply blend, which Linux's Impeller
+      renderer composites by resampling the page underneath. Now an opaque
+      `modulate` with identical colours; measured sharp at every zoom
 - [x] **M** Ctrl+F puts the caret in the search field, and searches as you type
 - [x] **S** The search field's text is readable in every reader theme
 
@@ -103,6 +104,35 @@ that gets posted.**
 - [ ] **S** README and store listing updated around them
 
 ---
+
+## Next — phone and tablet testing on an emulator
+
+Several checks in `BACKLOG.md` → *Manual device checks* can only be done on
+Android, and so far only on the owner's own phone. An emulator on this machine
+lets the work be checked before it ships.
+
+- [ ] **by hand** Turn on hardware acceleration. The CPU supports it (AMD-V)
+      and the `kvm_amd` module is installed but not loaded, so `/dev/kvm` is
+      missing and the emulator refuses to start. One-off:
+      `sudo modprobe kvm_amd && sudo usermod -aG kvm $USER` (log out and in);
+      to keep it across reboots,
+      `echo kvm_amd | sudo tee /etc/modules-load.d/kvm.conf`. If `modprobe`
+      says SVM is disabled, enable *SVM Mode* in the BIOS.
+- [ ] **S** Phone: the existing AVD `vellum_test` (Pixel 6, Android 14, Google
+      APIs, x86_64) boots headless and the debug APK installs and opens
+- [ ] **S** Tablet: a second AVD from the same Android 14 image with a tablet
+      profile (Pixel Tablet), for the wide layouts
+- [ ] **S** Android 16: an API 36 image and AVD, for `workmanager` 0.10's
+      Android 16 fixes (a ~1.5 GB download; the disk is 95 % full)
+- [ ] **M** A script under `tool/` that boots an AVD headless, installs the
+      APK, runs a check and shuts it down, so agents can use it without
+      leaving an emulator running
+- [ ] **M** Work through *Manual device checks* on the emulator: background
+      sync forced with `adb shell cmd jobscheduler run -f`, the home-screen
+      widget, shortcuts, share and open-with import, Material You colours,
+      the reader (open, zoom, highlight sharpness, search), large text.
+      What only a real device can show (camera scanning, ML Kit translation
+      on a real GPU, battery and Wi-Fi constraints) stays with the owner
 
 ## 1.3 — statistics
 
