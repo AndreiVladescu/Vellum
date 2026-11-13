@@ -10,6 +10,7 @@ import '../settings/spine_art.dart';
 import 'book_open_route.dart';
 import 'cover_image.dart';
 import 'cover_color.dart';
+import 'gradient_strip.dart';
 import 'spine_style.dart';
 import '../l10n/gen/app_localizations.dart';
 
@@ -472,6 +473,12 @@ int spineDecodeHeight(double wantedPx) {
   return bucket;
 }
 
+/// The shading over a cover-slice spine.
+const _coverShading = GradientStrip(
+  [Color(0x33FFFFFF), Color(0x00000000), Color(0x59000000)],
+  [0.0, 0.35, 1.0],
+);
+
 /// The spine artwork alone, filling its parent (the caller sizes it): a slice of
 /// the cover image if there is one, otherwise the generated spine. Shared by the
 /// digital shelf and the physical-layout view, so a book looks the same in both.
@@ -556,18 +563,8 @@ class SpineFace extends StatelessWidget {
             },
           ),
           // Cylindrical shading: highlight near the left, shade to the right.
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0x33FFFFFF),
-                  Color(0x00000000),
-                  Color(0x59000000),
-                ],
-                stops: [0.0, 0.35, 1.0],
-              ),
-            ),
-          ),
+          // A strip rather than a gradient, for raster time (gradient_strip).
+          const GradientStripBox(strip: _coverShading),
           // Scrim so the title stays readable on any artwork.
           const DecoratedBox(
             decoration: BoxDecoration(color: Color(0x42000000)),
@@ -601,44 +598,45 @@ class SpineFace extends StatelessWidget {
 
   Widget _generatedSpine(SpineStyle style) {
     final accent = style.textColor.withValues(alpha: 0.85);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-        gradient: LinearGradient(
-          // Subtle left highlight / right shade for a rounded-spine look.
-          colors: [
-            Color.lerp(style.color, Colors.white, 0.18)!,
-            style.color,
-            Color.lerp(style.color, Colors.black, 0.22)!,
-          ],
-          stops: const [0.0, 0.35, 1.0],
-        ),
+    return GradientStripBox(
+      // Subtle left highlight / right shade for a rounded-spine look. A strip
+      // rather than a gradient, for raster time (gradient_strip.dart).
+      strip: GradientStrip(
+        [
+          Color.lerp(style.color, Colors.white, 0.18)!,
+          style.color,
+          Color.lerp(style.color, Colors.black, 0.22)!,
+        ],
+        const [0.0, 0.35, 1.0],
       ),
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Column(
-        children: [
-          if (style.variant == 1) _band(accent),
-          if (style.variant == 2) _label(accent),
-          Expanded(
-            child: RotatedBox(
-              quarterTurns: 1,
-              child: Center(
-                child: Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: style.textColor,
-                    fontSize: 13 * titleScale,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
+      topRadius: 3,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          children: [
+            if (style.variant == 1) _band(accent),
+            if (style.variant == 2) _label(accent),
+            Expanded(
+              child: RotatedBox(
+                quarterTurns: 1,
+                child: Center(
+                  child: Text(
+                    book.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: style.textColor,
+                      fontSize: 13 * titleScale,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          if (style.variant == 1) _band(accent),
-        ],
+            if (style.variant == 1) _band(accent),
+          ],
+        ),
       ),
     );
   }

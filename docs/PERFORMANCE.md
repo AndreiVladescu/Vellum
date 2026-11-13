@@ -580,3 +580,90 @@ what every build used to.
 `RenderMode.listView` builds lazily, but conflicts with `SelectionArea` and with
 restoring the reading position by scroll offset — worth trying only with a
 profile of a long chapter in hand.
+
+## 2026-11 round: what the profiling run found
+
+The first rounds measured queries; this one measured frames. The profiling run
+above, on the development machine (Linux, Radeon RX 6700-class GPU, Impeller
+on OpenGL ES, 1280 × 800 window), seeded library of 4,000 books, v1.3.4 plus
+the profiling run (523886d), load average ~1.3:
+
+| | median | |
+|---|---:|---|
+| Cold start → first frame | 399 ms | the shelf's *empty* state |
+| Cold start → first frame with spines | 632 ms | rasterised at 695 |
+| Shelf, spines, 6 s scroll | 65–72 of ~377 frames janky | raster p90 20 ms, build p90 4 ms |
+| Shelf, dominant-colour spines | 75 janky | raster p90 19 ms |
+| Shelf, face-out covers / list | 0 / 0 janky | raster p90 7.9 / 2.1 ms |
+| Opening a book | 57 ms to the page, settled at 383 | |
+| Search, last keystroke → results | 157–203 ms | 150 of it the debounce |
+| Insights, open | 234 ms | one 120 ms frame |
+| Insights, a range chip | 246–313 ms | 123–160 ms frames |
+| Month page, one month back | 431–443 ms | 71–76 ms frames |
+| Room, pan / wheel zoom | 124 of 124 / 68 of 82 frames janky | raster p90 69 / 148 ms |
+| Preferences, open | 47 ms, settled at 339 | |
+| Resident set, after the whole run | 1.06 GB | 100 MB of it the image cache's desktop cap |
+
+(A first baseline on 92a4b16, before v1.3.4's pdfrx upgrade, read the same
+within noise: spines 72–77 janky, first shelf frame 596 ms.)
+
+Ranked by what a user meets: the shelf is the app's home and janked a fifth of
+its frames; the room was unusable to pan on a large room; insights and the
+month page hitch visibly on every tap; start-up shows "your shelf is empty" for
+a fifth of a second on every launch. Search, opening a book and Preferences are
+fine.
+
+### The raster lab: what a spine costs to draw
+
+Build times were small everywhere; raster times were not, and `RepaintBoundary`
+does not help on Impeller, which has no raster cache — so the question was
+which *drawing operation* costs. A scratch integration test filled the screen
+with 27 × 4 spine-sized boxes of one kind each and scrolled (raster ms per
+frame, mean / p90):
+
+| Each box draws | mean | p90 |
+|---|---:|---:|
+| a flat colour | 1.8 | 2.2 |
+| a 3-stop horizontal `LinearGradient` (rounded or not) | 16–18 | 21–23 |
+| a 2-stop gradient | 17.6 | 23.4 |
+| the cover-slice shading (a constant translucent gradient) | 17.4 | 22.1 |
+| the title, rotated | 2.3 | 2.5 |
+| the title with its blurred shadow | 5.0 | 12.9 |
+| a cover image (`BoxFit.cover`) | 2.0 | 2.5 |
+| the same in a `ClipRRect` | 2.9 | 3.6 |
+| `InkWell` + `Tooltip` | 2.2 | 2.6 |
+| a gradient pre-drawn into a 256 × 1 image, `drawImageRect` | 2.2–2.6 | 2.3–7.0 |
+| the same image as an `ImageShader` on the rounded rect | 20.9 | 46.2 |
+| a whole pre-rendered spine bitmap (`RawImage`) | 2.1 | 2.7 |
+
+So it was never the covers, the text layout or the decode: it was the
+**gradient** every spine is shaded with — a hundred of them a frame at ~0.15 ms
+each. The text shadow is the second cost, a quarter the size.
+
+### #1 Spines shade from a strip image, not a gradient — kept
+
+`GradientStrip` draws each ramp once into a 256 × 1 image (the same gradient,
+by the same engine) and `drawImageRect`s it over the box; the generated spine's
+rounded top is a clip, drawn without a second anti-aliasing pass so a
+fractional right edge is not lightened twice. Strips are cached by their
+colours (512 at most, 1 KB each — the dominant-colour artwork gives covered
+books a colour each). `gradient_strip_test.dart` paints every spine shape both
+ways at fractional widths and compares pixels: at most 1–2 levels apart in any
+channel, mean 0.3, corners included.
+
+| Shelf scroll, 6 s | janky frames | raster p90 | raster p99 |
+|---|---:|---:|---:|
+| Cover-slice spines, before | 65–72 | 20.0–20.3 ms | 23.8–24.0 ms |
+| after | 0–1 | 6.8–6.9 ms | 8.6–9.4 ms |
+| Dominant-colour spines, before | 75 | 19.1 ms | 22.6 ms |
+| after | 0 | 3.7 ms | 4.2 ms |
+| Room pan, before / after | 124 / 118 of ~124 | 69 / 54 ms | 80 / 63 ms |
+| Room zoom, before / after | 68 / 61 of ~90 | 148 / 52 ms | 528 / 147 ms |
+
+Both on v1.3.4, same machine, same hour. (On 92a4b16 the same change read
+72–77 → 0–1 janky frames.)
+
+The first attempt painted the strip through an `ImageShader` on the rounded
+rectangle, to keep one draw: it barely moved the shelf (raster p90 21→19 ms,
+jank 75→52) and measured *worse* than the gradient in the lab (46 ms p90), so
+it was replaced before committing.

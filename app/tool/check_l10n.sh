@@ -203,6 +203,7 @@ MIGRATED=(
   lib/shelf/content_search.dart
   lib/shelf/cover_color.dart
   lib/shelf/cover_image.dart
+  lib/shelf/gradient_strip.dart
   lib/shelf/library_header.dart
   lib/shelf/new_shelf_dialog.dart
   lib/shelf/series_page.dart
