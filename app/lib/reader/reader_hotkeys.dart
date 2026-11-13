@@ -26,6 +26,7 @@ class ReaderHotkeys {
     this.isPaged,
     this.onPageStep,
     this.onNudge,
+    this.spaceTurnsPages = false,
     bool Function()? isTextFieldFocused,
   }) : isTextFieldFocused = isTextFieldFocused ?? _editableHasFocus;
 
@@ -52,6 +53,10 @@ class ReaderHotkeys {
 
   /// Move by a little — a few lines' worth of scrolling. +1 is downward.
   final void Function(int delta)? onNudge;
+
+  /// Whether Space (Shift+Space back) turns a page in paged mode, as it does in
+  /// most e-readers. Opt-in, so a reader that never asked keeps Space as it was.
+  final bool spaceTurnsPages;
 
   /// Whether something that takes typing holds focus.
   ///
@@ -123,6 +128,12 @@ class ReaderHotkeys {
     }
     if (key == LogicalKeyboardKey.pageUp) {
       step(-1);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.space &&
+        spaceTurnsPages &&
+        (isPaged?.call() ?? false)) {
+      step(HardwareKeyboard.instance.isShiftPressed ? -1 : 1);
       return true;
     }
 

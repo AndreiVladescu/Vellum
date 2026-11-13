@@ -92,6 +92,23 @@ class ReaderSettingsSheet extends StatelessWidget {
                 ),
                 if (showTypography) ...[
                   const SizedBox(height: 16),
+                  _Label(l10n.readerSettingsEpubLayout),
+                  SegmentedButton<EpubLayout>(
+                    segments: [
+                      for (final layout in EpubLayout.values)
+                        ButtonSegment(
+                            value: layout, label: Text(layout.labelOf(l10n))),
+                    ],
+                    selected: {settings.epubLayout},
+                    onSelectionChanged: (s) => settings.setEpubLayout(s.first),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      settings.epubLayout.descriptionOf(l10n),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                   _Label(l10n.readerSettingsTypeface),
                   SegmentedButton<ReaderFont>(
                     segments: [

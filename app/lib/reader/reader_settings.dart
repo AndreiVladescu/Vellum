@@ -68,6 +68,14 @@ enum PdfFit { width, page }
 /// paged view you can nudge half a page leaves you reading across a seam.
 enum PdfPageMode { paged, scroll }
 
+/// How the EPUB reader shows a chapter (roadmap v1.4.0).
+///
+/// [scrolled] is one long column you scroll through; [paged] cuts the same
+/// column into screen-sized pages you turn. The text is laid out identically
+/// in both — same line breaks, same position fraction saved — so switching
+/// keeps your place, and so does a device that reads the other way.
+enum EpubLayout { scrolled, paged }
+
 /// Reader preferences, persisted and shared by both readers (plan 5 #23).
 ///
 /// Deliberately one store rather than per-format ones: theme, margins and
@@ -110,6 +118,7 @@ class ReaderSettings extends ChangeNotifier {
   static const _nightModeKey = 'reader.pdfNightMode';
   static const _immersiveKey = 'reader.immersive';
   static const _pdfModeKey = 'reader.pdfMode';
+  static const _epubLayoutKey = 'reader.epubLayout';
   static const _highlightColorKey = 'reader.highlightColor';
   static const _pageMetricKey = 'reader.pageMetric';
   static const _autoScrollKey = 'reader.autoScrollPagesPerMinute';
@@ -228,6 +237,19 @@ class ReaderSettings extends ChangeNotifier {
 
   Future<void> setPdfMode(PdfPageMode value) async {
     await _prefs.setString(_pdfModeKey, value.name);
+    notifyListeners();
+  }
+
+  /// Scrolled unless chosen: it is what the reader always did, and what
+  /// anyone who never opens the options should keep getting.
+  EpubLayout get epubLayout {
+    final stored = _prefs.getString(_epubLayoutKey);
+    return EpubLayout.values.where((m) => m.name == stored).firstOrNull ??
+        EpubLayout.scrolled;
+  }
+
+  Future<void> setEpubLayout(EpubLayout value) async {
+    await _prefs.setString(_epubLayoutKey, value.name);
     notifyListeners();
   }
 

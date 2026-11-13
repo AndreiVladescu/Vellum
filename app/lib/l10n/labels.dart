@@ -352,6 +352,18 @@ extension PdfPageModeL10n on PdfPageMode {
   };
 }
 
+extension EpubLayoutL10n on EpubLayout {
+  String labelOf(L10n l10n) => switch (this) {
+        EpubLayout.scrolled => l10n.readerEpubScrolled,
+        EpubLayout.paged => l10n.readerEpubPaged,
+      };
+
+  String descriptionOf(L10n l10n) => switch (this) {
+        EpubLayout.scrolled => l10n.readerEpubScrolledDescription,
+        EpubLayout.paged => l10n.readerEpubPagedDescription,
+      };
+}
+
 extension HighlightColorL10n on HighlightColor {
   String labelOf(L10n l10n) => switch (this) {
     HighlightColor.yellow => l10n.readerColourYellow,

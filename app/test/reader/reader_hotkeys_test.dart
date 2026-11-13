@@ -114,4 +114,25 @@ void main() {
     await simulateKeyUpEvent(LogicalKeyboardKey.controlLeft);
     expect(calls, ['find'], reason: 'only the press made while attached');
   });
+
+  test('Space turns a page only where asked, and only when paged', () {
+    var paged = true;
+    ReaderHotkeys make({required bool space}) => ReaderHotkeys(
+          isActive: () => true,
+          onFind: () {},
+          onGoTo: () {},
+          onEscape: () => false,
+          isPaged: () => paged,
+          onPageStep: (d) => calls.add('step $d'),
+          onNudge: (d) => calls.add('nudge $d'),
+          spaceTurnsPages: space,
+          isTextFieldFocused: () => false,
+        );
+    expect(make(space: false).handle(_down(LogicalKeyboardKey.space)), isFalse);
+    expect(make(space: true).handle(_down(LogicalKeyboardKey.space)), isTrue);
+    paged = false;
+    expect(make(space: true).handle(_down(LogicalKeyboardKey.space)), isFalse,
+        reason: 'a scroll keeps Space for itself');
+    expect(calls, ['step 1']);
+  });
 }

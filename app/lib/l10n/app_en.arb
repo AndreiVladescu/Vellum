@@ -4174,6 +4174,50 @@
     "description": "Explanation under the PDF movement choice."
   },
 
+  "readerEpubScrolled": "Scrolled",
+  "@readerEpubScrolled": {
+    "description": "EPUB layout choice: the chapter as one long scroll."
+  },
+
+  "readerEpubPaged": "Paged",
+  "@readerEpubPaged": {
+    "description": "EPUB layout choice: the chapter cut into pages you turn."
+  },
+
+  "readerEpubScrolledDescription": "The chapter as one long column you scroll",
+  "@readerEpubScrolledDescription": {
+    "description": "Explanation under the EPUB layout choice."
+  },
+
+  "readerEpubPagedDescription": "One screen at a time — tap the sides, swipe, or use the arrow keys to turn",
+  "@readerEpubPagedDescription": {
+    "description": "Explanation under the EPUB layout choice."
+  },
+
+  "readerSettingsEpubLayout": "Layout",
+  "@readerSettingsEpubLayout": {
+    "description": "Heading above the EPUB scrolled/paged choice in the reading options."
+  },
+
+  "readerActShowPaged": "Show as pages",
+  "@readerActShowPaged": {
+    "description": "EPUB reader toolbar action: switch from scrolling to turning pages."
+  },
+
+  "readerActShowScrolled": "Show as one scroll",
+  "@readerActShowScrolled": {
+    "description": "EPUB reader toolbar action: switch from turning pages to scrolling."
+  },
+
+  "readerChapterPageOf": "Page {page} of {count}",
+  "@readerChapterPageOf": {
+    "description": "EPUB paged mode: which page of the current chapter is showing.",
+    "placeholders": {
+      "page": {"type": "int"},
+      "count": {"type": "int"}
+    }
+  },
+
   "readerColourYellow": "Yellow",
   "@readerColourYellow": {
     "description": "Name of a highlighter colour."

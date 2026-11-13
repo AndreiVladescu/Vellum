@@ -16,6 +16,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
+import 'paged_chapter.dart';
+
 /// The filter that turns a rendered PDF page into a dark one.
 ///
 /// Not a naive `1 - x` invert. Two things are done at once:
@@ -57,7 +59,10 @@ const greyImageMatrix = <double>[
 /// element, which would mean re-implementing image loading, sizing and data-URI
 /// decoding to change one colour. Overriding [buildImage] lets the package do
 /// all of that and wraps whatever it produced.
-class NightModeFactory extends WidgetFactory {
+///
+/// On top of [ReaderHtmlFactory], so night mode keeps paged mode's pictures
+/// held to the page.
+class NightModeFactory extends ReaderHtmlFactory {
   @override
   Widget? buildImage(BuildTree tree, ImageMetadata data) {
     final built = super.buildImage(tree, data);

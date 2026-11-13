@@ -148,11 +148,13 @@ MIGRATED=(
   lib/reader/dictionary/wordnet.dart
   lib/reader/edge_turn.dart
   lib/reader/epub_book.dart
+  lib/reader/epub_pagination.dart
   lib/reader/epub_reader_page.dart
   lib/reader/epub_search.dart
   lib/reader/ink_tools.dart
   lib/reader/night_mode.dart
   lib/reader/page_metric.dart
+  lib/reader/paged_chapter.dart
   lib/reader/pdf_paged_view.dart
   lib/reader/reader_actions.dart
   lib/reader/reader_gestures.dart

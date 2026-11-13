@@ -240,10 +240,17 @@ and check it opens the loans list, from a cold start as well as a running app.
 Alarms are inexact on purpose (no exact-alarm permission), so a few minutes' delay
 is expected. Desktop shows the switch disabled.
 
-**Deferred from #23**, and why: paged (rather than scrolled) EPUB mode is a layout
-engine of its own; keep-screen-awake, volume-key page turns and the brightness
+**Deferred from #23**, and why: keep-screen-awake, volume-key page turns and the brightness
 slider each need a platform plugin, and were not worth adding three dependencies
 in the same pass. None of them block the rest of the item.
+
+**EPUB paged mode (v1.4.0) — device check owed.** Checked on Linux by driving
+the reader with synthetic key, tap and touch-swipe events (page turns, rolling
+into the next chapter and back onto the previous one's last page, a resize, and
+switching to scrolled and back all kept the place; no page cut a line). Still
+to see on a real phone: swipes and side-third taps against text selection
+(long-press to select, then dragging a handle must not turn), rotation, a
+chapter with a tall picture (it should be scaled to the page), and night mode.
 
 ---
 
@@ -282,5 +289,10 @@ this order.
 - **EPUB reader polish.** Partly resolved by plan 5 #23: in-chapter scroll
   position **is** saved and restored (the arithmetic is pinned in
   `test/reader/epub_reader_page_test.dart`), and typography/themes now apply.
-  Still open: paged (as opposed to scrolled) mode, and heavy CSS-driven layouts
-  rendering approximately (`flutter_widget_from_html_core`).
+  Paged mode landed in v1.4.0 (`epub_pagination.dart`, `paged_chapter.dart`).
+  Still open: heavy CSS-driven layouts rendering approximately
+  (`flutter_widget_from_html_core`). Paged-mode follow-ups: auto-scroll is
+  hidden there rather than turning pages on a timer; a tap in a side third on a
+  link turns the page as well as following it; a re-pagination (text size,
+  window) keeps the place by proportion of the chapter, not by the exact line;
+  no page-turn animation; volume-key turns still need a platform plugin.

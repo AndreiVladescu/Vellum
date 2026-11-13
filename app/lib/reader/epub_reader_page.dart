@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart'
+    show PointerDeviceKind, kLongPressTimeout, kTouchSlop;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -23,6 +25,9 @@ import 'night_mode.dart';
 import 'edge_turn.dart';
 import 'chapter_markup.dart';
 import 'epub_book.dart';
+import 'epub_pagination.dart';
+import 'paged_chapter.dart';
+import 'reader_gestures.dart';
 import 'epub_search.dart';
 import 'reader_hotkeys.dart';
 import 'reader_search_field.dart';
@@ -102,6 +107,25 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   int _count = 0;
   bool _restored = false;
   Timer? _saveDebounce;
+
+  /// Paged mode (roadmap v1.4.0): where in the chapter the page is, and the
+  /// chapter cut into pages, once it has been laid out. The anchor is the
+  /// position; the page number is derived from it against [_pages], so a
+  /// re-pagination (text size, window size) keeps the place.
+  PageAnchor _anchor = const AtScrollFraction(0);
+  ChapterPages? _pages;
+
+  /// The layout last built, to notice the preference changing under us.
+  EpubLayout? _layout;
+
+  bool get _paged => _settings?.epubLayout == EpubLayout.paged;
+
+  /// Where a pointer went down, for telling a tap from a swipe from a
+  /// selection — see [_onPointerDown].
+  ({Offset at, Duration time, PointerDeviceKind kind})? _pointerStart;
+
+  /// So a swipe can drop the selection its drag made on the way.
+  final _selectionArea = GlobalKey<SelectionAreaState>();
 
   AnnotationStore get _annotations => widget.repository.annotations;
 
@@ -282,6 +306,11 @@ class _EpubReaderPageState extends State<EpubReaderPage>
       _closeSearch();
       return true;
     },
+    isPaged: () => _paged,
+    onPageStep: (delta) =>
+        delta > 0 ? _pageForward(_count) : _pageBack(_count),
+    onNudge: _nudge,
+    spaceTurnsPages: true,
   );
 
   @override
@@ -298,6 +327,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
       if (!mounted) return;
       setState(() {
         _settings = settings;
+        _layout = settings.epubLayout;
         _chromeHidden = settings.immersive;
       });
       settings.addListener(_onSettingsChanged);
@@ -306,7 +336,112 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   }
 
   void _onSettingsChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final layout = _settings?.epubLayout;
+    if (layout != _layout) _switchLayout(layout);
+    setState(() {});
+  }
+
+  /// Keeps the place across a switch between scrolled and paged: both speak
+  /// the same scroll fraction, which is also what is saved.
+  void _switchLayout(EpubLayout? layout) {
+    _layout = layout;
+    if (layout == EpubLayout.paged) {
+      if (_autoScrolling) _stopAutoScroll();
+      if (_scroll.hasClients) _anchor = AtScrollFraction(_scrollFraction);
+      _pages = null;
+    } else {
+      final fraction = _pagedFraction;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        _scroll.jumpTo(fraction * _scroll.position.maxScrollExtent);
+      });
+    }
+  }
+
+  /// The paged position as a scroll fraction — what gets saved.
+  double get _pagedFraction {
+    final pages = _pages;
+    if (pages != null && pages.ready) {
+      return pages.scrollFractionOf(pages.pageFor(_anchor));
+    }
+    return switch (_anchor) {
+      AtScrollFraction(:final fraction) => fraction,
+      // Not laid out yet, so no better answer than the proportion itself.
+      AtContentFraction(:final fraction) => fraction,
+    };
+  }
+
+  /// Where in the chapter the reader is, whichever way it is showing it.
+  double get _positionFraction => _paged ? _pagedFraction : _scrollFraction;
+
+  int get _pageInChapter => _pages?.pageFor(_anchor) ?? 0;
+
+  void _onPaginated(ChapterPages pages) {
+    if (!mounted) return;
+    setState(() => _pages = pages);
+  }
+
+  /// A few lines' worth of scrolling — the arrow keys in scrolled mode.
+  void _nudge(int delta) {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final step = (_lineHeightOnScreen > 0 ? _lineHeightOnScreen : 24) * 3;
+    _scroll.jumpTo(
+        (position.pixels + delta * step).clamp(0.0, position.maxScrollExtent));
+  }
+
+  /// Paged mode's taps and swipes, read from raw pointer events.
+  ///
+  /// **Why not a GestureDetector.** The chapter is selectable, and its
+  /// selection recogniser sits deeper in the tree, so it wins every tap and —
+  /// on touch — every horizontal drag (dragging sideways selects text). A
+  /// [Listener] sees the pointer whatever wins. Nothing is turned if something
+  /// was already selected when the pointer went down: that tap is dismissing
+  /// the selection, and that drag is moving its handle.
+  void _onPointerDown(PointerDownEvent event) {
+    final selected = _selectionRange;
+    // A caret (an empty selection, which a tap on text leaves) is not a
+    // selection anyone is working on.
+    _pointerStart = selected == null || selected.end <= selected.start
+        ? (at: event.localPosition, time: event.timeStamp, kind: event.kind)
+        : null;
+  }
+
+  void _onPointerUp(PointerUpEvent event, double width) {
+    final start = _pointerStart;
+    _pointerStart = null;
+    if (start == null || !_paged) return;
+    final delta = event.localPosition - start.at;
+    final elapsed = event.timeStamp - start.time;
+    if (delta.distance < kTouchSlop && elapsed < kLongPressTimeout) {
+      _onPagedTap(start.at.dx, width);
+      return;
+    }
+    // A mouse drag is a selection, never a swipe.
+    if (start.kind == PointerDeviceKind.mouse) return;
+    final turn = swipeTurn(
+      delta: delta,
+      elapsed: elapsed,
+      paged: true,
+      atRestingZoom: true,
+    );
+    if (turn == null) return;
+    // The drag selected text on its way across; that was not what it meant.
+    _selectionArea.currentState?.selectableRegion.clearSelection();
+    turn == SwipeTurn.forward ? _pageForward(_count) : _pageBack(_count);
+  }
+
+  /// Paged mode's taps: the left third goes back, the right third forward, and
+  /// the middle does what a tap does in scrolled mode.
+  void _onPagedTap(double x, double width) {
+    if (x < width / 3) {
+      _pageBack(_count);
+    } else if (x > width * 2 / 3) {
+      _pageForward(_count);
+    } else if (_settings?.immersive == true) {
+      _setReadingMode(!_chromeHidden);
+    }
   }
 
   @override
@@ -344,7 +479,9 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     _selectionRange = next;
     // Selecting text is asking for the toolbar — highlight, note, look up,
     // translate all live there. Only on the edge where a selection appears.
-    if (!had && next != null && _chromeHidden && mounted) {
+    if (!had && next != null && _chromeHidden && mounted &&
+        // Not mid-swipe: a sideways drag selects on its way across.
+        _pointerStart == null) {
       _setReadingMode(false);
     }
     if (((next != null) != had || _selectionIsWord != hadWord) && mounted) {
@@ -383,7 +520,8 @@ class _EpubReaderPageState extends State<EpubReaderPage>
       bookId: widget.book.id,
       kind: AnnotationKind.bookmark,
       chapter: _chapter,
-      locator: EpubScrollLocator(chapter: _chapter, fraction: _scrollFraction),
+      locator:
+          EpubScrollLocator(chapter: _chapter, fraction: _positionFraction),
     );
     if (!mounted) return;
     setState(() => _bookmarkOnChapter = id);
@@ -673,10 +811,24 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     if (epub == null || index < 0 || index >= _hits.length) return;
     final hit = _hits[index];
     _goTo(hit.chapter, epub.chapters.length);
+    _jumpInChapter(hit.fraction);
+  }
+
+  /// Moves to [fraction] of the current chapter, in either layout — after the
+  /// frame in scrolled mode, because a chapter just switched to has no extent
+  /// yet. Paged mode needs no wait: the view resolves the anchor itself once
+  /// the chapter is laid out.
+  void _jumpInChapter(double fraction) {
+    final f = fraction.clamp(0.0, 1.0).toDouble();
+    if (_paged) {
+      setState(() => _anchor = AtScrollFraction(f));
+      _savePositionSoon();
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
       final max = _scroll.position.maxScrollExtent;
-      if (max > 0) _scroll.jumpTo(hit.fraction.clamp(0, 1) * max);
+      if (max > 0) _scroll.jumpTo(f * max);
     });
   }
 
@@ -743,11 +895,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
             Navigator.of(context).pop();
             if (target == null) return;
             _goTo(target.chapter, epub.chapters.length);
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || !_scroll.hasClients) return;
-              final max = _scroll.position.maxScrollExtent;
-              if (max > 0) _scroll.jumpTo(target.fraction.clamp(0, 1) * max);
-            });
+            _jumpInChapter(target.fraction);
           },
         ),
       ),
@@ -763,16 +911,21 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   // Persist the in-chapter scroll position, debounced so a flick isn't a write
   // storm. The chapter itself is saved eagerly on navigation in [_goTo].
   void _onScroll() {
+    if (!_paged) _savePositionSoon();
+  }
+
+  void _savePositionSoon() {
     if (_count == 0) return;
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 500), () {
+      final fraction = _positionFraction;
       widget.repository.saveEpubPosition(
         widget.book.id,
         chapterIndex: _chapter,
         chapterCount: _count,
-        scrollFraction: _scrollFraction,
+        scrollFraction: fraction,
       );
-      _saveFilePosition(_count, _scrollFraction);
+      _saveFilePosition(_count, fraction);
     });
   }
 
@@ -799,6 +952,17 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   /// at the bottom of every chapter would make the gesture useless exactly
   /// where it is most wanted.
   void _pageForward(int count) {
+    if (_paged) {
+      final pages = _pages;
+      if (pages == null || !pages.ready) return; // still laying out
+      final page = pages.pageFor(_anchor);
+      if (page < pages.count - 1) {
+        _turnTo(pages, page + 1);
+      } else if (_chapter < count - 1) {
+        _goTo(_chapter + 1, count);
+      }
+      return;
+    }
     if (_scroll.hasClients) {
       final position = _scroll.position;
       // A little overlap, so the line you were reading is still on screen —
@@ -818,6 +982,18 @@ class _EpubReaderPageState extends State<EpubReaderPage>
 
   /// One screenful back, rolling into the previous chapter's *end*.
   void _pageBack(int count) {
+    if (_paged) {
+      final pages = _pages;
+      if (pages == null || !pages.ready) return;
+      final page = pages.pageFor(_anchor);
+      if (page > 0) {
+        _turnTo(pages, page - 1);
+      } else if (_chapter > 0) {
+        // The previous chapter's last page, not its first.
+        _goTo(_chapter - 1, count, fraction: 1);
+      }
+      return;
+    }
     if (_scroll.hasClients) {
       final position = _scroll.position;
       final step = position.viewportDimension * 0.86;
@@ -841,24 +1017,46 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     }
   }
 
-  void _goTo(int index, int count) {
-    setState(() => _chapter = index.clamp(0, count - 1));
+  /// A page turn inside the chapter: the view repaints, nothing is laid out.
+  void _turnTo(ChapterPages pages, int page) {
+    setState(() => _anchor = AtContentFraction(pages.contentFractionOf(page)));
+    _savePositionSoon();
+  }
+
+  /// Opens chapter [index] at [fraction] — the top unless asked otherwise
+  /// (paged mode going back lands on the previous chapter's last page).
+  void _goTo(int index, int count, {double fraction = 0}) {
+    final target = index.clamp(0, count - 1);
+    final changed = target != _chapter;
+    setState(() {
+      _chapter = target;
+      _anchor = AtScrollFraction(fraction);
+      // The old chapter's pages say nothing about this one; turns wait for it.
+      if (changed) _pages = null;
+    });
     _session.touch(page: _chapter + 1);
     _refreshBookmark();
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    // A new chapter starts at the top; save immediately (fraction 0).
+    // Save immediately — a new chapter is worth more than a debounce.
+    _saveDebounce?.cancel();
     widget.repository.saveEpubPosition(
       widget.book.id,
       chapterIndex: _chapter,
       chapterCount: count,
-      scrollFraction: 0,
+      scrollFraction: fraction,
     );
-    _saveFilePosition(count, 0);
+    _saveFilePosition(count, fraction);
   }
 
   /// Restore the saved in-chapter scroll after the first layout: the global
   /// fraction minus the chapters below gives this chapter's fraction.
   void _restoreScroll(int count) {
+    // Paged mode resolves this itself once the chapter is laid out.
+    _anchor = AtScrollFraction(epubPositionFrom(
+      progress: widget.book.readingProgress,
+      lastReadPage: widget.book.lastReadPage,
+      chapterCount: count,
+    ).fraction);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
       final target = epubPositionFrom(
@@ -908,7 +1106,9 @@ class _EpubReaderPageState extends State<EpubReaderPage>
           );
         }
         final epub = snapshot.data;
-        if (epub == null) {
+        // The settings too: they decide scrolled or paged, and starting in the
+        // wrong one would restore the position into a view about to vanish.
+        if (epub == null || _settings == null) {
           return Scaffold(
             appBar: AppBar(title: Text(widget.book.title)),
             body: const Center(child: CircularProgressIndicator()),
@@ -939,6 +1139,8 @@ class _EpubReaderPageState extends State<EpubReaderPage>
         // is "the paper is dark, so the book's own near-black type has to go" —
         // and that stays true whatever a future palette does.
         final darkPage = readerTheme.isDark;
+        // The chapter's pages, when paged mode has them for this chapter.
+        final pages = _paged && (_pages?.ready ?? false) ? _pages : null;
         return Scaffold(
           backgroundColor: readerTheme.background,
           // Immersive mode drops the bar entirely rather than fading it: a
@@ -1094,15 +1296,29 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                         : l10n.readerActRemoveBookmark,
                     onPressed: _toggleBookmark,
                   ),
-                  ReaderAction(
-                    icon: _autoScrolling
-                        ? Icons.pause_circle_outline
-                        : Icons.play_circle_outline,
-                    label: _autoScrolling
-                        ? l10n.readerActAutoScrollStop
-                        : l10n.readerActAutoScroll,
-                    onPressed: _toggleAutoScroll,
-                  ),
+                  if (settings != null)
+                    ReaderAction(
+                      icon: _paged
+                          ? Icons.swap_vert
+                          : Icons.auto_stories_outlined,
+                      label: _paged
+                          ? l10n.readerActShowScrolled
+                          : l10n.readerActShowPaged,
+                      onPressed: () => settings.setEpubLayout(_paged
+                          ? EpubLayout.scrolled
+                          : EpubLayout.paged),
+                    ),
+                  // Scrolling by itself has nothing to scroll in paged mode.
+                  if (!_paged)
+                    ReaderAction(
+                      icon: _autoScrolling
+                          ? Icons.pause_circle_outline
+                          : Icons.play_circle_outline,
+                      label: _autoScrolling
+                          ? l10n.readerActAutoScrollStop
+                          : l10n.readerActAutoScroll,
+                      onPressed: _toggleAutoScroll,
+                    ),
                   ReaderAction(
                     icon: Icons.fullscreen,
                     label: l10n.readerActReadingMode,
@@ -1148,7 +1364,69 @@ class _EpubReaderPageState extends State<EpubReaderPage>
               constraints.maxWidth,
               settings?.measure ?? 720,
             );
+            // The chapter itself, the same widget in both layouts — which is
+            // what makes their line breaks, and so their positions, agree.
+            //
+            // Selectable so passages can be highlighted; the listener is what
+            // turns a selection into character offsets (plan 5 #22). The
+            // reader's typography applies to the book's text only — the UI
+            // keeps following the system text scale. On a dark page the book's
+            // own colours would otherwise win (a stylesheet saying `color:
+            // #222` is black on black); its *pictures* are the factory's job.
+            final chapterView = SelectionArea(
+              key: _selectionArea,
+              child: SelectionListener(
+                selectionNotifier: _selectionNotifier,
+                child: HtmlWidget(
+                  _markup.of(
+                    chapter,
+                    index: _chapter,
+                    darkPage: darkPage,
+                    ink: readerTheme.foreground,
+                    annotations: _bookAnnotations,
+                  ),
+                  textStyle: settings?.bodyTextStyle() ??
+                      TextStyle(color: readerTheme.foreground),
+                  customStylesBuilder: darkPage
+                      ? (element) => element.localName == 'mark'
+                          ? null
+                          : {'color': cssHex(readerTheme.foreground)}
+                      : null,
+                  factoryBuilder:
+                      dark ? NightModeFactory.new : ReaderHtmlFactory.new,
+                ),
+              ),
+            );
             return Stack(children: [
+              if (_paged)
+                Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: _onPointerDown,
+                  onPointerUp: (event) =>
+                      _onPointerUp(event, constraints.maxWidth),
+                  child: Padding(
+                    // The same insets as scrolled mode's scroll view, so the
+                    // column is the same width and wraps the same way.
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: SafeArea(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: settings?.measure ?? 720,
+                          ),
+                          child: PagedChapterView(
+                            key: ValueKey(_chapter),
+                            anchor: _anchor,
+                            onPaginated: _onPaginated,
+                            child: chapterView,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
               Listener(
                 // Holds the self-scroller still while a finger is down, rather
                 // than stopping it: steadying the page is not the same as
@@ -1175,37 +1453,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                     constraints: BoxConstraints(
                       maxWidth: settings?.measure ?? 720,
                     ),
-                    // Selectable so passages can be highlighted; the listener is
-                    // what turns a selection into character offsets (plan 5 #22).
-                    child: SelectionArea(
-                      child: SelectionListener(
-                        selectionNotifier: _selectionNotifier,
-                        child: HtmlWidget(
-                          _markup.of(
-                            chapter,
-                            index: _chapter,
-                            darkPage: darkPage,
-                            ink: readerTheme.foreground,
-                            annotations: _bookAnnotations,
-                          ),
-                          // The reader's own typography, applied to the book's
-                          // text only — the surrounding UI keeps following the
-                          // system text scale.
-                          textStyle: settings?.bodyTextStyle() ??
-                              TextStyle(color: readerTheme.foreground),
-                          // Night mode: the book's own colours would otherwise
-                          // win — a stylesheet saying `color: #222` is black
-                          // text on a black page. Its *pictures* are handled by
-                          // the factory, which greys them.
-                          customStylesBuilder: darkPage
-                              ? (element) => element.localName == 'mark'
-                                  ? null
-                                  : {'color': cssHex(readerTheme.foreground)}
-                              : null,
-                          factoryBuilder: dark ? NightModeFactory.new : null,
-                        ),
-                      ),
-                    ),
+                    child: chapterView,
                   ),
                 ),
               ),
@@ -1240,12 +1488,17 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   bottom: 12,
                   child: IgnorePointer(
                     child: Text(
-                      readingModeStatus(
-                        l10n,
-                        page: _chapter + 1,
-                        count: count,
-                        unit: 'chapter',
-                      ),
+                      [
+                        if (pages != null)
+                          l10n.readerStatusOf(
+                              'page', _pageInChapter + 1, pages.count),
+                        readingModeStatus(
+                          l10n,
+                          page: _chapter + 1,
+                          count: count,
+                          unit: 'chapter',
+                        ),
+                      ].join('  ·  '),
                       style: TextStyle(
                         fontSize: 11,
                         color: readerTheme.foreground.withValues(alpha: 0.55),
@@ -1312,15 +1565,43 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      chapter.titleOf(l10n, _chapter),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      // The bar takes the reader's page colour, so its text has
-                      // to take the reader's ink — the app theme's would be
-                      // dark-on-dark here.
-                      style: TextStyle(color: readerTheme.foreground),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          [
+                            chapter.titleOf(l10n, _chapter),
+                            if (pages != null)
+                              l10n.readerChapterPageOf(
+                                  _pageInChapter + 1, pages.count),
+                          ].join('  ·  '),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          // The bar takes the reader's page colour, so its
+                          // text has to take the reader's ink — the app
+                          // theme's would be dark-on-dark here.
+                          style: TextStyle(color: readerTheme.foreground),
+                        ),
+                        // How far through the chapter, in paged mode — the
+                        // scrollbar's job in scrolled mode.
+                        if (pages != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: ConstrainedBox(
+                              constraints:
+                                  const BoxConstraints(maxWidth: 320),
+                              child: LinearProgressIndicator(
+                                value: pages.progressOf(_pageInChapter),
+                                minHeight: 2,
+                                color: readerTheme.foreground
+                                    .withValues(alpha: 0.6),
+                                backgroundColor: readerTheme.foreground
+                                    .withValues(alpha: 0.12),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
