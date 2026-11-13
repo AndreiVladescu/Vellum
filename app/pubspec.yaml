@@ -57,7 +57,7 @@ dependencies:
   image_picker: ^1.2.4
   qr: ^4.0.1
   cryptography: ^2.9.0
-  dynamic_color: ^1.8.1
+  dynamic_color: ^1.9.0
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.3
