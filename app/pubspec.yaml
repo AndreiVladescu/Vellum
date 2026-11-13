@@ -51,11 +51,11 @@ dependencies:
   # Pure-Dart decode/resize/encode, so cover thumbnails can be made in a
   # background isolate (dart:ui's codecs only run on the UI isolate).
   image: ^4.12.0
-  xml: ^7.0.1
+  xml: ^7.1.0
   flutter_widget_from_html_core: ^0.17.4
   share_plus: ^12.0.2
   image_picker: ^1.2.4
-  qr: ^4.0.0
+  qr: ^4.0.1
   cryptography: ^2.9.0
   dynamic_color: ^1.8.1
   flutter_localizations:
