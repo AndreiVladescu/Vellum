@@ -111,7 +111,7 @@ Several checks in `BACKLOG.md` → *Manual device checks* can only be done on
 Android, and so far only on the owner's own phone. An emulator on this machine
 lets the work be checked before it ships.
 
-- [ ] **by hand** Turn on hardware acceleration. The CPU supports it (AMD-V)
+- [x] **by hand** Turn on hardware acceleration (done 2026-11-13). The CPU supports it (AMD-V)
       and the `kvm_amd` module is installed but not loaded, so `/dev/kvm` is
       missing and the emulator refuses to start. One-off:
       `sudo modprobe kvm_amd && sudo usermod -aG kvm $USER` (log out and in);
