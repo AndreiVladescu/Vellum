@@ -37,6 +37,8 @@ pub async fn forget(
         "copy-photos" => forget_copy_photos(&state, &user).await?,
         "annotations" => forget_annotations(&state, &user).await?,
         "sessions" => forget_sessions(&state, &user).await?,
+        // What KOReader devices reported, and the positions mirrored from it.
+        "koreader" => crate::koreader::forget(&state, &user.id).await?,
         other => {
             return Err(AppError::BadRequest(format!(
                 "'{other}' is not something that can be un-published"

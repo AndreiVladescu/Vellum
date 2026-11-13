@@ -2883,6 +2883,7 @@ dependencies = [
  "lettre",
  "libc",
  "lopdf",
+ "md-5",
  "rand_core 0.6.4",
  "rcgen",
  "reqwest",

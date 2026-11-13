@@ -266,6 +266,19 @@ async fn main() -> anyhow::Result<()> {
         tokio::spawn(vellum_server::run_text_worker(state.clone()));
     }
 
+    // KOReader document digests for files stored before migration 0042 (or
+    // whose upload-time digest failed). Spawned: it only reads, and a kosync
+    // request that arrives first digests a few stragglers itself.
+    {
+        let state = state.clone();
+        tokio::spawn(async move {
+            let n = vellum_server::index_koreader_digests(&state).await;
+            if n > 0 {
+                tracing::info!("koreader: indexed {n} file(s)");
+            }
+        });
+    }
+
     // Loan reminders (migration 0037). Started unconditionally: the sweep
     // itself checks whether there is a mailer and whether the owner has
     // switched reminders on, so a server with neither spends one query an hour

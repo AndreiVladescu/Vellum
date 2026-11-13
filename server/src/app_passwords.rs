@@ -126,17 +126,23 @@ pub(crate) async fn verify(
         return Ok(None);
     };
     if stale {
-        // Best effort: a failed stamp must not fail the request it describes.
-        let _ = sqlx::query(
-            "UPDATE app_password SET last_used_at = datetime('now') \
-             WHERE id = ? AND (last_used_at IS NULL \
-                               OR last_used_at < datetime('now', '-60 seconds'))",
-        )
-        .bind(&id)
-        .execute(&state.db)
-        .await;
+        touch(state, &id).await;
     }
     Ok(Some(id))
+}
+
+/// Stamp `last_used_at`, at most once a minute. Best effort: a failed stamp
+/// must not fail the request it describes. Also used by KOReader sync, whose
+/// key is a different credential for the same app password.
+pub(crate) async fn touch(state: &AppState, id: &str) {
+    let _ = sqlx::query(
+        "UPDATE app_password SET last_used_at = datetime('now') \
+         WHERE id = ? AND (last_used_at IS NULL \
+                           OR last_used_at < datetime('now', '-60 seconds'))",
+    )
+    .bind(id)
+    .execute(&state.db)
+    .await;
 }
 
 // ---- endpoints -------------------------------------------------------------
@@ -154,7 +160,14 @@ pub struct AppPasswordDto {
     pub prefix: String,
     pub created_at: String,
     pub last_used_at: Option<String>,
+    /// Whether it also opens KOReader progress sync (v1.6.3) — decided at
+    /// creation, since only then does the secret exist to derive its key from.
+    pub koreader: bool,
 }
+
+/// The DTO's columns, `koreader` derived from whether it has keys.
+const DTO_COLUMNS: &str = "id, label, prefix, created_at, last_used_at, \
+     EXISTS(SELECT 1 FROM koreader_key k WHERE k.app_password_id = app_password.id) AS koreader";
 
 /// The one response that carries the secret. Never stored, never logged.
 #[derive(Serialize)]
@@ -167,6 +180,10 @@ pub struct CreatedAppPassword {
 #[derive(Deserialize)]
 pub struct CreateInput {
     pub label: String,
+    /// Also record the key KOReader's progress sync authenticates with
+    /// (migration 0042). Off by default: an OPDS-only device has no use for it.
+    #[serde(default)]
+    pub koreader: bool,
 }
 
 /// `GET /api/app-passwords` — the caller's, newest first, without secrets.
@@ -174,10 +191,10 @@ pub async fn list(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<Vec<AppPasswordDto>>> {
-    let rows = sqlx::query_as::<_, AppPasswordDto>(
-        "SELECT id, label, prefix, created_at, last_used_at FROM app_password \
-         WHERE user_id = ? ORDER BY created_at DESC, id",
-    )
+    let rows = sqlx::query_as::<_, AppPasswordDto>(sqlx::AssertSqlSafe(format!(
+        "SELECT {DTO_COLUMNS} FROM app_password \
+         WHERE user_id = ? ORDER BY created_at DESC, id"
+    )))
     .bind(&user.id)
     .fetch_all(&state.db)
     .await?;
@@ -230,9 +247,12 @@ pub async fn create(
     .bind(hash(&normalized))
     .execute(&mut *tx)
     .await?;
-    let row = sqlx::query_as::<_, AppPasswordDto>(
-        "SELECT id, label, prefix, created_at, last_used_at FROM app_password WHERE id = ?",
-    )
+    if input.koreader {
+        crate::koreader::store_keys(&mut tx, &id, &secret).await?;
+    }
+    let row = sqlx::query_as::<_, AppPasswordDto>(sqlx::AssertSqlSafe(format!(
+        "SELECT {DTO_COLUMNS} FROM app_password WHERE id = ?"
+    )))
     .bind(&id)
     .fetch_one(&mut *tx)
     .await?;

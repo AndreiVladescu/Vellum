@@ -30,6 +30,7 @@ mod groups;
 mod gzip;
 mod ids;
 mod import_check;
+mod koreader;
 mod layouts;
 mod links;
 mod loans;
@@ -64,6 +65,15 @@ pub use events::EventBus;
 /// Re-exported for `main.rs`: the one-shot move of pre-#9 blobs into the
 /// content-addressed layout (plan 5 #9).
 pub use blobs::backfill_content_addressed;
+
+/// Re-exported for `main.rs`: digest stored files for KOReader sync (v1.6.3).
+pub async fn index_koreader_digests(state: &AppState) -> u64 {
+    koreader::index_missing(state, -1).await
+}
+
+/// KOReader's partial MD5, so tests can compute a file's document id the way
+/// the e-reader does.
+pub use koreader::partial_md5;
 
 pub use text_index::{
     drain as drain_text_index, enqueue_missing as enqueue_missing_text,
@@ -558,6 +568,11 @@ pub fn router(state: AppState) -> Router {
         // `/opds` was, so an existing client that bookmarked the root still
         // finds every book one hop away.
         .merge(opds_routes())
+        // KOReader progress sync (v1.6.3): KOReader's own kosync protocol, at
+        // the address its *Custom sync server* setting takes. Authenticated by
+        // its own headers with a KOReader app password, so nothing here
+        // accepts a session token or Basic auth, and nothing else accepts it.
+        .nest("/koreader", koreader::routes())
         .nest("/api", api.clone())
         .nest("/api/v1", api)
         .with_state(state)

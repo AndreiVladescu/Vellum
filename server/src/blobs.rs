@@ -437,6 +437,7 @@ pub async fn upload_file(
     let bg_id = id.clone();
     let bg_file_id = file_id.clone();
     let bg_full = full.clone();
+    let bg_full_for_koreader = full.clone();
     let bg_filename = q.filename.clone();
     let is_pdf = ext == "pdf";
     let is_epub = ext == "epub";
@@ -491,6 +492,9 @@ pub async fn upload_file(
         // server opted in, and never on the request path: extracting a 900-page
         // PDF must not hold an upload open.
         crate::text_index::enqueue(&bg, &bg_file_id, &bg_id).await;
+        // KOReader's document id for this file (v1.6.3), linking any position
+        // a KOReader device reported before the book was here.
+        crate::koreader::index_file(&bg, &bg_file_id, bg_full_for_koreader).await;
     });
 
     Ok(Json(file))

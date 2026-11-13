@@ -81,6 +81,9 @@ const FEATURES: &[&str] = &[
     // Per-device app passwords for OPDS e-readers (migration 0039): a client
     // can offer "make one for this device" instead of the account password.
     "app_passwords",
+    // KOReader's sync protocol under /koreader (migration 0042), fed by app
+    // passwords made with `koreader: true`.
+    "koreader_sync",
 ];
 
 pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {
