@@ -4,7 +4,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../data/shelf_service.dart';
 import '../server/connection_store.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import 'app_settings.dart';
 import '../l10n/gen/app_localizations.dart';
 
@@ -51,7 +51,7 @@ class SharedShelvesPage extends StatelessWidget {
                 if (shelfMadeByAnother(s, connection.userId)) s,
             ];
             return ListView(
-              padding: pageInsets(context, const EdgeInsets.only(bottom: 12)),
+              padding: readableInsets(context, const EdgeInsets.only(bottom: 12)),
               children: [
                 SwitchListTile(
                   value: settings.acceptSharedShelves,

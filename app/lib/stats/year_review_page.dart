@@ -11,7 +11,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import 'duration_label.dart';
 import 'month_review.dart';
 import 'month_review_page.dart' show openBookDetail;
@@ -122,7 +122,7 @@ class _YearReviewPageState extends State<YearReviewPage> {
     );
 
     return ListView(
-      padding: pageInsets(context, const EdgeInsets.all(16)),
+      padding: readableInsets(context, const EdgeInsets.all(16)),
       children: [
         Row(
           children: [

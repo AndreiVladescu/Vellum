@@ -6,7 +6,7 @@ import '../import/import_plan.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 import '../snack_bars.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import 'duplicate_finder.dart';
 import 'merge_service.dart';
 
@@ -144,7 +144,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
             );
           }
           return ListView.separated(
-            padding: pageInsets(context, EdgeInsets.zero),
+            padding: readableInsets(context, EdgeInsets.zero),
             itemCount: pairs.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, i) {

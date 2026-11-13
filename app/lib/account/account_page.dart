@@ -1,5 +1,5 @@
 import 'package:file_selector/file_selector.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import 'package:flutter/material.dart';
 import '../l10n/gen/app_localizations.dart';
 
@@ -70,7 +70,7 @@ class _AccountPageState extends State<AccountPage> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.drawerAccount)),
       body: ListView(
-        padding: pageInsets(context, EdgeInsets.all(24)),
+        padding: readableInsets(context, EdgeInsets.all(24)),
         children: [
           // Listens rather than relying on setState: the photo can change from
           // the drawer as well, and a page that only repaints its own edits

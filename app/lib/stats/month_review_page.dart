@@ -5,7 +5,7 @@ import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import 'day_detail_sheet.dart';
 import 'duration_label.dart';
 import 'heatmap_grid.dart';
@@ -102,7 +102,7 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
     final canGoForward = month.isBefore(current);
 
     return ListView(
-      padding: pageInsets(context, const EdgeInsets.all(16)),
+      padding: readableInsets(context, const EdgeInsets.all(16)),
       children: [
         Row(
           children: [

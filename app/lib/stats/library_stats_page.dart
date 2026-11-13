@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../data/database.dart';
 import '../l10n/gen/app_localizations.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import 'library_stats.dart';
 import 'library_stats_queries.dart';
 
@@ -79,7 +79,7 @@ class _LibraryStatsViewState extends State<LibraryStatsView> {
     final yearBars = _byYear ? s.byYear : s.byDecade;
 
     return ListView(
-      padding: pageInsets(context, const EdgeInsets.all(16)),
+      padding: readableInsets(context, const EdgeInsets.all(16)),
       children: [
         Text(
           l10n.libraryStatsTotal(s.total),

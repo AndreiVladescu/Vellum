@@ -11,7 +11,7 @@ import '../data/library_repository.dart';
 import '../server/connection_store.dart';
 import '../settings/app_settings.dart';
 import '../snack_bars.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 
 /// Books you want but don't own (plan 5 #21a).
 ///
@@ -45,7 +45,7 @@ class WishlistPage extends StatelessWidget {
           }
           if (books.isEmpty) return const _EmptyWishlist();
           return ListView.separated(
-            padding: pageInsets(context, EdgeInsets.zero),
+            padding: readableInsets(context, EdgeInsets.zero),
             itemCount: books.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, i) => _WishTile(

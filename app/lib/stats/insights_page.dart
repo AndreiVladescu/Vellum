@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
@@ -151,7 +151,7 @@ class _InsightsPageState extends State<InsightsPage> {
           }
           final theme = Theme.of(context);
           return ListView(
-            padding: pageInsets(context, const EdgeInsets.all(16)),
+            padding: readableInsets(context, const EdgeInsets.all(16)),
             children: [
               _RangeControl(range: _range, onChanged: _setRange),
               const SizedBox(height: 16),

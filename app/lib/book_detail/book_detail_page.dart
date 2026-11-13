@@ -1,5 +1,5 @@
 import 'package:desktop_drop/desktop_drop.dart';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
@@ -515,9 +515,13 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                   color: theme.colorScheme.primary.withValues(alpha: 0.06),
                 )
               : null,
-          child: ListView(
-            padding: pageInsets(context, EdgeInsets.all(24)),
-            children: [
+          // One column on a phone, as it always was; on a wide window the
+          // cover, title and read button hold the left while the rest of the
+          // page runs down the right, instead of every row stretching the
+          // whole width of a tablet on its side.
+          child: TwoColumnList(
+            padding: const EdgeInsets.all(24),
+            lead: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -622,6 +626,8 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
               ),
               const SizedBox(height: 20),
               ReadButton(book: book, repository: repository),
+            ],
+            rest: [
               if (book.description != null) ...[
                 const SizedBox(height: 20),
                 Text(l10n.detailAbout, style: theme.textTheme.titleMedium),

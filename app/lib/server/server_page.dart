@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -837,7 +837,7 @@ class _ServerPageState extends State<ServerPage> {
     final conn = widget.connection;
     final caps = conn.capabilities;
     return ListView(
-      padding: pageInsets(context, EdgeInsets.all(24)),
+      padding: readableInsets(context, EdgeInsets.all(24)),
       children: [
         Card(
           child: ListTile(
@@ -993,7 +993,7 @@ class _ServerPageState extends State<ServerPage> {
     final theme = Theme.of(context);
     final l10n = L10n.of(context);
     return ListView(
-      padding: pageInsets(context, EdgeInsets.all(24)),
+      padding: readableInsets(context, EdgeInsets.all(24)),
       children: [
         Text(
           _registerMode ? l10n.serverSignInRegister : l10n.serverSignInTitle,

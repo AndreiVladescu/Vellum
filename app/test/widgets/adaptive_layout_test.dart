@@ -17,6 +17,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/account/user_profile.dart';
 import 'package:vellum/app_drawer.dart';
+import 'package:vellum/book_detail/cover_thumb.dart';
+import 'package:vellum/book_detail/formats_section.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
@@ -209,4 +211,39 @@ void main() {
 
     await dispose(tester);
   });
+
+  // 700, not 400, for the one-column case: at 400 the read button's own row
+  // overflows under the test font, which is that row's problem (tracked with
+  // the large-text fixes), not the page layout's.
+  for (final (width, twoColumns) in [(700.0, false), (1280.0, true)]) {
+    testWidgets(
+        'at ${width.toInt()} wide the book page is '
+        '${twoColumns ? 'two columns' : 'one column'}', (tester) async {
+      setWidth(tester, width);
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(await buildApp(tester, NavigationHistory()));
+      await settle(tester);
+
+      await tester.tap(find.byType(BookSpine).first);
+      await settle(tester);
+
+      final cover = tester.getTopLeft(find.byType(CoverThumb));
+      final formats = tester.getTopLeft(find.byType(DigitalFormatsSection));
+      if (twoColumns) {
+        expect(formats.dx, greaterThan(cover.dx + 400),
+            reason: 'formats sit in the right-hand column');
+        expect(formats.dy,
+            lessThan(tester.getBottomLeft(find.byType(CoverThumb)).dy),
+            reason: 'beside the cover, not under it');
+        // Centred in the window rather than starting at its left edge.
+        expect(cover.dx, greaterThan(24));
+      } else {
+        expect(formats.dx, cover.dx, reason: 'one column: same left edge');
+        expect(formats.dy, greaterThan(cover.dy));
+      }
+      expect(tester.takeException(), isNull, reason: 'no overflow');
+
+      await dispose(tester);
+    });
+  }
 }

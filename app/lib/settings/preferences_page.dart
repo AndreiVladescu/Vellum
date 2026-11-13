@@ -1,5 +1,5 @@
 import 'dart:io';
-import '../widgets/page_insets.dart';
+import '../widgets/adaptive.dart';
 import '../snack_bars.dart';
 
 import 'package:file_selector/file_selector.dart';
@@ -60,7 +60,7 @@ class PreferencesPage extends StatelessWidget {
         builder: (context, _) {
           final l10n = L10n.of(context);
           return ListView(
-          padding: pageInsets(context, EdgeInsets.symmetric(vertical: 8)),
+          padding: readableInsets(context, EdgeInsets.symmetric(vertical: 8)),
           children: [
             _SectionHeader(l10n.prefsSectionAppearance),
             _AppearanceSection(settings: settings),
