@@ -129,7 +129,9 @@ lets the work be checked before it ships.
 - [ ] **M** A script under `tool/` that boots an AVD headless, installs the
       APK, runs a check and shuts it down, so agents can use it without
       leaving an emulator running
-- [ ] **M** Work through *Manual device checks* on the emulator: background
+- [ ] **M** Work through *Manual device checks* on the emulator (background
+      sync on Android 14 is done: forced job, and update in place from
+      `workmanager` 0.9 to 0.10, both ran): background
       sync forced with `adb shell cmd jobscheduler run -f`, the home-screen
       widget, shortcuts, share and open-with import, Material You colours,
       the reader (open, zoom, highlight sharpness, search), large text.
