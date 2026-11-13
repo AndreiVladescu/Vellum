@@ -61,6 +61,10 @@ const CONSOLE_MODULES: &[(&str, &str)] = &[
     ("actions.js", include_str!("../web/console/actions.js")),
     ("activity.js", include_str!("../web/console/activity.js")),
     ("add_book.js", include_str!("../web/console/add_book.js")),
+    (
+        "app_passwords.js",
+        include_str!("../web/console/app_passwords.js"),
+    ),
     ("api.js", include_str!("../web/console/api.js")),
     ("books.js", include_str!("../web/console/books.js")),
     ("boot.js", include_str!("../web/console/boot.js")),

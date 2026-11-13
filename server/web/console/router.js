@@ -20,6 +20,7 @@ import { showLoans } from './loans.js';
 import { showRequests } from './requests.js';
 import { showReminders } from './reminders.js';
 import { showPeople } from './people.js';
+import { showAppPasswords } from './app_passwords.js';
 import { showShares } from './shares.js';
 import { showRooms } from './rooms.js';
 import { showOverview } from './overview.js';
@@ -57,6 +58,10 @@ export const ROUTES = [
   { path: '/people/users', group: 'people', label: 'People', master: true, show: () => showPeople() },
   { path: '/people/shares', group: 'people', label: 'Shares and links', show: () => showShares() },
   { path: '/people/rooms', group: 'people', label: 'Rooms', show: () => showRooms() },
+  // Every account's own e-reader passwords — not master-only: each person
+  // manages their own devices.
+  { path: '/people/app-passwords', group: 'people', label: 'App passwords',
+    show: () => showAppPasswords() },
   { path: '/server/about', group: 'server', label: 'Server', master: true, show: () => showServer() },
   { path: '/server/activity', group: 'server', label: 'Activity log', master: true,
     show: () => showActivity() },

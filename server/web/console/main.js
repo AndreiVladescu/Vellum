@@ -32,6 +32,7 @@ import * as remindersModule from './reminders.js';
 import * as roomsModule from './rooms.js';
 import * as sharesModule from './shares.js';
 import * as peopleModule from './people.js';
+import * as appPasswordsModule from './app_passwords.js';
 import * as mailModule from './mail.js';
 import * as overviewModule from './overview.js';
 import * as serverModule from './server.js';
@@ -52,7 +53,7 @@ const modules = [
   exportModule, addBookModule, importModule, uploadsModule,
   tagsModule, bulkModule, detailModule, linksModule,
   certModule, requestsModule, loansModule, remindersModule,
-  roomsModule, sharesModule, peopleModule, mailModule,
+  roomsModule, sharesModule, peopleModule, appPasswordsModule, mailModule,
   overviewModule, serverModule, activityModule, searchModule, routerModule,
 ];
 for (const mod of modules) {

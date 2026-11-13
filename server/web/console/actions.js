@@ -19,6 +19,7 @@ import { grantAccess, revokeLink, revokeShare } from './shares.js';
 import { invitePerson, removePerson, renamePerson, resetFor, revokeInvite,
   setRole } from './people.js';
 import { showMailSetup, testMail } from './mail.js';
+import { copySecret, newAppPassword, revokeAppPassword } from './app_passwords.js';
 import { showActivity } from './activity.js';
 import { showOverview } from './overview.js';
 import { checkOrphans, deleteOrphans, downloadBackup } from './server.js';
@@ -91,6 +92,9 @@ export const ACTIONS = {
   revokelink: el => revokeLink(el.dataset.id),
   revokeshare: el => revokeShare(el.dataset.id),
   grantaccess: () => grantAccess(),
+  newapppassword: () => newAppPassword(),
+  revokeapppassword: el => revokeAppPassword(el.dataset.id, el.dataset.label),
+  copysecret: el => copySecret(el.dataset.secret),
   applyview: el => applyView(el.dataset.name),
   deleteview: el => deleteView(el.dataset.name),
   navaction: el => runNavAction(el.dataset.id),
