@@ -122,6 +122,11 @@ void main() {
 
   testWidgets('connected: the header keeps your email, the server tile has '
       'the account', (tester) async {
+    // Tall enough for the whole drawer: a ListView only builds what fits.
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.runAsync(() async {
       final (widget, _) = await buildDrawer(tester, {
         'profile.name': 'Testus Amogus',

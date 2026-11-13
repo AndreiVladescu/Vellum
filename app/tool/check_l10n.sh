@@ -212,6 +212,9 @@ MIGRATED=(
   lib/stats/goals_dialog.dart
   lib/stats/heatmap_grid.dart
   lib/stats/insights_page.dart
+  lib/stats/library_stats.dart
+  lib/stats/library_stats_page.dart
+  lib/stats/library_stats_queries.dart
   lib/stats/insights_range.dart
   lib/stats/month_review.dart
   lib/stats/month_review_page.dart

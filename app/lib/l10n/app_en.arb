@@ -9794,5 +9794,178 @@
   "insightsReadingDaysHint": "Select a day for its pages, time and books",
   "@insightsReadingDaysHint": {
     "description": "Subtitle of the 12-week heat map: days can be selected."
+  },
+
+  "libraryStatsTitle": "Library statistics",
+  "@libraryStatsTitle": {
+    "description": "App bar title and drawer entry of the page that describes the collection (genres, years, formats, authors, the unread pile)."
+  },
+
+  "libraryStatsEmpty": "Add some books and the shape of your library will show up here.",
+  "@libraryStatsEmpty": {
+    "description": "Empty state of the library statistics page."
+  },
+
+  "libraryStatsTotal": "{count, plural, =1{1 book in your library} other{{count} books in your library}}",
+  "@libraryStatsTotal": {
+    "description": "Headline of the library statistics page. Wishlist, trashed and sample books are not counted.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "libraryStatsGenres": "By genre",
+  "@libraryStatsGenres": {
+    "description": "Section heading: books per genre or tag."
+  },
+
+  "libraryStatsGenresNone": "No genres or tags yet",
+  "@libraryStatsGenresNone": {
+    "description": "Shown under the genre heading when no book has a genre."
+  },
+
+  "libraryStatsYears": "By publication year",
+  "@libraryStatsYears": {
+    "description": "Section heading: books per publication year or decade."
+  },
+
+  "libraryStatsDecades": "Decades",
+  "@libraryStatsDecades": {
+    "description": "Label of the toggle that groups publication years by decade."
+  },
+
+  "libraryStatsByYear": "Years",
+  "@libraryStatsByYear": {
+    "description": "Label of the toggle that shows each publication year."
+  },
+
+  "libraryStatsUnknownYear": "{count, plural, =1{1 book has no publication year} other{{count} books have no publication year}}",
+  "@libraryStatsUnknownYear": {
+    "description": "Note under the publication year chart.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "libraryStatsFormats": "By format",
+  "@libraryStatsFormats": {
+    "description": "Section heading: books per format (PDF, EPUB, physical, several)."
+  },
+
+  "libraryStatsFormatPdf": "PDF",
+  "@libraryStatsFormatPdf": {
+    "description": "Format category: the book has exactly one PDF file."
+  },
+
+  "libraryStatsFormatEpub": "EPUB",
+  "@libraryStatsFormatEpub": {
+    "description": "Format category: the book has exactly one EPUB file."
+  },
+
+  "libraryStatsFormatOther": "Other file",
+  "@libraryStatsFormatOther": {
+    "description": "Format category: the book has a file that is neither PDF nor EPUB."
+  },
+
+  "libraryStatsFormatPhysical": "Physical",
+  "@libraryStatsFormatPhysical": {
+    "description": "Format category: the book is only a physical copy."
+  },
+
+  "libraryStatsFormatSeveral": "Several",
+  "@libraryStatsFormatSeveral": {
+    "description": "Format category: the book is held in more than one way, such as a file and a paper copy."
+  },
+
+  "libraryStatsFormatNone": "No copy",
+  "@libraryStatsFormatNone": {
+    "description": "Format category: the book has neither a file nor a physical copy."
+  },
+
+  "libraryStatsAuthors": "Top authors",
+  "@libraryStatsAuthors": {
+    "description": "Section heading: the authors with the most books."
+  },
+
+  "libraryStatsAuthorsNone": "No authors yet",
+  "@libraryStatsAuthorsNone": {
+    "description": "Shown under the authors heading when no book has an author."
+  },
+
+  "libraryStatsUnread": "The unread pile",
+  "@libraryStatsUnread": {
+    "description": "Section heading: books whose status is still unread."
+  },
+
+  "libraryStatsUnreadBooks": "{count, plural, =0{Nothing unread. The pile is clear.} =1{1 unread book} other{{count} unread books}}",
+  "@libraryStatsUnreadBooks": {
+    "description": "Size of the unread pile.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "libraryStatsUnreadPages": "About {count, plural, =1{1 page} other{{count} pages}} to read",
+  "@libraryStatsUnreadPages": {
+    "description": "Estimated pages in the unread pile.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "libraryStatsUnreadPagesGuess": "{count, plural, =1{1 book has no page count, so it is estimated from the others} other{{count} books have no page count, so they are estimated from the others}}",
+  "@libraryStatsUnreadPagesGuess": {
+    "description": "Explains the estimate in the unread pile.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "libraryStatsUnreadSize": "{size} of files",
+  "@libraryStatsUnreadSize": {
+    "description": "Total file size of the unread pile.",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+
+  "libraryStatsAdded": "Books added per month",
+  "@libraryStatsAdded": {
+    "description": "Section heading: how many books were added each month."
+  },
+
+  "libraryStatsAddedLastYear": "Last 12 months",
+  "@libraryStatsAddedLastYear": {
+    "description": "Label of the toggle showing the last twelve months."
+  },
+
+  "libraryStatsAddedAllTime": "All time",
+  "@libraryStatsAddedAllTime": {
+    "description": "Label of the toggle showing every month since the first book."
+  },
+
+  "libraryStatsBarLabel": "{label}: {count, plural, =1{1 book} other{{count} books}}",
+  "@libraryStatsBarLabel": {
+    "description": "Screen-reader label of one bar in a chart.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

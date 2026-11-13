@@ -11,6 +11,7 @@ import 'data/library_repository.dart';
 import 'dedupe/duplicates_page.dart';
 import 'import/folder_import_page.dart';
 import 'stats/insights_page.dart';
+import 'stats/library_stats_page.dart';
 import 'loans/loans_page.dart';
 import 'server/connection_store.dart';
 import 'server/server_page.dart';
@@ -214,6 +215,16 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.insights_outlined),
             title: Text(L10n.of(context).drawerInsights),
             onTap: () => _openInsights(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.bar_chart_outlined),
+            title: Text(L10n.of(context).libraryStatsTitle),
+            onTap: () {
+              Navigator.of(context).pop(); // close the drawer first
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => LibraryStatsPage(db: repository.db),
+              ));
+            },
           ),
           ListenableBuilder(
             listenable: connection,
