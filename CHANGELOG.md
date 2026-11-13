@@ -6,6 +6,53 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.3.6 — 2026-11-13
+
+Pages you can turn, room on a tablet, and a safer server.
+
+### Added
+
+- **Paged EPUB reading.** Switch an EPUB from *Scrolled* to *Paged* and turn
+  pages with a tap on either side, a swipe, the arrow keys, Page Up/Down or
+  Space. A page never cuts a line in half, and your place is kept when you
+  switch modes, resize the window or change the text size.
+- **Tablet and wide-window layouts.** A navigation rail on medium widths, a
+  permanent menu on wide ones, a two-column book page, and lists and settings
+  at a readable width. Phones are unchanged.
+- **Two-factor sign-in.** Turn it on from the console's account security page
+  with any authenticator app; you get ten one-time recovery codes. The app asks
+  for the code when you sign in. App passwords keep working without a code —
+  that is what they are for.
+- **KOReader progress sync.** Point KOReader's *Custom sync server* at
+  `https://<your server>/koreader` and log in with an app password made for
+  KOReader. Its position shows up in the app like any other device's. See
+  `docs/DEPLOYMENT.md`.
+- **Signed links for covers and downloads** in the console: short-lived,
+  per-file and per-person, so no session token ever goes into a URL.
+
+### Changed
+
+- **Faster shelf and Insights.** Scrolling a large shelf no longer stutters
+  (janky frames down from about 70 to 0–1 in a 4,000-book test), and changing
+  the Insights range or stepping through months no longer freezes for a
+  moment. The physical room pans and zooms more smoothly too.
+- In a scrolled EPUB the arrow keys move a few lines and Page Up/Down a
+  screen.
+
+### Fixed
+
+- Large system text no longer cuts off the shelf chips or overflows the book
+  page's resume and rating rows.
+- The home-screen widget drops a book once it is marked Finished, and the
+  widget picker shows a preview instead of a grey box.
+
+### Maintenance
+
+- A repeatable profiling run (`app/tool/perf_run.sh`) to check performance
+  before a release; see `docs/PERFORMANCE.md`.
+
+---
+
 ## v1.3.5 — 2026-11-13
 
 Your year in a picture, your library in numbers, and reminders for lent books.
@@ -35,6 +82,10 @@ Your year in a picture, your library in numbers, and reminders for lent books.
 - The console's *Search inside books* no longer fails to show its separator.
 - The sync details dialog is fully translatable.
 - A custom reading goal shows the value that was actually saved.
+
+### Maintenance
+
+- Server: `quinn-udp` 0.5.16 for RUSTSEC-2026-0538.
 
 ---
 

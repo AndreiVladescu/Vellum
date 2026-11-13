@@ -43,6 +43,9 @@ takes the next free number, so year in review moves to v1.3.4.
 `v1.3.5` (2026-11-13) — year in review and library statistics, as planned,
 plus loan reminders (v1.4.2), scheduled backups (v1.6.1), app passwords
 (v1.6.2), the emulator script and small fixes.
+`v1.3.6` (2026-11-13) — paged EPUB (v1.4.0), wide layouts for tablets and
+desktop, signed links and two-factor sign-in (v1.6.2), KOReader sync
+(v1.6.3), large-text fixes and a performance round.
 
 ---
 
@@ -194,7 +197,7 @@ lets the work be checked before it ships.
 
 ### v1.4.0 — pages you can turn
 
-- [ ] **L** Paged EPUB mode, rather than a chapter you scroll
+- [x] **L** Paged EPUB mode, rather than a chapter you scroll
 
 ### v1.4.0a — keep up with Flutter
 
@@ -271,13 +274,13 @@ A new kind of book, so it starts with a design note rather than code.
 
 - [x] **L** App passwords: per-device tokens for OPDS and e-readers, so the
       account password is never typed into a Kindle
-- [ ] **M** Short-lived per-resource links for covers and downloads, replacing
+- [x] **M** Short-lived per-resource links for covers and downloads, replacing
       the session token in a `?token=` query string
-- [ ] **L** Two-factor sign-in (TOTP) for the console
+- [x] **L** Two-factor sign-in (TOTP) for the console
 
 ### v1.6.3 — e-readers
 
-- [ ] **L** KOReader progress sync: the server speaks KOReader's sync protocol,
+- [x] **L** KOReader progress sync: the server speaks KOReader's sync protocol,
       feeding the per-device reading-position channel
 
 ---
