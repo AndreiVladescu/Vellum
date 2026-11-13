@@ -253,7 +253,8 @@ A new kind of book, so it starts with a design note rather than code.
 - [x] **M** A *Server* page: version, whether a newer release exists, the
       configuration in effect (read-only), capabilities, storage, and the
       backup, sweep and activity-log actions that exist today as endpoints
-- [ ] **M** Scheduled server-side backups to a directory, with rotation
+- [x] **M** Scheduled server-side backups to a directory, with rotation
+      (`VELLUM_BACKUP_DIR`, `VELLUM_BACKUP_INTERVAL`, `VELLUM_BACKUP_KEEP`)
 
 ### v1.6.2 — safer access
 
