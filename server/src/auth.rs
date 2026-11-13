@@ -70,9 +70,9 @@ impl FromRequestParts<AppState> for AuthUser {
         // Bearer for the app; Basic so OPDS e-readers (and file downloads) work.
         // The session token is *only* ever accepted from the Authorization
         // header — never a `?token=` query param, so it can't leak into
-        // reverse-proxy access logs or browser history. The web console loads
-        // authenticated blobs (covers, downloads) with an `Authorization: Bearer`
-        // fetch into an object URL rather than a bare `<img src>`/`<a href>`.
+        // reverse-proxy access logs or browser history. For a bare
+        // `<img src>`/`<a href>` the console asks for a short-lived signed link
+        // (`POST /api/links`), accepted below in place of a header.
         if let Some(header) = parts
             .headers
             .get(AUTHORIZATION)
@@ -93,6 +93,26 @@ impl FromRequestParts<AppState> for AuthUser {
                     "unsupported authorization scheme".into(),
                 ))
             };
+        }
+        // No header: a signed link (cover/file GETs only; see `links.rs`). The
+        // signature only names the user; handlers still check access.
+        if parts.method == axum::http::Method::GET
+            && let Some(query) = parts.uri.query()
+        {
+            let path = parts
+                .extensions
+                .get::<axum::extract::OriginalUri>()
+                .map_or_else(|| parts.uri.path(), |o| o.0.path());
+            if let Some(uid) = crate::links::verify(state, path, query).await
+                && let Some(user) = sqlx::query_as::<_, AuthUser>(
+                    "SELECT id, email, display_name, is_master FROM app_user WHERE id = ?",
+                )
+                .bind(&uid)
+                .fetch_optional(&state.db)
+                .await?
+            {
+                return Ok(user);
+            }
         }
         Err(AppError::Unauthorized("missing credentials".into()))
     }

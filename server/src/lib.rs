@@ -31,6 +31,7 @@ mod gzip;
 mod ids;
 mod import_check;
 mod layouts;
+mod links;
 mod loans;
 mod mail;
 mod metadata;
@@ -297,6 +298,9 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // Send a book to an e-reader by email (plan 5 #53). Gated on the `mail`
         // capability, rate-limited per user, and RBAC'd exactly like a read.
         .route("/books/{id}/send", post(send::send_book))
+        // Short-lived signed URLs for covers and downloads (v1.6.2).
+        .route("/links", post(links::create))
+        .route("/links/rotate", post(links::rotate))
         .route(
             "/send-targets",
             get(send::list_targets).put(send::put_targets),
