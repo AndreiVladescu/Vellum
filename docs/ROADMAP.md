@@ -122,16 +122,24 @@ lets the work be checked before it ships.
       to keep it across reboots,
       `echo kvm_amd | sudo tee /etc/modules-load.d/kvm.conf`. If `modprobe`
       says SVM is disabled, enable *SVM Mode* in the BIOS.
-- [ ] **S** Phone: the existing AVD `vellum_test` (Pixel 6, Android 14, Google
+- [x] **S** Phone: the existing AVD `vellum_test` (Pixel 6, Android 14, Google
       APIs, x86_64) boots headless and the debug APK installs and opens
-- [ ] **S** Tablet: a second AVD from the same Android 14 image with a tablet
-      profile (Pixel Tablet), for the wide layouts
+      (done 2026-11-13: boots in ~30 s, installs, opens on the shelf)
+- [x] **S** Tablet: a second AVD from the same Android 14 image with a tablet
+      profile (Pixel Tablet), for the wide layouts (done 2026-11-13:
+      `vellum_tablet`, 2560x1600 at 320 dpi; the shelf and book detail just
+      stretch to the full width, no two-pane or rail yet)
 - [ ] **S** Android 16: an API 36 image and AVD, for `workmanager` 0.10's
       Android 16 fixes (a ~1.5 GB download; the disk is 95 % full)
-- [ ] **M** A script under `tool/` that boots an AVD headless, installs the
+- [x] **M** A script under `tool/` that boots an AVD headless, installs the
       APK, runs a check and shuts it down, so agents can use it without
-      leaving an emulator running
-- [ ] **M** Work through *Manual device checks* on the emulator (background
+      leaving an emulator running (done 2026-11-13: `app/tool/emulator.sh`,
+      `boot|install|shot|run|stop|status`; `run` always shuts down, `boot`
+      waits for a busy emulator and never kills one it did not start)
+- [~] **M** Work through *Manual device checks* on the emulator (2026-11-13:
+      shortcuts, widget, open-with and share, Material You, reader and large
+      text done on the phone, with two bugs found; the tablet's reader and
+      multi-file share not done: see `BACKLOG.md`) (background
       sync on Android 14 is done: forced job, and update in place from
       `workmanager` 0.9 to 0.10, both ran): background
       sync forced with `adb shell cmd jobscheduler run -f`, the home-screen

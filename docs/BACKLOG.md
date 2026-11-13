@@ -87,6 +87,39 @@ when it changes, so a book is drawn the same way in both views.
 
 ## Manual device checks (CI can't do these)
 
+**Emulator pass, 2026-11-13** (`app/tool/emulator.sh`; Pixel 6 and Pixel Tablet
+AVDs, Android 14, debug build). Passed on the phone: all three shortcuts cold
+and warm; the widget (added through the launcher, shows cover, title and
+progress); tapping the widget (this opened only the shelf until the fix
+`android: widget tap opens the book`, since the click sent a `vellum://`
+URI nothing reads instead of the shortcut extra); open-with a PDF (cold) and
+share an EPUB (warm), both landing on the add-book form with the file attached
+(through `file://` URIs from app storage, see below); Material You (system
+palette forced to blue with `settings put secure
+theme_customization_overlay_packages`, the app followed it once *Use the system
+colours* was on); the PDF reader (open, pinch to roughly 6x with
+`sendevent` after `adb root`, text sharp at every level, highlight, and the
+text away from the mark as crisp as with none, in-book search 1/46).
+Failed or open:
+
+- **Large text.** At font scale 1.3 the *All* / *New shelf* chips on the shelf
+  are clipped, and the book detail's *Resume reading* row overflows by 14 px
+  (the open-externally button); at 2.0 the same row overflows by 102 px and
+  the star-rating row by 8 px. Screenshots are in the agent scratch area.
+- **Widget empty state.** The widget treats 98 % progress, not the *Finished*
+  status, as "finished", like the shelf strip. Setting *Finished* by hand left
+  it showing the book; read to the end to check the fall-back.
+- **Tablet (2560x1600, 320 dpi).** No wide layout: the shelf, the book detail
+  and its notes box stretch edge to edge, the drawer is modal and the bottom
+  bar stays. Rotation to portrait works. Reader, insights and sync not looked
+  at on the tablet.
+- **Not possible on the emulator:** a real *Open with* from Files and a Gmail
+  share (the shell cannot grant a `content://` URI, so the import copy was
+  checked with `file://`); multi-file share (`am` cannot send a URI list);
+  the generic-mime case; the empty widget preview (the picker shows a grey box,
+  there is no preview layout); camera scanning; battery and Wi-Fi constraints;
+  the 2.12 items that need a real phone.
+
 **Background sync, shortcuts and the widget** (plan 5 #40). The scheduling
 *policy* is unit-tested (`app/test/server/background_sync_test.dart`) and the
 Kotlin, the manifest, the shortcut XML and the widget layout all compile in
