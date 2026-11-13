@@ -1846,12 +1846,13 @@ class _ReaderPageState extends State<ReaderPage>
             onTap: settings?.immersive == true
                 ? () => _setReadingMode(!_chromeHidden)
                 : null,
-            // Mitigation, not a proven fix, for pages going soft after a note
-            // is saved. pdfrx repaints its pages on every paint request and
-            // cancels a sharp tile still being rendered when the picture it was
-            // for has changed, and nothing separated the viewer from the rest
-            // of the Scaffold: a SnackBar sliding in repainted every page for
-            // its whole animation. The boundary keeps outside animations out.
+            // Keeps outside animations out of the pages: without it a SnackBar
+            // sliding in repainted every page for its whole animation, and each
+            // repaint makes pdfrx cancel and restart a sharp tile still being
+            // rendered. It was added for pages going soft after a note, but
+            // that was not the cause: measured, the page stayed sharp through
+            // the note dialog, the SnackBar and the repaints. The soft page was
+            // the highlight's multiply blend under Impeller (see `markerPaint`).
             child: RepaintBoundary(
               child: nightModeWrap(
               enabled: dark,

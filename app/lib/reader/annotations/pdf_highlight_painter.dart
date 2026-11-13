@@ -95,11 +95,7 @@ class PdfHighlightPainter {
     if (text == null) return; // repaints once the text is in
 
     for (final mark in marks) {
-      final paint = Paint()
-        ..color = mark.ink
-        // Multiply keeps the glyphs readable through the ink instead of
-        // washing them out, which is what a real highlighter does.
-        ..blendMode = BlendMode.multiply;
+      final paint = markerPaint(mark.ink);
       final bands = highlightBands(
         text.fullText,
         text.charRects,
@@ -151,6 +147,23 @@ class PdfHighlightPainter {
     return done.future;
   }
 }
+
+/// How a mark is laid on the page: the glyphs stay black through the ink and
+/// only the paper takes its colour, which is what a real highlighter does.
+///
+/// **Modulate, not multiply.** The two give the same pixels on a page: the
+/// translucent [ink] multiplied onto the page is the page times the ink laid
+/// over white, and modulate with that opaque colour is exactly that product.
+/// But to Impeller (Flutter's renderer, on Linux too) multiply is an
+/// "advanced" blend, drawn by copying what is already on the canvas into a
+/// texture and compositing it back, and that copy resampled the sharp page
+/// tile pdfrx had just drawn. Every page with a visible mark went soft, by an
+/// amount that changed with the zoom. Modulate is one of the plain Porter-Duff
+/// blends Impeller does in a single pass, so nothing under the mark is copied.
+/// It is opaque so the page keeps its alpha.
+Paint markerPaint(Color ink) => Paint()
+  ..color = Color.alphaBlend(ink, const Color(0xFFFFFFFF))
+  ..blendMode = BlendMode.modulate;
 
 /// Text that arrives asynchronously, keyed by page, loaded at most once per
 /// page and never retried on every paint.

@@ -157,6 +157,13 @@ on a page containing a photograph (it must not look like a negative); fit
 width/page; in-book search with next/previous; "go to page"; and the hide-controls
 preference plus tap-to-reveal in both readers.
 
+**PDF highlights and sharpness**: `pdf_marker_paint_test.dart` pins the blend
+(a pipeline one, same pixels as multiply), but only a real renderer shows the
+soft page multiply caused under Impeller. On Linux and Android, zoom a text PDF
+well in (past about 3x), highlight a passage, and compare the text *away* from
+the mark with a page that has none: it must be as crisp, at a few zoom levels,
+in scroll and paged mode, day and night.
+
 **Deferred from #27**: scheduled OS notifications a day before and on the due
 date. The *decision* logic is built and tested (`LoanDue.needingReminder`, which
 knows not to nag twice in a day but to come back while a book is still out) and
