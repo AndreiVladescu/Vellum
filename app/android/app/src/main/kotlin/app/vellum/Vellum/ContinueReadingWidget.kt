@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.widget.RemoteViews
-import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 
 /**
@@ -59,12 +58,21 @@ class ContinueReadingWidget : HomeWidgetProvider() {
 
                 // Tapping opens the app on the same "continue reading" path the
                 // launcher shortcut uses — one destination, not two.
+                // The extra is what MainActivity reads (cold: takeShortcut,
+                // warm: onNewIntent). HomeWidgetLaunchIntent only sets a
+                // vellum:// data URI, which nothing reads, so the tap just
+                // opened the shelf.
+                val open = android.content.Intent(context, MainActivity::class.java)
+                    .putExtra("vellum_shortcut", "continue")
+                    .setFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 setOnClickPendingIntent(
                     R.id.widget_root,
-                    HomeWidgetLaunchIntent.getActivity(
+                    android.app.PendingIntent.getActivity(
                         context,
-                        MainActivity::class.java,
-                        android.net.Uri.parse("vellum://continue"),
+                        0,
+                        open,
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                            android.app.PendingIntent.FLAG_IMMUTABLE,
                     ),
                 )
             }
