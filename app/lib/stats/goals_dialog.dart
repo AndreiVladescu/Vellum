@@ -118,6 +118,7 @@ class _GoalPickerState extends State<_GoalPicker> {
   late _Choice _choice;
   int? _preset;
   late final TextEditingController _text;
+  final _focus = FocusNode();
 
   @override
   void initState() {
@@ -132,13 +133,35 @@ class _GoalPickerState extends State<_GoalPicker> {
       _choice = _Choice.other;
     }
     _text = TextEditingController(
-        text: _choice == _Choice.other ? '$v' : ''); // i18n-ignore
+      text: _choice == _Choice.other ? '$v' : '',
+    ); // i18n-ignore
+    // The text is only tidied when the reader leaves the field (or submits it),
+    // never while they type: rewriting it mid-keystroke would fight them.
+    _focus.addListener(() {
+      if (!_focus.hasFocus) _showApplied();
+    });
   }
 
   @override
   void dispose() {
+    _focus.dispose();
     _text.dispose();
     super.dispose();
+  }
+
+  /// Shows the number that was actually saved: a value over the maximum is
+  /// clamped, and 0 or nothing means no goal (an empty field).
+  void _showApplied() {
+    final applied = ReadingGoals.normalise(
+      int.tryParse(_text.text),
+      max: widget.max,
+    );
+    final shown = applied == null ? '' : '$applied'; // i18n-ignore
+    if (_text.text == shown) return;
+    _text.value = TextEditingValue(
+      text: shown,
+      selection: TextSelection.collapsed(offset: shown.length),
+    );
   }
 
   void _pick(_Choice choice, {int? preset}) {
@@ -149,8 +172,10 @@ class _GoalPickerState extends State<_GoalPicker> {
     widget.onChanged(switch (choice) {
       _Choice.none => null,
       _Choice.preset => preset,
-      _Choice.other => ReadingGoals.normalise(int.tryParse(_text.text),
-          max: widget.max),
+      _Choice.other => ReadingGoals.normalise(
+        int.tryParse(_text.text),
+        max: widget.max,
+      ),
     });
   }
 
@@ -188,6 +213,7 @@ class _GoalPickerState extends State<_GoalPicker> {
           const SizedBox(height: 8),
           TextField(
             controller: _text,
+            focusNode: _focus,
             autofocus: true,
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -198,9 +224,10 @@ class _GoalPickerState extends State<_GoalPicker> {
               labelText: widget.customLabel,
               helperText: l10n.goalsCustomHelper(widget.max),
             ),
-            onChanged: (text) => widget.onChanged(ReadingGoals.normalise(
-                int.tryParse(text),
-                max: widget.max)),
+            onChanged: (text) => widget.onChanged(
+              ReadingGoals.normalise(int.tryParse(text), max: widget.max),
+            ),
+            onSubmitted: (_) => _showApplied(),
           ),
         ],
       ],
