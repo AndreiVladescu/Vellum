@@ -213,7 +213,7 @@ A new kind of book, so it starts with a design note rather than code.
 
 ### v1.5.0 — an audiobook is a book
 
-- [ ] **L** Design note: which formats (`.m4b`, a folder of `.mp3`), which
+- [x] **L** Design note ([AUDIOBOOKS.md](AUDIOBOOKS.md)): which formats (`.m4b`, a folder of `.mp3`), which
       player library on five platforms and whether the F-Droid flavour can ship
       it, how position is stored (seconds, not pages) and how it reaches the
       existing per-device reading-position channel
