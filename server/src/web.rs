@@ -89,6 +89,7 @@ const CONSOLE_MODULES: &[(&str, &str)] = &[
     ("rooms.js", include_str!("../web/console/rooms.js")),
     ("router.js", include_str!("../web/console/router.js")),
     ("search.js", include_str!("../web/console/search.js")),
+    ("security.js", include_str!("../web/console/security.js")),
     ("server.js", include_str!("../web/console/server.js")),
     ("session.js", include_str!("../web/console/session.js")),
     ("shares.js", include_str!("../web/console/shares.js")),

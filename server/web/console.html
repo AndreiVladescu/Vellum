@@ -15,12 +15,21 @@
     <img class="logo logo-xl" src="/assets/logo.svg" alt="" width="88" height="88">
     <h1>Vellum console</h1>
     <p class="auth-sub">Sign in to manage the library.</p>
-    <form class="auth-form" onsubmit="event.preventDefault(); login()">
+    <form id="l-form" class="auth-form" onsubmit="event.preventDefault(); login()">
       <input id="l-email" type="text" placeholder="Email" aria-label="Email"
              autocomplete="username">
       <input id="l-pass" type="password" placeholder="Password" aria-label="Password"
              autocomplete="current-password">
       <button class="btn primary auth-go" type="submit">Log in</button>
+    </form>
+    <!-- The second step, for an account with two-factor sign-in on. -->
+    <form id="l-2fa" class="auth-form hidden" onsubmit="event.preventDefault(); loginCode()">
+      <p class="auth-sub" style="margin:0">Enter the six-digit code from your
+        authenticator app, or one of your recovery codes.</p>
+      <input id="l-code" type="text" placeholder="Code" aria-label="Two-factor code"
+             inputmode="numeric" autocomplete="one-time-code">
+      <button class="btn primary auth-go" type="submit">Verify</button>
+      <button class="btn sm quiet" type="button" onclick="cancelLoginCode()">Back</button>
     </form>
     <p class="err" id="l-err"></p>
     <!-- Shown only on a server that has no accounts yet; see checkRegistration(). -->

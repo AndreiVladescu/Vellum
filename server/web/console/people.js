@@ -1,5 +1,6 @@
 // People: accounts and invitations.
 
+import { S } from './state.js';
 import { esc, toast } from './dom.js';
 import { api } from './api.js';
 import { ask } from './dialogs.js';
@@ -41,6 +42,7 @@ export async function showPeople(){
       <span>
         <strong>${esc(u.display_name || u.email)}</strong>
         ${u.is_master ? '<span class="muted"> · owner</span>' : ''}
+        ${u.two_factor ? '<span class="muted"> · 2FA on</span>' : ''}
         <div class="muted" style="font-size:12px; margin-top:3px">${esc(u.email)}</div>
       </span>
       <span class="row" style="gap:6px">
@@ -49,6 +51,9 @@ export async function showPeople(){
         <button class="btn sm" data-act="setrole" data-id="${esc(u.id)}" data-master="${u.is_master ? '0' : '1'}">
           ${u.is_master ? 'Make member' : 'Make owner'}</button>
         <button class="btn sm" data-act="resetfor" data-email="${esc(u.email)}">Send reset</button>
+        ${u.two_factor && u.email !== S.email
+          ? `<button class="btn sm" data-act="clear2fa" data-id="${esc(u.id)}"
+                     data-email="${esc(u.email)}">Clear 2FA</button>` : ''}
         <button class="btn sm danger" data-act="removeperson" data-id="${esc(u.id)}" data-email="${esc(u.email)}">
           Remove</button>
       </span>

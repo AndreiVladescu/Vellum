@@ -21,6 +21,7 @@ import { showRequests } from './requests.js';
 import { showReminders } from './reminders.js';
 import { showPeople } from './people.js';
 import { showAppPasswords } from './app_passwords.js';
+import { showSecurity } from './security.js';
 import { showShares } from './shares.js';
 import { showRooms } from './rooms.js';
 import { showOverview } from './overview.js';
@@ -62,6 +63,9 @@ export const ROUTES = [
   // manages their own devices.
   { path: '/people/app-passwords', group: 'people', label: 'App passwords',
     show: () => showAppPasswords() },
+  // Two-factor sign-in for the signed-in account; every account has it.
+  { path: '/people/security', group: 'people', label: 'Account security',
+    show: () => showSecurity() },
   { path: '/server/about', group: 'server', label: 'Server', master: true, show: () => showServer() },
   { path: '/server/activity', group: 'server', label: 'Activity log', master: true,
     show: () => showActivity() },

@@ -20,6 +20,7 @@ import { invitePerson, removePerson, renamePerson, resetFor, revokeInvite,
   setRole } from './people.js';
 import { showMailSetup, testMail } from './mail.js';
 import { copySecret, newAppPassword, revokeAppPassword } from './app_passwords.js';
+import { clear2fa, disable2fa, regen2fa, setup2fa } from './security.js';
 import { showActivity } from './activity.js';
 import { showOverview } from './overview.js';
 import { checkOrphans, deleteOrphans, downloadBackup } from './server.js';
@@ -95,6 +96,10 @@ export const ACTIONS = {
   newapppassword: () => newAppPassword(),
   revokeapppassword: el => revokeAppPassword(el.dataset.id, el.dataset.label),
   copysecret: el => copySecret(el.dataset.secret),
+  setup2fa: () => setup2fa(),
+  disable2fa: () => disable2fa(),
+  regen2fa: () => regen2fa(),
+  clear2fa: el => clear2fa(el.dataset.id, el.dataset.email),
   applyview: el => applyView(el.dataset.name),
   deleteview: el => deleteView(el.dataset.name),
   navaction: el => runNavAction(el.dataset.id),
