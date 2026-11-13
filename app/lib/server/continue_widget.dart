@@ -15,7 +15,6 @@ import 'package:home_widget/home_widget.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
-import '../data/reading_status.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/platform_l10n.dart';
 

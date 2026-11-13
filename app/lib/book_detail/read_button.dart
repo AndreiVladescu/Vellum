@@ -180,15 +180,17 @@ class ReadButton extends StatelessWidget {
             ? l10n.readRead
             : l10n.readResumeLabel((book.readingProgress! * 100).round(), unit,
                 book.lastReadPage ?? 0);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
+        // A Wrap, not a Row: at a large text scale the two buttons together
+        // are wider than a phone, so the second drops onto its own line.
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _read(context, files: files, pdf: pdf, epub: epub, unit: unit,
                 label: label),
-            if (files.isNotEmpty) ...[
-              const SizedBox(width: 8),
+            if (files.isNotEmpty)
               _OpenExternally(files: files, repository: repository),
-            ],
           ],
         );
       },

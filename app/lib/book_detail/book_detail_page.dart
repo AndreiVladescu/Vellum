@@ -768,7 +768,10 @@ class _StatusAndRating extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          // A Wrap so the stars drop to a second line at large text sizes.
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
             children: [
               PopupMenuButton<ReadingStatus>(
                 tooltip: l10n.detailReadingStatus,
@@ -795,7 +798,6 @@ class _StatusAndRating extends StatelessWidget {
                   label: Text(status.labelOf(l10n)),
                 ),
               ),
-              const SizedBox(width: 12),
               // Five taps, not a slider: a rating is a choice among five, and a
               // slider invites precision the scale doesn't have.
               for (var star = 1; star <= 5; star++)

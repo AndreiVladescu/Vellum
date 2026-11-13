@@ -1637,8 +1637,11 @@ class _LibraryPageState extends State<LibraryPage> {
   /// The horizontal chip row: All + each shelf + "New shelf". Selecting a chip
   /// filters the shelf below; long-press a shelf chip to rename or delete it.
   Widget _shelfChips(List<Shelf> shelves, String? active) {
+    // The row grows with the text scale; a fixed 48 clipped the chips at
+    // 1.3x and above.
+    final scaler = MediaQuery.textScalerOf(context);
     return SizedBox(
-      height: 48,
+      height: scaler.scale(32) + 16,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
