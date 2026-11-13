@@ -56,15 +56,22 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
 
   DateTime get _today => widget.now ?? DateTime.now();
 
+  /// Made once, not in `build`: a stream built there is a new query on every
+  /// rebuild, so each step to another month re-read every sitting and every
+  /// book — 4,000 of each in the profiling library — before drawing it.
+  late final Stream<List<ReadingSession>> _sessions =
+      widget.repository.db.select(widget.repository.db.readingSessions).watch();
+  late final Stream<List<Book>> _books =
+      widget.repository.db.select(widget.repository.db.books).watch();
+
   @override
   Widget build(BuildContext context) {
-    final db = widget.repository.db;
     return Scaffold(
       appBar: AppBar(title: Text(L10n.of(context).monthTitle)),
       body: StreamBuilder<List<ReadingSession>>(
-        stream: db.select(db.readingSessions).watch(),
+        stream: _sessions,
         builder: (context, sessionSnap) => StreamBuilder<List<Book>>(
-          stream: db.select(db.books).watch(),
+          stream: _books,
           builder: (context, bookSnap) {
             if (!sessionSnap.hasData || !bookSnap.hasData) {
               return const Center(child: CircularProgressIndicator());

@@ -13,10 +13,29 @@ class ReadingStats {
   ///
   /// Local, not UTC: "did I read yesterday?" is a question about the reader's own
   /// day. A session that starts at 23:30 counts for the day it started.
-  static DateTime dayOf(DateTime moment) {
-    final local = moment.toLocal();
-    return DateTime(local.year, local.month, local.day);
-  }
+  ///
+  /// Remembered per [moment] object (see [_days]): the insights page asks for
+  /// the day of every sitting a dozen times over, and turning an instant into
+  /// a local date is the expensive part of every statistic here.
+  static DateTime dayOf(DateTime moment) =>
+      _days[moment] ??= _localDay(moment.toLocal());
+
+  static DateTime _localDay(DateTime local) =>
+      DateTime(local.year, local.month, local.day);
+
+  /// [moment] in local time, remembered the same way as [dayOf].
+  static DateTime localOf(DateTime moment) =>
+      _locals[moment] ??= moment.toLocal();
+
+  /// Days and local times already worked out, keyed by the `DateTime` object
+  /// itself — an `Expando` attaches a value to an object without keeping it
+  /// alive, so the entries go when the sittings they belong to do, and each
+  /// fetch of the sittings starts afresh (performance round, November 2026:
+  /// converting an instant to a local date, a time-zone lookup, was most of a
+  /// 130 ms insights frame). A moment's local day only changes if the device's
+  /// time zone does, and the pages that use this fetch again when opened.
+  static final _days = Expando<DateTime>('ReadingStats.dayOf');
+  static final _locals = Expando<DateTime>('ReadingStats.localOf');
 
   /// Pages read per day. A session with unknown pages contributes nothing,
   /// rather than a guess.
@@ -189,13 +208,13 @@ class ReadingStats {
     DateTime? today,
   }) {
     final end = dayOf(today ?? DateTime.now());
-    return [
-      for (var i = days - 1; i >= 0; i--)
-        (
-          day: _addDays(end, -i),
-          value: byDay[_addDays(end, -i)] ?? 0,
-        ),
-    ];
+    final out = <({DateTime day, int value})>[];
+    for (var i = days - 1; i >= 0; i--) {
+      // Built once per day: a local date costs a time-zone lookup.
+      final day = _addDays(end, -i);
+      out.add((day: day, value: byDay[day] ?? 0));
+    }
+    return out;
   }
 
   /// Every page ever turned, across every sitting. The lifetime counterpart to
@@ -252,7 +271,7 @@ class ReadingStats {
     for (final s in sessions) {
       final minutes = s.endedAt.difference(s.startedAt).inMinutes;
       if (minutes <= 0) continue;
-      out[s.startedAt.toLocal().hour] += minutes;
+      out[localOf(s.startedAt).hour] += minutes;
     }
     return out;
   }

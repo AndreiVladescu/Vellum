@@ -667,3 +667,43 @@ The first attempt painted the strip through an `ImageShader` on the rounded
 rectangle, to keep one draw: it barely moved the shelf (raster p90 21→19 ms,
 jank 75→52) and measured *worse* than the gradient in the lab (46 ms p90), so
 it was replaced before committing.
+
+### #2 Insights and the month page stop converting dates on every frame — kept
+
+Every statistic groups sittings by local day, and `ReadingStats.dayOf` turned
+an instant into a local date — a time-zone lookup — each time it was asked.
+The insights page asked about every sitting a dozen times over, in `build`, so
+opening the page and every range chip cost one frame of 120–160 ms at 4,000
+sittings; the month page did the same per month, and also rebuilt its two
+database streams in `build`, re-reading every sitting and book on each step.
+
+- `dayOf`, `MonthReviews.monthOf` and a new `ReadingStats.localOf` remember
+  their answer per `DateTime` object in an `Expando` (it does not keep the
+  sittings alive; a new fetch starts afresh).
+- `InsightsSummary` (moved out of the page so it can be benchmarked) is worked
+  out for all four ranges at once, in a background isolate once a history has
+  1,000 sittings or more — smaller ones in place, where starting an isolate
+  would cost more. A range chip now picks one of four finished answers.
+- The month page builds its streams once.
+
+`test/benchmark/insights_bench.dart` (in CI, generous budgets), JIT:
+
+| 4,000 sittings | before | after |
+|---|---:|---:|
+| one range's summary | 103–154 ms | 17–62 ms (the first pays the conversions) |
+| all four, in the background | — | 106 ms wall, off the UI isolate |
+| four months reviewed | 101 ms | 26 ms |
+| 16,000 sittings, one range | 394–605 ms | 54–165 ms |
+
+On the profiling run (v1.3.4 + #1):
+
+| | before | after |
+|---|---:|---:|
+| Insights open: worst frame | 120 ms | 5.9 ms |
+| Insights open: page shown | 234–244 ms | 296 ms (the isolate; behind the spinner) |
+| A range chip: frame p90 / p99 | 123 / 160 ms | 14 / 19 ms |
+| Month page open: worst frame | 79 ms | 29 ms |
+| A month back: frame p90, janky frames | 70 ms, 12 of 55 | 0.2 ms, 0 of 119 |
+
+The one thing that got slower is the page appearing, by ~55 ms, while the
+spinner it always showed is up — traded for no dropped frame at all.

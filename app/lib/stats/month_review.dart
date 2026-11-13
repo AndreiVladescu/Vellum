@@ -75,10 +75,17 @@ class MonthReviews {
   /// like a verdict on nothing.
   static const sameThreshold = 0.05;
 
+  /// The first of [moment]'s month, in local time. Remembered per moment, as
+  /// `ReadingStats.dayOf` is and for the same reason: the month page asks it
+  /// of every sitting on every month it shows.
   static DateTime monthOf(DateTime moment) {
-    final local = moment.toLocal();
-    return DateTime(local.year, local.month);
+    final cached = _months[moment];
+    if (cached != null) return cached;
+    final local = ReadingStats.localOf(moment);
+    return _months[moment] = DateTime(local.year, local.month);
   }
+
+  static final _months = Expando<DateTime>('MonthReviews.monthOf');
 
   /// [month] shifted by [delta] whole months (negative goes back). Built from
   /// the parts, so it is exact across year ends and DST.

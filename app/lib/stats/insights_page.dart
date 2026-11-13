@@ -11,6 +11,7 @@ import 'insights_range.dart';
 import 'month_review_page.dart';
 import 'year_review_page.dart';
 import 'reading_goals.dart';
+import 'insights_summary.dart';
 import 'stats_queries.dart';
 import '../settings/app_settings.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -44,7 +45,8 @@ class InsightsPage extends StatefulWidget {
 }
 
 class _InsightsPageState extends State<InsightsPage> {
-  late Future<_Fetched> _insights;
+  /// What was read, and every range's figures worked out from it.
+  late Future<_Loaded> _insights;
   late InsightsRange _range;
 
   @override
@@ -59,7 +61,7 @@ class _InsightsPageState extends State<InsightsPage> {
     widget.settings.setInsightsRange(range);
   }
 
-  Future<_Fetched> _load() async {
+  Future<_Loaded> _load() async {
     final db = widget.repository.db;
     final sessions = await db.select(db.readingSessions).get();
     final books = await db.select(db.books).get();
@@ -69,11 +71,15 @@ class _InsightsPageState extends State<InsightsPage> {
     for (final file in files) {
       (formatsByBook[file.bookId] ??= []).add(file.format);
     }
-    return _Fetched(
+    final input = InsightsInput(
       sessions: sessions,
       books: books,
       genresByBook: genresByBook,
       formatsByBook: formatsByBook,
+    );
+    return (
+      input: input,
+      byRange: await InsightsSummary.forEveryRange(input, DateTime.now()),
     );
   }
 
@@ -120,15 +126,15 @@ class _InsightsPageState extends State<InsightsPage> {
           ),
         ],
       ),
-      body: FutureBuilder<_Fetched>(
+      body: FutureBuilder<_Loaded>(
         future: _insights,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final fetched = snapshot.data!;
-          final data = _Insights(fetched, _range, DateTime.now());
-          if (data.allSessions.isEmpty &&
+          final fetched = snapshot.data!.input;
+          final data = snapshot.data!.byRange[_range]!;
+          if (fetched.sessions.isEmpty &&
               ReadingStats.finishedPerMonth(fetched.books).isEmpty) {
             return Center(
               child: Padding(
@@ -189,7 +195,7 @@ class _InsightsPageState extends State<InsightsPage> {
               const SizedBox(height: 12),
               _GoalsCard(
                 settings: widget.settings,
-                books: data.books,
+                books: fetched.books,
                 minutesPerDay: data.allMinutesPerDay,
               ),
               const SizedBox(height: 20),
@@ -316,8 +322,8 @@ class _InsightsPageState extends State<InsightsPage> {
                   onDayTap: (day) => showDayDetailSheet(
                     context,
                     day: day,
-                    sessions: data.allSessions,
-                    books: data.books,
+                    sessions: fetched.sessions,
+                    books: fetched.books,
                     onOpenBook: (book) => openBookDetail(
                       context,
                       repository: widget.repository,
@@ -411,6 +417,11 @@ class _InsightsPageState extends State<InsightsPage> {
   }
 }
 
+typedef _Loaded = ({
+  InsightsInput input,
+  Map<InsightsRange, InsightsSummary> byRange,
+});
+
 /// "1,234" for a number worth grouping — a lifetime page count is the one
 /// figure here big enough to need it.
 String _compact(int value) {
@@ -497,104 +508,6 @@ class _RangeControl extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-/// What was fetched, before any range is applied.
-class _Fetched {
-  const _Fetched({
-    required this.sessions,
-    required this.books,
-    required this.genresByBook,
-    required this.formatsByBook,
-  });
-
-  final List<ReadingSession> sessions;
-  final List<Book> books;
-  final Map<String, List<String>> genresByBook;
-  final Map<String, List<String>> formatsByBook;
-}
-
-/// Everything the page shows: one fetch, with a range applied.
-///
-/// **Follow the range:** days read, the totals (pages, time, sessions'
-/// average, books finished), the best day, the pages-a-day chart, when you
-/// read, where you read, and the books-finished, genre and format lists.
-/// **Fixed by nature:** the streaks (a streak is a property of the whole
-/// history), this week against last, the 12-week heat map, and the goals
-/// (a year and a day by definition).
-class _Insights {
-  _Insights(_Fetched f, InsightsRange range, DateTime today)
-      : allSessions = f.sessions,
-        books = f.books,
-        sessions = RangeFilter.sessions(f.sessions, range, today),
-        range = range {
-    final inRange = RangeFilter.finishedBooks(f.books, range, today);
-    pagesPerDay = ReadingStats.pagesPerDay(sessions);
-    allPagesPerDay = ReadingStats.pagesPerDay(allSessions);
-    allMinutesPerDay = ReadingStats.minutesPerDay(allSessions);
-    pagesSeries = ReadingStats.dailySeries(
-      pagesPerDay,
-      days: RangeFilter.chartDays(range, allSessions, today),
-      today: today,
-    );
-    heatmapSeries =
-        ReadingStats.dailySeries(allMinutesPerDay, days: 84, today: today);
-    allReadingDays = ReadingStats.readingDays(allSessions);
-    readingDays = ReadingStats.readingDays(sessions);
-    averagePages = ReadingStats.averagePagesPerSession(sessions);
-    totalPages = ReadingStats.totalPages(sessions);
-    totalMinutes = ReadingStats.totalMinutes(sessions);
-    totalFinished = ReadingStats.totalFinished(inRange);
-    hourSeries = ReadingStats.minutesByHour(sessions);
-    deviceSeries = ReadingStats.minutesByDevice(sessions);
-    finishedPerMonth = ReadingStats.finishedPerMonth(inRange);
-    genreSplit = ReadingStats.finishedByGenre(
-      books: inRange,
-      genresByBook: f.genresByBook,
-    );
-    formatSplit = ReadingStats.finishedByFormat(
-      books: inRange,
-      formatsByBook: f.formatsByBook,
-    );
-  }
-
-  final InsightsRange range;
-  final List<ReadingSession> allSessions;
-  final List<ReadingSession> sessions;
-  final List<Book> books;
-  late final Map<DateTime, int> pagesPerDay;
-  late final Map<DateTime, int> allPagesPerDay;
-  late final Map<DateTime, int> allMinutesPerDay;
-  late final List<({DateTime day, int value})> pagesSeries;
-  late final List<({DateTime day, int value})> heatmapSeries;
-  late final Set<DateTime> allReadingDays;
-  late final Set<DateTime> readingDays;
-  late final double averagePages;
-  late final int totalPages;
-  late final int totalMinutes;
-  late final int totalFinished;
-  late final List<int> hourSeries;
-  late final List<({String device, int minutes})> deviceSeries;
-  late final Map<DateTime, int> finishedPerMonth;
-  late final List<({String genre, int count})> genreSplit;
-  late final List<({String format, int count})> formatSplit;
-
-  int get currentStreak => ReadingStats.currentStreak(allReadingDays);
-  int get longestStreak => ReadingStats.longestStreak(allReadingDays);
-  ({DateTime day, int pages})? get best => ReadingStats.bestDay(pagesPerDay);
-  int get thisWeekPages =>
-      ReadingStats.sumTrailingDays(allPagesPerDay, days: 7);
-  int get lastWeekPages => ReadingStats.sumTrailingDays(
-        allPagesPerDay,
-        days: 7,
-        endOffsetDays: 7,
-      );
-
-  List<MapEntry<DateTime, int>> get finishedMonthsNewestFirst {
-    final entries = finishedPerMonth.entries.toList()
-      ..sort((a, b) => b.key.compareTo(a.key));
-    return entries;
   }
 }
 
