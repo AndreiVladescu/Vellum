@@ -186,6 +186,15 @@ well in (past about 3x), highlight a passage, and compare the text *away* from
 the mark with a page that has none: it must be as crisp, at a few zoom levels,
 in scroll and paged mode, day and night.
 
+**After the pdfrx 2.12 bump**: measured on Linux and the Android 14 emulator
+(open, reopen with a highlight, pinch, sharpness, search, memory). Still owed:
+the Windows and macOS release builds launching and opening a PDF (PDFium now
+compiles a small C library on each platform); the AppImage; pinch and swipe
+page turns in paged mode on a real phone; search on a long book; memory on a
+phone (its page cache is capped at 32 MB); and pdfrx's own right-click /
+selection menu in dark mode, which now comes from the separate `material_ui`
+package and may no longer follow the app's theme.
+
 **Deferred from #27**: scheduled OS notifications a day before and on the due
 date. The *decision* logic is built and tested (`LoanDue.needingReminder`, which
 knows not to nag twice in a day but to come back while a book is still out) and

@@ -6,6 +6,32 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.3.4 — 2026-11-13
+
+A newer PDF engine, and the libraries under background sync and Material You.
+
+### Fixed
+
+- **In-book search steps through its matches.** *Next* now moves the counter
+  (2 of 33, 3 of 33…); before, it stayed on the first match.
+- **A selection dragged backwards across several PDF pages** now selects what
+  you dragged over.
+
+### Changed
+
+- The PDF reader uses less memory while scrolling a long book at fit zoom
+  (about 70 MB less on a 504-page PDF). Opening, highlights, zoom and
+  sharpness measure the same as before.
+
+### Maintenance
+
+- App: `pdfrx` 2.12 (PDFium 0.4.2), `workmanager` 0.10 (Android 16 fixes for
+  background sync; checked on an Android 14 emulator, including an update in
+  place), `dynamic_color` 1.9 (fills the surface colour roles Material You
+  schemes were missing), `qr` 4.0.1, `xml` 7.1.
+
+---
+
 ## v1.3.3 — 2026-11-13
 
 A highlighted page stays sharp, and a round of dependency updates.

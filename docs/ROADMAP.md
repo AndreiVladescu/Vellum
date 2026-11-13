@@ -38,6 +38,8 @@ still the hand-made one.)
 `v1.3.2` (2026-11-12) — month by month and explorable Insights, as planned.
 `v1.3.3` (2026-11-13) — the highlight blur fix and dependency updates; a fix
 takes the next free number, so year in review moves to v1.3.4.
+`v1.3.4` (2026-11-13) — dependency updates: `pdfrx` 2.12, `workmanager` 0.10,
+`dynamic_color` 1.9; year in review moves to v1.3.5.
 
 ---
 
@@ -162,7 +164,14 @@ lets the work be checked before it ships.
 - [x] **M** Insights you can explore: a range picker (30 days / year / all
       time) and heat-map days you can tap
 
-### v1.3.4 — the year, and the library
+### v1.3.4 — newer libraries
+
+- [x] **L** `pdfrx` 2.12: measured against 2.4.7 for sharpness, open time,
+      highlights after reopening, memory, search and selection, on Linux
+      and the emulator
+- [x] **M** `workmanager` 0.10 and `dynamic_color` 1.9
+
+### v1.3.5 — the year, and the library
 
 - [ ] **M** Year in review, with a picture you can save and share
 - [ ] **M** Library statistics: the collection by genre, year, format and
