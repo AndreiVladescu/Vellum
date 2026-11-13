@@ -23,6 +23,8 @@
     <!-- The continue-reading widget (plan 5 #40). -->
     <string name="widget_name">Continue reading</string>
     <string name="widget_cover_description">Book cover</string>
+    <string name="widget_preview_title">The Fellowship of the Ring</string>
+    <string name="widget_preview_subtitle">42% · page 214</string>
     <string name="widget_empty_title">Nothing on the go</string>
     <string name="widget_empty_subtitle">Open Vellum to start a book</string>
 </resources>
