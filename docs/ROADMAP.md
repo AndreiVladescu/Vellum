@@ -40,6 +40,9 @@ still the hand-made one.)
 takes the next free number, so year in review moves to v1.3.4.
 `v1.3.4` (2026-11-13) — dependency updates: `pdfrx` 2.12, `workmanager` 0.10,
 `dynamic_color` 1.9; year in review moves to v1.3.5.
+`v1.3.5` (2026-11-13) — year in review and library statistics, as planned,
+plus loan reminders (v1.4.2), scheduled backups (v1.6.1), app passwords
+(v1.6.2), the emulator script and small fixes.
 
 ---
 
@@ -181,8 +184,8 @@ lets the work be checked before it ships.
 
 ### v1.3.5 — the year, and the library
 
-- [ ] **M** Year in review, with a picture you can save and share
-- [ ] **M** Library statistics: the collection by genre, year, format and
+- [x] **M** Year in review, with a picture you can save and share
+- [x] **M** Library statistics: the collection by genre, year, format and
       author; the unread pile; books added per month
 
 ---
@@ -206,7 +209,7 @@ lets the work be checked before it ships.
 
 ### v1.4.2 — loans that remind you
 
-- [ ] **M** System notifications for loan due dates (the decision logic exists;
+- [x] **M** System notifications for loan due dates (the decision logic exists;
       this is scheduling and permissions)
 
 ### v1.4.3 — read aloud
@@ -266,7 +269,7 @@ A new kind of book, so it starts with a design note rather than code.
 
 ### v1.6.2 — safer access
 
-- [ ] **L** App passwords: per-device tokens for OPDS and e-readers, so the
+- [x] **L** App passwords: per-device tokens for OPDS and e-readers, so the
       account password is never typed into a Kindle
 - [ ] **M** Short-lived per-resource links for covers and downloads, replacing
       the session token in a `?token=` query string

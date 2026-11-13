@@ -6,6 +6,38 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.3.5 — 2026-11-13
+
+Your year in a picture, your library in numbers, and reminders for lent books.
+
+### Added
+
+- **Year in review.** Books finished, pages, time, longest streak, best month,
+  top authors and genres, and how it compares with the year before — with a
+  picture you can save or share. Open it from Reading insights.
+- **Library statistics.** Your collection by genre, publication year, format
+  and author, the unread pile, and books added per month. In the menu, under
+  Reading insights.
+- **Loan reminders.** Turn on *Remind me when lent books are due* and your
+  phone notifies you the day before and on the due date. Android only for now.
+- **Server: scheduled backups.** Set `VELLUM_BACKUP_DIR` (and optionally
+  `VELLUM_BACKUP_INTERVAL` in hours and `VELLUM_BACKUP_KEEP`) and the server
+  writes a backup on schedule and keeps the newest few. Shown on the console's
+  Server page.
+- **Server: app passwords.** Make a separate password for each e-reader in the
+  console (*People and sharing → App passwords*). It opens only the OPDS
+  catalogue, covers and downloads, and can be revoked on its own, so your
+  account password never goes into a Kindle or KOReader.
+
+### Fixed
+
+- Tapping the home-screen widget opens the book, not just the shelf.
+- The console's *Search inside books* no longer fails to show its separator.
+- The sync details dialog is fully translatable.
+- A custom reading goal shows the value that was actually saved.
+
+---
+
 ## v1.3.4 — 2026-11-13
 
 A newer PDF engine, and the libraries under background sync and Material You.
