@@ -707,3 +707,117 @@ On the profiling run (v1.3.4 + #1):
 
 The one thing that got slower is the page appearing, by ~55 ms, while the
 spinner it always showed is up — traded for no dropped frame at all.
+
+### Reverted: asking for the shelf before the first frame
+
+Between the first frame (~400 ms) and the first frame with spines (~630 ms) the
+page shows the *empty-library* state, because `watchLibrary`'s first answer is
+not in yet: cold, it costs ~180 ms (authors join 73, genres 21, the books query
+83, against 15/5/30 warm). The idea: start that query in `main` right after the
+repository opens, while the profile and server loads wait on the platform, and
+hand the answer to the page's `StreamBuilder` as `initialData` through a small
+"last view per arguments" cache in `LibraryQueries`.
+
+Fifteen interleaved cold starts of each build against the same library (the
+machine was busy — load 20–30 — so interleaving, not medians across runs, is
+what makes the two comparable):
+
+| | first frame | first shelf frame | frames before the shelf |
+|---|---:|---:|---:|
+| Without | 542 [412–1421] ms | 887 [694–2717] ms | 3 [2–3] |
+| With | 566 [427–1263] ms | 904 [718–2353] ms | 2 [2–3] |
+
+No gain. The warm-up does not finish before the first frame, and the page's
+own subscription then runs the books query a second time on the same database
+isolate, so the shelf arrives no sooner. Reverted. Two things stay true and are
+worth a later look: the empty-library page ("add your first book") really is
+on screen for a fifth of a second at every launch of a full library — showing
+nothing until the first answer would be a visual fix rather than a speed-up —
+and the cold query is dominated by mapping ~4,000 full `Book` rows when the
+shelf needs a handful of columns.
+
+### Finding, not fixed: the room is the title shadow
+
+After #1 the room still janks while panning (118 of ~124 frames). The same
+room with the spine title's blurred shadow switched off, as an experiment:
+
+| Room | janky frames | raster p90 | raster p99 | build p90 |
+|---|---:|---:|---:|---:|
+| pan, as shipped | 120 of 125 | 58 ms | 74 ms | 22 ms |
+| pan, no title shadow | 23 of 126 | 13 ms | 23 ms | 19 ms |
+| zoom, as shipped | 57 of 92 | 56 ms | 98 ms | 44 ms |
+| zoom, no title shadow | 54 of 88 | 18 ms | 65 ms | 35 ms |
+
+(Load average 13–16 during these.) A room of 400 placed books draws 400 blurred
+titles a frame; the shelf draws ~100, where the lab put the shadow at +3 ms
+mean, +10 ms p90 — no longer janking after #1, but the largest raster cost
+left. What remains in the room after that is *build*: every pan frame
+`setState`s the editor and rebuilds all 400 books (14–20 ms). Both are the
+next things to do here, in that order: draw the shadow from a cached image
+(below), then move panning into a `Transform` so a pan rebuilds nothing.
+
+### The spine ideas, measured
+
+**Spine strips** (a pre-cut thumbnail of only the cover's left slice). Not
+done, and not worth doing yet. The shelf's raster time was identical with no
+thumbnails, with thumbnails, and with every cover already decoded (cold / warm
+/ hot: 20.3 / 20.0 / 20.0 ms p90); an image draw costs what a flat colour does
+(lab: 2.0 against 1.8 ms); and a 6-second scroll through the 4,000-book shelf
+peaked at 20 MB of decoded images at 1280 × 800. Decoding is not where the time
+or memory goes on the desktop. The 2.8× memory saving the October analysis
+estimated still stands for phones, where the image cache is capped at 48 MB —
+measure `shelf_spines_*.image_cache_peak_mb` on the emulator before building
+it.
+
+**Pre-rendered spines** (rasterise each whole spine once into a bitmap). The
+lab says a bitmap spine costs 2.1 ms a screen against 17 for the gradient
+spines it would have replaced — but #1 got the shelf from 20 to 7 ms p90 with
+no bitmaps, no memory and no resampling, and with 0–1 janky frames there is
+nothing left on the shelf for bitmaps to win. Their trap is real, too: a spine
+is a fractional number of pixels wide, so its bitmap is drawn resampled, which
+softens the title. Where pre-rendering *is* the answer is the part #1 could not
+touch: the **title shadow**, the room's whole raster cost. Rendering only the
+blurred shadow into an image (keyed by the displayed title, font size, text
+scale and pixel ratio) and drawing the crisp title over it live keeps the text
+exact — a blur survives resampling — and would take the room from ~58 to
+~13 ms p90.
+
+**Spine metadata** (anything computed per build that could be stored). Nothing
+worth storing: `SpineStyle.fromJson` is already memoised, the shelf's build p90
+is 4 ms, and the rotated title's layout costs nothing measurable (lab: 2.3 ms a
+screen with titles against 1.8 without). The dominant colour is already stored.
+
+### Not measured this round
+
+- **Android.** The emulator was in use by another agent throughout; run
+  `tool/perf_run.sh --android` (it seeds a 2,000-book library on first use).
+- **The reader.** Out of scope while pdfrx was being upgraded; the profiling
+  run has no reader scenario yet. Opening a book's file is the obvious next one
+  to add.
+- **Memory over time.** The resident set climbs from ~210 MB to ~1.05 GB over
+  a run; 100 MB is the desktop image cache's cap and some is the recorded
+  timelines, but nobody has separated the rest. Worth a run with
+  `PERF_ONLY` per area and the timeline off.
+
+### Next, in the order they would pay
+
+1. **The title shadow from a cached image** — the room's raster cost (58 → ~13
+   ms p90 measured without it) and the shelf's largest remaining one. Blur only;
+   the crisp title stays live. Prove it with a pixel comparison like
+   `gradient_strip_test.dart`.
+2. **Pan the room with a `Transform`**, so a pan frame rebuilds none of the 400
+   placed books (14–20 ms of build a frame today).
+3. **No empty-library page while the library is still loading** — a visual
+   fix for the fifth of a second it flashes at every launch of a full library.
+4. **A narrower shelf query**: the shelf maps every column of ~4,000 `Book`
+   rows (descriptions included) on the UI isolate; the cold first answer is
+   ~180 ms.
+5. **The generated face-out cover's diagonal gradient** (covers view raster
+   p90 ~8 ms; no jank today, but the same Impeller cost as the spines had).
+   A diagonal ramp does not survive a non-uniform stretch, so the strip trick
+   does not transfer as is.
+6. **The insights range chip still builds a 14–19 ms frame** — the page
+   itself, now that the arithmetic is gone. Check `HeatmapGrid` first.
+7. **Measure Android** (`--android`), then decide on spine strips from its
+   `image_cache_peak_mb`; add a reader scenario; separate the resident-set
+   growth over a run.
