@@ -225,6 +225,7 @@ MIGRATED=(
   lib/stats/reading_goals.dart
   lib/stats/session_recorder.dart
   lib/stats/stats_queries.dart
+  lib/widgets/adaptive.dart
   lib/widgets/page_insets.dart
   lib/wishlist/wishlist_page.dart
 )

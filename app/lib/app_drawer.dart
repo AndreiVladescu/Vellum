@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_version.dart';
 import 'l10n/gen/app_localizations.dart';
+import 'widgets/adaptive.dart';
 import 'widgets/page_insets.dart';
 
 import 'account/account_page.dart';
@@ -22,7 +23,7 @@ import 'loans/due_dates.dart';
 import 'shelf/series_page.dart';
 import 'wishlist/wishlist_page.dart';
 
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends StatefulWidget {
   const AppDrawer({
     super.key,
     required this.profile,
@@ -30,6 +31,8 @@ class AppDrawer extends StatelessWidget {
     required this.connection,
     required this.repository,
     required this.sync,
+    this.section,
+    this.onSection,
   });
 
   final UserProfileStore profile;
@@ -38,8 +41,43 @@ class AppDrawer extends StatelessWidget {
   final LibraryRepository repository;
   final SyncService sync;
 
+  /// The shell's selected section, and how to change it — given only for the
+  /// *permanent* drawer of a wide window ([WindowSize.expanded]).
+  ///
+  /// There the drawer is the navigation: no bottom bar, no rail, so it lists
+  /// both sections itself. It also never pops — the modal drawer closes itself
+  /// with `Navigator.pop`, and from a drawer that is part of the page that pop
+  /// would close the page instead.
+  final int? section;
+  final ValueChanged<int>? onSection;
+
+  @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  UserProfileStore get profile => widget.profile;
+  AppSettingsStore get settings => widget.settings;
+  ServerConnection get connection => widget.connection;
+  LibraryRepository get repository => widget.repository;
+  SyncService get sync => widget.sync;
+
+  bool get _permanent => widget.onSection != null;
+
+  // Opened once, not per build. A modal drawer is built only while it is open,
+  // but the permanent one is rebuilt with the shell — every search keystroke —
+  // and a fresh `.watch()` each time would re-run both queries on every one.
+  late final Stream<List<LoanEntry>> _loans = repository.watchAllLoans();
+  late final Stream<int> _wishlistCount = repository.wishlist.watchCount();
+
+  /// Closes the modal drawer before going anywhere; the permanent one has
+  /// nothing to close.
+  void _close(BuildContext context) {
+    if (!_permanent) Navigator.of(context).pop();
+  }
+
   void _openServer(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ServerPage(
         connection: connection,
@@ -52,7 +90,7 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _openPreferences(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
@@ -67,7 +105,7 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _openLoans(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) =>
           LoansPage(repository: repository, connection: connection),
@@ -75,7 +113,7 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _openFolderImport(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => FolderImportPage(
         repository: repository,
@@ -85,21 +123,21 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _openDuplicates(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => DuplicatesPage(repository: repository),
     ));
   }
 
   void _openSeries(BuildContext context) {
-    Navigator.of(context).pop();
+    _close(context);
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => SeriesPage(repository: repository),
     ));
   }
 
   void _openWishlist(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => WishlistPage(
         repository: repository,
@@ -110,14 +148,14 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _openInsights(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => InsightsPage(repository: repository, settings: settings),
     ));
   }
 
   void _openAccount(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    _close(context);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => AccountPage(profile: profile)),
     );
@@ -126,6 +164,10 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      // Square and flat when it is part of the page: the rounded edge and the
+      // shadow are what say "this is on top of something", and it isn't.
+      elevation: _permanent ? 0 : null,
+      shape: _permanent ? const RoundedRectangleBorder() : null,
       child: ListView(
         padding: pageInsets(context, EdgeInsets.zero),
         children: [
@@ -155,12 +197,31 @@ class AppDrawer extends StatelessWidget {
               onDetailsPressed: () => _openAccount(context),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.shelves),
-            title: Text(L10n.of(context).drawerMyShelf),
-            selected: true,
-            onTap: () => Navigator.of(context).pop(),
-          ),
+          if (_permanent) ...[
+            // The same two sections, and the same icons, as the bottom bar and
+            // the rail they stand in for.
+            ListTile(
+              leading: Icon(
+                  widget.section == 0 ? Icons.menu_book : Icons.menu_book_outlined),
+              title: Text(L10n.of(context).drawerMyShelf),
+              selected: widget.section == 0,
+              onTap: () => widget.onSection!(0),
+            ),
+            ListTile(
+              leading: Icon(widget.section == 1
+                  ? Icons.grid_view_rounded
+                  : Icons.grid_view_outlined),
+              title: Text(L10n.of(context).physicalLibraries),
+              selected: widget.section == 1,
+              onTap: () => widget.onSection!(1),
+            ),
+          ] else
+            ListTile(
+              leading: const Icon(Icons.shelves),
+              title: Text(L10n.of(context).drawerMyShelf),
+              selected: true,
+              onTap: () => Navigator.of(context).pop(),
+            ),
           ListTile(
             leading: const Icon(Icons.swap_horiz),
             title: Text(L10n.of(context).drawerLoans),
@@ -169,7 +230,7 @@ class AppDrawer extends StatelessWidget {
             // screen you go looking for; an overdue loan is the one thing
             // that should come and find you.
             trailing: StreamBuilder<List<LoanEntry>>(
-              stream: repository.watchAllLoans(),
+              stream: _loans,
               builder: (context, snapshot) {
                 final needing = [
                   for (final e in snapshot.data ?? const <LoanEntry>[])
@@ -190,7 +251,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () => _openFolderImport(context),
           ),
           StreamBuilder<int>(
-            stream: repository.wishlist.watchCount(),
+            stream: _wishlistCount,
             builder: (context, snapshot) {
               final count = snapshot.data ?? 0;
               return ListTile(
@@ -220,7 +281,7 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.bar_chart_outlined),
             title: Text(L10n.of(context).libraryStatsTitle),
             onTap: () {
-              Navigator.of(context).pop(); // close the drawer first
+              _close(context);
               Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => LibraryStatsPage(db: repository.db),
               ));
@@ -254,7 +315,7 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.info_outline),
             title: Text(L10n.of(context).drawerAbout),
             onTap: () async {
-              Navigator.of(context).pop();
+              _close(context);
               // Read from the package itself rather than typed in here: this
               // line said 0.1.0 through eleven releases, because a number
               // written twice is a number that stops agreeing with itself.

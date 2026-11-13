@@ -12,6 +12,7 @@ import 'account/user_profile.dart';
 import 'add_book/add_book_page.dart';
 import 'add_book/scan_page.dart';
 import 'app_drawer.dart';
+import 'widgets/adaptive.dart';
 import 'loans/loan_reminders.dart';
 import 'loans/loans_page.dart';
 import 'book_detail/book_detail_page.dart';
@@ -1143,16 +1144,34 @@ class _LibraryPageState extends State<LibraryPage> {
     if (mounted) setState(() {});
   }
 
+  /// The shell, in one of three layouts by window width ([WindowSize]):
+  ///
+  ///  * **compact** (a phone upright): bottom navigation bar, modal drawer.
+  ///  * **medium** (a phone on its side, a tablet upright): a navigation rail
+  ///    down the left instead of the bar; the drawer stays modal.
+  ///  * **expanded** (a tablet on its side, a desktop window): the drawer is
+  ///    permanently open on the left and is the navigation, so neither the bar
+  ///    nor the rail is shown.
+  ///
+  /// The widget tree keeps the same shape in all three — a [Row] whose last
+  /// child is the keyed [Expanded] holding the content — so dragging a desktop
+  /// window across a breakpoint swaps the navigation around the shelf rather
+  /// than building a new shelf and losing its scroll position. (Flutter matches
+  /// a keyed child to its old self even when siblings appear before it.)
   Widget _scaffold(BuildContext context) {
     final l10n = L10n.of(context);
-    return Scaffold(
-      drawer: AppDrawer(
-        profile: widget.profile,
-        settings: widget.settings,
-        connection: widget.connection,
-        repository: widget.repository,
-        sync: _sync,
-      ),
+    final size = WindowSize.of(context);
+    AppDrawer drawer({int? section, ValueChanged<int>? onSection}) => AppDrawer(
+          profile: widget.profile,
+          settings: widget.settings,
+          connection: widget.connection,
+          repository: widget.repository,
+          sync: _sync,
+          section: section,
+          onSection: onSection,
+        );
+    final scaffold = Scaffold(
+      drawer: size == WindowSize.expanded ? null : drawer(),
       appBar: _tab == 0 && _selection.isNotEmpty
           ? _selectionBar()
           : _tab == 0
@@ -1176,33 +1195,62 @@ class _LibraryPageState extends State<LibraryPage> {
               ],
             )
           : AppBar(title: Text(l10n.physicalLibraries)),
-      body: IndexedStack(
-        index: _tab,
+      body: Row(
         children: [
-          _shelfTab(context),
-          PhysicalLibrariesTab(
-            repository: repository,
-            settings: widget.settings,
-            connection: widget.connection,
+          if (size == WindowSize.medium) ...[
+            NavigationRail(
+              selectedIndex: _tab,
+              onDestinationSelected: _goToTab,
+              labelType: NavigationRailLabelType.all,
+              destinations: [
+                NavigationRailDestination(
+                  icon: const Icon(Icons.menu_book_outlined),
+                  selectedIcon: const Icon(Icons.menu_book),
+                  label: Text(l10n.shelfTab),
+                ),
+                NavigationRailDestination(
+                  icon: const Icon(Icons.grid_view_outlined),
+                  selectedIcon: const Icon(Icons.grid_view_rounded),
+                  label: Text(l10n.physicalTab),
+                ),
+              ],
+            ),
+            const VerticalDivider(width: 1, thickness: 1),
+          ],
+          Expanded(
+            key: const ValueKey('shell-content'),
+            child: IndexedStack(
+              index: _tab,
+              children: [
+                _shelfTab(context),
+                PhysicalLibrariesTab(
+                  repository: repository,
+                  settings: widget.settings,
+                  connection: widget.connection,
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: _goToTab,
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.menu_book_outlined),
-            selectedIcon: const Icon(Icons.menu_book),
-            label: l10n.shelfTab,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.grid_view_outlined),
-            selectedIcon: const Icon(Icons.grid_view_rounded),
-            label: l10n.physicalTab,
-          ),
-        ],
-      ),
+      bottomNavigationBar: size != WindowSize.compact
+          ? null
+          : NavigationBar(
+              selectedIndex: _tab,
+              onDestinationSelected: _goToTab,
+              destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.menu_book_outlined),
+                  selectedIcon: const Icon(Icons.menu_book),
+                  label: l10n.shelfTab,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.grid_view_outlined),
+                  selectedIcon: const Icon(Icons.grid_view_rounded),
+                  label: l10n.physicalTab,
+                ),
+              ],
+            ),
       floatingActionButton: _tab == 0
           // Scan sits above Add book rather than replacing it: scanning is the
           // fast path for physical books you're holding, not a substitute for
@@ -1233,6 +1281,29 @@ class _LibraryPageState extends State<LibraryPage> {
               icon: const Icon(Icons.add),
               label: Text(l10n.newLibrary),
             ),
+    );
+    return Row(
+      children: [
+        if (size == WindowSize.expanded) ...[
+          drawer(section: _tab, onSection: _goToTab),
+          const VerticalDivider(width: 1, thickness: 1),
+        ],
+        Expanded(
+          key: const ValueKey('shell-scaffold'),
+          // The drawer has taken the left edge, and with it any left system
+          // inset (a cutout on a tablet on its side); the scaffold would
+          // otherwise pad for it a second time.
+          //
+          // Wrapped at every width, only *removing* at one: a wrapper that
+          // came and went would change the scaffold's parent, and that alone
+          // rebuilds it — shelf, scroll position and all — from scratch.
+          child: MediaQuery.removePadding(
+            context: context,
+            removeLeft: size == WindowSize.expanded,
+            child: scaffold,
+          ),
+        ),
+      ],
     );
   }
 
