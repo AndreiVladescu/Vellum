@@ -378,6 +378,27 @@ serve the catalogue over **HTTPS** (TLS above, or a reverse proxy) whenever the
 device is not on a network you trust. The API is `GET/POST /api/app-passwords`
 and `DELETE /api/app-passwords/<id>`, each scoped to the signed-in caller.
 
+### Signed cover and download links
+
+The console shows covers in plain `<img>` tags and saves books from plain
+links, which cannot send an `Authorization` header. Rather than put the session
+token in the URL (it would reach proxy logs and browser history), it asks
+`POST /api/links` with `{"paths": ["/api/books/<id>/cover", "/api/files/<id>"]}`
+and gets back URLs carrying `?u=<user>&exp=<unix>&sig=<HMAC-SHA256>`. A link
+names one path and one person, and expires: **6 hours** for covers (a page of
+them is re-requested as you scroll), **5 minutes** for downloads (used once,
+straight away). Nothing is stored per link, and a link grants nothing by
+itself: each request still checks that the person can see the book, so
+revoking a share stops its links at once.
+
+The HMAC key is generated on first use and kept in the `server_setting` table
+(`link_signing_key`). To invalidate every outstanding link, call
+`POST /api/links/rotate` as the owner, or delete that row.
+
+The session token in a `?token=` query is **not** accepted, and there is no
+setting to turn that back on: it has been refused since the L1 fix in
+`docs/SECURITY_AUDIT.md`. Old e-readers should use an app password (above).
+
 ### Activity log (optional)
 
 Off unless switched on. When enabled, every mutation (book create/update/delete,
