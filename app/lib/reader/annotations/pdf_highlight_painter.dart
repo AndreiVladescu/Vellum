@@ -24,14 +24,15 @@ import 'highlight_palette.dart';
 /// text extraction.
 ///
 /// **Text is only ever read from a loaded page.** pdfrx opens a document
-/// progressively: right after opening, every page but the first is a
-/// placeholder that knows its size and nothing else. Asking a placeholder for
-/// its text does not fail — it returns an *empty* text — and an empty text
-/// cached for the session means that page never shows a highlight again. A
-/// book reopens on the page you were reading, which is the page you annotated,
-/// and that page is painted before it has loaded: the mark was "gone" after
+/// progressively: right after opening, most pages are placeholders that know
+/// their size and nothing else. Asking a placeholder for its text does not
+/// fail — it returns an *empty* text (still the default in pdfrx 2.12; measured
+/// on a 504-page PDF, page 450 just after opening) — and an empty text cached
+/// for the session means that page never shows a highlight again. A book
+/// reopens on the page you were reading, which is the page you annotated, and
+/// that page can be painted before it has loaded: the mark was "gone" after
 /// leaving the book and coming back. So the painter waits for the loaded
-/// instance of the page first (see [_loadedInstance]).
+/// instance of the page first (see [_extract]).
 class PdfHighlightPainter {
   PdfHighlightPainter({required VoidCallback onNeedsRepaint})
       : _texts = PageTextCache(onLoaded: onNeedsRepaint);
@@ -112,39 +113,17 @@ class PdfHighlightPainter {
   }
 
   /// The page's structured text, or null if the document went away first.
-  Future<PdfPageText?> _extract(PdfPage page) async {
-    final loaded = await _loadedInstance(page);
-    return loaded?.loadStructuredText();
-  }
-
-  /// The loaded instance of [page], waiting for it if need be; null if the
-  /// document is closed before that happens.
   ///
-  /// pdfrx's own `ensureLoaded()` would do, but it waits on a stream that is
-  /// simply closed when the document is disposed, so it never finishes and the
-  /// caller hangs on a document that no longer exists. This listens for the
-  /// stream ending as well.
-  Future<PdfPage?> _loadedInstance(PdfPage page) {
-    final number = page.pageNumber;
-    final document = page.document;
-    final latest = document.pages[number - 1];
-    if (latest.isLoaded) return Future.value(latest);
-
-    final done = Completer<PdfPage?>();
-    late final StreamSubscription<PdfDocumentEvent> subscription;
-    subscription = document.events.listen(
-      (event) {
-        if (event is! PdfDocumentPageStatusChangedEvent) return;
-        final changed = event.changes[number]?.page;
-        if (changed == null || !changed.isLoaded) return;
-        subscription.cancel();
-        if (!done.isCompleted) done.complete(changed);
-      },
-      onDone: () {
-        if (!done.isCompleted) done.complete(null);
-      },
-    );
-    return done.future;
+  /// `waitForLoaded()` hands back the loaded instance of the page — the one
+  /// [paint] was given may be the placeholder — and, since pdfrx 2.11, null
+  /// when the document is closed before that happens. (In 2.4 it waited on a
+  /// stream that is simply closed on dispose, never finished, and this class
+  /// carried its own version that also listened for the end.)
+  /// `loadStructuredText(ensureLoaded: true)` does the same wait, but throws on
+  /// a closed document instead of answering null.
+  Future<PdfPageText?> _extract(PdfPage page) async {
+    final loaded = await page.waitForLoaded();
+    return loaded?.loadStructuredText();
   }
 }
 

@@ -78,15 +78,20 @@ class _ReaderPageState extends State<ReaderPage>
   /// What the viewer opens, created once and handed to every rebuild.
   ///
   /// **Why this is a field and not `PdfViewer.file(path)`.** That constructor
-  /// builds a *new* `PdfDocumentRefFile` each time the parent builds. On its
-  /// first frame the viewer awaits pdfrx's one-time start-up and then checks
-  /// that `widget.documentRef` is still the same object it began with; if the
+  /// builds a *new* `PdfDocumentRefFile` each time the parent builds. In pdfrx
+  /// 2.4 the viewer, on its first frame, awaited pdfrx's one-time start-up and
+  /// then checked that `widget.documentRef` was still the same *object*; if the
   /// reader rebuilt in the meantime (settings, reading pace and the annotation
-  /// stream all `setState` within milliseconds of opening) it is not, the viewer
-  /// concludes it was replaced and quietly never starts the load. The page then
-  /// sat on "Opening…" until you went back and in again, when pdfrx was already
-  /// initialised and nothing rebuilt in time. A ref that keeps its identity
-  /// across rebuilds makes that check pass.
+  /// stream all `setState` within milliseconds of opening) it was not, and the
+  /// viewer quietly never started the load. The page sat on "Opening…" until
+  /// you went back and in again.
+  ///
+  /// pdfrx 2.6.6 fixed that: the check now compares the ref's *key*, which a
+  /// rebuilt ref for the same file shares. (Checked: a new ref per build hangs
+  /// the first open on 2.4.7 and opens normally on 2.12.) The field stays
+  /// because it is still the simplest correct thing — one ref per attempt, its
+  /// key carrying the attempt number that *Try again* depends on — not because
+  /// the viewer needs it any more.
   late PdfDocumentRefFile _documentRef = _newDocumentRef();
 
   /// The attempt number is part of the key so that *Try again* gets a fresh
@@ -130,11 +135,13 @@ class _ReaderPageState extends State<ReaderPage>
   /// state and the match cursor.
   ///
   /// **Created only once the viewer is ready**, never in a field initialiser.
-  /// `PdfTextSearcher`'s constructor calls `controller!.document`, and pdfrx's
-  /// `controller` getter is null until a document is loaded — so building one
-  /// during the first `build()` threw "Null check operator used on a null
-  /// value" and no PDF would open at all. Null here simply means "search isn't
-  /// available yet", which is true.
+  /// In pdfrx 2.4 `PdfTextSearcher`'s constructor called `controller!.document`,
+  /// and the `controller` getter is null until a document is loaded — so
+  /// building one during the first `build()` threw "Null check operator used
+  /// on a null value" and no PDF would open at all. In 2.12 the constructor
+  /// tolerates an unready controller (it registers for the document again when
+  /// a search starts), but the rule is kept: null here is what disables the
+  /// Search action until there is a document to search, which is still true.
   PdfTextSearcher? _searcher;
 
   /// Draws stored highlights over the page (the "highlighter marker" look).
@@ -146,6 +153,12 @@ class _ReaderPageState extends State<ReaderPage>
   /// rebuilds the app bar, the viewer's params and every closure in them. Before
   /// the viewer has a document there is nothing to repaint, and its first paint
   /// will read the text anyway.
+  ///
+  /// Since pdfrx 2.11 `invalidate()` also marks the page layout dirty, so each
+  /// call re-runs the layout once on the next build. That is the work 2.4 did
+  /// on every frame anyway; with the page sizes unchanged it finds the same
+  /// layout and leaves the view where it is (measured: thirty marks in a row,
+  /// no movement of the view, frame times within run-to-run noise of 2.4.7).
   late final PdfHighlightPainter _highlights =
       PdfHighlightPainter(onNeedsRepaint: _repaintPages);
 
@@ -183,10 +196,11 @@ class _ReaderPageState extends State<ReaderPage>
   /// Search as you type: a pause in typing, not every keystroke, starts a run.
   final _searchDebounce = Debouncer(const Duration(milliseconds: 300));
 
-  /// The query the searcher was last given. Kept because pdfrx cancels a
-  /// running search when handed the *same* pattern again (and then does not
-  /// restart it), so Enter on an unchanged query must step to the next match
-  /// rather than "search again".
+  /// The query the searcher was last given. Kept because handing pdfrx the
+  /// *same* pattern again does not search again: 2.4 cancelled the running
+  /// search and never restarted it, and 2.12 ignores the call (a search still
+  /// running carries on). Either way Enter on an unchanged query must step to
+  /// the next match rather than "search again".
   String _searchedFor = '';
   bool _searching = false;
 
@@ -369,9 +383,10 @@ class _ReaderPageState extends State<ReaderPage>
   /// **Not `goToPage`**, which is what this used to call and why *Fit width*
   /// appeared to do nothing while *Fit page* worked. pdfrx computes a fit as
   /// `min(viewW / rect.width, viewH / rect.height)` and then clamps it with
-  /// `zoomMax: currentZoom` — so `goToPage` can only ever zoom *out*. Fitting a
-  /// whole page usually is zooming out, so that one worked; fitting the width
-  /// of a portrait page means zooming *in*, and the clamp swallowed it.
+  /// `zoomMax: currentZoom` (still so in 2.12) — so `goToPage` can only ever
+  /// zoom *out*. Fitting a whole page usually is zooming out, so that one
+  /// worked; fitting the width of a portrait page means zooming *in*, and the
+  /// clamp swallowed it.
   ///
   /// `goToArea` applies no such clamp. Handing it a rect as wide as the page
   /// and shaped like the viewport makes both terms of that `min` equal
