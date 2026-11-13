@@ -989,6 +989,14 @@ what keeps it from re-opening the settled question:
 - Other devices' rows are cached in the app-local `remote_reading_positions`
   table so the prompt works offline. `readerNotes` and `sourceMetadata` get no
   channel, opt-in or otherwise.
+- **KOReader feeds the same channel** (v1.6.3, `server/src/koreader.rs`,
+  migration 0042). The server speaks KOReader's kosync protocol under
+  `/koreader`, authenticated by an app password made for it (the stored key is
+  `sha256(md5(secret))`). KOReader's report is kept verbatim in
+  `koreader_progress` — its xpointer has to go back byte for byte — and
+  mirrored into `reading_progress` as device `koreader:<id>` for each book the
+  reporter can see whose file has that partial-MD5 digest. Nothing flows the
+  other way; the app needs no change to show it.
 
 The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
 pins the column list of every synced table (`book`, `author`, `book_author`,

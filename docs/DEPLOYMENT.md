@@ -399,6 +399,55 @@ The session token in a `?token=` query is **not** accepted, and there is no
 setting to turn that back on: it has been refused since the L1 fix in
 `docs/SECURITY_AUDIT.md`. Old e-readers should use an app password (above).
 
+### KOReader
+
+Always on, no configuration. The server speaks KOReader's own progress-sync
+protocol (the one `koreader-sync-server` serves) at `/koreader`, so KOReader
+keeps your place in the same per-device reading-position channel the Vellum
+app uses. Each page turn KOReader reports reaches the app as another device:
+*"You were on chapter 12 on KOReader on Kobo Libra 2 (43%)"*.
+
+1. In the console, open **People and sharing → App passwords**, choose
+   **New app password…**, and set **Used for** to *OPDS and KOReader progress
+   sync*. This can only be chosen at creation: KOReader logs in with an MD5 of
+   the password, which can only be worked out while the server still has the
+   secret. An existing app password cannot be switched on later; make a new one.
+2. In KOReader, open a book, then **Tools → Progress sync → Custom sync
+   server** and enter `https://<your host>/koreader`.
+3. **Progress sync → Login**: your account's email, and the app password.
+   Type it **exactly as shown**, or without the dashes, or all in capitals —
+   unlike OPDS, other variations (a letter `o` for a zero) are not forgiven.
+   Do not use **Register**: accounts are made in the console, and it says so.
+4. Leave **Document matching method** on *Binary* (the default). Vellum works
+   out KOReader's partial MD5 of every stored file, so a book downloaded from
+   this server — or the same file copied over by cable — is recognised. The
+   *Filename* method cannot be matched to a book, because the server keeps
+   files by content, not by name.
+
+What it does and does not do:
+
+- **KOReader gets back exactly what KOReader sent.** Its position is an xpointer
+  into the EPUB or a PDF page number, and only another KOReader can use it, so
+  the latest one from any of your KOReader devices is what a sync returns.
+  Positions from the Vellum app are not sent to KOReader.
+- **The app sees KOReader's position** once *Preferences → Sync reading
+  position* is on there. A PDF reports its page, an EPUB its chapter (KOReader's
+  `DocFragment[N]` is the N-th spine item, which is what the app counts as a
+  chapter), and the percentage in both cases.
+- **A book KOReader reads before it is on the server** is still recorded. When
+  the file is imported later, the positions waiting for it attach to the book.
+- **Per person.** The position belongs to the account whose app password sent
+  it, like every other reading position: someone a book is shared with never
+  sees where you are in it, and a position never attaches to a book its owner
+  cannot see.
+- **Revoking** the app password stops the device at once. `DELETE
+  /api/mine/koreader` forgets every position KOReader devices have reported for
+  the caller, including those it fed to the app.
+
+The app password's KOReader key is only valid on `/koreader`; it is not a
+password anywhere else. Like Basic auth, the key is sent with every request, so
+use **HTTPS** off a trusted network.
+
 ### Activity log (optional)
 
 Off unless switched on. When enabled, every mutation (book create/update/delete,
