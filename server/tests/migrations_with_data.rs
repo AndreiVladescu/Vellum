@@ -302,6 +302,67 @@ async fn existing_statuses_gain_an_unknown_rating_and_are_redelivered() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// 0039 adds a table, not columns — but it hangs off `app_user`, so it is
+/// checked against a server that already has accounts: they come through
+/// with no app passwords, and can be given one, which goes when they do.
+#[tokio::test]
+async fn existing_accounts_upgrade_to_app_passwords() {
+    let path = std::env::temp_dir().join(format!("vellum_popmig_{}.db", uuid::Uuid::new_v4()));
+    let path = path.to_str().unwrap().to_string();
+    {
+        let pool = migrate_partially(&path, 38).await;
+        for sql in [
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u1', 'someone@lib.test', 'Someone', 'x', 1)",
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u2', 'ana@lib.test', 'Ana', 'x', 0)",
+            "INSERT INTO session (token_hash, user_id, expires_at) \
+             VALUES ('h', 'u1', datetime('now', '+1 day'))",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+    }
+
+    let db = connect_db(&path)
+        .await
+        .expect("a database with accounts in it must migrate");
+    let none: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM app_password")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(none, 0);
+    let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM session")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(sessions, 1, "existing sign-ins are untouched");
+
+    sqlx::query(
+        "INSERT INTO app_password (id, user_id, label, prefix, secret_hash) \
+         VALUES ('a1', 'u2', 'Kobo', 'abcd', 'hash')",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let created: Option<String> =
+        sqlx::query_scalar("SELECT created_at FROM app_password WHERE id = 'a1'")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert!(created.is_some(), "created_at defaults on insert");
+    sqlx::query("DELETE FROM app_user WHERE id = 'u2'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM app_password")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(left, 0, "an account's app passwords go with it");
+    let _ = std::fs::remove_file(&path);
+}
+
 /// A known, deliberate exception, and the only one.
 ///
 /// `0010` carries the same mistake and cannot be fixed: it is applied on every

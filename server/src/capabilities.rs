@@ -78,6 +78,9 @@ const FEATURES: &[&str] = &[
     // nothing when nobody subscribes, and a client that can't use it simply
     // syncs at launch as before.
     "live_events",
+    // Per-device app passwords for OPDS e-readers (migration 0039): a client
+    // can offer "make one for this device" instead of the account password.
+    "app_passwords",
 ];
 
 pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {

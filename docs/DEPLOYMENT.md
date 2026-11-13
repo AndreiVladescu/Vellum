@@ -333,6 +333,51 @@ Reading a share link does **not** consume its `max_uses`. That counts downloads 
 a one-time link exists so a file can be handed over once, and spending it on a
 page turn would destroy the link the moment someone opened the book.
 
+### E-readers (OPDS) and app passwords
+
+Always on, no configuration. The server publishes an OPDS catalogue at
+`/opds` (OPDS 1.2, with search, paging and an OPDS 2.0 alternate at
+`/opds/v2`), which KOReader, Kobo with an OPDS add-on, PocketBook, Thorium,
+Moon+ Reader, Librera and most other reading apps can browse and download from.
+Each account sees exactly the books it can see in the console.
+
+**Use an app password, not your account password.** An e-reader keeps whatever
+it is given, often in the clear, on a device that gets lent and lost. An app
+password is a separate secret per device that only opens the catalogue:
+
+1. In the console, open **People and sharing → App passwords** and choose
+   **New app password…**. Name it after the device ("Kobo Clara").
+2. Copy the secret it shows — `k3m9-x2qa-…`, six groups of four. **It is shown
+   once**; the server keeps only a hash. Lose it, revoke it, make another.
+3. On the device, add an OPDS catalogue with:
+   - **URL:** `https://<your host>/opds`
+   - **Username:** your account's email address
+   - **Password:** the app password. Capitals, spaces and dashes don't matter.
+
+What an app password can and cannot do:
+
+- **Can:** browse the OPDS feeds, fetch covers, download book files — GETs
+  only, on `/opds/*`, `/api/books/<id>/cover` and `/api/files/<id>` (and their
+  `/api/v1` twins).
+- **Cannot:** anything else. Every other endpoint answers **403** to it — the
+  console, the JSON API, every write, every admin endpoint, and the app
+  password endpoints themselves, so a leaked one cannot mint a successor.
+- **Revoking** one (same page) locks that device out on its very next request.
+  The list shows when each was last used, to the minute, which is how to spot
+  the one you no longer have.
+- **A password reset revokes all of them**, as it signs out every session: an
+  account you thought was compromised should not leave a working secret behind.
+  Removing an account removes its app passwords.
+
+The account password still works over Basic auth on the same routes, so a
+reader set up before app passwords existed keeps working after an upgrade —
+but it carries everything the account can do, so replace it when convenient.
+
+Basic auth sends the password on every request, readable by anyone on the path:
+serve the catalogue over **HTTPS** (TLS above, or a reverse proxy) whenever the
+device is not on a network you trust. The API is `GET/POST /api/app-passwords`
+and `DELETE /api/app-passwords/<id>`, each scoped to the signed-in caller.
+
 ### Activity log (optional)
 
 Off unless switched on. When enabled, every mutation (book create/update/delete,

@@ -15,6 +15,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
 mod access;
 mod admin;
+mod app_passwords;
 mod audit;
 mod auth;
 pub mod backups;
@@ -231,6 +232,14 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/auth/forgot", post(auth::forgot))
         .route("/auth/reset", post(auth::reset))
         .route("/auth/me", get(auth::me))
+        // App passwords for e-readers (v1.6.2): the caller's own, listed
+        // without secrets. Outside the app-password scope on purpose, so one
+        // can never be used to mint or revoke another.
+        .route(
+            "/app-passwords",
+            get(app_passwords::list).post(app_passwords::create),
+        )
+        .route("/app-passwords/{id}", delete(app_passwords::revoke))
         .route("/users", get(auth::list_users).post(auth::create_user))
         // Administering the people in a shared library (plan 6 #1). Master-only,
         // and console-only by design — this is a desk job, not something to
@@ -264,10 +273,14 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         // limit is scoped to just these two write handlers, so every other
         // endpoint — including unauthenticated ones like login — keeps axum's
         // small default and can't be used to buffer gigabytes of body in RAM.
+        //
+        // The two GETs an e-reader follows out of an OPDS entry — the cover and
+        // the acquisition link — also take an app password (`reader_scope`).
+        // Only the GETs: the cover's PUT, like every write, does not.
         .route(
             "/books/{id}/cover",
             put(blobs::put_cover.layer(DefaultBodyLimit::max(32 * 1024 * 1024)))
-                .get(blobs::get_cover),
+                .get(blobs::get_cover.layer(reader_scope())),
         )
         .route(
             "/books/{id}/files",
@@ -277,7 +290,10 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/books/{id}/read", get(reader::manifest))
         .route("/books/{id}/read/{index}", get(reader::unit))
         .route("/books/{id}/read/asset/{*name}", get(reader::asset))
-        .route("/files/{file_id}", get(blobs::download_file))
+        .route(
+            "/files/{file_id}",
+            get(blobs::download_file.layer(reader_scope())),
+        )
         // Send a book to an e-reader by email (plan 5 #53). Gated on the `mail`
         // capability, rate-limited per user, and RBAC'd exactly like a read.
         .route("/books/{id}/send", post(send::send_book))
@@ -485,7 +501,15 @@ fn opds_routes() -> Router<AppState> {
         .route("/opds/search", get(opds::search))
         .route("/opds/search.xml", get(opds::search_description))
         .route("/opds/v2", get(opds::v2_root))
+        .layer(reader_scope())
         .layer(axum::middleware::map_response(add_basic_challenge))
+}
+
+/// Marks a route as one an app password may open (see `app_passwords.rs`).
+/// Applied only to the OPDS feeds and the cover/file GETs they link to; any
+/// route without it refuses app passwords, admin endpoints included.
+fn reader_scope() -> axum::Extension<app_passwords::AppPasswordScope> {
+    axum::Extension(app_passwords::AppPasswordScope)
 }
 
 async fn add_basic_challenge(mut response: axum::response::Response) -> axum::response::Response {

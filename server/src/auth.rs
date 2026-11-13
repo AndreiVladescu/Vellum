@@ -81,7 +81,13 @@ impl FromRequestParts<AppState> for AuthUser {
             return if let Some(token) = header.strip_prefix("Bearer ") {
                 user_from_token(state, token).await
             } else if let Some(encoded) = header.strip_prefix("Basic ") {
-                user_from_basic(state, encoded).await
+                // Whether this route takes app passwords is decided by the
+                // route table (see `AppPasswordScope`), never by the handler.
+                let scoped = parts
+                    .extensions
+                    .get::<crate::app_passwords::AppPasswordScope>()
+                    .is_some();
+                user_from_basic(state, encoded, scoped).await
             } else {
                 Err(AppError::Unauthorized(
                     "unsupported authorization scheme".into(),
@@ -149,7 +155,17 @@ async fn user_from_token(state: &AppState, token: &str) -> AppResult<AuthUser> {
     Ok(user)
 }
 
-async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser> {
+/// HTTP Basic: the email, and either an app password or the account password.
+///
+/// `app_password_scope` says whether this route accepts app passwords. An app
+/// password presented anywhere else is refused with 403 *after* it has been
+/// recognised — not treated as a wrong account password, which would count it
+/// as a failed login and let a misconfigured e-reader lock its owner out.
+async fn user_from_basic(
+    state: &AppState,
+    encoded: &str,
+    app_password_scope: bool,
+) -> AppResult<AuthUser> {
     use base64::Engine;
     let decoded = base64::engine::general_purpose::STANDARD
         .decode(encoded)
@@ -182,6 +198,28 @@ async fn user_from_basic(state: &AppState, encoded: &str) -> AppResult<AuthUser>
         state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
     };
+    // App passwords first: a SHA-256 lookup, so an e-reader using one never
+    // costs an Argon2 verify. Something shaped like one that isn't one falls
+    // through to the account password, which may simply look like this.
+    if crate::app_passwords::verify(state, &id, password)
+        .await?
+        .is_some()
+    {
+        if !app_password_scope {
+            return Err(AppError::Forbidden(
+                "an app password only opens the OPDS catalogue, covers and book downloads — \
+                 sign in with your account password for this"
+                    .into(),
+            ));
+        }
+        state.throttle.clear(&key);
+        return Ok(AuthUser {
+            id,
+            email,
+            display_name,
+            is_master,
+        });
+    }
     // Fast path: skip Argon2 when this exact password was verified recently.
     // Otherwise run the full verify and, on success, prime the cache.
     let ok = state.basic_cache.hit(&key, password) || {
@@ -906,7 +944,7 @@ pub struct ResetInput {
 /// transaction that writes the new hash, so two racing redemptions can't both
 /// succeed. Every existing session is dropped as well — a reset is what someone
 /// does when they fear their account is compromised, and leaving the attacker's
-/// session alive would defeat the point.
+/// session alive would defeat the point. So is every app password.
 pub async fn reset(
     State(state): State<AppState>,
     Json(input): Json<ResetInput>,
@@ -952,6 +990,13 @@ pub async fn reset(
         .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM session WHERE user_id = ?")
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await?;
+    // App passwords too, for the same reason: whoever had a session could have
+    // minted one, and an e-reader secret that outlived the reset would keep
+    // reading the library. Setting the devices up again is the price.
+    sqlx::query("DELETE FROM app_password WHERE user_id = ?")
         .bind(&user_id)
         .execute(&mut *tx)
         .await?;
