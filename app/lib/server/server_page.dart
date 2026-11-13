@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import '../widgets/page_insets.dart';
 
 import 'package:file_selector/file_selector.dart';
@@ -203,13 +204,13 @@ class _ServerPageState extends State<ServerPage> {
     final issues = l10n.syncIssues(report.issues.length);
     final msg = report.hasIssues
         ? (pulled
-            ? l10n.serverPulledBooksIssues(count, issues)
-            : l10n.serverPushedBooksIssues(count, issues))
+              ? l10n.serverPulledBooksIssues(count, issues)
+              : l10n.serverPushedBooksIssues(count, issues))
         : (count == 0
-            ? l10n.serverUpToDate
-            : (pulled
-                ? l10n.serverPulledBooks(count)
-                : l10n.serverPushedBooks(count)));
+              ? l10n.serverUpToDate
+              : (pulled
+                    ? l10n.serverPulledBooks(count)
+                    : l10n.serverPushedBooks(count)));
     // A snackbar is announced by the platform on Android but not reliably on
     // desktop, and this is the one message that says whether the sync worked.
     _announce(msg);
@@ -232,6 +233,13 @@ class _ServerPageState extends State<ServerPage> {
   double _dialogWidth(BuildContext context, double max) =>
       (MediaQuery.sizeOf(context).width - 80).clamp(0.0, max);
 
+  /// A book's title, or its id when the title is blank, or the personal-data
+  /// group for issues that belong to no single book.
+  String _issueTitle(SyncIssue i, L10n l10n) {
+    if (i.title.isNotEmpty) return i.title;
+    return i.bookId.isEmpty ? l10n.syncIssuePersonalData : i.bookId;
+  }
+
   void _showIssues(List<SyncIssue> issues) {
     showDialog<void>(
       context: context,
@@ -245,8 +253,10 @@ class _ServerPageState extends State<ServerPage> {
               for (final i in issues)
                 ListTile(
                   dense: true,
-                  title: Text(i.title.isEmpty ? i.bookId : i.title),
-                  subtitle: Text('${i.stage}: ${i.message}'), // i18n-ignore: technical detail
+                  title: Text(_issueTitle(i, L10n.of(context))),
+                  subtitle: Text(
+                    '${i.stage}: ${i.messageOf(L10n.of(context))}',
+                  ), // i18n-ignore: technical detail
                 ),
             ],
           ),
@@ -335,30 +345,29 @@ class _ServerPageState extends State<ServerPage> {
       // whether the address is known.
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(l10n.serverResetSent),
-    ));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(l10n.serverResetSent)));
   }
 
   Future<void> _authenticate() => _run(isAuthAttempt: true, () async {
-        final url = _url.text;
-        final client = widget.connection.anonymousClient(url);
-        final auth = _registerMode
-            ? await client.register(
-                email: _email.text.trim(),
-                displayName: _displayName.text.trim().isEmpty
-                    ? _email.text.trim()
-                    : _displayName.text.trim(),
-                password: _password.text,
-              )
-            : await client.login(
-                email: _email.text.trim(),
-                password: _password.text,
-              );
-        await widget.connection.saveSession(url: url, auth: auth);
-        await widget.connection.fetchCapabilities();
-        await _reconcileProfile(auth.user.displayName);
-      });
+    final url = _url.text;
+    final client = widget.connection.anonymousClient(url);
+    final auth = _registerMode
+        ? await client.register(
+            email: _email.text.trim(),
+            displayName: _displayName.text.trim().isEmpty
+                ? _email.text.trim()
+                : _displayName.text.trim(),
+            password: _password.text,
+          )
+        : await client.login(
+            email: _email.text.trim(),
+            password: _password.text,
+          );
+    await widget.connection.saveSession(url: url, auth: auth);
+    await widget.connection.fetchCapabilities();
+    await _reconcileProfile(auth.user.displayName);
+  });
 
   /// Two names, one person — asks which to keep.
   ///
@@ -460,9 +469,12 @@ class _ServerPageState extends State<ServerPage> {
         final msg = changed == 0 && !report.hasIssues
             ? l10n.serverUpToDate
             : report.hasIssues
-                ? l10n.serverSyncResultIssues(
-                    report.pulled, report.pushed, l10n.syncIssues(n))
-                : l10n.serverSyncResult(report.pulled, report.pushed);
+            ? l10n.serverSyncResultIssues(
+                report.pulled,
+                report.pushed,
+                l10n.syncIssues(n),
+              )
+            : l10n.serverSyncResult(report.pulled, report.pushed);
         resultMessage = msg;
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -485,23 +497,23 @@ class _ServerPageState extends State<ServerPage> {
   }
 
   Future<void> _pull() => _run(() async {
-        final client = widget.connection.client;
-        if (client == null) return;
-        final report = await _sync.pull(
-          client,
-          cursor: widget.connection.syncCursor,
-          onCursor: widget.connection.setSyncCursor,
-          onProgress: _onProgress,
-        );
-        _showReport(true, report.pulled, report);
-      });
+    final client = widget.connection.client;
+    if (client == null) return;
+    final report = await _sync.pull(
+      client,
+      cursor: widget.connection.syncCursor,
+      onCursor: widget.connection.setSyncCursor,
+      onProgress: _onProgress,
+    );
+    _showReport(true, report.pulled, report);
+  });
 
   Future<void> _push() => _run(() async {
-        final client = widget.connection.client;
-        if (client == null) return;
-        final report = await _sync.push(client, onProgress: _onProgress);
-        _showReport(false, report.pushed, report);
-      });
+    final client = widget.connection.client;
+    if (client == null) return;
+    final report = await _sync.push(client, onProgress: _onProgress);
+    _showReport(false, report.pushed, report);
+  });
 
   /// Certificate status + import control for [url], shown for https URLs (a
   /// self-signed server needs its certificate imported before the handshake can
@@ -535,7 +547,9 @@ class _ServerPageState extends State<ServerPage> {
           ),
           TextButton(
             onPressed: _busy ? null : () => _importCert(url),
-            child: Text(pem == null ? l10n.serverCertImport : l10n.serverCertChange),
+            child: Text(
+              pem == null ? l10n.serverCertImport : l10n.serverCertChange,
+            ),
           ),
         ],
       ),
@@ -563,8 +577,9 @@ class _ServerPageState extends State<ServerPage> {
   /// chosen `.pem`/`.crt` file. Passing an empty result forgets it.
   Future<void> _importCert(String url) async {
     final l10n = L10n.of(context);
-    final controller =
-        TextEditingController(text: widget.connection.certFor(url) ?? '');
+    final controller = TextEditingController(
+      text: widget.connection.certFor(url) ?? '',
+    );
     final result = await showDialog<String?>(
       context: context,
       builder: (context) {
@@ -588,10 +603,12 @@ class _ServerPageState extends State<ServerPage> {
                           label: l10n.serverCertGroup,
                           extensions: const ['pem', 'crt', 'cer'],
                         );
-                        final file =
-                            await openFile(acceptedTypeGroups: [group]);
+                        final file = await openFile(
+                          acceptedTypeGroups: [group],
+                        );
                         if (file != null) {
-                          controller.text = await File(file.path).readAsString();
+                          controller.text = await File(file.path)
+                              .readAsString();
                           setLocal(() => err = null);
                         }
                       },
@@ -603,7 +620,10 @@ class _ServerPageState extends State<ServerPage> {
                   TextField(
                     controller: controller,
                     maxLines: 6,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       hintText: '-----BEGIN CERTIFICATE-----', // i18n-ignore: PEM marker
@@ -611,9 +631,12 @@ class _ServerPageState extends State<ServerPage> {
                   ),
                   if (err != null) ...[
                     const SizedBox(height: 8),
-                    Text(err!,
-                        style:
-                            TextStyle(color: Theme.of(context).colorScheme.error)),
+                    Text(
+                      err!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -680,14 +703,18 @@ class _ServerPageState extends State<ServerPage> {
           children: [
             Row(
               children: [
-                Icon(Icons.lock_open,
-                    size: 18, color: theme.colorScheme.onErrorContainer),
+                Icon(
+                  Icons.lock_open,
+                  size: 18,
+                  color: theme.colorScheme.onErrorContainer,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     l10n.serverInsecureTitle,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(color: theme.colorScheme.onErrorContainer),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                    ),
                   ),
                 ),
               ],
@@ -695,8 +722,9 @@ class _ServerPageState extends State<ServerPage> {
             const SizedBox(height: 6),
             Text(
               l10n.serverInsecureBody,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onErrorContainer),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
             ),
             Align(
               alignment: Alignment.centerRight,
@@ -721,14 +749,18 @@ class _ServerPageState extends State<ServerPage> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(Icons.info_outline,
-                size: 18, color: theme.colorScheme.onSecondaryContainer),
+            Icon(
+              Icons.info_outline,
+              size: 18,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 L10n.of(context).serverNewer,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer,
+                ),
               ),
             ),
           ],
@@ -797,7 +829,8 @@ class _ServerPageState extends State<ServerPage> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.sync),
                   label: Text(busy ? l10n.serverSyncing : l10n.serverSyncNow),
                 );
@@ -826,7 +859,8 @@ class _ServerPageState extends State<ServerPage> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               l10n.serverNotSyncing(
-                  widget.settings.syncScope.excludedOf(l10n).join(', ')),
+                widget.settings.syncScope.excludedOf(l10n).join(', '),
+              ),
               style: theme.textTheme.bodySmall,
             ),
           ),
@@ -875,10 +909,11 @@ class _ServerPageState extends State<ServerPage> {
         OutlinedButton.icon(
           onPressed: _busy
               ? null
-              : () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) =>
-                        SharingPage(connection: widget.connection),
-                  )),
+              : () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SharingPage(connection: widget.connection),
+                  ),
+                ),
           icon: const Icon(Icons.group_outlined),
           label: Text(l10n.serverManageSharing),
         ),
@@ -904,9 +939,7 @@ class _ServerPageState extends State<ServerPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          _registerMode
-              ? l10n.serverRegisterBlurb
-              : l10n.serverSignInBlurb,
+          _registerMode ? l10n.serverRegisterBlurb : l10n.serverSignInBlurb,
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 20),
@@ -934,8 +967,9 @@ class _ServerPageState extends State<ServerPage> {
                   _httpBlockedOnAndroid(theme)
                       ? l10n.serverHttpBlocked
                       : l10n.serverHttpCleartext,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.error),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
                 ),
               ),
             ],
@@ -978,14 +1012,18 @@ class _ServerPageState extends State<ServerPage> {
         ],
         const SizedBox(height: 20),
         FilledButton(
-          onPressed:
-              (_busy || _httpBlockedOnAndroid(theme)) ? null : _authenticate,
+          onPressed: (_busy || _httpBlockedOnAndroid(theme))
+              ? null
+              : _authenticate,
           child: _busy
               ? const SizedBox(
                   height: 20,
                   width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(_registerMode ? l10n.serverCreateAccount : l10n.serverLogIn),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  _registerMode ? l10n.serverCreateAccount : l10n.serverLogIn,
+                ),
         ),
         // Offered only when the server says it can send mail (plan 5 #31): a
         // "Forgot password?" link on a LAN server with no SMTP would be a
@@ -1000,12 +1038,12 @@ class _ServerPageState extends State<ServerPage> {
           onPressed: _busy
               ? null
               : () => setState(() {
-                    _registerMode = !_registerMode;
-                    _error = null;
-                  }),
-          child: Text(_registerMode
-              ? l10n.serverHaveAccount
-              : l10n.serverNewServer),
+                  _registerMode = !_registerMode;
+                  _error = null;
+                }),
+          child: Text(
+            _registerMode ? l10n.serverHaveAccount : l10n.serverNewServer,
+          ),
         ),
       ],
     );

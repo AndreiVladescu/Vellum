@@ -5444,6 +5444,123 @@
     "description": "Phase name of a sync, shown under the progress bar and in the status-bar notification."
   },
 
+  "syncIssuePersonalData": "Personal data",
+  "@syncIssuePersonalData": {
+    "description": "Name of the sync-issues group for problems that belong to no single book (reading data, profile, copy photos)."
+  },
+
+  "syncNoteOverwritten": "Your unsent changes to “{title}” were replaced by a newer version from another device.",
+  "@syncNoteOverwritten": {
+    "description": "Sync issue: a local edit that had not been sent yet was replaced by a newer copy from another device.",
+    "placeholders": { "title": { "type": "String" } }
+  },
+
+  "syncNoteUnsafeBookId": "The server sent an unsafe book id; skipped.",
+  "@syncNoteUnsafeBookId": {
+    "description": "Sync issue: the server sent a book id that cannot be used as a file name, so the book was skipped."
+  },
+
+  "syncNoteUnsafeFileId": "The server sent an unsafe file id or format; skipped.",
+  "@syncNoteUnsafeFileId": {
+    "description": "Sync issue: the server sent a file id or format that cannot be used as a file name, so the file was skipped."
+  },
+
+  "syncNoteCopyMissing": "Book {id} isn't on this device yet.",
+  "@syncNoteCopyMissing": {
+    "description": "Sync issue: a physical copy was not synced because its book is not on this device yet.",
+    "placeholders": { "id": { "type": "String" } }
+  },
+
+  "syncNoteLoanCopyMissing": "Copy {id} isn't on this device yet.",
+  "@syncNoteLoanCopyMissing": {
+    "description": "Sync issue: a loan was not synced because its physical copy is not on this device yet.",
+    "placeholders": { "id": { "type": "String" } }
+  },
+
+  "syncNoteCopyPhotoDownload": "A copy photo could not be downloaded: {error}",
+  "@syncNoteCopyPhotoDownload": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteCopyPhotosPull": "Copy photos could not be pulled: {error}",
+  "@syncNoteCopyPhotosPull": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteCopyPhotoDelete": "A copy photo deletion could not be sent: {error}",
+  "@syncNoteCopyPhotoDelete": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteCopyPhotoPush": "A copy photo could not be sent: {error}",
+  "@syncNoteCopyPhotoPush": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteProfilePush": "Your profile could not be synced: {error}",
+  "@syncNoteProfilePush": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteAnnotationsPull": "Annotations could not be pulled: {error}",
+  "@syncNoteAnnotationsPull": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteReadingSessionsPull": "Reading sessions could not be pulled: {error}",
+  "@syncNoteReadingSessionsPull": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteReadingStatusesPull": "Reading statuses could not be pulled: {error}",
+  "@syncNoteReadingStatusesPull": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteReaderNotesPull": "Reader notes could not be pulled: {error}",
+  "@syncNoteReaderNotesPull": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteAnnotationDelete": "An annotation deletion could not be sent: {error}",
+  "@syncNoteAnnotationDelete": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteAnnotationPush": "An annotation could not be sent: {error}",
+  "@syncNoteAnnotationPush": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteReadingSessionPush": "A reading session could not be sent: {error}",
+  "@syncNoteReadingSessionPush": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteReaderNotePush": "A reader note could not be sent: {error}",
+  "@syncNoteReaderNotePush": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
+  "syncNoteReadingStatusPush": "A reading status could not be sent: {error}",
+  "@syncNoteReadingStatusPush": {
+    "description": "Sync issue. {error} is the underlying error text.",
+    "placeholders": { "error": { "type": "String" } }
+  },
+
   "syncTrayProgress": "{phase} — {done} of {total}",
   "@syncTrayProgress": {
     "description": "Body of the sync progress notification, e.g. \"Pushing books — 12 of 40\".",

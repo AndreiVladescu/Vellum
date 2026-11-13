@@ -35,15 +35,49 @@ class SyncIssue {
     required this.bookId,
     required this.title,
     required this.stage,
-    required this.message,
+    this.message = '',
+    this.note,
   });
 
+  /// Empty for a personal-data issue, which names no single book.
   final String bookId;
   final String title;
 
   /// Where it failed: 'delete', 'cover', 'file', 'render', 'push', ...
   final String stage;
+
+  /// Raw detail: an exception's text, or the id a [note] refers to.
   final String message;
+
+  /// A known problem, worded for the user by `SyncNoteL10n` (labels.dart).
+  /// The service has no BuildContext, so it records which problem and the UI
+  /// words it. Null when [message] is the whole story.
+  final SyncNote? note;
+}
+
+/// The known problems a sync can report. Each one is a sentence in
+/// `lib/l10n/app_en.arb`; the detail (an error, an id) goes in
+/// [SyncIssue.message].
+enum SyncNote {
+  overwritten,
+  unsafeBookId,
+  unsafeFileId,
+  copyMissing,
+  loanCopyMissing,
+  copyPhotoDownload,
+  copyPhotosPull,
+  copyPhotoDelete,
+  copyPhotoPush,
+  profilePush,
+  annotationsPull,
+  readingSessionsPull,
+  readingStatusesPull,
+  readerNotesPull,
+  annotationDelete,
+  annotationPush,
+  readingSessionPush,
+  readerNotePush,
+  readingStatusPush,
 }
 
 /// The outcome of a pull or push: counts plus any per-book failures.
@@ -222,12 +256,14 @@ class SyncService {
         await repository.deleteBook(row, recordTombstone: false);
         deletedLocally++;
       } catch (e) {
-        issues.add(SyncIssue(
-          bookId: id,
-          title: row.title,
-          stage: 'delete',
-          message: '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: id,
+            title: row.title,
+            stage: 'delete',
+            message: '$e',
+          ),
+        );
       }
     }
 
@@ -241,9 +277,9 @@ class SyncService {
     // the rule SyncScope already follows — so a book excluded here is not
     // overwritten by whatever the server holds for it either.
     final syncExcluded = {
-      for (final row in await (db.select(db.books)
-            ..where((b) => b.syncExcluded.equals(true)))
-          .get())
+      for (final row in await (db.select(
+        db.books,
+      )..where((b) => b.syncExcluded.equals(true))).get())
         row.id,
     };
 
@@ -288,19 +324,23 @@ class SyncService {
         // The sync report already exists and already surfaces; use it.
         final pendingTitle = locallyEdited[b.id];
         if (pendingTitle != null) {
-          overwritten.add(SyncIssue(
-            bookId: b.id,
-            title: pendingTitle,
-            stage: 'overwritten',
-            message: 'Your unsent changes to “$pendingTitle” were replaced by a '
-                'newer version from another device.',
-          ));
+          overwritten.add(
+            SyncIssue(
+              bookId: b.id,
+              title: pendingTitle,
+              stage: 'overwritten',
+              note: SyncNote.overwritten,
+            ),
+          );
         }
         applied.add(b);
 
         final spine =
             b.spineStyle ??
-            SpineStyle.generate(title: b.title, pageCount: b.pageCount).toJson();
+            SpineStyle.generate(
+              title: b.title,
+              pageCount: b.pageCount,
+            ).toJson();
         await db
             .into(db.books)
             .insertOnConflictUpdate(
@@ -324,7 +364,9 @@ class SyncService {
                 // Adopt the server's timestamp so this row isn't re-pulled every
                 // time, but a later server edit (newer) still wins. Absent when
                 // the server sent none, so the local default (now) applies.
-                updatedAt: server == null ? const Value.absent() : Value(server),
+                updatedAt: server == null
+                    ? const Value.absent()
+                    : Value(server),
               ),
             );
       }
@@ -338,8 +380,12 @@ class SyncService {
     // all and `series` stays null — indistinguishable, and harmless: the next
     // push re-asserts whatever this device knows.
     for (final b in applied) {
-      await repository.seriesService
-          .setSeries(b.id, b.series, b.seriesIndex, markDirty: false);
+      await repository.seriesService.setSeries(
+        b.id,
+        b.series,
+        b.seriesIndex,
+        markDirty: false,
+      );
     }
 
     // Replace authors/genres for the rows we adopted. Null means the server
@@ -371,7 +417,8 @@ class SyncService {
     // file was fetched and recorded regardless. Ask the database which ids are
     // really here instead of assuming.
     final presentIds = {
-      for (final row in await (db.selectOnly(db.books)
+      for (final row
+          in await (db.selectOnly(db.books)
                 ..addColumns([db.books.id])
                 ..where(db.books.id.isIn([for (final b in books) b.id])))
               .get())
@@ -385,12 +432,14 @@ class SyncService {
     var coverDone = 0;
     await _forEachBounded(coverBooks, (b) async {
       if (!_isSafeSegment(b.id)) {
-        issues.add(SyncIssue(
-          bookId: b.id,
-          title: b.title,
-          stage: 'cover',
-          message: 'server sent an unsafe book id; skipped',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: b.id,
+            title: b.title,
+            stage: 'cover',
+            note: SyncNote.unsafeBookId,
+          ),
+        );
         return;
       }
       try {
@@ -398,7 +447,10 @@ class SyncService {
         // file to be current: a cover changed on the server (console edit,
         // better art) must reach a device that already holds an old one. A 304
         // is cheap — the server's 304 path never opens the file.
-        final res = await client.downloadCover(b.id, etag: localCoverEtag[b.id]);
+        final res = await client.downloadCover(
+          b.id,
+          etag: localCoverEtag[b.id],
+        );
         if (res.bytes != null) {
           final rel = p.join('covers', '${b.id}.jpg');
           await File(p.join(_dataDir.path, rel)).writeAsBytes(res.bytes!);
@@ -410,15 +462,20 @@ class SyncService {
         }
       } catch (e) {
         // Leave this book cover-less; it still shows a generated spine.
-        issues.add(SyncIssue(
-          bookId: b.id,
-          title: b.title,
-          stage: 'cover',
-          message: '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: b.id,
+            title: b.title,
+            stage: 'cover',
+            message: '$e',
+          ),
+        );
       } finally {
         onProgress?.call(
-            ++coverDone, coverBooks.length, SyncPhase.downloadingCovers);
+          ++coverDone,
+          coverBooks.length,
+          SyncPhase.downloadingCovers,
+        );
       }
     });
 
@@ -439,12 +496,14 @@ class SyncService {
           if (have != null) continue;
           // Never let a server-chosen id/format escape the files/ dir.
           if (!_isSafeSegment(f.id) || !_isSafeSegment(f.format)) {
-            issues.add(SyncIssue(
-              bookId: b.id,
-              title: b.title,
-              stage: 'file',
-              message: 'server sent an unsafe file id/format; skipped',
-            ));
+            issues.add(
+              SyncIssue(
+                bookId: b.id,
+                title: b.title,
+                stage: 'file',
+                note: SyncNote.unsafeFileId,
+              ),
+            );
             continue;
           }
           final rel = p.join('files', '${f.id}.${f.format}');
@@ -469,12 +528,9 @@ class SyncService {
         }
       } catch (e) {
         // Metadata and cover are already pulled; skip files on error.
-        issues.add(SyncIssue(
-          bookId: b.id,
-          title: b.title,
-          stage: 'file',
-          message: '$e',
-        ));
+        issues.add(
+          SyncIssue(bookId: b.id, title: b.title, stage: 'file', message: '$e'),
+        );
       } finally {
         onProgress?.call(++fileDone, local.length, SyncPhase.downloadingFiles);
       }
@@ -499,29 +555,35 @@ class SyncService {
             localCover = p.join('covers', '${b.id}.jpg');
           }
         } catch (e) {
-          issues.add(SyncIssue(
-            bookId: b.id,
-            title: b.title,
-            stage: 'render',
-            message: '$e',
-          ));
+          issues.add(
+            SyncIssue(
+              bookId: b.id,
+              title: b.title,
+              stage: 'render',
+              message: '$e',
+            ),
+          );
         }
       }
       if (localCover == null) continue;
       final coverFile = File(p.join(_dataDir.path, localCover));
       if (await coverFile.exists()) {
         try {
-          final etag =
-              await client.uploadCover(b.id, await coverFile.readAsBytes());
+          final etag = await client.uploadCover(
+            b.id,
+            await coverFile.readAsBytes(),
+          );
           await _rememberCoverEtag(b.id, etag);
         } catch (e) {
           // View-only or offline — the cover stays local to this device.
-          issues.add(SyncIssue(
-            bookId: b.id,
-            title: b.title,
-            stage: 'cover',
-            message: '$e',
-          ));
+          issues.add(
+            SyncIssue(
+              bookId: b.id,
+              title: b.title,
+              stage: 'cover',
+              message: '$e',
+            ),
+          );
         }
       }
     }
@@ -543,10 +605,12 @@ class SyncService {
     final shelfResult = scope.books
         ? await _pullShelves(requests, issues)
         : nothing;
-    final copyResult =
-        scope.copies ? await _pullCopies(requests, issues) : nothing;
-    final loanResult =
-        scope.loans ? await _pullLoans(requests, issues) : nothing;
+    final copyResult = scope.copies
+        ? await _pullCopies(requests, issues)
+        : nothing;
+    final loanResult = scope.loans
+        ? await _pullLoans(requests, issues)
+        : nothing;
     // Personal data last: an annotation or a sitting names a book, and its
     // foreign key needs that book already applied above.
     final photoResult = scope.copyPhotos
@@ -561,13 +625,15 @@ class SyncService {
     final serverNow = listed.serverNow;
     if (serverNow != null && onCursor != null) onCursor(serverNow);
     return SyncReport(
-      pulled: applied.length +
+      pulled:
+          applied.length +
           shelfResult.pulled +
           copyResult.pulled +
           loanResult.pulled +
           photoResult.pulled +
           personalPulled,
-      deletedLocally: deletedLocally +
+      deletedLocally:
+          deletedLocally +
           shelfResult.deletedLocally +
           copyResult.deletedLocally +
           loanResult.deletedLocally +
@@ -595,8 +661,9 @@ class SyncService {
   /// downloading our own upload back. Null (an older server) leaves it alone.
   Future<void> _rememberCoverEtag(String bookId, String? etag) async {
     if (etag == null) return;
-    await (_db.update(_db.books)..where((x) => x.id.equals(bookId)))
-        .write(BooksCompanion(coverEtag: Value(etag)));
+    await (_db.update(_db.books)..where((x) => x.id.equals(bookId))).write(
+      BooksCompanion(coverEtag: Value(etag)),
+    );
   }
 
   /// Pulls shelves: applies the server's shelf tombstones, then upserts
@@ -621,28 +688,32 @@ class SyncService {
         await repository.deleteShelf(id, recordTombstone: false);
         deletedLocally++;
       } catch (e) {
-        issues.add(SyncIssue(
-          bookId: id,
-          title: row.name,
-          stage: 'delete',
-          message: '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: id,
+            title: row.name,
+            stage: 'delete',
+            message: '$e',
+          ),
+        );
       }
     }
 
     // Shelves deleted locally but not yet pushed: skip them below, same
     // reasoning as books' localTombstoned.
     final localTombstoned = {
-      for (final d in await (db.select(db.localDeletions)
-            ..where((d) => d.kind.equals('shelf')))
-          .get())
+      for (final d in await (db.select(
+        db.localDeletions,
+      )..where((d) => d.kind.equals('shelf'))).get())
         d.bookId,
     };
 
     final listed = await requests.shelves;
     final localShelves = await db.select(db.shelves).get();
     final localUpdatedAt = {for (final s in localShelves) s.id: s.updatedAt};
-    final localBookIds = {for (final b in await db.select(db.books).get()) b.id};
+    final localBookIds = {
+      for (final b in await db.select(db.books).get()) b.id,
+    };
 
     final adopted = <String>[];
     await db.transaction(() async {
@@ -661,13 +732,16 @@ class SyncService {
         // decision every time the shelf's name changed. A shelf arriving for
         // the first time simply has no answer yet (null), which the library
         // reads as "follow the preference".
-        await db.into(db.shelves).insertOnConflictUpdate(
+        await db
+            .into(db.shelves)
+            .insertOnConflictUpdate(
               ShelvesCompanion.insert(
                 id: s.id,
                 name: s.name,
                 sortOrder: Value(s.sortOrder),
-                updatedAt:
-                    server == null ? const Value.absent() : Value(server),
+                updatedAt: server == null
+                    ? const Value.absent()
+                    : Value(server),
                 isPersonal: Value(s.personal),
                 ownerId: Value(s.ownerId),
               ),
@@ -678,18 +752,23 @@ class SyncService {
           db.shelfBooks,
         )..where((sb) => sb.shelfId.equals(s.id))).go();
         for (var i = 0; i < filtered.length; i++) {
-          await db.into(db.shelfBooks).insert(ShelfBooksCompanion.insert(
-                shelfId: s.id,
-                bookId: filtered[i],
-                position: Value(i),
-              ));
+          await db
+              .into(db.shelfBooks)
+              .insert(
+                ShelfBooksCompanion.insert(
+                  shelfId: s.id,
+                  bookId: filtered[i],
+                  position: Value(i),
+                ),
+              );
         }
       }
     });
 
     if (adopted.isNotEmpty) {
-      await (db.update(db.shelves)..where((s) => s.id.isIn(adopted)))
-          .write(const ShelvesCompanion(needsPush: Value(false)));
+      await (db.update(db.shelves)..where((s) => s.id.isIn(adopted))).write(
+        const ShelvesCompanion(needsPush: Value(false)),
+      );
     }
     return (pulled: adopted.length, deletedLocally: deletedLocally);
   }
@@ -721,28 +800,32 @@ class SyncService {
         await repository.deletePhysicalCopy(id, recordTombstone: false);
         deletedLocally++;
       } catch (e) {
-        issues.add(SyncIssue(
-          bookId: id,
-          title: row.location ?? id,
-          stage: 'delete',
-          message: '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: id,
+            title: row.location ?? id,
+            stage: 'delete',
+            message: '$e',
+          ),
+        );
       }
     }
 
     // Copies deleted locally but not yet pushed: skip them below, same
     // reasoning as books'/shelves' localTombstoned.
     final localTombstoned = {
-      for (final d in await (db.select(db.localDeletions)
-            ..where((d) => d.kind.equals('copy')))
-          .get())
+      for (final d in await (db.select(
+        db.localDeletions,
+      )..where((d) => d.kind.equals('copy'))).get())
         d.bookId,
     };
 
     final listed = await requests.copies;
     final localCopies = await db.select(db.physicalCopies).get();
     final localUpdatedAt = {for (final c in localCopies) c.id: c.updatedAt};
-    final localBookIds = {for (final b in await db.select(db.books).get()) b.id};
+    final localBookIds = {
+      for (final b in await db.select(db.books).get()) b.id,
+    };
 
     final adopted = <String>[];
     await db.transaction(() async {
@@ -754,12 +837,15 @@ class SyncService {
           // never be retried and the copy would be lost on this device for
           // good (unlike a shelf's per-book-id filter, a copy *is* its one
           // book — there's no partial form to keep retrying towards).
-          issues.add(SyncIssue(
-            bookId: c.id,
-            title: c.location ?? c.id,
-            stage: 'copy',
-            message: "book ${c.bookId} isn't present on this device yet",
-          ));
+          issues.add(
+            SyncIssue(
+              bookId: c.id,
+              title: c.location ?? c.id,
+              stage: 'copy',
+              note: SyncNote.copyMissing,
+              message: c.bookId,
+            ),
+          );
           continue;
         }
 
@@ -770,15 +856,18 @@ class SyncService {
         }
         adopted.add(c.id);
 
-        await db.into(db.physicalCopies).insertOnConflictUpdate(
+        await db
+            .into(db.physicalCopies)
+            .insertOnConflictUpdate(
               PhysicalCopiesCompanion.insert(
                 id: c.id,
                 bookId: c.bookId,
                 location: Value(c.location),
                 condition: Value(c.condition),
                 notes: Value(c.notes),
-                updatedAt:
-                    server == null ? const Value.absent() : Value(server),
+                updatedAt: server == null
+                    ? const Value.absent()
+                    : Value(server),
               ),
             );
       }
@@ -819,12 +908,14 @@ class SyncService {
         await (db.delete(db.loans)..where((l) => l.id.equals(id))).go();
         deletedLocally++;
       } catch (e) {
-        issues.add(SyncIssue(
-          bookId: id,
-          title: row.borrower,
-          stage: 'delete',
-          message: '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: id,
+            title: row.borrower,
+            stage: 'delete',
+            message: '$e',
+          ),
+        );
       }
     }
 
@@ -832,9 +923,9 @@ class SyncService {
     // reasoning as books'/shelves'/copies' localTombstoned. (No app code path
     // creates one of these today, but the pull side stays symmetric with push.)
     final localTombstoned = {
-      for (final d in await (db.select(db.localDeletions)
-            ..where((d) => d.kind.equals('loan')))
-          .get())
+      for (final d in await (db.select(
+        db.localDeletions,
+      )..where((d) => d.kind.equals('loan'))).get())
         d.bookId,
     };
 
@@ -850,12 +941,15 @@ class SyncService {
       for (final l in listed.loans) {
         if (localTombstoned.contains(l.id)) continue;
         if (!localCopyIds.contains(l.copyId)) {
-          issues.add(SyncIssue(
-            bookId: l.id,
-            title: l.borrower,
-            stage: 'loan',
-            message: "copy ${l.copyId} isn't present on this device yet",
-          ));
+          issues.add(
+            SyncIssue(
+              bookId: l.id,
+              title: l.borrower,
+              stage: 'loan',
+              note: SyncNote.loanCopyMissing,
+              message: l.copyId,
+            ),
+          );
           continue;
         }
 
@@ -866,7 +960,9 @@ class SyncService {
         }
         adopted.add(l.id);
 
-        await db.into(db.loans).insertOnConflictUpdate(
+        await db
+            .into(db.loans)
+            .insertOnConflictUpdate(
               LoansCompanion.insert(
                 id: l.id,
                 copyId: l.copyId,
@@ -878,16 +974,18 @@ class SyncService {
                 notes: Value(l.notes),
                 reminderSentAt: Value(l.reminderSentAt),
                 remind: Value(l.remind),
-                updatedAt:
-                    server == null ? const Value.absent() : Value(server),
+                updatedAt: server == null
+                    ? const Value.absent()
+                    : Value(server),
               ),
             );
       }
     });
 
     if (adopted.isNotEmpty) {
-      await (db.update(db.loans)..where((l) => l.id.isIn(adopted)))
-          .write(const LoansCompanion(needsPush: Value(false)));
+      await (db.update(db.loans)..where((l) => l.id.isIn(adopted))).write(
+        const LoansCompanion(needsPush: Value(false)),
+      );
     }
     return (pulled: adopted.length, deletedLocally: deletedLocally);
   }
@@ -925,9 +1023,9 @@ class SyncService {
     // a shared book locally is a local-only act — it will legitimately return
     // on the next pull).
     var deletedRemotely = 0;
-    for (final d in await (db.select(db.localDeletions)
-          ..where((d) => d.kind.equals('book')))
-        .get()) {
+    for (final d in await (db.select(
+      db.localDeletions,
+    )..where((d) => d.kind.equals('book'))).get()) {
       try {
         await client.deleteBook(d.bookId);
       } on ServerException {
@@ -953,12 +1051,14 @@ class SyncService {
     // before stays on the server — stopping the traffic is not the same as
     // recalling what already went, and taking it back would remove it from
     // everyone the library is shared with.
-    final books = await (db.select(db.books)
-          ..where((b) =>
-              b.needsPush.equals(true) &
-              b.deletedAt.isNull() &
-              b.syncExcluded.equals(false)))
-        .get();
+    final books =
+        await (db.select(db.books)..where(
+              (b) =>
+                  b.needsPush.equals(true) &
+                  b.deletedAt.isNull() &
+                  b.syncExcluded.equals(false),
+            ))
+            .get();
 
     // Which files the server already has, so they aren't uploaded again. Only
     // books with local files need asking (performance round #5). A few ask
@@ -967,9 +1067,10 @@ class SyncService {
     // to be fetched for every push, though: at 5,000 books it is 4.4 MB, for
     // the one book an auto-push after an edit usually carries.
     final booksWithFiles = {
-      for (final row in await (db.selectOnly(db.bookFiles, distinct: true)
-            ..addColumns([db.bookFiles.bookId]))
-          .get())
+      for (final row in await (db.selectOnly(
+        db.bookFiles,
+        distinct: true,
+      )..addColumns([db.bookFiles.bookId])).get())
         row.read(db.bookFiles.bookId)!,
     };
     final asking = books.where((b) => booksWithFiles.contains(b.id)).length;
@@ -1078,12 +1179,14 @@ class SyncService {
         pushed++;
       } catch (e) {
         // Read-only, rejected, or a blob error — leave it dirty and record it.
-        issues.add(SyncIssue(
-          bookId: b.id,
-          title: b.title,
-          stage: 'push',
-          message: e is ServerException ? e.message : '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: b.id,
+            title: b.title,
+            stage: 'push',
+            message: e is ServerException ? e.message : '$e',
+          ),
+        );
       } finally {
         onProgress?.call(++pushDone, books.length, SyncPhase.pushingBooks);
       }
@@ -1097,23 +1200,28 @@ class SyncService {
     // a loan for a copy pushed for the first time just above needs that
     // copy already on the server.
     const nothing = (pushed: 0, deletedRemotely: 0);
-    final shelfResult =
-        scope.books ? await _pushShelves(client, issues) : nothing;
-    final copyResult =
-        scope.copies ? await _pushCopies(client, issues) : nothing;
+    final shelfResult = scope.books
+        ? await _pushShelves(client, issues)
+        : nothing;
+    final copyResult = scope.copies
+        ? await _pushCopies(client, issues)
+        : nothing;
     final loanResult = scope.loans ? await _pushLoans(client, issues) : nothing;
-    final photoPushed =
-        scope.copyPhotos ? await _pushCopyPhotos(client, issues) : 0;
+    final photoPushed = scope.copyPhotos
+        ? await _pushCopyPhotos(client, issues)
+        : 0;
     final personalPushed = await _pushPersonal(client, issues, scope);
 
     return SyncReport(
-      pushed: pushed +
+      pushed:
+          pushed +
           shelfResult.pushed +
           copyResult.pushed +
           loanResult.pushed +
           photoPushed +
           personalPushed,
-      deletedRemotely: deletedRemotely +
+      deletedRemotely:
+          deletedRemotely +
           shelfResult.deletedRemotely +
           copyResult.deletedRemotely +
           loanResult.deletedRemotely,
@@ -1136,11 +1244,10 @@ class SyncService {
     var pulled = 0;
     var deletedLocally = 0;
     try {
-      for (final id
-          in await requests.copyPhotoDeletions) {
-        final rows = await (db.select(db.copyPhotos)
-              ..where((ph) => ph.id.equals(id)))
-            .get();
+      for (final id in await requests.copyPhotoDeletions) {
+        final rows = await (db.select(
+          db.copyPhotos,
+        )..where((ph) => ph.id.equals(id))).get();
         for (final row in rows) {
           final file = File(p.join(_dataDir.path, row.path));
           if (file.existsSync()) {
@@ -1152,9 +1259,9 @@ class SyncService {
             }
           }
         }
-        deletedLocally +=
-            await (db.delete(db.copyPhotos)..where((ph) => ph.id.equals(id)))
-                .go();
+        deletedLocally += await (db.delete(
+          db.copyPhotos,
+        )..where((ph) => ph.id.equals(id))).go();
       }
 
       final known = {
@@ -1165,9 +1272,9 @@ class SyncService {
         // A copy this device doesn't have — a share it hasn't taken, or a copy
         // whose own pull failed. The foreign key would otherwise abort.
         if (!known.contains(photo.copyId)) continue;
-        final local = await (db.select(db.copyPhotos)
-              ..where((ph) => ph.id.equals(photo.id)))
-            .getSingleOrNull();
+        final local = await (db.select(
+          db.copyPhotos,
+        )..where((ph) => ph.id.equals(photo.id))).getSingleOrNull();
         if (local != null &&
             photo.updatedAt != null &&
             !local.updatedAt.isBefore(photo.updatedAt!)) {
@@ -1186,12 +1293,13 @@ class SyncService {
               await file.writeAsBytes(bytes, flush: true);
             }
           } catch (e) {
-            issues.add(_personalIssue('file', 'A copy photo could not be '
-                'downloaded: $e'));
+            issues.add(_personalIssue('file', SyncNote.copyPhotoDownload, e));
             continue; // no row without its image — it would render as a gap
           }
         }
-        await db.into(db.copyPhotos).insertOnConflictUpdate(
+        await db
+            .into(db.copyPhotos)
+            .insertOnConflictUpdate(
               CopyPhotosCompanion.insert(
                 id: photo.id,
                 copyId: photo.copyId,
@@ -1206,7 +1314,7 @@ class SyncService {
       }
     } catch (e) {
       if (!_serverLacksPersonal(e)) {
-        issues.add(_personalIssue('pull', 'Copy photos could not be pulled: $e'));
+        issues.add(_personalIssue('pull', SyncNote.copyPhotosPull, e));
       }
     }
     return (pulled: pulled, deletedLocally: deletedLocally);
@@ -1219,31 +1327,30 @@ class SyncService {
     final db = _db;
     var pushed = 0;
 
-    final tombstones = await (db.select(db.localDeletions)
-          ..where((d) => d.kind.equals('copy_photo')))
-        .get();
+    final tombstones = await (db.select(
+      db.localDeletions,
+    )..where((d) => d.kind.equals('copy_photo'))).get();
     for (final t in tombstones) {
       try {
         await client.deleteCopyPhoto(t.bookId);
-        await (db.delete(db.localDeletions)
-              ..where((d) => d.bookId.equals(t.bookId)))
-            .go();
+        await (db.delete(
+          db.localDeletions,
+        )..where((d) => d.bookId.equals(t.bookId))).go();
         pushed++;
       } catch (e) {
         if (_serverLacksPersonal(e)) {
-          await (db.delete(db.localDeletions)
-                ..where((d) => d.bookId.equals(t.bookId)))
-              .go();
+          await (db.delete(
+            db.localDeletions,
+          )..where((d) => d.bookId.equals(t.bookId))).go();
         } else {
-          issues.add(_personalIssue('delete', 'A copy photo deletion could '
-              'not be sent: $e'));
+          issues.add(_personalIssue('delete', SyncNote.copyPhotoDelete, e));
         }
       }
     }
 
-    final dirty = await (db.select(db.copyPhotos)
-          ..where((ph) => ph.needsPush.equals(true)))
-        .get();
+    final dirty = await (db.select(
+      db.copyPhotos,
+    )..where((ph) => ph.needsPush.equals(true))).get();
     for (final photo in dirty) {
       try {
         await client.pushCopyPhoto(
@@ -1264,7 +1371,7 @@ class SyncService {
       } catch (e) {
         // View-only, or a copy the server doesn't have yet. It stays dirty and
         // rides the next sync.
-        issues.add(_personalIssue('push', 'A copy photo could not be sent: $e'));
+        issues.add(_personalIssue('push', SyncNote.copyPhotoPush, e));
       }
     }
     return pushed;
@@ -1304,7 +1411,8 @@ class SyncService {
       final remote = await requests.profile;
       final localStamp = local.updatedAt;
       final remoteStamp = remote.updatedAt;
-      final remoteIsNewer = localStamp == null ||
+      final remoteIsNewer =
+          localStamp == null ||
           (remoteStamp != null && remoteStamp.isAfter(localStamp));
 
       if (remoteIsNewer) {
@@ -1327,14 +1435,15 @@ class SyncService {
       final path = local.photoPath;
       if (path != null) {
         final file = File(path);
-        if (file.existsSync()) await client.pushAvatar(await file.readAsBytes());
+        if (file.existsSync()) {
+          await client.pushAvatar(await file.readAsBytes());
+        }
       } else if (remote.hasAvatar) {
         await client.deleteAvatar();
       }
     } catch (e) {
       if (!_serverLacksPersonal(e)) {
-        issues.add(
-            _personalIssue('push', 'Your profile could not be synced: $e'));
+        issues.add(_personalIssue('push', SyncNote.profilePush, e));
       }
     }
   }
@@ -1354,11 +1463,13 @@ class SyncService {
 
   /// Personal-data failures have no single book to name, so they report under
   /// the category rather than pretending to.
-  SyncIssue _personalIssue(String stage, String message) => SyncIssue(
+  SyncIssue _personalIssue(String stage, SyncNote note, Object error) =>
+      SyncIssue(
         bookId: '',
-        title: 'Personal data', // i18n-ignore: sync diagnostics
+        title: '',
         stage: stage,
-        message: message,
+        message: '$error',
+        note: note,
       );
 
   /// Combines the server's copy of a book's status with this device's, by the
@@ -1371,8 +1482,11 @@ class SyncService {
   /// server's copy is the newcomer, and the flag is set only if the merge kept
   /// something the server lacks: a rating it has never heard of, or a finish
   /// it would otherwise not count.
-  Future<bool> _adoptStatus(Book local, RemoteBookStatus remote,
-      {required bool pending}) async {
+  Future<bool> _adoptStatus(
+    Book local,
+    RemoteBookStatus remote, {
+    required bool pending,
+  }) async {
     final mine = StatusState.ofBook(local);
     final theirs = StatusState(
       status: remote.status,
@@ -1386,26 +1500,30 @@ class SyncService {
       rating: remote.hasRating ? remote.rating : null,
       ratingUpdatedAt: remote.hasRating ? remote.ratingUpdatedAt : null,
     );
-    final merged = pending ? mergeStatus(theirs, mine) : mergeStatus(mine, theirs);
+    final merged = pending
+        ? mergeStatus(theirs, mine)
+        : mergeStatus(mine, theirs);
     final needsPush =
         pending || !merged.sameAs(theirs, withRating: remote.hasRating);
-    final unchanged = merged.sameAs(mine) &&
+    final unchanged =
+        merged.sameAs(mine) &&
         merged.updatedAt == mine.updatedAt &&
         merged.ratingUpdatedAt == mine.ratingUpdatedAt &&
         needsPush == local.statusNeedsPush;
     if (unchanged) return false;
-    await (_db.update(_db.books)..where((b) => b.id.equals(local.id)))
-        .write(BooksCompanion(
-      status: Value(merged.status),
-      startedAt: Value(merged.startedAt),
-      finishedAt: Value(merged.finishedAt),
-      readCount: Value(merged.readCount),
-      statusInferred: Value(merged.inferred),
-      statusUpdatedAt: Value(merged.updatedAt),
-      rating: Value(merged.rating),
-      ratingUpdatedAt: Value(merged.ratingUpdatedAt),
-      statusNeedsPush: Value(needsPush),
-    ));
+    await (_db.update(_db.books)..where((b) => b.id.equals(local.id))).write(
+      BooksCompanion(
+        status: Value(merged.status),
+        startedAt: Value(merged.startedAt),
+        finishedAt: Value(merged.finishedAt),
+        readCount: Value(merged.readCount),
+        statusInferred: Value(merged.inferred),
+        statusUpdatedAt: Value(merged.updatedAt),
+        rating: Value(merged.rating),
+        ratingUpdatedAt: Value(merged.ratingUpdatedAt),
+        statusNeedsPush: Value(needsPush),
+      ),
+    );
     return true;
   }
 
@@ -1420,89 +1538,90 @@ class SyncService {
     // Books this device actually has. An annotation whose book failed its own
     // pull — or belongs to a share this device hasn't taken — would otherwise
     // violate the foreign key and abort the whole sync.
-    final known = {
-      for (final b in await db.select(db.books).get()) b.id,
-    };
+    final known = {for (final b in await db.select(db.books).get()) b.id};
 
     // Annotations and reader notes travel together: a note *is* a
     // `book_note` row on the same personal channel, and "sync my highlights but
     // not my private note on the same book" is a distinction nobody asked for.
     if (scope.annotations) {
       try {
-      final deletions = await requests.annotationDeletions;
-      for (final tombstone in deletions.entries) {
-        final removed = await (db.delete(db.annotations)
-              ..where((a) => a.id.equals(tombstone.id)))
-            .go();
-        if (removed > 0) pulled++;
-      }
-
-      final remote = await requests.annotations;
-      for (final a in remote.entries) {
-        if (!known.contains(a.bookId)) continue;
-        final local = await (db.select(db.annotations)
-              ..where((row) => row.id.equals(a.id)))
-            .getSingleOrNull();
-        // Last-write-wins, and a tie keeps what is already here: re-applying
-        // an identical row would only clear its `needsPush` for no reason.
-        if (local != null &&
-            a.updatedAt != null &&
-            !local.updatedAt.isBefore(a.updatedAt!)) {
-          continue;
+        final deletions = await requests.annotationDeletions;
+        for (final tombstone in deletions.entries) {
+          final removed = await (db.delete(
+            db.annotations,
+          )..where((a) => a.id.equals(tombstone.id))).go();
+          if (removed > 0) pulled++;
         }
-        await db.into(db.annotations).insertOnConflictUpdate(
-              AnnotationsCompanion.insert(
-                id: a.id,
-                bookId: a.bookId,
-                kind: a.kind,
-                page: Value(a.page),
-                chapter: Value(a.chapter),
-                locator: Value(a.locator),
-                quotedText: Value(a.quotedText),
-                note: Value(a.note),
-                color: Value(a.color),
-                ink: Value(a.ink),
-                createdAt: Value(a.createdAt ?? DateTime.now()),
-                updatedAt: Value(a.updatedAt ?? DateTime.now()),
-                // It came *from* the server, so it is not waiting to go there.
-                needsPush: const Value(false),
-              ),
-            );
-        pulled++;
+
+        final remote = await requests.annotations;
+        for (final a in remote.entries) {
+          if (!known.contains(a.bookId)) continue;
+          final local = await (db.select(
+            db.annotations,
+          )..where((row) => row.id.equals(a.id))).getSingleOrNull();
+          // Last-write-wins, and a tie keeps what is already here: re-applying
+          // an identical row would only clear its `needsPush` for no reason.
+          if (local != null &&
+              a.updatedAt != null &&
+              !local.updatedAt.isBefore(a.updatedAt!)) {
+            continue;
+          }
+          await db
+              .into(db.annotations)
+              .insertOnConflictUpdate(
+                AnnotationsCompanion.insert(
+                  id: a.id,
+                  bookId: a.bookId,
+                  kind: a.kind,
+                  page: Value(a.page),
+                  chapter: Value(a.chapter),
+                  locator: Value(a.locator),
+                  quotedText: Value(a.quotedText),
+                  note: Value(a.note),
+                  color: Value(a.color),
+                  ink: Value(a.ink),
+                  createdAt: Value(a.createdAt ?? DateTime.now()),
+                  updatedAt: Value(a.updatedAt ?? DateTime.now()),
+                  // It came *from* the server, so it is not waiting to go there.
+                  needsPush: const Value(false),
+                ),
+              );
+          pulled++;
+        }
+      } catch (e) {
+        if (!_serverLacksPersonal(e)) {
+          issues.add(_personalIssue('pull', SyncNote.annotationsPull, e));
+        }
       }
-    } catch (e) {
-      if (!_serverLacksPersonal(e)) {
-        issues.add(_personalIssue('pull', 'Annotations could not be pulled: $e'));
-      }
-    }
     }
 
     if (scope.sessions) {
       try {
-      final remote = await requests.sessions;
-      for (final s in remote.entries) {
-        if (!known.contains(s.bookId)) continue;
-        await db.into(db.readingSessions).insertOnConflictUpdate(
-              ReadingSessionsCompanion.insert(
-                id: s.id,
-                bookId: s.bookId,
-                startedAt: s.startedAt,
-                endedAt: s.endedAt,
-                startPage: Value(s.startPage),
-                endPage: Value(s.endPage),
-                deviceId: Value(s.deviceId),
-                deviceLabel: Value(s.deviceLabel),
-                needsPush: const Value(false),
-              ),
-            );
-        pulled++;
+        final remote = await requests.sessions;
+        for (final s in remote.entries) {
+          if (!known.contains(s.bookId)) continue;
+          await db
+              .into(db.readingSessions)
+              .insertOnConflictUpdate(
+                ReadingSessionsCompanion.insert(
+                  id: s.id,
+                  bookId: s.bookId,
+                  startedAt: s.startedAt,
+                  endedAt: s.endedAt,
+                  startPage: Value(s.startPage),
+                  endPage: Value(s.endPage),
+                  deviceId: Value(s.deviceId),
+                  deviceLabel: Value(s.deviceLabel),
+                  needsPush: const Value(false),
+                ),
+              );
+          pulled++;
+        }
+      } catch (e) {
+        if (!_serverLacksPersonal(e)) {
+          issues.add(_personalIssue('pull', SyncNote.readingSessionsPull, e));
+        }
       }
-    } catch (e) {
-      if (!_serverLacksPersonal(e)) {
-        issues.add(
-            _personalIssue('pull', 'Reading sessions could not be pulled: $e'));
-      }
-    }
     }
 
     if (scope.books) {
@@ -1514,42 +1633,46 @@ class SyncService {
         final statuses = await requests.statuses;
         for (final remote in statuses.entries) {
           if (!known.contains(remote.bookId)) continue;
-          final local = await (db.select(db.books)
-                ..where((b) => b.id.equals(remote.bookId)))
-              .getSingleOrNull();
+          final local = await (db.select(
+            db.books,
+          )..where((b) => b.id.equals(remote.bookId))).getSingleOrNull();
           if (local == null) continue;
-          if (await _adoptStatus(local, remote, pending: local.statusNeedsPush)) {
+          if (await _adoptStatus(
+            local,
+            remote,
+            pending: local.statusNeedsPush,
+          )) {
             pulled++;
           }
         }
       } catch (e) {
         if (!_serverLacksPersonal(e)) {
-          issues.add(_personalIssue(
-              'pull', 'Reading statuses could not be pulled: $e'));
+          issues.add(_personalIssue('pull', SyncNote.readingStatusesPull, e));
         }
       }
     }
 
     if (scope.annotations) {
       try {
-      final notes = await requests.notes;
-      for (final n in notes.entries) {
-        if (!known.contains(n.bookId)) continue;
-        await (db.update(db.books)..where((b) => b.id.equals(n.bookId))).write(
-          BooksCompanion(
-            readerNotes: Value(n.note.isEmpty ? null : n.note),
-            readerNotesUpdatedAt: Value(n.updatedAt),
-            readerNotesNeedsPush: const Value(false),
-          ),
-        );
-        pulled++;
+        final notes = await requests.notes;
+        for (final n in notes.entries) {
+          if (!known.contains(n.bookId)) continue;
+          await (db.update(
+            db.books,
+          )..where((b) => b.id.equals(n.bookId))).write(
+            BooksCompanion(
+              readerNotes: Value(n.note.isEmpty ? null : n.note),
+              readerNotesUpdatedAt: Value(n.updatedAt),
+              readerNotesNeedsPush: const Value(false),
+            ),
+          );
+          pulled++;
+        }
+      } catch (e) {
+        if (!_serverLacksPersonal(e)) {
+          issues.add(_personalIssue('pull', SyncNote.readerNotesPull, e));
+        }
       }
-    } catch (e) {
-      if (!_serverLacksPersonal(e)) {
-        issues.add(
-            _personalIssue('pull', 'Reader notes could not be pulled: $e'));
-      }
-    }
     }
     return pulled;
   }
@@ -1566,16 +1689,16 @@ class SyncService {
     // Deletions first, so a delete followed by a re-add in the same window
     // lands in that order rather than the reverse.
     final tombstones = scope.annotations
-        ? await (db.select(db.localDeletions)
-              ..where((d) => d.kind.equals('annotation')))
-            .get()
+        ? await (db.select(
+            db.localDeletions,
+          )..where((d) => d.kind.equals('annotation'))).get()
         : const <LocalDeletion>[];
     for (final t in tombstones) {
       try {
         await client.deleteAnnotation(t.bookId);
-        await (db.delete(db.localDeletions)
-              ..where((d) => d.bookId.equals(t.bookId)))
-            .go();
+        await (db.delete(
+          db.localDeletions,
+        )..where((d) => d.bookId.equals(t.bookId))).go();
         pushed++;
       } catch (e) {
         // A 404 means the server never had it — the tombstone has done its job
@@ -1587,11 +1710,11 @@ class SyncService {
         // server had not seen — a page drawn on and rubbed out between two
         // syncs — was reported as a failed deletion, on every sync, for good.
         if (e is ServerException && e.statusCode == 404) {
-          await (db.delete(db.localDeletions)
-                ..where((d) => d.bookId.equals(t.bookId)))
-              .go();
+          await (db.delete(
+            db.localDeletions,
+          )..where((d) => d.bookId.equals(t.bookId))).go();
         } else {
-          issues.add(_personalIssue('delete', 'An annotation deletion could not be sent: $e'));
+          issues.add(_personalIssue('delete', SyncNote.annotationDelete, e));
         }
       }
     }
@@ -1601,19 +1724,23 @@ class SyncService {
     // client that pushed it anyway would report a failed sync on every pass
     // and never clear the flag. Ask instead — and only when there is ink
     // waiting, so an ordinary sync still costs no handshake.
-    final inkWaiting = scope.annotations &&
+    final inkWaiting =
+        scope.annotations &&
         await (db.select(db.annotations)
-              ..where((a) =>
-                  a.needsPush.equals(true) &
-                  a.kind.equals(AnnotationKind.ink.name))
-              ..limit(1))
-            .getSingleOrNull() !=
+                  ..where(
+                    (a) =>
+                        a.needsPush.equals(true) &
+                        a.kind.equals(AnnotationKind.ink.name),
+                  )
+                  ..limit(1))
+                .getSingleOrNull() !=
             null;
     final canInk = !inkWaiting || await _supportsInk(client);
 
     final dirty = scope.annotations
-        ? await (db.select(db.annotations)..where((a) => a.needsPush.equals(true)))
-            .get()
+        ? await (db.select(
+            db.annotations,
+          )..where((a) => a.needsPush.equals(true))).get()
         : const <Annotation>[];
     for (final a in dirty) {
       // Ink waits for a server that can take it, rather than failing every
@@ -1644,14 +1771,14 @@ class SyncService {
         // A book the server doesn't have (or won't share) is not an error worth
         // stopping for — the annotation stays dirty and rides the next sync,
         // once its book has been pushed.
-        issues.add(_personalIssue('push', 'An annotation could not be sent: $e'));
+        issues.add(_personalIssue('push', SyncNote.annotationPush, e));
       }
     }
 
     final sessions = scope.sessions
-        ? await (db.select(db.readingSessions)
-              ..where((s) => s.needsPush.equals(true)))
-            .get()
+        ? await (db.select(
+            db.readingSessions,
+          )..where((s) => s.needsPush.equals(true))).get()
         : const <ReadingSession>[];
     for (final s in sessions) {
       try {
@@ -1670,14 +1797,14 @@ class SyncService {
             .write(const ReadingSessionsCompanion(needsPush: Value(false)));
         pushed++;
       } catch (e) {
-        issues.add(_personalIssue('push', 'A reading session could not be sent: $e'));
+        issues.add(_personalIssue('push', SyncNote.readingSessionPush, e));
       }
     }
 
     final notedBooks = scope.annotations
-        ? await (db.select(db.books)
-              ..where((b) => b.readerNotesNeedsPush.equals(true)))
-            .get()
+        ? await (db.select(
+            db.books,
+          )..where((b) => b.readerNotesNeedsPush.equals(true))).get()
         : const <Book>[];
     for (final b in notedBooks) {
       try {
@@ -1686,11 +1813,12 @@ class SyncService {
           note: b.readerNotes ?? '',
           updatedAt: b.readerNotesUpdatedAt,
         );
-        await (db.update(db.books)..where((row) => row.id.equals(b.id)))
-            .write(const BooksCompanion(readerNotesNeedsPush: Value(false)));
+        await (db.update(db.books)..where((row) => row.id.equals(b.id))).write(
+          const BooksCompanion(readerNotesNeedsPush: Value(false)),
+        );
         pushed++;
       } catch (e) {
-        issues.add(_personalIssue('push', 'A reader note could not be sent: $e'));
+        issues.add(_personalIssue('push', SyncNote.readerNotePush, e));
       }
     }
 
@@ -1710,19 +1838,20 @@ class SyncService {
     // time waits for it, rather than drawing a 404 for an id the server has
     // not met yet.
     final dirtyStatuses = scope.books
-        ? await (db.select(db.books)
-              ..where((b) =>
-                  b.statusNeedsPush.equals(true) &
-                  b.needsPush.equals(false) &
-                  b.deletedAt.isNull() &
-                  b.syncExcluded.equals(false)))
-            .get()
+        ? await (db.select(db.books)..where(
+                (b) =>
+                    b.statusNeedsPush.equals(true) &
+                    b.needsPush.equals(false) &
+                    b.deletedAt.isNull() &
+                    b.syncExcluded.equals(false),
+              ))
+              .get()
         : const <Book>[];
     // The handshake only when there is something to send: a push with nothing
     // to say must not cost a request to find that out (see the batch-push
     // handshake, which is skipped for the same reason).
-    final statusBooks = dirtyStatuses.isNotEmpty &&
-            await _supportsBookStatus(client)
+    final statusBooks =
+        dirtyStatuses.isNotEmpty && await _supportsBookStatus(client)
         ? dirtyStatuses
         : const <Book>[];
     for (final b in statusBooks) {
@@ -1738,12 +1867,13 @@ class SyncService {
           rating: b.rating,
           ratingUpdatedAt: b.ratingUpdatedAt,
         );
-        final now = await (db.select(db.books)
-              ..where((row) => row.id.equals(b.id)))
-            .getSingleOrNull();
+        final now = await (db.select(
+          db.books,
+        )..where((row) => row.id.equals(b.id))).getSingleOrNull();
         // Changed again while the request was out: that change is still to
         // go, so leave the flag and the row alone for the next pass.
-        final untouched = now != null &&
+        final untouched =
+            now != null &&
             now.statusUpdatedAt == b.statusUpdatedAt &&
             now.ratingUpdatedAt == b.ratingUpdatedAt &&
             StatusState.ofBook(now).sameAs(StatusState.ofBook(b));
@@ -1770,12 +1900,10 @@ class SyncService {
           await (db.update(db.books)..where((row) => row.id.equals(b.id)))
               .write(const BooksCompanion(statusNeedsPush: Value(false)));
         } else {
-          issues.add(
-              _personalIssue('push', 'A reading status could not be sent: $e'));
+          issues.add(_personalIssue('push', SyncNote.readingStatusPush, e));
         }
       } catch (e) {
-        issues.add(
-            _personalIssue('push', 'A reading status could not be sent: $e'));
+        issues.add(_personalIssue('push', SyncNote.readingStatusPush, e));
       }
     }
     return pushed;
@@ -1791,9 +1919,9 @@ class SyncService {
     final db = _db;
 
     var deletedRemotely = 0;
-    for (final d in await (db.select(db.localDeletions)
-          ..where((d) => d.kind.equals('shelf')))
-        .get()) {
+    for (final d in await (db.select(
+      db.localDeletions,
+    )..where((d) => d.kind.equals('shelf'))).get()) {
       try {
         await client.deleteShelf(d.bookId);
       } on ServerException {
@@ -1805,16 +1933,17 @@ class SyncService {
       deletedRemotely++;
     }
 
-    final dirty =
-        await (db.select(db.shelves)..where((s) => s.needsPush.equals(true)))
-            .get();
+    final dirty = await (db.select(
+      db.shelves,
+    )..where((s) => s.needsPush.equals(true))).get();
     var pushed = 0;
     for (final s in dirty) {
       try {
-        final members = await (db.select(db.shelfBooks)
-              ..where((sb) => sb.shelfId.equals(s.id))
-              ..orderBy([(sb) => OrderingTerm.asc(sb.position)]))
-            .get();
+        final members =
+            await (db.select(db.shelfBooks)
+                  ..where((sb) => sb.shelfId.equals(s.id))
+                  ..orderBy([(sb) => OrderingTerm.asc(sb.position)]))
+                .get();
         await client.pushShelf(
           id: s.id,
           name: s.name,
@@ -1828,12 +1957,14 @@ class SyncService {
         );
         pushed++;
       } catch (e) {
-        issues.add(SyncIssue(
-          bookId: s.id,
-          title: s.name,
-          stage: 'push',
-          message: e is ServerException ? e.message : '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: s.id,
+            title: s.name,
+            stage: 'push',
+            message: e is ServerException ? e.message : '$e',
+          ),
+        );
       }
     }
     return (pushed: pushed, deletedRemotely: deletedRemotely);
@@ -1849,9 +1980,9 @@ class SyncService {
     final db = _db;
 
     var deletedRemotely = 0;
-    for (final d in await (db.select(db.localDeletions)
-          ..where((d) => d.kind.equals('copy')))
-        .get()) {
+    for (final d in await (db.select(
+      db.localDeletions,
+    )..where((d) => d.kind.equals('copy'))).get()) {
       try {
         await client.deleteCopy(d.bookId);
       } on ServerException {
@@ -1881,12 +2012,14 @@ class SyncService {
             .write(const PhysicalCopiesCompanion(needsPush: Value(false)));
         pushed++;
       } catch (e) {
-        issues.add(SyncIssue(
-          bookId: c.id,
-          title: c.location ?? c.id,
-          stage: 'push',
-          message: e is ServerException ? e.message : '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: c.id,
+            title: c.location ?? c.id,
+            stage: 'push',
+            message: e is ServerException ? e.message : '$e',
+          ),
+        );
       }
     }
     return (pushed: pushed, deletedRemotely: deletedRemotely);
@@ -1902,9 +2035,9 @@ class SyncService {
     final db = _db;
 
     var deletedRemotely = 0;
-    for (final d in await (db.select(db.localDeletions)
-          ..where((d) => d.kind.equals('loan')))
-        .get()) {
+    for (final d in await (db.select(
+      db.localDeletions,
+    )..where((d) => d.kind.equals('loan'))).get()) {
       try {
         await client.deleteLoan(d.bookId);
       } on ServerException {
@@ -1922,10 +2055,13 @@ class SyncService {
     // `returnedAt` puts every closure first, which is the order the events
     // actually happened in. (A refused push keeps `needsPush`, so this is
     // about not making noise rather than about correctness.)
-    final dirty = await (db.select(db.loans)
-          ..where((l) => l.needsPush.equals(true))
-          ..orderBy([(l) => OrderingTerm(expression: l.returnedAt.isNull())]))
-        .get();
+    final dirty =
+        await (db.select(db.loans)
+              ..where((l) => l.needsPush.equals(true))
+              ..orderBy([
+                (l) => OrderingTerm(expression: l.returnedAt.isNull()),
+              ]))
+            .get();
     var pushed = 0;
     for (final l in dirty) {
       try {
@@ -1942,16 +2078,19 @@ class SyncService {
           remind: l.remind,
           updatedAt: l.updatedAt,
         );
-        await (db.update(db.loans)..where((x) => x.id.equals(l.id)))
-            .write(const LoansCompanion(needsPush: Value(false)));
+        await (db.update(db.loans)..where((x) => x.id.equals(l.id))).write(
+          const LoansCompanion(needsPush: Value(false)),
+        );
         pushed++;
       } catch (e) {
-        issues.add(SyncIssue(
-          bookId: l.id,
-          title: l.borrower,
-          stage: 'push',
-          message: e is ServerException ? e.message : '$e',
-        ));
+        issues.add(
+          SyncIssue(
+            bookId: l.id,
+            title: l.borrower,
+            stage: 'push',
+            message: e is ServerException ? e.message : '$e',
+          ),
+        );
       }
     }
     return (pushed: pushed, deletedRemotely: deletedRemotely);
@@ -2013,22 +2152,19 @@ class SyncService {
     if (isFullPull) {
       await db.delete(db.remoteReadingPositions).go();
     }
-    await positions.cacheRemotePositions(
-      [
-        for (final e in listed.entries)
-          RemoteReadingPositionsCompanion.insert(
-            bookId: e.bookId,
-            deviceId: e.deviceId,
-            deviceLabel: Value(e.deviceLabel),
-            progress: Value(e.progress),
-            page: Value(e.page),
-            unit: Value(e.unit),
-            scroll: Value(e.scroll),
-            updatedAt: e.updatedAt ?? DateTime.now(),
-          ),
-      ],
-      ownDeviceId: deviceId,
-    );
+    await positions.cacheRemotePositions([
+      for (final e in listed.entries)
+        RemoteReadingPositionsCompanion.insert(
+          bookId: e.bookId,
+          deviceId: e.deviceId,
+          deviceLabel: Value(e.deviceLabel),
+          progress: Value(e.progress),
+          page: Value(e.page),
+          unit: Value(e.unit),
+          scroll: Value(e.scroll),
+          updatedAt: e.updatedAt ?? DateTime.now(),
+        ),
+    ], ownDeviceId: deviceId);
     final serverNow = listed.serverNow;
     if (serverNow != null && onCursor != null) onCursor(serverNow);
 
@@ -2037,9 +2173,9 @@ class SyncService {
     var published = 0;
     for (final book in await positions.booksNeedingProgressPush()) {
       final formats = [
-        for (final f in await (db.select(db.bookFiles)
-              ..where((f) => f.bookId.equals(book.id)))
-            .get())
+        for (final f in await (db.select(
+          db.bookFiles,
+        )..where((f) => f.bookId.equals(book.id))).get())
           f.format,
       ];
       await client.pushReadingPosition(
@@ -2138,22 +2274,24 @@ class SyncService {
       final items = <BookPushItem>[];
       for (final b in chunk) {
         final details = await repository.detailsFor(b.id);
-        items.add(BookPushItem(
-          id: b.id,
-          title: b.title,
-          series: await repository.seriesService.nameOf(b.id) ?? '',
-          seriesIndex: b.seriesIndex,
-          subtitle: b.subtitle,
-          description: b.description,
-          isbn: b.isbn,
-          publisher: b.publisher,
-          publishedYear: b.publishedYear,
-          pageCount: b.pageCount,
-          spineStyle: b.spineStyle,
-          updatedAt: b.updatedAt,
-          authors: details.authors,
-          genres: details.genres,
-        ));
+        items.add(
+          BookPushItem(
+            id: b.id,
+            title: b.title,
+            series: await repository.seriesService.nameOf(b.id) ?? '',
+            seriesIndex: b.seriesIndex,
+            subtitle: b.subtitle,
+            description: b.description,
+            isbn: b.isbn,
+            publisher: b.publisher,
+            publishedYear: b.publishedYear,
+            pageCount: b.pageCount,
+            spineStyle: b.spineStyle,
+            updatedAt: b.updatedAt,
+            authors: details.authors,
+            genres: details.genres,
+          ),
+        );
       }
       results.addAll(await client.pushBooksBatch(items));
     }
@@ -2209,8 +2347,9 @@ class _PullRequests {
   late final copyPhotos = _sent(_client.listCopyPhotos(cursor: _cursor));
   late final copyPhotoDeletions = _deletions('copy_photo');
   late final annotations = _sent(_client.listAnnotations(cursor: _cursor));
-  late final annotationDeletions =
-      _sent(_client.listAnnotationDeletions(cursor: _cursor));
+  late final annotationDeletions = _sent(
+    _client.listAnnotationDeletions(cursor: _cursor),
+  );
   late final sessions = _sent(_client.listSessions(cursor: _cursor));
   late final statuses = _sent(_client.listBookStatuses(cursor: _cursor));
   late final notes = _sent(_client.listBookNotes(cursor: _cursor));

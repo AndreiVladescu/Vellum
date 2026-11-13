@@ -980,8 +980,10 @@ void main() {
     final overwritten =
         report.issues.where((i) => i.stage == 'overwritten').toList();
     expect(overwritten, hasLength(1));
-    expect(overwritten.single.message, contains('Dune, my edit'));
-    expect(overwritten.single.message, contains('another device'));
+    // The service records which problem and the title; the sentence is worded
+    // by the UI from the l10n strings (SyncIssueL10n), not here.
+    expect(overwritten.single.note, SyncNote.overwritten);
+    expect(overwritten.single.title, 'Dune, my edit');
 
     // And the server's version did win — the report is a notice, not a veto.
     final book = await (repo.db.select(repo.db.books)
