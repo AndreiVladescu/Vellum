@@ -348,6 +348,32 @@ Bounded on purpose: the oldest rows are trimmed beyond 50,000, so an unattended
 server cannot fill its disk with a log. Writes are best-effort — a failed audit
 row is logged and ignored rather than failing the request the user asked for.
 
+### Scheduled backups (optional)
+
+Off unless `VELLUM_BACKUP_DIR` is set. The server then writes the same archive
+as the console's **Download a backup** (a consistent database copy plus covers
+and book files) into that folder on a schedule, and deletes the oldest ones
+beyond a limit.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VELLUM_BACKUP_DIR` | off | Folder to write `vellum-backup-YYYYMMDD-HHMMSS.tar` files to |
+| `VELLUM_BACKUP_INTERVAL` | `24` | Hours between backups |
+| `VELLUM_BACKUP_KEEP` | `7` | How many to keep (minimum 1) |
+
+- The interval counts from the newest backup in the folder, not from boot, so
+  restarting the server does not trigger or postpone backups. With an empty
+  folder the first one runs a minute after start.
+- Files are written under a `.part` name and renamed when complete. Rotation
+  touches only files matching the naming pattern above; anything else in the
+  folder is left alone.
+- In Docker the folder is *inside the container*: mount a host folder (see the
+  commented volume in `docker-compose.yml`) and set `VELLUM_BACKUP_DIR=/backups`.
+  A backup on the same disk as the library does not survive that disk failing;
+  point it at another drive or a network share.
+- The console's **Server** page shows the schedule, the newest backup and how
+  the last run went; failures are also logged.
+
 ### Email (optional)
 
 Off unless configured — a LAN server needs no mailer, and the app hides the

@@ -170,33 +170,9 @@ pub async fn snapshot(State(state): State<AppState>, user: AuthUser) -> AppResul
         .await
         .map_err(|e| AppError::Internal(format!("snapshot workspace: {e}")))?;
 
-    let db_copy = work.join("vellum.db");
-    sqlx::query("VACUUM INTO ?")
-        .bind(db_copy.to_string_lossy().to_string())
-        .execute(&state.db)
-        .await?;
-
-    let archive_path = work.join("snapshot.tar");
-    let data_dir = state.data_dir.clone();
-    let archive_for_task = archive_path.clone();
-    let db_copy_for_task = db_copy.clone();
-    // `tar` is synchronous and this walks the whole blob store: off the async
-    // runtime, or a big snapshot would stall every other request.
-    tokio::task::spawn_blocking(move || -> std::io::Result<()> {
-        let file = std::fs::File::create(&archive_for_task)?;
-        let mut builder = tar::Builder::new(file);
-        builder.append_path_with_name(&db_copy_for_task, "vellum.db")?;
-        for sub in ["covers", "files"] {
-            let dir = data_dir.join(sub);
-            if dir.is_dir() {
-                builder.append_dir_all(sub, &dir)?;
-            }
-        }
-        builder.finish()
-    })
-    .await
-    .map_err(|e| AppError::Internal(format!("snapshot task: {e}")))?
-    .map_err(|e| AppError::Internal(format!("snapshot: {e}")))?;
+    let archive_path = build_archive(&state.db, &state.data_dir, &work)
+        .await
+        .map_err(AppError::Internal)?;
 
     let file = tokio::fs::File::open(&archive_path)
         .await
@@ -233,9 +209,48 @@ pub async fn snapshot(State(state): State<AppState>, user: AuthUser) -> AppResul
         .into_response())
 }
 
+/// Builds `<work>/snapshot.tar`: a `VACUUM INTO` copy of the database plus the
+/// covers and files directories. Shared by the download endpoint and the
+/// scheduled backup (`backups.rs`), so the two are the same archive by
+/// construction.
+pub(crate) async fn build_archive(
+    db: &sqlx::SqlitePool,
+    data_dir: &std::path::Path,
+    work: &std::path::Path,
+) -> Result<std::path::PathBuf, String> {
+    let db_copy = work.join("vellum.db");
+    sqlx::query("VACUUM INTO ?")
+        .bind(db_copy.to_string_lossy().to_string())
+        .execute(db)
+        .await
+        .map_err(|e| format!("snapshot database copy: {e}"))?;
+
+    let archive_path = work.join("snapshot.tar");
+    let data_dir = data_dir.to_path_buf();
+    let archive_for_task = archive_path.clone();
+    // `tar` is synchronous and this walks the whole blob store: off the async
+    // runtime, or a big snapshot would stall every other request.
+    tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+        let file = std::fs::File::create(&archive_for_task)?;
+        let mut builder = tar::Builder::new(file);
+        builder.append_path_with_name(&db_copy, "vellum.db")?;
+        for sub in ["covers", "files"] {
+            let dir = data_dir.join(sub);
+            if dir.is_dir() {
+                builder.append_dir_all(sub, &dir)?;
+            }
+        }
+        builder.finish()
+    })
+    .await
+    .map_err(|e| format!("snapshot task: {e}"))?
+    .map_err(|e| format!("snapshot: {e}"))?;
+    Ok(archive_path)
+}
+
 /// Removes a directory when dropped. Used to clean up a snapshot workspace
 /// exactly once, whether the download finished or the client vanished.
-struct TempDir(std::path::PathBuf);
+pub(crate) struct TempDir(pub(crate) std::path::PathBuf);
 
 impl Drop for TempDir {
     fn drop(&mut self) {

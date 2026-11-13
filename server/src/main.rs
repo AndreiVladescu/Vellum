@@ -27,6 +27,9 @@ ENVIRONMENT:
     VELLUM_BOOTSTRAP_TOKEN   Secret the first (master) registration must present
     VELLUM_LOGIN_MAX_FAILURES  Failed logins per email/IP per 15 min before
                              throttling (default 10); 0 disables it
+    VELLUM_BACKUP_DIR        Write scheduled backups here (off when unset)
+    VELLUM_BACKUP_INTERVAL   Hours between scheduled backups (default 24)
+    VELLUM_BACKUP_KEEP       Scheduled backups to keep (default 7)
 
 MAIL (all optional; without VELLUM_SMTP_HOST mail features stay off):
     VELLUM_SMTP_HOST         SMTP server for password resets and invites
@@ -269,6 +272,15 @@ async fn main() -> anyhow::Result<()> {
     // finding that out — and the day someone switches it on, it works without
     // a restart.
     tokio::spawn(vellum_server::run_reminder_worker(state.clone()));
+
+    // Scheduled backups (v1.6.1): off unless VELLUM_BACKUP_DIR is set.
+    if let Some(cfg) = vellum_server::backups::BackupConfig::from_env() {
+        tokio::spawn(vellum_server::backups::run_backup_worker(
+            state.db.clone(),
+            state.data_dir.clone(),
+            cfg,
+        ));
+    }
 
     let port: u16 = std::env::var("VELLUM_PORT")
         .ok()

@@ -165,6 +165,7 @@ async fn the_response_has_exactly_the_allowlisted_keys() {
         keys,
         [
             "audit_log",
+            "backup",
             "bootstrap_token",
             "data_dir",
             "database_path",

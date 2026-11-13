@@ -213,6 +213,19 @@ pub struct ServerConfig {
     pub text_indexing: bool,
     pub audit_log: bool,
     pub bootstrap_token: bool,
+    /// Scheduled backups (v1.6.1); `None` when `VELLUM_BACKUP_DIR` is unset.
+    pub backup: Option<BackupStatus>,
+}
+
+#[derive(Serialize)]
+pub struct BackupStatus {
+    pub dir: String,
+    pub interval_hours: u64,
+    pub keep: usize,
+    /// Newest backup file in the directory (survives restarts).
+    pub newest_backup: Option<chrono::DateTime<chrono::Utc>>,
+    /// Outcome of the last run since this process started.
+    pub last_run: Option<crate::backups::LastRun>,
 }
 
 /// `GET /api/admin/config` — the settings in effect, read-only.
@@ -243,6 +256,13 @@ pub async fn config(
         text_indexing: state.index_text,
         audit_log: state.audit,
         bootstrap_token: crate::auth::bootstrap_token_set(),
+        backup: crate::backups::BackupConfig::from_env().map(|cfg| BackupStatus {
+            newest_backup: crate::backups::newest_backup(&cfg.dir),
+            dir: cfg.dir.to_string_lossy().into_owned(),
+            interval_hours: cfg.interval_hours,
+            keep: cfg.keep,
+            last_run: crate::backups::last_run(),
+        }),
     }))
 }
 

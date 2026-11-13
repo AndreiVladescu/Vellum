@@ -17,6 +17,7 @@ mod access;
 mod admin;
 mod audit;
 mod auth;
+pub mod backups;
 mod blobs;
 mod books;
 mod borrow;

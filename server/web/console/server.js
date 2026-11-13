@@ -42,7 +42,26 @@ export function configRows(cfg){
     ['Searching inside books', yn(cfg.text_indexing, 'on', 'off (VELLUM_INDEX_TEXT=1)')],
     ['Activity log', yn(cfg.audit_log, 'on', 'off (VELLUM_AUDIT=1)')],
     ['First-account token', yn(cfg.bootstrap_token, 'required to register the first account', 'not set')],
+    ...backupRows(cfg.backup),
   ];
+}
+
+/// "Scheduled backups" lines: the schedule, the newest file in the folder (it
+/// survives restarts), and how the last run since boot went.
+export function backupRows(b){
+  if (!b) return [['Scheduled backups', 'off (VELLUM_BACKUP_DIR)']];
+  const when = t => new Date(t).toLocaleString();
+  const rows = [
+    ['Scheduled backups', `every ${b.interval_hours} h, keeping ${b.keep}`],
+    ['Backup folder', b.dir],
+    ['Newest scheduled backup', b.newest_backup ? when(b.newest_backup) : 'none yet'],
+  ];
+  if (b.last_run){
+    rows.push(['Last scheduled run', b.last_run.ok
+      ? `succeeded ${when(b.last_run.at)}`
+      : `failed ${when(b.last_run.at)}: ${b.last_run.detail}`]);
+  }
+  return rows;
 }
 
 /// What the integrity check found, as a sentence per finding. Nothing here has

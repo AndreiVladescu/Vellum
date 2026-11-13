@@ -74,12 +74,21 @@ services:
       VELLUM_INDEX_TEXT: "${VELLUM_INDEX_TEXT:-}"
       VELLUM_AUDIT: "${VELLUM_AUDIT:-}"
       VELLUM_LOGIN_MAX_FAILURES: "${VELLUM_LOGIN_MAX_FAILURES:-}"
+      # Scheduled backups; off while VELLUM_BACKUP_DIR is empty. The directory is
+      # a path *inside the container*, so mount something there (see below).
+      VELLUM_BACKUP_DIR: "${VELLUM_BACKUP_DIR:-}"
+      VELLUM_BACKUP_INTERVAL: "${VELLUM_BACKUP_INTERVAL:-}"
+      VELLUM_BACKUP_KEEP: "${VELLUM_BACKUP_KEEP:-}"
       # No VELLUM_TLS here on purpose: whatever sits in front terminates TLS,
       # and running two certificate stories at once is how you end up debugging
       # both. For a server with *no* proxy at all, drop the ports mapping below
       # and set VELLUM_TLS — see docs/DEPLOYMENT.md.
     volumes:
       - vellum-data:/var/lib/vellum
+      # For scheduled backups: put the host folder on the left, and set
+      # VELLUM_BACKUP_DIR=/backups in .env. Backups on the same disk as the
+      # library protect against mistakes, not against the disk.
+      # - /srv/vellum-backups:/backups
     # Loopback only. Your proxy reaches it here; the internet cannot, whichever
     # profile you use. Change the left-hand side to 0.0.0.0 only if you mean to
     # expose an unencrypted port to your network.
