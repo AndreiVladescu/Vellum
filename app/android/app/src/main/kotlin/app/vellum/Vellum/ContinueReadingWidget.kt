@@ -34,7 +34,7 @@ class ContinueReadingWidget : HomeWidgetProvider() {
                 val subtitle = widgetData.getString("continue_subtitle", null)
                 val coverPath = widgetData.getString("continue_cover", null)
 
-                if (title == null) {
+                if (title.isNullOrEmpty()) {
                     // Empty state rather than a blank rectangle: a widget with
                     // nothing in it looks broken, and "nothing to continue" is
                     // a real answer.

@@ -135,8 +135,8 @@ void main() {
   });
 
   group('the widget snapshot', () {
-    Book book({double? progress, int? page, DateTime? lastRead}) => Book(
-          id: 'b1',
+    Book book({double? progress, int? page, DateTime? lastRead, String status = 'unread', String id = 'b1'}) => Book(
+          id: id,
           title: 'Dune',
           readingProgress: progress,
           lastReadPage: page,
@@ -148,7 +148,7 @@ void main() {
       statusNeedsPush: false,
       statusInferred: false,
           needsProgressPush: false,
-          status: 'unread',
+          status: status,
           readCount: 0,
         );
 
@@ -171,6 +171,19 @@ void main() {
       expect(snapshotFor(L10nEn(), book(progress: 0.98)).isEmpty, isTrue,
           reason: '98% counts as finished, same as the shelf strip');
       expect(snapshotFor(L10nEn(), book(progress: 1.0)).isEmpty, isTrue);
+    });
+
+    test('a Finished or Abandoned book is the empty state', () {
+      expect(snapshotFor(L10nEn(), book(progress: 0.4, status: 'finished')).isEmpty, isTrue);
+      expect(snapshotFor(L10nEn(), book(progress: 0.4, status: 'abandoned')).isEmpty, isTrue);
+      expect(snapshotFor(L10nEn(), book(progress: 0.4, status: 'reading')).isEmpty, isFalse);
+    });
+
+    test('selection skips finished books and falls back to the next', () {
+      final newest = book(id: 'n', progress: 0.5, status: 'finished', lastRead: DateTime(2026, 5));
+      final older = book(id: 'o', progress: 0.3, status: 'reading', lastRead: DateTime(2026, 4));
+      expect(pickContinueBook([newest, older])!.id, 'o');
+      expect(pickContinueBook([newest]), isNull);
     });
 
     test('the cover path is carried through when there is one', () {

@@ -15,6 +15,7 @@ import 'package:home_widget/home_widget.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../data/reading_status.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/platform_l10n.dart';
 
@@ -42,6 +43,29 @@ class ContinueWidgetData {
   bool get isEmpty => title.isEmpty;
 }
 
+bool _onTheGo(Book book) {
+  final status = ReadingStatus.parse(book.status);
+  return status != ReadingStatus.finished &&
+      status != ReadingStatus.abandoned;
+}
+
+/// The book the widget should show: the most recently read one that is still
+/// on the go. A book marked Finished or Abandoned drops out whatever its
+/// progress says, so the next candidate (or the empty state) takes over.
+Book? pickContinueBook(Iterable<Book> books) {
+  Book? candidate;
+  for (final book in books) {
+    final progress = book.readingProgress;
+    if (progress == null || progress >= 0.98) continue;
+    if (!_onTheGo(book)) continue;
+    if (book.lastReadAt == null) continue;
+    if (candidate == null || book.lastReadAt!.isAfter(candidate.lastReadAt!)) {
+      candidate = book;
+    }
+  }
+  return candidate;
+}
+
 /// Builds the snapshot for [book].
 ///
 /// A book at 98% or more is treated as finished and doesn't count as "on the
@@ -50,7 +74,9 @@ class ContinueWidgetData {
 ContinueWidgetData snapshotFor(L10n l10n, Book? book, {String? coverPath}) {
   if (book == null) return ContinueWidgetData.empty;
   final progress = book.readingProgress;
-  if (progress == null || progress >= 0.98) return ContinueWidgetData.empty;
+  if (progress == null || progress >= 0.98 || !_onTheGo(book)) {
+    return ContinueWidgetData.empty;
+  }
 
   final percent = (progress * 100).round();
   final page = book.lastReadPage;
@@ -71,18 +97,7 @@ Future<void> updateContinueWidget(LibraryRepository repository) async {
   if (!Platform.isAndroid) return;
   try {
     final view = await repository.queries.watchLibrary().first;
-    final entries = view.entries;
-    Book? candidate;
-    for (final entry in entries) {
-      final book = entry.book;
-      final progress = book.readingProgress;
-      if (progress == null || progress >= 0.98) continue;
-      if (book.lastReadAt == null) continue;
-      if (candidate == null ||
-          book.lastReadAt!.isAfter(candidate.lastReadAt!)) {
-        candidate = book;
-      }
-    }
+    final candidate = pickContinueBook([for (final e in view.entries) e.book]);
 
     final cover = candidate == null ? null : repository.coverFileOf(candidate);
     // No widget tree here to ask (this also runs from the background sync), so
