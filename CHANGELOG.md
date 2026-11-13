@@ -6,6 +6,32 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.3.3 — 2026-11-13
+
+A highlighted page stays sharp, and a round of dependency updates.
+
+### Fixed
+
+- **A page with a highlight or note on it no longer goes soft when zoomed
+  in.** Highlights were drawn with a multiply blend, and the renderer Flutter
+  uses on Linux softens the page underneath while it composites one — more
+  the further you zoom. They are now drawn with a blend that gives the same
+  colours and leaves the page sharp. Measured at three zoom levels, in day
+  and night mode, scrolled and paged.
+
+### Maintenance
+
+- Server: `argon2` 0.6. Passwords stored by earlier versions still verify —
+  a test holds one made by the old version — and new ones use the same
+  strength as before.
+- App: `drift` 2.35 (the database code is regenerated; no schema change),
+  `desktop_drop` 0.8, `home_widget` 0.10, `google_mlkit` 0.15, and patch
+  updates to `image`, `intl`, `shared_preferences`, `image_picker`, `crypto`,
+  `pool`, `flutter_local_notifications` and `flutter_widget_from_html_core`.
+- CI: `actions/setup-java` 6 and `osv-scanner` 2.7.
+
+---
+
 ## v1.3.2 — 2026-11-12
 
 A month at a time, and Reading insights you can poke at.

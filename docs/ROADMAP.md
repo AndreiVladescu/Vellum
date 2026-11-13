@@ -36,6 +36,8 @@ pages (v1.6.0 and part of v1.6.1).
 (`v1.3.0`'s rating sync shipped in `v1.2.1`; `v1.2.4`, the public release, is
 still the hand-made one.)
 `v1.3.2` (2026-11-12) — month by month and explorable Insights, as planned.
+`v1.3.3` (2026-11-13) — the highlight blur fix and dependency updates; a fix
+takes the next free number, so year in review moves to v1.3.4.
 
 ---
 
@@ -158,7 +160,7 @@ lets the work be checked before it ships.
 - [x] **M** Insights you can explore: a range picker (30 days / year / all
       time) and heat-map days you can tap
 
-### v1.3.3 — the year, and the library
+### v1.3.4 — the year, and the library
 
 - [ ] **M** Year in review, with a picture you can save and share
 - [ ] **M** Library statistics: the collection by genre, year, format and
