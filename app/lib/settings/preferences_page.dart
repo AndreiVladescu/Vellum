@@ -25,6 +25,7 @@ import 'app_settings.dart';
 import 'appearance.dart';
 import 'book_face.dart';
 import 'spine_art.dart';
+import '../loans/loan_reminders.dart';
 import '../notifications/tray.dart';
 import 'shared_shelves_page.dart';
 import 'trash_page.dart';
@@ -148,6 +149,7 @@ class PreferencesPage extends StatelessWidget {
             ),
             _BackgroundSyncTile(settings: settings),
             _TrayNotificationsTile(settings: settings),
+            _LoanRemindersTile(settings: settings),
             // Only meaningful on a shared library: with no server there is
             // nobody else whose shelves could arrive.
             if (connection.isConnected)
@@ -1121,6 +1123,61 @@ class _TrayNotificationsTileState extends State<_TrayNotificationsTile> {
           ? L10n.of(context).prefsTraySubtitle
           : L10n.of(context).prefsTrayUnavailable),
       value: _supported && widget.settings.trayNotifications,
+      onChanged: _supported && !_busy ? _toggle : null,
+    );
+  }
+}
+
+/// System notifications for loan due dates (roadmap v1.4.2).
+///
+/// Off by default; turning it on asks for the Android notification permission
+/// and stays off if refused, for the same reason as the tile above. The
+/// scheduling itself is `LoanReminderService`, which reacts to this setting.
+class _LoanRemindersTile extends StatefulWidget {
+  const _LoanRemindersTile({required this.settings});
+
+  final AppSettingsStore settings;
+
+  @override
+  State<_LoanRemindersTile> createState() => _LoanRemindersTileState();
+}
+
+class _LoanRemindersTileState extends State<_LoanRemindersTile> {
+  bool _busy = false;
+
+  bool get _supported => defaultTargetPlatform == TargetPlatform.android;
+
+  Future<void> _toggle(bool wanted) async {
+    if (!wanted) {
+      await widget.settings.setLoanReminders(false);
+      return;
+    }
+    setState(() => _busy = true);
+    final granted = await LocalReminderNotifier().requestPermission();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!granted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(L10n.of(context).prefsLoanRemindDenied),
+      ));
+      return;
+    }
+    await widget.settings.setLoanReminders(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: _busy
+          ? const SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.event_available_outlined),
+      title: Text(L10n.of(context).prefsLoanRemindTitle),
+      subtitle: Text(_supported
+          ? L10n.of(context).prefsLoanRemindSubtitle
+          : L10n.of(context).prefsLoanRemindUnavailable),
+      value: _supported && widget.settings.loanReminders,
       onChanged: _supported && !_busy ? _toggle : null,
     );
   }

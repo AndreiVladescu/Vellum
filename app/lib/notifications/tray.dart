@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../loans/loan_reminders.dart';
 import '../l10n/platform_l10n.dart';
 
 /// Notifications in the Android status bar.
@@ -51,6 +52,8 @@ class NotificationTray {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
+      // The plugin is a singleton: keep loan-reminder taps working.
+      onDidReceiveNotificationResponse: LoanReminderTaps.handle,
     );
     _ready = true;
   }

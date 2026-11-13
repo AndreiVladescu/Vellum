@@ -195,13 +195,17 @@ phone (its page cache is capped at 32 MB); and pdfrx's own right-click /
 selection menu in dark mode, which now comes from the separate `material_ui`
 package and may no longer follow the app's theme.
 
-**Deferred from #27**: scheduled OS notifications a day before and on the due
-date. The *decision* logic is built and tested (`LoanDue.needingReminder`, which
-knows not to nag twice in a day but to come back while a book is still out) and
-the loans list badges what needs attention, but nothing schedules a system
-notification — that needs `flutter_local_notifications` plus per-platform channel
-setup, permissions and a timezone database. The in-app path (badge → *Copy a
-reminder*) works everywhere today.
+**Loan due-date notifications (v1.4.2) — device check owed.** Built and unit
+tested (`lib/loans/loan_reminders.dart`: what gets scheduled, and the service that
+keeps it in step), but the OS side has not been seen on a device. On Android:
+Preferences → *Remind me when lent books are due* asks for the notification
+permission (13+) and stays off if refused; lend a book due tomorrow and check
+that a notification is pending (`adb shell dumpsys alarm | grep vellum`) and
+arrives at about 09:00 the day before and the day it is due; return the loan and
+check it is cancelled; reboot and check it is re-registered; tap a notification
+and check it opens the loans list, from a cold start as well as a running app.
+Alarms are inexact on purpose (no exact-alarm permission), so a few minutes' delay
+is expected. Desktop shows the switch disabled.
 
 **Deferred from #23**, and why: paged (rather than scrolled) EPUB mode is a layout
 engine of its own; keep-screen-awake, volume-key page turns and the brightness

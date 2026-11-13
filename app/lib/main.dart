@@ -12,6 +12,8 @@ import 'account/user_profile.dart';
 import 'add_book/add_book_page.dart';
 import 'add_book/scan_page.dart';
 import 'app_drawer.dart';
+import 'loans/loan_reminders.dart';
+import 'loans/loans_page.dart';
 import 'book_detail/book_detail_page.dart';
 import 'data/database.dart';
 import 'diagnostics/error_log.dart';
@@ -288,6 +290,15 @@ class _LibraryPageState extends State<LibraryPage> {
   StreamSubscription<List<String>>? _incomingSub;
   StreamSubscription<LauncherShortcut>? _shortcutSub;
 
+  /// Due-date notifications for lent books (roadmap v1.4.2).
+  late final LocalReminderNotifier _reminderNotifier = LocalReminderNotifier();
+  late final LoanReminderService _loanReminders = LoanReminderService(
+    loans: widget.repository.watchAllLoans(),
+    settings: widget.settings,
+    notifier: _reminderNotifier,
+  );
+  StreamSubscription<String>? _reminderTapSub;
+
   LibraryRepository get repository => widget.repository;
 
   /// Switches section, remembering where we were so the mouse's back button can
@@ -316,6 +327,7 @@ class _LibraryPageState extends State<LibraryPage> {
     _live.start();
     _offerWatchedFolder();
     _listenForSharedBooks();
+    _startLoanReminders();
     _showFirstRun();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
@@ -536,6 +548,27 @@ class _LibraryPageState extends State<LibraryPage> {
     });
   }
 
+  /// Schedules loan reminders (a no-op off Android) and makes a tap on one
+  /// open the loans list, whether the app was running or started by the tap.
+  void _startLoanReminders() {
+    _loanReminders.start();
+    if (!_reminderNotifier.supported) return;
+    _reminderTapSub = LoanReminderTaps.stream.listen((_) => _openLoans());
+    _reminderNotifier.launchedByReminder().then((launched) {
+      if (launched) _openLoans();
+    }).catchError((Object _) {});
+  }
+
+  void _openLoans() {
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => LoansPage(
+        repository: repository,
+        connection: widget.connection,
+      ),
+    ));
+  }
+
   /// A launcher shortcut lands on the same destination the in-app action does,
   /// rather than a parallel entry point with its own state to get wrong.
   void _runShortcut(LauncherShortcut shortcut) {
@@ -599,6 +632,8 @@ class _LibraryPageState extends State<LibraryPage> {
     _live.dispose();
     _incomingSub?.cancel();
     _shortcutSub?.cancel();
+    _reminderTapSub?.cancel();
+    _loanReminders.dispose();
     _incoming.dispose();
     super.dispose();
   }

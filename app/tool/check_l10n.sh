@@ -92,6 +92,7 @@ MIGRATED=(
   lib/import/opds_client.dart
   lib/loans/borrow_requests.dart
   lib/loans/due_dates.dart
+  lib/loans/loan_reminders.dart
   lib/loans/loans_page.dart
   lib/notifications/notifications_button.dart
   lib/notifications/notifications_page.dart

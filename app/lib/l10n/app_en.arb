@@ -2874,6 +2874,54 @@
     "description": "Switch subtitle where notifications are unavailable."
   },
 
+  "loanReminderTomorrow": "Due tomorrow — lent to {borrower}",
+  "@loanReminderTomorrow": {
+    "description": "Body of the notification the morning before a lent book is due.",
+    "placeholders": {"borrower": {"type": "String"}}
+  },
+
+  "loanReminderToday": "Due today — lent to {borrower}",
+  "@loanReminderToday": {
+    "description": "Body of the notification the morning a lent book is due.",
+    "placeholders": {"borrower": {"type": "String"}}
+  },
+
+  "loanReminderOverdue": "Overdue — lent to {borrower}",
+  "@loanReminderOverdue": {
+    "description": "Body of the notification for a lent book that is past its due date.",
+    "placeholders": {"borrower": {"type": "String"}}
+  },
+
+  "loanReminderChannelName": "Loan due dates",
+  "@loanReminderChannelName": {
+    "description": "Name of the Android notification channel for loan reminders, shown in the system settings."
+  },
+
+  "loanReminderChannelDescription": "Reminders the day before and the day a lent book is due",
+  "@loanReminderChannelDescription": {
+    "description": "Description of the Android notification channel for loan reminders."
+  },
+
+  "prefsLoanRemindTitle": "Remind me when lent books are due",
+  "@prefsLoanRemindTitle": {
+    "description": "Switch title."
+  },
+
+  "prefsLoanRemindSubtitle": "A notification the day before and the day a lent book is due",
+  "@prefsLoanRemindSubtitle": {
+    "description": "Switch subtitle on Android."
+  },
+
+  "prefsLoanRemindUnavailable": "Android only — scheduled notifications aren't available here",
+  "@prefsLoanRemindUnavailable": {
+    "description": "Switch subtitle where scheduled notifications are unavailable."
+  },
+
+  "prefsLoanRemindDenied": "Android refused permission to post notifications. You can grant it in the system settings for Vellum.",
+  "@prefsLoanRemindDenied": {
+    "description": "Snack bar when the notification permission was refused."
+  },
+
   "prefsBgTitle": "Background sync",
   "@prefsBgTitle": {
     "description": "Expansion tile title."

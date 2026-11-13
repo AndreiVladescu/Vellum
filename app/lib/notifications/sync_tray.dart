@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 import '../l10n/platform_l10n.dart';
+import '../loans/loan_reminders.dart';
 import '../server/sync_service.dart' show SyncPhase;
 
 /// The body line under a sync's progress notification, e.g. "Pushing books —
@@ -50,6 +51,8 @@ class SyncNotificationTray {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
+      // The plugin is a singleton: keep loan-reminder taps working.
+      onDidReceiveNotificationResponse: LoanReminderTaps.handle,
     );
     _ready = true;
   }

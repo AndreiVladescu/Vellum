@@ -27,6 +27,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _importGenresKey = 'settings.importOpenLibraryGenres';
   static const _acceptShelvesKey = 'settings.acceptSharedShelves';
   static const _trayNotificationsKey = 'settings.trayNotifications';
+  static const _loanRemindersKey = 'settings.loanReminders';
   static const _lastTrayShownKey = 'settings.lastTrayShownAt';
   static const _syncReadingPositionKey = 'settings.syncReadingPosition';
   static const _syncScopeKey = 'settings.syncScope';
@@ -284,6 +285,15 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setTrayNotifications(bool value) async {
     await _prefs.setBool(_trayNotificationsKey, value);
+    notifyListeners();
+  }
+
+  /// System notifications for loan due dates (roadmap v1.4.2). Off until asked
+  /// for, because turning it on is also where the permission is requested.
+  bool get loanReminders => _prefs.getBool(_loanRemindersKey) ?? false;
+
+  Future<void> setLoanReminders(bool value) async {
+    await _prefs.setBool(_loanRemindersKey, value);
     notifyListeners();
   }
 
