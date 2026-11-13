@@ -107,6 +107,28 @@ Kotlin, the manifest, the shortcut XML and the widget layout all compile in
    at the same time, which is the one failure this design could still have.
 4. **Constraints.** Off Wi-Fi, or unplugged, the job must not run at all. This
    is the whole point of the defaults and the only way to check them.
+5. **After the workmanager 0.10 bump (update in place).** On a phone that has
+   the previous release installed *with background sync already on*, install
+   the new build over it (`adb install -r`, do not uninstall). Before opening
+   the app, run `adb shell dumpsys jobscheduler | grep -A6 app.vellum.Vellum`:
+   the periodic job must still be listed (the old WorkManager row survives the
+   update; the worker class and input keys are unchanged). Then open the app
+   once and confirm the job is still there, once, with Unmetered + Charging
+   constraints (the launch re-registers it with `ExistingPeriodicWorkPolicy.update`),
+   and force it as in step 3. A job forced *before* the first launch can fail
+   once because the stored callback handle belongs to the old build; that is
+   expected, and the next period recovers.
+6. **Android 14, 15 and 16.** Repeat step 3 on each (0.10.8 to 0.10.10 fix
+   Android 16 handshake and foreground-service-permission failures). Expect
+   the headless sync to complete without `Dart engine did not initialize the
+   background channel` in `adb logcat` (the plugin's 30 second watchdog), and
+   the job not to stay `RUNNING` after the app is backgrounded mid-run. The
+   manifest drops `FOREGROUND_SERVICE_SHORT_SERVICE` on purpose (plain periodic
+   work starts no foreground service); confirm no `workmanager_android:` error
+   about a missing permission appears.
+7. **Nothing new on desktop.** `workmanager_linux` is Dart-only and the app
+   never calls it; confirm no `systemd` unit named `workmanager-*` appears
+   (`systemctl --user list-units 'workmanager*'`) after running the Linux build.
 
 **Sync notification and backgrounding** (plan 6). `syncProgressBody`'s wording
 is unit-tested (`app/test/notifications/sync_tray_test.dart`) and
