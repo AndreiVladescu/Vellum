@@ -6,6 +6,7 @@ use axum::extract::{FromRequestParts, Path, State};
 use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
+use axum::response::{IntoResponse, Response};
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -205,15 +206,17 @@ async fn user_from_basic(
         ));
     }
 
-    let row = sqlx::query_as::<_, (String, String, String, bool, String)>(
-        "SELECT id, email, display_name, is_master, password_hash \
+    let row = sqlx::query_as::<_, (String, String, String, bool, String, bool)>(
+        "SELECT id, email, display_name, is_master, password_hash, \
+                EXISTS(SELECT 1 FROM user_totp t \
+                       WHERE t.user_id = app_user.id AND t.enabled_at IS NOT NULL) \
          FROM app_user WHERE email = ?",
     )
     .bind(&key)
     .fetch_optional(&state.db)
     .await?;
 
-    let Some((id, email, display_name, is_master, password_hash)) = row else {
+    let Some((id, email, display_name, is_master, password_hash, two_factor)) = row else {
         let _ = verify_password(password, &DUMMY_HASH); // equalize timing
         state.throttle.record_failure(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
@@ -253,6 +256,18 @@ async fn user_from_basic(
         state.throttle.record_failure(&key);
         state.basic_cache.forget(&key);
         return Err(AppError::Unauthorized("invalid email or password".into()));
+    }
+    // The account password alone must not open a two-factor account by the
+    // side door: Basic carries no code, so it is refused here, on every route.
+    // Checked after the password, so this answer says no more than `login`'s
+    // challenge does. An e-reader uses an app password instead (above) — the
+    // exception two_factor.rs documents.
+    if two_factor {
+        return Err(AppError::Unauthorized(
+            "this account uses two-factor sign-in, so its password can't be used here — \
+             make an app password for this device in the console"
+                .into(),
+        ));
     }
     state.throttle.clear(&key);
     Ok(AuthUser {
@@ -472,11 +487,14 @@ pub async fn register(
     Ok(Json(AuthResponse { token, user }))
 }
 
+/// `POST /api/auth/login`. On a two-factor account a right password answers
+/// 401 with a challenge rather than a session (see `two_factor.rs`), hence the
+/// bare response type.
 pub async fn login(
     State(state): State<AppState>,
     client: ClientKey,
     Json(input): Json<LoginInput>,
-) -> AppResult<Json<AuthResponse>> {
+) -> AppResult<Response> {
     // Bound work before Argon2 runs, even for a wrong password.
     check_password_length(&input.password)?;
     let key = input.email.trim().to_lowercase();
@@ -513,6 +531,12 @@ pub async fn login(
     state.throttle.clear(&key);
     state.throttle.clear(&ip_key);
 
+    // The password was right; a two-factor account still owes a code. Wrong
+    // codes are throttled under their own key, which this does not clear.
+    if crate::two_factor::is_enabled(&state, &id).await? {
+        return crate::two_factor::challenge_response(&state, &id).await;
+    }
+
     let user = AuthUser {
         id,
         email,
@@ -520,7 +544,7 @@ pub async fn login(
         is_master,
     };
     let token = issue_token(&state, &user.id).await?;
-    Ok(Json(AuthResponse { token, user }))
+    Ok(Json(AuthResponse { token, user }).into_response())
 }
 
 pub async fn me(user: AuthUser) -> Json<AuthUser> {
@@ -574,13 +598,27 @@ pub async fn create_user(
     Ok(Json(user))
 }
 
+/// A row of the People page: the account, and whether it has two-factor on —
+/// so an owner can see whose would need clearing, never anything of it.
+#[derive(Serialize, sqlx::FromRow)]
+pub struct UserRow {
+    #[serde(flatten)]
+    #[sqlx(flatten)]
+    pub user: AuthUser,
+    pub two_factor: bool,
+}
+
 pub async fn list_users(
     State(state): State<AppState>,
     caller: AuthUser,
-) -> AppResult<Json<Vec<AuthUser>>> {
+) -> AppResult<Json<Vec<UserRow>>> {
     require_master(&caller)?;
-    let users = sqlx::query_as::<_, AuthUser>(
-        "SELECT id, email, display_name, is_master FROM app_user ORDER BY created_at",
+    let users = sqlx::query_as::<_, UserRow>(
+        "SELECT id, email, display_name, is_master, \
+                EXISTS(SELECT 1 FROM user_totp t \
+                       WHERE t.user_id = app_user.id AND t.enabled_at IS NOT NULL) \
+                  AS two_factor \
+         FROM app_user ORDER BY created_at",
     )
     .fetch_all(&state.db)
     .await?;
@@ -813,7 +851,7 @@ where
     })
 }
 
-async fn issue_token(state: &AppState, user_id: &str) -> AppResult<String> {
+pub(crate) async fn issue_token(state: &AppState, user_id: &str) -> AppResult<String> {
     let token = new_token();
     sqlx::query(
         "INSERT INTO session (token_hash, user_id, expires_at) \
@@ -1017,6 +1055,14 @@ pub async fn reset(
     // minted one, and an e-reader secret that outlived the reset would keep
     // reading the library. Setting the devices up again is the price.
     sqlx::query("DELETE FROM app_password WHERE user_id = ?")
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await?;
+    // A sign-in waiting on its code started from the old password. Two-factor
+    // itself stays on: the link came by email, and someone who can read the
+    // mail must not be able to remove the second factor with it
+    // (two_factor.rs). An owner can clear it from People instead.
+    sqlx::query("DELETE FROM login_challenge WHERE user_id = ?")
         .bind(&user_id)
         .execute(&mut *tx)
         .await?;

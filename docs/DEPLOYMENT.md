@@ -372,6 +372,60 @@ What an app password can and cannot do:
 The account password still works over Basic auth on the same routes, so a
 reader set up before app passwords existed keeps working after an upgrade —
 but it carries everything the account can do, so replace it when convenient.
+**Once an account turns on two-factor sign-in, its account password stops
+working over Basic auth altogether** (a device cannot type a code), so its
+e-readers need app passwords from then on.
+
+### Two-factor sign-in
+
+Each person can turn on a second factor for their own account in the console:
+**People and sharing → Account security**. It uses any authenticator app
+(RFC 6238 TOTP: SHA-1, 6 digits, 30 seconds — the defaults of Google
+Authenticator, Aegis, 2FAS, 1Password and the rest).
+
+1. **Set up two-factor…**, confirm your password, and scan the QR code (or type
+   the key shown under it).
+2. Type the six-digit code the app now shows. That turns it on and shows ten
+   **recovery codes**, once — each signs you in once in place of a code, for
+   the day the phone is lost. Keep them somewhere that is not the phone.
+
+From then on, signing in — in the console and in the Vellum app — asks for a
+code after the password. Codes are accepted for 30 seconds either side of now
+and only once each. Wrong codes count against the same throttle as wrong
+passwords (`VELLUM_LOGIN_MAX_FAILURES`, default 10 per 15 minutes), and signing
+in with the right password again does not reset that count.
+
+What it does and does not cover:
+
+- **Sessions already signed in stay signed in** when it is turned on.
+- **App passwords are not subject to it.** That is deliberate: an e-reader
+  cannot show a code prompt. Each app password is minted from a signed-in
+  session (so after the second factor), can only read the catalogue, and can be
+  revoked on its own.
+- **Turning it off, or making new recovery codes,** asks for your password or a
+  current code, so a session left open somewhere cannot remove it.
+- **A password reset does not turn it off.** The reset link arrives by email,
+  and someone who can read your mail should still need your phone.
+- **Lost the phone and the recovery codes?** An owner can clear it for you:
+  **People → Clear 2FA** on your row. An owner cannot clear their own that way.
+  A sole owner locked out of their own account clears it on the server itself:
+
+  ```sh
+  sqlite3 vellum.db "DELETE FROM user_totp WHERE user_id =
+    (SELECT id FROM app_user WHERE email = 'you@example.com')"
+  ```
+
+- **The secret is stored readable in the database** (`user_totp.secret`), not
+  hashed: checking a code needs it, and the server has no key store to encrypt it
+  with that would not sit in the same backup. Anyone with a copy of the database
+  can generate your codes — guard backups accordingly. Two-factor protects
+  against a phished, reused or guessed password, not a stolen database.
+
+The API: `GET /api/auth/2fa`, `POST /api/auth/2fa/{setup,enable,disable,
+recovery-codes}`; signing in is `POST /api/auth/login`, which answers **401**
+with `"two_factor_required": true` and a five-minute `challenge`, then
+`POST /api/auth/login/2fa` with `{challenge, code}` (a recovery code goes in
+`code` too). An owner clears someone's with `DELETE /api/users/<id>/2fa`.
 
 Basic auth sends the password on every request, readable by anyone on the path:
 serve the catalogue over **HTTPS** (TLS above, or a reverse proxy) whenever the

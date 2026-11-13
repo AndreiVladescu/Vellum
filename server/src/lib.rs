@@ -52,6 +52,10 @@ mod shelves;
 mod text_index;
 mod throttle;
 pub mod tls;
+/// Public so the integration tests can compute the codes an authenticator
+/// app would show.
+pub mod totp;
+mod two_factor;
 mod unpublish;
 mod web;
 
@@ -243,6 +247,22 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
         .route("/auth/forgot", post(auth::forgot))
         .route("/auth/reset", post(auth::reset))
         .route("/auth/me", get(auth::me))
+        // Two-factor sign-in (v1.6.2, two_factor.rs). The second half of a
+        // login is unauthenticated by necessity — it carries the challenge
+        // `/auth/login` handed out, not a session — and is throttled like it.
+        .route("/auth/login/2fa", post(two_factor::login_second_factor))
+        // The caller's own. Outside the app-password scope, like everything
+        // that changes how an account signs in.
+        .route("/auth/2fa", get(two_factor::status))
+        .route("/auth/2fa/setup", post(two_factor::setup))
+        .route("/auth/2fa/enable", post(two_factor::enable))
+        .route("/auth/2fa/disable", post(two_factor::disable))
+        .route(
+            "/auth/2fa/recovery-codes",
+            post(two_factor::regenerate_recovery_codes),
+        )
+        // Master-only: clear someone else's, for a lost phone.
+        .route("/users/{id}/2fa", delete(two_factor::admin_clear))
         // App passwords for e-readers (v1.6.2): the caller's own, listed
         // without secrets. Outside the app-password scope on purpose, so one
         // can never be used to mint or revoke another.

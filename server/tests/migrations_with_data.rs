@@ -363,6 +363,76 @@ async fn existing_accounts_upgrade_to_app_passwords() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// 0040 adds tables only, hanging off `app_user`: existing accounts come
+/// through with two-factor off and their sessions intact, can turn it on, and
+/// take all of it with them when they go.
+#[tokio::test]
+async fn existing_accounts_upgrade_to_two_factor() {
+    let path = std::env::temp_dir().join(format!("vellum_popmig_{}.db", uuid::Uuid::new_v4()));
+    let path = path.to_str().unwrap().to_string();
+    {
+        let pool = migrate_partially(&path, 39).await;
+        for sql in [
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u1', 'someone@lib.test', 'Someone', 'x', 1)",
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u2', 'ana@lib.test', 'Ana', 'x', 0)",
+            "INSERT INTO session (token_hash, user_id, expires_at) \
+             VALUES ('h', 'u2', datetime('now', '+1 day'))",
+            "INSERT INTO app_password (id, user_id, label, prefix, secret_hash) \
+             VALUES ('a1', 'u2', 'Kobo', 'abcd', 'hash')",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+    }
+
+    let db = connect_db(&path)
+        .await
+        .expect("a database with accounts in it must migrate");
+    let on: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM user_totp")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(on, 0, "nobody has two-factor until they turn it on");
+    let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM session")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(sessions, 1, "existing sign-ins are untouched");
+
+    for sql in [
+        "INSERT INTO user_totp (user_id, secret) VALUES ('u2', 'JBSWY3DPEHPK3PXP')",
+        "INSERT INTO totp_recovery_code (user_id, code_hash) VALUES ('u2', 'c1')",
+        "INSERT INTO login_challenge (token_hash, user_id, expires_at) \
+         VALUES ('t', 'u2', datetime('now', '+5 minutes'))",
+    ] {
+        sqlx::query(sql).execute(&db).await.unwrap();
+    }
+    let (enabled_at, last_step, created_at): (Option<String>, i64, Option<String>) =
+        sqlx::query_as("SELECT enabled_at, last_step, created_at FROM user_totp")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert!(enabled_at.is_none(), "a new secret starts pending");
+    assert_eq!(last_step, 0);
+    assert!(created_at.is_some());
+
+    sqlx::query("DELETE FROM app_user WHERE id = 'u2'")
+        .execute(&db)
+        .await
+        .unwrap();
+    for sql in [
+        "SELECT COUNT(*) FROM user_totp",
+        "SELECT COUNT(*) FROM totp_recovery_code",
+        "SELECT COUNT(*) FROM login_challenge",
+    ] {
+        let left: i64 = sqlx::query_scalar(sql).fetch_one(&db).await.unwrap();
+        assert_eq!(left, 0, "{sql}: rows go with the account");
+    }
+    let _ = std::fs::remove_file(&path);
+}
+
 /// A known, deliberate exception, and the only one.
 ///
 /// `0010` carries the same mistake and cannot be fixed: it is applied on every

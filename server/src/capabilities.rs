@@ -84,6 +84,10 @@ const FEATURES: &[&str] = &[
     // KOReader's sync protocol under /koreader (migration 0042), fed by app
     // passwords made with `koreader: true`.
     "koreader_sync",
+    // Two-factor sign-in (migration 0040). A client does not need this to
+    // sign in — the login answer itself says when a code is owed — but it
+    // lets one offer "turn on two-factor" only where it exists.
+    "two_factor",
 ];
 
 pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {

@@ -54,6 +54,14 @@ async-stream = "0.3.6"
 # Gzip for JSON responses (src/gzip.rs). Already compiled in via lopdf and
 # png; listed so the middleware can name it.
 flate2 = "1"
+# Two-factor sign-in (src/totp.rs): RFC 6238 is HMAC-SHA-1 over a counter.
+# Both were already compiled in (via sqlx); listed so totp.rs can name them,
+# rather than pulling in a TOTP crate for thirty lines of arithmetic.
+hmac = "0.13"
+sha1 = "0.11"
+# The enrolment QR code, rendered server-side as SVG so the console needs no
+# CDN and no vendored JS encoder. SVG only: no image backend, no dependencies.
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 
 # Used only to apply setrlimit resource caps to the PDF-render subprocesses on
 # Unix (see blobs.rs). Unused on other platforms.
