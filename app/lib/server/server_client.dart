@@ -19,6 +19,15 @@ class ServerException implements Exception {
   String toString() => message;
 }
 
+/// The password was right, but the account has two-factor sign-in on: send a
+/// code with [challenge] to `completeTwoFactor` to finish. A [ServerException]
+/// (401) so anything that does not handle it still shows [message].
+class TwoFactorRequired extends ServerException {
+  TwoFactorRequired(this.challenge, String message)
+    : super(message, statusCode: 401);
+  final String challenge;
+}
+
 /// An account as returned by the server.
 class ServerUser {
   ServerUser({
@@ -300,6 +309,9 @@ class VellumServerClient {
     return AuthResult._(_body(res) as Map<String, dynamic>);
   }
 
+  /// Signs in with a password. Throws [TwoFactorRequired] when the password
+  /// was right but the account has two-factor sign-in on; finish with
+  /// [completeTwoFactor].
   Future<AuthResult> login({
     required String email,
     required String password,
@@ -308,6 +320,34 @@ class VellumServerClient {
       _uri('/api/auth/login'),
       headers: _headers,
       body: jsonEncode({'email': email, 'password': password}),
+    );
+    if (res.statusCode == 401) {
+      // The server answers a two-factor account with a 401 that carries a
+      // challenge, so an app too old to know this shows the message instead.
+      final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
+      if (decoded is Map &&
+          decoded['two_factor_required'] == true &&
+          decoded['challenge'] is String) {
+        throw TwoFactorRequired(
+          decoded['challenge'] as String,
+          decoded['error'] as String? ?? 'Two-factor code required',
+        );
+      }
+    }
+    return AuthResult._(_body(res) as Map<String, dynamic>);
+  }
+
+  /// The second half of a two-factor sign-in: the [challenge] from
+  /// [TwoFactorRequired] and a code from the authenticator app (or a recovery
+  /// code). A wrong code throws a 401 [ServerException].
+  Future<AuthResult> completeTwoFactor({
+    required String challenge,
+    required String code,
+  }) async {
+    final res = await _http.post(
+      _uri('/api/auth/login/2fa'),
+      headers: _headers,
+      body: jsonEncode({'challenge': challenge, 'code': code}),
     );
     return AuthResult._(_body(res) as Map<String, dynamic>);
   }

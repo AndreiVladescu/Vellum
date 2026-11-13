@@ -345,8 +345,9 @@ class _ServerPageState extends State<ServerPage> {
       // whether the address is known.
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(l10n.serverResetSent)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.serverResetSent)));
   }
 
   Future<void> _authenticate() => _run(isAuthAttempt: true, () async {
@@ -360,14 +361,73 @@ class _ServerPageState extends State<ServerPage> {
                 : _displayName.text.trim(),
             password: _password.text,
           )
-        : await client.login(
-            email: _email.text.trim(),
-            password: _password.text,
-          );
+        : await _login(client);
+    if (auth == null) return; // the code prompt was cancelled
     await widget.connection.saveSession(url: url, auth: auth);
     await widget.connection.fetchCapabilities();
     await _reconcileProfile(auth.user.displayName);
   });
+
+  /// Password sign-in, plus the code when the account has two-factor sign-in
+  /// on. Null when the code prompt is cancelled. A wrong code throws a 401
+  /// [ServerException], which [_run] shows as the error; signing in again
+  /// starts a fresh challenge.
+  Future<AuthResult?> _login(VellumServerClient client) async {
+    try {
+      return await client.login(
+        email: _email.text.trim(),
+        password: _password.text,
+      );
+    } on TwoFactorRequired catch (e) {
+      final code = await _askTwoFactorCode();
+      if (code == null) return null;
+      return client.completeTwoFactor(challenge: e.challenge, code: code);
+    }
+  }
+
+  /// Asks for the code from the authenticator app (or a recovery code).
+  /// Null when the dialog is dismissed or left empty.
+  Future<String?> _askTwoFactorCode() async {
+    if (!mounted) return null;
+    final l10n = L10n.of(context);
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.serverTwoFactorTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.serverTwoFactorBody),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              // Recovery codes have letters, so not a number-only keyboard.
+              keyboardType: TextInputType.visiblePassword,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              decoration: InputDecoration(labelText: l10n.serverTwoFactorCode),
+              onSubmitted: (_) => Navigator.of(dialogContext).pop(true),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.serverTwoFactorVerify),
+          ),
+        ],
+      ),
+    );
+    final code = controller.text.trim();
+    controller.dispose();
+    return ok == true && code.isNotEmpty ? code : null;
+  }
 
   /// Two names, one person — asks which to keep.
   ///
@@ -607,8 +667,9 @@ class _ServerPageState extends State<ServerPage> {
                           acceptedTypeGroups: [group],
                         );
                         if (file != null) {
-                          controller.text = await File(file.path)
-                              .readAsString();
+                          controller.text = await File(
+                            file.path,
+                          ).readAsString();
                           setLocal(() => err = null);
                         }
                       },
@@ -626,7 +687,8 @@ class _ServerPageState extends State<ServerPage> {
                     ),
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '-----BEGIN CERTIFICATE-----', // i18n-ignore: PEM marker
+                      hintText:
+                          '-----BEGIN CERTIFICATE-----', // i18n-ignore: PEM marker
                     ),
                   ),
                   if (err != null) ...[

@@ -62,4 +62,68 @@ void main() {
     );
     expect(client.capabilities(), throwsA(isA<ServerException>()));
   });
+
+  // Two-factor sign-in (server v1.6.2): a right password on a two-factor
+  // account answers 401 with a challenge; the code goes in a second call.
+  group('two-factor sign-in', () {
+    const user = '{"id":"u1","email":"a@b.c","display_name":"A","is_master":false}';
+
+    test('login() throws TwoFactorRequired with the challenge, and '
+        'completeTwoFactor() sends it with the code', () async {
+      final seen = <http.Request>[];
+      final client = VellumServerClient(
+        baseUrl: 'http://test',
+        httpClient: MockClient((req) async {
+          seen.add(req);
+          if (req.url.path == '/api/auth/login') {
+            return http.Response(
+              '{"error":"enter the code","two_factor_required":true,'
+              '"challenge":"ch1"}',
+              401,
+            );
+          }
+          return http.Response('{"token":"tok","user":$user}', 200);
+        }),
+      );
+
+      Object? thrown;
+      try {
+        await client.login(email: 'a@b.c', password: 'pw');
+      } catch (e) {
+        thrown = e;
+      }
+      expect(thrown, isA<TwoFactorRequired>());
+      final challenge = (thrown! as TwoFactorRequired).challenge;
+      expect(challenge, 'ch1');
+      // Still a ServerException, so anything not handling it shows the text.
+      expect((thrown as ServerException).message, 'enter the code');
+
+      final auth = await client.completeTwoFactor(
+        challenge: challenge,
+        code: '123456',
+      );
+      expect(auth.token, 'tok');
+      expect(seen.last.url.path, '/api/auth/login/2fa');
+      expect(seen.last.body, '{"challenge":"ch1","code":"123456"}');
+    });
+
+    test('a wrong password stays an ordinary 401', () async {
+      final client = VellumServerClient(
+        baseUrl: 'http://test',
+        httpClient: MockClient((req) async => http.Response(
+              '{"error":"invalid email or password"}',
+              401,
+            )),
+      );
+      expect(
+        client.login(email: 'a@b.c', password: 'nope'),
+        throwsA(
+          allOf(
+            isA<ServerException>(),
+            isNot(isA<TwoFactorRequired>()),
+          ),
+        ),
+      );
+    });
+  });
 }

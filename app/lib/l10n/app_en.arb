@@ -8662,6 +8662,26 @@
     "description": "Confirm button of the forgot-password dialog."
   },
 
+  "serverTwoFactorTitle": "Two-factor sign-in",
+  "@serverTwoFactorTitle": {
+    "description": "Title of the dialog that asks for a two-factor code after a correct password."
+  },
+
+  "serverTwoFactorBody": "Enter the six-digit code from your authenticator app, or one of your recovery codes.",
+  "@serverTwoFactorBody": {
+    "description": "Body of the two-factor code dialog."
+  },
+
+  "serverTwoFactorCode": "Code",
+  "@serverTwoFactorCode": {
+    "description": "Label of the two-factor code field."
+  },
+
+  "serverTwoFactorVerify": "Verify",
+  "@serverTwoFactorVerify": {
+    "description": "Confirm button of the two-factor code dialog."
+  },
+
   "serverResetSent": "If that address has an account, a link is on its way.",
   "@serverResetSent": {
     "description": "Snackbar after a password reset was requested. Deliberately does not say whether the address is known."
