@@ -9967,5 +9967,86 @@
         "type": "int"
       }
     }
-  }
+  },
+
+  "yearEntryTitle": "Year in review",
+  "@yearEntryTitle": {"description": "Title of the entry on the insights page that opens the year in review."},
+
+  "yearEntrySub": "A picture of your reading year to save or share",
+  "@yearEntrySub": {"description": "Subtitle of the year-in-review entry on the insights page."},
+
+  "yearTitle": "Year in review",
+  "@yearTitle": {"description": "App bar title of the year-in-review page, and the heading on the shareable picture."},
+
+  "yearPreviousTooltip": "Previous year",
+  "@yearPreviousTooltip": {"description": "Tooltip and screen-reader label of the button that shows the year before."},
+
+  "yearNextTooltip": "Next year",
+  "@yearNextTooltip": {"description": "Tooltip and screen-reader label of the button that shows the year after."},
+
+  "yearHeading": "{year}",
+  "@yearHeading": {"description": "Heading of the year being reviewed, e.g. \"2026\"; tapping it opens the year list. A String so no thousands separator is added.", "placeholders": {"year": {"type": "String"}}},
+
+  "yearPickerTitle": "Jump to a year",
+  "@yearPickerTitle": {"description": "Title of the sheet listing the years that have any reading."},
+
+  "yearCardBooks": "{count, plural, =1{book finished} other{books finished}}",
+  "@yearCardBooks": {"description": "Caption under the big number of finished books on the picture and the page.", "placeholders": {"count": {"type": "int"}}},
+
+  "yearBestMonth": "Best month",
+  "@yearBestMonth": {"description": "Label of the month with the most reading."},
+
+  "yearMonthName": "{month}",
+  "@yearMonthName": {"description": "Name of a month, e.g. \"March\".", "placeholders": {"month": {"type": "DateTime", "format": "MMMM"}}},
+
+  "yearTopAuthors": "Most-read authors",
+  "@yearTopAuthors": {"description": "Heading of the list of authors the reader finished most books by."},
+
+  "yearTopGenres": "Most-read genres",
+  "@yearTopGenres": {"description": "Heading of the list of genres the reader finished most books in."},
+
+  "yearTopEntry": "{name}, {count, plural, =1{1 book} other{{count} books}}",
+  "@yearTopEntry": {"description": "An author or genre with the number of finished books.", "placeholders": {"name": {"type": "String"}, "count": {"type": "int"}}},
+
+  "yearGoalProgress": "{finished} of {goal, plural, =1{1 book} other{{goal} books}}",
+  "@yearGoalProgress": {"description": "Progress against the books-a-year goal of a past or current year.", "placeholders": {"finished": {"type": "int"}, "goal": {"type": "int"}}},
+
+  "yearGoalReached": "You reached your goal for the year",
+  "@yearGoalReached": {"description": "Shown under the goal progress when the books-a-year goal was met."},
+
+  "yearCompareTitle": "Compared with {year}",
+  "@yearCompareTitle": {"description": "Heading of the comparison with the previous year.", "placeholders": {"year": {"type": "String"}}},
+
+  "yearCompareBooks": "{trend, select, more{{percent}% more books than in {year}} less{{percent}% fewer books than in {year}} same{About the same number of books as in {year}} other{No books were finished in {year} to compare with}}",
+  "@yearCompareBooks": {"description": "Compares books finished with the previous year; trend is more, less, same or none.", "placeholders": {"trend": {"type": "String"}, "percent": {"type": "int"}, "year": {"type": "String"}}},
+
+  "yearComparePages": "{trend, select, more{{percent}% more pages than in {year}} less{{percent}% fewer pages than in {year}} same{About the same number of pages as in {year}} other{No pages were recorded in {year} to compare with}}",
+  "@yearComparePages": {"description": "Compares pages read with the previous year; trend is more, less, same or none.", "placeholders": {"trend": {"type": "String"}, "percent": {"type": "int"}, "year": {"type": "String"}}},
+
+  "yearCompareTime": "{trend, select, more{{percent}% more time reading than in {year}} less{{percent}% less time reading than in {year}} same{About the same time reading as in {year}} other{No reading time was recorded in {year} to compare with}}",
+  "@yearCompareTime": {"description": "Compares reading time with the previous year; trend is more, less, same or none.", "placeholders": {"trend": {"type": "String"}, "percent": {"type": "int"}, "year": {"type": "String"}}},
+
+  "yearEmptyTitle": "Nothing read in {year}",
+  "@yearEmptyTitle": {"description": "Heading of the year page when the year has no reading.", "placeholders": {"year": {"type": "String"}}},
+
+  "yearEmptyBody": "Sittings and finished books will show up here.",
+  "@yearEmptyBody": {"description": "Body of the empty year page."},
+
+  "yearSavePicture": "Save picture",
+  "@yearSavePicture": {"description": "Button that saves the year-in-review picture as a PNG file (desktop)."},
+
+  "yearSharePicture": "Share picture",
+  "@yearSharePicture": {"description": "Button that shares the year-in-review picture (mobile)."},
+
+  "yearPictureSaved": "Saved to {path}",
+  "@yearPictureSaved": {"description": "Snack bar after the picture was saved.", "placeholders": {"path": {"type": "String"}}},
+
+  "yearPictureFailed": "Could not make the picture: {error}",
+  "@yearPictureFailed": {"description": "Snack bar when saving or sharing the picture failed.", "placeholders": {"error": {"type": "String"}}},
+
+  "yearPictureSemantics": "Reading in {year}: {books}, {pages} pages, {time}",
+  "@yearPictureSemantics": {"description": "Screen-reader summary of the shareable picture; books is already worded, e.g. \"3 books finished\".", "placeholders": {"year": {"type": "String"}, "books": {"type": "String"}, "pages": {"type": "int"}, "time": {"type": "String"}}},
+
+  "yearMonthsChartSemantics": "Time read in each month of the year",
+  "@yearMonthsChartSemantics": {"description": "Screen-reader label of the small bar chart of months on the picture."}
 }

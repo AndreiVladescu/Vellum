@@ -218,6 +218,9 @@ MIGRATED=(
   lib/stats/insights_range.dart
   lib/stats/month_review.dart
   lib/stats/month_review_page.dart
+  lib/stats/year_card.dart
+  lib/stats/year_review.dart
+  lib/stats/year_review_page.dart
   lib/stats/reading_goals.dart
   lib/stats/session_recorder.dart
   lib/stats/stats_queries.dart

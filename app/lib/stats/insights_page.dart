@@ -9,6 +9,7 @@ import 'goals_dialog.dart';
 import 'heatmap_grid.dart';
 import 'insights_range.dart';
 import 'month_review_page.dart';
+import 'year_review_page.dart';
 import 'reading_goals.dart';
 import 'stats_queries.dart';
 import '../settings/app_settings.dart';
@@ -163,6 +164,22 @@ class _InsightsPageState extends State<InsightsPage> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
                     builder: (_) => MonthReviewPage(
+                      repository: widget.repository,
+                      settings: widget.settings,
+                    ),
+                  )),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.auto_awesome_outlined),
+                  title: Text(l10n.yearEntryTitle),
+                  subtitle: Text(l10n.yearEntrySub),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => YearReviewPage(
                       repository: widget.repository,
                       settings: widget.settings,
                     ),
