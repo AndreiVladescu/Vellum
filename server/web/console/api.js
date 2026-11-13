@@ -72,26 +72,76 @@ export async function authBlobUrl(path){
   return URL.createObjectURL(await res.blob());
 }
 
-// Load every `<img data-src>` under `root` with an auth-header fetch, swapping
-// in an object URL once fetched (and revoking it after the image decodes). On
-// failure we invoke the element's own onerror, so the no-cover placeholder
-// still appears exactly as it did with a direct `src`.
-export function hydrateImages(root){
-  for (const img of root.querySelectorAll('img[data-src]')){
-    const path = img.getAttribute('data-src');
-    img.removeAttribute('data-src');
-    authBlobUrl(path).then(url=>{
-      img.addEventListener('load', ()=>URL.revokeObjectURL(url), { once:true });
-      img.src = url;
-    }).catch(()=>{ if (typeof img.onerror === 'function') img.onerror(); });
+// Short-lived signed links (POST /api/links) for covers and downloads: a URL
+// good for one resource and a few hours or minutes, so a plain `<img src>` or
+// `<a href>` works and the browser can cache covers, with the session token
+// still out of every URL. Cached per path until a minute before expiry.
+const linkCache = new Map();
+
+/// Signed URLs for `paths` (no query strings), as a Map path -> url. A path the
+/// caller cannot view, or any failure, is simply absent: callers fall back to
+/// the header-authenticated blob fetch.
+export async function signedLinks(paths){
+  const now = Date.now() / 1000, out = new Map(), need = [];
+  for (const p of new Set(paths)){
+    const hit = linkCache.get(p);
+    if (hit && hit.expires_at - 60 > now) out.set(p, hit.url); else need.push(p);
   }
+  if (need.length && S.token){
+    try {
+      const res = await fetch('/api/links', { method:'POST',
+        headers: { authorization:'Bearer '+S.token, 'content-type':'application/json' },
+        body: JSON.stringify({ paths: need }) });
+      if (res.ok) for (const l of (await res.json()).links || []){
+        linkCache.set(l.path, l);
+        out.set(l.path, l.url);
+      }
+    } catch(e){ /* fall back to blob fetches */ }
+  }
+  return out;
 }
 
-// Download an authenticated file by fetching it with the auth header and
-// triggering a save from the resulting object URL, so the token stays out of
-// the `<a href>`.
+// Load every `<img data-src>` under `root`. One request signs all the covers;
+// each image then uses its signed URL directly (a query such as `?w=` or `?t=`
+// is re-attached after the signature, which covers the path only). Anything
+// that could not be signed falls back to an auth-header fetch into an object
+// URL. On failure the element's own onerror runs, so the no-cover placeholder
+// still appears exactly as it did with a direct `src`.
+export function hydrateImages(root){
+  const imgs = [];
+  for (const img of root.querySelectorAll('img[data-src]')){
+    imgs.push([img, img.getAttribute('data-src')]);
+    img.removeAttribute('data-src');
+  }
+  if (!imgs.length) return;
+  signedLinks(imgs.map(([, src]) => src.split('?')[0])).then(links => {
+    for (const [img, src] of imgs){
+      const [path, query] = src.split('?');
+      const signed = links.get(path);
+      if (signed){
+        img.src = signed + (query ? '&'+query : '');
+        continue;
+      }
+      authBlobUrl(src).then(url=>{
+        img.addEventListener('load', ()=>URL.revokeObjectURL(url), { once:true });
+        img.src = url;
+      }).catch(()=>{ if (typeof img.onerror === 'function') img.onerror(); });
+    }
+  });
+}
+
+// Download a book file through a short-lived (five minute) signed link, or, if
+// none can be had, by fetching it with the auth header into an object URL.
 export async function downloadFile(fileId, filename){
-  return downloadPath('/api/files/'+fileId, filename);
+  const path = '/api/files/'+fileId;
+  const url = (await signedLinks([path])).get(path);
+  if (url){
+    const a = document.createElement('a');
+    a.href = url; a.download = filename || 'download';
+    document.body.appendChild(a); a.click(); a.remove();
+    return true;
+  }
+  return downloadPath(path, filename);
 }
 
 /// The same for any authenticated GET — a book file, or the server's backup.
