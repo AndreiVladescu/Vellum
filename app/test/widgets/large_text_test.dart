@@ -8,6 +8,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/account/user_profile.dart';
 import 'package:vellum/book_detail/read_button.dart';
+import 'package:vellum/loans/loans_page.dart';
+import 'package:vellum/server/sync_service.dart';
+import 'package:vellum/settings/preferences_page.dart';
+import 'package:vellum/stats/insights_page.dart';
+import 'package:vellum/stats/library_stats_page.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
@@ -161,4 +166,133 @@ void main() {
       },
     );
   }
+
+  // The other text-heavy screens, at 2.0 on the same 411x891 phone surface.
+  // Each is scrolled end to end so every lazily built row gets laid out; a
+  // RenderFlex overflow surfaces as a FlutterError via takeException.
+  group('2.0x text scale, whole-screen sweep', () {
+    Future<LibraryRepository> seed(WidgetTester tester) async {
+      late LibraryRepository repo;
+      await tester.runAsync(() async {
+        repo = await LibraryRepository.forTesting(
+          VellumDatabase(NativeDatabase.memory()),
+          dir,
+        );
+        final db = repo.db;
+        await db.into(db.books).insert(BooksCompanion.insert(
+              id: 'a',
+              title: 'The Fellowship of the Ring',
+              subtitle: const Value('Being the First Part of The Lord of the Rings'),
+              finishedAt: Value(DateTime(2026, 7, 20)),
+              status: const Value('finished'),
+              pageCount: const Value(423),
+              publisher: const Value('Allen & Unwin'),
+              publishedYear: const Value(1954),
+            ));
+        await db.into(db.bookFiles).insert(BookFilesCompanion.insert(
+              id: 'f',
+              bookId: 'a',
+              format: 'epub',
+              path: 'x.epub',
+              sizeBytes: 1,
+              sha256: 'h',
+            ));
+        for (final (i, day) in [19, 20].indexed) {
+          await db.into(db.readingSessions).insert(
+                ReadingSessionsCompanion.insert(
+                  id: 's$i',
+                  bookId: 'a',
+                  startedAt: DateTime(2026, 7, day, 21),
+                  endedAt: DateTime(2026, 7, day, 21, 40),
+                  startPage: Value(i * 30 + 1),
+                  endPage: Value(i * 30 + 30),
+                ),
+              );
+        }
+        final copy = await repo.addPhysicalCopy('a', location: 'Living room');
+        await repo.lendCopy(
+          copy,
+          'Alexandrina Constantinescu-Popescu',
+          dueAt: DateTime(2026, 8, 1),
+          contact: 'alexandrina.constantinescu@example.org',
+          notes: 'Said she would return it after the summer holiday.',
+        );
+      });
+      return repo;
+    }
+
+    Future<void> sweep(
+      WidgetTester tester,
+      Future<Widget> Function(LibraryRepository repo) home,
+    ) async {
+      tester.view.physicalSize = const Size(411 * 2.625, 891 * 2.625);
+      tester.view.devicePixelRatio = 2.625;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final repo = await seed(tester);
+      late Widget page;
+      await tester.runAsync(() async => page = await home(repo));
+      await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2.0)),
+          child: child!,
+        ),
+        home: page,
+      ));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(tester.takeException(), isNull);
+      expect(find.byType(CircularProgressIndicator), findsNothing,
+          reason: 'the page loaded');
+      // Walk down the page in screen-sized steps, then back up.
+      final scrollable = find.byType(Scrollable).first;
+      for (final dy in [-600.0, 600.0]) {
+        for (var i = 0; i < 12; i++) {
+          await tester.drag(scrollable, Offset(0, dy));
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(tester.takeException(), isNull, reason: 'step $i, dy $dy');
+        }
+      }
+      await tester.pump(const Duration(seconds: 2));
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox());
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+    }
+
+    testWidgets('Insights', (tester) async {
+      await sweep(tester, (repo) async {
+        SharedPreferences.setMockInitialValues({});
+        return InsightsPage(
+          repository: repo,
+          settings: await AppSettingsStore.load(),
+        );
+      });
+    });
+
+    testWidgets('Loans', (tester) async {
+      await sweep(tester, (repo) async => LoansPage(repository: repo));
+    });
+
+    testWidgets('Library statistics', (tester) async {
+      await sweep(tester, (repo) async => LibraryStatsPage(db: repo.db));
+    });
+
+    testWidgets('Preferences', (tester) async {
+      await sweep(tester, (repo) async {
+        SharedPreferences.setMockInitialValues({});
+        return PreferencesPage(
+          repository: repo,
+          settings: await AppSettingsStore.load(),
+          connection: await ServerConnection.load(),
+          sync: SyncService(repo),
+        );
+      });
+    });
+  });
 }
