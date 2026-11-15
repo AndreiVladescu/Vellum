@@ -5,6 +5,8 @@ import 'page_metric.dart';
 import 'reader_settings.dart';
 import '../widgets/page_insets.dart';
 import 'translate/on_device.dart';
+import 'tts/read_aloud.dart';
+import 'tts/read_aloud_widgets.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 
@@ -19,6 +21,7 @@ class ReaderSettingsSheet extends StatelessWidget {
     required this.settings,
     required this.showTypography,
     required this.showPdfOptions,
+    this.readAloud,
   });
 
   final ReaderSettings settings;
@@ -29,11 +32,15 @@ class ReaderSettingsSheet extends StatelessWidget {
   /// PDF: fit and night mode.
   final bool showPdfOptions;
 
+  /// Read aloud's speed and voice (roadmap v1.4.3), when this reader has it.
+  final ReadAloud? readAloud;
+
   static Future<void> show(
     BuildContext context, {
     required ReaderSettings settings,
     bool typography = false,
     bool pdf = false,
+    ReadAloud? readAloud,
   }) =>
       showModalBottomSheet<void>(
         context: context,
@@ -43,6 +50,7 @@ class ReaderSettingsSheet extends StatelessWidget {
           settings: settings,
           showTypography: typography,
           showPdfOptions: pdf,
+          readAloud: readAloud,
         ),
       );
 
@@ -193,6 +201,8 @@ class ReaderSettingsSheet extends StatelessWidget {
                     if (metric != null) settings.setPageMetric(metric);
                   },
                 ),
+                if (readAloud != null)
+                  ReadAloudSettingsSection(readAloud: readAloud!),
                 const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,

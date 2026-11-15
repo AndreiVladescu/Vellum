@@ -10456,5 +10456,65 @@
   "@yearPictureSemantics": {"description": "Screen-reader summary of the shareable picture; books is already worded, e.g. \"3 books finished\".", "placeholders": {"year": {"type": "String"}, "books": {"type": "String"}, "pages": {"type": "int"}, "time": {"type": "String"}}},
 
   "yearMonthsChartSemantics": "Time read in each month of the year",
-  "@yearMonthsChartSemantics": {"description": "Screen-reader label of the small bar chart of months on the picture."}
+  "@yearMonthsChartSemantics": {"description": "Screen-reader label of the small bar chart of months on the picture."},
+
+  "ttsReadAloud": "Read aloud",
+  "@ttsReadAloud": {"description": "Reader toolbar action that starts reading the book aloud with the system's speech engine."},
+
+  "ttsStopReading": "Stop reading aloud",
+  "@ttsStopReading": {"description": "Reader toolbar action while the book is being read aloud; also the stop button of the player."},
+
+  "ttsPlay": "Resume reading",
+  "@ttsPlay": {"description": "Tooltip of the play button of the read-aloud player while paused."},
+
+  "ttsPause": "Pause reading",
+  "@ttsPause": {"description": "Tooltip of the pause button of the read-aloud player."},
+
+  "ttsPreviousSentence": "Previous sentence",
+  "@ttsPreviousSentence": {"description": "Tooltip of the read-aloud player's skip-back button."},
+
+  "ttsNextSentence": "Next sentence",
+  "@ttsNextSentence": {"description": "Tooltip of the read-aloud player's skip-forward button."},
+
+  "ttsUnavailable": "Reading aloud needs a speech engine, and this device has none. Install one in the system's text-to-speech settings (on Linux, speech-dispatcher).",
+  "@ttsUnavailable": {"description": "Snack bar when Read aloud is chosen but the device has no text-to-speech engine."},
+
+  "ttsNoText": "There is no text here to read aloud.",
+  "@ttsNoText": {"description": "Snack bar when Read aloud is started somewhere with no text, such as a scanned PDF."},
+
+  "ttsPageSkipped": "Page {page} has no text, so it was skipped — it may be a scan.",
+  "@ttsPageSkipped": {
+    "description": "Snack bar while reading a PDF aloud, when a page has no text layer and is passed over.",
+    "placeholders": {"page": {"type": "int"}}
+  },
+
+  "ttsFinished": "Finished reading aloud.",
+  "@ttsFinished": {"description": "Snack bar when read-aloud reaches the end of the book."},
+
+  "ttsFailed": "Reading aloud stopped: {message}",
+  "@ttsFailed": {
+    "description": "Snack bar when the speech engine fails; message is the engine's own.",
+    "placeholders": {"message": {"type": "String"}}
+  },
+
+  "ttsSettingsTitle": "Read aloud",
+  "@ttsSettingsTitle": {"description": "Heading of the read-aloud section in the reader's settings sheet."},
+
+  "ttsSpeed": "Speed",
+  "@ttsSpeed": {"description": "Label of the read-aloud speed slider."},
+
+  "ttsSpeedValue": "{speed}×",
+  "@ttsSpeedValue": {
+    "description": "The read-aloud speed, e.g. 1.5×.",
+    "placeholders": {"speed": {"type": "String"}}
+  },
+
+  "ttsVoice": "Voice",
+  "@ttsVoice": {"description": "Label of the read-aloud voice picker."},
+
+  "ttsVoiceAutomatic": "Automatic (the book's language)",
+  "@ttsVoiceAutomatic": {"description": "The read-aloud voice choice that lets the engine pick a voice for the book's language."},
+
+  "ttsVoiceUnavailable": "This device's speech engine does not offer a choice of voice.",
+  "@ttsVoiceUnavailable": {"description": "Shown in place of the voice picker when the speech engine lists no voices."}
 }

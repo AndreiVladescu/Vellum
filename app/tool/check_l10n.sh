@@ -165,6 +165,11 @@ MIGRATED=(
   lib/reader/reader_settings.dart
   lib/reader/reader_settings_sheet.dart
   lib/reader/translate/local_engine_backend.dart
+  lib/reader/tts/read_aloud.dart
+  lib/reader/tts/read_aloud_widgets.dart
+  lib/reader/tts/tts_controller.dart
+  lib/reader/tts/tts_engine.dart
+  lib/reader/tts/tts_text.dart
   lib/reader/translate/on_device.dart
   lib/reader/translate/on_device_stub.dart
   lib/reader/translate/proprietary/language_packs_sheet.dart

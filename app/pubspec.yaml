@@ -73,6 +73,7 @@ dependencies:
   flutter_zxing: ^2.3.0
   wakelock_plus: ^1.5.2
   package_info_plus: ^9.0.1
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   flutter_test:

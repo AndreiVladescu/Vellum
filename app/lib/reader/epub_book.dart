@@ -71,10 +71,14 @@ String stripHtml(String html) {
 /// reading order. Vellum parses just enough of that to page through chapters —
 /// no external renderer package, so the dependency surface stays small.
 class EpubBook {
-  const EpubBook({required this.title, required this.chapters});
+  const EpubBook({required this.title, required this.chapters, this.language});
 
   final String? title;
   final List<EpubChapter> chapters;
+
+  /// The package's `dc:language` (a BCP-47 tag such as `en` or `fr-CA`), when it
+  /// names one. Read aloud takes its voice's language from it.
+  final String? language;
 
   // A tiny LRU of parsed books, keyed by book id: parsing (zip + XML + base64
   // image inlining) is slow for a big EPUB, and reopening is common.
@@ -140,6 +144,12 @@ class EpubBook {
         .where((t) => t.isNotEmpty)
         .firstOrNull;
 
+    final bookLanguage = opf
+        .findAllElements('dc:language')
+        .map((e) => e.innerText.trim())
+        .where((t) => t.isNotEmpty)
+        .firstOrNull;
+
     // Manifest: id -> (absolute path, media type); spine: ordered idrefs.
     final items = <String, ({String path, String type})>{};
     for (final item in opf.findAllElements('item')) {
@@ -173,7 +183,8 @@ class EpubBook {
     if (chapters.isEmpty) {
       throw const FormatException('EPUB has no readable chapters');
     }
-    return EpubBook(title: bookTitle, chapters: chapters);
+    return EpubBook(
+        title: bookTitle, chapters: chapters, language: bookLanguage);
   }
 
   /// The EPUB's declared cover-image bytes, or null when it declares none.
