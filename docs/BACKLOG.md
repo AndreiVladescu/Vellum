@@ -120,6 +120,74 @@ Failed or open:
   there is no preview layout); camera scanning; battery and Wi-Fi constraints;
   the 2.12 items that need a real phone.
 
+**Emulator pass, 2026-11-13 (evening)** (debug build of the commit after
+"system bars hide only in the reader"; Android 16 phone `vellum_android16`
+first, then the Pixel Tablet and the Android 14 phone; a local `cargo run`
+server reached through `adb reverse tcp:3000 tcp:3000` and `http://localhost:3000`,
+because the app refuses cleartext to `10.0.2.2`). Passed:
+
+- *Android 16, system bars.* The "Viewing full screen" hint came from
+  `immersiveSticky` set app-wide in `main()`. Fixed (`android: system bars
+  hide only in the reader`): the app is edge to edge, the bars hide while a
+  reader is open. On a fresh install the shelf and the Physical tab show no
+  hint, the bars stay and nothing sits under the gesture bar; the hint now
+  appears once, in the reader.
+- *Android 16, background sync.* Job id 1 is in the `androidx.work.systemjobscheduler`
+  namespace, so the job is run with `cmd jobscheduler run -f -n
+  androidx.work.systemjobscheduler app.vellum.Vellum <id>`. WorkManager still
+  refuses ("executed before schedule") until the initial delay has passed:
+  move the clock a day with `adb root; date MMDDhhmmYYYY.ss`, run it, then put
+  the clock back and `adb unroot` (root restarts adbd and drops `adb reverse`;
+  the first run returned RETRY for exactly that reason). With the forward back
+  the worker returned SUCCESS and the server saw its requests; the status-bar
+  progress notification was posted and cleared.
+- *Loan reminders permission (Android 16).* The switch asks; Don't allow leaves
+  it off with a snack bar; asking again and Allow turns it on.
+- *Material You on Android 16* follows the system palette (forced blue).
+- *Sync details.* An unreachable server now reads "Could not reach the server.
+  Check the address and your connection." with the raw exception on a second
+  line (sign-in); the issues dialog does the same for classified failures.
+- *Open with, warm.* A PDF and an EPUB in app storage (`file://`) land on the
+  add-book form with the file attached. A `file:///sdcard/...` URI does nothing
+  (no storage permission), which is expected.
+- *PDF reader.* Opens, selecting text and the highlight button, in-book search
+  (14 hits for a word, 1/14).
+- *EPUB reader.* Scrolled opens and the chevrons turn chapters; paged mode
+  turns pages by tap on the right third and by swipe in a text chapter
+  ("Page 1 of 12" to "Page 2 of 12", and back with a swipe).
+- *Tablet (2560x1600).* Permanent navigation drawer, two-column book page
+  (cover and actions left, formats, copies, status and notes right).
+- *Large text 1.3 and 2.0.* The shelf chips were still clipped at both (the
+  chip got a tight row height and drew its label off-centre); fixed
+  (`shelf: chips keep their height at large text`), looked at at 2.0 on the
+  Android 16 phone. The book page's read row fits (also a widget test at 360
+  and 400 px; it did not reproduce on HEAD).
+
+Failed or open:
+
+- **Paged mode in a chapter that holds a picture.** On the Time Machine and
+  Frankenstein samples the title page (an SVG) and the Imprint (the logo) do
+  not turn pages by tap, swipe or the chevron, and do not move on to the next
+  chapter, so a reader is stuck there until they use the chapter list. The
+  same books' text chapters paginate and turn fine. `_pageForward` returns when
+  `pages.ready` is false; `measureLines` clears it while a `RenderChapterLoading`
+  is under the chapter, so a picture that never finishes building keeps it
+  false. Screenshots: `paged_tap_next.png`, `paged3_a.png` in the agent
+  scratch area.
+- **Widget after a reinstall.** On the Android 14 phone the widget said
+  "Nothing on the go" while the shelf's Continue reading card had a book at
+  13 %; the widget had not been refreshed since the reinstall. Open the app
+  and check it follows.
+- **Sample books push a reading session.** A reading session recorded on a
+  device-only sample book is sent on every sync and the server answers 400
+  "no such book", so each sync ends with "1 issue" on a library whose books
+  are all samples. Sessions of books the server does not have should not be
+  pushed.
+- **Not done:** the two-factor code prompt (needs an account with 2FA on and a
+  TOTP generator on the host), shortcuts and the widget add flow on Android
+  16, EPUB paged mode and the reader on the tablet (the tablet's library had
+  no EPUB), pinch zoom in the PDF reader (`input` cannot pinch).
+
 **Background sync, shortcuts and the widget** (plan 5 #40). The scheduling
 *policy* is unit-tested (`app/test/server/background_sync_test.dart`) and the
 Kotlin, the manifest, the shortcut XML and the widget layout all compile in

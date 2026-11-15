@@ -789,8 +789,8 @@ screen with titles against 1.8 without). The dominant colour is already stored.
 
 ### Not measured this round
 
-- **Android.** The emulator was in use by another agent throughout; run
-  `tool/perf_run.sh --android` (it seeds a 2,000-book library on first use).
+- **Android on a real phone.** See "Android baseline" below: the one run so
+  far is on the emulator.
 - **The reader.** Out of scope while pdfrx was being upgraded; the profiling
   run has no reader scenario yet. Opening a book's file is the obvious next one
   to add.
@@ -798,6 +798,54 @@ screen with titles against 1.8 without). The dominant colour is already stored.
   a run; 100 MB is the desktop image cache's cap and some is the recorded
   timelines, but nobody has separated the rest. Worth a run with
   `PERF_ONLY` per area and the timeline off.
+
+### Android baseline (emulator, 2026-11-15)
+
+`tool/perf_run.sh --android` on the Pixel 6 AVD (`vellum_test`, Android 14,
+x86_64, **software GL** — swiftshader — on a 16-core host), profile build,
+the 2,000-book seeded library, commit 8af55f4. **A baseline for comparing later
+emulator runs, not a phone number**: raster times are the host CPU's, and
+every scenario reads as janky (200–340 frames, 160–270 "jank") for that reason.
+Build times are the more honest column, since the Dart side runs as AOT on the
+host's cores, which are faster than a phone's.
+
+| scenario | build p50 / p90 / p99 ms | raster p90 / p99 ms | rss MB |
+|---|---:|---:|---:|
+| shelf, spines cold | 1.3 / 4.0 / 14.3 | 42 / 70 | 342 |
+| shelf, spines warm | 1.2 / 2.6 / 4.5 | 27 / 33 | 380 |
+| shelf, spines hot | 1.1 / 2.5 / 4.2 | 24 / 29 | 403 |
+| shelf, covers cold | 1.2 / 2.3 / 6.4 | 29 / 44 | 474 |
+| shelf, list | 1.7 / 2.7 / 4.3 | 21 / 23 | 512 |
+| Insights open (shown / settled) | 0.2 / 1.9 / 26.6 | 43 / 132 | 556 |
+| Insights scroll | 0.5 / 2.3 / 11.3 | 25 / 110 | 585 |
+| Insights range chip | 1.1 / 14.4 / 22.2 | 23 / 24 | 584 |
+| month page open | 0.3 / 1.3 / 20.6 | 53 / 189 | 581 |
+| Preferences open | 0.3 / 1.3 / 12.6 | 45 / 151 | 704 |
+| room open | 5.1 / 49.6 / 49.6 | 688 / 688 | 694 |
+| room pan | 16.8 / 37.2 / 75.2 | 867 / 1166 | 798 |
+
+- **Start-up.** First frame 62 ms and first shelf frame 453 ms inside the
+  profiling test (a warm engine). The cold-start probe (`startup_probe.dart`,
+  six launches) printed nothing on the emulator — the six launches all read
+  "no result" — so there is no cold-start number yet; a plain
+  `am start -W` of the profile build's launcher activity took 1.8 s.
+- **Shelf scroll.** Build stays under 5 ms at p90 in every view; the frame
+  budget is spent on raster, which this emulator cannot price. Image cache peak
+  is 99.9 MB with spines and 61 MB with the list — the 48 MB phone cap in
+  `main()` is not applied in the test binary, so `image_cache_peak_mb` here says
+  what the shelf *asks* for, not what a phone keeps.
+- **Insights.** Opens in 231 ms shown / 498 ms settled; the range chip switches
+  in 65–83 ms, but its build p90 (14 ms) is still the highest of the screens,
+  as on desktop.
+- **The room** is the outlier on both axes (build p90 50 ms, resident set
+  to 905 MB over the run); the title shadow and the 400 placed books on a
+  pan are the open items below.
+- **Search typing:** 129–157 ms per query on 2,000 books.
+- **Fix to the script.** `flutter drive` on Android needs `--no-dds` or the
+  test's timeline connection is refused ("Failed to connect to VM Service");
+  `perf_run.sh` now passes it for `--android`. The app on the device must also
+  be one the seeder made: after a manual session, `adb uninstall` it first, or
+  the guard refuses to profile.
 
 ### Next, in the order they would pay
 
@@ -818,6 +866,7 @@ screen with titles against 1.8 without). The dominant colour is already stored.
    does not transfer as is.
 6. **The insights range chip still builds a 14–19 ms frame** — the page
    itself, now that the arithmetic is gone. Check `HeatmapGrid` first.
-7. **Measure Android** (`--android`), then decide on spine strips from its
+7. **Measure Android on a real phone** (the emulator baseline is above, and
+   its cold-start probe needs a look), then decide on spine strips from its
    `image_cache_peak_mb`; add a reader scenario; separate the resident-set
    growth over a run.
