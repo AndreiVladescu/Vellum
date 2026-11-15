@@ -373,6 +373,29 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _listenPositionMeta = const VerificationMeta(
+    'listenPosition',
+  );
+  @override
+  late final GeneratedColumn<double> listenPosition = GeneratedColumn<double>(
+    'listen_position',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastListenedAtMeta = const VerificationMeta(
+    'lastListenedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastListenedAt =
+      GeneratedColumn<DateTime>(
+        'last_listened_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _readerNotesMeta = const VerificationMeta(
     'readerNotes',
   );
@@ -646,6 +669,8 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     readingProgress,
     lastReadPage,
     lastReadAt,
+    listenPosition,
+    lastListenedAt,
     readerNotes,
     readerNotesUpdatedAt,
     readerNotesNeedsPush,
@@ -786,6 +811,24 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         lastReadAt.isAcceptableOrUnknown(
           data['last_read_at']!,
           _lastReadAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('listen_position')) {
+      context.handle(
+        _listenPositionMeta,
+        listenPosition.isAcceptableOrUnknown(
+          data['listen_position']!,
+          _listenPositionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_listened_at')) {
+      context.handle(
+        _lastListenedAtMeta,
+        lastListenedAt.isAcceptableOrUnknown(
+          data['last_listened_at']!,
+          _lastListenedAtMeta,
         ),
       );
     }
@@ -1014,6 +1057,14 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_read_at'],
       ),
+      listenPosition: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}listen_position'],
+      ),
+      lastListenedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_listened_at'],
+      ),
       readerNotes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}reader_notes'],
@@ -1123,6 +1174,8 @@ class Book extends DataClass implements Insertable<Book> {
   final double? readingProgress;
   final int? lastReadPage;
   final DateTime? lastReadAt;
+  final double? listenPosition;
+  final DateTime? lastListenedAt;
   final String? readerNotes;
 
   /// The private note's own clock and outbox flag.
@@ -1242,6 +1295,8 @@ class Book extends DataClass implements Insertable<Book> {
     this.readingProgress,
     this.lastReadPage,
     this.lastReadAt,
+    this.listenPosition,
+    this.lastListenedAt,
     this.readerNotes,
     this.readerNotesUpdatedAt,
     required this.readerNotesNeedsPush,
@@ -1307,6 +1362,12 @@ class Book extends DataClass implements Insertable<Book> {
     }
     if (!nullToAbsent || lastReadAt != null) {
       map['last_read_at'] = Variable<DateTime>(lastReadAt);
+    }
+    if (!nullToAbsent || listenPosition != null) {
+      map['listen_position'] = Variable<double>(listenPosition);
+    }
+    if (!nullToAbsent || lastListenedAt != null) {
+      map['last_listened_at'] = Variable<DateTime>(lastListenedAt);
     }
     if (!nullToAbsent || readerNotes != null) {
       map['reader_notes'] = Variable<String>(readerNotes);
@@ -1395,6 +1456,12 @@ class Book extends DataClass implements Insertable<Book> {
       lastReadAt: lastReadAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastReadAt),
+      listenPosition: listenPosition == null && nullToAbsent
+          ? const Value.absent()
+          : Value(listenPosition),
+      lastListenedAt: lastListenedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastListenedAt),
       readerNotes: readerNotes == null && nullToAbsent
           ? const Value.absent()
           : Value(readerNotes),
@@ -1462,6 +1529,8 @@ class Book extends DataClass implements Insertable<Book> {
       readingProgress: serializer.fromJson<double?>(json['readingProgress']),
       lastReadPage: serializer.fromJson<int?>(json['lastReadPage']),
       lastReadAt: serializer.fromJson<DateTime?>(json['lastReadAt']),
+      listenPosition: serializer.fromJson<double?>(json['listenPosition']),
+      lastListenedAt: serializer.fromJson<DateTime?>(json['lastListenedAt']),
       readerNotes: serializer.fromJson<String?>(json['readerNotes']),
       readerNotesUpdatedAt: serializer.fromJson<DateTime?>(
         json['readerNotesUpdatedAt'],
@@ -1508,6 +1577,8 @@ class Book extends DataClass implements Insertable<Book> {
       'readingProgress': serializer.toJson<double?>(readingProgress),
       'lastReadPage': serializer.toJson<int?>(lastReadPage),
       'lastReadAt': serializer.toJson<DateTime?>(lastReadAt),
+      'listenPosition': serializer.toJson<double?>(listenPosition),
+      'lastListenedAt': serializer.toJson<DateTime?>(lastListenedAt),
       'readerNotes': serializer.toJson<String?>(readerNotes),
       'readerNotesUpdatedAt': serializer.toJson<DateTime?>(
         readerNotesUpdatedAt,
@@ -1550,6 +1621,8 @@ class Book extends DataClass implements Insertable<Book> {
     Value<double?> readingProgress = const Value.absent(),
     Value<int?> lastReadPage = const Value.absent(),
     Value<DateTime?> lastReadAt = const Value.absent(),
+    Value<double?> listenPosition = const Value.absent(),
+    Value<DateTime?> lastListenedAt = const Value.absent(),
     Value<String?> readerNotes = const Value.absent(),
     Value<DateTime?> readerNotesUpdatedAt = const Value.absent(),
     bool? readerNotesNeedsPush,
@@ -1591,6 +1664,12 @@ class Book extends DataClass implements Insertable<Book> {
         : this.readingProgress,
     lastReadPage: lastReadPage.present ? lastReadPage.value : this.lastReadPage,
     lastReadAt: lastReadAt.present ? lastReadAt.value : this.lastReadAt,
+    listenPosition: listenPosition.present
+        ? listenPosition.value
+        : this.listenPosition,
+    lastListenedAt: lastListenedAt.present
+        ? lastListenedAt.value
+        : this.lastListenedAt,
     readerNotes: readerNotes.present ? readerNotes.value : this.readerNotes,
     readerNotesUpdatedAt: readerNotesUpdatedAt.present
         ? readerNotesUpdatedAt.value
@@ -1652,6 +1731,12 @@ class Book extends DataClass implements Insertable<Book> {
       lastReadAt: data.lastReadAt.present
           ? data.lastReadAt.value
           : this.lastReadAt,
+      listenPosition: data.listenPosition.present
+          ? data.listenPosition.value
+          : this.listenPosition,
+      lastListenedAt: data.lastListenedAt.present
+          ? data.lastListenedAt.value
+          : this.lastListenedAt,
       readerNotes: data.readerNotes.present
           ? data.readerNotes.value
           : this.readerNotes,
@@ -1716,6 +1801,8 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
+          ..write('listenPosition: $listenPosition, ')
+          ..write('lastListenedAt: $lastListenedAt, ')
           ..write('readerNotes: $readerNotes, ')
           ..write('readerNotesUpdatedAt: $readerNotesUpdatedAt, ')
           ..write('readerNotesNeedsPush: $readerNotesNeedsPush, ')
@@ -1758,6 +1845,8 @@ class Book extends DataClass implements Insertable<Book> {
     readingProgress,
     lastReadPage,
     lastReadAt,
+    listenPosition,
+    lastListenedAt,
     readerNotes,
     readerNotesUpdatedAt,
     readerNotesNeedsPush,
@@ -1799,6 +1888,8 @@ class Book extends DataClass implements Insertable<Book> {
           other.readingProgress == this.readingProgress &&
           other.lastReadPage == this.lastReadPage &&
           other.lastReadAt == this.lastReadAt &&
+          other.listenPosition == this.listenPosition &&
+          other.lastListenedAt == this.lastListenedAt &&
           other.readerNotes == this.readerNotes &&
           other.readerNotesUpdatedAt == this.readerNotesUpdatedAt &&
           other.readerNotesNeedsPush == this.readerNotesNeedsPush &&
@@ -1838,6 +1929,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<double?> readingProgress;
   final Value<int?> lastReadPage;
   final Value<DateTime?> lastReadAt;
+  final Value<double?> listenPosition;
+  final Value<DateTime?> lastListenedAt;
   final Value<String?> readerNotes;
   final Value<DateTime?> readerNotesUpdatedAt;
   final Value<bool> readerNotesNeedsPush;
@@ -1876,6 +1969,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
+    this.listenPosition = const Value.absent(),
+    this.lastListenedAt = const Value.absent(),
     this.readerNotes = const Value.absent(),
     this.readerNotesUpdatedAt = const Value.absent(),
     this.readerNotesNeedsPush = const Value.absent(),
@@ -1915,6 +2010,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.readingProgress = const Value.absent(),
     this.lastReadPage = const Value.absent(),
     this.lastReadAt = const Value.absent(),
+    this.listenPosition = const Value.absent(),
+    this.lastListenedAt = const Value.absent(),
     this.readerNotes = const Value.absent(),
     this.readerNotesUpdatedAt = const Value.absent(),
     this.readerNotesNeedsPush = const Value.absent(),
@@ -1955,6 +2052,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<double>? readingProgress,
     Expression<int>? lastReadPage,
     Expression<DateTime>? lastReadAt,
+    Expression<double>? listenPosition,
+    Expression<DateTime>? lastListenedAt,
     Expression<String>? readerNotes,
     Expression<DateTime>? readerNotesUpdatedAt,
     Expression<bool>? readerNotesNeedsPush,
@@ -1994,6 +2093,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (readingProgress != null) 'reading_progress': readingProgress,
       if (lastReadPage != null) 'last_read_page': lastReadPage,
       if (lastReadAt != null) 'last_read_at': lastReadAt,
+      if (listenPosition != null) 'listen_position': listenPosition,
+      if (lastListenedAt != null) 'last_listened_at': lastListenedAt,
       if (readerNotes != null) 'reader_notes': readerNotes,
       if (readerNotesUpdatedAt != null)
         'reader_notes_updated_at': readerNotesUpdatedAt,
@@ -2037,6 +2138,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<double?>? readingProgress,
     Value<int?>? lastReadPage,
     Value<DateTime?>? lastReadAt,
+    Value<double?>? listenPosition,
+    Value<DateTime?>? lastListenedAt,
     Value<String?>? readerNotes,
     Value<DateTime?>? readerNotesUpdatedAt,
     Value<bool>? readerNotesNeedsPush,
@@ -2076,6 +2179,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
       readingProgress: readingProgress ?? this.readingProgress,
       lastReadPage: lastReadPage ?? this.lastReadPage,
       lastReadAt: lastReadAt ?? this.lastReadAt,
+      listenPosition: listenPosition ?? this.listenPosition,
+      lastListenedAt: lastListenedAt ?? this.lastListenedAt,
       readerNotes: readerNotes ?? this.readerNotes,
       readerNotesUpdatedAt: readerNotesUpdatedAt ?? this.readerNotesUpdatedAt,
       readerNotesNeedsPush: readerNotesNeedsPush ?? this.readerNotesNeedsPush,
@@ -2148,6 +2253,12 @@ class BooksCompanion extends UpdateCompanion<Book> {
     }
     if (lastReadAt.present) {
       map['last_read_at'] = Variable<DateTime>(lastReadAt.value);
+    }
+    if (listenPosition.present) {
+      map['listen_position'] = Variable<double>(listenPosition.value);
+    }
+    if (lastListenedAt.present) {
+      map['last_listened_at'] = Variable<DateTime>(lastListenedAt.value);
     }
     if (readerNotes.present) {
       map['reader_notes'] = Variable<String>(readerNotes.value);
@@ -2240,6 +2351,8 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('readingProgress: $readingProgress, ')
           ..write('lastReadPage: $lastReadPage, ')
           ..write('lastReadAt: $lastReadAt, ')
+          ..write('listenPosition: $listenPosition, ')
+          ..write('lastListenedAt: $lastListenedAt, ')
           ..write('readerNotes: $readerNotes, ')
           ..write('readerNotesUpdatedAt: $readerNotesUpdatedAt, ')
           ..write('readerNotesNeedsPush: $readerNotesNeedsPush, ')
@@ -3236,6 +3349,61 @@ class $BookFilesTable extends BookFiles
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _durationMsMeta = const VerificationMeta(
+    'durationMs',
+  );
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+    'duration_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _trackMeta = const VerificationMeta('track');
+  @override
+  late final GeneratedColumn<int> track = GeneratedColumn<int>(
+    'track',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _narratorMeta = const VerificationMeta(
+    'narrator',
+  );
+  @override
+  late final GeneratedColumn<String> narrator = GeneratedColumn<String>(
+    'narrator',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _presentMeta = const VerificationMeta(
+    'present',
+  );
+  @override
+  late final GeneratedColumn<bool> present = GeneratedColumn<bool>(
+    'present',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("present" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3245,6 +3413,11 @@ class $BookFilesTable extends BookFiles
     sizeBytes,
     sha256,
     addedAt,
+    durationMs,
+    track,
+    label,
+    narrator,
+    present,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3309,6 +3482,36 @@ class $BookFilesTable extends BookFiles
         addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
       );
     }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+        _durationMsMeta,
+        durationMs.isAcceptableOrUnknown(data['duration_ms']!, _durationMsMeta),
+      );
+    }
+    if (data.containsKey('track')) {
+      context.handle(
+        _trackMeta,
+        track.isAcceptableOrUnknown(data['track']!, _trackMeta),
+      );
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    }
+    if (data.containsKey('narrator')) {
+      context.handle(
+        _narratorMeta,
+        narrator.isAcceptableOrUnknown(data['narrator']!, _narratorMeta),
+      );
+    }
+    if (data.containsKey('present')) {
+      context.handle(
+        _presentMeta,
+        present.isAcceptableOrUnknown(data['present']!, _presentMeta),
+      );
+    }
     return context;
   }
 
@@ -3346,6 +3549,26 @@ class $BookFilesTable extends BookFiles
         DriftSqlType.dateTime,
         data['${effectivePrefix}added_at'],
       )!,
+      durationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_ms'],
+      ),
+      track: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}track'],
+      ),
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      ),
+      narrator: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}narrator'],
+      ),
+      present: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}present'],
+      )!,
     );
   }
 
@@ -3363,6 +3586,19 @@ class BookFile extends DataClass implements Insertable<BookFile> {
   final int sizeBytes;
   final String sha256;
   final DateTime addedAt;
+  final int? durationMs;
+
+  /// 1-based order of this part within the book's audio.
+  final int? track;
+
+  /// The part's title ("Chapter 3", "Disc 1 – 04").
+  final String? label;
+  final String? narrator;
+
+  /// Whether this device holds the file's bytes. **App-local**: false for a
+  /// file this device knows about but has not downloaded (on-demand audio,
+  /// §6), which the doctor, backups and the push must not treat as missing.
+  final bool present;
   const BookFile({
     required this.id,
     required this.bookId,
@@ -3371,6 +3607,11 @@ class BookFile extends DataClass implements Insertable<BookFile> {
     required this.sizeBytes,
     required this.sha256,
     required this.addedAt,
+    this.durationMs,
+    this.track,
+    this.label,
+    this.narrator,
+    required this.present,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3382,6 +3623,19 @@ class BookFile extends DataClass implements Insertable<BookFile> {
     map['size_bytes'] = Variable<int>(sizeBytes);
     map['sha256'] = Variable<String>(sha256);
     map['added_at'] = Variable<DateTime>(addedAt);
+    if (!nullToAbsent || durationMs != null) {
+      map['duration_ms'] = Variable<int>(durationMs);
+    }
+    if (!nullToAbsent || track != null) {
+      map['track'] = Variable<int>(track);
+    }
+    if (!nullToAbsent || label != null) {
+      map['label'] = Variable<String>(label);
+    }
+    if (!nullToAbsent || narrator != null) {
+      map['narrator'] = Variable<String>(narrator);
+    }
+    map['present'] = Variable<bool>(present);
     return map;
   }
 
@@ -3394,6 +3648,19 @@ class BookFile extends DataClass implements Insertable<BookFile> {
       sizeBytes: Value(sizeBytes),
       sha256: Value(sha256),
       addedAt: Value(addedAt),
+      durationMs: durationMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationMs),
+      track: track == null && nullToAbsent
+          ? const Value.absent()
+          : Value(track),
+      label: label == null && nullToAbsent
+          ? const Value.absent()
+          : Value(label),
+      narrator: narrator == null && nullToAbsent
+          ? const Value.absent()
+          : Value(narrator),
+      present: Value(present),
     );
   }
 
@@ -3410,6 +3677,11 @@ class BookFile extends DataClass implements Insertable<BookFile> {
       sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
       sha256: serializer.fromJson<String>(json['sha256']),
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+      durationMs: serializer.fromJson<int?>(json['durationMs']),
+      track: serializer.fromJson<int?>(json['track']),
+      label: serializer.fromJson<String?>(json['label']),
+      narrator: serializer.fromJson<String?>(json['narrator']),
+      present: serializer.fromJson<bool>(json['present']),
     );
   }
   @override
@@ -3423,6 +3695,11 @@ class BookFile extends DataClass implements Insertable<BookFile> {
       'sizeBytes': serializer.toJson<int>(sizeBytes),
       'sha256': serializer.toJson<String>(sha256),
       'addedAt': serializer.toJson<DateTime>(addedAt),
+      'durationMs': serializer.toJson<int?>(durationMs),
+      'track': serializer.toJson<int?>(track),
+      'label': serializer.toJson<String?>(label),
+      'narrator': serializer.toJson<String?>(narrator),
+      'present': serializer.toJson<bool>(present),
     };
   }
 
@@ -3434,6 +3711,11 @@ class BookFile extends DataClass implements Insertable<BookFile> {
     int? sizeBytes,
     String? sha256,
     DateTime? addedAt,
+    Value<int?> durationMs = const Value.absent(),
+    Value<int?> track = const Value.absent(),
+    Value<String?> label = const Value.absent(),
+    Value<String?> narrator = const Value.absent(),
+    bool? present,
   }) => BookFile(
     id: id ?? this.id,
     bookId: bookId ?? this.bookId,
@@ -3442,6 +3724,11 @@ class BookFile extends DataClass implements Insertable<BookFile> {
     sizeBytes: sizeBytes ?? this.sizeBytes,
     sha256: sha256 ?? this.sha256,
     addedAt: addedAt ?? this.addedAt,
+    durationMs: durationMs.present ? durationMs.value : this.durationMs,
+    track: track.present ? track.value : this.track,
+    label: label.present ? label.value : this.label,
+    narrator: narrator.present ? narrator.value : this.narrator,
+    present: present ?? this.present,
   );
   BookFile copyWithCompanion(BookFilesCompanion data) {
     return BookFile(
@@ -3452,6 +3739,13 @@ class BookFile extends DataClass implements Insertable<BookFile> {
       sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
       sha256: data.sha256.present ? data.sha256.value : this.sha256,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+      durationMs: data.durationMs.present
+          ? data.durationMs.value
+          : this.durationMs,
+      track: data.track.present ? data.track.value : this.track,
+      label: data.label.present ? data.label.value : this.label,
+      narrator: data.narrator.present ? data.narrator.value : this.narrator,
+      present: data.present.present ? data.present.value : this.present,
     );
   }
 
@@ -3464,14 +3758,31 @@ class BookFile extends DataClass implements Insertable<BookFile> {
           ..write('path: $path, ')
           ..write('sizeBytes: $sizeBytes, ')
           ..write('sha256: $sha256, ')
-          ..write('addedAt: $addedAt')
+          ..write('addedAt: $addedAt, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('track: $track, ')
+          ..write('label: $label, ')
+          ..write('narrator: $narrator, ')
+          ..write('present: $present')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, bookId, format, path, sizeBytes, sha256, addedAt);
+  int get hashCode => Object.hash(
+    id,
+    bookId,
+    format,
+    path,
+    sizeBytes,
+    sha256,
+    addedAt,
+    durationMs,
+    track,
+    label,
+    narrator,
+    present,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3482,7 +3793,12 @@ class BookFile extends DataClass implements Insertable<BookFile> {
           other.path == this.path &&
           other.sizeBytes == this.sizeBytes &&
           other.sha256 == this.sha256 &&
-          other.addedAt == this.addedAt);
+          other.addedAt == this.addedAt &&
+          other.durationMs == this.durationMs &&
+          other.track == this.track &&
+          other.label == this.label &&
+          other.narrator == this.narrator &&
+          other.present == this.present);
 }
 
 class BookFilesCompanion extends UpdateCompanion<BookFile> {
@@ -3493,6 +3809,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
   final Value<int> sizeBytes;
   final Value<String> sha256;
   final Value<DateTime> addedAt;
+  final Value<int?> durationMs;
+  final Value<int?> track;
+  final Value<String?> label;
+  final Value<String?> narrator;
+  final Value<bool> present;
   final Value<int> rowid;
   const BookFilesCompanion({
     this.id = const Value.absent(),
@@ -3502,6 +3823,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
     this.sizeBytes = const Value.absent(),
     this.sha256 = const Value.absent(),
     this.addedAt = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.track = const Value.absent(),
+    this.label = const Value.absent(),
+    this.narrator = const Value.absent(),
+    this.present = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BookFilesCompanion.insert({
@@ -3512,6 +3838,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
     required int sizeBytes,
     required String sha256,
     this.addedAt = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.track = const Value.absent(),
+    this.label = const Value.absent(),
+    this.narrator = const Value.absent(),
+    this.present = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        bookId = Value(bookId),
@@ -3527,6 +3858,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
     Expression<int>? sizeBytes,
     Expression<String>? sha256,
     Expression<DateTime>? addedAt,
+    Expression<int>? durationMs,
+    Expression<int>? track,
+    Expression<String>? label,
+    Expression<String>? narrator,
+    Expression<bool>? present,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3537,6 +3873,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
       if (sizeBytes != null) 'size_bytes': sizeBytes,
       if (sha256 != null) 'sha256': sha256,
       if (addedAt != null) 'added_at': addedAt,
+      if (durationMs != null) 'duration_ms': durationMs,
+      if (track != null) 'track': track,
+      if (label != null) 'label': label,
+      if (narrator != null) 'narrator': narrator,
+      if (present != null) 'present': present,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3549,6 +3890,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
     Value<int>? sizeBytes,
     Value<String>? sha256,
     Value<DateTime>? addedAt,
+    Value<int?>? durationMs,
+    Value<int?>? track,
+    Value<String?>? label,
+    Value<String?>? narrator,
+    Value<bool>? present,
     Value<int>? rowid,
   }) {
     return BookFilesCompanion(
@@ -3559,6 +3905,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
       sizeBytes: sizeBytes ?? this.sizeBytes,
       sha256: sha256 ?? this.sha256,
       addedAt: addedAt ?? this.addedAt,
+      durationMs: durationMs ?? this.durationMs,
+      track: track ?? this.track,
+      label: label ?? this.label,
+      narrator: narrator ?? this.narrator,
+      present: present ?? this.present,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3587,6 +3938,21 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
     if (addedAt.present) {
       map['added_at'] = Variable<DateTime>(addedAt.value);
     }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
+    if (track.present) {
+      map['track'] = Variable<int>(track.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (narrator.present) {
+      map['narrator'] = Variable<String>(narrator.value);
+    }
+    if (present.present) {
+      map['present'] = Variable<bool>(present.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3603,6 +3969,11 @@ class BookFilesCompanion extends UpdateCompanion<BookFile> {
           ..write('sizeBytes: $sizeBytes, ')
           ..write('sha256: $sha256, ')
           ..write('addedAt: $addedAt, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('track: $track, ')
+          ..write('label: $label, ')
+          ..write('narrator: $narrator, ')
+          ..write('present: $present, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9527,6 +9898,28 @@ class $RemoteReadingPositionsTable extends RemoteReadingPositions
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _audioPositionMeta = const VerificationMeta(
+    'audioPosition',
+  );
+  @override
+  late final GeneratedColumn<double> audioPosition = GeneratedColumn<double>(
+    'audio_position',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioDurationMeta = const VerificationMeta(
+    'audioDuration',
+  );
+  @override
+  late final GeneratedColumn<double> audioDuration = GeneratedColumn<double>(
+    'audio_duration',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -9547,6 +9940,8 @@ class $RemoteReadingPositionsTable extends RemoteReadingPositions
     page,
     unit,
     scroll,
+    audioPosition,
+    audioDuration,
     updatedAt,
   ];
   @override
@@ -9610,6 +10005,24 @@ class $RemoteReadingPositionsTable extends RemoteReadingPositions
         scroll.isAcceptableOrUnknown(data['scroll']!, _scrollMeta),
       );
     }
+    if (data.containsKey('audio_position')) {
+      context.handle(
+        _audioPositionMeta,
+        audioPosition.isAcceptableOrUnknown(
+          data['audio_position']!,
+          _audioPositionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_duration')) {
+      context.handle(
+        _audioDurationMeta,
+        audioDuration.isAcceptableOrUnknown(
+          data['audio_duration']!,
+          _audioDurationMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -9655,6 +10068,14 @@ class $RemoteReadingPositionsTable extends RemoteReadingPositions
         DriftSqlType.double,
         data['${effectivePrefix}scroll'],
       ),
+      audioPosition: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}audio_position'],
+      ),
+      audioDuration: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}audio_duration'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -9684,6 +10105,12 @@ class RemoteReadingPosition extends DataClass
   /// the row instead of being inferred locally.
   final String? unit;
   final double? scroll;
+
+  /// Where that device is in the book's audio, in seconds, and how long it
+  /// thinks the audio is — the edition check for a listening offer: seconds
+  /// from a different narration point somewhere plausible and wrong.
+  final double? audioPosition;
+  final double? audioDuration;
   final DateTime updatedAt;
   const RemoteReadingPosition({
     required this.bookId,
@@ -9693,6 +10120,8 @@ class RemoteReadingPosition extends DataClass
     this.page,
     this.unit,
     this.scroll,
+    this.audioPosition,
+    this.audioDuration,
     required this.updatedAt,
   });
   @override
@@ -9715,6 +10144,12 @@ class RemoteReadingPosition extends DataClass
     if (!nullToAbsent || scroll != null) {
       map['scroll'] = Variable<double>(scroll);
     }
+    if (!nullToAbsent || audioPosition != null) {
+      map['audio_position'] = Variable<double>(audioPosition);
+    }
+    if (!nullToAbsent || audioDuration != null) {
+      map['audio_duration'] = Variable<double>(audioDuration);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -9734,6 +10169,12 @@ class RemoteReadingPosition extends DataClass
       scroll: scroll == null && nullToAbsent
           ? const Value.absent()
           : Value(scroll),
+      audioPosition: audioPosition == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioPosition),
+      audioDuration: audioDuration == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioDuration),
       updatedAt: Value(updatedAt),
     );
   }
@@ -9751,6 +10192,8 @@ class RemoteReadingPosition extends DataClass
       page: serializer.fromJson<int?>(json['page']),
       unit: serializer.fromJson<String?>(json['unit']),
       scroll: serializer.fromJson<double?>(json['scroll']),
+      audioPosition: serializer.fromJson<double?>(json['audioPosition']),
+      audioDuration: serializer.fromJson<double?>(json['audioDuration']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -9765,6 +10208,8 @@ class RemoteReadingPosition extends DataClass
       'page': serializer.toJson<int?>(page),
       'unit': serializer.toJson<String?>(unit),
       'scroll': serializer.toJson<double?>(scroll),
+      'audioPosition': serializer.toJson<double?>(audioPosition),
+      'audioDuration': serializer.toJson<double?>(audioDuration),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -9777,6 +10222,8 @@ class RemoteReadingPosition extends DataClass
     Value<int?> page = const Value.absent(),
     Value<String?> unit = const Value.absent(),
     Value<double?> scroll = const Value.absent(),
+    Value<double?> audioPosition = const Value.absent(),
+    Value<double?> audioDuration = const Value.absent(),
     DateTime? updatedAt,
   }) => RemoteReadingPosition(
     bookId: bookId ?? this.bookId,
@@ -9786,6 +10233,12 @@ class RemoteReadingPosition extends DataClass
     page: page.present ? page.value : this.page,
     unit: unit.present ? unit.value : this.unit,
     scroll: scroll.present ? scroll.value : this.scroll,
+    audioPosition: audioPosition.present
+        ? audioPosition.value
+        : this.audioPosition,
+    audioDuration: audioDuration.present
+        ? audioDuration.value
+        : this.audioDuration,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   RemoteReadingPosition copyWithCompanion(
@@ -9801,6 +10254,12 @@ class RemoteReadingPosition extends DataClass
       page: data.page.present ? data.page.value : this.page,
       unit: data.unit.present ? data.unit.value : this.unit,
       scroll: data.scroll.present ? data.scroll.value : this.scroll,
+      audioPosition: data.audioPosition.present
+          ? data.audioPosition.value
+          : this.audioPosition,
+      audioDuration: data.audioDuration.present
+          ? data.audioDuration.value
+          : this.audioDuration,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -9815,6 +10274,8 @@ class RemoteReadingPosition extends DataClass
           ..write('page: $page, ')
           ..write('unit: $unit, ')
           ..write('scroll: $scroll, ')
+          ..write('audioPosition: $audioPosition, ')
+          ..write('audioDuration: $audioDuration, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -9829,6 +10290,8 @@ class RemoteReadingPosition extends DataClass
     page,
     unit,
     scroll,
+    audioPosition,
+    audioDuration,
     updatedAt,
   );
   @override
@@ -9842,6 +10305,8 @@ class RemoteReadingPosition extends DataClass
           other.page == this.page &&
           other.unit == this.unit &&
           other.scroll == this.scroll &&
+          other.audioPosition == this.audioPosition &&
+          other.audioDuration == this.audioDuration &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -9854,6 +10319,8 @@ class RemoteReadingPositionsCompanion
   final Value<int?> page;
   final Value<String?> unit;
   final Value<double?> scroll;
+  final Value<double?> audioPosition;
+  final Value<double?> audioDuration;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const RemoteReadingPositionsCompanion({
@@ -9864,6 +10331,8 @@ class RemoteReadingPositionsCompanion
     this.page = const Value.absent(),
     this.unit = const Value.absent(),
     this.scroll = const Value.absent(),
+    this.audioPosition = const Value.absent(),
+    this.audioDuration = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -9875,6 +10344,8 @@ class RemoteReadingPositionsCompanion
     this.page = const Value.absent(),
     this.unit = const Value.absent(),
     this.scroll = const Value.absent(),
+    this.audioPosition = const Value.absent(),
+    this.audioDuration = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : bookId = Value(bookId),
@@ -9888,6 +10359,8 @@ class RemoteReadingPositionsCompanion
     Expression<int>? page,
     Expression<String>? unit,
     Expression<double>? scroll,
+    Expression<double>? audioPosition,
+    Expression<double>? audioDuration,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -9899,6 +10372,8 @@ class RemoteReadingPositionsCompanion
       if (page != null) 'page': page,
       if (unit != null) 'unit': unit,
       if (scroll != null) 'scroll': scroll,
+      if (audioPosition != null) 'audio_position': audioPosition,
+      if (audioDuration != null) 'audio_duration': audioDuration,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -9912,6 +10387,8 @@ class RemoteReadingPositionsCompanion
     Value<int?>? page,
     Value<String?>? unit,
     Value<double?>? scroll,
+    Value<double?>? audioPosition,
+    Value<double?>? audioDuration,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -9923,6 +10400,8 @@ class RemoteReadingPositionsCompanion
       page: page ?? this.page,
       unit: unit ?? this.unit,
       scroll: scroll ?? this.scroll,
+      audioPosition: audioPosition ?? this.audioPosition,
+      audioDuration: audioDuration ?? this.audioDuration,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -9952,6 +10431,12 @@ class RemoteReadingPositionsCompanion
     if (scroll.present) {
       map['scroll'] = Variable<double>(scroll.value);
     }
+    if (audioPosition.present) {
+      map['audio_position'] = Variable<double>(audioPosition.value);
+    }
+    if (audioDuration.present) {
+      map['audio_duration'] = Variable<double>(audioDuration.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -9971,6 +10456,8 @@ class RemoteReadingPositionsCompanion
           ..write('page: $page, ')
           ..write('unit: $unit, ')
           ..write('scroll: $scroll, ')
+          ..write('audioPosition: $audioPosition, ')
+          ..write('audioDuration: $audioDuration, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -11694,6 +12181,321 @@ class BookTextsCompanion extends UpdateCompanion<BookText> {
   }
 }
 
+class $AudioChaptersTable extends AudioChapters
+    with TableInfo<$AudioChaptersTable, AudioChapter> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AudioChaptersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _fileIdMeta = const VerificationMeta('fileId');
+  @override
+  late final GeneratedColumn<String> fileId = GeneratedColumn<String>(
+    'file_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES book_files (id)',
+    ),
+  );
+  static const VerificationMeta _idxMeta = const VerificationMeta('idx');
+  @override
+  late final GeneratedColumn<int> idx = GeneratedColumn<int>(
+    'idx',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startMsMeta = const VerificationMeta(
+    'startMs',
+  );
+  @override
+  late final GeneratedColumn<int> startMs = GeneratedColumn<int>(
+    'start_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [fileId, idx, title, startMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'audio_chapters';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AudioChapter> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('file_id')) {
+      context.handle(
+        _fileIdMeta,
+        fileId.isAcceptableOrUnknown(data['file_id']!, _fileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileIdMeta);
+    }
+    if (data.containsKey('idx')) {
+      context.handle(
+        _idxMeta,
+        idx.isAcceptableOrUnknown(data['idx']!, _idxMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_idxMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('start_ms')) {
+      context.handle(
+        _startMsMeta,
+        startMs.isAcceptableOrUnknown(data['start_ms']!, _startMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {fileId, idx};
+  @override
+  AudioChapter map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AudioChapter(
+      fileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_id'],
+      )!,
+      idx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}idx'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
+      startMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}start_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $AudioChaptersTable createAlias(String alias) {
+    return $AudioChaptersTable(attachedDatabase, alias);
+  }
+}
+
+class AudioChapter extends DataClass implements Insertable<AudioChapter> {
+  final String fileId;
+  final int idx;
+  final String? title;
+
+  /// From the start of *this file*.
+  final int startMs;
+  const AudioChapter({
+    required this.fileId,
+    required this.idx,
+    this.title,
+    required this.startMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['file_id'] = Variable<String>(fileId);
+    map['idx'] = Variable<int>(idx);
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    map['start_ms'] = Variable<int>(startMs);
+    return map;
+  }
+
+  AudioChaptersCompanion toCompanion(bool nullToAbsent) {
+    return AudioChaptersCompanion(
+      fileId: Value(fileId),
+      idx: Value(idx),
+      title: title == null && nullToAbsent
+          ? const Value.absent()
+          : Value(title),
+      startMs: Value(startMs),
+    );
+  }
+
+  factory AudioChapter.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AudioChapter(
+      fileId: serializer.fromJson<String>(json['fileId']),
+      idx: serializer.fromJson<int>(json['idx']),
+      title: serializer.fromJson<String?>(json['title']),
+      startMs: serializer.fromJson<int>(json['startMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'fileId': serializer.toJson<String>(fileId),
+      'idx': serializer.toJson<int>(idx),
+      'title': serializer.toJson<String?>(title),
+      'startMs': serializer.toJson<int>(startMs),
+    };
+  }
+
+  AudioChapter copyWith({
+    String? fileId,
+    int? idx,
+    Value<String?> title = const Value.absent(),
+    int? startMs,
+  }) => AudioChapter(
+    fileId: fileId ?? this.fileId,
+    idx: idx ?? this.idx,
+    title: title.present ? title.value : this.title,
+    startMs: startMs ?? this.startMs,
+  );
+  AudioChapter copyWithCompanion(AudioChaptersCompanion data) {
+    return AudioChapter(
+      fileId: data.fileId.present ? data.fileId.value : this.fileId,
+      idx: data.idx.present ? data.idx.value : this.idx,
+      title: data.title.present ? data.title.value : this.title,
+      startMs: data.startMs.present ? data.startMs.value : this.startMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AudioChapter(')
+          ..write('fileId: $fileId, ')
+          ..write('idx: $idx, ')
+          ..write('title: $title, ')
+          ..write('startMs: $startMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(fileId, idx, title, startMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AudioChapter &&
+          other.fileId == this.fileId &&
+          other.idx == this.idx &&
+          other.title == this.title &&
+          other.startMs == this.startMs);
+}
+
+class AudioChaptersCompanion extends UpdateCompanion<AudioChapter> {
+  final Value<String> fileId;
+  final Value<int> idx;
+  final Value<String?> title;
+  final Value<int> startMs;
+  final Value<int> rowid;
+  const AudioChaptersCompanion({
+    this.fileId = const Value.absent(),
+    this.idx = const Value.absent(),
+    this.title = const Value.absent(),
+    this.startMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AudioChaptersCompanion.insert({
+    required String fileId,
+    required int idx,
+    this.title = const Value.absent(),
+    required int startMs,
+    this.rowid = const Value.absent(),
+  }) : fileId = Value(fileId),
+       idx = Value(idx),
+       startMs = Value(startMs);
+  static Insertable<AudioChapter> custom({
+    Expression<String>? fileId,
+    Expression<int>? idx,
+    Expression<String>? title,
+    Expression<int>? startMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (fileId != null) 'file_id': fileId,
+      if (idx != null) 'idx': idx,
+      if (title != null) 'title': title,
+      if (startMs != null) 'start_ms': startMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AudioChaptersCompanion copyWith({
+    Value<String>? fileId,
+    Value<int>? idx,
+    Value<String?>? title,
+    Value<int>? startMs,
+    Value<int>? rowid,
+  }) {
+    return AudioChaptersCompanion(
+      fileId: fileId ?? this.fileId,
+      idx: idx ?? this.idx,
+      title: title ?? this.title,
+      startMs: startMs ?? this.startMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (fileId.present) {
+      map['file_id'] = Variable<String>(fileId.value);
+    }
+    if (idx.present) {
+      map['idx'] = Variable<int>(idx.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (startMs.present) {
+      map['start_ms'] = Variable<int>(startMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AudioChaptersCompanion(')
+          ..write('fileId: $fileId, ')
+          ..write('idx: $idx, ')
+          ..write('title: $title, ')
+          ..write('startMs: $startMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$VellumDatabase extends GeneratedDatabase {
   _$VellumDatabase(QueryExecutor e) : super(e);
   $VellumDatabaseManager get managers => $VellumDatabaseManager(this);
@@ -11725,6 +12527,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     this,
   );
   late final $BookTextsTable bookTexts = $BookTextsTable(this);
+  late final $AudioChaptersTable audioChapters = $AudioChaptersTable(this);
   late final Index idxBooksSeries = Index(
     'idx_books_series',
     'CREATE INDEX idx_books_series ON books (series_id)',
@@ -11816,6 +12619,7 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     annotations,
     readingSessions,
     bookTexts,
+    audioChapters,
     idxBooksSeries,
     idxBookAuthorsAuthor,
     idxBookGenresGenre,
@@ -12087,6 +12891,8 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<double?> readingProgress,
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
+      Value<double?> listenPosition,
+      Value<DateTime?> lastListenedAt,
       Value<String?> readerNotes,
       Value<DateTime?> readerNotesUpdatedAt,
       Value<bool> readerNotesNeedsPush,
@@ -12127,6 +12933,8 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<double?> readingProgress,
       Value<int?> lastReadPage,
       Value<DateTime?> lastReadAt,
+      Value<double?> listenPosition,
+      Value<DateTime?> lastListenedAt,
       Value<String?> readerNotes,
       Value<DateTime?> readerNotesUpdatedAt,
       Value<bool> readerNotesNeedsPush,
@@ -12415,6 +13223,16 @@ class $$BooksTableFilterComposer
 
   ColumnFilters<DateTime> get lastReadAt => $composableBuilder(
     column: $table.lastReadAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get listenPosition => $composableBuilder(
+    column: $table.listenPosition,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastListenedAt => $composableBuilder(
+    column: $table.lastListenedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12851,6 +13669,16 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get listenPosition => $composableBuilder(
+    column: $table.listenPosition,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastListenedAt => $composableBuilder(
+    column: $table.lastListenedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get readerNotes => $composableBuilder(
     column: $table.readerNotes,
     builder: (column) => ColumnOrderings(column),
@@ -13042,6 +13870,16 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastReadAt => $composableBuilder(
     column: $table.lastReadAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get listenPosition => $composableBuilder(
+    column: $table.listenPosition,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastListenedAt => $composableBuilder(
+    column: $table.lastListenedAt,
     builder: (column) => column,
   );
 
@@ -13433,6 +14271,8 @@ class $$BooksTableTableManager
                 Value<double?> readingProgress = const Value.absent(),
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<double?> listenPosition = const Value.absent(),
+                Value<DateTime?> lastListenedAt = const Value.absent(),
                 Value<String?> readerNotes = const Value.absent(),
                 Value<DateTime?> readerNotesUpdatedAt = const Value.absent(),
                 Value<bool> readerNotesNeedsPush = const Value.absent(),
@@ -13471,6 +14311,8 @@ class $$BooksTableTableManager
                 readingProgress: readingProgress,
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
+                listenPosition: listenPosition,
+                lastListenedAt: lastListenedAt,
                 readerNotes: readerNotes,
                 readerNotesUpdatedAt: readerNotesUpdatedAt,
                 readerNotesNeedsPush: readerNotesNeedsPush,
@@ -13511,6 +14353,8 @@ class $$BooksTableTableManager
                 Value<double?> readingProgress = const Value.absent(),
                 Value<int?> lastReadPage = const Value.absent(),
                 Value<DateTime?> lastReadAt = const Value.absent(),
+                Value<double?> listenPosition = const Value.absent(),
+                Value<DateTime?> lastListenedAt = const Value.absent(),
                 Value<String?> readerNotes = const Value.absent(),
                 Value<DateTime?> readerNotesUpdatedAt = const Value.absent(),
                 Value<bool> readerNotesNeedsPush = const Value.absent(),
@@ -13549,6 +14393,8 @@ class $$BooksTableTableManager
                 readingProgress: readingProgress,
                 lastReadPage: lastReadPage,
                 lastReadAt: lastReadAt,
+                listenPosition: listenPosition,
+                lastListenedAt: lastListenedAt,
                 readerNotes: readerNotes,
                 readerNotesUpdatedAt: readerNotesUpdatedAt,
                 readerNotesNeedsPush: readerNotesNeedsPush,
@@ -15042,6 +15888,11 @@ typedef $$BookFilesTableCreateCompanionBuilder =
       required int sizeBytes,
       required String sha256,
       Value<DateTime> addedAt,
+      Value<int?> durationMs,
+      Value<int?> track,
+      Value<String?> label,
+      Value<String?> narrator,
+      Value<bool> present,
       Value<int> rowid,
     });
 typedef $$BookFilesTableUpdateCompanionBuilder =
@@ -15053,6 +15904,11 @@ typedef $$BookFilesTableUpdateCompanionBuilder =
       Value<int> sizeBytes,
       Value<String> sha256,
       Value<DateTime> addedAt,
+      Value<int?> durationMs,
+      Value<int?> track,
+      Value<String?> label,
+      Value<String?> narrator,
+      Value<bool> present,
       Value<int> rowid,
     });
 
@@ -15112,6 +15968,24 @@ final class $$BookFilesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$AudioChaptersTable, List<AudioChapter>>
+  _audioChaptersRefsTable(_$VellumDatabase db) => MultiTypedResultKey.fromTable(
+    db.audioChapters,
+    aliasName: 'book_files__id__audio_chapters__file_id',
+  );
+
+  $$AudioChaptersTableProcessedTableManager get audioChaptersRefs {
+    final manager = $$AudioChaptersTableTableManager(
+      $_db,
+      $_db.audioChapters,
+    ).filter((f) => f.fileId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_audioChaptersRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$BookFilesTableFilterComposer
@@ -15150,6 +16024,31 @@ class $$BookFilesTableFilterComposer
 
   ColumnFilters<DateTime> get addedAt => $composableBuilder(
     column: $table.addedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get track => $composableBuilder(
+    column: $table.track,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get narrator => $composableBuilder(
+    column: $table.narrator,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get present => $composableBuilder(
+    column: $table.present,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15225,6 +16124,31 @@ class $$BookFilesTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> audioChaptersRefs(
+    Expression<bool> Function($$AudioChaptersTableFilterComposer f) f,
+  ) {
+    final $$AudioChaptersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.audioChapters,
+      getReferencedColumn: (t) => t.fileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioChaptersTableFilterComposer(
+            $db: $db,
+            $table: $db.audioChapters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$BookFilesTableOrderingComposer
@@ -15263,6 +16187,31 @@ class $$BookFilesTableOrderingComposer
 
   ColumnOrderings<DateTime> get addedAt => $composableBuilder(
     column: $table.addedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get track => $composableBuilder(
+    column: $table.track,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get narrator => $composableBuilder(
+    column: $table.narrator,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get present => $composableBuilder(
+    column: $table.present,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -15316,6 +16265,23 @@ class $$BookFilesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get addedAt =>
       $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get track =>
+      $composableBuilder(column: $table.track, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get narrator =>
+      $composableBuilder(column: $table.narrator, builder: (column) => column);
+
+  GeneratedColumn<bool> get present =>
+      $composableBuilder(column: $table.present, builder: (column) => column);
 
   $$BooksTableAnnotationComposer get bookId {
     final $$BooksTableAnnotationComposer composer = $composerBuilder(
@@ -15389,6 +16355,31 @@ class $$BookFilesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> audioChaptersRefs<T extends Object>(
+    Expression<T> Function($$AudioChaptersTableAnnotationComposer a) f,
+  ) {
+    final $$AudioChaptersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.audioChapters,
+      getReferencedColumn: (t) => t.fileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AudioChaptersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.audioChapters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$BookFilesTableTableManager
@@ -15408,6 +16399,7 @@ class $$BookFilesTableTableManager
             bool bookId,
             bool filePositionsRefs,
             bool bookTextsRefs,
+            bool audioChaptersRefs,
           })
         > {
   $$BookFilesTableTableManager(_$VellumDatabase db, $BookFilesTable table)
@@ -15430,6 +16422,11 @@ class $$BookFilesTableTableManager
                 Value<int> sizeBytes = const Value.absent(),
                 Value<String> sha256 = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
+                Value<int?> track = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<String?> narrator = const Value.absent(),
+                Value<bool> present = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookFilesCompanion(
                 id: id,
@@ -15439,6 +16436,11 @@ class $$BookFilesTableTableManager
                 sizeBytes: sizeBytes,
                 sha256: sha256,
                 addedAt: addedAt,
+                durationMs: durationMs,
+                track: track,
+                label: label,
+                narrator: narrator,
+                present: present,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -15450,6 +16452,11 @@ class $$BookFilesTableTableManager
                 required int sizeBytes,
                 required String sha256,
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
+                Value<int?> track = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<String?> narrator = const Value.absent(),
+                Value<bool> present = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookFilesCompanion.insert(
                 id: id,
@@ -15459,6 +16466,11 @@ class $$BookFilesTableTableManager
                 sizeBytes: sizeBytes,
                 sha256: sha256,
                 addedAt: addedAt,
+                durationMs: durationMs,
+                track: track,
+                label: label,
+                narrator: narrator,
+                present: present,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -15474,12 +16486,14 @@ class $$BookFilesTableTableManager
                 bookId = false,
                 filePositionsRefs = false,
                 bookTextsRefs = false,
+                audioChaptersRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (filePositionsRefs) db.filePositions,
                     if (bookTextsRefs) db.bookTexts,
+                    if (audioChaptersRefs) db.audioChapters,
                   ],
                   addJoins:
                       <
@@ -15555,6 +16569,26 @@ class $$BookFilesTableTableManager
                           referencedColumn: 'file_id',
                           typedResults: items,
                         ),
+                      if (audioChaptersRefs)
+                        await $_getPrefetchedDataByColumns<
+                          BookFile,
+                          $BookFilesTable,
+                          AudioChapter,
+                          $AudioChaptersTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BookFilesTableReferences
+                              ._audioChaptersRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BookFilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).audioChaptersRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'file_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -15579,6 +16613,7 @@ typedef $$BookFilesTableProcessedTableManager =
         bool bookId,
         bool filePositionsRefs,
         bool bookTextsRefs,
+        bool audioChaptersRefs,
       })
     >;
 typedef $$FilePositionsTableCreateCompanionBuilder =
@@ -20453,6 +21488,8 @@ typedef $$RemoteReadingPositionsTableCreateCompanionBuilder =
       Value<int?> page,
       Value<String?> unit,
       Value<double?> scroll,
+      Value<double?> audioPosition,
+      Value<double?> audioDuration,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -20465,6 +21502,8 @@ typedef $$RemoteReadingPositionsTableUpdateCompanionBuilder =
       Value<int?> page,
       Value<String?> unit,
       Value<double?> scroll,
+      Value<double?> audioPosition,
+      Value<double?> audioDuration,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -20510,6 +21549,16 @@ class $$RemoteReadingPositionsTableFilterComposer
 
   ColumnFilters<double> get scroll => $composableBuilder(
     column: $table.scroll,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get audioPosition => $composableBuilder(
+    column: $table.audioPosition,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get audioDuration => $composableBuilder(
+    column: $table.audioDuration,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20563,6 +21612,16 @@ class $$RemoteReadingPositionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get audioPosition => $composableBuilder(
+    column: $table.audioPosition,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get audioDuration => $composableBuilder(
+    column: $table.audioDuration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -20600,6 +21659,16 @@ class $$RemoteReadingPositionsTableAnnotationComposer
 
   GeneratedColumn<double> get scroll =>
       $composableBuilder(column: $table.scroll, builder: (column) => column);
+
+  GeneratedColumn<double> get audioPosition => $composableBuilder(
+    column: $table.audioPosition,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get audioDuration => $composableBuilder(
+    column: $table.audioDuration,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -20658,6 +21727,8 @@ class $$RemoteReadingPositionsTableTableManager
                 Value<int?> page = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
                 Value<double?> scroll = const Value.absent(),
+                Value<double?> audioPosition = const Value.absent(),
+                Value<double?> audioDuration = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RemoteReadingPositionsCompanion(
@@ -20668,6 +21739,8 @@ class $$RemoteReadingPositionsTableTableManager
                 page: page,
                 unit: unit,
                 scroll: scroll,
+                audioPosition: audioPosition,
+                audioDuration: audioDuration,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -20680,6 +21753,8 @@ class $$RemoteReadingPositionsTableTableManager
                 Value<int?> page = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
                 Value<double?> scroll = const Value.absent(),
+                Value<double?> audioPosition = const Value.absent(),
+                Value<double?> audioDuration = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => RemoteReadingPositionsCompanion.insert(
@@ -20690,6 +21765,8 @@ class $$RemoteReadingPositionsTableTableManager
                 page: page,
                 unit: unit,
                 scroll: scroll,
+                audioPosition: audioPosition,
+                audioDuration: audioDuration,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -22018,6 +23095,311 @@ typedef $$BookTextsTableProcessedTableManager =
       BookText,
       PrefetchHooks Function({bool fileId, bool bookId})
     >;
+typedef $$AudioChaptersTableCreateCompanionBuilder =
+    AudioChaptersCompanion Function({
+      required String fileId,
+      required int idx,
+      Value<String?> title,
+      required int startMs,
+      Value<int> rowid,
+    });
+typedef $$AudioChaptersTableUpdateCompanionBuilder =
+    AudioChaptersCompanion Function({
+      Value<String> fileId,
+      Value<int> idx,
+      Value<String?> title,
+      Value<int> startMs,
+      Value<int> rowid,
+    });
+
+final class $$AudioChaptersTableReferences
+    extends
+        BaseReferences<_$VellumDatabase, $AudioChaptersTable, AudioChapter> {
+  $$AudioChaptersTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $BookFilesTable _fileIdTable(_$VellumDatabase db) =>
+      db.bookFiles.createAlias('audio_chapters__file_id__book_files__id');
+
+  $$BookFilesTableProcessedTableManager get fileId {
+    final $_column = $_itemColumn<String>('file_id')!;
+
+    final manager = $$BookFilesTableTableManager(
+      $_db,
+      $_db.bookFiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_fileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$AudioChaptersTableFilterComposer
+    extends Composer<_$VellumDatabase, $AudioChaptersTable> {
+  $$AudioChaptersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get idx => $composableBuilder(
+    column: $table.idx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startMs => $composableBuilder(
+    column: $table.startMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$BookFilesTableFilterComposer get fileId {
+    final $$BookFilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fileId,
+      referencedTable: $db.bookFiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookFilesTableFilterComposer(
+            $db: $db,
+            $table: $db.bookFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AudioChaptersTableOrderingComposer
+    extends Composer<_$VellumDatabase, $AudioChaptersTable> {
+  $$AudioChaptersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get idx => $composableBuilder(
+    column: $table.idx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startMs => $composableBuilder(
+    column: $table.startMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$BookFilesTableOrderingComposer get fileId {
+    final $$BookFilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fileId,
+      referencedTable: $db.bookFiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookFilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.bookFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AudioChaptersTableAnnotationComposer
+    extends Composer<_$VellumDatabase, $AudioChaptersTable> {
+  $$AudioChaptersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get idx =>
+      $composableBuilder(column: $table.idx, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get startMs =>
+      $composableBuilder(column: $table.startMs, builder: (column) => column);
+
+  $$BookFilesTableAnnotationComposer get fileId {
+    final $$BookFilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fileId,
+      referencedTable: $db.bookFiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BookFilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bookFiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$AudioChaptersTableTableManager
+    extends
+        RootTableManager<
+          _$VellumDatabase,
+          $AudioChaptersTable,
+          AudioChapter,
+          $$AudioChaptersTableFilterComposer,
+          $$AudioChaptersTableOrderingComposer,
+          $$AudioChaptersTableAnnotationComposer,
+          $$AudioChaptersTableCreateCompanionBuilder,
+          $$AudioChaptersTableUpdateCompanionBuilder,
+          (AudioChapter, $$AudioChaptersTableReferences),
+          AudioChapter,
+          PrefetchHooks Function({bool fileId})
+        > {
+  $$AudioChaptersTableTableManager(
+    _$VellumDatabase db,
+    $AudioChaptersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AudioChaptersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AudioChaptersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AudioChaptersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> fileId = const Value.absent(),
+                Value<int> idx = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<int> startMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AudioChaptersCompanion(
+                fileId: fileId,
+                idx: idx,
+                title: title,
+                startMs: startMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String fileId,
+                required int idx,
+                Value<String?> title = const Value.absent(),
+                required int startMs,
+                Value<int> rowid = const Value.absent(),
+              }) => AudioChaptersCompanion.insert(
+                fileId: fileId,
+                idx: idx,
+                title: title,
+                startMs: startMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AudioChaptersTable, AudioChapter>(table),
+                  $$AudioChaptersTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({fileId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (fileId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.fileId,
+                                referencedTable: $$AudioChaptersTableReferences
+                                    ._fileIdTable(db),
+                                referencedColumn: $$AudioChaptersTableReferences
+                                    ._fileIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$AudioChaptersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$VellumDatabase,
+      $AudioChaptersTable,
+      AudioChapter,
+      $$AudioChaptersTableFilterComposer,
+      $$AudioChaptersTableOrderingComposer,
+      $$AudioChaptersTableAnnotationComposer,
+      $$AudioChaptersTableCreateCompanionBuilder,
+      $$AudioChaptersTableUpdateCompanionBuilder,
+      (AudioChapter, $$AudioChaptersTableReferences),
+      AudioChapter,
+      PrefetchHooks Function({bool fileId})
+    >;
 
 class $VellumDatabaseManager {
   final _$VellumDatabase _db;
@@ -22069,4 +23451,6 @@ class $VellumDatabaseManager {
       $$ReadingSessionsTableTableManager(_db, _db.readingSessions);
   $$BookTextsTableTableManager get bookTexts =>
       $$BookTextsTableTableManager(_db, _db.bookTexts);
+  $$AudioChaptersTableTableManager get audioChapters =>
+      $$AudioChaptersTableTableManager(_db, _db.audioChapters);
 }

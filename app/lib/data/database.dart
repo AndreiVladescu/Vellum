@@ -32,6 +32,13 @@ class Books extends Table {
   RealColumn get readingProgress => real().nullable()(); // 0..1
   IntColumn get lastReadPage => integer().nullable()();
   DateTimeColumn get lastReadAt => dateTime().nullable()();
+  // Listening state (docs/AUDIOBOOKS.md §4): seconds from the start of the
+  // book's audio, across all its parts. App-local like the reading state above
+  // and kept apart from it — a book with text and audio has two places, and
+  // the player never writes `readingProgress`. Travels to other devices only
+  // on the reading-progress channel, never on the book row.
+  RealColumn get listenPosition => real().nullable()();
+  DateTimeColumn get lastListenedAt => dateTime().nullable()();
   // Personal reader notes. Local-only — never pushed to or pulled from a server.
   TextColumn get readerNotes => text().nullable()();
 
@@ -237,8 +244,46 @@ class BookFiles extends Table {
   TextColumn get sha256 => text()();
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 
+  // ---- Audio parts (docs/AUDIOBOOKS.md §3) ---------------------------------
+  // Synced, and null for text formats. A book's audiobook is its audio files
+  // ordered by [track]. [durationMs] is synced rather than re-measured on each
+  // device because a position in seconds across several parts is a sum of part
+  // durations, and every device has to sum the same numbers.
+  IntColumn get durationMs => integer().nullable()();
+
+  /// 1-based order of this part within the book's audio.
+  IntColumn get track => integer().nullable()();
+
+  /// The part's title ("Chapter 3", "Disc 1 – 04").
+  TextColumn get label => text().nullable()();
+  TextColumn get narrator => text().nullable()();
+
+  /// Whether this device holds the file's bytes. **App-local**: false for a
+  /// file this device knows about but has not downloaded (on-demand audio,
+  /// §6), which the doctor, backups and the push must not treat as missing.
+  BoolColumn get present => boolean().withDefault(const Constant(true))();
+
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Chapter marks inside one audio file (docs/AUDIOBOOKS.md §3).
+///
+/// **App-local and derived**, like [BookTexts]: rebuilt from the files, so it
+/// has no `updatedAt`/`needsPush` and no server counterpart. An mp3 part gets a
+/// single row at 0 titled from its label, so the player reads chapters from
+/// one place whatever the format.
+@DataClassName('AudioChapter')
+class AudioChapters extends Table {
+  TextColumn get fileId => text().references(BookFiles, #id)();
+  IntColumn get idx => integer()();
+  TextColumn get title => text().nullable()();
+
+  /// From the start of *this file*.
+  IntColumn get startMs => integer()();
+
+  @override
+  Set<Column> get primaryKey => {fileId, idx};
 }
 
 /// Where you are in one *file*, as opposed to in the book (8/25 request: "if I
@@ -631,6 +676,12 @@ class RemoteReadingPositions extends Table {
   /// the row instead of being inferred locally.
   TextColumn get unit => text().nullable()();
   RealColumn get scroll => real().nullable()();
+
+  /// Where that device is in the book's audio, in seconds, and how long it
+  /// thinks the audio is — the edition check for a listening offer: seconds
+  /// from a different narration point somewhere plausible and wrong.
+  RealColumn get audioPosition => real().nullable()();
+  RealColumn get audioDuration => real().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -777,13 +828,14 @@ class BookTexts extends Table {
   Annotations,
   ReadingSessions,
   BookTexts,
+  AudioChapters,
 ])
 class VellumDatabase extends _$VellumDatabase {
   VellumDatabase([QueryExecutor? executor])
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 39;
+  int get schemaVersion => 40;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1270,6 +1322,52 @@ class VellumDatabase extends _$VellumDatabase {
               "CAST(strftime('%s', 'now') AS INTEGER)) "
               "WHERE rating IS NOT NULL",
             );
+          }
+          if (from < 40) {
+            // Audiobooks (docs/AUDIOBOOKS.md §3, server migration 0043). The
+            // four part columns sync; `present`, the listening position and
+            // the chapter table are this device's own.
+            // A table missing outright (a database stuck part-way through an
+            // early upgrade) is created from the latest schema instead, which
+            // already has these columns.
+            final tables = await tableNames();
+            if (!tables.contains('book_files')) {
+              await m.createTable(bookFiles);
+            }
+            final fileCols = await columnsOf('book_files');
+            for (final (name, column) in <(String, GeneratedColumn)>[
+              ('duration_ms', bookFiles.durationMs),
+              ('track', bookFiles.track),
+              ('label', bookFiles.label),
+              ('narrator', bookFiles.narrator),
+              ('present', bookFiles.present),
+            ]) {
+              if (!fileCols.contains(name)) {
+                await m.addColumn(bookFiles, column);
+              }
+            }
+            final cols = await columnsOf('books');
+            if (!cols.contains('listen_position')) {
+              await m.addColumn(books, books.listenPosition);
+            }
+            if (!cols.contains('last_listened_at')) {
+              await m.addColumn(books, books.lastListenedAt);
+            }
+            if (!tables.contains('remote_reading_positions')) {
+              await m.createTable(remoteReadingPositions);
+            }
+            final remoteCols = await columnsOf('remote_reading_positions');
+            if (!remoteCols.contains('audio_position')) {
+              await m.addColumn(
+                  remoteReadingPositions, remoteReadingPositions.audioPosition);
+            }
+            if (!remoteCols.contains('audio_duration')) {
+              await m.addColumn(
+                  remoteReadingPositions, remoteReadingPositions.audioDuration);
+            }
+            if (!tables.contains('audio_chapters')) {
+              await m.createTable(audioChapters);
+            }
           }
         },
         beforeOpen: (details) async {

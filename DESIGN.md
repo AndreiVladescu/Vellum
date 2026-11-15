@@ -331,7 +331,11 @@ slow one now blocks every other writer rather than just racing them.
   cover image path, spine style (JSON).
 - **author**, **genre** — many-to-many with book.
 - **book_file** — 0..n per book: format, path, size, content hash. A book can
-  be physical-only, digital-only, or both.
+  be physical-only, digital-only, or both. An audio part (`m4b`/`m4a`/`mp3`,
+  migration 0043) also carries `duration_ms`, `track` (1-based order),
+  `label` and `narrator`, all synced; a book's audiobook is its audio files
+  ordered by `track`. The app adds an app-local `present` flag and a derived
+  `audio_chapters` table (docs/AUDIOBOOKS.md §3).
 - **physical_copy** — 0..n per book: location (room/shelf), condition, notes.
   **Synced** (plan 5 #4, second of three): LWW on `physical_copy.updated_at`.
   Unlike shelf, a copy has no owner of its own — it belongs to exactly one

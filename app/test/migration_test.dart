@@ -299,6 +299,33 @@ void main() {
     expect(unrated.ratingUpdatedAt, isNull);
   });
 
+  // v40 adds audio columns to a table that already has rows: an existing PDF
+  // must come out as an ordinary present file with no audio fields.
+  test('upgrading a library with files keeps them present and text', () async {
+    final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
+    final schema = await verifier.schemaAt(39);
+    addTearDown(schema.close);
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, created_at, updated_at, "
+      "needs_push, reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('b', 'Dune', 'unread', 0, 0, 0, 0, 0)",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO book_files (id, book_id, format, path, size_bytes, sha256, "
+      "added_at) VALUES ('f', 'b', 'pdf', 'files/f.pdf', 10, 'abc', 0)",
+    );
+
+    final db = VellumDatabase(schema.newConnection());
+    addTearDown(db.close);
+    final file = await db.select(db.bookFiles).getSingle();
+    expect(file.present, isTrue);
+    expect(file.durationMs, isNull);
+    expect(file.track, isNull);
+    final book = await db.select(db.books).getSingle();
+    expect(book.listenPosition, isNull);
+    expect(await db.select(db.audioChapters).get(), isEmpty);
+  });
+
   group('every historical schema version migrates cleanly to the latest', () {
     final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
     final latest = versions.GeneratedHelper.versions.last;

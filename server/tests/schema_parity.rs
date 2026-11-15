@@ -87,6 +87,12 @@ async fn synced_tables_have_the_expected_columns() {
                 "size_bytes",
                 "sha256",
                 "added_at",
+                // Audio parts (migration 0043). `present`, the app's "do I
+                // hold the bytes" flag, is app-local and not here.
+                "duration_ms",
+                "track",
+                "label",
+                "narrator",
             ],
         ),
         // Synced since migration 0008 (plan 5 #4) — previously created in

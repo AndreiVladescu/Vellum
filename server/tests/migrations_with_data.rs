@@ -302,6 +302,51 @@ async fn existing_statuses_gain_an_unknown_rating_and_are_redelivered() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// 0043 adds the audio columns to `book_file` and `reading_progress`, both of
+/// which a real server has rows in. Existing rows must come out as text files
+/// and text positions: every new column null.
+#[tokio::test]
+async fn existing_files_and_positions_upgrade_to_audiobooks() {
+    let path = std::env::temp_dir().join(format!("vellum_popmig_{}.db", uuid::Uuid::new_v4()));
+    let path = path.to_str().unwrap().to_string();
+    {
+        let pool = migrate_partially(&path, 42).await;
+        for sql in [
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u1', 'someone@lib.test', 'Someone', 'x', 1)",
+            "INSERT INTO book (id, title, updated_at) VALUES ('b1', 'Dune', datetime('now'))",
+            "INSERT INTO book_file (id, book_id, format, path, size_bytes, sha256) \
+             VALUES ('f1', 'b1', 'epub', 'f1.epub', 10, 'abc')",
+            "INSERT INTO reading_progress (book_id, user_id, device_id, progress, page, unit, \
+             updated_at) VALUES ('b1', 'u1', 'd1', 0.5, 12, 'chapter', '2026-11-01 10:00:00')",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+    }
+
+    let db = connect_db(&path)
+        .await
+        .expect("a database with files and positions in it must migrate");
+    let file = sqlx::query("SELECT format, duration_ms, track, label, narrator FROM book_file")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(file.get::<String, _>(0), "epub");
+    assert_eq!(file.get::<Option<i64>, _>(1), None);
+    assert_eq!(file.get::<Option<i64>, _>(2), None);
+    assert_eq!(file.get::<Option<String>, _>(3), None);
+    assert_eq!(file.get::<Option<String>, _>(4), None);
+    let pos = sqlx::query("SELECT page, audio_position, audio_duration FROM reading_progress")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(pos.get::<i64, _>(0), 12, "the text position is untouched");
+    assert_eq!(pos.get::<Option<f64>, _>(1), None);
+    assert_eq!(pos.get::<Option<f64>, _>(2), None);
+    let _ = std::fs::remove_file(&path);
+}
+
 /// 0039 adds a table, not columns — but it hangs off `app_user`, so it is
 /// checked against a server that already has accounts: they come through
 /// with no app passwords, and can be given one, which goes when they do.
