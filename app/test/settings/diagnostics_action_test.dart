@@ -60,12 +60,12 @@ void main() {
           settings: settings,
           connection: connection,
           sync: SyncService(repo),
+          initialSection: 'data',
         ),
       ),
     );
     await settle(tester);
 
-    await tester.scrollUntilVisible(find.text('Copy diagnostics'), 300);
     // Scrolled into reach is not yet on screen enough to tap: bring the whole
     // row in, wherever the rows above it leave it.
     await tester.ensureVisible(find.text('Copy diagnostics'));

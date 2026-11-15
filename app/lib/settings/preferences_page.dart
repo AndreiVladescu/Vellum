@@ -1,5 +1,4 @@
 import 'dart:io';
-import '../widgets/adaptive.dart';
 import '../snack_bars.dart';
 
 import 'package:file_selector/file_selector.dart';
@@ -22,6 +21,7 @@ import '../server/background_sync.dart';
 import '../server/connection_store.dart';
 import '../server/sync_service.dart';
 import 'app_settings.dart';
+import 'preferences_layout.dart';
 import 'appearance.dart';
 import 'book_face.dart';
 import 'spine_art.dart';
@@ -34,9 +34,13 @@ import '../l10n/labels.dart';
 import '../onboarding/sample_library.dart';
 import 'wallpaper.dart';
 
-/// Appearance preferences (how books are shown on the shelf, the shelf
-/// wallpaper — on the local [AppSettingsStore], applied instantly) plus the
-/// library backup/restore actions.
+/// Preferences: appearance and shelf settings on the local
+/// [AppSettingsStore] (applied instantly), sync and notification switches, and
+/// the library backup/restore and housekeeping actions — split into sections
+/// with a search box (roadmap v1.4.1, see `preferences_layout.dart`).
+///
+/// [initialSection] / [initialEntry] are deep links: ids from
+/// [preferencesCatalogue], opening that section and scrolling to that setting.
 class PreferencesPage extends StatelessWidget {
   const PreferencesPage({
     super.key,
@@ -44,157 +48,338 @@ class PreferencesPage extends StatelessWidget {
     required this.repository,
     required this.connection,
     required this.sync,
+    this.initialSection,
+    this.initialEntry,
   });
 
   final AppSettingsStore settings;
   final LibraryRepository repository;
   final ServerConnection connection;
   final SyncService sync;
+  final String? initialSection;
+  final String? initialEntry;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(L10n.of(context).prefsTitle)),
-      body: ListenableBuilder(
+      body: PrefsLayout(
         listenable: settings,
-        builder: (context, _) {
-          final l10n = L10n.of(context);
-          return ListView(
-          padding: readableInsets(context, EdgeInsets.symmetric(vertical: 8)),
-          children: [
-            _SectionHeader(l10n.prefsSectionAppearance),
-            _AppearanceSection(settings: settings),
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionBooks),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: SegmentedButton<BookFace>(
-                segments: [
-                  for (final face in BookFace.values)
-                    ButtonSegment(
-                      value: face,
-                      label: Text(face.labelOf(l10n)),
-                      icon: Icon(face.icon),
-                    ),
-                ],
-                selected: {settings.bookFace},
-                onSelectionChanged: (selection) =>
-                    settings.setBookFace(selection.first),
-              ),
-            ),
-            // Spine artwork only matters spine-out; face-out always shows the
-            // cover itself.
-            if (settings.bookFace == BookFace.spine) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Text(l10n.prefsSpineArtLabel),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: SegmentedButton<SpineArt>(
-                  segments: [
-                    for (final art in SpineArt.values)
-                      ButtonSegment(
-                        value: art,
-                        label: Text(art.labelOf(l10n)),
-                        icon: Icon(art == SpineArt.coverSlice
-                            ? Icons.image_outlined
-                            : Icons.palette_outlined),
-                      ),
-                  ],
-                  selected: {settings.spineArt},
-                  onSelectionChanged: (selection) =>
-                      settings.setSpineArt(selection.first),
-                ),
-              ),
-            ],
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionWallpaper),
-            for (final wallpaper in Wallpaper.values)
-              _WallpaperTile(
-                wallpaper: wallpaper,
-                selected: settings.wallpaper == wallpaper,
-                onTap: () => settings.setWallpaper(wallpaper),
-              ),
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionGenres),
-            SwitchListTile(
-              secondary: const Icon(Icons.sell_outlined),
-              title: Text(l10n.prefsGenresImportTitle),
-              subtitle: Text(l10n.prefsGenresImportSubtitle),
-              value: settings.importOpenLibraryGenres,
-              onChanged: settings.setImportOpenLibraryGenres,
-            ),
-            if (textIndexSupportedHere) ...[
-              const Divider(height: 24),
-              _SectionHeader(l10n.prefsSectionSearch),
-              _ContentIndexSection(
-                repository: repository,
-                settings: settings,
-              ),
-            ],
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionSync),
-            SwitchListTile(
-              secondary: const Icon(Icons.cloud_sync_outlined),
-              title: Text(l10n.prefsAutoPushTitle),
-              subtitle: Text(l10n.prefsAutoPushSubtitle),
-              value: settings.autoPush,
-              onChanged: settings.setAutoPush,
-            ),
-            _ReadingPositionSwitch(
-              settings: settings,
-              repository: repository,
-              connection: connection,
-            ),
-            _BackgroundSyncTile(settings: settings),
-            _TrayNotificationsTile(settings: settings),
-            _LoanRemindersTile(settings: settings),
-            // Only meaningful on a shared library: with no server there is
-            // nobody else whose shelves could arrive.
-            if (connection.isConnected)
-              ListTile(
-                leading: const Icon(Icons.shelves),
-                title: Text(l10n.prefsSharedShelvesTitle),
-                subtitle: Text(l10n.prefsSharedShelvesSubtitle),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => SharedShelvesPage(
-                      repository: repository,
-                      settings: settings,
-                      connection: connection,
-                    ),
-                  ),
-                ),
-              ),
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionSamples),
-            _SamplesTile(repository: repository),
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionTrash),
-            _TrashTile(repository: repository),
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionHealth),
-            _HealthSection(repository: repository, connection: connection),
-            _DiagnosticsTile(repository: repository, connection: connection),
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionBackup),
-            _BackupSection(
-              repository: repository,
-              connection: connection,
-              sync: sync,
-              settings: settings,
-            ),
-            const Divider(height: 24),
-            _SectionHeader(l10n.prefsSectionDanger),
-            _ClearLibraryTile(repository: repository),
-          ],
-          );
-        },
+        initialSection: initialSection,
+        initialEntry: initialEntry,
+        sections: (context) => preferencesCatalogue(
+          context,
+          settings: settings,
+          repository: repository,
+          connection: connection,
+          sync: sync,
+        ),
       ),
     );
   }
+}
+
+/// Every setting on the Preferences page, grouped into sections.
+///
+/// One list is the source for the sections list, each section's page and the
+/// search, so a setting added here shows up in all three. A guard test
+/// (`preferences_catalogue_test.dart`) names every entry, so one cannot be lost
+/// in a reshuffle.
+@visibleForTesting
+List<PrefsSection> preferencesCatalogue(
+  BuildContext context, {
+  required AppSettingsStore settings,
+  required LibraryRepository repository,
+  required ServerConnection connection,
+  required SyncService sync,
+}) {
+  final l10n = L10n.of(context);
+  return [
+    PrefsSection(
+      id: 'appearance',
+      title: l10n.prefsSectionAppearance,
+      icon: Icons.palette_outlined,
+      entries: [
+        PrefsEntry(
+          id: 'appearance',
+          title: l10n.prefsEntryAppearance,
+          keywords: [
+            l10n.prefsKwAppearance,
+            l10n.prefsThemeSystem,
+            l10n.prefsThemeLight,
+            l10n.prefsThemeDark,
+            l10n.prefsColour,
+            l10n.prefsShelfMaterial,
+            l10n.prefsSpineSize,
+            l10n.prefsSpineTitleScale,
+            l10n.prefsSpineThickness,
+            l10n.prefsDynamicColourTitle,
+          ],
+          builder: (_) => _AppearanceSection(settings: settings),
+        ),
+        PrefsEntry(
+          id: 'wallpaper',
+          title: l10n.prefsSectionWallpaper,
+          keywords: [
+            l10n.prefsKwWallpaper,
+            for (final w in Wallpaper.values) w.labelOf(l10n),
+          ],
+          heading: l10n.prefsSectionWallpaper,
+          builder: (_) => Column(
+            children: [
+              for (final wallpaper in Wallpaper.values)
+                _WallpaperTile(
+                  wallpaper: wallpaper,
+                  selected: settings.wallpaper == wallpaper,
+                  onTap: () => settings.setWallpaper(wallpaper),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+    PrefsSection(
+      id: 'shelf',
+      title: l10n.prefsGroupShelf,
+      icon: Icons.menu_book_outlined,
+      entries: [
+        PrefsEntry(
+          id: 'books',
+          title: l10n.prefsSectionBooks,
+          keywords: [
+            l10n.prefsKwBooks,
+            l10n.prefsSpineArtLabel,
+            for (final f in BookFace.values) f.labelOf(l10n),
+            for (final a in SpineArt.values) a.labelOf(l10n),
+          ],
+          heading: l10n.prefsSectionBooks,
+          builder: (_) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: SegmentedButton<BookFace>(
+                  segments: [
+                    for (final face in BookFace.values)
+                      ButtonSegment(
+                        value: face,
+                        label: Text(face.labelOf(l10n)),
+                        icon: Icon(face.icon),
+                      ),
+                  ],
+                  selected: {settings.bookFace},
+                  onSelectionChanged: (selection) =>
+                      settings.setBookFace(selection.first),
+                ),
+              ),
+              // Spine artwork only matters spine-out; face-out always shows
+              // the cover itself.
+              if (settings.bookFace == BookFace.spine) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text(l10n.prefsSpineArtLabel),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: SegmentedButton<SpineArt>(
+                    segments: [
+                      for (final art in SpineArt.values)
+                        ButtonSegment(
+                          value: art,
+                          label: Text(art.labelOf(l10n)),
+                          icon: Icon(art == SpineArt.coverSlice
+                              ? Icons.image_outlined
+                              : Icons.palette_outlined),
+                        ),
+                    ],
+                    selected: {settings.spineArt},
+                    onSelectionChanged: (selection) =>
+                        settings.setSpineArt(selection.first),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        PrefsEntry(
+          id: 'genres',
+          title: l10n.prefsGenresImportTitle,
+          subtitle: l10n.prefsGenresImportSubtitle,
+          keywords: [l10n.prefsKwGenres, l10n.prefsSectionGenres],
+          heading: l10n.prefsSectionGenres,
+          builder: (_) => SwitchListTile(
+            secondary: const Icon(Icons.sell_outlined),
+            title: Text(l10n.prefsGenresImportTitle),
+            subtitle: Text(l10n.prefsGenresImportSubtitle),
+            value: settings.importOpenLibraryGenres,
+            onChanged: settings.setImportOpenLibraryGenres,
+          ),
+        ),
+        if (textIndexSupportedHere)
+          PrefsEntry(
+            id: 'index',
+            title: l10n.prefsIndexTitle,
+            subtitle: l10n.prefsIndexSubtitle,
+            keywords: [l10n.prefsKwIndex, l10n.prefsSectionSearch],
+            heading: l10n.prefsSectionSearch,
+            builder: (_) => _ContentIndexSection(
+              repository: repository,
+              settings: settings,
+            ),
+          ),
+        PrefsEntry(
+          id: 'samples',
+          title: l10n.prefsSectionSamples,
+          subtitle: l10n.prefsSamplesAddSubtitle,
+          keywords: [l10n.prefsKwSamples],
+          heading: l10n.prefsSectionSamples,
+          builder: (_) => _SamplesTile(repository: repository),
+        ),
+      ],
+    ),
+    PrefsSection(
+      id: 'sync',
+      title: l10n.prefsGroupSync,
+      icon: Icons.cloud_sync_outlined,
+      entries: [
+        PrefsEntry(
+          id: 'autoPush',
+          title: l10n.prefsAutoPushTitle,
+          subtitle: l10n.prefsAutoPushSubtitle,
+          keywords: [l10n.prefsKwSync],
+          builder: (_) => SwitchListTile(
+            secondary: const Icon(Icons.cloud_sync_outlined),
+            title: Text(l10n.prefsAutoPushTitle),
+            subtitle: Text(l10n.prefsAutoPushSubtitle),
+            value: settings.autoPush,
+            onChanged: settings.setAutoPush,
+          ),
+        ),
+        PrefsEntry(
+          id: 'readingPosition',
+          title: l10n.prefsReadingPositionTitle,
+          subtitle:
+              l10n.prefsReadingPositionSubtitle(settings.deviceLabel),
+          keywords: [l10n.prefsKwReadingPosition],
+          builder: (_) => _ReadingPositionSwitch(
+            settings: settings,
+            repository: repository,
+            connection: connection,
+          ),
+        ),
+        PrefsEntry(
+          id: 'backgroundSync',
+          title: l10n.prefsBgTitle,
+          subtitle: l10n.prefsBgConditions,
+          keywords: [l10n.prefsKwBackgroundSync, l10n.prefsHowOften],
+          builder: (_) => _BackgroundSyncTile(settings: settings),
+        ),
+        // Only meaningful on a shared library: with no server there is
+        // nobody else whose shelves could arrive.
+        if (connection.isConnected)
+          PrefsEntry(
+            id: 'sharedShelves',
+            title: l10n.prefsSharedShelvesTitle,
+            subtitle: l10n.prefsSharedShelvesSubtitle,
+            keywords: [l10n.prefsKwSharedShelves],
+            builder: (context) => ListTile(
+              leading: const Icon(Icons.shelves),
+              title: Text(l10n.prefsSharedShelvesTitle),
+              subtitle: Text(l10n.prefsSharedShelvesSubtitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SharedShelvesPage(
+                    repository: repository,
+                    settings: settings,
+                    connection: connection,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+    PrefsSection(
+      id: 'notifications',
+      title: l10n.prefsGroupNotifications,
+      icon: Icons.notifications_outlined,
+      entries: [
+        PrefsEntry(
+          id: 'tray',
+          title: l10n.prefsTrayTitle,
+          subtitle: l10n.prefsTraySubtitle,
+          keywords: [l10n.prefsKwTray],
+          builder: (_) => _TrayNotificationsTile(settings: settings),
+        ),
+        PrefsEntry(
+          id: 'loanReminders',
+          title: l10n.prefsLoanRemindTitle,
+          subtitle: l10n.prefsLoanRemindSubtitle,
+          keywords: [l10n.prefsKwLoans],
+          builder: (_) => _LoanRemindersTile(settings: settings),
+        ),
+      ],
+    ),
+    PrefsSection(
+      id: 'data',
+      title: l10n.prefsGroupData,
+      icon: Icons.inventory_2_outlined,
+      entries: [
+        PrefsEntry(
+          id: 'backup',
+          title: l10n.prefsSectionBackup,
+          keywords: [
+            l10n.prefsKwBackup,
+            l10n.prefsExportTitle,
+            l10n.prefsExportSubtitle,
+            l10n.prefsVerifyTitle,
+            l10n.prefsRestoreTile,
+            l10n.prefsSchedTitle,
+          ],
+          heading: l10n.prefsSectionBackup,
+          builder: (_) => _BackupSection(
+            repository: repository,
+            connection: connection,
+            sync: sync,
+            settings: settings,
+          ),
+        ),
+        PrefsEntry(
+          id: 'trash',
+          title: l10n.prefsSectionTrash,
+          keywords: [l10n.prefsKwTrash],
+          heading: l10n.prefsSectionTrash,
+          builder: (_) => _TrashTile(repository: repository),
+        ),
+        PrefsEntry(
+          id: 'health',
+          title: l10n.prefsSectionHealth,
+          subtitle: l10n.prefsHealthIntro,
+          keywords: [l10n.prefsKwHealth],
+          heading: l10n.prefsSectionHealth,
+          builder: (_) =>
+              _HealthSection(repository: repository, connection: connection),
+        ),
+        PrefsEntry(
+          id: 'diagnostics',
+          title: l10n.prefsEntryDiagnostics,
+          subtitle: l10n.prefsDiagIntro,
+          keywords: [l10n.prefsKwDiagnostics, l10n.prefsDiagCopyButton],
+          builder: (_) =>
+              _DiagnosticsTile(repository: repository, connection: connection),
+        ),
+        PrefsEntry(
+          id: 'clearLibrary',
+          title: l10n.prefsClearTitle,
+          subtitle: l10n.prefsClearSubtitle,
+          keywords: [l10n.prefsKwClear, l10n.prefsSectionDanger],
+          heading: l10n.prefsSectionDanger,
+          builder: (_) => _ClearLibraryTile(repository: repository),
+        ),
+      ],
+    ),
+  ];
 }
 
 /// The on-device index of book *text*, so search can look inside books and not
@@ -1373,25 +1558,6 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
           ],
         );
       },
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.titleSmall
-            ?.copyWith(color: theme.colorScheme.primary),
-      ),
     );
   }
 }

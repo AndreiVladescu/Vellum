@@ -191,6 +191,7 @@ MIGRATED=(
   lib/settings/appearance.dart
   lib/settings/book_face.dart
   lib/settings/preferences_page.dart
+  lib/settings/preferences_layout.dart
   lib/settings/shared_shelves_page.dart
   lib/settings/shelf_sort.dart
   lib/settings/spine_art.dart

@@ -63,6 +63,7 @@ void main() {
           settings: settings,
           connection: connection,
           sync: SyncService(repo),
+          initialSection: 'data',
         ),
       ),
     );
@@ -71,10 +72,7 @@ void main() {
   }
 
   Future<void> openDialog(WidgetTester tester) async {
-    await tester.scrollUntilVisible(
-      find.text('Remove every book from this device'),
-      300,
-    );
+    await tester.ensureVisible(find.text('Remove every book from this device'));
     await settle(tester);
     await tester.tap(find.text('Remove every book from this device'));
     await settle(tester);

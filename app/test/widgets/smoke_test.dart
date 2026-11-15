@@ -214,6 +214,7 @@ void main() {
         repository: repo,
         connection: connection,
         sync: SyncService(repo),
+        initialSection: 'shelf',
       ),
     ));
     await _settle(tester);

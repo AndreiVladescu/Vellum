@@ -2401,6 +2401,139 @@
     "description": "App bar title of the Preferences page."
   },
 
+  "prefsGroupShelf": "Shelf",
+  "@prefsGroupShelf": {
+    "description": "Preferences section: the shelf's content and genres."
+  },
+
+  "prefsGroupSync": "Sync and server",
+  "@prefsGroupSync": {
+    "description": "Preferences section: sync, server and shared shelves."
+  },
+
+  "prefsGroupNotifications": "Notifications",
+  "@prefsGroupNotifications": {
+    "description": "Preferences section: notifications and reminders."
+  },
+
+  "prefsGroupData": "Data and backups",
+  "@prefsGroupData": {
+    "description": "Preferences section: backups, trash, health, diagnostics and clearing the library."
+  },
+
+  "prefsSearchHint": "Search preferences",
+  "@prefsSearchHint": {
+    "description": "Hint of the search box on Preferences."
+  },
+
+  "prefsSearchClear": "Clear search",
+  "@prefsSearchClear": {
+    "description": "Tooltip of the clear button in the preferences search box."
+  },
+
+  "prefsEntryAppearance": "Theme, colour and spine size",
+  "@prefsEntryAppearance": {
+    "description": "Search result title for the theme, colour, shelf material and spine size controls."
+  },
+
+  "prefsEntryDiagnostics": "Diagnostics",
+  "@prefsEntryDiagnostics": {
+    "description": "Search result title for the diagnostics report."
+  },
+
+  "prefsKwAppearance": "dark light mode theme accent colour palette wood shelf board font size thickness",
+  "@prefsKwAppearance": {
+    "description": "Extra search words (space separated) for the appearance settings."
+  },
+
+  "prefsKwWallpaper": "background backdrop room wall image",
+  "@prefsKwWallpaper": {
+    "description": "Extra search words for the wallpaper setting."
+  },
+
+  "prefsKwBooks": "spine cover face out view display artwork",
+  "@prefsKwBooks": {
+    "description": "Extra search words for how books are drawn."
+  },
+
+  "prefsKwGenres": "subjects categories open library tags",
+  "@prefsKwGenres": {
+    "description": "Extra search words for the genre import setting."
+  },
+
+  "prefsKwIndex": "full text find inside content",
+  "@prefsKwIndex": {
+    "description": "Extra search words for the book-text index."
+  },
+
+  "prefsKwSamples": "demo example starter",
+  "@prefsKwSamples": {
+    "description": "Extra search words for sample books."
+  },
+
+  "prefsKwSync": "server upload push automatic",
+  "@prefsKwSync": {
+    "description": "Extra search words for the auto-push setting."
+  },
+
+  "prefsKwReadingPosition": "page progress resume bookmark device",
+  "@prefsKwReadingPosition": {
+    "description": "Extra search words for syncing the reading position."
+  },
+
+  "prefsKwBackgroundSync": "periodic wifi charging android schedule",
+  "@prefsKwBackgroundSync": {
+    "description": "Extra search words for background sync."
+  },
+
+  "prefsKwSharedShelves": "share library other people friends",
+  "@prefsKwSharedShelves": {
+    "description": "Extra search words for shared shelves."
+  },
+
+  "prefsKwTray": "system tray desktop alert",
+  "@prefsKwTray": {
+    "description": "Extra search words for tray notifications."
+  },
+
+  "prefsKwLoans": "lend borrow due date return reminder",
+  "@prefsKwLoans": {
+    "description": "Extra search words for loan reminders."
+  },
+
+  "prefsKwTrash": "deleted removed restore recover bin",
+  "@prefsKwTrash": {
+    "description": "Extra search words for the trash."
+  },
+
+  "prefsKwHealth": "repair scan duplicates orphan blobs doctor check",
+  "@prefsKwHealth": {
+    "description": "Extra search words for the library health check."
+  },
+
+  "prefsKwDiagnostics": "bug report log support debug",
+  "@prefsKwDiagnostics": {
+    "description": "Extra search words for diagnostics."
+  },
+
+  "prefsKwBackup": "export import restore archive zip encrypt passphrase verify schedule automatic",
+  "@prefsKwBackup": {
+    "description": "Extra search words for backups."
+  },
+
+  "prefsKwClear": "delete everything wipe reset empty",
+  "@prefsKwClear": {
+    "description": "Extra search words for clearing the library."
+  },
+
+  "prefsSearchNone": "No preference matches \"{query}\"",
+  "@prefsSearchNone": {
+    "description": "Shown when the preferences search finds nothing.",
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+
   "prefsSectionAppearance": "Appearance",
   "@prefsSectionAppearance": {
     "description": "Section header on Preferences."
