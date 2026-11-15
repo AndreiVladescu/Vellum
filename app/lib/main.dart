@@ -1727,26 +1727,29 @@ class _LibraryPageState extends State<LibraryPage> {
   /// filters the shelf below; long-press a shelf chip to rename or delete it.
   Widget _shelfChips(List<Shelf> shelves, String? active) {
     // The row grows with the text scale; a fixed 48 clipped the chips at
-    // 1.3x and above.
+    // 1.3x and above. Each chip sits in a Center so it takes the height its
+    // scaled padding needs: a horizontal list hands its children the full
+    // row height as a *tight* constraint, and a chip squeezed to it draws its
+    // label off-centre and clipped.
     final scaler = MediaQuery.textScalerOf(context);
     return SizedBox(
-      height: scaler.scale(32) + 16,
+      height: scaler.scale(36) + 16,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: ChoiceChip(
+            child: Center(child: ChoiceChip(
               label: Text(L10n.of(context).shelfAll),
               selected: active == null,
               onSelected: (_) => widget.settings.setSelectedShelfId(null),
-            ),
+            )),
           ),
           for (final shelf in shelves)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-              child: GestureDetector(
+              child: Center(child: GestureDetector(
                 onLongPress: () => _shelfMenu(shelf),
                 child: ChoiceChip(
                   label: Text(shelf.name),
@@ -1754,15 +1757,15 @@ class _LibraryPageState extends State<LibraryPage> {
                   onSelected: (_) =>
                       widget.settings.setSelectedShelfId(shelf.id),
                 ),
-              ),
+              )),
             ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: ActionChip(
+            child: Center(child: ActionChip(
               avatar: const Icon(Icons.add, size: 18),
               label: Text(L10n.of(context).shelfNew),
               onPressed: _promptNewShelf,
-            ),
+            )),
           ),
         ],
       ),
