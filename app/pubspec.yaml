@@ -74,6 +74,15 @@ dependencies:
   wakelock_plus: ^1.5.2
   package_info_plus: ^9.0.1
   flutter_tts: ^4.2.5
+  # Audiobooks (docs/AUDIOBOOKS.md). just_audio is ExoPlayer on Android and
+  # AVPlayer on macOS; on Linux and Windows it goes through media_kit (libmpv),
+  # registered only there, so no libmpv reaches the APK. All free software, so
+  # both flavours carry them.
+  just_audio: ^0.10.6
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: ^1.2.1
+  media_kit_libs_windows_audio: ^1.0.9
+  audio_metadata_reader: ^1.8.1
 
 dev_dependencies:
   flutter_test:

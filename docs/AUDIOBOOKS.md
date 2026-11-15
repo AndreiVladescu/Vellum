@@ -117,9 +117,10 @@ Reasons:
 
 Costs:
 
-- Linux now needs libmpv: `libmpv-dev` in `linux-flutter-deps`, and
-  `libmpv2` in the `.deb` `Depends`. The AppImage either bundles libmpv and
-  its FFmpeg (tens of MB) or requires it on the host.
+- Linux now needs libmpv at run time: `libmpv2` (or `libmpv1`) in the `.deb`
+  `Depends`. The spike showed `libmpv-dev` is not needed to build (§7a). The
+  AppImage either bundles libmpv and its FFmpeg (tens of MB) or requires it on
+  the host.
 - On Android, `MainActivity` has to extend `AudioServiceActivity` instead of
   `FlutterActivity`, and the manifest needs a `mediaPlayback` foreground
   service next to the existing `dataSync` one.
@@ -191,7 +192,7 @@ This is `schemaVersion` 39 → 40.
   `read_button.dart`, `readingUnitForFormats`, the local text index, dedupe,
   send-to-device and the Insights format list.
 
-### Server (next free migration at implementation time — 0039 today)
+### Server (migration 0043; 0039–0042 went to other work)
 
 ```sql
 ALTER TABLE book_file ADD COLUMN duration_ms INTEGER;
@@ -418,6 +419,64 @@ Risks, roughly in order:
    Android 14 and later.
 6. **Disk and backup size**, handled by on-demand download and backups that
    exclude audio by default.
+
+## 7a. What the spike found (2026-11-15)
+
+Run on the development machine (Ubuntu 24.04-based, x86-64) with
+`just_audio` 0.10.6, `just_audio_media_kit` 2.1.0, `media_kit` 1.2.6,
+`media_kit_libs_linux` 1.2.1 and `media_kit_libs_windows_audio` 1.0.9. The
+fixtures were made with ffmpeg: a 5 h 30 min AAC `.m4b` with six chapters
+(20 MB at 8 kb/s) and a folder of 30 ten-second CBR mp3s with ID3v2.3 tags.
+
+**The stack is viable on Linux.** Measured:
+
+| | Result |
+|---|---|
+| m4b load | duration 5:30:00.128 reported in 0.7–0.9 s |
+| m4b seek to 5:12:33 and back to 0:10 | lands within 1 s of the target both ways |
+| mp3 playlist of 30 sources | loads in 0.1–0.2 s, plays, advances to the next part on its own |
+| `seek(position, index: n)` into another part | **broken**: jumps to part *n* but the position is dropped (mpv logs `error running command seek`) |
+| `setFilePath(part, initialPosition: x)` | exact, every time; `completed` fires at the end of the part |
+
+- **libmpv**: only the runtime `libmpv2` (0.37) is installed here, and that is
+  enough. `media_kit` opens `libmpv.so`, then `libmpv.so.2`, then
+  `libmpv.so.1`, so the `.so.1`/`.so.2` split in §7 risk 1 is already handled
+  and `libmpv-dev` is **not** needed to build. The `.deb` needs
+  `libmpv2 | libmpv1` in `Depends`, not a `-dev` package.
+- **`media_kit_libs_linux` downloads mimalloc** from GitHub during the CMake
+  step (on by default, `MIMALLOC_USE_STATIC_LIBS`). A Linux build therefore
+  needs the network once, like the Windows build that downloads its libmpv DLL.
+  Flatpak or any offline build will want `-DMIMALLOC_USE_STATIC_LIBS=OFF`.
+- **The cross-part seek bug** is in `just_audio_media_kit`'s `seek`: after
+  `jump()` it checks the *previous* part's duration, sees it is non-zero, and
+  seeks a file that is still loading. A two-phase seek (index, wait, position)
+  works but needs a wait that has nothing reliable to wait on when parts have
+  equal durations. **So the player loads one part at a time** with
+  `setFilePath(initialPosition:)` and moves to the next part itself on
+  `completed`. That is one code path on every backend, and positions in seconds
+  across the whole book map to (part, offset) in one place. The cost is a gap
+  of a few hundred milliseconds between mp3 parts, which is acceptable for
+  speech. This supersedes "a list of sources for multi-part books" in §2.
+- **Initialisation is lazy.** `JustAudioMediaKit.ensureInitialized()` is
+  called the first time a player is made, not in `main()`, so a Linux machine
+  without libmpv still starts and only the player page says what is missing.
+  The plugin has no `pubspec` plugin entry, so nothing registers it behind our
+  back.
+- **Android**: `flutter build apk --debug` succeeds with the plugins, in the
+  full flavour *and* the free one. The APK gains no new `.so`: the Android side
+  is `androidx.media3:media3-exoplayer` 1.4.1 (plus its dash/hls/smoothstreaming
+  modules, which `just_audio` lists unconditionally). Nothing in `flavour.sh`
+  needs to change. Playback on Android was **not** run (the emulator was in use
+  by other work), nor on Windows or macOS.
+- **Licences** checked in the pub cache: `just_audio` MIT,
+  `just_audio_media_kit` Unlicense, `media_kit`/`media_kit_libs_*` MIT,
+  `audio_metadata_reader` MIT.
+- **The m4b fixture has both chapter forms**: ffmpeg writes Nero `chpl` *and* a
+  QuickTime chapter track (`tref/chap` → a text track), with `moov` after
+  `mdat`. The reader's tests build files with only one of the two, so both
+  paths are exercised.
+- Not done in the spike: ten real-world m4bs, the `.deb`/AppImage on clean
+  Ubuntu 22.04/24.04, and `audio_service`, which is v1.5.1.
 
 ## 8. Task breakdown
 
