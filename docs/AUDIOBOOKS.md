@@ -67,9 +67,19 @@ The bytes then go through the existing cover pipeline (thumbnails, dominant
 colour, push to the server).
 
 **Parsing.** Use `audio_metadata_reader` 1.8.1 (MIT, pure Dart) for the ID3
-and `ilst` tags and the pictures. Write our own small MP4 reader for duration
-and chapters: the package's MP4 chapter support is thin, and it does not list
-`.m4b` as an extension.
+tags and pictures. Write our own small MP4 reader for duration and chapters:
+the package's MP4 chapter support is thin, and it does not list `.m4b` as an
+extension.
+
+*As built* (`app/lib/audio/`), two things moved to our own code:
+
+- **The MP4 tags and `covr`** come from `mp4_reader.dart` too. It walks
+  `moov` anyway, and the package does not read `©wrt`, the narrator.
+- **MP3 durations** come from `mp3_duration.dart`, which reads the first
+  frame's Xing/Info or VBRI header and otherwise estimates from the bitrate.
+  The package's own figure was 36 % short on a 22.05 kHz mono MPEG-2 file,
+  which is a common audiobook encoding, and part durations are summed and
+  synced, so they have to be right.
 
 **Not in 1.5:**
 

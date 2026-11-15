@@ -275,7 +275,11 @@ class BookFiles extends Table {
 /// one place whatever the format.
 @DataClassName('AudioChapter')
 class AudioChapters extends Table {
-  TextColumn get fileId => text().references(BookFiles, #id)();
+  // Cascades, unlike the older tables' references: a part's chapters are
+  // nothing without it, and every path that drops a file row (delete, the
+  // doctor's repair, replacing an audiobook) then needs no extra step.
+  TextColumn get fileId =>
+      text().references(BookFiles, #id, onDelete: KeyAction.cascade)();
   IntColumn get idx => integer()();
   TextColumn get title => text().nullable()();
 

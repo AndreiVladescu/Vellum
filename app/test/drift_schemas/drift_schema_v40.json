@@ -2751,9 +2751,9 @@
             "moor_type": "string",
             "nullable": false,
             "customConstraints": null,
-            "defaultConstraints": "REFERENCES book_files (id)",
+            "defaultConstraints": "REFERENCES book_files (id) ON DELETE CASCADE",
             "dialectAwareDefaultConstraints": {
-              "sqlite": "REFERENCES book_files (id)"
+              "sqlite": "REFERENCES book_files (id) ON DELETE CASCADE"
             },
             "default_dart": null,
             "default_client_dart": null,
@@ -2766,7 +2766,7 @@
                   },
                   "initially_deferred": false,
                   "on_update": null,
-                  "on_delete": null
+                  "on_delete": "cascade"
                 }
               }
             ]
@@ -3320,7 +3320,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"audio_chapters\" (\"file_id\" TEXT NOT NULL REFERENCES book_files (id), \"idx\" INTEGER NOT NULL, \"title\" TEXT NULL, \"start_ms\" INTEGER NOT NULL, PRIMARY KEY (\"file_id\", \"idx\"));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"audio_chapters\" (\"file_id\" TEXT NOT NULL REFERENCES book_files (id) ON DELETE CASCADE, \"idx\" INTEGER NOT NULL, \"title\" TEXT NULL, \"start_ms\" INTEGER NOT NULL, PRIMARY KEY (\"file_id\", \"idx\"));"
         }
       ]
     },

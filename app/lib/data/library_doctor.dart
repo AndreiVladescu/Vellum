@@ -195,6 +195,9 @@ class LibraryDoctor {
         return DoctorReport(defects: defects, checkedBlobs: checkedBlobs);
       }
       referenced.add(p.normalize(file.path));
+      // Known here but deliberately not downloaded (an audiobook fetched on
+      // demand, docs/AUDIOBOOKS.md §6): absent bytes are not damage.
+      if (!file.present) continue;
       final onDisk = File(p.join(_dataDir.path, file.path));
       checkedBlobs++;
       if (!await onDisk.exists()) {

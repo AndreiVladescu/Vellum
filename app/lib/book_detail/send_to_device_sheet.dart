@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../audio/audio_formats.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../server/connection_store.dart';
@@ -64,7 +65,11 @@ class _SendToDeviceSheetState extends State<SendToDeviceSheet> {
   }
 
   Future<void> _load() async {
-    final files = await widget.repository.watchFilesOf(widget.book.id).first;
+    // E-readers take text; an audiobook's parts are not offered.
+    final files = [
+      for (final f in await widget.repository.watchFilesOf(widget.book.id).first)
+        if (!isAudioFormat(f.format)) f,
+    ];
     List<SendTarget> targets = const [];
     try {
       targets = await widget.connection.client?.sendTargets() ?? const [];

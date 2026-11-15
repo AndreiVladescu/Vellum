@@ -11,6 +11,22 @@ import 'database.dart';
 import 'sync_clock.dart';
 import 'pdf_cover.dart';
 
+/// The synced fields of one audio part, as measured at import.
+class AudioPartFields {
+  const AudioPartFields({
+    required this.track,
+    this.durationMs,
+    this.label,
+    this.narrator,
+  });
+
+  /// 1-based order within the book's audio.
+  final int track;
+  final int? durationMs;
+  final String? label;
+  final String? narrator;
+}
+
 /// Attaching/detaching digital files, hashing, and page count. Split out of
 /// `LibraryRepository` (plan 5 §A10). Depends on [CoverService] because
 /// attaching the first PDF/EPUB to a coverless book derives a cover from it.
@@ -39,7 +55,14 @@ class FileService {
   /// a row pointing at a partial file, or a blob no row knows about — are both
   /// unreachable. Stale `.part` files are swept at startup
   /// (`LibraryRepository._withDataDir`), which covers a crash mid-copy.
-  Future<void> attachFile(String bookId, String sourcePath) async {
+  ///
+  /// [audio] carries an audio part's synced fields (docs/AUDIOBOOKS.md §3);
+  /// null for a text file. Returns the new file's id.
+  Future<String> attachFile(
+    String bookId,
+    String sourcePath, {
+    AudioPartFields? audio,
+  }) async {
     final source = File(sourcePath);
     final ext = p.extension(sourcePath).replaceFirst('.', '').toLowerCase();
     final id = _uuid.v4();
@@ -73,6 +96,10 @@ class FileService {
                 path: relPath,
                 sizeBytes: size,
                 sha256: digest,
+                durationMs: Value(audio?.durationMs),
+                track: Value(audio?.track),
+                label: Value(audio?.label),
+                narrator: Value(audio?.narrator),
               ),
             );
         // A new file is synced data, so the book needs pushing
@@ -105,6 +132,7 @@ class FileService {
         }
       }
     }
+    return id;
   }
 
   /// The page count read from one of the book's attached PDFs, or null if it

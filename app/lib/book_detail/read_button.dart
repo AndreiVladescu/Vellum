@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../audio/audio_formats.dart';
 import '../data/database.dart';
 import '../data/external_open.dart';
 import '../data/library_repository.dart';
@@ -210,6 +211,11 @@ class ReadButton extends StatelessWidget {
       for (final file in files)
         if (file.format == 'pdf' || file.format == 'epub') file,
     ];
+    // An audiobook with no text: the Listen button beside this is the action,
+    // and a greyed-out "Read" would only say the book is missing something.
+    if (readable.isEmpty && files.any((f) => isAudioFormat(f.format))) {
+      return const SizedBox.shrink();
+    }
     // One readable file is a button. Several is a choice — and it has to be
     // offered, because before this the PDF simply won and the EPUB could not
     // be opened at all (8/25 report).

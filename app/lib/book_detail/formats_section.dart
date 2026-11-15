@@ -1,6 +1,8 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../audio/attach_audio.dart';
+import '../audio/audio_formats.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -21,15 +23,29 @@ class DigitalFormatsSection extends StatelessWidget {
     final l10n = L10n.of(context);
     final typeGroup = XTypeGroup(
       label: l10n.bookFilesTypeGroup,
-      extensions: const ['pdf', 'epub'],
+      extensions: const ['pdf', 'epub', ...audioFormats],
     );
-    final picked = await openFile(acceptedTypeGroups: [typeGroup]);
-    if (picked == null) return;
-    await repository.attachFile(book.id, picked.path);
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.formatsAttached(picked.name))));
+    // Several at once, for a folder of mp3s: they become one audiobook.
+    final picked = await openFiles(acceptedTypeGroups: [typeGroup]);
+    if (picked.isEmpty || !context.mounted) return;
+    final audio = [
+      for (final f in picked)
+        if (isAudioFormat(extensionOf(f.path))) f.path,
+    ];
+    final text = [
+      for (final f in picked)
+        if (!isAudioFormat(extensionOf(f.path))) f,
+    ];
+    for (final f in text) {
+      await repository.attachFile(book.id, f.path);
+    }
+    if (text.isNotEmpty && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.formatsAttached(text.first.name))));
+    }
+    if (audio.isNotEmpty && context.mounted) {
+      await attachAudioToBook(context,
+          repository: repository, bookId: book.id, paths: audio);
     }
   }
 
@@ -64,9 +80,10 @@ class DigitalFormatsSection extends StatelessWidget {
                 l10n.formatsEmpty,
                 style: theme.textTheme.bodySmall,
               )
-            else
+            else ...[
               for (final f in files)
-                ListTile(
+                if (!isAudioFormat(f.format))
+                  ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(
                     f.format == 'pdf'
@@ -78,9 +95,29 @@ class DigitalFormatsSection extends StatelessWidget {
                     '${(f.sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB',
                   ),
                 ),
+              // An audiobook is one row however many parts it has.
+              if (files.any((f) => isAudioFormat(f.format)))
+                _audiobookTile(l10n, files),
+            ],
           ],
         );
       },
+    );
+  }
+
+  Widget _audiobookTile(L10n l10n, List<BookFile> files) {
+    final parts = [for (final f in files) if (isAudioFormat(f.format)) f];
+    final ms = parts.fold<int>(0, (sum, f) => sum + (f.durationMs ?? 0));
+    final bytes = parts.fold<int>(0, (sum, f) => sum + f.sizeBytes);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.headphones_outlined),
+      title: Text(l10n.formatsAudiobook),
+      subtitle: Text(l10n.formatsAudiobookDetail(
+        parts.length,
+        formatAudioTime(Duration(milliseconds: ms)),
+        (bytes / (1024 * 1024)).toStringAsFixed(1),
+      )),
     );
   }
 }

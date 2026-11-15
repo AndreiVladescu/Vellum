@@ -2475,7 +2475,7 @@ class AudioChapters extends Table with TableInfo {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL REFERENCES book_files(id)',
+    $customConstraints: 'NOT NULL REFERENCES book_files(id)ON DELETE CASCADE',
   );
   late final GeneratedColumn<int> idx = GeneratedColumn<int>(
     'idx',
@@ -2663,6 +2663,16 @@ class DatabaseAtV40 extends GeneratedDatabase {
     idxBookTextBook,
     idxBookTextStatus,
   ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'book_files',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('audio_chapters', kind: UpdateKind.delete)],
+    ),
+  ]);
   @override
   int get schemaVersion => 40;
 }

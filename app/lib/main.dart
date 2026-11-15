@@ -12,6 +12,7 @@ import 'account/user_profile.dart';
 import 'add_book/add_book_page.dart';
 import 'add_book/scan_page.dart';
 import 'app_drawer.dart';
+import 'audio/audio_formats.dart';
 import 'widgets/adaptive.dart';
 import 'loans/loan_reminders.dart';
 import 'loans/loans_page.dart';
@@ -593,7 +594,9 @@ class _LibraryPageState extends State<LibraryPage> {
   Future<void> _openSharedFiles(List<String> paths) async {
     if (!mounted || paths.isEmpty) return;
     final navigator = Navigator.of(context);
-    if (paths.length == 1) {
+    // A single audio file still goes through the import review: it becomes an
+    // audiobook, which the add-book form has no notion of.
+    if (paths.length == 1 && !isAudioFormat(extensionOf(paths.single))) {
       final added = await navigator.push<String>(MaterialPageRoute(
         builder: (_) => AddBookPage(
           repository: repository,

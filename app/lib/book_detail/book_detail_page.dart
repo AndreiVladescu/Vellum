@@ -3,6 +3,8 @@ import '../widgets/adaptive.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import '../audio/attach_audio.dart';
+import '../audio/audio_formats.dart';
 import '../data/book_file_validation.dart';
 import '../data/database.dart';
 import '../shelf/author_page.dart';
@@ -121,7 +123,12 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     var attached = 0;
     var coverChanged = false;
     String? message;
+    final audio = <String>[];
     for (final file in files) {
+      if (isAudioFormat(extensionOf(file.path))) {
+        audio.add(file.path); // one audiobook from all of them, below
+        continue;
+      }
       final kind = await classifyBookFile(file.path);
       if (kind == BookFileKind.image) {
         await repository.setCoverFromFile(book.id, file.path);
@@ -142,6 +149,10 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
+    }
+    if (audio.isNotEmpty && mounted) {
+      await attachAudioToBook(context,
+          repository: repository, bookId: book.id, paths: audio);
     }
   }
 

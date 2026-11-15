@@ -12196,7 +12196,7 @@ class $AudioChaptersTable extends AudioChapters
     type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES book_files (id)',
+      'REFERENCES book_files (id) ON DELETE CASCADE',
     ),
   );
   static const VerificationMeta _idxMeta = const VerificationMeta('idx');
@@ -12637,6 +12637,16 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
     idxBookTextBook,
     idxBookTextStatus,
   ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'book_files',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('audio_chapters', kind: UpdateKind.delete)],
+    ),
+  ]);
 }
 
 typedef $$SeriesTableCreateCompanionBuilder =

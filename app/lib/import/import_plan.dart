@@ -49,6 +49,7 @@ class ImportCandidate {
     this.matchedTitle,
     this.error,
     this.entry,
+    this.audioParts,
   });
 
   final String path;
@@ -77,6 +78,14 @@ class ImportCandidate {
   /// states the title has no reason to defer to a parse of the file name.
   final CatalogEntry? entry;
 
+  /// The files of an audiobook, when this row is one (docs/AUDIOBOOKS.md §1):
+  /// a folder of mp3s or a single m4b becomes one book. Then [path] is the
+  /// first part (or the folder), [sizeBytes] the total and [sha256] the first
+  /// part's hash, which is enough to recognise an audiobook already imported.
+  final List<String>? audioParts;
+
+  bool get isAudiobook => audioParts != null;
+
   /// Whether this row is imported by default. Duplicates are deselected but
   /// still shown — "nothing happened to 200 of my files" is worse than a list.
   bool get selectedByDefault => status == ImportStatus.newBook;
@@ -98,6 +107,7 @@ class ImportCandidate {
         matchedTitle: matchedTitle ?? this.matchedTitle,
         error: error,
         entry: entry,
+        audioParts: audioParts,
       );
 }
 
@@ -137,12 +147,16 @@ ImportCandidate classify({
   String? isbn,
   String? error,
   CatalogEntry? entry,
+  FilenameMeta? tagMeta,
+  List<String>? audioParts,
 }) {
   // A catalogue's own statement beats a parse of the file name — that is the
   // whole reason to read Calibre rather than its folder (plan 5 #21c). It also
   // supplies the ISBN, which makes the decisive arm below live rather than
   // dormant for these sources.
-  final meta = entry?.asFilenameMeta ?? parseFilename(filenameStem(path));
+  // An audiobook's tags name it better than its file names do.
+  final meta =
+      entry?.asFilenameMeta ?? tagMeta ?? parseFilename(filenameStem(path));
   isbn ??= entry?.isbn;
   // A catalogue row may legitimately bring no file (a CSV export describes
   // books whose bytes are elsewhere), so "no hash" there means "nothing to
@@ -158,6 +172,7 @@ ImportCandidate classify({
       status: ImportStatus.skip,
       error: error ?? 'unreadable',
       entry: entry,
+      audioParts: audioParts,
     );
   }
 
@@ -173,6 +188,7 @@ ImportCandidate classify({
         matchedBookId: book.bookId,
         matchedTitle: book.title,
         entry: entry,
+        audioParts: audioParts,
       );
     }
   }
@@ -194,6 +210,7 @@ ImportCandidate classify({
           matchedBookId: book.bookId,
           matchedTitle: book.title,
           entry: entry,
+          audioParts: audioParts,
         );
       }
     }
@@ -227,6 +244,7 @@ ImportCandidate classify({
         matchedBookId: book.bookId,
         matchedTitle: book.title,
         entry: entry,
+        audioParts: audioParts,
       );
     }
   }
@@ -239,6 +257,7 @@ ImportCandidate classify({
     status: ImportStatus.newBook,
     sha256: sha256,
     entry: entry,
+    audioParts: audioParts,
   );
 }
 

@@ -10545,5 +10545,29 @@
   "@ttsVoiceAutomatic": {"description": "The read-aloud voice choice that lets the engine pick a voice for the book's language."},
 
   "ttsVoiceUnavailable": "This device's speech engine does not offer a choice of voice.",
-  "@ttsVoiceUnavailable": {"description": "Shown in place of the voice picker when the speech engine lists no voices."}
+  "@ttsVoiceUnavailable": {"description": "Shown in place of the voice picker when the speech engine lists no voices."},
+
+  "audioNotReadable": "None of these files is an audiobook Vellum can play (M4B, M4A or MP3).",
+  "@audioNotReadable": {"description": "Snack bar when the audio files given to a book are not playable audio."},
+
+  "audioReplaceTitle": "Replace the audiobook?",
+  "@audioReplaceTitle": {"description": "Dialog title when audio is added to a book that already has audio."},
+
+  "audioReplaceBody": "{count, plural, =1{This book already has audio. Replace it with the new file?} other{This book already has audio. Replace it with these {count} files?}}",
+  "@audioReplaceBody": {"description": "Dialog body: a book holds one audiobook, so new audio replaces the old.", "placeholders": {"count": {"type": "int"}}},
+
+  "audioReplaceAction": "Replace",
+  "@audioReplaceAction": {"description": "Confirms replacing a book's audiobook."},
+
+  "audioAttached": "{count, plural, =1{Added the audiobook (1 part)} other{Added the audiobook ({count} parts)}}",
+  "@audioAttached": {"description": "Snack bar after audio files are attached to a book.", "placeholders": {"count": {"type": "int"}}},
+
+  "audioImportFailed": "Could not read the audio: {error}",
+  "@audioImportFailed": {"description": "Snack bar when reading an audio file's tags fails.", "placeholders": {"error": {"type": "String"}}},
+
+  "formatsAudiobook": "Audiobook",
+  "@formatsAudiobook": {"description": "The row for a book's audio parts in the Digital formats list."},
+
+  "formatsAudiobookDetail": "{parts, plural, =1{1 part} other{{parts} parts}} · {length} · {size} MB",
+  "@formatsAudiobookDetail": {"description": "Under 'Audiobook' in the formats list: how many files, total length (like 5:12:33) and size.", "placeholders": {"parts": {"type": "int"}, "length": {"type": "String"}, "size": {"type": "String"}}}
 }

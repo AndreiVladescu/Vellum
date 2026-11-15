@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 
+import '../audio/audio_formats.dart';
+import '../audio/audiobook_import.dart';
+import '../audio/audiobook_scan.dart';
 import '../data/background_work.dart';
 import '../data/database.dart';
 import '../data/file_hash.dart';
@@ -95,6 +98,14 @@ class FolderImportService {
   /// ignored outright rather than imported as an unreadable "book".
   static const supportedFormats = {'pdf', 'epub'};
 
+  /// Everything a scan picks up: the text formats, plus the audio parts that
+  /// are grouped into audiobooks (docs/AUDIOBOOKS.md §1).
+  static final importableFormats = {...supportedFormats, ...audioFormats};
+
+  /// A lone audio file shorter than this, found in a folder, is taken for
+  /// music rather than a book: a library folder can contain both.
+  static const minSingleFileAudiobook = Duration(minutes: 10);
+
   /// Recursively lists importable files under [root], newest-first by name so
   /// the dry-run table has a stable order.
   ///
@@ -105,7 +116,7 @@ class FolderImportService {
     await for (final entry in root.list(recursive: true, followLinks: false)) {
       if (entry is! File) continue;
       final ext = _formatOf(entry.path);
-      if (supportedFormats.contains(ext)) found.add(entry);
+      if (importableFormats.contains(ext)) found.add(entry);
     }
     found.sort((a, b) => a.path.compareTo(b.path));
     return found;
@@ -159,22 +170,105 @@ class FolderImportService {
         await findImportableFiles(root),
         onProgress: onProgress,
         isCancelled: isCancelled,
+        skipShortAudio: true,
       );
 
   /// The same dry run over an explicit list of files rather than a folder — what
   /// a multi-file share hands over (plan 5 #20), which has paths but no folder.
   /// Unsupported formats are dropped here too: a share sheet will offer Vellum
   /// anything once the user has picked it.
+  ///
+  /// Audio files are grouped per folder into audiobooks (see
+  /// [groupAudioByFolder]) and come after the text rows. [skipShortAudio]
+  /// drops a folder's lone audio file under [minSingleFileAudiobook] — set
+  /// for a folder scan, not for files someone picked on purpose.
   Future<List<ImportCandidate>> scanFiles(
     List<File> requested, {
     ImportProgress? onProgress,
     Future<bool> Function()? isCancelled,
+    bool skipShortAudio = false,
   }) async {
     final files = [
       for (final f in requested)
         if (supportedFormats.contains(_formatOf(f.path))) f,
     ];
+    final audio = [
+      for (final f in requested)
+        if (audioFormats.contains(_formatOf(f.path))) f.path,
+    ];
     final library = await libraryFingerprint();
+    final text = await _scanText(files, library, onProgress, isCancelled);
+    if (audio.isEmpty || (await isCancelled?.call() ?? false)) return text;
+    return [
+      ...text,
+      ...await _scanAudio(audio, library,
+          isCancelled: isCancelled, skipShort: skipShortAudio),
+    ];
+  }
+
+  Future<List<ImportCandidate>> _scanAudio(
+    List<String> paths,
+    List<LibraryFingerprint> library, {
+    Future<bool> Function()? isCancelled,
+    required bool skipShort,
+  }) async {
+    final importer = AudiobookImporter(repository);
+    final out = <ImportCandidate>[];
+    for (final entry in groupAudioByFolder(paths).entries) {
+      if (await isCancelled?.call() ?? false) break;
+      final group = [
+        for (final path in entry.value)
+          if (await isImportableAudio(path)) path,
+      ];
+      if (group.isEmpty) continue;
+      AudiobookScan? scan;
+      String? hash;
+      String? error;
+      var size = 0;
+      try {
+        scan = await importer.scan(group);
+        final ms = scan.totalMs;
+        if (skipShort &&
+            group.length == 1 &&
+            ms != null &&
+            ms < minSingleFileAudiobook.inMilliseconds) {
+          continue;
+        }
+        for (final path in group) {
+          size += await File(path).length();
+        }
+        hash = await sha256OfFileInBackground(scan.parts.first.path);
+      } catch (e) {
+        error = '$e';
+      }
+      final parts = scan == null
+          ? group
+          : [for (final part in scan.parts) part.path];
+      out.add(classify(
+        path: group.length == 1 ? group.single : entry.key,
+        sizeBytes: size,
+        format: _formatOf(parts.first),
+        sha256: hash,
+        library: library,
+        error: error,
+        tagMeta: scan == null
+            ? null
+            : FilenameMeta(
+                title: scan.title,
+                authors: [?scan.author],
+              ),
+        audioParts: parts,
+      ));
+    }
+    return out;
+  }
+
+  Future<List<ImportCandidate>> _scanText(
+    List<File> files,
+    List<LibraryFingerprint> library,
+    ImportProgress? onProgress,
+    Future<bool> Function()? isCancelled,
+  ) async {
     onProgress?.call(0, files.length, '');
     final candidates = await _inParallel(
       files.length,
@@ -291,6 +385,12 @@ class FolderImportService {
       }
       final c = candidates[i];
       onProgress?.call(i, candidates.length, c.meta.title ?? filenameStem(c.path));
+      final parts = c.audioParts;
+      if (parts != null) {
+        outcomes.add(await _importAudiobook(c, parts,
+            shelfId: shelfId, localOnly: localOnly));
+        continue;
+      }
       try {
         // [localOnly] books are born `syncExcluded`, in the same transaction
         // as the row, so no sync can ever see them as pushable.
@@ -324,6 +424,39 @@ class FolderImportService {
     }
     onProgress?.call(candidates.length, candidates.length, '');
     return ImportReport(outcomes: outcomes, cancelled: cancelled);
+  }
+
+  /// One audiobook row: its parts become one book, titled from the review
+  /// table (which the user may have edited) rather than straight from the tags.
+  Future<ImportOutcome> _importAudiobook(
+    ImportCandidate c,
+    List<String> parts, {
+    String? shelfId,
+    required bool localOnly,
+  }) async {
+    try {
+      final importer = AudiobookImporter(repository);
+      final scan = await importer.scan(parts);
+      final bookId = await repository.db.transaction(() async {
+        final id = await repository.createCustomBook(
+          title: c.meta.title ?? scan.title,
+          author: c.meta.authors.isEmpty
+              ? scan.author
+              : c.meta.authors.join(', '),
+        );
+        if (localOnly) {
+          await (repository.db.update(repository.db.books)
+                ..where((b) => b.id.equals(id)))
+              .write(const BooksCompanion(syncExcluded: Value(true)));
+        }
+        return id;
+      });
+      await importer.attachTo(bookId, scan);
+      if (shelfId != null) await repository.addToShelf(bookId, shelfId);
+      return ImportOutcome(path: c.path, bookId: bookId);
+    } catch (e) {
+      return ImportOutcome(path: c.path, error: '$e');
+    }
   }
 
   /// Creates the book row for one candidate.
