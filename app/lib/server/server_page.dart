@@ -144,7 +144,11 @@ class _ServerPageState extends State<ServerPage> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = L10n.of(context).serverUnreachable('$e'));
+        final l10n = L10n.of(context);
+        final reason = classifyServerError(e).labelOf(l10n);
+        setState(() => _error = reason == null
+            ? l10n.serverUnreachable('$e')
+            : '$reason\n$e'); // i18n-ignore: raw detail on second line
       }
     } finally {
       if (mounted) {
@@ -240,6 +244,26 @@ class _ServerPageState extends State<ServerPage> {
     return i.bookId.isEmpty ? l10n.syncIssuePersonalData : i.bookId;
   }
 
+  /// A classified failure reads as a plain sentence, with the raw text kept on
+  /// a second, dimmer line for diagnostics; anything else shows the raw text.
+  Widget _issueDetail(SyncIssue i, L10n l10n) {
+    final raw = '${i.stage}: ${i.messageOf(l10n)}'; // i18n-ignore: technical
+    final reason = i.reasonOf(l10n);
+    if (reason == null) return Text(raw);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(reason),
+        Text(
+          raw,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showIssues(List<SyncIssue> issues) {
     showDialog<void>(
       context: context,
@@ -254,9 +278,7 @@ class _ServerPageState extends State<ServerPage> {
                 ListTile(
                   dense: true,
                   title: Text(_issueTitle(i, L10n.of(context))),
-                  subtitle: Text(
-                    '${i.stage}: ${i.messageOf(L10n.of(context))}',
-                  ), // i18n-ignore: technical detail
+                  subtitle: _issueDetail(i, L10n.of(context)),
                 ),
             ],
           ),

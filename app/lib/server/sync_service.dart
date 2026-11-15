@@ -37,6 +37,7 @@ class SyncIssue {
     required this.stage,
     this.message = '',
     this.note,
+    this.error,
   });
 
   /// Empty for a personal-data issue, which names no single book.
@@ -53,6 +54,11 @@ class SyncIssue {
   /// The service has no BuildContext, so it records which problem and the UI
   /// words it. Null when [message] is the whole story.
   final SyncNote? note;
+
+  /// The exception behind [message], when there was one, so the dialog can
+  /// classify it (unreachable, timeout, 401, ...) and word it in the reader's
+  /// language while [message] stays as the diagnostic line.
+  final Object? error;
 }
 
 /// The known problems a sync can report. Each one is a sentence in
@@ -262,6 +268,7 @@ class SyncService {
             title: row.title,
             stage: 'delete',
             message: '$e',
+            error: e,
           ),
         );
       }
@@ -468,6 +475,7 @@ class SyncService {
             title: b.title,
             stage: 'cover',
             message: '$e',
+            error: e,
           ),
         );
       } finally {
@@ -529,7 +537,7 @@ class SyncService {
       } catch (e) {
         // Metadata and cover are already pulled; skip files on error.
         issues.add(
-          SyncIssue(bookId: b.id, title: b.title, stage: 'file', message: '$e'),
+          SyncIssue(bookId: b.id, title: b.title, stage: 'file', message: '$e', error: e),
         );
       } finally {
         onProgress?.call(++fileDone, local.length, SyncPhase.downloadingFiles);
@@ -561,6 +569,7 @@ class SyncService {
               title: b.title,
               stage: 'render',
               message: '$e',
+            error: e,
             ),
           );
         }
@@ -582,6 +591,7 @@ class SyncService {
               title: b.title,
               stage: 'cover',
               message: '$e',
+            error: e,
             ),
           );
         }
@@ -694,6 +704,7 @@ class SyncService {
             title: row.name,
             stage: 'delete',
             message: '$e',
+            error: e,
           ),
         );
       }
@@ -806,6 +817,7 @@ class SyncService {
             title: row.location ?? id,
             stage: 'delete',
             message: '$e',
+            error: e,
           ),
         );
       }
@@ -914,6 +926,7 @@ class SyncService {
             title: row.borrower,
             stage: 'delete',
             message: '$e',
+            error: e,
           ),
         );
       }
@@ -1185,6 +1198,7 @@ class SyncService {
             title: b.title,
             stage: 'push',
             message: e is ServerException ? e.message : '$e',
+            error: e,
           ),
         );
       } finally {
@@ -1469,6 +1483,7 @@ class SyncService {
         title: '',
         stage: stage,
         message: '$error',
+        error: error,
         note: note,
       );
 
@@ -1963,6 +1978,7 @@ class SyncService {
             title: s.name,
             stage: 'push',
             message: e is ServerException ? e.message : '$e',
+            error: e,
           ),
         );
       }
@@ -2018,6 +2034,7 @@ class SyncService {
             title: c.location ?? c.id,
             stage: 'push',
             message: e is ServerException ? e.message : '$e',
+            error: e,
           ),
         );
       }
@@ -2089,6 +2106,7 @@ class SyncService {
             title: l.borrower,
             stage: 'push',
             message: e is ServerException ? e.message : '$e',
+            error: e,
           ),
         );
       }

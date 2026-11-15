@@ -17,6 +17,7 @@ import '../physical/room_measure.dart' show ShelfKind;
 import '../physical/room_prop.dart' show PropKind;
 import '../dedupe/merge_service.dart' show MergeConflict;
 import '../server/background_sync.dart';
+import '../server/server_client.dart' show ServerErrorKind, classifyServerError;
 import '../server/sync_scope.dart' show SyncScope;
 import '../server/sync_service.dart' show SyncIssue, SyncNote, SyncPhase;
 import '../settings/appearance.dart';
@@ -200,10 +201,33 @@ extension SyncPhaseL10n on SyncPhase {
   };
 }
 
+extension ServerErrorKindL10n on ServerErrorKind {
+  /// A plain-language reason, or null for [ServerErrorKind.other], where the
+  /// raw text is all there is to show.
+  String? labelOf(L10n l10n) => switch (this) {
+    ServerErrorKind.unreachable => l10n.serverErrorKindUnreachable,
+    ServerErrorKind.timeout => l10n.serverErrorKindTimeout,
+    ServerErrorKind.unauthorized => l10n.serverErrorKindUnauthorized,
+    ServerErrorKind.forbidden => l10n.serverErrorKindForbidden,
+    ServerErrorKind.notFound => l10n.serverErrorKindNotFound,
+    ServerErrorKind.serverError => l10n.serverErrorKindServer,
+    ServerErrorKind.tls => l10n.serverErrorKindTls,
+    ServerErrorKind.other => null,
+  };
+}
+
 /// The sentence for a sync problem. The service records which problem it was
 /// ([SyncIssue.note]) and the detail; this is where it becomes English (or,
 /// later, another language).
 extension SyncIssueL10n on SyncIssue {
+  /// The reader-language reason when this issue came from a classifiable
+  /// request failure (and is not a worded [note]), else null.
+  String? reasonOf(L10n l10n) {
+    final e = error;
+    if (e == null || note != null) return null;
+    return classifyServerError(e).labelOf(l10n);
+  }
+
   String messageOf(L10n l10n) => switch (note) {
     null => message,
     SyncNote.overwritten => l10n.syncNoteOverwritten(title),

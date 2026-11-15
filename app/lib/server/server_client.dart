@@ -1,3 +1,4 @@
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -17,6 +18,42 @@ class ServerException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// The broad kinds of failure a request can end in, so the UI can word each in
+/// the reader's language (`ServerErrorKindL10n` in labels.dart) instead of
+/// showing an exception's English text. The raw text stays available as a
+/// secondary line for diagnostics.
+enum ServerErrorKind {
+  unreachable,
+  timeout,
+  unauthorized,
+  forbidden,
+  notFound,
+  serverError,
+  tls,
+  other,
+}
+
+/// Which [ServerErrorKind] [error] is. Reads the type and status code, never
+/// the message text.
+ServerErrorKind classifyServerError(Object error) {
+  if (error is TlsException) return ServerErrorKind.tls;
+  if (error is TimeoutException) return ServerErrorKind.timeout;
+  if (error is ServerException) {
+    final code = error.statusCode;
+    if (code == 401) return ServerErrorKind.unauthorized;
+    if (code == 403) return ServerErrorKind.forbidden;
+    if (code == 404) return ServerErrorKind.notFound;
+    if (code != null && code >= 500) return ServerErrorKind.serverError;
+    return ServerErrorKind.other;
+  }
+  // `http` wraps a failed connection in a ClientException whose text names the
+  // underlying SocketException; both mean "could not get there".
+  if (error is SocketException || error is http.ClientException) {
+    return ServerErrorKind.unreachable;
+  }
+  return ServerErrorKind.other;
 }
 
 /// The password was right, but the account has two-factor sign-in on: send a

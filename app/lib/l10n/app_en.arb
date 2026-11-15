@@ -8781,6 +8781,35 @@
     "description": "Error on the server page when the TLS handshake failed."
   },
 
+  "serverErrorKindUnreachable": "Could not reach the server. Check the address and your connection.",
+  "@serverErrorKindUnreachable": {
+    "description": "Plain-language reason a sync request failed; the raw error is shown on a second line."
+  },
+  "serverErrorKindTimeout": "The server took too long to answer.",
+  "@serverErrorKindTimeout": {
+    "description": "Plain-language reason a sync request failed; the raw error is shown on a second line."
+  },
+  "serverErrorKindUnauthorized": "The server refused the sign-in. Sign in again.",
+  "@serverErrorKindUnauthorized": {
+    "description": "Plain-language reason a sync request failed; the raw error is shown on a second line."
+  },
+  "serverErrorKindForbidden": "This account is not allowed to do that.",
+  "@serverErrorKindForbidden": {
+    "description": "Plain-language reason a sync request failed; the raw error is shown on a second line."
+  },
+  "serverErrorKindNotFound": "The server does not support this yet.",
+  "@serverErrorKindNotFound": {
+    "description": "Plain-language reason a sync request failed; the raw error is shown on a second line."
+  },
+  "serverErrorKindServer": "The server hit an error. Try again later.",
+  "@serverErrorKindServer": {
+    "description": "Plain-language reason a sync request failed; the raw error is shown on a second line."
+  },
+  "serverErrorKindTls": "The server's certificate was not trusted.",
+  "@serverErrorKindTls": {
+    "description": "Plain-language reason a sync request failed; the raw error is shown on a second line."
+  },
+
   "serverUnreachable": "Could not reach the server.\n{error}",
   "@serverUnreachable": {
     "description": "Error on the server page; `error` is the technical detail on the second line.",
