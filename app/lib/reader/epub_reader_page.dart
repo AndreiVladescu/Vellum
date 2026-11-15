@@ -9,6 +9,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../data/database.dart';
+import 'reader_system_ui.dart';
 import '../data/library_repository.dart';
 import '../shortcuts.dart';
 import 'ai/ai_settings.dart';
@@ -331,6 +332,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   @override
   void initState() {
     super.initState();
+    ReaderSystemUi.enter();
     _hotkeys.attach();
     _readAloud.addListener(_onSpeechChanged);
     _readAloud.init();
@@ -463,6 +465,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
 
   @override
   void dispose() {
+    ReaderSystemUi.leave();
     _autoTicker?.dispose();
     // The wakelock belongs to this page, not to the app.
     unawaited(WakelockPlus.disable().catchError((_) {}));

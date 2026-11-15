@@ -10,6 +10,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../data/database.dart';
+import 'reader_system_ui.dart';
 import '../data/library_repository.dart';
 import '../stats/stats_queries.dart';
 import '../shortcuts.dart';
@@ -290,6 +291,7 @@ class _ReaderPageState extends State<ReaderPage>
   @override
   void initState() {
     super.initState();
+    ReaderSystemUi.enter();
     // Hand the shelf's memory back before asking PDFium for page bitmaps. The
     // covers behind this page are worth hundreds of megabytes on a phone and
     // none of them are on screen now; the shelf re-decodes what it needs when
@@ -368,6 +370,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   @override
   void dispose() {
+    ReaderSystemUi.leave();
     _autoTicker?.dispose();
     _livePoints.dispose();
     // The wakelock belongs to this page, not to the app.

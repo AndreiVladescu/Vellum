@@ -66,22 +66,13 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Remember the last few errors for "Copy diagnostics" (in memory only).
   ErrorLog.instance.install();
-  // Android: true fullscreen. Status and navigation bars are hidden outright
-  // rather than drawn translucently over the content — edgeToEdge kept both
-  // bars permanently on screen, which is what put the gesture bar over the
-  // Physical tab's "Add books" button and its scale ruler on every device with
-  // no hardware nav keys. immersiveSticky hides them and only brings them back
-  // — as a temporary overlay, not a layout change — on a swipe from the edge
-  // they belong to, hiding again a moment later. The Material scaffolding
-  // (AppBar, NavigationBar, FAB, bottom sheets) already insets itself for
-  // whatever the system reports; custom bottom bars use SafeArea (see the EPUB
-  // reader).
-  //
-  // Desktop keeps its window chrome; this mode is an Android concept and
-  // iOS isn't a build target for this project.
-  SystemChrome.setEnabledSystemUIMode(
-    Platform.isAndroid ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
-  );
+  // Edge to edge with the system bars showing, everywhere but the reader:
+  // immersive mode on the shelf made Android 16 show its "Viewing full screen"
+  // hint on every first launch. The Material scaffolding (AppBar,
+  // NavigationBar, FAB, bottom sheets) insets itself for the bars; custom
+  // bottom bars use SafeArea. The reader hides the bars while a book is open
+  // (reader/reader_system_ui.dart).
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   // A phone's image budget. Flutter's default is 100 MB of *decoded* images,
   // which a shelf of covers reaches easily — a library of 88 books was
   // measured holding 300 MB of graphics memory and a 900 MB resident set on
