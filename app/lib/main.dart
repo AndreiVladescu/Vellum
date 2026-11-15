@@ -45,6 +45,7 @@ import 'settings/app_settings.dart';
 import 'settings/appearance.dart';
 import 'settings/book_face.dart';
 import 'settings/preferences_page.dart';
+import 'settings/shelf_group_by.dart';
 import 'settings/shelf_sort.dart';
 import 'settings/wallpaper.dart';
 import 'shelf/shelf_target_sheet.dart';
@@ -52,6 +53,7 @@ import 'shelf/book_list_view.dart';
 import 'shelf/command_palette.dart';
 import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
+import 'shelf/shelf_grouping.dart';
 import 'shelf/shelf_view.dart';
 import 'shortcuts.dart';
 import 'snack_bars.dart';
@@ -1192,6 +1194,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 _statusMenu(),
                 _genreMenu(),
                 _sortMenu(),
+                _groupMenu(),
               ],
             )
           : AppBar(title: Text(l10n.physicalLibraries)),
@@ -1314,6 +1317,28 @@ class _LibraryPageState extends State<LibraryPage> {
           icon: const Icon(Icons.keyboard_command_key),
           tooltip: L10n.of(context).commandsTooltip('${commandModifierLabel()}K'),
           onPressed: _openCommandPalette,
+        ),
+      );
+
+  final _groupMemo = GroupMemo();
+
+  Widget _groupMenu() => Builder(
+        builder: (context) => PopupMenuButton<ShelfGroupBy>(
+          icon: Icon(
+            widget.settings.shelfGroupBy == ShelfGroupBy.none
+                ? Icons.view_agenda_outlined
+                : Icons.view_agenda,
+          ),
+          tooltip: L10n.of(context).groupBy,
+          initialValue: widget.settings.shelfGroupBy,
+          onSelected: widget.settings.setShelfGroupBy,
+          itemBuilder: (context) => [
+            for (final g in ShelfGroupBy.values)
+              PopupMenuItem(
+                value: g,
+                child: Text(g.labelOf(L10n.of(context))),
+              ),
+          ],
         ),
       );
 
@@ -1654,13 +1679,15 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       );
     }
+    // Memoised on the entry list, so this runs once per query result.
+    final groups = _groupMemo.of(entries, widget.settings.shelfGroupBy);
     // The list is a different widget rather than a mode inside ShelfView: it
     // needs the whole entry (author, whether there is a file) where the shelf
     // needs only the book, and a shelf that drew no shelves would be a shelf
     // in name only.
     if (widget.settings.bookFace == BookFace.list) {
       return BookListView(
-        entries: entries,
+        groups: groups,
         selected: _selection,
         onToggleSelected: _toggleSelected,
         selectionMode: _selection.isNotEmpty,
@@ -1674,7 +1701,7 @@ class _LibraryPageState extends State<LibraryPage> {
       );
     }
     return ShelfView(
-      books: [for (final e in entries) e.book],
+      groups: groups,
       selected: _selection,
       onToggleSelected: _toggleSelected,
       selectionMode: _selection.isNotEmpty,

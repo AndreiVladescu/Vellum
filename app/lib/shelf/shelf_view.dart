@@ -11,6 +11,8 @@ import 'book_open_route.dart';
 import 'cover_image.dart';
 import 'cover_color.dart';
 import 'gradient_strip.dart';
+import 'group_header.dart';
+import 'shelf_grouping.dart';
 import 'spine_style.dart';
 import '../l10n/gen/app_localizations.dart';
 
@@ -25,10 +27,15 @@ const _coverWidth = 116.0;
 ///
 /// Spines have known widths (from their [SpineStyle]), so books are packed
 /// greedily into as many shelf rows as the screen width requires.
-class ShelfView extends StatelessWidget {
+///
+/// With [groups] the shelf is cut into headed sections (v1.4.1): each group is
+/// packed into its own rows, so a header always starts a fresh shelf board.
+/// Everything is a sliver, so only the rows on screen are built, grouped or not.
+class ShelfView extends StatefulWidget {
   const ShelfView({
     super.key,
-    required this.books,
+    this.books = const [],
+    this.groups,
     required this.detailBuilder,
     this.bookFace = BookFace.spine,
     this.spineArt = SpineArt.coverSlice,
@@ -40,7 +47,12 @@ class ShelfView extends StatelessWidget {
     this.selectionMode = false,
   });
 
+  /// The books to show when [groups] is null.
   final List<Book> books;
+
+  /// Headed sections to show instead of [books]; see `groupEntries`. A single
+  /// group with `headed: false` is the ungrouped shelf.
+  final List<ShelfGroup>? groups;
 
   /// Book ids currently ticked (next features #4).
   final Set<String> selected;
@@ -77,42 +89,117 @@ class ShelfView extends StatelessWidget {
   final File? Function(Book)? coverFileOf;
 
   @override
+  State<ShelfView> createState() => _ShelfViewState();
+}
+
+/// One run of shelf rows, under a header or not.
+class _Section {
+  const _Section(this.group, this.rows);
+  final ShelfGroup? group;
+  final List<List<Book>> rows;
+}
+
+class _ShelfViewState extends State<ShelfView> {
+  /// Folded groups, by [ShelfGroup.key].
+  final _collapsed = <String>{};
+
+  // The packing is memoised: it measures every book (a JSON decode of its
+  // spine style each) and only depends on what is in the key below, whereas
+  // build runs on every selection tick and every scroll-driven rebuild above.
+  List<_Section>? _sections;
+  Object? _packBooks;
+  Object? _packGroups;
+  double? _packWidth;
+  BookFace? _packFace;
+  double? _packScale;
+
+  List<_Section> _pack(double rowWidth) {
+    final w = widget;
+    if (_sections == null ||
+        !identical(_packBooks, w.books) ||
+        !identical(_packGroups, w.groups) ||
+        _packWidth != rowWidth ||
+        _packFace != w.bookFace ||
+        _packScale != w.typography.clampedWidth) {
+      final groups = w.groups;
+      _sections = groups == null
+          ? [_Section(null, _packIntoRows(w.books, rowWidth))]
+          : [
+              for (final g in groups)
+                _Section(g, _packIntoRows([for (final e in g.entries) e.book], rowWidth)),
+            ];
+      _packBooks = w.books;
+      _packGroups = groups;
+      _packWidth = rowWidth;
+      _packFace = w.bookFace;
+      _packScale = w.typography.clampedWidth;
+    }
+    return _sections!;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final rowWidth = constraints.maxWidth - 2 * _shelfPadding;
-        final rows = _packIntoRows(rowWidth);
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _shelfPadding,
-            vertical: 24,
-          ),
-          itemCount: rows.length,
-          itemBuilder: (context, i) => _ShelfRow(
-            row: rows[i],
-            bookFace: bookFace,
-            spineArt: spineArt,
-            material: material,
-            typography: typography,
-            detailBuilder: detailBuilder,
-            coverFileOf: coverFileOf,
-            selected: selected,
-            onToggleSelected: onToggleSelected,
-            selectionMode: selectionMode,
-          ),
+        final sections = _pack(rowWidth);
+        final headed = sections.any((s) => s.group?.headed ?? false);
+        return CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: headed ? 8 : 24)),
+            for (final section in sections)
+              SliverMainAxisGroup(
+                slivers: [
+                  if (section.group?.headed ?? false)
+                    groupHeaderSliver(
+                      group: section.group!,
+                      collapsed: _collapsed.contains(section.group!.key),
+                      onToggle: () => setState(() {
+                        final k = section.group!.key;
+                        if (!_collapsed.remove(k)) _collapsed.add(k);
+                      }),
+                    ),
+                  if (!_collapsed.contains(section.group?.key ?? ''))
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        _shelfPadding,
+                        headed ? 12 : 0,
+                        _shelfPadding,
+                        0,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: section.rows.length,
+                        itemBuilder: (context, i) => _ShelfRow(
+                          row: section.rows[i],
+                          bookFace: widget.bookFace,
+                          spineArt: widget.spineArt,
+                          material: widget.material,
+                          typography: widget.typography,
+                          detailBuilder: widget.detailBuilder,
+                          coverFileOf: widget.coverFileOf,
+                          selected: widget.selected,
+                          onToggleSelected: widget.onToggleSelected,
+                          selectionMode: widget.selectionMode,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
         );
       },
     );
   }
 
-  double _widthOf(Book book) => bookFace == BookFace.cover
+  double _widthOf(Book book) => widget.bookFace == BookFace.cover
       ? _coverWidth
       // The same scale the spine itself is drawn at, or the packer would lay
       // out rows for a width the books no longer have.
       : SpineStyle.fromJson(book.spineStyle, title: book.title).width *
-          typography.clampedWidth;
+          widget.typography.clampedWidth;
 
-  List<List<Book>> _packIntoRows(double rowWidth) {
+  List<List<Book>> _packIntoRows(List<Book> books, double rowWidth) {
     final rows = <List<Book>>[[]];
     var used = 0.0;
     for (final book in books) {
@@ -124,6 +211,8 @@ class ShelfView extends StatelessWidget {
       rows.last.add(book);
       used += w + _spineGap;
     }
+    // An empty group (or no books at all) is no rows, not one empty shelf.
+    if (rows.length == 1 && rows.first.isEmpty) return const [];
     return rows;
   }
 }

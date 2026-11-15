@@ -6,6 +6,9 @@ import '../data/reading_status.dart';
 import '../widgets/page_insets.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
+import '../settings/shelf_group_by.dart';
+import 'group_header.dart';
+import 'shelf_grouping.dart';
 
 /// The library as a list, one line per book and no artwork.
 ///
@@ -18,35 +21,82 @@ import '../l10n/labels.dart';
 /// the things worth showing here — the author, whether there is a file to open
 /// — are exactly the things a spine cannot say, and they already travel with
 /// the shelf's query.
-class BookListView extends StatelessWidget {
+class BookListView extends StatefulWidget {
   const BookListView({
     super.key,
-    required this.entries,
+    this.entries = const [],
+    this.groups,
     required this.detailBuilder,
     this.selected = const {},
     this.onToggleSelected,
     this.selectionMode = false,
   });
 
+  /// The rows to show when [groups] is null.
   final List<LibraryEntry> entries;
+
+  /// Headed sections to show instead of [entries] (v1.4.1).
+  final List<ShelfGroup>? groups;
   final Widget Function(Book) detailBuilder;
   final Set<String> selected;
   final void Function(Book)? onToggleSelected;
   final bool selectionMode;
 
   @override
+  State<BookListView> createState() => _BookListViewState();
+}
+
+class _BookListViewState extends State<BookListView> {
+  final _collapsed = <String>{};
+
+  @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: pageInsets(context, const EdgeInsets.symmetric(vertical: 4)),
-      itemCount: entries.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, i) => _BookRow(
-        entry: entries[i],
-        detailBuilder: detailBuilder,
-        ticked: selected.contains(entries[i].book.id),
-        onToggleSelected: onToggleSelected,
-        selectionMode: selectionMode,
-      ),
+    final groups = widget.groups ??
+        [
+          ShelfGroup(
+            by: ShelfGroupBy.none,
+            key: '',
+            name: null,
+            entries: widget.entries,
+            headed: false,
+          ),
+        ];
+    final insets = pageInsets(context, const EdgeInsets.symmetric(vertical: 4));
+    return CustomScrollView(
+      slivers: [
+        // Slivers, so a 4,000-book list builds only the rows on screen,
+        // grouped or not.
+        for (final group in groups)
+          SliverMainAxisGroup(
+            slivers: [
+              if (group.headed)
+                groupHeaderSliver(
+                  group: group,
+                  collapsed: _collapsed.contains(group.key),
+                  onToggle: () => setState(() {
+                    if (!_collapsed.remove(group.key)) {
+                      _collapsed.add(group.key);
+                    }
+                  }),
+                ),
+              if (!_collapsed.contains(group.key))
+                SliverPadding(
+                  padding: insets,
+                  sliver: SliverList.separated(
+                    itemCount: group.entries.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, i) => _BookRow(
+                      entry: group.entries[i],
+                      detailBuilder: widget.detailBuilder,
+                      ticked: widget.selected.contains(group.entries[i].book.id),
+                      onToggleSelected: widget.onToggleSelected,
+                      selectionMode: widget.selectionMode,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

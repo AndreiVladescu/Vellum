@@ -14,9 +14,13 @@ class LibraryEntry {
     required this.authors,
     required this.genres,
     required this.hasFile,
+    this.seriesName,
   });
 
   final Book book;
+  /// The series' display name (not lowercased), for grouping the shelf by
+  /// series. Null when the book is in none.
+  final String? seriesName;
   final List<String> authors; // ordered by book_authors.position
   final List<String> genres;
   final bool hasFile;
@@ -234,6 +238,7 @@ class LibraryQueries {
               authors: authorsByBook[b.book.id] ?? const [],
               genres: genresByBook[b.book.id] ?? const [],
               hasFile: b.hasFile,
+              seriesName: b.seriesName,
             ),
         ];
         return LibraryView(
@@ -272,7 +277,8 @@ class LibraryQueries {
         .map((row) => row.read<bool>('empty'));
   }
 
-  Stream<List<({Book book, bool hasFile})>> _watchFilteredSortedBooks({
+  Stream<List<({Book book, bool hasFile, String? seriesName})>>
+      _watchFilteredSortedBooks({
     String? shelfId,
     String query = '',
     String? genre,
@@ -361,6 +367,10 @@ class LibraryQueries {
     final sql =
         'SELECT books.*, $authorSortExpr AS sort_author, '
         '$seriesSortExpr AS sort_series, '
+        '(SELECT s.name FROM series s WHERE s.id = books.series_id) '
+        'AS series_name, '
+        '(SELECT s.name FROM series s WHERE s.id = books.series_id) '
+        'AS series_name, '
         'EXISTS(SELECT 1 FROM book_files bf WHERE bf.book_id = books.id) '
         'AS has_file '
         'FROM books '
@@ -390,7 +400,11 @@ class LibraryQueries {
         .watch()
         .map((rows) => [
               for (final row in rows)
-                (book: db.books.map(row.data), hasFile: row.read<bool>('has_file')),
+                (
+                  book: db.books.map(row.data),
+                  hasFile: row.read<bool>('has_file'),
+                  seriesName: row.read<String?>('series_name'),
+                ),
             ]);
   }
 }

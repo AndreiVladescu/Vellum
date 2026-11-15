@@ -133,6 +133,52 @@
     "description": "Tooltip on the shelf's sort menu."
   },
 
+  "groupBy": "Group by",
+  "@groupBy": {
+    "description": "Tooltip on the shelf's group-by menu."
+  },
+
+  "groupByNone": "No grouping",
+  "@groupByNone": {
+    "description": "Menu entry: show the shelf as one list, without headers."
+  },
+
+  "groupByAuthor": "By author",
+  "@groupByAuthor": {
+    "description": "Menu entry: group the shelf under a header per author."
+  },
+
+  "groupBySeries": "By series",
+  "@groupBySeries": {
+    "description": "Menu entry: group the shelf under a header per series."
+  },
+
+  "groupByGenre": "By genre",
+  "@groupByGenre": {
+    "description": "Menu entry: group the shelf under a header per genre."
+  },
+
+  "groupNoAuthor": "No author",
+  "@groupNoAuthor": {
+    "description": "Header of the shelf group holding books without an author."
+  },
+
+  "groupNoSeries": "No series",
+  "@groupNoSeries": {
+    "description": "Header of the shelf group holding books outside any series."
+  },
+
+  "groupNoGenre": "No genre",
+  "@groupNoGenre": {
+    "description": "Header of the shelf group holding books without a genre."
+  },
+
+  "groupHeaderLabel": "{name}, {count} books",
+  "@groupHeaderLabel": {
+    "description": "Screen-reader label of a shelf group header.",
+    "placeholders": { "name": { "type": "String" }, "count": { "type": "int" } }
+  },
+
   "sortBy": "Sort by {field}",
   "@sortBy": {
     "placeholders": { "field": { "type": "String" } }

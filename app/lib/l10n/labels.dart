@@ -21,6 +21,7 @@ import '../server/sync_scope.dart' show SyncScope;
 import '../server/sync_service.dart' show SyncIssue, SyncNote, SyncPhase;
 import '../settings/appearance.dart';
 import '../settings/book_face.dart';
+import '../settings/shelf_group_by.dart';
 import '../settings/shelf_sort.dart';
 import '../settings/spine_art.dart';
 import '../reader/annotations/annotation_store.dart';
@@ -59,6 +60,23 @@ extension ShelfSortL10n on ShelfSort {
     ShelfSort.author => l10n.sortAuthor,
     ShelfSort.year => l10n.sortYear,
     ShelfSort.series => l10n.sortSeries,
+  };
+}
+
+extension ShelfGroupByL10n on ShelfGroupBy {
+  String labelOf(L10n l10n) => switch (this) {
+    ShelfGroupBy.none => l10n.groupByNone,
+    ShelfGroupBy.author => l10n.groupByAuthor,
+    ShelfGroupBy.series => l10n.groupBySeries,
+    ShelfGroupBy.genre => l10n.groupByGenre,
+  };
+
+  /// The header of the group for books with no value.
+  String missingLabelOf(L10n l10n) => switch (this) {
+    ShelfGroupBy.author => l10n.groupNoAuthor,
+    ShelfGroupBy.series => l10n.groupNoSeries,
+    ShelfGroupBy.genre => l10n.groupNoGenre,
+    ShelfGroupBy.none => '',
   };
 }
 

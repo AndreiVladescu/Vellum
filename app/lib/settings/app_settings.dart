@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import 'appearance.dart';
 import 'book_face.dart';
+import 'shelf_group_by.dart';
 import 'shelf_sort.dart';
 import 'spine_art.dart';
 import 'wallpaper.dart';
@@ -23,6 +24,7 @@ class AppSettingsStore extends ChangeNotifier {
   static const _spineArtKey = 'settings.spineArt';
   static const _selectedShelfKey = 'settings.selectedShelf';
   static const _shelfSortKey = 'settings.shelfSort';
+  static const _shelfGroupByKey = 'settings.shelfGroupBy';
   static const _autoPushKey = 'settings.autoPush';
   static const _importGenresKey = 'settings.importOpenLibraryGenres';
   static const _acceptShelvesKey = 'settings.acceptSharedShelves';
@@ -258,6 +260,19 @@ class AppSettingsStore extends ChangeNotifier {
 
   Future<void> setShelfSort(ShelfSort value) async {
     await _prefs.setString(_shelfSortKey, value.name);
+    notifyListeners();
+  }
+
+  /// How the digital shelf is split under headers (none by default). Global,
+  /// like [shelfSort].
+  ShelfGroupBy get shelfGroupBy {
+    final stored = _prefs.getString(_shelfGroupByKey);
+    return ShelfGroupBy.values.where((s) => s.name == stored).firstOrNull ??
+        ShelfGroupBy.none;
+  }
+
+  Future<void> setShelfGroupBy(ShelfGroupBy value) async {
+    await _prefs.setString(_shelfGroupByKey, value.name);
     notifyListeners();
   }
 

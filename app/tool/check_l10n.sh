@@ -193,6 +193,7 @@ MIGRATED=(
   lib/settings/preferences_page.dart
   lib/settings/preferences_layout.dart
   lib/settings/shared_shelves_page.dart
+  lib/settings/shelf_group_by.dart
   lib/settings/shelf_sort.dart
   lib/settings/spine_art.dart
   lib/settings/trash_page.dart
@@ -201,6 +202,8 @@ MIGRATED=(
   lib/shelf/book_list_view.dart
   lib/shelf/book_open_route.dart
   lib/shelf/command_palette.dart
+  lib/shelf/group_header.dart
+  lib/shelf/shelf_grouping.dart
   lib/shelf/content_search.dart
   lib/shelf/cover_color.dart
   lib/shelf/cover_image.dart
