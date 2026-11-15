@@ -200,3 +200,10 @@ APK is the **free** flavour, so no anti-features apply.
    would build ML Kit into an F-Droid release.
 
 Step 2 is ordinary work. Step 1 is a project.
+
+## Read aloud
+
+`flutter_tts` (MIT) is in both flavours. On Android it only calls the system's
+`TextToSpeech` service: no engine, no Google Play Services and no extra native
+library ship in the APK, so it needs no flavour switch. Linux, which the plugin
+does not support, runs the `spd-say` command if it is installed.

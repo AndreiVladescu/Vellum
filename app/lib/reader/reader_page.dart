@@ -32,6 +32,10 @@ import 'page_metric.dart';
 import 'edge_turn.dart';
 import 'reader_gestures.dart';
 import 'reader_hotkeys.dart';
+import 'tts/read_aloud.dart';
+import 'tts/read_aloud_widgets.dart';
+import 'tts/tts_controller.dart';
+import 'tts/tts_text.dart';
 import 'reader_search_field.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
@@ -204,6 +208,38 @@ class _ReaderPageState extends State<ReaderPage>
   String _searchedFor = '';
   bool _searching = false;
 
+  /// Read aloud (roadmap v1.4.3). Created with the page so that closing it
+  /// silences it.
+  late final ReadAloud _readAloud = ReadAloud(source: _PdfSpeech(this));
+  bool _speaking = false;
+
+  void _onSpeechChanged() {
+    final speaking = _readAloud.controller.active;
+    if (speaking != _speaking && mounted) setState(() => _speaking = speaking);
+  }
+
+  /// Start or stop reading aloud, from the page on screen.
+  Future<void> _toggleReadAloud() async {
+    if (_readAloud.controller.active) {
+      await _readAloud.stop();
+      return;
+    }
+    final page = _page;
+    if (page == null || !_controller.isReady) return;
+    final l10n = L10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    if (_readAloud.available == null) await _readAloud.init();
+    if (!mounted) return;
+    if (_readAloud.available != true) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.ttsUnavailable)));
+      return;
+    }
+    await _readAloud.start(page - 1);
+    if (mounted && !_readAloud.controller.active) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.ttsNoText)));
+    }
+  }
+
   /// Ctrl+F / Ctrl+G, which have to work before the page is clicked.
   late final ReaderHotkeys _hotkeys = ReaderHotkeys(
     isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
@@ -217,6 +253,7 @@ class _ReaderPageState extends State<ReaderPage>
     isPaged: () => _mode == PdfPageMode.paged,
     onPageStep: _stepPage,
     onNudge: _nudge,
+    onReadAloud: _toggleReadAloud,
   );
 
   /// A whole page, in either mode.
@@ -264,6 +301,8 @@ class _ReaderPageState extends State<ReaderPage>
         ..clearLiveImages();
     }
     _hotkeys.attach();
+    _readAloud.addListener(_onSpeechChanged);
+    _readAloud.init();
     _watchForASlowOpen();
     _loadPace();
     _annotationsSub =
@@ -335,6 +374,8 @@ class _ReaderPageState extends State<ReaderPage>
     unawaited(WakelockPlus.disable().catchError((_) {}));
     _openTimer?.cancel();
     _hotkeys.detach();
+    _readAloud.removeListener(_onSpeechChanged);
+    _readAloud.dispose();
     // Closing the session is fire-and-forget: the widget is going away, and a
     // dropped write costs one session row, not correctness.
     _session.end(page: _page);
@@ -780,6 +821,14 @@ class _ReaderPageState extends State<ReaderPage>
                 : l10n.readerActAutoScroll,
             onPressed: _controller.isReady ? _toggleAutoScroll : null,
           ),
+        ReaderAction(
+          icon: _speaking
+              ? Icons.stop_circle_outlined
+              : Icons.record_voice_over_outlined,
+          label: _speaking ? l10n.ttsStopReading : l10n.ttsReadAloud,
+          selected: _speaking,
+          onPressed: _controller.isReady ? _toggleReadAloud : null,
+        ),
         ReaderAction(
           icon: _penMode ? Icons.edit : Icons.edit_outlined,
           label: _penMode ? l10n.readerActPenStop : l10n.readerActPenStart,
@@ -1837,7 +1886,8 @@ class _ReaderPageState extends State<ReaderPage>
                   value: () {
                     final s = _settings;
                     if (s == null) return;
-                    ReaderSettingsSheet.show(context, settings: s, pdf: true);
+                    ReaderSettingsSheet.show(context,
+                        settings: s, pdf: true, readAloud: _readAloud);
                   },
                   child: Text(l10n.readerMenuReadingOptions),
                 ),
@@ -1977,6 +2027,19 @@ class _ReaderPageState extends State<ReaderPage>
           // A swipe down from the very top edge brings the chrome back, the way
           // a video player does. A deliberate gesture from a place nothing else
           // uses, rather than a tap: taps are how pages turn.
+          if (_speaking)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 24,
+              child: Center(
+                child: ReadAloudBar(
+                  readAloud: _readAloud,
+                  foreground: readerTheme.foreground,
+                  background: readerTheme.background,
+                ),
+              ),
+            ),
           if (_chromeHidden)
             Positioned(
               top: 0,
@@ -2353,4 +2416,68 @@ class _InkDrag {
   /// True when the drag started on the corner handle, which turns and resizes
   /// instead of moving.
   final bool handle;
+}
+
+/// The PDF as read aloud sees it: one section per page, from its text layer.
+/// A page without one (a scan) has no chunks, and is passed over.
+class _PdfSpeech implements TtsSource {
+  _PdfSpeech(this._state);
+
+  final _ReaderPageState _state;
+
+  @override
+  int get sectionCount => _state._controller.isReady ? _state._controller.pageCount : 0;
+
+  @override
+  Future<List<TtsChunk>> chunksOf(int section) async {
+    final text = await _state._controller.useDocument((document) async {
+          // pdfrx loads pages progressively, and an unloaded page reads as
+          // empty text, so wait for it before reading it.
+          final loaded = await document.pages[section]
+              .waitForLoaded(timeout: const Duration(seconds: 5));
+          if (loaded == null) return '';
+          return (await loaded.loadStructuredText()).fullText;
+        }) ??
+        '';
+    return speechChunks(speakablePdfText(text));
+  }
+
+  @override
+  void onSpeaking(int section, int index, TtsChunk chunk) {
+    final state = _state;
+    if (!state.mounted || !state._controller.isReady) return;
+    // Only when the voice has moved on to another page: the sentence itself is
+    // not located on the page, so within one the view is left alone.
+    if (state._page != section + 1) {
+      state._controller.goToPage(pageNumber: section + 1);
+    }
+  }
+
+  @override
+  void onSectionSkipped(int section) {
+    final state = _state;
+    if (!state.mounted) return;
+    ScaffoldMessenger.of(state.context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content: Text(L10n.of(state.context).ttsPageSkipped(section + 1)),
+        duration: const Duration(seconds: 2),
+      ));
+  }
+
+  @override
+  void onFinished() {
+    final state = _state;
+    if (!state.mounted) return;
+    ScaffoldMessenger.of(state.context)
+        .showSnackBar(SnackBar(content: Text(L10n.of(state.context).ttsFinished)));
+  }
+
+  @override
+  void onError(String message) {
+    final state = _state;
+    if (!state.mounted) return;
+    ScaffoldMessenger.of(state.context).showSnackBar(
+        SnackBar(content: Text(L10n.of(state.context).ttsFailed(message))));
+  }
 }

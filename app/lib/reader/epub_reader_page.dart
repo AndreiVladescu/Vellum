@@ -35,6 +35,10 @@ import 'page_metric.dart';
 import 'reader_actions.dart';
 import 'reader_settings.dart';
 import 'translate/translate_sheet.dart';
+import 'tts/read_aloud.dart';
+import 'tts/read_aloud_widgets.dart';
+import 'tts/tts_controller.dart';
+import 'tts/tts_text.dart';
 import 'reader_settings_sheet.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
@@ -128,6 +132,16 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   final _selectionArea = GlobalKey<SelectionAreaState>();
 
   AnnotationStore get _annotations => widget.repository.annotations;
+
+  /// Read aloud (roadmap v1.4.3). Created with the page so that closing it
+  /// silences it.
+  late final ReadAloud _readAloud = ReadAloud(source: _EpubSpeech(this));
+  bool _speaking = false;
+
+  void _onSpeechChanged() {
+    final speaking = _readAloud.controller.active;
+    if (speaking != _speaking && mounted) setState(() => _speaking = speaking);
+  }
 
   /// Records this sitting (plan 5 #19). Pages are chapters here, which is the
   /// honest unit for an EPUB — the stats say "pages" because that is what the
@@ -311,12 +325,15 @@ class _EpubReaderPageState extends State<EpubReaderPage>
         delta > 0 ? _pageForward(_count) : _pageBack(_count),
     onNudge: _nudge,
     spaceTurnsPages: true,
+    onReadAloud: _toggleReadAloud,
   );
 
   @override
   void initState() {
     super.initState();
     _hotkeys.attach();
+    _readAloud.addListener(_onSpeechChanged);
+    _readAloud.init();
     _annotationsSub =
         _annotations.watchForBook(widget.book.id).listen((annotations) {
       if (mounted) setState(() => _bookAnnotations = annotations);
@@ -450,6 +467,8 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     // The wakelock belongs to this page, not to the app.
     unawaited(WakelockPlus.disable().catchError((_) {}));
     _hotkeys.detach();
+    _readAloud.removeListener(_onSpeechChanged);
+    _readAloud.dispose();
     _annotationsSub?.cancel();
     _saveDebounce?.cancel();
     _scroll.removeListener(_onScroll);
@@ -866,6 +885,89 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     );
     if (target == null || !mounted) return;
     _goTo(target.clamp(1, count) - 1, count);
+  }
+
+  /// Read aloud's start/stop: from the selection if there is one, else from
+  /// the top of what is on screen.
+  Future<void> _toggleReadAloud() async {
+    final epub = _loaded;
+    if (epub == null) return;
+    if (_readAloud.controller.active) {
+      await _readAloud.stop();
+      return;
+    }
+    final l10n = L10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    if (_readAloud.available == null) await _readAloud.init();
+    if (!mounted) return;
+    if (_readAloud.available != true) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.ttsUnavailable)));
+      return;
+    }
+    _readAloud.bookLanguage = epub.language;
+    final length = epub.chapters[_chapter].plainText.length;
+    final selection = _selectionRange;
+    final offset = selection != null && selection.end > selection.start
+        ? selection.start
+        : (_topOfViewFraction() * length).floor();
+    await _readAloud.start(_chapter, offset: offset);
+    if (mounted && _readAloud.controller.current == null &&
+        !_readAloud.controller.active) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.ttsNoText)));
+    }
+  }
+
+  /// How far down the chapter's text the top of the page is, as a proportion
+  /// of the whole — the same measure [_followSpeech] moves by.
+  double _topOfViewFraction() {
+    final pages = _pages;
+    if (_paged && pages != null && pages.ready) {
+      return pages.contentFractionOf(pages.pageFor(_anchor));
+    }
+    if (!_paged && _scroll.hasClients) {
+      final extent = _scroll.position.maxScrollExtent +
+          _scroll.position.viewportDimension;
+      return extent <= 0 ? 0 : (_scroll.offset / extent).clamp(0.0, 1.0);
+    }
+    return switch (_anchor) {
+      AtScrollFraction(:final fraction) => fraction,
+      AtContentFraction(:final fraction) => fraction,
+    };
+  }
+
+  /// Brings the sentence being spoken into view: the chapter it is in, then —
+  /// paged — the page it is on, or — scrolled — a scroll that keeps it in the
+  /// upper part of the screen.
+  ///
+  /// **Approximate by design.** The place is the sentence's share of the
+  /// chapter's text, mapped onto the share of its laid-out height; a chapter
+  /// that is mostly pictures puts the two out by a little. It errs by a
+  /// sentence or a page at most, and the voice, not the view, is what keeps
+  /// the place.
+  void _followSpeech(int chapter, TtsChunk chunk, int textLength) {
+    if (!mounted) return;
+    if (chapter != _chapter) _goTo(chapter, _count);
+    final fraction = textLength <= 0 ? 0.0 : chunk.start / textLength;
+    if (_paged) {
+      final pages = _pages;
+      if (pages == null || !pages.ready || chapter != _chapter) return;
+      final target = pages.pageAt(fraction * pages.contentHeight);
+      if (target != pages.pageFor(_anchor)) _turnTo(pages, target);
+      return;
+    }
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final extent = position.maxScrollExtent + position.viewportDimension;
+    final y = fraction * extent;
+    final top = position.pixels;
+    final view = position.viewportDimension;
+    if (y < top + view * 0.05 || y > top + view * 0.7) {
+      _scroll.animateTo(
+        (y - view * 0.25).clamp(0.0, position.maxScrollExtent),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _openPanel(EpubBook epub) {
@@ -1320,6 +1422,14 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                       onPressed: _toggleAutoScroll,
                     ),
                   ReaderAction(
+                    icon: _speaking
+                        ? Icons.stop_circle_outlined
+                        : Icons.record_voice_over_outlined,
+                    label: _speaking ? l10n.ttsStopReading : l10n.ttsReadAloud,
+                    selected: _speaking,
+                    onPressed: _toggleReadAloud,
+                  ),
+                  ReaderAction(
                     icon: Icons.fullscreen,
                     label: l10n.readerActReadingMode,
                     onPressed: () => _setReadingMode(true),
@@ -1352,6 +1462,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                         context,
                         settings: settings,
                         typography: true,
+                        readAloud: _readAloud,
                       ),
                     ),
                 ],
@@ -1509,6 +1620,19 @@ class _EpubReaderPageState extends State<EpubReaderPage>
               // The speed control, shown only while the page is moving by
               // itself — and shown in reading mode too, because that is where
               // it is used.
+              if (_speaking)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: _autoScrolling ? 84 : 24,
+                  child: Center(
+                    child: ReadAloudBar(
+                      readAloud: _readAloud,
+                      foreground: readerTheme.foreground,
+                      background: readerTheme.background,
+                    ),
+                  ),
+                ),
               if (_autoScrolling)
                 Positioned(
                   left: 0,
@@ -1611,5 +1735,53 @@ class _EpubReaderPageState extends State<EpubReaderPage>
         );
       },
     );
+  }
+}
+
+/// The EPUB as read aloud sees it: each chapter's plain text, cut into
+/// sentences. Their offsets index that same text, which is how a sentence
+/// becomes a place on the page.
+class _EpubSpeech implements TtsSource {
+  _EpubSpeech(this._state);
+
+  final _EpubReaderPageState _state;
+  final _cache = <int, ({List<TtsChunk> chunks, int length})>{};
+
+  @override
+  int get sectionCount => _state._count;
+
+  ({List<TtsChunk> chunks, int length}) _of(int section) {
+    final hit = _cache[section];
+    if (hit != null) return hit;
+    final text = _state._loaded!.chapters[section].plainText;
+    // A chapter either side of the one being read is all that is revisited.
+    if (_cache.length > 3) _cache.remove(_cache.keys.first);
+    return _cache[section] = (chunks: speechChunks(text), length: text.length);
+  }
+
+  @override
+  Future<List<TtsChunk>> chunksOf(int section) async => _of(section).chunks;
+
+  @override
+  void onSpeaking(int section, int index, TtsChunk chunk) =>
+      _state._followSpeech(section, chunk, _of(section).length);
+
+  @override
+  void onSectionSkipped(int section) {}
+
+  @override
+  void onFinished() {
+    final state = _state;
+    if (!state.mounted) return;
+    ScaffoldMessenger.of(state.context)
+        .showSnackBar(SnackBar(content: Text(L10n.of(state.context).ttsFinished)));
+  }
+
+  @override
+  void onError(String message) {
+    final state = _state;
+    if (!state.mounted) return;
+    ScaffoldMessenger.of(state.context).showSnackBar(
+        SnackBar(content: Text(L10n.of(state.context).ttsFailed(message))));
   }
 }

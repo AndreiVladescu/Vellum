@@ -296,3 +296,29 @@ this order.
   link turns the page as well as following it; a re-pagination (text size,
   window) keeps the place by proportion of the chapter, not by the exact line;
   no page-turn animation; volume-key turns still need a platform plugin.
+
+## Read aloud (v1.4.3): checks owed on a device
+
+Written without a speech engine to hand; the controller and sentence cutting are
+unit tested (`test/reader/tts/`), the engines and the page-following are not.
+
+- **Android, EPUB, paged and scrolled.** Read aloud from the middle of a
+  chapter: it starts at the top of the page (or the selection), the page turns
+  as sentences go by, and it rolls into the next chapter. Pause, skip back and
+  forward, stop. Check the page it turns to is the one the voice is on (the
+  position is the sentence's share of the chapter's text, so a chapter heavy in
+  pictures may be a page out).
+- **Android, PDF.** Starts on the current page, moves the view along, skips a
+  scanned page with a short notice.
+- **Speed and voice** in the reader's settings sheet are remembered across
+  books and restarts. The default voice follows the EPUB's `dc:language`.
+- **No engine:** with the system speech service disabled, Read aloud explains
+  rather than doing nothing.
+- **Audio focus.** `flutter_tts` asks for focus when it speaks but reports no
+  loss of it, so a phone call or another player does not pause the reader;
+  leaving the app (paused/hidden) does. Decide whether that is enough.
+- **Linux.** `flutter_tts` has no Linux support, so the app calls `spd-say`
+  (speech-dispatcher) directly. Check with and without it installed, that stop
+  cuts the voice at once, and that the speed slider is audible.
+- **Windows / macOS:** the plugin's speed scales are mapped by guess
+  (`PluginTtsEngine.pluginRate`); check 0.5x, 1x and 2x sound right.

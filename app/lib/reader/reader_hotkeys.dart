@@ -27,6 +27,7 @@ class ReaderHotkeys {
     this.onPageStep,
     this.onNudge,
     this.spaceTurnsPages = false,
+    this.onReadAloud,
     bool Function()? isTextFieldFocused,
   }) : isTextFieldFocused = isTextFieldFocused ?? _editableHasFocus;
 
@@ -53,6 +54,9 @@ class ReaderHotkeys {
 
   /// Move by a little — a few lines' worth of scrolling. +1 is downward.
   final void Function(int delta)? onNudge;
+
+  /// Ctrl+Shift+R (Cmd+Shift+R on a Mac): start or stop reading aloud.
+  final void Function()? onReadAloud;
 
   /// Whether Space (Shift+Space back) turns a page in paged mode, as it does in
   /// most e-readers. Opt-in, so a reader that never asked keeps Space as it was.
@@ -98,6 +102,12 @@ class ReaderHotkeys {
 
     if (event.logicalKey == LogicalKeyboardKey.keyF) {
       onFind();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyR &&
+        HardwareKeyboard.instance.isShiftPressed &&
+        onReadAloud != null) {
+      onReadAloud!();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.keyG) {
