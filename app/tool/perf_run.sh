@@ -153,6 +153,7 @@ if [ "$target" = linux ]; then
     exit 75
   fi
 else
+  NODDS=1
   serial=${ANDROID_SERIAL:-$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')}
   [ -n "$serial" ] || { echo "no Android device connected" >&2; exit 69; }
   DEVICE=$serial
@@ -181,7 +182,10 @@ if [ "$only" != startup ]; then
       done
     ) &
   fi
-  PERF_OUT=$RUN/gui "$FLUTTER" drive --profile -d "$DEVICE" \
+  # On a phone the test reaches the VM service through its own port forward;
+  # with DDS in the middle the connection is refused ("Failed to connect to VM
+  # Service"), so Android runs without it.
+  PERF_OUT=$RUN/gui "$FLUTTER" drive --profile -d "$DEVICE" ${NODDS:+--no-dds} \
     --driver test_driver/perf_driver.dart \
     --target integration_test/perf_test.dart \
     2>&1 | tee "$RUN/gui.log" | grep -E 'All tests passed|Some tests failed|Exception|Error' || true
