@@ -11,7 +11,8 @@
 #   tool/emulator.sh status                  list running emulators / qemu
 #
 # AVDs on this machine: vellum_test (Pixel 6), vellum_tablet (Pixel Tablet),
-# both Android 14 Google APIs x86_64. Inside `run`, the command can call
+# both Android 14, and vellum_android16 (Pixel 6, Android 16); all Google APIs
+# x86_64. Inside `run`, the command can call
 # `tool/emulator.sh install`, `shot`, `adb ...` freely; the emulator is gone
 # when it exits, pass or fail.
 #

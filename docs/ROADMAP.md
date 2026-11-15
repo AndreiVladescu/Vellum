@@ -135,8 +135,9 @@ lets the work be checked before it ships.
       profile (Pixel Tablet), for the wide layouts (done 2026-11-13:
       `vellum_tablet`, 2560x1600 at 320 dpi; the shelf and book detail just
       stretch to the full width, no two-pane or rail yet)
-- [ ] **S** Android 16: an API 36 image and AVD, for `workmanager` 0.10's
-      Android 16 fixes (a ~1.5 GB download; the disk is 95 % full)
+- [x] **S** Android 16: an API 36 image and AVD `vellum_android16` (Pixel 6,
+      Google APIs x86_64), for `workmanager` 0.10's Android 16 fixes; the app
+      installs and opens (2026-11-15)
 - [x] **M** A script under `tool/` that boots an AVD headless, installs the
       APK, runs a check and shuts it down, so agents can use it without
       leaving an emulator running (done 2026-11-13: `app/tool/emulator.sh`,
