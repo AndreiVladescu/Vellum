@@ -282,6 +282,7 @@ class _LibraryPageState extends State<LibraryPage> {
   /// Books opened or shared into Vellum from another app (plan 5 #20).
   late final IncomingShare _incoming = IncomingShare();
   StreamSubscription<List<String>>? _incomingSub;
+  StreamSubscription<void>? _continueWidgetSub;
   StreamSubscription<LauncherShortcut>? _shortcutSub;
 
   /// Due-date notifications for lent books (roadmap v1.4.2).
@@ -325,10 +326,10 @@ class _LibraryPageState extends State<LibraryPage> {
     _showFirstRun();
     // Catch up covers that predate dominant-colour extraction (no-op once done).
     widget.repository.backfillCoverColors();
-    // Refresh the home-screen widget (plan 5 #40) — a no-op off Android, and
-    // silent everywhere. Pushed at launch and after a sync, which is when the
-    // answer can actually have changed.
-    unawaited(updateContinueWidget(widget.repository));
+    // Keep the home-screen widget (plan 5 #40) in step — a no-op off Android,
+    // and silent everywhere. Pushed once the database answers at launch, and
+    // again whenever what it would show changes (reading, a sync, a status).
+    _continueWidgetSub = watchContinueWidget(widget.repository);
   }
 
   /// Records that a sync happened, so the background schedule's "is it due?"
@@ -624,6 +625,7 @@ class _LibraryPageState extends State<LibraryPage> {
     _searchFocus.dispose();
     _autoPusher.dispose();
     _live.dispose();
+    _continueWidgetSub?.cancel();
     _incomingSub?.cancel();
     _shortcutSub?.cancel();
     _reminderTapSub?.cancel();

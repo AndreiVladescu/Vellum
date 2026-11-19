@@ -186,6 +186,24 @@ void main() {
       expect(pickContinueBook([newest]), isNull);
     });
 
+    test('a position with no timestamp is still on the go', () {
+      // After a restore or a pulled position the book has progress but no
+      // lastReadAt; it used to drop out and leave the widget empty.
+      final restored = book(id: 'r', progress: 0.13);
+      expect(pickContinueBook([restored])!.id, 'r');
+      final dated = book(id: 'd', progress: 0.5, lastRead: DateTime(2026, 4));
+      expect(pickContinueBook([restored, dated])!.id, 'd');
+    });
+
+    test('the push key changes with the percentage, not with every turn', () {
+      final a = book(progress: 0.131, page: 5);
+      final b = book(progress: 0.134, page: 5);
+      final c = book(progress: 0.15, page: 6);
+      expect(continueWidgetKey(a), continueWidgetKey(b));
+      expect(continueWidgetKey(a), isNot(continueWidgetKey(c)));
+      expect(continueWidgetKey(null), isNull);
+    });
+
     test('the cover path is carried through when there is one', () {
       final data = snapshotFor(L10nEn(), book(progress: 0.1), coverPath: '/tmp/x.jpg');
       expect(data.coverPath, '/tmp/x.jpg');
