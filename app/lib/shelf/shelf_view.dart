@@ -14,6 +14,7 @@ import 'gradient_strip.dart';
 import 'group_header.dart';
 import 'shelf_grouping.dart';
 import 'spine_style.dart';
+import 'text_shadow_cache.dart';
 import '../l10n/gen/app_localizations.dart';
 
 const _bookAreaHeight = 175.0;
@@ -562,6 +563,10 @@ int spineDecodeHeight(double wantedPx) {
   return bucket;
 }
 
+/// The soft shadow under a cover-slice spine's title, so it reads over any
+/// artwork. Public for the test that compares the cached drawing with it.
+const spineTitleShadow = Shadow(blurRadius: 4, color: Color(0xB3000000));
+
 /// The shading over a cover-slice spine.
 const _coverShading = GradientStrip(
   [Color(0x33FFFFFF), Color(0x00000000), Color(0x59000000)],
@@ -663,18 +668,20 @@ class SpineFace extends StatelessWidget {
             child: RotatedBox(
               quarterTurns: 1,
               child: Center(
-                child: Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13 * titleScale,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                    shadows: const [
-                      Shadow(blurRadius: 4, color: Color(0xB3000000)),
-                    ],
+                // The shadow is drawn once into an image and reused, not
+                // blurred again every frame (text_shadow_cache.dart).
+                child: CachedTextShadow(
+                  shadow: spineTitleShadow,
+                  child: Text(
+                    book.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13 * titleScale,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
                   ),
                 ),
               ),

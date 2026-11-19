@@ -849,10 +849,8 @@ host's cores, which are faster than a phone's.
 
 ### Next, in the order they would pay
 
-1. **The title shadow from a cached image** — the room's raster cost (58 → ~13
-   ms p90 measured without it) and the shelf's largest remaining one. Blur only;
-   the crisp title stays live. Prove it with a pixel comparison like
-   `gradient_strip_test.dart`.
+1. ~~**The title shadow from a cached image**~~ — done, see "The room round"
+   below.
 2. **Pan the room with a `Transform`**, so a pan frame rebuilds none of the 400
    placed books (14–20 ms of build a frame today).
 3. **No empty-library page while the library is still loading** — a visual
@@ -870,3 +868,71 @@ host's cores, which are faster than a phone's.
    its cold-start probe needs a look), then decide on spine strips from its
    `image_cache_peak_mb`; add a reader scenario; separate the resident-set
    growth over a run.
+
+## The room round (2026-11-20): panning and zooming the physical room
+
+The two room items at the top of the list above, plus what the measurements
+put next. **Measured headless**: the user was logged out, so `perf_run.sh
+--headless` ran Xephyr nested in a private Xvfb — Mesa's llvmpipe, **software
+rendering**. Raster times below are the CPU's, several times the GPU's (the
+GPU numbers above are the ones to quote); they compare two builds on the same
+machine, nothing more. Build times and wall times are the real Dart side.
+`PERF_ONLY=room tool/perf_run.sh --headless --only gui`, 1280 × 720 at 1×, the
+seeded library (4,000 books, 400 placed in the room), base 885b1dc, load
+average 3–7 (other work on the machine).
+
+The pan scenario is 120 pointer moves, each waiting for its frame, so its
+**wall time** is the plainest reading of how a drag feels.
+
+### #1 The title shadow is drawn once, from an image — kept
+
+`CachedTextShadow` (`lib/shelf/text_shadow_cache.dart`) wraps the cover
+spine's title. The first time a title is painted it lays the same paragraph out
+again with a transparent fill and the shadow in its style, records it, and
+`toImageSync`s it at the device pixel ratio: the engine's own shadow, alone, in
+an image the size of the title plus three sigmas of blur. From then on the
+title paints that image (one textured quad) and the crisp text over it, live,
+as before. Images are shared by key — text, style, text scale, pixel ratio,
+shadow, and where the ellipsis falls (the boxes of the laid-out text, so a
+zoom that does not move the cut-off reuses the image) — in a 16 MB LRU; each
+spine keeps a clone of its own, so the cache never pulls one out from under a
+frame. A paragraph that overflowed clips its shadow to its own box, and so does
+the image.
+
+Zooming moves most titles' ellipsis on every step, and drawing 400 new shadows
+a frame cost more than the blur did (zoom build p90 44 → 65 ms in a first
+attempt). So a spine whose cut-off moved keeps showing its previous shadow
+(same title, same glyphs up to the ellipsis, clipped to the box) until the
+cut-off has held still for a frame, and at most 24 are redrawn a frame; one
+more frame is always asked for, so the last ones land after the zoom stops.
+
+`text_shadow_cache_test.dart` (Roboto from the SDK, so the shadow follows real
+glyphs): on whole pixels the cached shadow is **the same pixels** (max 0–1
+levels at 1×, 2× and 2.75×). Where a spine puts it — rotated, centred, at a
+fractional position — the image is resampled between device pixels, which
+moves the blur by under half a pixel: at most 7 levels at the steepest part of
+its edge, mean under 0.5, nothing in the title itself. A zoom sweep and a
+resized-in-place spine are compared the same way; mid-zoom, before the refresh,
+a stale shadow differs by up to ~50 levels near the ellipsis for a frame or so.
+
+| Room, headless | before | after |
+|---|---:|---:|
+| pan: wall for 120 moves | 15.2–16.1 s | 4.8 s |
+| pan: raster p90 / p99 | 170–183 / 218–221 ms | 47–49 / 53–55 ms |
+| pan: build p90 | 19 ms | 20–22 ms (unchanged: see #2) |
+| zoom: wall for 80 wheel steps | 8.1–8.2 s | 5.8–6.4 s |
+| zoom: raster p90 | 195–223 ms | 72–78 ms |
+| zoom: build p90 | 44–49 ms | 50–55 ms |
+
+Shelf, the same headless runs (the shadow is only on cover-slice spines), two
+interleaved rounds of each:
+
+| Shelf scroll, 6 s | before | after |
+|---|---:|---:|
+| spines cold: raster p90 / build p90 | 26.3–26.5 / 4.4–4.7 ms | 22.1–22.7 / 4.6 ms |
+| spines warm | 25.5–26.0 / 4.6–4.7 ms | 22.3–22.7 / 4.2–4.4 ms |
+| spines hot | 25.8–26.1 / 4.7 ms | 22.6–22.8 / 4.5–4.6 ms |
+| dominant colour (no shadow drawn) | 22.4–23.2 / 4.0–4.1 ms | 22.6–22.8 / 4.2–4.3 ms |
+
+(The shelf numbers are from the end of the round, with #2 and #3 in too; those
+touch only the room.) Not slower; the cover spines a little faster.
