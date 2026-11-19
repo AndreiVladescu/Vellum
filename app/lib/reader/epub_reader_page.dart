@@ -120,6 +120,16 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   PageAnchor _anchor = const AtScrollFraction(0);
   ChapterPages? _pages;
 
+  /// When the current chapter last had no finished pagination — set when it is
+  /// opened and whenever a pagination arrives ready. A chapter that is still
+  /// not ready [_layoutPatience] later is not going to be: page turns then
+  /// move between chapters rather than wait for it, so no chapter, whatever is
+  /// in it, can trap the reader.
+  DateTime _notReadySince = DateTime.now();
+  static const _layoutPatience = Duration(seconds: 4);
+  bool get _layoutStuck =>
+      DateTime.now().difference(_notReadySince) > _layoutPatience;
+
   /// The layout last built, to notice the preference changing under us.
   EpubLayout? _layout;
 
@@ -398,6 +408,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
 
   void _onPaginated(ChapterPages pages) {
     if (!mounted) return;
+    if (pages.ready) _notReadySince = DateTime.now();
     setState(() => _pages = pages);
   }
 
@@ -1059,7 +1070,11 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   void _pageForward(int count) {
     if (_paged) {
       final pages = _pages;
-      if (pages == null || !pages.ready) return; // still laying out
+      if (pages == null || !pages.ready) {
+        // Still laying out — unless it has been too long to be going to.
+        if (_layoutStuck && _chapter < count - 1) _goTo(_chapter + 1, count);
+        return;
+      }
       final page = pages.pageFor(_anchor);
       if (page < pages.count - 1) {
         _turnTo(pages, page + 1);
@@ -1089,7 +1104,12 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   void _pageBack(int count) {
     if (_paged) {
       final pages = _pages;
-      if (pages == null || !pages.ready) return;
+      if (pages == null || !pages.ready) {
+        if (_layoutStuck && _chapter > 0) {
+          _goTo(_chapter - 1, count, fraction: 1);
+        }
+        return;
+      }
       final page = pages.pageFor(_anchor);
       if (page > 0) {
         _turnTo(pages, page - 1);
@@ -1137,7 +1157,10 @@ class _EpubReaderPageState extends State<EpubReaderPage>
       _chapter = target;
       _anchor = AtScrollFraction(fraction);
       // The old chapter's pages say nothing about this one; turns wait for it.
-      if (changed) _pages = null;
+      if (changed) {
+        _pages = null;
+        _notReadySince = DateTime.now();
+      }
     });
     _session.touch(page: _chapter + 1);
     _refreshBookmark();

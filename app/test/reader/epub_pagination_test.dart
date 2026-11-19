@@ -173,6 +173,46 @@ void main() {
     });
   });
 
+  group('pictures that are unsized, late or too tall', () {
+    // A picture that has not reported a size yet is a zero-height box; the
+    // title page's picture arrives that way before its bytes are decoded.
+    test('an unsized picture is ignored and pagination still finishes', () {
+      final starts = paginate(
+        lines: [
+          (top: 0, bottom: 20),
+          (top: 20, bottom: 20), // the picture, no size yet
+          (top: 20, bottom: 40),
+          (top: 40, bottom: 60),
+        ],
+        pageHeight: 50,
+        contentHeight: 60,
+      );
+      expect(starts, [0, 40]);
+    });
+
+    test('a picture that gets its size later moves to the next page whole', () {
+      List<double> run(double pictureHeight) => paginate(
+            lines: [
+              (top: 0, bottom: 20),
+              (top: 20, bottom: 20 + pictureHeight),
+            ],
+            pageHeight: 50,
+            contentHeight: 20 + pictureHeight,
+          );
+      expect(run(0), [0], reason: 'nothing to cut yet');
+      expect(run(40), [0, 20], reason: 'sized: it starts the next page');
+    });
+
+    test('a picture taller than a page cannot trap pagination', () {
+      final starts = paginate(
+        lines: [(top: 0, bottom: 300)],
+        pageHeight: 100,
+        contentHeight: 300,
+      );
+      expect(starts, [0, 100, 200]);
+    });
+  });
+
   test('a paragraph\'s run boxes merge into lines', () {
     final merged = mergeIntoLines([
       (top: 0, bottom: 20),

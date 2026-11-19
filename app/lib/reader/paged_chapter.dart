@@ -228,8 +228,14 @@ class RenderPagedViewport extends RenderBox
         ]));
       }
     } else if (node is RenderImage && node.hasSize) {
+      // Not `node.size`: this runs inside the viewport's own layout, and a
+      // picture's size may only be read by its parent then — in a debug build
+      // `size` throws, which aborted the viewport's layout and left a chapter
+      // with a picture forever "not ready" (so: unable to turn a page). The
+      // dry layout under the picture's own constraints is the same height.
       final dy = transform.getTranslation().y;
-      lines.add((top: dy, bottom: dy + node.size.height));
+      final height = node.getDryLayout(node.constraints).height;
+      lines.add((top: dy, bottom: dy + height));
     }
     // Into a paragraph's children too: an inline block (a WidgetSpan) has its
     // own lines, which matter when the block is taller than a page.
