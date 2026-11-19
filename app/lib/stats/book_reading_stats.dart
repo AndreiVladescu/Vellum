@@ -1,6 +1,36 @@
 import '../data/database.dart';
 import 'stats_queries.dart';
 
+/// What one audiobook's listening sittings add up to ("Your listening" on the
+/// book page): time and the day of the latest one. Wall-clock time, so an hour
+/// at 1.5x is an hour; no pages, pace or time left, which are about reading.
+class BookListening {
+  const BookListening({required this.minutes, required this.last});
+
+  final int minutes;
+
+  /// The local calendar day of the latest listening sitting.
+  final DateTime last;
+
+  /// Null when [sessions] holds no listening sitting. Reading sittings in the
+  /// list are ignored, so either mix can be passed in.
+  static BookListening? of(List<ReadingSession> sessions) {
+    final listened = [
+      for (final s in sessions)
+        if (s.kind == 'listen') s,
+    ];
+    if (listened.isEmpty) return null;
+    var last = listened.first.startedAt;
+    for (final s in listened) {
+      if (s.startedAt.isAfter(last)) last = s.startedAt;
+    }
+    return BookListening(
+      minutes: ReadingStats.totalMinutes(listened),
+      last: ReadingStats.dayOf(last),
+    );
+  }
+}
+
 /// What one book's sittings add up to (roadmap v1.3.1, "Your reading" on the
 /// book page). Pure over rows already fetched, like [ReadingStats], which it
 /// reuses so the numbers here are the same numbers the reader and the Insights
@@ -30,7 +60,13 @@ class BookReading {
 
   /// Null when [sessions] is empty: a book with no recorded sitting has no
   /// "Your reading" to show.
-  static BookReading? of(List<ReadingSession> sessions) {
+  static BookReading? of(List<ReadingSession> all) {
+    // Reading sittings only: listening has its own block ([BookListening]) and
+    // must not add minutes, sittings or dates here.
+    final sessions = [
+      for (final s in all)
+        if (s.kind == 'read') s,
+    ];
     if (sessions.isEmpty) return null;
     var first = sessions.first.startedAt;
     var last = first;

@@ -22,6 +22,8 @@ class MonthReview {
     required this.minutesByDay,
     required this.pagesByDay,
     required this.goalDaysMet,
+    this.listenMinutes = 0,
+    this.listenDays = 0,
   });
 
   /// The first of the month, local time.
@@ -55,8 +57,15 @@ class MonthReview {
   /// is set.
   final int? goalDaysMet;
 
+  /// Time spent listening to audiobooks in the month, and the days it was on.
+  /// Counted on their own: every figure above is reading only, so listening
+  /// never adds pages, reading time or reading days.
+  final int listenMinutes;
+  final int listenDays;
+
   /// Nothing happened: no sitting and no finished book.
-  bool get isEmpty => readingDays == 0 && finished.isEmpty;
+  bool get isEmpty =>
+      readingDays == 0 && listenDays == 0 && finished.isEmpty;
 
   /// Whole minutes per reading day, or null with no reading day.
   int? get averageMinutesPerReadingDay =>
@@ -160,10 +169,12 @@ class MonthReviews {
     final isCurrent = monthOf(todayDay) == start;
     final elapsed = isCurrent ? todayDay.day : total;
 
-    final inMonth = [
-      for (final s in sessions)
-        if (monthOf(s.startedAt) == start) s,
-    ];
+    final inMonth = <ReadingSession>[];
+    final listenedInMonth = <ReadingSession>[];
+    for (final s in sessions) {
+      if (monthOf(s.startedAt) != start) continue;
+      (s.kind == 'read' ? inMonth : listenedInMonth).add(s);
+    }
     final minutesByDay = ReadingStats.minutesPerDay(inMonth);
     final pagesByDay = ReadingStats.pagesPerDay(inMonth);
     final days = ReadingStats.readingDays(inMonth);
@@ -220,6 +231,8 @@ class MonthReviews {
       minutesByDay: minutesByDay,
       pagesByDay: pagesByDay,
       goalDaysMet: met,
+      listenMinutes: ReadingStats.totalMinutes(listenedInMonth),
+      listenDays: ReadingStats.readingDays(listenedInMonth).length,
     );
   }
 
@@ -254,7 +267,8 @@ class MonthReviews {
     final upTo = review.daysElapsed < prevDays ? review.daysElapsed : prevDays;
     final window = [
       for (final s in sessions)
-        if (monthOf(s.startedAt) == prev &&
+        if (s.kind == 'read' &&
+            monthOf(s.startedAt) == prev &&
             ReadingStats.dayOf(s.startedAt).day <= upTo)
           s,
     ];

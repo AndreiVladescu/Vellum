@@ -12,7 +12,8 @@ HeatmapCell heatmapCellFor(
   L10n l10n,
   DateTime day, {
   required Map<DateTime, int> minutes,
-  required Map<DateTime, int> pages,
+  Map<DateTime, int> pages = const {},
+  bool listening = false,
 }) {
   final m = minutes[day] ?? 0;
   final p = pages[day] ?? 0;
@@ -21,7 +22,9 @@ HeatmapCell heatmapCellFor(
     value: m,
     label: m == 0 && p == 0
         ? l10n.insightsDayLabelNone(day)
-        : l10n.insightsDayLabelRead(day, formatMinutes(l10n, m), p),
+        : listening
+            ? l10n.insightsDayLabelListened(day, formatMinutes(l10n, m))
+            : l10n.insightsDayLabelRead(day, formatMinutes(l10n, m), p),
   );
 }
 
@@ -37,6 +40,7 @@ Future<void> showDayDetailSheet(
   required List<ReadingSession> sessions,
   required List<Book> books,
   required void Function(Book book) onOpenBook,
+  bool listening = false,
 }) {
   final detail = DayDetail.of(sessions, day);
   final byId = {for (final b in books) b.id: b};
@@ -68,9 +72,12 @@ Future<void> showDayDetailSheet(
                   spacing: 16,
                   runSpacing: 4,
                   children: [
-                    Text(l10n.insightsDayTime(
-                        formatMinutes(l10n, detail.minutes))),
-                    Text(l10n.insightsDayPages(detail.pages)),
+                    Text(listening
+                        ? l10n.insightsDayTimeListened(
+                            formatMinutes(l10n, detail.minutes))
+                        : l10n.insightsDayTime(
+                            formatMinutes(l10n, detail.minutes))),
+                    if (!listening) Text(l10n.insightsDayPages(detail.pages)),
                     Text(l10n.insightsDaySittings(detail.sittings)),
                   ],
                 ),
@@ -78,7 +85,7 @@ Future<void> showDayDetailSheet(
                 Text(l10n.insightsDayBooks, style: theme.textTheme.labelLarge),
                 for (final entry in detail.books)
                   _bookTile(sheetContext, l10n, entry, byId[entry.bookId],
-                      onOpenBook),
+                      onOpenBook, listening),
               ],
             ],
           ),
@@ -94,12 +101,15 @@ Widget _bookTile(
   ({String bookId, int minutes, int pages}) entry,
   Book? book,
   void Function(Book book) onOpenBook,
+  bool listening,
 ) {
   return ListTile(
     contentPadding: EdgeInsets.zero,
     title: Text(book?.title ?? l10n.insightsDayUnknownBook),
-    subtitle: Text(l10n.insightsDayBookLine(
-        formatMinutes(l10n, entry.minutes), entry.pages)),
+    subtitle: Text(listening
+        ? l10n.insightsDayTimeListened(formatMinutes(l10n, entry.minutes))
+        : l10n.insightsDayBookLine(
+            formatMinutes(l10n, entry.minutes), entry.pages)),
     trailing: book == null ? null : const Icon(Icons.chevron_right),
     onTap: book == null
         ? null

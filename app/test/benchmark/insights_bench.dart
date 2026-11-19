@@ -36,6 +36,7 @@ void main() {
               endPage: page + rng.nextInt(60),
               deviceLabel: ['Phone', 'Desktop', null][rng.nextInt(3)],
               needsPush: false,
+              kind: 'read',
             );
           }(),
       ];

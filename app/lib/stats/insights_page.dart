@@ -49,6 +49,10 @@ class _InsightsPageState extends State<InsightsPage> {
   late Future<_Loaded> _insights;
   late InsightsRange _range;
 
+  /// Which figures are shown. Null until the sittings are in: a history with
+  /// listening and no reading opens on Listening, anything else on Reading.
+  bool? _listening;
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +67,14 @@ class _InsightsPageState extends State<InsightsPage> {
 
   Future<_Loaded> _load() async {
     final db = widget.repository.db;
-    final sessions = await db.select(db.readingSessions).get();
+    final all = await db.select(db.readingSessions).get();
+    // Split once, here: every reading figure is made from `sessions`, which
+    // holds reading sittings only, so a listening sitting cannot reach one.
+    final sessions = <ReadingSession>[];
+    final listening = <ReadingSession>[];
+    for (final s in all) {
+      (s.kind == 'read' ? sessions : listening).add(s);
+    }
     final books = await db.select(db.books).get();
     final files = await db.select(db.bookFiles).get();
     final genresByBook = await widget.repository.watchGenresByBook().first;
@@ -73,6 +84,7 @@ class _InsightsPageState extends State<InsightsPage> {
     }
     final input = InsightsInput(
       sessions: sessions,
+      listening: listening,
       books: books,
       genresByBook: genresByBook,
       formatsByBook: formatsByBook,
@@ -135,6 +147,7 @@ class _InsightsPageState extends State<InsightsPage> {
           final fetched = snapshot.data!.input;
           final data = snapshot.data!.byRange[_range]!;
           if (fetched.sessions.isEmpty &&
+              fetched.listening.isEmpty &&
               ReadingStats.finishedPerMonth(fetched.books).isEmpty) {
             return Center(
               child: Padding(
@@ -156,9 +169,20 @@ class _InsightsPageState extends State<InsightsPage> {
             );
           }
           final theme = Theme.of(context);
+          final listening = _listening ??
+              (fetched.sessions.isEmpty && fetched.listening.isNotEmpty);
+          if (listening) {
+            return _listeningView(context, fetched, data.listen);
+          }
           return ListView(
             padding: readableInsets(context, const EdgeInsets.all(16)),
             children: [
+              if (fetched.listening.isNotEmpty) ...[
+                _ModeSwitch(
+                    listening: false,
+                    onChanged: (v) => setState(() => _listening = v)),
+                const SizedBox(height: 16),
+              ],
               _RangeControl(range: _range, onChanged: _setRange),
               const SizedBox(height: 16),
               Card(
@@ -412,6 +436,224 @@ class _InsightsPageState extends State<InsightsPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// The Listening view: the time-based figures over listening sittings.
+  /// Pages, goals and the page-based charts have no meaning here, and *books
+  /// finished* counts only the finishes that were listened to.
+  Widget _listeningView(
+    BuildContext context,
+    InsightsInput fetched,
+    ListeningFigures data,
+  ) {
+    final l10n = L10n.of(context);
+    final theme = Theme.of(context);
+    return ListView(
+      padding: readableInsets(context, const EdgeInsets.all(16)),
+      children: [
+        _ModeSwitch(
+            listening: true, onChanged: (v) => setState(() => _listening = v)),
+        const SizedBox(height: 16),
+        _RangeControl(range: _range, onChanged: _setRange),
+        const SizedBox(height: 16),
+        if (data.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Column(
+              children: [
+                const Icon(Icons.headphones_outlined, size: 48),
+                const SizedBox(height: 12),
+                Text(l10n.insightsListeningEmptyTitle),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.insightsListeningEmptyBody,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else ...[
+          Text(l10n.insightsHabits, style: theme.textTheme.labelLarge),
+          const SizedBox(height: 8),
+          _StatRow(stats: [
+            (
+              label: l10n.insightsCurrentStreak,
+              value: l10n.insightsDaysShort(data.currentStreak),
+              sub: null,
+            ),
+            (
+              label: l10n.insightsLongestStreak,
+              value: l10n.insightsDaysShort(data.longestStreak),
+              sub: null,
+            ),
+            (
+              label: l10n.insightsDaysListened,
+              value: '${data.days.length}', // i18n-ignore
+              sub: null,
+            ),
+          ]),
+          const SizedBox(height: 20),
+          Text(l10n.insightsTotals, style: theme.textTheme.labelLarge),
+          const SizedBox(height: 8),
+          _StatRow(stats: [
+            (
+              label: l10n.insightsTimeListening,
+              value: formatMinutes(l10n, data.totalMinutes),
+              sub: null,
+            ),
+            (
+              label: l10n.insightsListeningSittings,
+              value: '${data.sittings}', // i18n-ignore
+              sub: null,
+            ),
+            (
+              label: l10n.insightsListenedFinished,
+              value: '${data.finished.length}', // i18n-ignore
+              sub: null,
+            ),
+            (
+              label: l10n.insightsListenedThisWeek,
+              value: formatMinutes(l10n, data.thisWeekMinutes),
+              sub: l10n.insightsListenedLastWeek(
+                  formatMinutes(l10n, data.lastWeekMinutes)),
+            ),
+          ]),
+          const SizedBox(height: 24),
+          _Section(
+            title: l10n.insightsMinutesListenedADay,
+            child: SizedBox(
+              height: 90,
+              child: CustomPaint(
+                painter: _SparklinePainter(
+                  values: [for (final p in data.minutesSeries) p.value],
+                  color: theme.colorScheme.primary,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _Section(
+            title: l10n.insightsWhenYouListen,
+            subtitle: l10n.insightsWhenYouListenSub,
+            child: SizedBox(
+              height: 110,
+              child: CustomPaint(
+                painter: _HourBarsPainter(
+                  minutesByHour: data.hourSeries,
+                  color: theme.colorScheme.primary,
+                  empty: theme.colorScheme.surfaceContainerHighest,
+                  labelStyle: theme.textTheme.bodySmall,
+                  quarterNames: [
+                    l10n.insightsHourMidnight,
+                    l10n.insightsHourSix,
+                    l10n.insightsHourNoon,
+                    l10n.insightsHourEighteen,
+                  ],
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _Section(
+            title: l10n.insightsListeningDays,
+            subtitle: l10n.insightsReadingDaysHint,
+            child: HeatmapGrid(
+              cells: [
+                for (final d in data.heatmapSeries)
+                  heatmapCellFor(
+                    l10n,
+                    d.day,
+                    minutes: data.allMinutesPerDay,
+                    listening: true,
+                  ),
+              ],
+              rows: 7,
+              columns: 12,
+              rowMajor: false,
+              maxCell: 28,
+              startAtEnd: true,
+              color: theme.colorScheme.primary,
+              empty: theme.colorScheme.surfaceContainerHighest,
+              onColor: theme.colorScheme.onPrimary,
+              textColor: theme.colorScheme.onSurface,
+              focusColor: theme.colorScheme.tertiary,
+              semanticsLabel: l10n.insightsListeningDays,
+              onDayTap: (day) => showDayDetailSheet(
+                context,
+                day: day,
+                sessions: fetched.listening,
+                books: fetched.books,
+                listening: true,
+                onOpenBook: (book) => openBookDetail(
+                  context,
+                  repository: widget.repository,
+                  settings: widget.settings,
+                  book: book,
+                ),
+              ),
+            ),
+          ),
+          if (data.deviceSeries.length > 1) ...[
+            const SizedBox(height: 20),
+            _Section(
+              title: l10n.insightsWhereYouListen,
+              child: Column(
+                children: [
+                  for (final d in data.deviceSeries)
+                    _BarListRow(
+                      label: d.device == ReadingStats.unknownDevice
+                          ? l10n.insightsUnknownDevice
+                          : d.device,
+                      value: formatMinutes(l10n, d.minutes),
+                      fraction: d.minutes / data.deviceSeries.first.minutes,
+                      color: theme.colorScheme.primary,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+        const SizedBox(height: 24),
+        Text(l10n.insightsListeningNote, style: theme.textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+/// The Reading / Listening switch at the top of the page. A segmented button:
+/// two choices, always both visible, announced as one group.
+class _ModeSwitch extends StatelessWidget {
+  const _ModeSwitch({required this.listening, required this.onChanged});
+
+  final bool listening;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    return Semantics(
+      container: true,
+      label: l10n.insightsModeLabel,
+      child: SegmentedButton<bool>(
+        showSelectedIcon: false,
+        segments: [
+          ButtonSegment(
+            value: false,
+            icon: const Icon(Icons.menu_book_outlined),
+            label: Text(l10n.insightsModeReading),
+          ),
+          ButtonSegment(
+            value: true,
+            icon: const Icon(Icons.headphones_outlined),
+            label: Text(l10n.insightsModeListening),
+          ),
+        ],
+        selected: {listening},
+        onSelectionChanged: (s) => onChanged(s.first),
       ),
     );
   }

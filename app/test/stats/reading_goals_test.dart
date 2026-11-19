@@ -28,6 +28,7 @@ ReadingSession _session(DateTime start, int minutes) => ReadingSession(
       startedAt: start,
       endedAt: start.add(Duration(minutes: minutes)),
       needsPush: false,
+      kind: 'read',
     );
 
 void main() {

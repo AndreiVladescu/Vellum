@@ -161,6 +161,11 @@ class _YearReviewPageState extends State<YearReviewPage> {
         else ...[
           _picture(context, review),
           const SizedBox(height: 20),
+          if (review.listenMinutes > 0) ...[
+            Text(l10n.yearListenedLine(
+                formatMinutes(l10n, review.listenMinutes), review.listenDays)),
+            const SizedBox(height: 12),
+          ],
           if (review.longestSitting != null) ...[
             Text(
               '${l10n.monthLongestSitting}: ' // i18n-ignore

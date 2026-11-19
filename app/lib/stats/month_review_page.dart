@@ -267,6 +267,12 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
         value: l10n.monthDaysReadValue(review.readingDays, review.daysElapsed),
         sub: null,
       ),
+      if (review.listenMinutes > 0)
+        (
+          label: l10n.monthTimeListened,
+          value: formatMinutes(l10n, review.listenMinutes),
+          sub: l10n.monthDaysListenedValue(review.listenDays),
+        ),
       if (average != null)
         (
           label: l10n.monthAveragePerDay,

@@ -27,6 +27,7 @@ ReadingSession _session({
       endPage: endPage,
       deviceLabel: deviceLabel,
       needsPush: false,
+      kind: 'read',
     );
 
 Book _book({DateTime? finishedAt, String id = 'b1'}) => Book(

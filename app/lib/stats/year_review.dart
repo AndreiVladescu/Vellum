@@ -17,6 +17,8 @@ class YearReview {
     required this.topAuthors,
     required this.topGenres,
     required this.goalBooks,
+    this.listenMinutes = 0,
+    this.listenDays = 0,
   });
 
   final int year;
@@ -50,8 +52,14 @@ class YearReview {
   /// The books-a-year goal, or null when none is set.
   final int? goalBooks;
 
+  /// Time spent listening to audiobooks in the year, and the days it was on —
+  /// kept apart from every figure above, which is reading only.
+  final int listenMinutes;
+  final int listenDays;
+
   /// Nothing happened: no sitting and no finished book.
-  bool get isEmpty => readingDays == 0 && finished.isEmpty;
+  bool get isEmpty =>
+      readingDays == 0 && listenDays == 0 && finished.isEmpty;
 
   int get booksFinished => finished.length;
 
@@ -95,10 +103,12 @@ class YearReviews {
     Map<String, List<String>> genresByBook = const {},
     int? bookGoal,
   }) {
-    final inYear = [
-      for (final s in sessions)
-        if (s.startedAt.toLocal().year == year) s,
-    ];
+    final inYear = <ReadingSession>[];
+    final listenedInYear = <ReadingSession>[];
+    for (final s in sessions) {
+      if (s.startedAt.toLocal().year != year) continue;
+      (s.kind == 'read' ? inYear : listenedInYear).add(s);
+    }
     final days = ReadingStats.readingDays(inYear);
     final minutesByDay = ReadingStats.minutesPerDay(inYear);
     final pagesByDay = ReadingStats.pagesPerDay(inYear);
@@ -152,6 +162,8 @@ class YearReviews {
       topAuthors: _top(finished, authorsByBook),
       topGenres: _top(finished, genresByBook),
       goalBooks: bookGoal != null && bookGoal > 0 ? bookGoal : null,
+      listenMinutes: ReadingStats.totalMinutes(listenedInYear),
+      listenDays: ReadingStats.readingDays(listenedInYear).length,
     );
   }
 

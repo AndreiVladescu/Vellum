@@ -10662,5 +10662,98 @@
   "@nowPlayingOpen": {"description": "Tooltip of the now-playing bar on the shelf, which reopens the audiobook player."},
 
   "nowPlayingClose": "Stop and close",
-  "@nowPlayingClose": {"description": "Tooltip of the now-playing bar's close button."}
+  "@nowPlayingClose": {"description": "Tooltip of the now-playing bar's close button."},
+
+  "insightsModeReading": "Reading",
+  "@insightsModeReading": {"description": "One side of the switch at the top of Insights: the reading figures."},
+
+  "insightsModeListening": "Listening",
+  "@insightsModeListening": {"description": "The other side of the switch at the top of Insights: the audiobook listening figures."},
+
+  "insightsModeLabel": "Show reading or listening figures",
+  "@insightsModeLabel": {"description": "Screen-reader label of the Reading/Listening switch on Insights."},
+
+  "insightsListeningEmptyTitle": "No listening yet",
+  "@insightsListeningEmptyTitle": {"description": "Heading of the Listening view of Insights when no audiobook has been played."},
+
+  "insightsListeningEmptyBody": "Play an audiobook and the time you spend listening shows up here, kept apart from your reading.",
+  "@insightsListeningEmptyBody": {"description": "Body of the empty Listening view of Insights."},
+
+  "insightsListeningNote": "Listening time is the time spent listening, so an hour at 1.5x counts as an hour. It is never counted as pages or reading time.",
+  "@insightsListeningNote": {"description": "Footnote of the Listening view of Insights."},
+
+  "insightsTimeListening": "Time listening",
+  "@insightsTimeListening": {"description": "Label of a stat tile in the Listening view."},
+
+  "insightsDaysListened": "Days listened",
+  "@insightsDaysListened": {"description": "Label of a stat tile in the Listening view: distinct days with listening."},
+
+  "insightsListeningSittings": "Sittings",
+  "@insightsListeningSittings": {"description": "Label of a stat tile in the Listening view: how many separate listening sittings."},
+
+  "insightsListenedThisWeek": "Listened this week",
+  "@insightsListenedThisWeek": {"description": "Label of a stat tile in the Listening view: listening time over the last seven days."},
+
+  "insightsListenedLastWeek": "Last week: {time}",
+  "@insightsListenedLastWeek": {
+    "description": "Under the this-week tile in the Listening view; time is already formatted, e.g. \"35m\".",
+    "placeholders": {"time": {"type": "String"}}
+  },
+
+  "insightsListenedFinished": "Finished by listening",
+  "@insightsListenedFinished": {"description": "Label of a stat tile in the Listening view: books finished that were listened to."},
+
+  "insightsMinutesListenedADay": "Time listened a day",
+  "@insightsMinutesListenedADay": {"description": "Chart title in the Listening view."},
+
+  "insightsWhenYouListen": "When you listen",
+  "@insightsWhenYouListen": {"description": "Chart title in the Listening view."},
+
+  "insightsWhenYouListenSub": "Minutes spent listening, by the hour a sitting began",
+  "@insightsWhenYouListenSub": {"description": "Chart subtitle in the Listening view."},
+
+  "insightsListeningDays": "Listening days (last 12 weeks)",
+  "@insightsListeningDays": {"description": "Heat map title in the Listening view."},
+
+  "insightsWhereYouListen": "Where you listen",
+  "@insightsWhereYouListen": {"description": "Chart title in the Listening view: time per device."},
+
+  "insightsDayLabelListened": "{date}: {time} listened",
+  "@insightsDayLabelListened": {
+    "description": "Screen-reader label of one day of the listening heat map on which something was listened to; time is already formatted, e.g. \"35m\".",
+    "placeholders": {
+      "date": {"type": "DateTime", "format": "MMMMEEEEd"},
+      "time": {"type": "String"}
+    }
+  },
+
+  "insightsDayTimeListened": "{time} listened",
+  "@insightsDayTimeListened": {
+    "description": "Time listened on the day in the day sheet; time is already formatted, e.g. \"35m\".",
+    "placeholders": {"time": {"type": "String"}}
+  },
+
+  "monthTimeListened": "Time listened",
+  "@monthTimeListened": {"description": "Label of the tile with the total listening time of the month."},
+
+  "monthDaysListenedValue": "{days, plural, =1{1 day} other{{days} days}}",
+  "@monthDaysListenedValue": {
+    "description": "Under the time-listened tile of a month: on how many days there was listening.",
+    "placeholders": {"days": {"type": "int"}}
+  },
+
+  "yearListenedLine": "Listened for {time} on {days, plural, =1{1 day} other{{days} days}}",
+  "@yearListenedLine": {
+    "description": "One line on the year page: listening time of the year, kept apart from the reading figures; time is already formatted, e.g. \"12h 5m\".",
+    "placeholders": {"time": {"type": "String"}, "days": {"type": "int"}}
+  },
+
+  "detailListeningTitle": "Your listening",
+  "@detailListeningTitle": {"description": "Heading of the listening block on an audiobook's page."},
+
+  "detailListeningTimeLabel": "Time listened",
+  "@detailListeningTimeLabel": {"description": "Row of the listening block on the book page."},
+
+  "detailListeningLastLabel": "Last listened",
+  "@detailListeningLastLabel": {"description": "Row of the listening block on the book page: the day of the latest listening sitting."}
 }
