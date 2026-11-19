@@ -3,7 +3,7 @@
 // This is documentation that runs: if the reader's column names or value
 // handling ever drift from what the help sheet promises, the failure lands here
 // rather than on someone with a spreadsheet open.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/import/catalog_format_help.dart';

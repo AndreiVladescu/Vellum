@@ -4,7 +4,7 @@
 // rather than only through whichever platform the CI machine happens to be.
 // The palette gets widget tests, because what matters there is that a key
 // event actually reaches it and that picking a row runs the right command.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/shortcuts.dart';

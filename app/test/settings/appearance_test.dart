@@ -6,7 +6,7 @@
 // sensitive, so the same property is pinned by *value* instead: the spine
 // palette must not move with the seed (a library is not a colour swatch), while
 // the shelf board must.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/data/database.dart';

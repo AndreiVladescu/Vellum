@@ -1,6 +1,6 @@
 // The reader's search box: legible in every reader theme, and focusable from
 // Ctrl+F even after the page has been clicked.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/reader_hotkeys.dart';

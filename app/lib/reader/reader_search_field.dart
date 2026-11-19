@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// The query box in a reader's app bar, drawn in the *reader's* colours.

@@ -3,7 +3,7 @@
 // The promises worth pinning: a long-press starts a selection instead of
 // opening the book, a tap then toggles rather than opening, and the selection
 // is visible on the shelf rather than only as a count.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/shelf/shelf_view.dart';

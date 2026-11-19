@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The dominant colour of a cover image, or null when [bytes] can't be
 /// decoded. Decodes at a tiny size (32 px) and histograms the pixels with a

@@ -6,7 +6,7 @@
 // control. The arithmetic that stops that happening again is here, and the rule
 // that matters is that nothing becomes unreachable: what does not fit is in the
 // menu, not gone.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/reader_actions.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';

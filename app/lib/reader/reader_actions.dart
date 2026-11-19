@@ -12,7 +12,7 @@
 /// which is also why every action carries a label, not just an icon.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// What the leading control (the back arrow) and its padding cost.

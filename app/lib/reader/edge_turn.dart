@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A page-turn strip down one edge of a reader: the whole strip is the target,
 /// with a chevron at the vertical middle as its affordance.

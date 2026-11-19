@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// The book's cover: shows the image and, on hover (desktop), reveals a

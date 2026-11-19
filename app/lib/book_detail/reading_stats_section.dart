@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart' show OrderingTerm;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';

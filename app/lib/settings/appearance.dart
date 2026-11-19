@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The look of the app, as choices rather than constants (plan 5 #39).
 ///

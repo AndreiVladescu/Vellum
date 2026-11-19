@@ -3,7 +3,7 @@
 /// "some text writing on top of the pdf, with the drawing, would be nicer").
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';

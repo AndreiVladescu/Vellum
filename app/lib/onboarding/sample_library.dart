@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/material.dart' show ScaffoldMessengerState, SnackBarAction, Text;
+import 'package:material_ui/material_ui.dart' show ScaffoldMessengerState, SnackBarAction, Text;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 

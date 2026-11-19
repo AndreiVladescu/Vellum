@@ -5,7 +5,7 @@
 // which is the path that benefits: with a fixed extent the sliver works out
 // where each row lands arithmetically, instead of building and measuring rows
 // to find the scroll offset.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/shelf/shelf_view.dart';

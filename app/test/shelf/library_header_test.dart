@@ -2,7 +2,7 @@
 // is a pure function over the shelf's own LibraryView, which is what keeps it
 // from costing a second set of queries — so most of this tests that function
 // directly, plus a widget pass for the collapse-to-nothing behaviour.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_queries.dart';

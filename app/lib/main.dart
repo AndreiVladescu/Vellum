@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart' show pdfrxFlutterInitialize;
 import 'l10n/gen/app_localizations.dart';

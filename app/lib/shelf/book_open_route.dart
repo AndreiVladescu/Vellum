@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Route that animates a book being eased partway out of the shelf: the tapped
 /// book grows a little — as if pulled forward off the shelf — while the detail

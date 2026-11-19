@@ -3,7 +3,7 @@
 // commands and books share one list, that a row runs the command it names, and
 // that the palette closes before doing so (a command that pushes a route under
 // an open dialog is the bug this prevents).
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';

@@ -12,7 +12,7 @@
 // Nothing about the *colour* is asserted here. What matters is that the child
 // keeps its State across the flip, because in the real tree that State owns an
 // open PDF and your place in it.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/night_mode.dart';
 

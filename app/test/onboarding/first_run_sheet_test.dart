@@ -1,7 +1,7 @@
 // First-run onboarding (plan 5 #41). The behaviour that matters is restraint:
 // shown once, dismissible in every direction, and never shown again afterwards —
 // including when the user swiped it away without choosing anything.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';

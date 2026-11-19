@@ -5,7 +5,7 @@
 // renderer honours it — and a highlight that is correct in the markup and
 // invisible on the page is exactly the bug being fixed. So this pumps the same
 // widget the EPUB reader builds and reads the colour back off the text.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:vellum/data/database.dart';

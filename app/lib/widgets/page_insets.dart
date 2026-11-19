@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Padding for a full-page scroll view, clear of the system navigation bar.
 ///

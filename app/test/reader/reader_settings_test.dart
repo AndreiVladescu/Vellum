@@ -1,7 +1,7 @@
 // Reader comfort settings (plan 5 #23). These are the app's only preferences
 // that deliberately do *not* follow the system text scale — they set the book's
 // type, not the UI's — so the clamps and the persistence are what matter.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/reader/night_mode.dart';
