@@ -1654,6 +1654,9 @@ class SyncService {
                   endPage: Value(s.endPage),
                   deviceId: Value(s.deviceId),
                   deviceLabel: Value(s.deviceLabel),
+                  kind: Value(s.kind),
+                  startSecond: Value(s.startSecond),
+                  endSecond: Value(s.endSecond),
                   needsPush: const Value(false),
                 ),
               );
@@ -1835,8 +1838,16 @@ class SyncService {
             db.readingSessions,
           )..where((s) => s.needsPush.equals(true))).get()
         : const <ReadingSession>[];
+    // A server without migration 0044 would store a listening sitting as
+    // reading time (it drops `kind`), so those wait, still dirty, until the
+    // server says it knows them — as `book_status` does. Asked only when there
+    // is one to send.
+    final listenOk = sessions.any((s) => s.kind != 'read')
+        ? await _supportsListeningSessions(client)
+        : false;
     for (final s in sessions) {
       if (excluded.contains(s.bookId)) continue;
+      if (s.kind != 'read' && !listenOk) continue;
       try {
         await client.pushSession(
           id: s.id,
@@ -1847,6 +1858,9 @@ class SyncService {
           endPage: s.endPage,
           deviceId: s.deviceId,
           deviceLabel: s.deviceLabel,
+          kind: s.kind,
+          startSecond: s.startSecond,
+          endSecond: s.endSecond,
         );
         await (db.update(db.readingSessions)
               ..where((row) => row.id.equals(s.id)))
@@ -2282,6 +2296,23 @@ class SyncService {
       }
     }
     return _caps?.hasFeature('audiobooks') ?? false;
+  }
+
+  /// Whether [client]'s server stores listening sittings as such (server
+  /// migration 0044). Memoized per base URL, like the other handshakes.
+  Future<bool> _supportsListeningSessions(VellumServerClient client) async {
+    if (_capsBaseUrl != client.baseUrl) {
+      try {
+        _caps = await client.capabilities();
+        _capsBaseUrl = client.baseUrl;
+      } on ServerException {
+        _caps = null;
+        _capsBaseUrl = client.baseUrl;
+      } catch (_) {
+        return false;
+      }
+    }
+    return _caps?.hasFeature('listening_sessions') ?? false;
   }
 
   /// Whether [client]'s server can take writing on a page (server migration

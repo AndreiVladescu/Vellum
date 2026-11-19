@@ -94,6 +94,11 @@ const FEATURES: &[&str] = &[
     // without it rejects audio uploads and drops the position, so the app
     // keeps audiobooks local there rather than failing every sync.
     "audiobooks",
+    // Listening sittings (migration 0044): `kind`, `start_second` and
+    // `end_second` on /api/sessions, and `?kinds=read,listen` on the list. A
+    // server without it would store a listening sitting as reading time, so
+    // the app keeps those sittings dirty until it sees this.
+    "listening_sessions",
 ];
 
 pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {

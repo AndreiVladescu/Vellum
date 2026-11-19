@@ -46,6 +46,7 @@ Future<http.Response> Function(http.Request) _server({
   bool personalSupported = true,
   bool bookStatusSupported = true,
   bool inkSupported = true,
+  bool listeningSupported = true,
   Set<String> unknownAnnotations = const {},
   // What the server answers a status PUT with: its merged row, as migration
   // 0038's server does. Null answers `{}`, as the tests above always have.
@@ -79,6 +80,7 @@ Future<http.Response> Function(http.Request) _server({
           'features': [
             if (bookStatusSupported) 'book_status',
             if (inkSupported) 'ink_annotations',
+            if (listeningSupported) 'listening_sessions',
           ],
         }),
         200,
@@ -431,6 +433,93 @@ void main() {
       {'phone', 'laptop', 'pc'},
       reason: 'statistics can still say where you read',
     );
+  });
+
+  test('a listening sitting keeps its kind and audio range both ways', () async {
+    final repo = await _repo();
+    await SyncService(repo).pull(_client(_server(sessions: [
+      {
+        'id': 'heard',
+        'book_id': 'b1',
+        'started_at': '2026-07-20 20:00:00',
+        'ended_at': '2026-07-20 20:30:00',
+        'kind': 'listen',
+        'start_second': 60,
+        'end_second': 1800,
+      },
+      {
+        // From a server before migration 0044: no kind at all.
+        'id': 'read',
+        'book_id': 'b1',
+        'started_at': '2026-07-21 20:00:00',
+        'ended_at': '2026-07-21 20:30:00',
+        'start_page': 1,
+        'end_page': 9,
+      },
+    ])));
+    final byId = {
+      for (final s in await repo.db.select(repo.db.readingSessions).get())
+        s.id: s,
+    };
+    expect(byId['heard']!.kind, 'listen');
+    expect(byId['heard']!.startSecond, 60);
+    expect(byId['heard']!.endSecond, 1800);
+    expect(byId['read']!.kind, 'read');
+
+    await repo.db.into(repo.db.readingSessions).insert(
+          ReadingSessionsCompanion.insert(
+            id: 'mine',
+            bookId: 'b1',
+            startedAt: DateTime(2026, 11, 13, 20),
+            endedAt: DateTime(2026, 11, 13, 21),
+            kind: const Value('listen'),
+            startSecond: const Value(10),
+            endSecond: const Value(3610),
+          ),
+        );
+    final pushed = <Map<String, dynamic>>[];
+    await SyncService(repo).push(_client(_server(pushedSessions: pushed)));
+    final mine = pushed.single;
+    expect(mine['kind'], 'listen');
+    expect(mine['start_second'], 10);
+    expect(mine['end_second'], 3610);
+    expect(mine['start_page'], isNull);
+  });
+
+  test('listening sittings wait, still dirty, for a server that lacks them',
+      () async {
+    final repo = await _repo();
+    await repo.db.into(repo.db.readingSessions).insert(
+          ReadingSessionsCompanion.insert(
+            id: 'heard',
+            bookId: 'b1',
+            startedAt: DateTime(2026, 11, 13, 20),
+            endedAt: DateTime(2026, 11, 13, 21),
+            kind: const Value('listen'),
+          ),
+        );
+    await repo.db.into(repo.db.readingSessions).insert(
+          ReadingSessionsCompanion.insert(
+            id: 'read',
+            bookId: 'b1',
+            startedAt: DateTime(2026, 11, 12, 20),
+            endedAt: DateTime(2026, 11, 12, 21),
+          ),
+        );
+    final pushed = <Map<String, dynamic>>[];
+    await SyncService(repo).push(_client(_server(
+      pushedSessions: pushed,
+      listeningSupported: false,
+    )));
+    // The old server stored `kind` nowhere, so it must never be sent one.
+    expect(pushed, hasLength(1));
+    expect(pushed.single['kind'], 'read');
+    final rows = {
+      for (final s in await repo.db.select(repo.db.readingSessions).get())
+        s.id: s,
+    };
+    expect(rows['heard']!.needsPush, isTrue);
+    expect(rows['read']!.needsPush, isFalse);
   });
 
   test('a private note travels to the account, not to the book row', () async {

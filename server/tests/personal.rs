@@ -2484,3 +2484,113 @@ async fn a_kind_the_server_does_not_know_is_still_refused() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+// ---- listening sittings (migration 0044) -----------------------------------
+
+#[tokio::test]
+async fn a_listening_sitting_round_trips_only_to_a_client_that_asks_for_it() {
+    // An app from before 1.5.3 would count a listening sitting as reading time
+    // with no pages, so it is never handed one.
+    let app = test_app().await;
+    let token = register(&app, "ears@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/sessions/l1",
+        Some(&token),
+        Some(json!({
+            "book_id": book,
+            "started_at": "2026-07-20 20:00:00",
+            "ended_at": "2026-07-20 20:30:00",
+            "kind": "listen", "start_second": 100, "end_second": 2000
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["kind"], "listen");
+    // A reading sitting pushed by an old client: no `kind` at all.
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/api/sessions/r1",
+        Some(&token),
+        Some(json!({
+            "book_id": book,
+            "started_at": "2026-07-20 21:00:00",
+            "ended_at": "2026-07-20 21:10:00",
+            "start_page": 1, "end_page": 5
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["kind"], "read");
+
+    let (_, old) = call(&app, "GET", "/api/sessions?cursor=", Some(&token), None).await;
+    assert_eq!(
+        entries(&old).len(),
+        1,
+        "an old client saw a listening sitting"
+    );
+    assert_eq!(entries(&old)[0]["id"], "r1");
+
+    let (_, new) = call(
+        &app,
+        "GET",
+        "/api/sessions?cursor=&kinds=read,listen",
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(entries(&new).len(), 2);
+    let listen = entries(&new).iter().find(|e| e["id"] == "l1").unwrap();
+    assert_eq!(listen["start_second"], 100);
+    assert_eq!(listen["end_second"], 2000);
+
+    // The end moves forward when a sitting is pushed again, and the kind stays.
+    let (_, body) = call(
+        &app,
+        "PUT",
+        "/api/sessions/l1",
+        Some(&token),
+        Some(json!({
+            "book_id": book,
+            "started_at": "2026-07-20 20:00:00",
+            "ended_at": "2026-07-20 20:40:00",
+            "kind": "listen", "start_second": 100, "end_second": 2600
+        })),
+    )
+    .await;
+    assert_eq!(body["end_second"], 2600);
+    assert_eq!(body["kind"], "listen");
+
+    let (_, caps) = call(&app, "GET", "/api/capabilities", None, None).await;
+    assert!(
+        caps["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f == "listening_sessions")
+    );
+}
+
+#[tokio::test]
+async fn an_unknown_sitting_kind_is_refused() {
+    let app = test_app().await;
+    let token = register(&app, "odd@lib.test").await;
+    let book = create_book(&app, &token, "Dune").await;
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/api/sessions/x1",
+        Some(&token),
+        Some(json!({
+            "book_id": book,
+            "started_at": "2026-07-20 20:00:00",
+            "ended_at": "2026-07-20 20:30:00",
+            "kind": "watch"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

@@ -296,6 +296,18 @@ pub struct SessionDto {
     pub start_page: Option<i64>,
     pub end_page: Option<i64>,
     pub updated_at: String,
+    pub kind: String,
+    pub start_second: Option<i64>,
+    pub end_second: Option<i64>,
+}
+
+#[derive(Deserialize)]
+pub struct SessionListQuery {
+    pub cursor: Option<String>,
+    /// `kinds=read,listen`: the client knows listening sittings. A client from
+    /// before 1.5.3 does not send it, and would count a listening sitting as
+    /// reading time with no pages, so it is only ever handed `read` rows.
+    pub kinds: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -307,23 +319,37 @@ pub struct SessionInput {
     pub ended_at: String,
     pub start_page: Option<i64>,
     pub end_page: Option<i64>,
+    /// 'read' (the default, so an app from before 1.5.3 still works) or
+    /// 'listen'.
+    pub kind: Option<String>,
+    pub start_second: Option<i64>,
+    pub end_second: Option<i64>,
 }
 
 pub async fn list_sessions(
     State(state): State<AppState>,
     user: AuthUser,
-    Query(q): Query<ListQuery>,
+    Query(q): Query<SessionListQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
     let filter = if since(&q.cursor).is_some() {
         " AND s.synced_at >= ?"
     } else {
         ""
     };
+    let knows_listening = q
+        .kinds
+        .as_deref()
+        .is_some_and(|k| k.split(',').any(|k| k.trim() == "listen"));
+    let kind_filter = if knows_listening {
+        ""
+    } else {
+        " AND s.kind = 'read'"
+    };
     let sql = format!(
         "SELECT s.id, s.book_id, s.device_id, s.device_label, s.started_at, s.ended_at, \
-                s.start_page, s.end_page, s.updated_at \
+                s.start_page, s.end_page, s.updated_at, s.kind, s.start_second, s.end_second \
          FROM reading_session s JOIN book b ON b.id = s.book_id \
-         WHERE s.user_id = ? AND {} {filter} \
+         WHERE s.user_id = ? AND {} {filter}{kind_filter} \
          ORDER BY s.synced_at",
         access_predicate()
     );
@@ -356,14 +382,24 @@ pub async fn upsert_session(
 ) -> AppResult<Json<SessionDto>> {
     crate::ids::check("session", &id)?;
     require_view(&state, &user, &input.book_id).await?;
+    let kind = match input.kind.as_deref() {
+        None | Some("read") => "read",
+        Some("listen") => "listen",
+        Some(_) => {
+            return Err(AppError::BadRequest(
+                "kind must be 'read' or 'listen'".into(),
+            ));
+        }
+    };
     sqlx::query(
         "INSERT INTO reading_session \
             (id, user_id, book_id, device_id, device_label, started_at, ended_at, \
-             start_page, end_page, updated_at, synced_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')) \
+             start_page, end_page, kind, start_second, end_second, updated_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')) \
          ON CONFLICT(id) DO UPDATE SET \
             ended_at = excluded.ended_at, \
             end_page = excluded.end_page, \
+            end_second = excluded.end_second, \
             device_label = excluded.device_label, \
             updated_at = datetime('now'), \
             synced_at = datetime('now') \
@@ -379,13 +415,16 @@ pub async fn upsert_session(
     .bind(&input.ended_at)
     .bind(input.start_page)
     .bind(input.end_page)
+    .bind(kind)
+    .bind(input.start_second)
+    .bind(input.end_second)
     .bind(&user.id)
     .execute(&state.db)
     .await?;
 
     let row: SessionDto = sqlx::query_as(
         "SELECT id, book_id, device_id, device_label, started_at, ended_at, \
-                start_page, end_page, updated_at \
+                start_page, end_page, updated_at, kind, start_second, end_second \
          FROM reading_session WHERE id = ? AND user_id = ?",
     )
     .bind(&id)

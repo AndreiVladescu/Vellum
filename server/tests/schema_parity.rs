@@ -19,6 +19,9 @@
 //! against columns on the book row on the other (`books.reader_notes`,
 //! `books.status`). Their contract is `server/tests/personal.rs`, which tests the
 //! behaviour that actually matters: isolation between accounts.
+//! `reading_session.kind`/`start_second`/`end_second` (migration 0044, the
+//! app's `ReadingSessions`) are pinned there too, by the listening-sitting
+//! test, for the same reason.
 //!
 //! `reading_progress` (migration 0011, plan 5 #5) is excluded on purpose, not by
 //! oversight: it is a per-(book, user, device) channel with no column-for-column

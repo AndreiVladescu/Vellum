@@ -1326,7 +1326,12 @@ class VellumServerClient {
     String? cursor,
   }) async {
     final uri =
-        _uri('/api/sessions').replace(queryParameters: {'cursor': cursor ?? ''});
+        _uri('/api/sessions').replace(queryParameters: {
+      'cursor': cursor ?? '',
+      // This app knows listening sittings. A server before migration 0044
+      // ignores the parameter and sends reading sittings only.
+      'kinds': 'read,listen',
+    });
     final map = _body(await _http.get(uri, headers: _headers))
         as Map<String, dynamic>;
     return (
@@ -1347,6 +1352,9 @@ class VellumServerClient {
     int? endPage,
     String? deviceId,
     String? deviceLabel,
+    String kind = 'read',
+    int? startSecond,
+    int? endSecond,
   }) async {
     final res = await _http.put(
       _uri('/api/sessions/$id'),
@@ -1359,6 +1367,9 @@ class VellumServerClient {
         'end_page': endPage,
         'device_id': deviceId,
         'device_label': deviceLabel,
+        'kind': kind,
+        'start_second': startSecond,
+        'end_second': endSecond,
       }),
     );
     _body(res);
@@ -1849,6 +1860,9 @@ class ServerSession {
     this.endPage,
     this.deviceId,
     this.deviceLabel,
+    this.kind = 'read',
+    this.startSecond,
+    this.endSecond,
   });
 
   factory ServerSession.fromJson(Map<String, dynamic> json) => ServerSession(
@@ -1860,6 +1874,10 @@ class ServerSession {
         endPage: (json['end_page'] as num?)?.toInt(),
         deviceId: json['device_id'] as String?,
         deviceLabel: json['device_label'] as String?,
+        // A server from before migration 0044 sends none: a reading sitting.
+        kind: (json['kind'] as String?) ?? 'read',
+        startSecond: (json['start_second'] as num?)?.toInt(),
+        endSecond: (json['end_second'] as num?)?.toInt(),
       );
 
   final String id;
@@ -1870,6 +1888,11 @@ class ServerSession {
   final int? endPage;
   final String? deviceId;
   final String? deviceLabel;
+
+  /// 'read' or 'listen'; `startSecond`/`endSecond` are the audio covered.
+  final String kind;
+  final int? startSecond;
+  final int? endSecond;
 }
 
 class ServerReadingPosition {
