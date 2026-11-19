@@ -493,12 +493,17 @@ fixtures were made with ffmpeg: a 5 h 30 min AAC `.m4b` with six chapters
 **v1.5.0 — an audiobook is a book**
 
 - [x] **L** This note
-- [ ] **M** Spike (§7): player on four platforms, MP4 chapter reader, Linux packaging
-- [ ] **M** Schema: app v40 and the server migration (`book_file` and `reading_progress` columns), the `audiobooks` capability, `schema_parity.rs`
-- [ ] **L** Import: detection, ordering, tags, duration, chapters, cover, magic bytes at both ends
-- [ ] **M** Server: accept audio uploads plus the file fields, hide audio from old clients, skip it in text index, reader, send and cover rendering, OPDS mime types
-- [ ] **L** Sync: upload audio, `present` flag, on-demand resumable download; audit every `bookFiles` consumer (doctor, backups, dedupe, read button, local text index)
-- [ ] **L** Basic player page: play and pause, ±30 s, chapter list and skip, position saved locally and on `reading_progress`, the "go there?" offer
+- [x] **M** Spike (§7, findings in §7a): Linux playback, the Android build, the MP4 chapter reader. *Open:* playback on Android, Windows and macOS; ten real-world m4bs; the `.deb`/AppImage on clean Ubuntu 22.04/24.04
+- [x] **M** Schema: app v40 and the server migration (0043: `book_file` and `reading_progress` columns), the `audiobooks` capability, `schema_parity.rs`
+- [x] **L** Import: detection, ordering, tags, duration, chapters, cover, magic bytes at both ends. *Open:* the "One audiobook from these 24 files?" prompt — several audio files are grouped per folder without asking
+- [x] **M** Server: accept audio uploads plus the file fields, hide audio from old clients (`?audio=1`), skip it in the text index, KOReader digests, send and cover rendering, OPDS mime types
+- [ ] **L** Sync: upload audio, `present` flag, on-demand resumable download; audit every `bookFiles` consumer (doctor, backups, dedupe, read button, local text index). *Done so far:* audio uploads with its fields (only to a server with `audiobooks`), pulled parts keep them and get their chapters re-read, the doctor skips `present = false`, the read button, text index and send sheet skip audio. *Open:* the pull still downloads audio straight away — nothing sets `present = false` yet — and there is no Range resume, Wi-Fi-only default or backup exclusion
+- [x] **L** Basic player page: play and pause, ±30 s, chapter list and skip, position saved locally and on `reading_progress`, the "go there?" offer. *Open:* the "Mark as finished" offer is a snack bar at the end; there is no *Continue listening* yet (v1.5.2). *Unverified:* the page itself has only run against a fake engine in tests; the real engine's calls (`setFilePath(initialPosition:)`, `completed`) are the ones the spike exercised on Linux
+
+**Hooks left for later.** `AudiobookPlayer` (`app/lib/audio/audiobook_player.dart`)
+holds no widget, so v1.5.1's `audio_service` handler can own it instead of the
+page; speed goes on `AudioEngine`, next to `play`/`pause`; the v1.5.3 session
+recorder hangs off the player's play/pause/ended transitions.
 
 **v1.5.1 — a player you can live with**
 

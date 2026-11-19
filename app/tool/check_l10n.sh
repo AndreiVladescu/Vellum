@@ -26,11 +26,14 @@ MIGRATED=(
   lib/account/profile_avatar.dart
   lib/account/user_profile.dart
   lib/audio/attach_audio.dart
+  lib/audio/audio_engine.dart
   lib/audio/audio_formats.dart
   lib/audio/audiobook_import.dart
+  lib/audio/audiobook_player.dart
   lib/audio/audiobook_scan.dart
   lib/audio/mp3_duration.dart
   lib/audio/mp4_reader.dart
+  lib/audio/player_page.dart
   lib/add_book/add_book_page.dart
   lib/add_book/barcode_camera.dart
   lib/add_book/isbn.dart

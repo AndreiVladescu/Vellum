@@ -10569,5 +10569,59 @@
   "@formatsAudiobook": {"description": "The row for a book's audio parts in the Digital formats list."},
 
   "formatsAudiobookDetail": "{parts, plural, =1{1 part} other{{parts} parts}} · {length} · {size} MB",
-  "@formatsAudiobookDetail": {"description": "Under 'Audiobook' in the formats list: how many files, total length (like 5:12:33) and size.", "placeholders": {"parts": {"type": "int"}, "length": {"type": "String"}, "size": {"type": "String"}}}
+  "@formatsAudiobookDetail": {"description": "Under 'Audiobook' in the formats list: how many files, total length (like 5:12:33) and size.", "placeholders": {"parts": {"type": "int"}, "length": {"type": "String"}, "size": {"type": "String"}}},
+
+  "listenListen": "Listen",
+  "@listenListen": {"description": "Book page button that opens the audiobook player."},
+
+  "listenResume": "Resume listening · {time}",
+  "@listenResume": {"description": "Book page button for an audiobook already started; time is where you are, like 1:02:33.", "placeholders": {"time": {"type": "String"}}},
+
+  "playerPlay": "Play",
+  "@playerPlay": {"description": "Audiobook player: start playing."},
+
+  "playerPause": "Pause",
+  "@playerPause": {"description": "Audiobook player: pause."},
+
+  "playerBack30": "Back 30 seconds",
+  "@playerBack30": {"description": "Audiobook player: skip back 30 seconds (tooltip)."},
+
+  "playerForward30": "Forward 30 seconds",
+  "@playerForward30": {"description": "Audiobook player: skip forward 30 seconds (tooltip)."},
+
+  "playerPreviousChapter": "Previous chapter",
+  "@playerPreviousChapter": {"description": "Audiobook player: go to the previous chapter (tooltip)."},
+
+  "playerNextChapter": "Next chapter",
+  "@playerNextChapter": {"description": "Audiobook player: go to the next chapter (tooltip)."},
+
+  "playerChapters": "Chapters",
+  "@playerChapters": {"description": "Heading of the audiobook player's chapter list."},
+
+  "playerChapterNumber": "Chapter {number}",
+  "@playerChapterNumber": {"description": "Fallback name for a chapter without a title.", "placeholders": {"number": {"type": "int"}}},
+
+  "playerNeedsLibmpv": "Playing audiobooks on Linux needs libmpv. Install the mpv package (libmpv2 on Debian and Ubuntu), then open this page again.",
+  "@playerNeedsLibmpv": {"description": "Audiobook player error on Linux when the libmpv library is missing."},
+
+  "playerUnavailable": "This device can't play audio: {detail}",
+  "@playerUnavailable": {"description": "Audiobook player error when playback cannot start.", "placeholders": {"detail": {"type": "String"}}},
+
+  "playerEndedPrompt": "That's the end of the book.",
+  "@playerEndedPrompt": {"description": "Shown when an audiobook has played to its end."},
+
+  "playerMarkFinished": "Mark as finished",
+  "@playerMarkFinished": {"description": "Action that marks the audiobook as finished."},
+
+  "listenResumeBody": "You were at {time} on {device}. Go there?",
+  "@listenResumeBody": {"description": "Dialog body offering to jump to the listening position from another device.", "placeholders": {"time": {"type": "String"}, "device": {"type": "String"}}},
+
+  "listenAnotherDevice": "another device",
+  "@listenAnotherDevice": {"description": "Stands in for a device name in the listening offer when the device sent none."},
+
+  "listenGoTo": "Go to {time}",
+  "@listenGoTo": {"description": "Accepts the listening offer.", "placeholders": {"time": {"type": "String"}}},
+
+  "listenStayHere": "Stay here",
+  "@listenStayHere": {"description": "Declines the listening offer."}
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../audio/attach_audio.dart';
 import '../audio/audio_formats.dart';
+import '../audio/player_page.dart';
 import '../data/book_file_validation.dart';
 import '../data/database.dart';
 import '../shelf/author_page.dart';
@@ -636,7 +637,17 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                 ],
               ),
               const SizedBox(height: 20),
-              ReadButton(book: book, repository: repository),
+              // Read and Listen side by side: a book can hold text and audio
+              // at once, each with its own place (docs/AUDIOBOOKS.md §3).
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ReadButton(book: book, repository: repository),
+                  ListenButton(book: book, repository: repository),
+                ],
+              ),
             ],
             rest: [
               if (book.description != null) ...[
