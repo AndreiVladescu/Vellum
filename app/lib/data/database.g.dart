@@ -11336,6 +11336,38 @@ class $ReadingSessionsTable extends ReadingSessions
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('read'),
+  );
+  static const VerificationMeta _startSecondMeta = const VerificationMeta(
+    'startSecond',
+  );
+  @override
+  late final GeneratedColumn<int> startSecond = GeneratedColumn<int>(
+    'start_second',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endSecondMeta = const VerificationMeta(
+    'endSecond',
+  );
+  @override
+  late final GeneratedColumn<int> endSecond = GeneratedColumn<int>(
+    'end_second',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -11347,6 +11379,9 @@ class $ReadingSessionsTable extends ReadingSessions
     deviceId,
     deviceLabel,
     needsPush,
+    kind,
+    startSecond,
+    endSecond,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -11422,6 +11457,27 @@ class $ReadingSessionsTable extends ReadingSessions
         needsPush.isAcceptableOrUnknown(data['needs_push']!, _needsPushMeta),
       );
     }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
+    if (data.containsKey('start_second')) {
+      context.handle(
+        _startSecondMeta,
+        startSecond.isAcceptableOrUnknown(
+          data['start_second']!,
+          _startSecondMeta,
+        ),
+      );
+    }
+    if (data.containsKey('end_second')) {
+      context.handle(
+        _endSecondMeta,
+        endSecond.isAcceptableOrUnknown(data['end_second']!, _endSecondMeta),
+      );
+    }
     return context;
   }
 
@@ -11467,6 +11523,18 @@ class $ReadingSessionsTable extends ReadingSessions
         DriftSqlType.bool,
         data['${effectivePrefix}needs_push'],
       )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      startSecond: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}start_second'],
+      ),
+      endSecond: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_second'],
+      ),
     );
   }
 
@@ -11492,6 +11560,19 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
   /// Waiting to be pushed. A session is an immutable fact, so this is only ever
   /// set once — there is no edit to re-push and no conflict to resolve.
   final bool needsPush;
+
+  /// 'read' (a reader open on a page) or 'listen' (the audiobook player
+  /// running; docs/AUDIOBOOKS.md section 5). Every reading figure filters on
+  /// `'read'`, so listening never turns into pages or reading time. Synced on
+  /// the personal sessions channel (server migration 0044).
+  final String kind;
+
+  /// For a listening sitting: the audio position, in seconds from the start of
+  /// the book, where it began and where it ended. The time counted is wall
+  /// clock; this is the audio it covered, kept beside it for pace. Null for
+  /// reading, which has pages instead.
+  final int? startSecond;
+  final int? endSecond;
   const ReadingSession({
     required this.id,
     required this.bookId,
@@ -11502,6 +11583,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     this.deviceId,
     this.deviceLabel,
     required this.needsPush,
+    required this.kind,
+    this.startSecond,
+    this.endSecond,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -11523,6 +11607,13 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       map['device_label'] = Variable<String>(deviceLabel);
     }
     map['needs_push'] = Variable<bool>(needsPush);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || startSecond != null) {
+      map['start_second'] = Variable<int>(startSecond);
+    }
+    if (!nullToAbsent || endSecond != null) {
+      map['end_second'] = Variable<int>(endSecond);
+    }
     return map;
   }
 
@@ -11545,6 +11636,13 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           ? const Value.absent()
           : Value(deviceLabel),
       needsPush: Value(needsPush),
+      kind: Value(kind),
+      startSecond: startSecond == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startSecond),
+      endSecond: endSecond == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endSecond),
     );
   }
 
@@ -11563,6 +11661,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       deviceLabel: serializer.fromJson<String?>(json['deviceLabel']),
       needsPush: serializer.fromJson<bool>(json['needsPush']),
+      kind: serializer.fromJson<String>(json['kind']),
+      startSecond: serializer.fromJson<int?>(json['startSecond']),
+      endSecond: serializer.fromJson<int?>(json['endSecond']),
     );
   }
   @override
@@ -11578,6 +11679,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       'deviceId': serializer.toJson<String?>(deviceId),
       'deviceLabel': serializer.toJson<String?>(deviceLabel),
       'needsPush': serializer.toJson<bool>(needsPush),
+      'kind': serializer.toJson<String>(kind),
+      'startSecond': serializer.toJson<int?>(startSecond),
+      'endSecond': serializer.toJson<int?>(endSecond),
     };
   }
 
@@ -11591,6 +11695,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     Value<String?> deviceId = const Value.absent(),
     Value<String?> deviceLabel = const Value.absent(),
     bool? needsPush,
+    String? kind,
+    Value<int?> startSecond = const Value.absent(),
+    Value<int?> endSecond = const Value.absent(),
   }) => ReadingSession(
     id: id ?? this.id,
     bookId: bookId ?? this.bookId,
@@ -11601,6 +11708,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     deviceId: deviceId.present ? deviceId.value : this.deviceId,
     deviceLabel: deviceLabel.present ? deviceLabel.value : this.deviceLabel,
     needsPush: needsPush ?? this.needsPush,
+    kind: kind ?? this.kind,
+    startSecond: startSecond.present ? startSecond.value : this.startSecond,
+    endSecond: endSecond.present ? endSecond.value : this.endSecond,
   );
   ReadingSession copyWithCompanion(ReadingSessionsCompanion data) {
     return ReadingSession(
@@ -11615,6 +11725,11 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           ? data.deviceLabel.value
           : this.deviceLabel,
       needsPush: data.needsPush.present ? data.needsPush.value : this.needsPush,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      startSecond: data.startSecond.present
+          ? data.startSecond.value
+          : this.startSecond,
+      endSecond: data.endSecond.present ? data.endSecond.value : this.endSecond,
     );
   }
 
@@ -11629,7 +11744,10 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           ..write('endPage: $endPage, ')
           ..write('deviceId: $deviceId, ')
           ..write('deviceLabel: $deviceLabel, ')
-          ..write('needsPush: $needsPush')
+          ..write('needsPush: $needsPush, ')
+          ..write('kind: $kind, ')
+          ..write('startSecond: $startSecond, ')
+          ..write('endSecond: $endSecond')
           ..write(')'))
         .toString();
   }
@@ -11645,6 +11763,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     deviceId,
     deviceLabel,
     needsPush,
+    kind,
+    startSecond,
+    endSecond,
   );
   @override
   bool operator ==(Object other) =>
@@ -11658,7 +11779,10 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           other.endPage == this.endPage &&
           other.deviceId == this.deviceId &&
           other.deviceLabel == this.deviceLabel &&
-          other.needsPush == this.needsPush);
+          other.needsPush == this.needsPush &&
+          other.kind == this.kind &&
+          other.startSecond == this.startSecond &&
+          other.endSecond == this.endSecond);
 }
 
 class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
@@ -11671,6 +11795,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
   final Value<String?> deviceId;
   final Value<String?> deviceLabel;
   final Value<bool> needsPush;
+  final Value<String> kind;
+  final Value<int?> startSecond;
+  final Value<int?> endSecond;
   final Value<int> rowid;
   const ReadingSessionsCompanion({
     this.id = const Value.absent(),
@@ -11682,6 +11809,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     this.deviceId = const Value.absent(),
     this.deviceLabel = const Value.absent(),
     this.needsPush = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.startSecond = const Value.absent(),
+    this.endSecond = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReadingSessionsCompanion.insert({
@@ -11694,6 +11824,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     this.deviceId = const Value.absent(),
     this.deviceLabel = const Value.absent(),
     this.needsPush = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.startSecond = const Value.absent(),
+    this.endSecond = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        bookId = Value(bookId),
@@ -11709,6 +11842,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     Expression<String>? deviceId,
     Expression<String>? deviceLabel,
     Expression<bool>? needsPush,
+    Expression<String>? kind,
+    Expression<int>? startSecond,
+    Expression<int>? endSecond,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -11721,6 +11857,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
       if (deviceId != null) 'device_id': deviceId,
       if (deviceLabel != null) 'device_label': deviceLabel,
       if (needsPush != null) 'needs_push': needsPush,
+      if (kind != null) 'kind': kind,
+      if (startSecond != null) 'start_second': startSecond,
+      if (endSecond != null) 'end_second': endSecond,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -11735,6 +11874,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     Value<String?>? deviceId,
     Value<String?>? deviceLabel,
     Value<bool>? needsPush,
+    Value<String>? kind,
+    Value<int?>? startSecond,
+    Value<int?>? endSecond,
     Value<int>? rowid,
   }) {
     return ReadingSessionsCompanion(
@@ -11747,6 +11889,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
       deviceId: deviceId ?? this.deviceId,
       deviceLabel: deviceLabel ?? this.deviceLabel,
       needsPush: needsPush ?? this.needsPush,
+      kind: kind ?? this.kind,
+      startSecond: startSecond ?? this.startSecond,
+      endSecond: endSecond ?? this.endSecond,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -11781,6 +11926,15 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     if (needsPush.present) {
       map['needs_push'] = Variable<bool>(needsPush.value);
     }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (startSecond.present) {
+      map['start_second'] = Variable<int>(startSecond.value);
+    }
+    if (endSecond.present) {
+      map['end_second'] = Variable<int>(endSecond.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -11799,6 +11953,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
           ..write('deviceId: $deviceId, ')
           ..write('deviceLabel: $deviceLabel, ')
           ..write('needsPush: $needsPush, ')
+          ..write('kind: $kind, ')
+          ..write('startSecond: $startSecond, ')
+          ..write('endSecond: $endSecond, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -22303,6 +22460,9 @@ typedef $$ReadingSessionsTableCreateCompanionBuilder =
       Value<String?> deviceId,
       Value<String?> deviceLabel,
       Value<bool> needsPush,
+      Value<String> kind,
+      Value<int?> startSecond,
+      Value<int?> endSecond,
       Value<int> rowid,
     });
 typedef $$ReadingSessionsTableUpdateCompanionBuilder =
@@ -22316,6 +22476,9 @@ typedef $$ReadingSessionsTableUpdateCompanionBuilder =
       Value<String?> deviceId,
       Value<String?> deviceLabel,
       Value<bool> needsPush,
+      Value<String> kind,
+      Value<int?> startSecond,
+      Value<int?> endSecond,
       Value<int> rowid,
     });
 
@@ -22399,6 +22562,21 @@ class $$ReadingSessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startSecond => $composableBuilder(
+    column: $table.startSecond,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get endSecond => $composableBuilder(
+    column: $table.endSecond,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$BooksTableFilterComposer get bookId {
     final $$BooksTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -22472,6 +22650,21 @@ class $$ReadingSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startSecond => $composableBuilder(
+    column: $table.startSecond,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get endSecond => $composableBuilder(
+    column: $table.endSecond,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$BooksTableOrderingComposer get bookId {
     final $$BooksTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -22530,6 +22723,17 @@ class $$ReadingSessionsTableAnnotationComposer
 
   GeneratedColumn<bool> get needsPush =>
       $composableBuilder(column: $table.needsPush, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get startSecond => $composableBuilder(
+    column: $table.startSecond,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get endSecond =>
+      $composableBuilder(column: $table.endSecond, builder: (column) => column);
 
   $$BooksTableAnnotationComposer get bookId {
     final $$BooksTableAnnotationComposer composer = $composerBuilder(
@@ -22594,6 +22798,9 @@ class $$ReadingSessionsTableTableManager
                 Value<String?> deviceId = const Value.absent(),
                 Value<String?> deviceLabel = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<int?> startSecond = const Value.absent(),
+                Value<int?> endSecond = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingSessionsCompanion(
                 id: id,
@@ -22605,6 +22812,9 @@ class $$ReadingSessionsTableTableManager
                 deviceId: deviceId,
                 deviceLabel: deviceLabel,
                 needsPush: needsPush,
+                kind: kind,
+                startSecond: startSecond,
+                endSecond: endSecond,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -22618,6 +22828,9 @@ class $$ReadingSessionsTableTableManager
                 Value<String?> deviceId = const Value.absent(),
                 Value<String?> deviceLabel = const Value.absent(),
                 Value<bool> needsPush = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<int?> startSecond = const Value.absent(),
+                Value<int?> endSecond = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingSessionsCompanion.insert(
                 id: id,
@@ -22629,6 +22842,9 @@ class $$ReadingSessionsTableTableManager
                 deviceId: deviceId,
                 deviceLabel: deviceLabel,
                 needsPush: needsPush,
+                kind: kind,
+                startSecond: startSecond,
+                endSecond: endSecond,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

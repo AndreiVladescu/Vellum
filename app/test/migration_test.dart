@@ -326,6 +326,31 @@ void main() {
     expect(await db.select(db.audioChapters).get(), isEmpty);
   });
 
+  // v41 adds `kind` to a table full of reading sittings: every one of them has
+  // to come out as 'read', or its minutes would drop out of every figure.
+  test('upgrading keeps existing sittings as reading', () async {
+    final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
+    final schema = await verifier.schemaAt(40);
+    addTearDown(schema.close);
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, created_at, updated_at, "
+      "needs_push, reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('b', 'Dune', 'unread', 0, 0, 0, 0, 0)",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO reading_sessions (id, book_id, started_at, ended_at, "
+      "start_page, end_page) VALUES ('s', 'b', 0, 600, 3, 9)",
+    );
+
+    final db = VellumDatabase(schema.newConnection());
+    addTearDown(db.close);
+    final row = await db.select(db.readingSessions).getSingle();
+    expect(row.kind, 'read');
+    expect(row.startSecond, isNull);
+    expect(row.endSecond, isNull);
+    expect(row.endPage, 9);
+  });
+
   group('every historical schema version migrates cleanly to the latest', () {
     final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
     final latest = versions.GeneratedHelper.versions.last;

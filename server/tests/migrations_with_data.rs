@@ -527,3 +527,39 @@ fn no_migration_adds_a_column_with_a_non_constant_default() {
         offenders.join("\n")
     );
 }
+
+/// 0044 adds `kind` (with a constant default) and two nullable columns to
+/// `reading_session`, which a real server has rows in. Every existing sitting
+/// must come out as reading, with its pages untouched.
+#[tokio::test]
+async fn existing_sittings_upgrade_to_reading_sittings() {
+    let path = std::env::temp_dir().join(format!("vellum_popmig_{}.db", uuid::Uuid::new_v4()));
+    let path = path.to_str().unwrap().to_string();
+    {
+        let pool = migrate_partially(&path, 43).await;
+        for sql in [
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u1', 'someone@lib.test', 'Someone', 'x', 1)",
+            "INSERT INTO book (id, title, updated_at) VALUES ('b1', 'Dune', datetime('now'))",
+            "INSERT INTO reading_session (id, user_id, book_id, started_at, ended_at, \
+             start_page, end_page) VALUES ('s1', 'u1', 'b1', '2026-11-01 10:00:00', \
+             '2026-11-01 10:30:00', 3, 20)",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+    }
+
+    let db = connect_db(&path)
+        .await
+        .expect("a database with sittings in it must migrate");
+    let row = sqlx::query("SELECT kind, start_second, end_second, end_page FROM reading_session")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(row.get::<String, _>(0), "read");
+    assert_eq!(row.get::<Option<i64>, _>(1), None);
+    assert_eq!(row.get::<Option<i64>, _>(2), None);
+    assert_eq!(row.get::<i64, _>(3), 20);
+    let _ = std::fs::remove_file(&path);
+}

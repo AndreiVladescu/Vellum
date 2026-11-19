@@ -768,6 +768,19 @@ class ReadingSessions extends Table {
   /// set once — there is no edit to re-push and no conflict to resolve.
   BoolColumn get needsPush => boolean().withDefault(const Constant(true))();
 
+  /// 'read' (a reader open on a page) or 'listen' (the audiobook player
+  /// running; docs/AUDIOBOOKS.md section 5). Every reading figure filters on
+  /// `'read'`, so listening never turns into pages or reading time. Synced on
+  /// the personal sessions channel (server migration 0044).
+  TextColumn get kind => text().withDefault(const Constant('read'))();
+
+  /// For a listening sitting: the audio position, in seconds from the start of
+  /// the book, where it began and where it ended. The time counted is wall
+  /// clock; this is the audio it covered, kept beside it for pace. Null for
+  /// reading, which has pages instead.
+  IntColumn get startSecond => integer().nullable()();
+  IntColumn get endSecond => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -839,7 +852,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 40;
+  int get schemaVersion => 41;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1371,6 +1384,21 @@ class VellumDatabase extends _$VellumDatabase {
             }
             if (!tables.contains('audio_chapters')) {
               await m.createTable(audioChapters);
+            }
+          }
+          if (from < 41) {
+            // Listening sittings (docs/AUDIOBOOKS.md section 5, server
+            // migration 0044): every existing row is a reading sitting, which
+            // the constant default says.
+            final sessionCols = await columnsOf('reading_sessions');
+            for (final (name, column) in <(String, GeneratedColumn)>[
+              ('kind', readingSessions.kind),
+              ('start_second', readingSessions.startSecond),
+              ('end_second', readingSessions.endSecond),
+            ]) {
+              if (!sessionCols.contains(name)) {
+                await m.addColumn(readingSessions, column);
+              }
             }
           }
         },
