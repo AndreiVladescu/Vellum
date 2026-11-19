@@ -239,6 +239,10 @@ class _LibraryPageState extends State<LibraryPage> {
   String? _genreFilter;
   // The reading-status facet (plan 5 #18), or null for "any status".
   ReadingStatus? _statusFilter;
+  // The Audiobooks facet (v1.5.2): only books with an audio part. A chip in the
+  // shelf row, off for every launch like the other facets.
+  bool _audioOnly = false;
+  late final Stream<bool> _hasAudio = repository.queries.watchHasAudio();
   int _tab = 0; // 0 = digital shelf, 1 = physical libraries
 
   /// Book ids ticked in selection mode (next features #4). Empty means the mode
@@ -1051,6 +1055,7 @@ class _LibraryPageState extends State<LibraryPage> {
       _query = '';
       _genreFilter = null;
       _statusFilter = null;
+      _audioOnly = false;
       _searchInsideBooks = false;
     });
   }
@@ -1549,6 +1554,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       query: _query,
                       genre: _genreFilter,
                       status: _statusFilter?.name,
+                      audioOnly: _audioOnly,
                       sort: widget.settings.shelfSort,
                     ),
                     builder: (context, snapshot) {
@@ -1605,6 +1611,8 @@ class _LibraryPageState extends State<LibraryPage> {
                   setState(() {
                     _query = '';
                     _genreFilter = null;
+                    _statusFilter = null;
+                    _audioOnly = false;
                   });
                 },
                 icon: const Icon(Icons.filter_alt_off_outlined),
@@ -1735,6 +1743,7 @@ class _LibraryPageState extends State<LibraryPage> {
       return l10n.noBooksInGenreMatch(genre, q);
     }
     if (genre != null) return l10n.noBooksInGenre(genre);
+    if (_audioOnly && q.isEmpty) return l10n.noAudiobooksHere;
     return l10n.noBooksMatch(q);
   }
 
@@ -1753,6 +1762,26 @@ class _LibraryPageState extends State<LibraryPage> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
+          // Only when there is audio to filter to (or the filter is on, so it
+          // can always be switched off).
+          StreamBuilder<bool>(
+            stream: _hasAudio,
+            builder: (context, snapshot) => !(snapshot.data ?? false) &&
+                    !_audioOnly
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    child: Center(
+                      child: FilterChip(
+                        avatar: const Icon(Icons.headphones, size: 18),
+                        label: Text(L10n.of(context).shelfFilterAudiobooks),
+                        selected: _audioOnly,
+                        onSelected: (v) => setState(() => _audioOnly = v),
+                      ),
+                    ),
+                  ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: Center(child: ChoiceChip(

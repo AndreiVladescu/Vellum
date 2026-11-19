@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 
+import '../audio/audio_formats.dart';
 import '../settings/shelf_sort.dart';
 import 'database.dart';
 import 'search_index.dart';
@@ -15,6 +16,7 @@ class LibraryEntry {
     required this.genres,
     required this.hasFile,
     this.seriesName,
+    this.audioMs,
   });
 
   final Book book;
@@ -24,6 +26,15 @@ class LibraryEntry {
   final List<String> authors; // ordered by book_authors.position
   final List<String> genres;
   final bool hasFile;
+
+  /// Total length of the book's audio parts in milliseconds, or null when it
+  /// has no audio at all. Zero means audio whose durations are not known yet,
+  /// so [hasAudio] is the test and this is only a size (spine thickness).
+  final int? audioMs;
+
+  /// Whether there is anything to listen to: what the headphones badge and the
+  /// Audiobooks filter mean. A book with text *and* audio has both.
+  bool get hasAudio => audioMs != null;
 }
 
 /// One snapshot of everything the shelf UI needs: already filtered and
@@ -54,6 +65,10 @@ class LibraryView {
   );
 }
 
+/// `book_files.format` values that are audio, as an SQL list. Built from
+/// [audioFormats] so the two cannot drift; the values are our own constants.
+final _audioFormatsSql = audioFormats.map((f) => "'$f'").join(', ');
+
 /// The library's read/watch side — the multi-table streams the shelf UI
 /// consumes. Split out of `LibraryRepository` (plan 5 §A10) so it can be
 /// tested and extended (§A1's view-model, §A2's search) in isolation from the
@@ -79,6 +94,20 @@ class LibraryQueries {
   final _Cached<Map<String, List<String>>> _genresByBook;
   final _Cached<List<Shelf>> _shelvesOrdered;
   final _Cached<List<String>> _allGenreNames;
+
+  /// Whether the library has any audio at all, live. Decides whether the shelf
+  /// offers the Audiobooks filter: a library with no audiobooks has no use for
+  /// it, and the chip row is crowded enough.
+  Stream<bool> watchHasAudio() => db
+      .customSelect(
+        'SELECT EXISTS(SELECT 1 FROM book_files af JOIN books b '
+        'ON b.id = af.book_id WHERE b.deleted_at IS NULL '
+        'AND af.format IN ($_audioFormatsSql)) AS has',
+        readsFrom: {db.bookFiles, db.books},
+      )
+      .watchSingle()
+      .map((row) => row.read<bool>('has'))
+      .distinct();
 
   /// All books, alphabetically — reactive: the shelf UI rebuilds on changes.
   Stream<List<Book>> watchAllBooks() => db.watchAllBooks();
@@ -216,6 +245,7 @@ class LibraryQueries {
     String query = '',
     String? genre,
     String? status,
+    bool audioOnly = false,
     ShelfSort sort = ShelfSort.title,
   }) {
     return _combine6(
@@ -224,6 +254,7 @@ class LibraryQueries {
           query: query,
           genre: genre,
           status: status,
+          audioOnly: audioOnly,
           sort: sort),
       _authorsByBook.stream,
       _genresByBook.stream,
@@ -239,6 +270,7 @@ class LibraryQueries {
               genres: genresByBook[b.book.id] ?? const [],
               hasFile: b.hasFile,
               seriesName: b.seriesName,
+              audioMs: b.audioMs,
             ),
         ];
         return LibraryView(
@@ -277,12 +309,13 @@ class LibraryQueries {
         .map((row) => row.read<bool>('empty'));
   }
 
-  Stream<List<({Book book, bool hasFile, String? seriesName})>>
+  Stream<List<({Book book, bool hasFile, String? seriesName, int? audioMs})>>
       _watchFilteredSortedBooks({
     String? shelfId,
     String query = '',
     String? genre,
     String? status,
+    bool audioOnly = false,
     ShelfSort sort = ShelfSort.title,
   }) {
     // Trash (plan 5 #52) is filtered here, once, for every caller of the
@@ -308,6 +341,12 @@ class LibraryQueries {
       // no status was asked for — a caller that explicitly wants
       // `status = 'wishlist'` gets exactly that.
       where.add("books.status <> 'wishlist'");
+    }
+    if (audioOnly) {
+      // The Audiobooks facet (v1.5.2): anything with an audio part, whether or
+      // not it also has text. Another predicate on the one query.
+      where.add('EXISTS (SELECT 1 FROM book_files af WHERE '
+          'af.book_id = books.id AND af.format IN ($_audioFormatsSql))');
     }
     if (genre != null && genre.isNotEmpty) {
       where.add(
@@ -369,8 +408,12 @@ class LibraryQueries {
         '$seriesSortExpr AS sort_series, '
         '(SELECT s.name FROM series s WHERE s.id = books.series_id) '
         'AS series_name, '
-        '(SELECT s.name FROM series s WHERE s.id = books.series_id) '
-        'AS series_name, '
+        // NULL when there is no audio part; otherwise the summed length (0 if
+        // no part knows its duration yet).
+        '(SELECT CASE WHEN COUNT(*) = 0 THEN NULL '
+        'ELSE COALESCE(SUM(af.duration_ms), 0) END FROM book_files af '
+        'WHERE af.book_id = books.id AND af.format IN ($_audioFormatsSql)) '
+        'AS audio_ms, '
         'EXISTS(SELECT 1 FROM book_files bf WHERE bf.book_id = books.id) '
         'AS has_file '
         'FROM books '
@@ -404,6 +447,7 @@ class LibraryQueries {
                   book: db.books.map(row.data),
                   hasFile: row.read<bool>('has_file'),
                   seriesName: row.read<String?>('series_name'),
+                  audioMs: row.read<int?>('audio_ms'),
                 ),
             ]);
   }

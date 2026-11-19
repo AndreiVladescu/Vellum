@@ -114,6 +114,11 @@ class _ShelfViewState extends State<ShelfView> {
   BookFace? _packFace;
   double? _packScale;
 
+  /// `bookId -> audio length (ms)` for the books that have audio, rebuilt with
+  /// the packing. Both the packer (spine width) and each spine (badge) read it,
+  /// so a book is measured the same way in both places.
+  Map<String, int> _audioMs = const {};
+
   List<_Section> _pack(double rowWidth) {
     final w = widget;
     if (_sections == null ||
@@ -123,6 +128,11 @@ class _ShelfViewState extends State<ShelfView> {
         _packFace != w.bookFace ||
         _packScale != w.typography.clampedWidth) {
       final groups = w.groups;
+      _audioMs = {
+        for (final g in groups ?? const <ShelfGroup>[])
+          for (final e in g.entries)
+            if (e.audioMs != null) e.book.id: e.audioMs!,
+      };
       _sections = groups == null
           ? [_Section(null, _packIntoRows(w.books, rowWidth))]
           : [
@@ -172,6 +182,7 @@ class _ShelfViewState extends State<ShelfView> {
                         itemCount: section.rows.length,
                         itemBuilder: (context, i) => _ShelfRow(
                           row: section.rows[i],
+                          audioMs: _audioMs,
                           bookFace: widget.bookFace,
                           spineArt: widget.spineArt,
                           material: widget.material,
@@ -197,8 +208,7 @@ class _ShelfViewState extends State<ShelfView> {
       ? _coverWidth
       // The same scale the spine itself is drawn at, or the packer would lay
       // out rows for a width the books no longer have.
-      : SpineStyle.fromJson(book.spineStyle, title: book.title).width *
-          widget.typography.clampedWidth;
+      : _spineWidth(book, _audioMs[book.id]) * widget.typography.clampedWidth;
 
   List<List<Book>> _packIntoRows(List<Book> books, double rowWidth) {
     final rows = <List<Book>>[[]];
@@ -218,9 +228,18 @@ class _ShelfViewState extends State<ShelfView> {
   }
 }
 
+/// A spine's width before the user's size nudge: the stored style's, or the
+/// duration's when the book is audio with no page count.
+double _spineWidth(Book book, int? audioMs) => SpineStyle.effectiveWidth(
+      stored: SpineStyle.fromJson(book.spineStyle, title: book.title).width,
+      pageCount: book.pageCount,
+      audioMs: audioMs,
+    );
+
 class _ShelfRow extends StatelessWidget {
   const _ShelfRow({
     required this.row,
+    required this.audioMs,
     required this.bookFace,
     required this.spineArt,
     required this.material,
@@ -233,6 +252,9 @@ class _ShelfRow extends StatelessWidget {
   });
 
   final List<Book> row;
+
+  /// Which books have audio, and how long; see `_ShelfViewState._audioMs`.
+  final Map<String, int> audioMs;
   final Set<String> selected;
   final void Function(Book)? onToggleSelected;
   final bool selectionMode;
@@ -288,6 +310,7 @@ class _ShelfRow extends StatelessWidget {
                           ? BookCover(
                               book: book,
                               coverFile: coverFile,
+                              audio: audioMs.containsKey(book.id),
                               onTap: onTap,
                               onLongPress: onLongPress,
                               selected: ticked,
@@ -295,6 +318,7 @@ class _ShelfRow extends StatelessWidget {
                           : BookSpine(
                               book: book,
                               coverFile: coverFile,
+                              audioMs: audioMs[book.id],
                               spineArt: spineArt,
                               typography: typography,
                               onTap: onTap,
@@ -399,10 +423,15 @@ class BookSpine extends StatelessWidget {
     this.coverFile,
     this.spineArt = SpineArt.coverSlice,
     this.typography = SpineTypography.normal,
+    this.audioMs,
   });
 
   final Book book;
   final VoidCallback? onTap;
+
+  /// The book's audio length in milliseconds, or null when it has no audio.
+  /// Non-null draws the headphones badge, and sizes a page-less book's spine.
+  final int? audioMs;
 
   /// Enters selection mode (next features #4). Also fired by a right-click,
   /// which is what a mouse user reaches for.
@@ -419,13 +448,13 @@ class BookSpine extends StatelessWidget {
     final style = SpineStyle.fromJson(book.spineStyle, title: book.title);
     final finished =
         ReadingStatus.parse(book.status) == ReadingStatus.finished;
+    final l10n = L10n.of(context);
+    var label = bookSemanticLabel(book.title, book.subtitle);
+    if (audioMs != null) label = l10n.shelfBookAudioLabel(label);
     return Semantics(
-      // The mark below is painted inside `excludeSemantics`, so the one place
-      // a screen reader can hear about it is here.
-      label: finished
-          ? L10n.of(context).shelfBookFinishedLabel(
-              bookSemanticLabel(book.title, book.subtitle))
-          : bookSemanticLabel(book.title, book.subtitle),
+      // The marks below are painted inside `excludeSemantics`, so the one place
+      // a screen reader can hear about them is here.
+      label: finished ? l10n.shelfBookFinishedLabel(label) : label,
       button: onTap != null,
       onTap: onTap,
       // The title is painted into the spine art; screen readers get it from the
@@ -452,7 +481,12 @@ class BookSpine extends StatelessWidget {
               ? TooltipTriggerMode.manual
               : TooltipTriggerMode.longPress,
           child: SizedBox(
-            width: style.width * typography.clampedWidth,
+            width: SpineStyle.effectiveWidth(
+                  stored: style.width,
+                  pageCount: book.pageCount,
+                  audioMs: audioMs,
+                ) *
+                typography.clampedWidth,
             height: _bookAreaHeight * style.heightFactor,
             child: SelectedBookOverlay(
               selected: selected,
@@ -465,6 +499,7 @@ class BookSpine extends StatelessWidget {
                       style: style,
                       spineArt: spineArt,
                       titleScale: typography.clampedTitle,
+                      audio: audioMs != null,
                     ),
                   ),
                   // Books you have read, marked on the shelf itself (v1.1.5
@@ -482,6 +517,40 @@ class BookSpine extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The headphones on a book that has audio: on its spine, on its face-out
+/// cover, and (smaller, without the ring) in the list.
+///
+/// A fixed-size glyph and not text-scaled, so it is the same at any text size
+/// and a spine's narrowest width still has room for it. The dark ring behind
+/// the white glyph is what keeps it legible on a pale generated spine, on a
+/// busy cover slice and over either shelf material, the same trick as
+/// [_FinishedMark]. Two glyphs, no layers and nothing saved to a bitmap, so it
+/// costs an audio spine two more text runs to paint and other books nothing.
+class AudioBadge extends StatelessWidget {
+  const AudioBadge({super.key, this.size = 14});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(
+            Icons.headphones,
+            size: size,
+            color: Colors.black.withValues(alpha: 0.55),
+          ),
+          Icon(Icons.headphones, size: size - 3, color: Colors.white),
+        ],
       ),
     );
   }
@@ -584,11 +653,20 @@ class SpineFace extends StatelessWidget {
     this.style,
     this.spineArt = SpineArt.coverSlice,
     this.titleScale = 1.0,
+    this.audio = false,
   });
 
   final Book book;
   final File? coverFile;
   final SpineStyle? style;
+
+  /// Draws the headphones badge at the foot of the spine and keeps the title
+  /// clear of it. Part of the face so it is the same on both spine materials
+  /// (cover slice and generated), and so the physical room could show it too.
+  final bool audio;
+
+  /// Room the title leaves at the foot of an audio spine for the badge.
+  static const _audioFoot = 24.0;
 
   /// Multiplier on the title painted down the spine (plan 5 #39). Defaults to
   /// 1 so the physical view, which has no typography preference of its own,
@@ -604,18 +682,39 @@ class SpineFace extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = style ?? SpineStyle.fromJson(book.spineStyle, title: book.title);
     final cover = coverFile;
+    final Widget face;
     // No filesystem call in build: a non-null path means "has a cover". If the
     // file is actually missing (rare orphaned path), Image.file's errorBuilder
     // falls back to the generated spine.
-    if (cover == null) return _generatedSpine(s);
     final dominant = s.coverColor;
-    if (spineArt == SpineArt.dominantColor && dominant != null) {
-      return _generatedSpine(
+    if (cover == null) {
+      face = _generatedSpine(s);
+    } else if (spineArt == SpineArt.dominantColor && dominant != null) {
+      face = _generatedSpine(
         s.withCoverColor(null).recolored(dominant, spineTextColorFor(dominant)),
       );
+    } else {
+      face = _coverSpine(context, cover, s);
     }
-    return _coverSpine(context, cover, s);
+    if (!audio) return face;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        face,
+        const Positioned(
+          left: 0,
+          right: 0,
+          bottom: 4,
+          child: Center(child: AudioBadge()),
+        ),
+      ],
+    );
   }
+
+  EdgeInsets get _titlePadding => EdgeInsets.only(
+        top: 10,
+        bottom: audio ? _audioFoot : 10,
+      );
 
   /// Spine drawn from the left edge of the cover image.
   Widget _coverSpine(BuildContext context, File cover, SpineStyle s) {
@@ -664,7 +763,7 @@ class SpineFace extends StatelessWidget {
             decoration: BoxDecoration(color: Color(0x42000000)),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: _titlePadding,
             child: RotatedBox(
               quarterTurns: 1,
               child: Center(
@@ -707,7 +806,7 @@ class SpineFace extends StatelessWidget {
       ),
       topRadius: 3,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: _titlePadding,
         child: Column(
           children: [
             if (style.variant == 1) _band(accent),
@@ -770,10 +869,14 @@ class BookCover extends StatelessWidget {
     this.onLongPress,
     this.selected = false,
     this.coverFile,
+    this.audio = false,
   });
 
   final Book book;
   final VoidCallback? onTap;
+
+  /// Whether the book has audio: draws the headphones badge in a corner.
+  final bool audio;
 
   /// Enters selection mode — see [BookSpine.onLongPress].
   final VoidCallback? onLongPress;
@@ -784,8 +887,20 @@ class BookCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = coverFile;
     final dpr = MediaQuery.devicePixelRatioOf(context);
+    final Widget art = cover != null
+        ? Image(
+            image: CoverImage(
+              cover,
+              height: (_bookAreaHeight * dpr).round(),
+              version: coverVersionOf(book),
+            ),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _generatedCover(),
+          )
+        : _generatedCover();
+    final label = bookSemanticLabel(book.title, book.subtitle);
     return Semantics(
-      label: bookSemanticLabel(book.title, book.subtitle),
+      label: audio ? L10n.of(context).shelfBookAudioLabel(label) : label,
       button: onTap != null,
       onTap: onTap,
       excludeSemantics: true,
@@ -813,21 +928,24 @@ class BookCover extends StatelessWidget {
               selected: selected,
               child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
+              // The badge sits over the artwork, so it is inside the clip.
               // Non-null path means "has a cover"; decode below full res but by
               // the box *height* (a 2:3 cover in this taller box is height-driven,
               // so a width budget would leave it soft). Fall back to a generated
               // cover if the file is missing. No filesystem call in build.
-              child: cover != null
-                  ? Image(
-                      image: CoverImage(
-                        cover,
-                        height: (_bookAreaHeight * dpr).round(),
-                        version: coverVersionOf(book),
-                      ),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _generatedCover(),
+              child: audio
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        art,
+                        const Positioned(
+                          right: 5,
+                          bottom: 5,
+                          child: AudioBadge(),
+                        ),
+                      ],
                     )
-                  : _generatedCover(),
+                  : art,
               ),
             ),
           ),

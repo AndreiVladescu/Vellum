@@ -166,6 +166,18 @@ class _BookRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Headphones on anything with audio, beside (not instead of) the
+          // file icon: a book can have both text and audio. A plain icon, not
+          // the spine's ringed badge, because here it sits on a flat surface.
+          if (entry.hasAudio) ...[
+            Icon(
+              Icons.headphones,
+              size: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+              semanticLabel: L10n.of(context).shelfFilterAudiobooks,
+            ),
+            const SizedBox(width: 10),
+          ],
           if (book.rating != null) ...[
             Icon(Icons.star, size: 14, color: theme.colorScheme.primary),
             const SizedBox(width: 2),

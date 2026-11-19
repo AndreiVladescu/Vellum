@@ -10755,5 +10755,14 @@
   "@detailListeningTimeLabel": {"description": "Row of the listening block on the book page."},
 
   "detailListeningLastLabel": "Last listened",
-  "@detailListeningLastLabel": {"description": "Row of the listening block on the book page: the day of the latest listening sitting."}
+  "@detailListeningLastLabel": {"description": "Row of the listening block on the book page: the day of the latest listening sitting."},
+
+  "shelfFilterAudiobooks": "Audiobooks",
+  "@shelfFilterAudiobooks": {"description": "Tooltip of the shelf filter that shows only books with audio, and the label of its active chip."},
+
+  "shelfBookAudioLabel": "{label}, audiobook",
+  "@shelfBookAudioLabel": {"description": "Screen-reader label of a spine or cover that has audio; label is the title.", "placeholders": {"label": {"type": "String"}}},
+
+  "noAudiobooksHere": "No audiobooks here.",
+  "@noAudiobooksHere": {"description": "Shown when the Audiobooks filter is on and nothing in the current shelf has audio."}
 }

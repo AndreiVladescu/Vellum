@@ -59,6 +59,39 @@ class SpineStyle {
   // one thing that was theme-coupled here, the brown title ink, now comes from
   // `spineTextColorFor` (plan 5 #39).
 
+  /// Spine width in logical pixels for a book of [pages], clamped to the
+  /// narrowest and widest spine the shelf draws.
+  static double widthForPages(int pages) =>
+      34.0 + ((pages - 120) / 14.0).clamp(0.0, 28.0);
+
+  /// Pages an audiobook of [ms] milliseconds stands in for when it has no page
+  /// count of its own: about thirty an hour (docs/AUDIOBOOKS.md, v1.5.2), so a
+  /// ten-hour book is as thick as a 300-page one. Null for no usable length.
+  static int? pagesForDuration(int? ms) {
+    if (ms == null || ms <= 0) return null;
+    return (ms / Duration.millisecondsPerHour * audioPagesPerHour).round();
+  }
+
+  /// Pages per hour of audio, for a thickness only.
+  static const audioPagesPerHour = 30.0;
+
+  /// The width a book's spine is drawn at. [stored] is the width baked into its
+  /// `spineStyle` when it was created. A book that has a page count keeps it —
+  /// the real figure beats an estimate — and so does one with no audio; a
+  /// book with audio and *no* page count is sized from its duration instead,
+  /// at render time, so an audiobook added later (or one whose parts were
+  /// measured after the style was made) is thick as it should be without
+  /// rewriting the stored, synced style.
+  static double effectiveWidth({
+    required double stored,
+    int? pageCount,
+    int? audioMs,
+  }) {
+    if (pageCount != null) return stored;
+    final pages = pagesForDuration(audioMs);
+    return pages == null ? stored : widthForPages(pages);
+  }
+
   static SpineStyle generate({
     required String title,
     String? author,
@@ -67,8 +100,7 @@ class SpineStyle {
     final h = _fnv1a('$title|${author ?? ''}');
     final color = _palette[h % _palette.length];
     final textColor = spineTextColorFor(color);
-    final pages = pageCount ?? 220;
-    final width = 34.0 + ((pages - 120) / 14.0).clamp(0.0, 28.0);
+    final width = widthForPages(pageCount ?? 220);
     final heightFactor = 0.85 + ((h >> 4) % 14) / 100.0;
     return SpineStyle(
       color: color,
