@@ -315,15 +315,21 @@ ALTER TABLE reading_session ADD COLUMN end_second   INTEGER;
 
 **Recording.**
 
-- The `SessionRecorder` is owned by the player service, not by a page, because
-  playback outlives the page.
-- A sitting begins on play, is touched every 30 s, and ends on pause, stop or
-  the end of the book.
+- The `SessionRecorder` is owned by the player (`AudiobookPlayer`, itself owned
+  by `PlaybackHost`), not by a page, because playback outlives the page.
+- A sitting begins on play, is touched whenever the player saves its position
+  (every 15 s while playing, and on seeks), and ends on pause, a system pause,
+  the sleep timer, the end of the book and dispose. Writes are queued so a
+  pause right behind a play closes the sitting the play opened.
+- A listening sitting under five seconds is dropped (position moves by itself
+  while playing, so only length says whether it was one).
 - Two-minute coalescing still applies, but `begin()` must match on `kind` as
   well as `bookId`, so that reading straight after listening starts a new
   sitting.
-- At startup, sittings left open by a killed app are closed at their last
-  touch.
+- *Not built:* closing, at startup, a sitting left open by a killed app. An
+  open sitting is `needsPush = false` like a pulled one, so there is no marker
+  to find it by; it keeps its last touch (at most 15 s old) locally but is not
+  pushed. Reading sittings have the same gap. Closing it needs an `open` flag.
 - The time counted is **wall-clock time**: 1 h at 1.5× is 1 h listened. The
   seconds of audio covered (`endSecond − startSecond`) are kept beside it for
   pace.
@@ -337,7 +343,10 @@ on other devices:
 - An old server would store a listening sitting as reading (serde drops
   `kind`). So the app pushes listening sittings only after the server
   advertises the `listening_sessions` capability, and keeps them dirty until
-  then, as `book_status` does.
+  then, as `book_status` does. The app sends `?kinds=read,listen` on every
+  pull; an old server ignores it and sends reading sittings only.
+- A server with 0044 refuses a `kind` other than `read` or `listen`, and a
+  sitting pushed with no `kind` (an old app) is a reading sitting.
 
 **Insights.**
 
@@ -346,9 +355,16 @@ on other devices:
   its meaning, and the "minutes read" goal stays a reading goal.
 - A *Reading / Listening* switch sits at the top of the page, defaulting to
   *Reading*. *Listening* shows the same time-based views: streaks, heat map,
-  time per day, when and where you listen, and best day. The page-based views
-  are hidden.
-- *Books finished* belongs to neither view, since a finish is about the book.
+  time per day, when and where you listen. The page-based views, the goals and
+  the best-day card are hidden. The switch is shown once there is any listening
+  sitting, and a history with listening but no reading opens on *Listening*.
+- *Books finished* stays in *Reading* as it was. *Listening* shows *Finished
+  by listening*: the finished books in the range that have a listening
+  sitting. (This revises the first draft, which left finishes out of both
+  views: a listener asked how many books they finished by ear, and the
+  listening sitting is the honest way to say it.)
+- The month and year pages count listening on its own line (time and days) and
+  never add it to pages, reading time, reading days or streaks.
 - The book page gains *Your listening* next to *Your reading*.
 
 ## 6. Syncing the audio files
