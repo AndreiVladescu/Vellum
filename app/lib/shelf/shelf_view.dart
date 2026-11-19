@@ -448,13 +448,15 @@ class BookSpine extends StatelessWidget {
     final style = SpineStyle.fromJson(book.spineStyle, title: book.title);
     final finished =
         ReadingStatus.parse(book.status) == ReadingStatus.finished;
-    final l10n = L10n.of(context);
+    // Looked up only for the books that need it: most spines have neither mark.
+    final l10n = finished || audioMs != null ? L10n.of(context) : null;
     var label = bookSemanticLabel(book.title, book.subtitle);
-    if (audioMs != null) label = l10n.shelfBookAudioLabel(label);
+    if (audioMs != null) label = l10n!.shelfBookAudioLabel(label);
+    if (finished) label = l10n!.shelfBookFinishedLabel(label);
     return Semantics(
       // The marks below are painted inside `excludeSemantics`, so the one place
       // a screen reader can hear about them is here.
-      label: finished ? l10n.shelfBookFinishedLabel(label) : label,
+      label: label,
       button: onTap != null,
       onTap: onTap,
       // The title is painted into the spine art; screen readers get it from the
@@ -900,6 +902,7 @@ class BookCover extends StatelessWidget {
         : _generatedCover();
     final label = bookSemanticLabel(book.title, book.subtitle);
     return Semantics(
+      // Looked up only for audio: most covers need no localisation here.
       label: audio ? L10n.of(context).shelfBookAudioLabel(label) : label,
       button: onTap != null,
       onTap: onTap,
