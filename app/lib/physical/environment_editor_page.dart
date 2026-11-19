@@ -78,7 +78,14 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   // Camera: pixels-per-metre and the screen offset of world (0, 0). World Y is
   // up, so screen Y is flipped in the transforms below.
   double _scale = 300;
-  Offset? _origin;
+
+  /// The screen offset of world (0, 0), published to the parts that move with
+  /// it — the room painter and the translated layer holding every book and
+  /// prop — so a pan moves them without rebuilding anything
+  /// (docs/PERFORMANCE.md). Null until the canvas has a size.
+  final ValueNotifier<Offset?> _originVN = ValueNotifier(null);
+  Offset? get _origin => _originVN.value;
+  set _origin(Offset? value) => _originVN.value = value;
   static const _minScale = 40.0;
   static const _maxScale = 1600.0;
 
@@ -220,6 +227,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     _pulse.dispose();
     _dragPosVN.dispose();
     _shelfDeltaVN.dispose();
+    _originVN.dispose();
     super.dispose();
   }
 
@@ -227,6 +235,11 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   Offset _worldToScreen(Offset w) =>
       Offset(_origin!.dx + w.dx * _scale, _origin!.dy - w.dy * _scale);
+
+  /// Where world point [w] sits in the translated layer the books and props
+  /// are drawn in: the screen position without the camera's offset, which the
+  /// layer adds as a transform.
+  Offset _worldToLayer(Offset w) => Offset(w.dx * _scale, -w.dy * _scale);
 
   Offset _screenToWorld(Offset s) =>
       Offset((s.dx - _origin!.dx) / _scale, (_origin!.dy - s.dy) / _scale);
@@ -505,13 +518,21 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     if (d.scale != 1.0 || d.pointerCount >= 2 || !draggingItem) {
       // Pan + zoom the camera, anchoring the world point grabbed at start.
       final newScale = (_camStartScale * d.scale).clamp(_minScale, _maxScale);
-      setState(() {
-        _scale = newScale;
-        _origin = Offset(
-          focal.dx - _camWorldFocal.dx * newScale,
-          focal.dy + _camWorldFocal.dy * newScale,
-        );
-      });
+      final origin = Offset(
+        focal.dx - _camWorldFocal.dx * newScale,
+        focal.dy + _camWorldFocal.dy * newScale,
+      );
+      if (newScale == _scale) {
+        // A pan: only the camera moves. The painter and the book layer listen
+        // to it, so nothing is rebuilt — a setState here rebuilt and laid out
+        // all 400 placed books on every frame of a drag.
+        _origin = origin;
+      } else {
+        setState(() {
+          _scale = newScale;
+          _origin = origin;
+        });
+      }
       _moved = true;
       return;
     }
@@ -2186,6 +2207,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                 painter: RoomPainter(
                   shelves: _shelves,
                   origin: _origin!,
+                  camera: _originVN,
                   scale: _scale,
                   line: theme.colorScheme.outlineVariant,
                   plank: theme.colorScheme.primary,
@@ -2221,32 +2243,57 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
             ),
           ),
         ),
-        // Props are drawn in two passes, either side of the books, because
-        // which side a prop belongs on is a property of the prop (issue #10
-        // item 4). Behind is the default and the ordinary case — an ornament
-        // pushed to the back of a shelf, with the spines readable in front of
-        // it. In front is for the things that really do stand at the edge.
-        for (final prop in _props)
-          if (!prop.inFront)
-            _ridingPropIds.contains(prop.id)
-                ? _ridingPropWidget(prop)
-                : _propWidget(prop),
-        // Books (each in its own RepaintBoundary; the one being dragged is
-        // drawn as a live overlay instead of in this static list).
-        for (final pb in _placed)
-          if (pb.placement.id != _dragId)
-            (_dragShelfId != null && _ridingIds.contains(pb.placement.id))
-                ? _ridingBookWidget(pb)
-                : _bookWidget(pb),
-        // The other pass. Before the dragged book, not after: whatever is
-        // under your finger stays visible, or dragging a book behind a plant
-        // would mean dragging something you cannot see.
-        for (final prop in _props)
-          if (prop.inFront)
-            _ridingPropIds.contains(prop.id)
-                ? _ridingPropWidget(prop)
-                : _propWidget(prop),
-        if (_dragId != null) _draggedBookOverlay(),
+        // Everything that lives in the room — props, books, the one being
+        // dragged — in one layer the camera moves by a transform. A pan changes
+        // only the transform: the books are neither rebuilt nor repainted.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: ValueListenableBuilder<Offset?>(
+              valueListenable: _originVN,
+              child: RepaintBoundary(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                  // Props are drawn in two passes, either side of the books,
+                  // because which side a prop belongs on is a property of the
+                  // prop (issue #10 item 4). Behind is the default and the
+                  // ordinary case — an ornament pushed to the back of a shelf,
+                  // with the spines readable in front of it. In front is for
+                  // the things that really do stand at the edge.
+                  for (final prop in _props)
+                    if (!prop.inFront)
+                      _ridingPropIds.contains(prop.id)
+                          ? _ridingPropWidget(prop)
+                          : _propWidget(prop),
+                  // Books (each in its own RepaintBoundary; the one being
+                  // dragged is drawn as a live overlay instead of in this
+                  // static list).
+                  for (final pb in _placed)
+                    if (pb.placement.id != _dragId)
+                      (_dragShelfId != null &&
+                              _ridingIds.contains(pb.placement.id))
+                          ? _ridingBookWidget(pb)
+                          : _bookWidget(pb),
+                  // The other pass. Before the dragged book, not after:
+                  // whatever is under your finger stays visible, or dragging a
+                  // book behind a plant would mean dragging something you
+                  // cannot see.
+                  for (final prop in _props)
+                    if (prop.inFront)
+                      _ridingPropIds.contains(prop.id)
+                          ? _ridingPropWidget(prop)
+                          : _propWidget(prop),
+                  if (_dragId != null) _draggedBookOverlay(),
+                  ],
+                ),
+              ),
+              builder: (context, origin, child) => Transform.translate(
+                offset: origin ?? Offset.zero,
+                child: child,
+              ),
+            ),
+          ),
+        ),
         // Empty-state hint.
         if (_placed.isEmpty && _shelves.isEmpty)
           Center(
@@ -2335,7 +2382,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// neighbour being dragged doesn't force it to re-raster.
   Widget _bookWidget(PlacedBook pb) {
     final f = _footOf(pb);
-    final topLeft = _worldToScreen(Offset(pb.placement.x, pb.placement.y + f.h));
+    final topLeft = _worldToLayer(Offset(pb.placement.x, pb.placement.y + f.h));
     return Positioned(
       left: topLeft.dx,
       top: topLeft.dy,
@@ -2357,7 +2404,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         valueListenable: _shelfDeltaVN,
         child: RepaintBoundary(child: _bookVisual(pb, dragging: false)),
         builder: (context, delta, child) {
-          final topLeft = _worldToScreen(
+          final topLeft = _worldToLayer(
             Offset(pb.placement.x + delta.dx, pb.placement.y + delta.dy + f.h),
           );
           return Stack(
@@ -2398,7 +2445,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         // the surrounding Positioned is recomputed from the drag position.
         child: _bookVisual(pb, dragging: true),
         builder: (context, dragPos, child) {
-          final topLeft = _worldToScreen(Offset(dragPos.dx, dragPos.dy + f.h));
+          final topLeft = _worldToLayer(Offset(dragPos.dx, dragPos.dy + f.h));
           return Stack(
             children: [
               Positioned(
@@ -2421,7 +2468,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     final kind = PropKind.parse(prop.kind);
     final dragging = _dragPropId == prop.id;
     final at = dragging ? _propDragPos : Offset(prop.x, prop.y);
-    final topLeft = _worldToScreen(Offset(at.dx, at.dy + prop.heightM));
+    final topLeft = _worldToLayer(Offset(at.dx, at.dy + prop.heightM));
     return Positioned(
       left: topLeft.dx,
       top: topLeft.dy,
@@ -2453,7 +2500,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
           color: Theme.of(context).colorScheme.tertiary,
         ),
         builder: (context, delta, child) {
-          final topLeft = _worldToScreen(
+          final topLeft = _worldToLayer(
             Offset(prop.x + delta.dx, prop.y + delta.dy + prop.heightM),
           );
           return Stack(

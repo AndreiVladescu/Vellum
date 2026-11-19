@@ -19,7 +19,8 @@ const skirtingMetres = 0.09;
 class RoomPainter extends CustomPainter {
   RoomPainter({
     required this.shelves,
-    required this.origin,
+    required this._origin,
+    this.camera,
     required this.scale,
     required this.line,
     required this.plank,
@@ -38,7 +39,11 @@ class RoomPainter extends CustomPainter {
     this.surfaces = true,
     this.highlightIds = const {},
     this.outlines = const [],
-  }) : super(repaint: shelfDelta);
+  }) : super(
+          repaint: camera == null
+              ? shelfDelta
+              : Listenable.merge([shelfDelta, camera]),
+        );
 
   final List<PhysicalShelf> shelves;
 
@@ -60,7 +65,14 @@ class RoomPainter extends CustomPainter {
   final Offset? measureFrom;
   final Offset? measureTo;
   final Color? measureColor;
-  final Offset origin;
+  final Offset _origin;
+
+  /// The camera's origin as it moves, when the caller pans by updating this
+  /// instead of rebuilding the painter; [origin] is then only the first value.
+  final ValueListenable<Offset?>? camera;
+
+  /// The screen offset of world (0, 0).
+  Offset get origin => camera?.value ?? _origin;
   final double scale;
   final Color line;
   final Color plank;
@@ -350,7 +362,8 @@ class RoomPainter extends CustomPainter {
       !setEquals(old.highlightIds, highlightIds) ||
       !listEquals(old.outlines, outlines) ||
       old.shelves != shelves ||
-      old.origin != origin ||
+      old._origin != _origin ||
+      old.camera != camera ||
       old.scale != scale ||
       !setEquals(old.draggingIds, draggingIds) ||
       old.backdrop != backdrop ||

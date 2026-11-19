@@ -851,8 +851,7 @@ host's cores, which are faster than a phone's.
 
 1. ~~**The title shadow from a cached image**~~ — done, see "The room round"
    below.
-2. **Pan the room with a `Transform`**, so a pan frame rebuilds none of the 400
-   placed books (14–20 ms of build a frame today).
+2. ~~**Pan the room with a `Transform`**~~ — done, see "The room round" below.
 3. **No empty-library page while the library is still loading** — a visual
    fix for the fifth of a second it flashes at every launch of a full library.
 4. **A narrower shelf query**: the shelf maps every column of ~4,000 `Book`
@@ -936,3 +935,34 @@ interleaved rounds of each:
 
 (The shelf numbers are from the end of the round, with #2 and #3 in too; those
 touch only the room.) Not slower; the cover spines a little faster.
+
+### #2 The room pans by a transform — kept
+
+Every pan frame used to `setState` the editor, which rebuilt and laid out all
+400 placed books to move them by a few pixels. Now the camera's origin is a
+`ValueNotifier`: the props, the books and the dragged-book overlay sit in one
+layer (`Transform.translate` over a `RepaintBoundary`) positioned in
+origin-free coordinates, and a pan only sets the notifier. The transform moves
+the layer, and `RoomPainter` takes the same notifier as a `repaint` listenable
+(the grid, floor and planks are drawn relative to the screen, so it still
+repaints — it is cheap). A pinch that changes the scale still rebuilds, as it
+must: the books change size. Hit-testing was already done in world
+coordinates from the gesture, so selection, book drags, shelf drags and the
+edit gestures go through unchanged. `room_camera_test.dart` drives the real
+page: a pan moves the books exactly by the drag and hands back the *same*
+`SpineFace` widget objects (the old code fails that), a wheel zoom grows the
+books by 10 %, a tap selects, the selected book drags along its shelf and is
+saved there, and an unanchored shelf drags with its books riding on it.
+
+Per-book `RepaintBoundary`s stay: one boundary for the whole layer instead
+measured worse (pan raster p90 86 against 48 ms, in one noisy run).
+
+| Room, headless | #1 | #1 + #2 |
+|---|---:|---:|
+| pan: build p90 / p99 | 20–22 / 32–36 ms | **1.2–1.3** / 4.5–14 ms |
+| pan: raster p90 | 47–49 ms | 47.5 ms (software: the same pictures) |
+| pan: wall for 120 moves | 4.8 s | 4.1 s |
+| zoom: build p90 | 50–55 ms | 52–57 ms (unchanged: see #3) |
+
+(A second run of #1 + #2, at a load spike, read 6.7 s and 120 ms raster for
+the pan; the build p90 read 1.3 ms in both.)
