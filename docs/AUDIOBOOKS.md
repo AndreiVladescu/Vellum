@@ -528,7 +528,7 @@ recorder hangs off the player's play/pause/ended transitions.
 
 **v1.5.2 — on the shelf**
 
-- [ ] **M** An *Audiobooks* facet or section, a headphones badge, spine thickness from duration when there is no page count (about 30 pages an hour), *Continue listening* in the app and the home widget
+- [x] **M** An *Audiobooks* facet or section, a headphones badge, spine thickness from duration when there is no page count (about 30 pages an hour), *Continue listening* in the app and the home widget. See §10
 
 **v1.5.3 — in the numbers**
 
@@ -592,4 +592,45 @@ reading-progress channel.
 
 **Saving in the background.** Unchanged: the 15-second timer, pause, seek and
 dispose. A process killed outright loses at most 15 seconds.
+
+## 10. v1.5.2 as built
+
+**The facet** is a *filter chip* at the start of the shelf's chip row, not a
+section: it is one more predicate on the single `watchLibrary` query
+(`audioOnly`), so it combines with shelves, genre, status, search, sort and
+Group by without a second stream. The chip appears only when the library has
+audio (or the filter is on, so it can always be turned off). A book with text
+*and* audio is in it.
+
+**One book, one place.** A book with text and audio appears once, not once per
+medium. It carries the badge (it can be listened to) and has both Read and
+Listen on its page. The two positions stay apart: *Continue reading* follows
+`readingProgress`, *Continue listening* follows `listenPosition`, so one book
+can be in both strips. Its list row keeps the file icon and adds the
+headphones.
+
+**The badge** is `AudioBadge`: a white headphones glyph on a dark ring (the
+finished mark's trick), at the foot of the spine (the title leaves it 24 px),
+bottom right of a face-out cover, and a plain icon in the list. Two glyphs, no
+layers and no bitmaps; books without audio pay nothing. It is part of
+`SpineFace`, so both materials (cover slice and generated) get it.
+
+**Thickness** is decided at render time, not baked into the synced
+`spineStyle`: with audio and no `pageCount`, the width is the page-count curve
+at 30 pages per hour of total duration (`SpineStyle.effectiveWidth`), clamped
+like page counts. A real page count wins. Rendering rather than rewriting the
+style means a book whose audio is attached or measured later changes
+immediately, on every device, with no sync. The physical room still uses the
+page curve (it has no durations to hand) and is unchanged.
+
+**Continue listening** uses §4's rule (`isListeningOnTheGo`), plus *abandoned*
+leaves it, as it leaves the widget. It is a second row under *Continue reading*
+with the same card and a headphones glyph; its subtitle is "42% · at 1:02:33".
+Tapping opens the player, which resumes at the saved position. On a short
+screen the compact row shows both kinds of card.
+
+**The home widget** has one slot and keeps it: it shows whichever of reading or
+listening happened last (`pickContinue`), with "42% · at 1:02:33" for audio.
+One of each would need a second layout and a second widget provider; not worth
+it for a launcher tile. No Android code changed.
 
