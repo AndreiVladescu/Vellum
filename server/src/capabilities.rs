@@ -88,6 +88,12 @@ const FEATURES: &[&str] = &[
     // sign in — the login answer itself says when a code is owed — but it
     // lets one offer "turn on two-factor" only where it exists.
     "two_factor",
+    // Audiobooks (migration 0043): m4b/m4a/mp3 uploads with their part
+    // fields, audio in the delta pull behind `?audio=1`, and the
+    // `audio_position`/`audio_duration` pair on reading_progress. A server
+    // without it rejects audio uploads and drops the position, so the app
+    // keeps audiobooks local there rather than failing every sync.
+    "audiobooks",
 ];
 
 pub async fn get(State(state): State<AppState>) -> Json<Capabilities> {

@@ -709,6 +709,8 @@ fn mime_for(format: &str) -> &'static str {
     match format {
         "epub" => "application/epub+zip",
         "pdf" => "application/pdf",
+        "m4b" | "m4a" => "audio/mp4",
+        "mp3" => "audio/mpeg",
         _ => "application/octet-stream",
     }
 }

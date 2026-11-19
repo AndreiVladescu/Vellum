@@ -640,7 +640,8 @@ pub async fn index_missing(state: &AppState, limit: i64) -> u64 {
     let rows: Vec<(String, String)> = match sqlx::query_as(
         "SELECT bf.id, bf.path FROM book_file bf \
          LEFT JOIN koreader_file_digest d ON d.file_id = bf.id \
-         WHERE d.file_id IS NULL ORDER BY bf.added_at LIMIT ?",
+         WHERE d.file_id IS NULL AND bf.format NOT IN ('m4b', 'm4a', 'mp3') \
+         ORDER BY bf.added_at LIMIT ?",
     )
     .bind(limit)
     .fetch_all(&state.db)

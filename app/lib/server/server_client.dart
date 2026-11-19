@@ -639,9 +639,11 @@ class VellumServerClient {
   Future<({String? serverNow, List<ServerBook> books})> listBooks({
     String? cursor,
   }) async {
+    // `audio=1`: this app plays audiobooks, so the server includes their
+    // parts in `files`. A server from before 1.5 ignores the parameter.
     final uri = _uri(
       '/api/books',
-    ).replace(queryParameters: {'cursor': cursor ?? ''});
+    ).replace(queryParameters: {'cursor': cursor ?? '', 'audio': '1'});
     final res = await _http.get(uri, headers: _headers);
     final body = _body(res);
     final list = (body is Map ? body['books'] as List? : body as List?) ?? const [];
@@ -948,19 +950,36 @@ class VellumServerClient {
 
   /// Streams [source] up as a book file. [format] (e.g. 'pdf') sets the stored
   /// extension.
+  ///
+  /// An audio part also sends its [durationMs], [track], [label] and
+  /// [narrator] (docs/AUDIOBOOKS.md §3): the server never parses audio, and
+  /// once the blob is content-addressed the file name that ordered the parts
+  /// is gone.
   Future<void> uploadFileFrom(
     String bookId,
     File source, {
     required String format,
+    int? durationMs,
+    int? track,
+    String? label,
+    String? narrator,
   }) async {
     final mime = switch (format) {
       'pdf' => 'application/pdf',
       'epub' => 'application/epub+zip',
+      'm4b' || 'm4a' => 'audio/mp4',
+      'mp3' => 'audio/mpeg',
       _ => 'application/octet-stream',
     };
-    final filename = Uri.encodeQueryComponent('book.$format');
+    final uri = _uri('/api/books/$bookId/files').replace(queryParameters: {
+      'filename': 'book.$format',
+      'duration_ms': ?durationMs?.toString(),
+      'track': ?track?.toString(),
+      'label': ?label,
+      'narrator': ?narrator,
+    });
     final req =
-        http.StreamedRequest('POST', _uri('/api/books/$bookId/files?filename=$filename'))
+        http.StreamedRequest('POST', uri)
           ..contentLength = await source.length()
           ..headers['content-type'] = mime;
     final auth = _bearer;
@@ -1517,6 +1536,8 @@ class VellumServerClient {
     int? page,
     String? unit,
     double? scroll,
+    double? audioPosition,
+    double? audioDuration,
     DateTime? updatedAt,
   }) async {
     final res = await _http.put(
@@ -1529,6 +1550,11 @@ class VellumServerClient {
         'page': page,
         'unit': unit,
         'scroll': scroll,
+        // Seconds into the audio and its total (server migration 0043).
+        // Omitted rather than null when there is none, so a server keeps the
+        // last audio position this device sent; an older server ignores both.
+        'audio_position': ?audioPosition,
+        'audio_duration': ?audioDuration,
         'updated_at': ?formatServerTime(updatedAt),
       }),
     );
@@ -1855,6 +1881,8 @@ class ServerReadingPosition {
     this.page,
     this.unit,
     this.scroll,
+    this.audioPosition,
+    this.audioDuration,
     this.updatedAt,
   });
 
@@ -1868,6 +1896,12 @@ class ServerReadingPosition {
   /// row because another device may have read a different format.
   final String? unit;
   final double? scroll;
+
+  /// Seconds into the book's audio on that device, and how long it makes the
+  /// whole audiobook; null from a device that has not listened, or a server
+  /// from before 1.5.
+  final double? audioPosition;
+  final double? audioDuration;
   final DateTime? updatedAt;
 
   factory ServerReadingPosition.fromJson(Map<String, dynamic> j) =>
@@ -1879,6 +1913,8 @@ class ServerReadingPosition {
         page: (j['page'] as num?)?.toInt(),
         unit: j['unit'] as String?,
         scroll: (j['scroll'] as num?)?.toDouble(),
+        audioPosition: (j['audio_position'] as num?)?.toDouble(),
+        audioDuration: (j['audio_duration'] as num?)?.toDouble(),
         updatedAt: ServerBook._parseServerTime(j['updated_at'] as String?),
       );
 }
@@ -1993,6 +2029,10 @@ class ServerFile {
     required this.format,
     required this.sizeBytes,
     required this.sha256,
+    this.durationMs,
+    this.track,
+    this.label,
+    this.narrator,
   });
 
   final String id;
@@ -2001,12 +2041,23 @@ class ServerFile {
   final int sizeBytes;
   final String sha256;
 
+  /// An audio part's fields (server migration 0043); null for text, and from
+  /// a server that predates them.
+  final int? durationMs;
+  final int? track;
+  final String? label;
+  final String? narrator;
+
   factory ServerFile.fromJson(Map<String, dynamic> j) => ServerFile(
     id: j['id'] as String,
     bookId: j['book_id'] as String,
     format: j['format'] as String? ?? 'bin',
     sizeBytes: j['size_bytes'] as int? ?? 0,
     sha256: j['sha256'] as String? ?? '',
+    durationMs: (j['duration_ms'] as num?)?.toInt(),
+    track: (j['track'] as num?)?.toInt(),
+    label: j['label'] as String?,
+    narrator: j['narrator'] as String?,
   );
 }
 

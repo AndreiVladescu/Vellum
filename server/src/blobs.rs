@@ -31,12 +31,48 @@ pub struct FileDto {
     pub size_bytes: i64,
     pub sha256: String,
     pub added_at: String,
+    /// An audio part's fields (migration 0043, docs/AUDIOBOOKS.md §3); null
+    /// for text. Measured by the uploading device — the server never parses
+    /// audio — and returned so every device sums the same part lengths.
+    pub duration_ms: Option<i64>,
+    pub track: Option<i64>,
+    pub label: Option<String>,
+    pub narrator: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct UploadQuery {
     /// Original file name, used to derive the format/extension.
     pub filename: String,
+    /// An audio part's length, 1-based order, title and narrator. They have to
+    /// travel with the upload: once the blob is content-addressed its file
+    /// name — which is what orders a folder of mp3s — is gone.
+    pub duration_ms: Option<i64>,
+    pub track: Option<i64>,
+    pub label: Option<String>,
+    pub narrator: Option<String>,
+}
+
+/// The formats an audiobook part can be, by extension.
+pub(crate) const AUDIO_FORMATS: &[&str] = &["m4b", "m4a", "mp3"];
+
+/// Whether a `book_file.format` is an audio part. Text-only paths (the text
+/// index, the browser reader, Send to device, cover rendering, KOReader) skip
+/// these.
+pub(crate) fn is_audio_format(format: &str) -> bool {
+    AUDIO_FORMATS.contains(&format)
+}
+
+/// Longest label or narrator kept, in characters: a tag, not a document.
+const MAX_AUDIO_TEXT: usize = 300;
+
+fn clean_audio_text(value: Option<String>) -> Option<String> {
+    let v = value?
+        .trim()
+        .chars()
+        .take(MAX_AUDIO_TEXT)
+        .collect::<String>();
+    (!v.is_empty()).then_some(v)
 }
 
 // ---- content sniffing -----------------------------------------------------
@@ -52,6 +88,10 @@ pub(crate) enum Sniffed {
     Png,
     Gif,
     WebP,
+    /// `ftyp` at offset 4: an MP4 container (`.m4b`/`.m4a`).
+    Mp4,
+    /// An ID3v2 tag, or an MPEG audio frame sync.
+    Mp3,
     Unknown,
 }
 
@@ -73,6 +113,14 @@ pub(crate) fn sniff(head: &[u8]) -> Sniffed {
     }
     if head.len() >= 12 && &head[0..4] == b"RIFF" && &head[8..12] == b"WEBP" {
         return Sniffed::WebP;
+    }
+    if head.len() >= 8 && &head[4..8] == b"ftyp" {
+        return Sniffed::Mp4;
+    }
+    // After JPEG, which also starts 0xFF: its second byte (0xD8) fails the
+    // eleven-bit frame-sync test anyway.
+    if head.starts_with(b"ID3") || (head.len() >= 2 && head[0] == 0xFF && head[1] & 0xE0 == 0xE0) {
+        return Sniffed::Mp3;
     }
     Sniffed::Unknown
 }
@@ -320,11 +368,28 @@ pub async fn upload_file(
         .filter(|e| !e.is_empty())
         .unwrap_or_default();
     // Reject unsupported extensions up front, before reading a single byte.
-    if ext != "pdf" && ext != "epub" {
+    let is_audio = is_audio_format(&ext);
+    if ext != "pdf" && ext != "epub" && !is_audio {
         return Err(AppError::BadRequest(
-            "only pdf and epub files are supported".into(),
+            "only pdf, epub, m4b, m4a and mp3 files are supported".into(),
         ));
     }
+    let (duration_ms, track) = if is_audio {
+        (
+            q.duration_ms.filter(|d| *d >= 0),
+            q.track.filter(|t| *t >= 1),
+        )
+    } else {
+        (None, None)
+    };
+    let (label, narrator) = if is_audio {
+        (
+            clean_audio_text(q.label.clone()),
+            clean_audio_text(q.narrator.clone()),
+        )
+    } else {
+        (None, None)
+    };
 
     let file_id = uuid::Uuid::new_v4().to_string();
     let files_dir = state.data_dir.join("files");
@@ -367,14 +432,18 @@ pub async fn upload_file(
     let sniffed = sniff(&head);
     let content_ok = matches!(
         (ext.as_str(), sniffed),
-        ("pdf", Sniffed::Pdf) | ("epub", Sniffed::Zip)
+        ("pdf", Sniffed::Pdf)
+            | ("epub", Sniffed::Zip)
+            | ("m4b" | "m4a", Sniffed::Mp4)
+            | ("mp3", Sniffed::Mp3)
     );
     if !content_ok {
         let _ = tokio::fs::remove_file(&tmp).await;
-        let msg = if ext == "pdf" {
-            "file is not a valid PDF"
-        } else {
-            "file is not a valid EPUB"
+        let msg = match ext.as_str() {
+            "pdf" => "file is not a valid PDF",
+            "epub" => "file is not a valid EPUB",
+            "mp3" => "file is not a valid MP3",
+            _ => "file is not a valid MP4 audio file",
         };
         return Err(AppError::BadRequest(msg.into()));
     }
@@ -397,8 +466,8 @@ pub async fn upload_file(
         tokio::fs::rename(&tmp, &full).await.map_err(internal)?;
     }
     sqlx::query(
-        "INSERT INTO book_file (id, book_id, format, path, size_bytes, sha256) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO book_file (id, book_id, format, path, size_bytes, sha256, \
+         duration_ms, track, label, narrator) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&file_id)
     .bind(&id)
@@ -406,11 +475,16 @@ pub async fn upload_file(
     .bind(&rel)
     .bind(size)
     .bind(&sha)
+    .bind(duration_ms)
+    .bind(track)
+    .bind(&label)
+    .bind(&narrator)
     .execute(&state.db)
     .await?;
 
     let file = sqlx::query_as::<_, FileDto>(
-        "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
+        "SELECT id, book_id, format, path, size_bytes, sha256, added_at, \
+         duration_ms, track, label, narrator \
          FROM book_file WHERE id = ?",
     )
     .bind(&file_id)
@@ -426,6 +500,13 @@ pub async fn upload_file(
         Some(&q.filename),
     )
     .await;
+
+    // Audio has nothing for the enrichment below: no pages, no cover to render,
+    // no text to index, and a part's file name ("01 - Chapter 1.mp3") would be
+    // a wrong guess at the book's title.
+    if is_audio {
+        return Ok(Json(file));
+    }
 
     // The heavy enrichment — page-count parse, first-page cover render (a
     // shell-out that can take seconds), and file-name metadata — runs in a
@@ -1397,7 +1478,8 @@ pub async fn list_files(
 ) -> AppResult<Json<Vec<FileDto>>> {
     require_view(&state, &user, &id).await?;
     let files = sqlx::query_as::<_, FileDto>(
-        "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
+        "SELECT id, book_id, format, path, size_bytes, sha256, added_at, \
+         duration_ms, track, label, narrator \
          FROM book_file WHERE book_id = ? ORDER BY added_at",
     )
     .bind(&id)
@@ -1850,6 +1932,8 @@ fn content_type_for_ext(ext: &str) -> &'static str {
         "jpg" | "jpeg" => "image/jpeg",
         "pdf" => "application/pdf",
         "epub" => "application/epub+zip",
+        "m4b" | "m4a" => "audio/mp4",
+        "mp3" => "audio/mpeg",
         _ => "application/octet-stream",
     }
 }
@@ -1893,6 +1977,13 @@ mod tests {
         assert_eq!(sniff(b"\x89PNG\r\n\x1a\n"), Sniffed::Png);
         assert_eq!(sniff(b"GIF89a"), Sniffed::Gif);
         assert_eq!(sniff(b"RIFF\0\0\0\0WEBPVP8 "), Sniffed::WebP);
+        assert_eq!(sniff(b"\0\0\0\x20ftypM4B \0\0\0\0"), Sniffed::Mp4);
+        assert_eq!(sniff(b"ID3\x03\0\0\0\0\0\0"), Sniffed::Mp3);
+        assert_eq!(
+            sniff(&[0xFF, 0xFB, 0x90, 0x44]),
+            Sniffed::Mp3,
+            "a bare frame"
+        );
         assert_eq!(sniff(b"not a known format"), Sniffed::Unknown);
         assert_eq!(sniff(b""), Sniffed::Unknown);
     }

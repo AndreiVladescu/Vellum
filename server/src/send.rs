@@ -103,6 +103,11 @@ pub async fn send_book(
     if file_book_id != book_id {
         return Err(AppError::NotFound("file not found".into()));
     }
+    if crate::blobs::is_audio_format(&format) {
+        return Err(AppError::BadRequest(
+            "an audiobook cannot be sent to an e-reader".into(),
+        ));
+    }
     if size > MAX_ATTACHMENT_BYTES {
         return Err(AppError::BadRequest(format!(
             "that file is {} MB; the limit for email is {} MB",

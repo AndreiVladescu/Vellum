@@ -34,6 +34,11 @@ pub struct ProgressDto {
     pub page: Option<i64>,
     pub unit: Option<String>,
     pub scroll: Option<f64>,
+    /// Where this device is in the book's audio, in seconds, and the whole
+    /// audiobook's length as it sums it (migration 0043). Older clients never
+    /// send them and ignore them when they read.
+    pub audio_position: Option<f64>,
+    pub audio_duration: Option<f64>,
     pub updated_at: String,
 }
 
@@ -48,6 +53,13 @@ pub struct ProgressInput {
     /// reads back when phrasing a prompt.
     pub unit: Option<String>,
     pub scroll: Option<f64>,
+    /// Seconds into the book's audio, and the audio's total length. Absent
+    /// from an older client's push, which then keeps whatever audio position
+    /// that device last sent (`COALESCE` in [`upsert`]).
+    #[serde(default)]
+    pub audio_position: Option<f64>,
+    #[serde(default)]
+    pub audio_duration: Option<f64>,
     /// The writing device's clock. Unlike every other synced entity this is
     /// *not* a LWW comparison key — a device only ever overwrites its own row
     /// — it is what other devices order "who is furthest ahead" by. Defaults
@@ -73,7 +85,7 @@ async fn my_progress(
     };
     let sql = format!(
         "SELECT rp.book_id, rp.device_id, rp.device_label, rp.progress, rp.page, \
-                rp.unit, rp.scroll, rp.updated_at \
+                rp.unit, rp.scroll, rp.audio_position, rp.audio_duration, rp.updated_at \
          FROM reading_progress rp JOIN book b ON b.id = rp.book_id \
          WHERE rp.user_id = ? AND {} {filter} \
          ORDER BY rp.book_id, rp.device_id",
@@ -144,18 +156,23 @@ pub async fn upsert(
         return Err(AppError::NotFound("no such book".into()));
     }
 
+    let finite_non_negative = |v: Option<f64>| v.filter(|x| x.is_finite() && *x >= 0.0);
+    let audio_position = finite_non_negative(input.audio_position);
+    let audio_duration = finite_non_negative(input.audio_duration);
     let device_id = input.device_id.trim();
     sqlx::query(
         "INSERT INTO reading_progress \
             (book_id, user_id, device_id, device_label, progress, page, unit, scroll, \
-             updated_at, synced_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now')) \
+             audio_position, audio_duration, updated_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now')) \
          ON CONFLICT(book_id, user_id, device_id) DO UPDATE SET \
             device_label = excluded.device_label, \
             progress = excluded.progress, \
             page = excluded.page, \
             unit = excluded.unit, \
             scroll = excluded.scroll, \
+            audio_position = COALESCE(excluded.audio_position, reading_progress.audio_position), \
+            audio_duration = COALESCE(excluded.audio_duration, reading_progress.audio_duration), \
             updated_at = excluded.updated_at, \
             synced_at = datetime('now')",
     )
@@ -167,12 +184,15 @@ pub async fn upsert(
     .bind(input.page)
     .bind(&input.unit)
     .bind(input.scroll)
+    .bind(audio_position)
+    .bind(audio_duration)
     .bind(&input.updated_at)
     .execute(&state.db)
     .await?;
 
     let row: ProgressDto = sqlx::query_as(
-        "SELECT book_id, device_id, device_label, progress, page, unit, scroll, updated_at \
+        "SELECT book_id, device_id, device_label, progress, page, unit, scroll, \
+                audio_position, audio_duration, updated_at \
          FROM reading_progress WHERE book_id = ? AND user_id = ? AND device_id = ?",
     )
     .bind(&book_id)

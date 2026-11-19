@@ -118,6 +118,41 @@ class AudiobookImporter {
     }
   }
 
+  /// Re-derives one audio file's chapters from its bytes — what a device
+  /// that pulled the file (rather than importing it) does, since chapters
+  /// are app-local. Quietly leaves none on a file it cannot read.
+  Future<void> rebuildChapters(String fileId) async {
+    final file = await repository.fileById(fileId);
+    if (file == null || !isAudioFormat(file.format)) return;
+    List<ScannedChapter> chapters;
+    try {
+      final path = repository.fileOf(file).path;
+      final part = await inBackground(() => scanAudioPart(path));
+      chapters = part.chapters.isNotEmpty
+          ? part.chapters
+          : [ScannedChapter(0, file.label ?? part.label)];
+    } catch (_) {
+      chapters = [ScannedChapter(0, file.label)];
+    }
+    await _db.transaction(() async {
+      await (_db.delete(_db.audioChapters)..where((c) => c.fileId.equals(fileId)))
+          .go();
+      await _db.batch((b) {
+        for (var c = 0; c < chapters.length; c++) {
+          b.insert(
+            _db.audioChapters,
+            AudioChaptersCompanion.insert(
+              fileId: fileId,
+              idx: c,
+              title: Value(chapters[c].title),
+              startMs: chapters[c].startMs,
+            ),
+          );
+        }
+      });
+    });
+  }
+
   /// The chapters of [files] (a book's audio parts, in order), keyed by file.
   Future<Map<String, List<AudioChapter>>> chaptersOf(List<BookFile> files) async {
     if (files.isEmpty) return const {};

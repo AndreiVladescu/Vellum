@@ -395,7 +395,8 @@ pub async fn files_full_map_for(
     }
     for chunk in ids.chunks(ID_CHUNK) {
         let sql = format!(
-            "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
+            "SELECT id, book_id, format, path, size_bytes, sha256, added_at, \
+             duration_ms, track, label, narrator \
              FROM book_file WHERE book_id IN ({}) ORDER BY book_id, added_at",
             in_placeholders(chunk.len())
         );
@@ -456,6 +457,11 @@ pub struct ListQuery {
     pub tag: Option<String>,
     /// 'file' | 'cover' | 'year' | 'author' — books *missing* that thing.
     pub missing: Option<String>,
+    /// `audio=1`: the client plays audiobooks, so the delta pull includes
+    /// audio parts in `files` (docs/AUDIOBOOKS.md §6). An app from before 1.5
+    /// does not send it, and is not handed files it cannot open — it would
+    /// download every audiobook to a phone that cannot play them.
+    pub audio: Option<u8>,
 }
 
 const DEFAULT_PAGE_SIZE: i64 = 200;
@@ -474,7 +480,7 @@ pub async fn list(
         let since = cursor.trim();
         let since = if since.is_empty() { None } else { Some(since) };
         let books = visible_books(&state, &user, since).await?;
-        let items = assemble_items(&state, books).await?;
+        let items = assemble_items(&state, books, q.audio == Some(1)).await?;
         let server_now: String = sqlx::query_scalar("SELECT datetime('now')")
             .fetch_one(&state.db)
             .await?;
@@ -494,7 +500,8 @@ pub async fn list(
         } else {
             None
         };
-        let items = assemble_items(&state, books).await?;
+        // The console lists every file, audio included.
+        let items = assemble_items(&state, books, true).await?;
         return Ok(Json(serde_json::json!({
             "items": items,
             "total": total,
@@ -505,14 +512,21 @@ pub async fn list(
     // Neither cursor nor page: today's unbounded bare array, kept for console
     // clients until they're moved onto `?page=1`.
     let books = visible_books(&state, &user, None).await?;
-    let items = assemble_items(&state, books).await?;
+    let items = assemble_items(&state, books, true).await?;
     Ok(Json(serde_json::to_value(items)?))
 }
 
 /// Assembles `BookListItem`s for exactly `books`, scoping the authors/genres/
 /// files aggregation to their ids (§3) instead of scanning the whole library
 /// regardless of how few books the caller actually asked for.
-async fn assemble_items(state: &AppState, books: Vec<BookDto>) -> AppResult<Vec<BookListItem>> {
+///
+/// Without [include_audio], audio parts are left out of `files` (and
+/// `file_count`) — see [`ListQuery::audio`].
+async fn assemble_items(
+    state: &AppState,
+    books: Vec<BookDto>,
+    include_audio: bool,
+) -> AppResult<Vec<BookListItem>> {
     let ids: Vec<String> = books.iter().map(|b| b.id.clone()).collect();
     let authors_by_book = author_map_for(state, &ids).await?;
     let genres_by_book = genre_map_for(state, &ids).await?;
@@ -523,7 +537,10 @@ async fn assemble_items(state: &AppState, books: Vec<BookDto>) -> AppResult<Vec<
         .map(|book| {
             let authors = authors_by_book.get(&book.id).cloned().unwrap_or_default();
             let genres = genres_by_book.get(&book.id).cloned().unwrap_or_default();
-            let files = files_by_book.remove(&book.id).unwrap_or_default();
+            let mut files = files_by_book.remove(&book.id).unwrap_or_default();
+            if !include_audio {
+                files.retain(|f| !crate::blobs::is_audio_format(&f.format));
+            }
             let file_count = files.len() as i64;
             BookListItem {
                 book,
@@ -1020,7 +1037,8 @@ pub async fn detail(
     .fetch_all(&state.db)
     .await?;
     let files = sqlx::query_as::<_, crate::blobs::FileDto>(
-        "SELECT id, book_id, format, path, size_bytes, sha256, added_at \
+        "SELECT id, book_id, format, path, size_bytes, sha256, added_at, \
+         duration_ms, track, label, narrator \
          FROM book_file WHERE book_id = ? ORDER BY added_at",
     )
     .bind(&id)

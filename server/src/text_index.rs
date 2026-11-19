@@ -84,7 +84,8 @@ pub async fn enqueue_missing(state: &AppState) -> AppResult<u64> {
     let result = sqlx::query(
         "INSERT INTO book_text (file_id, book_id, status, extracted_at) \
          SELECT f.id, f.book_id, ?, datetime('now') FROM book_file f \
-         WHERE NOT EXISTS (SELECT 1 FROM book_text t WHERE t.file_id = f.id)",
+         WHERE NOT EXISTS (SELECT 1 FROM book_text t WHERE t.file_id = f.id) \
+         AND f.format NOT IN ('m4b', 'm4a', 'mp3')",
     )
     .bind(PENDING)
     .execute(&state.db)

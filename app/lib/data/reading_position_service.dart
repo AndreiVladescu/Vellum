@@ -9,6 +9,19 @@ import 'database.dart';
 String readingUnitForFormats(Iterable<String> formats) =>
     formats.contains('pdf') ? 'page' : 'chapter';
 
+/// Another device is further into the same audiobook: "You were at 5:12:33
+/// on Pixel 8 — go there?". Produced by
+/// [ReadingPositionService.listenOfferFor]; offered, never adopted.
+class ListenJumpOffer {
+  const ListenJumpOffer({required this.seconds, this.deviceLabel});
+
+  final double seconds;
+
+  /// Null when that device sent no name; the prompt then says "another
+  /// device" in the reader's language.
+  final String? deviceLabel;
+}
+
 /// Another *file* of the same book is further along — the PDF when you are
 /// opening the EPUB, say. Produced by
 /// [ReadingPositionService.offerFromAnotherFile].
@@ -81,6 +94,13 @@ class ReadingPositionService {
             ..orderBy([(r) => OrderingTerm.desc(r.updatedAt)]))
           .watch();
 
+  /// The other devices' rows for [bookId], once.
+  Future<List<RemoteReadingPosition>> remotePositions(String bookId) =>
+      (db.select(db.remoteReadingPositions)
+            ..where((r) => r.bookId.equals(bookId))
+            ..orderBy([(r) => OrderingTerm.desc(r.updatedAt)]))
+          .get();
+
   /// The one remote position worth offering for [book], or null.
   ///
   /// Two rules, both deliberate:
@@ -128,6 +148,56 @@ class ReadingPositionService {
           readingProgress: Value(offer.progress),
           lastReadPage: Value(offer.page),
           lastReadAt: Value(DateTime.now()),
+          needsProgressPush: const Value(true),
+        ),
+      );
+
+  // ---- listening (docs/AUDIOBOOKS.md §4) -----------------------------------
+
+  /// How far ahead, in seconds, another device's listening position has to be
+  /// before it is offered.
+  static const listenMinLeadSeconds = 30.0;
+
+  /// How close two devices' audio totals must be, in seconds, to count as the
+  /// same edition. Seconds from a different narration point somewhere
+  /// plausible and wrong, so a mismatch offers nothing.
+  static const sameEditionSeconds = 2.0;
+
+  /// The furthest-ahead listening position on another device, or null. The
+  /// same rules as [offerFor], with a same-edition guard (the remote's
+  /// `audioDuration` within [sameEditionSeconds] of [totalSeconds]) in place
+  /// of the same-unit one.
+  ListenJumpOffer? listenOfferFor({
+    required Book book,
+    required List<RemoteReadingPosition> remotes,
+    required double totalSeconds,
+  }) {
+    final local = book.listenPosition ?? 0;
+    RemoteReadingPosition? best;
+    for (final r in remotes) {
+      final at = r.audioPosition;
+      final total = r.audioDuration;
+      if (at == null || total == null) continue;
+      if ((total - totalSeconds).abs() > sameEditionSeconds) continue;
+      if (at < local + listenMinLeadSeconds) continue;
+      if (best == null || at > best.audioPosition!) best = r;
+    }
+    if (best == null) return null;
+    final label = best.deviceLabel?.trim();
+    return ListenJumpOffer(
+      seconds: best.audioPosition!,
+      deviceLabel: label == null || label.isEmpty ? null : label,
+    );
+  }
+
+  /// Records where this device is in [bookId]'s audio and queues it for the
+  /// reading-progress channel. Never touches the text position: a book with
+  /// text and audio keeps two places.
+  Future<void> saveListenPosition(String bookId, double seconds) =>
+      (db.update(db.books)..where((b) => b.id.equals(bookId))).write(
+        BooksCompanion(
+          listenPosition: Value(seconds),
+          lastListenedAt: Value(DateTime.now()),
           needsProgressPush: const Value(true),
         ),
       );
@@ -229,10 +299,12 @@ class ReadingPositionService {
     );
   }
 
+  /// A book read *or* listened to: an audiobook has no text progress, and its
+  /// listening position rides the same row (docs/AUDIOBOOKS.md §4).
   Future<List<Book>> booksNeedingProgressPush() => (db.select(db.books)
         ..where((b) =>
             b.needsProgressPush.equals(true) &
-            b.readingProgress.isNotNull() &
+            (b.readingProgress.isNotNull() | b.listenPosition.isNotNull()) &
             // Kept on this device only (the samples): the server has no such
             // book, and would answer every sync with an error.
             b.syncExcluded.equals(false)))
@@ -246,7 +318,8 @@ class ReadingPositionService {
   /// the feature on. Without this, "off" would have quietly published positions
   /// saved before the switch, and the opt-in wouldn't mean what it says.
   Future<void> markReadBooksForProgressPush() async {
-    await (db.update(db.books)..where((b) => b.readingProgress.isNotNull()))
+    await (db.update(db.books)
+          ..where((b) => b.readingProgress.isNotNull() | b.listenPosition.isNotNull()))
         .write(const BooksCompanion(needsProgressPush: Value(true)));
   }
 

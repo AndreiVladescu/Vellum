@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../audio/audio_formats.dart';
+import '../audio/audiobook_import.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -531,8 +533,17 @@ class SyncService {
                   path: rel,
                   sizeBytes: f.sizeBytes,
                   sha256: f.sha256,
+                  durationMs: Value(f.durationMs),
+                  track: Value(f.track),
+                  label: Value(f.label),
+                  narrator: Value(f.narrator),
                 ),
               );
+          // Chapters are derived, not synced: read them from the bytes that
+          // just arrived, as the importing device did.
+          if (isAudioFormat(f.format)) {
+            await AudiobookImporter(repository).rebuildChapters(f.id);
+          }
         }
       } catch (e) {
         // Metadata and cover are already pulled; skip files on error.
@@ -1178,9 +1189,25 @@ class SyncService {
               : {for (final f in await client.listFiles(b.id)) f.sha256};
           for (final lf in localFiles) {
             if (remoteHashes.contains(lf.sha256)) continue;
+            // A server without audiobooks (before migration 0043) refuses the
+            // upload; the audio stays here rather than failing the book.
+            if (isAudioFormat(lf.format) && !await _supportsAudiobooks(client)) {
+              continue;
+            }
+            // Not downloaded to this device: there are no bytes to send, and
+            // the server is where the row came from anyway.
+            if (!lf.present) continue;
             final file = repository.fileOf(lf);
             if (await file.exists()) {
-              await client.uploadFileFrom(b.id, file, format: lf.format);
+              await client.uploadFileFrom(
+                b.id,
+                file,
+                format: lf.format,
+                durationMs: lf.durationMs,
+                track: lf.track,
+                label: lf.label,
+                narrator: lf.narrator,
+              );
             }
           }
         }
@@ -2198,6 +2225,8 @@ class SyncService {
           page: Value(e.page),
           unit: Value(e.unit),
           scroll: Value(e.scroll),
+          audioPosition: Value(e.audioPosition),
+          audioDuration: Value(e.audioDuration),
           updatedAt: e.updatedAt ?? DateTime.now(),
         ),
     ], ownDeviceId: deviceId);
@@ -2208,12 +2237,19 @@ class SyncService {
     // it opens in, so a device reading the EPUB doesn't claim PDF pages.
     var published = 0;
     for (final book in await positions.booksNeedingProgressPush()) {
-      final formats = [
-        for (final f in await (db.select(
-          db.bookFiles,
-        )..where((f) => f.bookId.equals(book.id))).get())
-          f.format,
-      ];
+      final files = await (db.select(
+        db.bookFiles,
+      )..where((f) => f.bookId.equals(book.id))).get();
+      final formats = [for (final f in files) f.format];
+      // The listening position, with the audio's total as this device sums
+      // it — the edition check another device's offer is made against.
+      final audioMs = [
+        for (final f in files)
+          if (isAudioFormat(f.format)) f.durationMs ?? 0,
+      ].fold<int>(0, (a, b) => a + b);
+      final listened = book.listenPosition != null && audioMs > 0;
+      final lastAt = [book.lastReadAt, book.lastListenedAt].nonNulls.fold<DateTime?>(
+          null, (a, b) => a == null || b.isAfter(a) ? b : a);
       await client.pushReadingPosition(
         book.id,
         deviceId: deviceId,
@@ -2221,12 +2257,31 @@ class SyncService {
         progress: book.readingProgress,
         page: book.lastReadPage,
         unit: readingUnitForFormats(formats),
-        updatedAt: book.lastReadAt,
+        audioPosition: listened ? book.listenPosition : null,
+        audioDuration: listened ? audioMs / 1000 : null,
+        updatedAt: lastAt,
       );
       await positions.clearProgressDirty(book.id);
       published++;
     }
     return (published: published, cached: listed.entries.length);
+  }
+
+  /// Whether [client]'s server takes audiobook parts (server migration
+  /// 0043). Memoized per base URL, like the other handshakes.
+  Future<bool> _supportsAudiobooks(VellumServerClient client) async {
+    if (_capsBaseUrl != client.baseUrl) {
+      try {
+        _caps = await client.capabilities();
+        _capsBaseUrl = client.baseUrl;
+      } on ServerException {
+        _caps = null;
+        _capsBaseUrl = client.baseUrl;
+      } catch (_) {
+        return false;
+      }
+    }
+    return _caps?.hasFeature('audiobooks') ?? false;
   }
 
   /// Whether [client]'s server can take writing on a page (server migration

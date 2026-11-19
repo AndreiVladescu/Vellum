@@ -865,7 +865,10 @@ pub async fn public_file(
         book_id.ok_or_else(|| AppError::NotFound("link is invalid, expired, or used up".into()))?;
 
     let file: Option<(String, String)> = sqlx::query_as(
-        "SELECT path, format FROM book_file WHERE book_id = ? ORDER BY added_at LIMIT 1",
+        // Text before audio: a link to "the book" means something to read,
+        // and an audiobook part is one file of many.
+        "SELECT path, format FROM book_file WHERE book_id = ? \
+         ORDER BY format IN ('m4b', 'm4a', 'mp3'), added_at LIMIT 1",
     )
     .bind(&book_id)
     .fetch_optional(&state.db)
