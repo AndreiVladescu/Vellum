@@ -10,6 +10,9 @@ import 'attach_audio.dart';
 import 'audio_engine.dart';
 import 'audio_formats.dart';
 import 'audiobook_player.dart';
+import 'playback_host.dart';
+import 'playback_options.dart';
+import 'player_sheets.dart';
 
 /// The book page's way into the player: nothing for a book without audio,
 /// "Listen" for one not started, "Resume listening · 1:02:33" otherwise.
@@ -45,34 +48,34 @@ class ListenButton extends StatelessWidget {
   }
 }
 
-/// A basic audiobook player (v1.5.0): play and pause, ±30 s, the chapter list
-/// and skipping between chapters, and the position remembered locally and on
-/// the reading-progress channel. Speed, the sleep timer and background
-/// playback come in v1.5.1, on top of [AudiobookPlayer] rather than this page.
+/// The audiobook player: play and pause, ±30 s, the chapter list and skipping
+/// between chapters, speed, the sleep timer, and the position remembered
+/// locally and on the reading-progress channel.
+///
+/// A view of the [AudiobookPlayer] the [PlaybackHost] holds, not its owner:
+/// leaving the page leaves the book playing, and opening it again finds it
+/// where it was.
 class PlayerPage extends StatefulWidget {
-  const PlayerPage({
+  PlayerPage({
     super.key,
     required this.bookId,
     required this.repository,
-    this.engine,
-  });
+    PlaybackHost? host,
+  }) : host = host ?? PlaybackHost.instance;
 
   final String bookId;
   final LibraryRepository repository;
 
-  /// Replaces the real backend; for tests.
-  final AudioEngine Function()? engine;
+  /// What is playing; the app's own unless a test passes one.
+  final PlaybackHost host;
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
 }
 
 class _PlayerPageState extends State<PlayerPage> {
-  late final AudiobookPlayer _player = AudiobookPlayer(
-    repository: widget.repository,
-    bookId: widget.bookId,
-    engine: widget.engine,
-  );
+  AudiobookPlayer? _player;
+  bool _started = false;
   Book? _book;
   Object? _error;
   bool _loading = true;
@@ -82,18 +85,29 @@ class _PlayerPageState extends State<PlayerPage> {
   /// than snapping back to the playing position until it is let go.
   double? _dragMs;
 
+  // Not initState: opening the book needs the localised strings for the
+  // notification, and a State may not read inherited widgets there.
   @override
-  void initState() {
-    super.initState();
-    _player.addListener(_onPlayerChanged);
-    _load();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    _load(L10n.of(context));
   }
 
-  Future<void> _load() async {
+  Future<void> _load(L10n l10n) async {
     try {
       _book = await _readBook();
-      await _player.load();
-      if (mounted) await _maybeOfferJump();
+      final opened = await widget.host.open(
+        widget.repository,
+        widget.bookId,
+        channelName: l10n.playerChannelName,
+        untitledChapter: l10n.playerChapterNumber,
+      );
+      _player = opened.player..addListener(_onPlayerChanged);
+      // Only for a book just opened: one already playing has no use for
+      // "go to where you were on another device".
+      if (mounted && !opened.reused) await _maybeOfferJump();
     } catch (e) {
       _error = e;
     }
@@ -115,7 +129,7 @@ class _PlayerPageState extends State<PlayerPage> {
     final offer = positions.listenOfferFor(
       book: book,
       remotes: await positions.remotePositions(widget.bookId),
-      totalSeconds: _player.total.inMilliseconds / 1000,
+      totalSeconds: _player!.total.inMilliseconds / 1000,
     );
     if (offer == null || !mounted) return;
     final time =
@@ -142,14 +156,14 @@ class _PlayerPageState extends State<PlayerPage> {
       },
     );
     if (go == true) {
-      await _player.seek(Duration(milliseconds: (offer.seconds * 1000).round()));
+      await _player!.seek(Duration(milliseconds: (offer.seconds * 1000).round()));
     }
   }
 
   void _onPlayerChanged() {
     if (!mounted) return;
     setState(() {});
-    if (_player.ended && !_endPromptShown) {
+    if (_player!.ended && !_endPromptShown) {
       _endPromptShown = true;
       final l10n = L10n.of(context);
       ScaffoldMessenger.of(context).showSnackBar(appSnackBar(
@@ -162,18 +176,18 @@ class _PlayerPageState extends State<PlayerPage> {
         ),
       ));
     }
-    if (!_player.ended) _endPromptShown = false;
+    if (!_player!.ended) _endPromptShown = false;
   }
 
   @override
   void dispose() {
-    _player.removeListener(_onPlayerChanged);
-    _player.dispose(); // saves the position on the way out
+    // Only a view: the host's player goes on playing.
+    _player?.removeListener(_onPlayerChanged);
     super.dispose();
   }
 
   String _chapterTitle(L10n l10n, int index) {
-    final title = _player.chapters[index].title?.trim();
+    final title = _player!.chapters[index].title?.trim();
     return title == null || title.isEmpty ? l10n.playerChapterNumber(index + 1) : title;
   }
 
@@ -205,9 +219,10 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _playerView(BuildContext context, L10n l10n) {
     final theme = Theme.of(context);
-    final position = _player.position;
-    final total = _player.total;
-    final current = _player.currentChapter;
+    final player = _player!;
+    final position = player.position;
+    final total = player.total;
+    final current = player.currentChapter;
     final cover = _book == null ? null : widget.repository.coverFileOf(_book!);
     final maxMs = total.inMilliseconds <= 0 ? 1.0 : total.inMilliseconds.toDouble();
     return Column(
@@ -243,7 +258,7 @@ class _PlayerPageState extends State<PlayerPage> {
             onChanged: (v) => setState(() => _dragMs = v),
             onChangeEnd: (v) {
               setState(() => _dragMs = null);
-              _player.seek(Duration(milliseconds: v.round()));
+              player.seek(Duration(milliseconds: v.round()));
             },
           ),
         ),
@@ -263,30 +278,51 @@ class _PlayerPageState extends State<PlayerPage> {
             IconButton(
               tooltip: l10n.playerPreviousChapter,
               icon: const Icon(Icons.skip_previous),
-              onPressed: current > 0 ? () => _player.jumpToChapter(current - 1) : null,
+              onPressed: current > 0 ? () => player.jumpToChapter(current - 1) : null,
             ),
             IconButton(
               tooltip: l10n.playerBack30,
               icon: const Icon(Icons.replay_30),
-              onPressed: () => _player.skip(const Duration(seconds: -30)),
+              onPressed: () => player.skip(const Duration(seconds: -30)),
             ),
             IconButton.filled(
               iconSize: 40,
-              tooltip: _player.playing ? l10n.playerPause : l10n.playerPlay,
-              icon: Icon(_player.playing ? Icons.pause : Icons.play_arrow),
-              onPressed: _player.playing ? _player.pause : _player.play,
+              tooltip: player.playing ? l10n.playerPause : l10n.playerPlay,
+              icon: Icon(player.playing ? Icons.pause : Icons.play_arrow),
+              onPressed: player.playing ? player.pause : player.play,
             ),
             IconButton(
               tooltip: l10n.playerForward30,
               icon: const Icon(Icons.forward_30),
-              onPressed: () => _player.skip(const Duration(seconds: 30)),
+              onPressed: () => player.skip(const Duration(seconds: 30)),
             ),
             IconButton(
               tooltip: l10n.playerNextChapter,
               icon: const Icon(Icons.skip_next),
-              onPressed: current + 1 < _player.chapters.length
-                  ? () => _player.jumpToChapter(current + 1)
+              onPressed: current + 1 < player.chapters.length
+                  ? () => player.jumpToChapter(current + 1)
                   : null,
+            ),
+          ],
+        ),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.speed),
+              label: Text(l10n.playerSpeedButton(formatSpeed(player.speed))),
+              onPressed: () => showSpeedSheet(context, player),
+            ),
+            TextButton.icon(
+              icon: Icon(player.sleepActive ? Icons.bedtime : Icons.bedtime_outlined),
+              label: Text(player.sleepActive
+                  ? (player.sleepAtChapterEnd
+                      ? l10n.playerSleepAtChapterEnd
+                      : l10n.playerSleepIn(
+                          formatAudioTime(player.sleepRemaining!)))
+                  : l10n.playerSleepButton),
+              onPressed: () => showSleepSheet(context, player),
             ),
           ],
         ),
@@ -300,15 +336,15 @@ class _PlayerPageState extends State<PlayerPage> {
         ),
         Expanded(
           child: ListView.builder(
-            itemCount: _player.chapters.length,
+            itemCount: player.chapters.length,
             itemBuilder: (context, i) {
-              final chapter = _player.chapters[i];
+              final chapter = player.chapters[i];
               return ListTile(
                 selected: i == current,
                 title: Text(_chapterTitle(l10n, i)),
                 trailing: Text(
                     formatAudioTime(Duration(milliseconds: chapter.startMs))),
-                onTap: () => _player.jumpToChapter(i),
+                onTap: () => player.jumpToChapter(i),
               );
             },
           ),

@@ -8,6 +8,7 @@ import '../data/library_repository.dart';
 import '../data/sync_clock.dart';
 import 'audio_engine.dart';
 import 'audiobook_import.dart';
+import 'playback_options.dart';
 
 /// One chapter, placed on the whole book's timeline.
 class BookChapter {
@@ -65,9 +66,11 @@ class PartTimeline {
 
 /// Plays one book's audio parts as one timeline, and remembers where you are.
 ///
-/// Owned by the player page in v1.5.0. It is a plain [ChangeNotifier] with no
-/// widget in it so that v1.5.1 can hand it to a background service (and the
-/// session recorder of v1.5.3 can hang off it) without the page.
+/// Owned by the `PlaybackHost` (v1.5.1), not by the player page, so playback
+/// carries on when the page is left; the media session of the background
+/// service drives it through the same methods as the page's buttons. It is a
+/// plain [ChangeNotifier] with no widget in it, which is also what the session
+/// recorder of v1.5.3 will hang off.
 ///
 /// The position is saved to `books.listenPosition` on pause, on every seek and
 /// chapter skip, every [saveEvery] while playing, and on [dispose]; each save
@@ -79,14 +82,29 @@ class AudiobookPlayer extends ChangeNotifier {
     required this.bookId,
     AudioEngine Function()? engine,
     this.saveEvery = const Duration(seconds: 15),
-  }) : _engineFactory = engine ?? JustAudioEngine.new;
+    SpeedStore? speedStore,
+  })  : _engineFactory = engine ?? JustAudioEngine.new,
+        _speedStore = speedStore ?? PrefsSpeedStore();
 
   final LibraryRepository repository;
   final String bookId;
   final Duration saveEvery;
   final AudioEngine Function() _engineFactory;
+  final SpeedStore _speedStore;
+
+  /// How often the sleep timer looks at the clock. Short, so the fade is a
+  /// smooth ramp and "end of chapter" stops within a quarter second.
+  static const sleepTick = Duration(milliseconds: 250);
 
   AudioEngine? _engine;
+  StreamSubscription<bool>? _playingSub;
+  Timer? _sleepTimer;
+  Duration? _sleepLeft;
+  bool _sleepAtChapterEnd = false;
+
+  /// Where the chapter the timer is waiting for ends, on the book's timeline.
+  int _sleepTargetMs = 0;
+  double _speed = 1.0;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<void>? _completedSub;
   Timer? _saveTimer;
@@ -102,6 +120,19 @@ class AudiobookPlayer extends ChangeNotifier {
   bool _disposed = false;
 
   bool get playing => _playing;
+
+  /// The playback speed, 1.0 being normal.
+  double get speed => _speed;
+
+  /// Whether a sleep timer is running, of either kind.
+  bool get sleepActive => _sleepLeft != null || _sleepAtChapterEnd;
+
+  /// True when the timer waits for the chapter to end rather than a clock.
+  bool get sleepAtChapterEnd => _sleepAtChapterEnd;
+
+  /// Time left on a timed sleep timer, in listening time (it does not run
+  /// while paused), or null for none and for "end of chapter".
+  Duration? get sleepRemaining => _sleepLeft;
 
   /// True once the last part has played to its end.
   bool get ended => _ended;
@@ -133,6 +164,9 @@ class AudiobookPlayer extends ChangeNotifier {
         .getSingleOrNull();
     final savedMs = ((book?.listenPosition ?? 0) * 1000).round();
     _engine = _engineFactory();
+    _speed = normaliseSpeed(await _speedStore.read(bookId) ?? 1.0);
+    if (_speed != 1.0) await _engine!.setSpeed(_speed);
+    _playingSub = _engine!.playingStream.listen(_onEnginePlaying);
     _positionSub = _engine!.positionStream.listen((p) {
       _offsetMs = p.inMilliseconds;
       if (!_disposed) notifyListeners();
@@ -165,6 +199,9 @@ class AudiobookPlayer extends ChangeNotifier {
     _offsetMs = offsetMs;
     final file = repository.fileOf(parts[part]);
     final measured = await _engine!.open(file.path, at: Duration(milliseconds: offsetMs));
+    // A new source can reset the backend's speed (media_kit does on some
+    // versions); saying it again is free.
+    if (_speed != 1.0) await _engine!.setSpeed(_speed);
     // A part pulled or imported without a duration (a VBR mp3 with no
     // header) is measured by the player once, and the measurement kept: it
     // is synced, so every device sums the same numbers from then on.
@@ -205,9 +242,127 @@ class AudiobookPlayer extends ChangeNotifier {
     }
     _playing = true;
     await engine.play();
+    _startSaving();
+    notifyListeners();
+  }
+
+  void _startSaving() {
     _saveTimer?.cancel();
     _saveTimer = Timer.periodic(saveEvery, (_) => save());
+  }
+
+  /// The backend started or stopped on its own: audio focus was taken (a call,
+  /// another app) or given back, or the headphones came out. The controller
+  /// follows, saving the position when it was paused, so what the page and the
+  /// notification show is what is true.
+  void _onEnginePlaying(bool playing) {
+    if (_disposed || playing == _playing) return;
+    if (playing && _ended) return;
+    _playing = playing;
+    if (playing) {
+      _startSaving();
+    } else {
+      _saveTimer?.cancel();
+      unawaited(save());
+    }
     notifyListeners();
+  }
+
+  /// Sets the speed (pitch is kept) and remembers it for this book.
+  Future<void> setSpeed(double value) async {
+    _speed = normaliseSpeed(value);
+    await _engine?.setSpeed(_speed);
+    await _speedStore.write(bookId, _speed);
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Stops playback after [after] of listening, fading out over the last
+  /// [sleepFade]. Replaces any timer already running.
+  void sleepFor(Duration after) {
+    _sleepAtChapterEnd = false;
+    _sleepLeft = after;
+    _armSleep();
+    notifyListeners();
+  }
+
+  /// Stops playback where the chapter now playing ends, fading out over the
+  /// last [sleepFade] of it. Skipping to another chapter moves the stop to
+  /// that chapter's end.
+  void sleepAtEndOfChapter() {
+    _sleepLeft = null;
+    _sleepAtChapterEnd = true;
+    _sleepTargetMs = _chapterEndMs(position.inMilliseconds);
+    _armSleep();
+    notifyListeners();
+  }
+
+  void cancelSleep() {
+    if (!sleepActive) return;
+    _clearSleep();
+    unawaited(_engine?.setVolume(1.0));
+    notifyListeners();
+  }
+
+  void _armSleep() {
+    _sleepTimer?.cancel();
+    _sleepTimer = Timer.periodic(sleepTick, (_) => _sleepTicked());
+  }
+
+  void _clearSleep() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepLeft = null;
+    _sleepAtChapterEnd = false;
+  }
+
+  /// Where the chapter containing [bookMs] ends, on the book's timeline.
+  int _chapterEndMs(int bookMs) {
+    var end = _timeline.totalMs;
+    for (final c in chapters) {
+      if (c.startMs > bookMs && c.startMs < end) end = c.startMs;
+    }
+    return end;
+  }
+
+  void _sleepTicked() {
+    final engine = _engine;
+    if (engine == null || !_playing) return; // a pause freezes the countdown
+    Duration remaining;
+    if (_sleepAtChapterEnd) {
+      final nowMs = _timeline.startOf(_part) + engine.position.inMilliseconds;
+      final end = _chapterEndMs(nowMs);
+      if (end != _sleepTargetMs) {
+        // Either playback ran over the end of the chapter between two ticks,
+        // which is what the timer waits for, or the listener moved to another
+        // chapter, which moves the wait to that chapter's end.
+        final ranOver =
+            nowMs >= _sleepTargetMs && nowMs - _sleepTargetMs <= 2000;
+        if (ranOver) {
+          unawaited(_stopForSleep());
+          return;
+        }
+        _sleepTargetMs = end;
+      }
+      final leftMs = _sleepTargetMs - nowMs;
+      // Book time to listening time: at 2x the rest of a chapter takes half
+      // as long, and the fade should be ten real seconds.
+      remaining = Duration(microseconds: (leftMs * 1000 / _speed).round());
+    } else {
+      remaining = _sleepLeft! - sleepTick;
+      _sleepLeft = remaining;
+    }
+    if (remaining <= Duration.zero) {
+      unawaited(_stopForSleep());
+      return;
+    }
+    unawaited(engine.setVolume(sleepVolume(remaining)));
+    if (!_sleepAtChapterEnd) notifyListeners();
+  }
+
+  Future<void> _stopForSleep() async {
+    _clearSleep();
+    await pause(); // saves the position
+    await _engine?.setVolume(1.0);
   }
 
   Future<void> pause() async {
@@ -250,7 +405,35 @@ class AudiobookPlayer extends ChangeNotifier {
   Future<void> jumpToChapter(int index) =>
       seek(Duration(milliseconds: chapters[index].startMs));
 
+  /// The next chapter, for the notification's skip button. Nothing at the
+  /// last one.
+  Future<void> nextChapter() async {
+    final next = currentChapter + 1;
+    if (next < chapters.length) await jumpToChapter(next);
+  }
+
+  /// Like a CD player's back button: more than [restartAfter] into the chapter
+  /// it restarts it, sooner than that it goes to the one before.
+  Future<void> previousChapter(
+      {Duration restartAfter = const Duration(seconds: 3)}) async {
+    final current = currentChapter;
+    if (current < 0) return seek(Duration.zero);
+    final into = position.inMilliseconds - chapters[current].startMs;
+    if (into > restartAfter.inMilliseconds || current == 0) {
+      return jumpToChapter(current);
+    }
+    await jumpToChapter(current - 1);
+  }
+
   Future<void> _onPartCompleted() async {
+    if (_part + 1 < parts.length && _sleepAtChapterEnd) {
+      // The chapter ended with the part: line up the next one, paused.
+      _playing = false;
+      _saveTimer?.cancel();
+      await _openPart(_part + 1, 0);
+      await _stopForSleep();
+      return;
+    }
     if (_part + 1 < parts.length) {
       await _openPart(_part + 1, 0);
       if (_playing) await _engine!.play();
@@ -261,6 +444,8 @@ class AudiobookPlayer extends ChangeNotifier {
     // decides it.
     _playing = false;
     _ended = true;
+    _clearSleep();
+    unawaited(_engine?.setVolume(1.0));
     _saveTimer?.cancel();
     _offsetMs = _timeline.durationOf(_part);
     await save();
@@ -278,12 +463,14 @@ class AudiobookPlayer extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _saveTimer?.cancel();
+    _sleepTimer?.cancel();
     final engine = _engine;
     unawaited(() async {
       try {
         if (engine != null) {
           await save();
           await _positionSub?.cancel();
+          await _playingSub?.cancel();
           await _completedSub?.cancel();
           await engine.dispose();
         }

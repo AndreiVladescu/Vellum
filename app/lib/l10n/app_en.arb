@@ -10623,5 +10623,44 @@
   "@listenGoTo": {"description": "Accepts the listening offer.", "placeholders": {"time": {"type": "String"}}},
 
   "listenStayHere": "Stay here",
-  "@listenStayHere": {"description": "Declines the listening offer."}
+  "@listenStayHere": {"description": "Declines the listening offer."},
+
+  "playerSpeedButton": "Speed {speed}",
+  "@playerSpeedButton": {"description": "Audiobook player: button showing the playback speed; opens the speed sheet.", "placeholders": {"speed": {"type": "String"}}},
+
+  "playerSpeedTitle": "Playback speed",
+  "@playerSpeedTitle": {"description": "Heading of the audiobook speed sheet."},
+
+  "playerSpeedNote": "Remembered for this book on this device. The pitch stays the same.",
+  "@playerSpeedNote": {"description": "Explains the speed sheet."},
+
+  "playerSleepButton": "Sleep timer",
+  "@playerSleepButton": {"description": "Audiobook player: button that opens the sleep timer sheet."},
+
+  "playerSleepIn": "Sleep in {time}",
+  "@playerSleepIn": {"description": "Audiobook player: the running sleep timer, with the time left (like 12:30).", "placeholders": {"time": {"type": "String"}}},
+
+  "playerSleepAtChapterEnd": "Sleep at end of chapter",
+  "@playerSleepAtChapterEnd": {"description": "Audiobook player: shown while the sleep timer is set to the end of the chapter."},
+
+  "playerSleepEndOfChapter": "End of chapter",
+  "@playerSleepEndOfChapter": {"description": "Sleep timer choice: stop when the chapter ends."},
+
+  "playerSleepMinutes": "{minutes} minutes",
+  "@playerSleepMinutes": {"description": "Sleep timer choice: stop after this many minutes.", "placeholders": {"minutes": {"type": "int"}}},
+
+  "playerSleepTurnOff": "Turn off the timer",
+  "@playerSleepTurnOff": {"description": "Sleep timer sheet: cancel the running timer."},
+
+  "playerSleepNote": "The sound fades out over the last ten seconds, and the position is saved when it stops.",
+  "@playerSleepNote": {"description": "Explains the sleep timer sheet."},
+
+  "playerChannelName": "Audiobook playback",
+  "@playerChannelName": {"description": "Name of the notification channel for the audiobook player, shown in Android's notification settings."},
+
+  "nowPlayingOpen": "Open the player",
+  "@nowPlayingOpen": {"description": "Tooltip of the now-playing bar on the shelf, which reopens the audiobook player."},
+
+  "nowPlayingClose": "Stop and close",
+  "@nowPlayingClose": {"description": "Tooltip of the now-playing bar's close button."}
 }

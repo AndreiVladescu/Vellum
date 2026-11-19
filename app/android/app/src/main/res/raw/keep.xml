@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release builds strip resources nothing references from Java or XML. The
+     player's notification icon is named from Dart (audio_service), so it is
+     kept explicitly. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_audio" />

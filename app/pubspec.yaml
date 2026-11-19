@@ -83,6 +83,12 @@ dependencies:
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
   audio_metadata_reader: ^1.8.1
+  # Background playback (v1.5.1): the media session, notification and lock
+  # screen on Android, Now Playing on macOS, MPRIS on Linux. audio_session is
+  # the audio-focus plugin just_audio already uses; listed because we set it up.
+  audio_service: ^0.18.19
+  audio_service_mpris: ^0.2.1
+  audio_session: ^0.2.4
 
 dev_dependencies:
   flutter_test:

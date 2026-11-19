@@ -1,61 +1,22 @@
 // The player's bookkeeping (docs/AUDIOBOOKS.md §4) over a fake backend: one
 // timeline across parts, chapters placed on it, the position saved where the
 // reading-progress channel picks it up, and the offer from another device.
-import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vellum/audio/audio_engine.dart';
 import 'package:vellum/audio/audiobook_player.dart';
+import 'package:vellum/audio/background_playback.dart';
+import 'package:vellum/audio/playback_host.dart';
+import 'package:vellum/audio/playback_options.dart';
 import 'package:vellum/audio/player_page.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
-/// Records what the player asked for; positions are whatever it was told.
-class FakeEngine implements AudioEngine {
-  final opened = <(String, Duration)>[];
-  bool isPlaying = false;
-  Duration _position = Duration.zero;
-  final _positions = StreamController<Duration>.broadcast();
-  final _completed = StreamController<void>.broadcast();
-  Duration? reportDuration;
-
-  @override
-  Future<Duration?> open(String path, {Duration at = Duration.zero}) async {
-    opened.add((path, at));
-    _position = at;
-    return reportDuration;
-  }
-
-  @override
-  Future<void> play() async => isPlaying = true;
-  @override
-  Future<void> pause() async => isPlaying = false;
-  @override
-  Future<void> seek(Duration position) async => _position = position;
-  @override
-  Duration get position => _position;
-  @override
-  Stream<Duration> get positionStream => _positions.stream;
-  @override
-  Stream<void> get completed => _completed.stream;
-
-  void finishPart() => _completed.add(null);
-  void tick(Duration at) {
-    _position = at;
-    _positions.add(at);
-  }
-
-  @override
-  Future<void> dispose() async {
-    await _positions.close();
-    await _completed.close();
-  }
-}
+import 'fake_engine.dart';
 
 void main() {
   group('timeline', () {
@@ -112,8 +73,11 @@ void main() {
 
     Future<Book> book() async => (await repo.watchBook('b').first)!;
 
-    AudiobookPlayer make() =>
-        AudiobookPlayer(repository: repo, bookId: 'b', engine: () => engine);
+    AudiobookPlayer make() => AudiobookPlayer(
+        repository: repo,
+        bookId: 'b',
+        engine: () => engine,
+        speedStore: MemorySpeedStore());
 
     test('chapters sit on the whole book', () async {
       final player = make();
@@ -282,10 +246,19 @@ void main() {
     }
 
     final engine = FakeEngine();
+    final host = PlaybackHost(
+      engine: () => engine,
+      speedStore: MemorySpeedStore(),
+      background: BackgroundPlayback(handlerFactory: (_) async => null),
+    );
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: L10n.localizationsDelegates,
       supportedLocales: L10n.supportedLocales,
-      home: PlayerPage(bookId: 'b', repository: repo, engine: () => engine),
+      home: PlayerPage(
+        bookId: 'b',
+        repository: repo,
+        host: host,
+      ),
     ));
     await settle();
     expect(find.text('The Desert'), findsOneWidget);
@@ -303,13 +276,16 @@ void main() {
     await settle();
     expect(engine.position, const Duration(minutes: 10));
 
-    // Leaving the page saves the position.
+    // Leaving the page leaves the book playing, and the position was saved by
+    // the chapter jump.
     await tester.pumpWidget(const SizedBox());
     await settle();
+    expect(engine.isPlaying, isTrue);
     final saved = await tester.runAsync(() => (repo.db.select(repo.db.books)
           ..where((b) => b.id.equals('b')))
         .getSingle());
     expect(saved!.listenPosition, 600);
+    await tester.runAsync(host.close); // stops the save timer
     // Not closed: closing a database opened outside the fake clock from
     // inside a widget test never completes, and an in-memory one holds
     // nothing worth releasing.

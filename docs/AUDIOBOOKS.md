@@ -507,8 +507,8 @@ recorder hangs off the player's play/pause/ended transitions.
 
 **v1.5.1 — a player you can live with**
 
-- [ ] **L** `audio_service`: background playback, notification and lock screen on Android, Now Playing on macOS, MPRIS on Linux; a mini-player while browsing
-- [ ] **M** Speed (0.5–3×, per book, app-local) and a sleep timer (minutes, or the end of the chapter, with a fade)
+- [x] **L** `audio_service`: background playback, notification and lock screen on Android, Now Playing on macOS, MPRIS on Linux; a mini-player while browsing. *Unverified:* everything past the handler, which is tested; see §9 and `docs/BACKLOG.md`
+- [x] **M** Speed (0.5–3×, per book, app-local) and a sleep timer (minutes, or the end of the chapter, with a fade)
 
 **v1.5.2 — on the shelf**
 
@@ -518,3 +518,62 @@ recorder hangs off the player's play/pause/ended transitions.
 
 - [ ] **M** Listening sittings: recorder in the player service, app and server schema, `?kinds=` and the `listening_sessions` capability
 - [ ] **M** Insights: the Reading/Listening switch, `kind = 'read'` on every existing query, *Your listening* on the book page
+
+## 9. v1.5.1 as built
+
+**Plugin: `audio_service`, not `just_audio_background`.** `just_audio_background`
+takes over the `AudioPlayer` and describes a *playlist* of `MediaItem`s, so the
+notification and lock screen would show one part at a time, with a seek bar
+over that part only, and the notification's skip buttons would move between
+parts. Vellum plays one file at a time (§7a) and keeps its own timeline over
+the parts. `audio_service` lets a handler (`VellumAudioHandler`,
+`lib/audio/audio_handler.dart`) wrap the existing `AudiobookPlayer`: the session
+sees the whole book (one `MediaItem`, the book's duration, the chapter as its
+title) and each button calls the same method as the page's. Both are
+free software and the Android side is `androidx.media` only, so **both flavours
+carry it** and `flavour.sh` is untouched.
+
+**Who owns the player.** `PlaybackHost` (`playback_host.dart`) owns the
+`AudiobookPlayer`, not the page. The page, the mini bar and the media session
+are views of it. Opening the same book returns the running player; another book
+saves and replaces it. The mini bar (`now_playing_bar.dart`) is the shell's
+`bottomNavigationBar` (above the navigation bar on a phone, alone beside the
+rail or drawer on wider windows), so the floating buttons ride above it and it
+never covers the shelf. It closes with the book.
+
+**Platforms.**
+
+| | Session |
+|---|---|
+| Android | `audio_service`: notification, lock screen, headset and Bluetooth buttons. Foreground service of type `mediaPlayback` (`FOREGROUND_SERVICE_MEDIA_PLAYBACK` for API 34+). `MainActivity` now extends `AudioServiceActivity`. |
+| macOS | `audio_service`: Now Playing, media keys. |
+| Linux | MPRIS through `audio_service_mpris` (pure Dart over D-Bus; MPL-2.0 `dbus`, Linux only). If there is no session bus the session simply does not start. |
+| Windows | `audio_service` has no Windows support: no system controls. Playback continues while the app is open. |
+
+Leaving the player page does not stop playback anywhere.
+
+**Audio focus.** `just_audio` already follows the `audio_session` focus events;
+the engine only chooses the speech profile (`configureAudioSession`). A call or
+another app's playback pauses, a short interruption resumes afterwards, a
+navigation prompt ducks, and unplugging the headphones pauses ("becoming
+noisy"). The controller follows the engine's `playingStream`, so the page and
+the notification show what is true, and an outside pause saves the position.
+The sleep timer's fade and a duck both use the volume; they do not combine, and
+the fade wins in its last ten seconds.
+
+**Speed.** 0.5 to 3.0 in 0.05 steps, with presets. It is remembered **per
+book, per device, in the preferences** (`listen.speed.<bookId>`), so there is
+no schema change and nothing syncs. The pitch is kept: ExoPlayer, AVPlayer and
+libmpv all time-stretch. Chosen over a global speed because narrators differ.
+
+**Sleep timer.** 5/10/15/30/45/60 minutes or the end of the chapter. The
+countdown runs only while playing. The volume fades linearly over the last ten
+seconds of *listening* time (at 2x the last ten book-seconds are only five
+fade-seconds long, so it is computed in listening time). Skipping to another
+chapter moves "end of chapter" to that chapter. When it stops, the position is
+saved through the ordinary pause path, which queues it for the
+reading-progress channel.
+
+**Saving in the background.** Unchanged: the 15-second timer, pause, seek and
+dispose. A process killed outright loses at most 15 seconds.
+

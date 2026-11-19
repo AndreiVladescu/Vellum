@@ -29,11 +29,17 @@ MIGRATED=(
   lib/audio/audio_engine.dart
   lib/audio/audio_formats.dart
   lib/audio/audiobook_import.dart
+  lib/audio/audio_handler.dart
   lib/audio/audiobook_player.dart
+  lib/audio/background_playback.dart
+  lib/audio/now_playing_bar.dart
+  lib/audio/playback_host.dart
+  lib/audio/playback_options.dart
   lib/audio/audiobook_scan.dart
   lib/audio/mp3_duration.dart
   lib/audio/mp4_reader.dart
   lib/audio/player_page.dart
+  lib/audio/player_sheets.dart
   lib/add_book/add_book_page.dart
   lib/add_book/barcode_camera.dart
   lib/add_book/isbn.dart

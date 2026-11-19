@@ -58,6 +58,7 @@ import 'shelf/shelf_grouping.dart';
 import 'shelf/shelf_view.dart';
 import 'shortcuts.dart';
 import 'snack_bars.dart';
+import 'audio/now_playing_bar.dart';
 import 'wishlist/wishlist_page.dart';
 import 'data/shelf_service.dart';
 import 'notifications/notifications_button.dart';
@@ -1136,6 +1137,13 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
+  /// [nav] under the now-playing strip. The strip insets nothing itself here:
+  /// the navigation bar below it already keeps clear of the system bar.
+  Widget _withNowPlaying(Widget nav) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [NowPlayingBar(), nav],
+      );
+
   /// Rebuilds so `PopScope` sees the current focus. Guarded on `mounted`
   /// because unfocusing during a pop can fire this after the state is gone.
   void _onSearchFocusChanged() {
@@ -1233,8 +1241,10 @@ class _LibraryPageState extends State<LibraryPage> {
         ],
       ),
       bottomNavigationBar: size != WindowSize.compact
-          ? null
-          : NavigationBar(
+          // The now-playing strip (v1.5.1) is part of the bottom bar so the
+          // floating buttons ride above it and it never hides the shelf.
+          ? NowPlayingBar(padBottom: true)
+          : _withNowPlaying(NavigationBar(
               selectedIndex: _tab,
               onDestinationSelected: _goToTab,
               destinations: [
@@ -1249,7 +1259,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   label: l10n.physicalTab,
                 ),
               ],
-            ),
+            )),
       floatingActionButton: _tab == 0
           // Scan sits above Add book rather than replacing it: scanning is the
           // fast path for physical books you're holding, not a substitute for

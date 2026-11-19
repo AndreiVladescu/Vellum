@@ -19,6 +19,12 @@
          SyncForegroundService.kt. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- The audiobook player (roadmap v1.5.1, audio_service): a foreground
+         service of type mediaPlayback keeps playback and its notification alive
+         with the screen off. The typed permission is required from API 34;
+         WAKE_LOCK keeps the CPU awake while it plays. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <!-- workmanager_android 0.10 declares this for *expedited* one-off work
          (a shortService foreground service). Vellum schedules only plain
          periodic work, which never starts a foreground service, so the
@@ -117,6 +123,27 @@
             android:name=".SyncForegroundService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
+        <!-- Background audiobook playback (audio_service): the media session
+             service behind the notification and lock-screen controls, and the
+             receiver for headset and Bluetooth buttons. Exported because the
+             system and other apps' media controllers bind to it. -->
+        <service
+            android:name="com.ryanheise.audioservice.AudioService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+        <receiver
+            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:exported="true"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
         <!-- Loan due-date reminders (roadmap v1.4.2): the plugin's alarm
              receiver delivers each scheduled notification, and the boot
              receiver re-registers them after a reboot (alarms don't survive

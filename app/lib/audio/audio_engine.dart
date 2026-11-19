@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 
@@ -17,6 +19,18 @@ abstract class AudioEngine {
   Future<void> play();
   Future<void> pause();
   Future<void> seek(Duration position);
+
+  /// Playback speed, 1.0 being normal. The pitch is kept: the backends
+  /// time-stretch rather than resample.
+  Future<void> setSpeed(double speed);
+
+  /// Output volume, 0.0 to 1.0. The sleep timer's fade-out.
+  Future<void> setVolume(double volume);
+
+  /// Whether the backend is playing. Changes by itself when the system takes
+  /// audio focus away (a call, another app) or the headphones are pulled out,
+  /// which is how the player learns it was paused from outside.
+  Stream<bool> get playingStream;
 
   /// The position within the open file.
   Duration get position;
@@ -51,11 +65,31 @@ void ensureAudioBackend() {
   _backendReady = true;
 }
 
+bool _sessionConfigured = false;
+
+/// Tells the OS this is spoken-word media: Android then pauses for a call or
+/// another app's playback and resumes after a short interruption, ducks for a
+/// navigation prompt, and pauses when the headphones are unplugged
+/// ("becoming noisy"). `just_audio` listens to the session and acts on all of
+/// that itself, so the one thing to do here is choose the profile. Only where
+/// `audio_session` has an implementation, and never fatal.
+Future<void> configureAudioSession() async {
+  if (_sessionConfigured || !(Platform.isAndroid || Platform.isMacOS)) return;
+  _sessionConfigured = true;
+  try {
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.speech());
+  } catch (_) {
+    // Playback works with the defaults; only the speech profile is lost.
+  }
+}
+
 /// The real engine: `just_audio` (ExoPlayer on Android, AVPlayer on macOS,
 /// libmpv through media_kit on Linux and Windows).
 class JustAudioEngine implements AudioEngine {
   JustAudioEngine() {
     ensureAudioBackend();
+    unawaited(configureAudioSession());
     _player = AudioPlayer();
     _sub = _player.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) _completed.add(null);
@@ -81,6 +115,15 @@ class JustAudioEngine implements AudioEngine {
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> setSpeed(double speed) => _player.setSpeed(speed);
+
+  @override
+  Future<void> setVolume(double volume) => _player.setVolume(volume);
+
+  @override
+  Stream<bool> get playingStream => _player.playingStream;
 
   @override
   Duration get position => _player.position;

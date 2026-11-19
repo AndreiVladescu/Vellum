@@ -3,7 +3,7 @@ package app.vellum.Vellum
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -21,8 +21,13 @@ import java.io.File
  * intent is alive, so handing it to Dart to open later is a race the user
  * eventually loses. Everything is copied into `cacheDir/incoming` first, and
  * Dart imports from there.
+ *
+ * Extends audio_service's activity, not plain `FlutterActivity` (v1.5.1): the
+ * player's media session lives in a service that must share this activity's
+ * Flutter engine, and that class is what makes the two use the same one. It
+ * still *is* a FlutterActivity, so the channels below are unchanged.
  */
-class MainActivity : FlutterActivity() {
+class MainActivity : AudioServiceActivity() {
     private val channelName = "app.vellum.Vellum/incoming_share"
     private var channel: MethodChannel? = null
 

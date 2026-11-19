@@ -390,3 +390,44 @@ unit tested (`test/reader/tts/`), the engines and the page-following are not.
   cuts the voice at once, and that the speed slider is audible.
 - **Windows / macOS:** the plugin's speed scales are mapped by guess
   (`PluginTtsEngine.pluginRate`); check 0.5x, 1x and 2x sound right.
+
+## Audiobook player: background playback, speed, sleep timer (v1.5.1)
+
+Nothing below has run on a device; the controller, the handler and the mini bar
+are tested over fakes.
+
+- **Notification.** Play a book, press Home. A media notification shows the
+  chapter title, the book, the author and the cover, with previous chapter, -30 s,
+  play/pause, +30 s and next chapter. Each button works; the seek bar spans the
+  whole book. Paused, the notification can be swiped away; pressing play from
+  the lock screen or the mini bar afterwards brings it back (Android 12+ may
+  refuse a foreground-service restart: look for
+  `ForegroundServiceStartNotAllowedException` in logcat).
+- **Lock screen and Bluetooth.** The same controls on the lock screen, and a
+  headset's play/pause and skip buttons.
+- **Headphones.** Unplugging wired headphones, or switching off Bluetooth
+  ones, pauses; the page, mini bar and notification all show paused, and the
+  position was saved.
+- **A call.** An incoming call pauses; after hanging up a short call resumes,
+  a long one may not. Another app starting playback pauses the book.
+  Navigation prompts duck it.
+- **Leaving the page.** Back out of the player: the book keeps playing and the
+  mini bar above the navigation shows it; tapping the bar reopens the player
+  without the "go there?" offer. The bar's close button stops the book.
+  Check the bar on a phone, on a tablet in landscape (rail) and on the
+  desktop layout (drawer), and that the floating buttons sit above it.
+- **Speed.** 0.5x, 1.5x and 3x sound right and the pitch does not change, on
+  Android (ExoPlayer) and Linux (libmpv). The speed comes back when the book
+  is reopened after a restart, and across a part change in an mp3 folder.
+- **Sleep timer.** 5 minutes: the sound fades over the last ten seconds, then
+  stops; the position on the book page is where it stopped. "End of chapter"
+  stops at the chapter's end, including a chapter that ends with a file in an
+  mp3 folder. A pause freezes the countdown.
+- **Linux.** `playerctl status` and `playerctl play-pause` (or a desktop media
+  widget) see and drive Vellum while a book is open.
+- **macOS and Windows.** macOS: Now Playing and the media keys. Windows: only
+  that playback continues while the app is open.
+- **Killing the app.** Swipe it from the recents while playing: it keeps playing
+  from the service (decide whether that is wanted); while paused the
+  notification goes away.
+
