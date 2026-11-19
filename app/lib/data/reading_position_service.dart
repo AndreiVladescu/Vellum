@@ -230,7 +230,12 @@ class ReadingPositionService {
   }
 
   Future<List<Book>> booksNeedingProgressPush() => (db.select(db.books)
-        ..where((b) => b.needsProgressPush.equals(true) & b.readingProgress.isNotNull()))
+        ..where((b) =>
+            b.needsProgressPush.equals(true) &
+            b.readingProgress.isNotNull() &
+            // Kept on this device only (the samples): the server has no such
+            // book, and would answer every sync with an error.
+            b.syncExcluded.equals(false)))
       .get();
 
   Future<void> clearProgressDirty(String bookId) =>

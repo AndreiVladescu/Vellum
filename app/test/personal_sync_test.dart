@@ -187,6 +187,66 @@ Future<LibraryRepository> _repo() async {
 }
 
 void main() {
+  test('nothing personal about a syncExcluded book is sent', () async {
+    // The bundled samples: kept on this device, never pushed, so the server
+    // answers any row about them with "no such book" on every sync.
+    final repo = await _repo();
+    final db = repo.db;
+    await db.into(db.books).insert(BooksCompanion.insert(
+          id: 'sample',
+          title: 'Frankenstein',
+          needsPush: const Value(false),
+          syncExcluded: const Value(true),
+          readerNotes: const Value('my note'),
+          readerNotesNeedsPush: const Value(true),
+          statusNeedsPush: const Value(true),
+          readingProgress: const Value(0.4),
+          needsProgressPush: const Value(true),
+        ));
+    await repo.annotations.add(
+      bookId: 'sample',
+      kind: AnnotationKind.highlight,
+      quotedText: 'it was a dreary night',
+    );
+    await db.into(db.readingSessions).insert(ReadingSessionsCompanion.insert(
+          id: 's1',
+          bookId: 'sample',
+          startedAt: DateTime(2026, 11, 13, 20),
+          endedAt: DateTime(2026, 11, 13, 21),
+        ));
+    // A normal book alongside, so the test would notice a push that stopped.
+    await db.into(db.readingSessions).insert(ReadingSessionsCompanion.insert(
+          id: 's2',
+          bookId: 'b1',
+          startedAt: DateTime(2026, 11, 13, 20),
+          endedAt: DateTime(2026, 11, 13, 21),
+        ));
+
+    final sessions = <Map<String, dynamic>>[];
+    final annotations = <Map<String, dynamic>>[];
+    final notes = <Map<String, dynamic>>[];
+    final statuses = <Map<String, dynamic>>[];
+    final handler = _server(
+      pushedSessions: sessions,
+      pushedAnnotations: annotations,
+      pushedNotes: notes,
+      pushedStatuses: statuses,
+    );
+    final writes = <String>[];
+    await SyncService(repo).push(_client((req) {
+      if (req.method != 'GET') writes.add('${req.method} ${req.url.path}');
+      return handler(req);
+    }));
+
+    expect(sessions, hasLength(1), reason: 'only the ordinary book sitting');
+    expect(writes.where((w) => w.contains('/sessions/s2')), hasLength(1));
+    expect(annotations, isEmpty);
+    expect(notes, isEmpty);
+    expect(statuses, isEmpty);
+    expect(writes.where((w) => w.contains('sample')), isEmpty);
+    expect(await repo.readingPositions.booksNeedingProgressPush(), isEmpty);
+  });
+
   test('a highlight made here is pushed, once', () async {
     final repo = await _repo();
     final pushed = <Map<String, dynamic>>[];

@@ -1701,6 +1701,18 @@ class SyncService {
     final db = _db;
     var pushed = 0;
 
+    // Books this device keeps to itself (the bundled samples among them) were
+    // never pushed, so the server answers every personal row for them with
+    // "no such book" — one issue per sync, for ever. Nothing personal about
+    // such a book leaves the device.
+    final excluded = {
+      for (final row in await (db.selectOnly(db.books)
+            ..addColumns([db.books.id])
+            ..where(db.books.syncExcluded.equals(true)))
+          .get())
+        row.read(db.books.id)!,
+    };
+
     // Deletions first, so a delete followed by a re-add in the same window
     // lands in that order rather than the reverse.
     final tombstones = scope.annotations
@@ -1758,6 +1770,7 @@ class SyncService {
           )..where((a) => a.needsPush.equals(true))).get()
         : const <Annotation>[];
     for (final a in dirty) {
+      if (excluded.contains(a.bookId)) continue;
       // Ink waits for a server that can take it, rather than failing every
       // sync until one arrives. The flag stays set, so it goes the moment the
       // server is upgraded.
@@ -1796,6 +1809,7 @@ class SyncService {
           )..where((s) => s.needsPush.equals(true))).get()
         : const <ReadingSession>[];
     for (final s in sessions) {
+      if (excluded.contains(s.bookId)) continue;
       try {
         await client.pushSession(
           id: s.id,
@@ -1819,7 +1833,11 @@ class SyncService {
     final notedBooks = scope.annotations
         ? await (db.select(
             db.books,
-          )..where((b) => b.readerNotesNeedsPush.equals(true))).get()
+          )..where(
+            (b) =>
+                b.readerNotesNeedsPush.equals(true) &
+                b.syncExcluded.equals(false),
+          )).get()
         : const <Book>[];
     for (final b in notedBooks) {
       try {
