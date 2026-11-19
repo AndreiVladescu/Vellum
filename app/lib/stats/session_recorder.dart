@@ -15,6 +15,14 @@ import '../data/database.dart';
 /// instead of starting a new one. Without that, every derived number (sessions
 /// per day, average pages per session, streaks) would measure interruptions
 /// rather than reading.
+///
+/// **Listening uses the same recorder** (docs/AUDIOBOOKS.md section 5): the
+/// audiobook player opens a sitting with `kind: SessionRecorder.listen` on
+/// play and closes it on pause, stop, the sleep timer or the end of the book.
+/// It carries seconds of audio where reading carries pages. The time counted is
+/// wall-clock time (an hour at 1.5x is an hour listened); the audio covered is
+/// kept beside it. Coalescing matches on the kind as well as the book, so
+/// reading straight after listening starts a new sitting.
 class SessionRecorder {
   SessionRecorder(this.db, {this.deviceId, this.deviceLabel});
 
@@ -31,20 +39,34 @@ class SessionRecorder {
   /// Gaps shorter than this are treated as the same sitting.
   static const coalesceGap = Duration(minutes: 2);
 
+  /// The two kinds of sitting, as stored in `reading_sessions.kind`.
+  static const read = 'read';
+  static const listen = 'listen';
+
+  /// A sitting shorter than this, with no page moved, is not kept.
+  static const minimumLength = Duration(seconds: 5);
+
   /// The session this recorder is currently extending, if any.
   String? _sessionId;
 
-  /// Opens (or resumes) a session for [bookId] starting at [page].
+  /// Opens (or resumes) a session for [bookId] starting at [page] — or, for
+  /// a listening sitting, at [second] of the audio.
   ///
   /// Returns the session id, so a caller can tell whether it resumed an existing
   /// one. Idempotent while a session is open.
-  Future<String> begin(String bookId, {int? page, DateTime? now}) async {
+  Future<String> begin(
+    String bookId, {
+    int? page,
+    String kind = read,
+    int? second,
+    DateTime? now,
+  }) async {
     final at = now ?? DateTime.now();
     final open = _sessionId;
     if (open != null) return open;
 
     final recent = await (db.select(db.readingSessions)
-          ..where((s) => s.bookId.equals(bookId))
+          ..where((s) => s.bookId.equals(bookId) & s.kind.equals(kind))
           ..orderBy([(s) => OrderingTerm.desc(s.endedAt)])
           ..limit(1))
         .getSingleOrNull();
@@ -63,6 +85,9 @@ class SessionRecorder {
           endedAt: at,
           startPage: Value(page),
           endPage: Value(page),
+          kind: Value(kind),
+          startSecond: Value(second),
+          endSecond: Value(second),
           deviceId: Value(deviceId),
           deviceLabel: Value(deviceLabel),
           // Not yet: an open sitting is a fact still being made, and the row
@@ -78,13 +103,14 @@ class SessionRecorder {
 
   /// Extends the open session to [page] and *now*. Called as the reader turns
   /// pages; cheap enough to call per turn since it updates one row.
-  Future<void> touch({int? page, DateTime? now}) async {
+  Future<void> touch({int? page, int? second, DateTime? now}) async {
     final id = _sessionId;
     if (id == null) return;
     await (db.update(db.readingSessions)..where((s) => s.id.equals(id))).write(
       ReadingSessionsCompanion(
         endedAt: Value(now ?? DateTime.now()),
         endPage: page == null ? const Value.absent() : Value(page),
+        endSecond: second == null ? const Value.absent() : Value(second),
         // Deliberately not marked for push: a sitting is only worth publishing
         // once it is over, and [end] is what settles its final page and
         // duration. This comment used to sit above a line that did the
@@ -96,21 +122,25 @@ class SessionRecorder {
   /// Closes the session. A session with no measurable duration *and* no page
   /// progress is deleted rather than kept: opening a book to check its cover is
   /// not reading, and a pile of zero-length rows would skew every average.
-  Future<void> end({int? page, DateTime? now}) async {
+  Future<void> end({int? page, int? second, DateTime? now}) async {
     final id = _sessionId;
     if (id == null) return;
     // The final extend happens *before* the id is cleared — writing it through
     // [touch] after clearing would silently drop the last page and the end time,
     // making every session look empty (and therefore get discarded below).
-    await touch(page: page, now: now);
+    await touch(page: page, second: second, now: now);
     _sessionId = null;
     final row = await (db.select(db.readingSessions)
           ..where((s) => s.id.equals(id)))
         .getSingleOrNull();
     if (row == null) return;
     final duration = row.endedAt.difference(row.startedAt);
-    final moved = (row.endPage ?? 0) != (row.startPage ?? 0);
-    if (duration.inSeconds < 5 && !moved) {
+    // Playing moves the audio position by itself, so for a listening sitting
+    // only its length says whether it was one.
+    final moved = row.kind == listen
+        ? false
+        : (row.endPage ?? 0) != (row.startPage ?? 0);
+    if (duration < minimumLength && !moved) {
       await (db.delete(db.readingSessions)..where((s) => s.id.equals(id))).go();
       return;
     }

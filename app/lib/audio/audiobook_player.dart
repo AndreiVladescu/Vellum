@@ -70,7 +70,10 @@ class PartTimeline {
 /// carries on when the page is left; the media session of the background
 /// service drives it through the same methods as the page's buttons. It is a
 /// plain [ChangeNotifier] with no widget in it, which is also what the session
-/// recorder of v1.5.3 will hang off.
+/// recorder hangs off: a listening sitting (`kind = 'listen'`) opens when the
+/// audio starts and closes on pause, on the sleep timer, at the end of the book
+/// and on [dispose], because playback outlives any page. Its length is wall
+/// clock; the audio position range is kept beside it.
 ///
 /// The position is saved to `books.listenPosition` on pause, on every seek and
 /// chapter skip, every [saveEvery] while playing, and on [dispose]; each save
@@ -83,14 +86,24 @@ class AudiobookPlayer extends ChangeNotifier {
     AudioEngine Function()? engine,
     this.saveEvery = const Duration(seconds: 15),
     SpeedStore? speedStore,
+    SessionRecorder? recorder,
+    DateTime Function()? clock,
   })  : _engineFactory = engine ?? JustAudioEngine.new,
-        _speedStore = speedStore ?? PrefsSpeedStore();
+        _speedStore = speedStore ?? PrefsSpeedStore(),
+        _recorder = recorder ?? SessionRecorder(repository.db),
+        _clock = clock ?? DateTime.now;
 
   final LibraryRepository repository;
   final String bookId;
   final Duration saveEvery;
   final AudioEngine Function() _engineFactory;
   final SpeedStore _speedStore;
+  final SessionRecorder _recorder;
+  final DateTime Function() _clock;
+
+  /// Sitting writes run one after another, so a pause right behind a play
+  /// closes the sitting the play opened rather than racing it.
+  Future<void> _sitting = Future.value();
 
   /// How often the sleep timer looks at the clock. Short, so the fade is a
   /// smooth ramp and "end of chapter" stops within a quarter second.
@@ -241,10 +254,44 @@ class AudiobookPlayer extends ChangeNotifier {
       await repository.readingStatus.noteOpened(bookId);
     }
     _playing = true;
+    _beginSitting();
     await engine.play();
     _startSaving();
     notifyListeners();
   }
+
+  void _queueSitting(Future<void> Function() job) {
+    _sitting = _sitting.then((_) => job()).catchError((_) {
+      // A sitting that cannot be written costs one row of statistics, never
+      // playback.
+    });
+  }
+
+  void _beginSitting() {
+    final at = _clock();
+    final second = position.inSeconds;
+    _queueSitting(() async {
+      await _recorder.begin(bookId,
+          kind: SessionRecorder.listen, second: second, now: at);
+    });
+  }
+
+  void _touchSitting() {
+    final at = _clock();
+    final second = position.inSeconds;
+    _queueSitting(() => _recorder.touch(second: second, now: at));
+  }
+
+  void _endSitting() {
+    final at = _clock();
+    final second = position.inSeconds;
+    _queueSitting(() => _recorder.end(second: second, now: at));
+  }
+
+  /// Completes when every sitting write queued so far has finished; for tests
+  /// and for [dispose].
+  @visibleForTesting
+  Future<void> get sittingsSettled => _sitting;
 
   void _startSaving() {
     _saveTimer?.cancel();
@@ -260,9 +307,11 @@ class AudiobookPlayer extends ChangeNotifier {
     if (playing && _ended) return;
     _playing = playing;
     if (playing) {
+      _beginSitting();
       _startSaving();
     } else {
       _saveTimer?.cancel();
+      _endSitting();
       unawaited(save());
     }
     notifyListeners();
@@ -368,9 +417,11 @@ class AudiobookPlayer extends ChangeNotifier {
   Future<void> pause() async {
     final engine = _engine;
     if (engine == null) return;
+    final wasPlaying = _playing;
     _playing = false;
     _saveTimer?.cancel();
     await engine.pause();
+    if (wasPlaying) _endSitting();
     await save();
     notifyListeners();
   }
@@ -427,7 +478,10 @@ class AudiobookPlayer extends ChangeNotifier {
 
   Future<void> _onPartCompleted() async {
     if (_part + 1 < parts.length && _sleepAtChapterEnd) {
-      // The chapter ended with the part: line up the next one, paused.
+      // The chapter ended with the part: line up the next one, paused. The
+      // sitting ends here, at the chapter's end, because `_playing` is already
+      // false by the time `pause` looks.
+      _endSitting();
       _playing = false;
       _saveTimer?.cancel();
       await _openPart(_part + 1, 0);
@@ -448,6 +502,7 @@ class AudiobookPlayer extends ChangeNotifier {
     unawaited(_engine?.setVolume(1.0));
     _saveTimer?.cancel();
     _offsetMs = _timeline.durationOf(_part);
+    _endSitting();
     await save();
     if (!_disposed) notifyListeners();
   }
@@ -455,6 +510,7 @@ class AudiobookPlayer extends ChangeNotifier {
   /// Writes the current position (seconds from the start of part 1).
   Future<void> save() async {
     if (_engine == null) return;
+    if (_playing) _touchSitting();
     await repository.readingPositions
         .saveListenPosition(bookId, position.inMilliseconds / 1000);
   }
@@ -468,7 +524,9 @@ class AudiobookPlayer extends ChangeNotifier {
     unawaited(() async {
       try {
         if (engine != null) {
+          _endSitting(); // a no-op when no sitting is open
           await save();
+          await _sitting;
           await _positionSub?.cancel();
           await _playingSub?.cancel();
           await _completedSub?.cancel();
