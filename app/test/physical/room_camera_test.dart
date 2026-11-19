@@ -120,9 +120,24 @@ void main() {
   testWidgets('a tap selects a book, and the selected book drags along the '
       'shelf', (tester) async {
     await load(tester);
+    // The outline round a selected book: its visual is reused between
+    // rebuilds, so it must still notice that it was selected.
+    final outline = find.descendant(
+      of: find
+          .ancestor(of: spine('Book Zero'), matching: find.byType(Stack))
+          .first,
+      matching: find.byWidgetPredicate(
+        (w) =>
+            w is DecoratedBox &&
+            w.decoration is BoxDecoration &&
+            (w.decoration as BoxDecoration).border != null,
+      ),
+    );
+    expect(outline, findsNothing);
     await tester.tapAt(tester.getCenter(spine('Book Zero')));
     await tester.pump();
     expect(find.byType(SelectionBar), findsOneWidget);
+    expect(outline, findsOneWidget);
 
     final placed = await tester.runAsync(
       () => repo.layout.watchPlacedBooks(envId).first,

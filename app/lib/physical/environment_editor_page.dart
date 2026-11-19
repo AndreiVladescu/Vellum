@@ -177,6 +177,17 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   Offset? _measureFrom;
   Offset? _measureTo;
 
+  /// The room's three streams, made once. Made in `build`, they were new
+  /// streams on every rebuild — every zoom step, every selection — and each
+  /// new one re-ran its query (the books one joins every placement to its
+  /// book) and rebuilt the page again when the answer came.
+  late final Stream<List<PhysicalShelf>> _shelvesStream =
+      repo.layout.watchShelves(widget.environmentId);
+  late final Stream<List<PlacedBook>> _placedStream =
+      repo.layout.watchPlacedBooks(widget.environmentId);
+  late final Stream<List<RoomProp>> _propsStream =
+      repo.layout.watchProps(widget.environmentId);
+
   @override
   void initState() {
     super.initState();
@@ -2073,15 +2084,21 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       body: ListenableBuilder(
         listenable: widget.settings,
         builder: (context, _) => StreamBuilder<List<PhysicalShelf>>(
-          stream: repo.layout.watchShelves(widget.environmentId),
+          stream: _shelvesStream,
           builder: (context, shelfSnap) {
             _shelves = shelfSnap.data ?? const [];
             return StreamBuilder<List<PlacedBook>>(
-              stream: repo.layout.watchPlacedBooks(widget.environmentId),
+              stream: _placedStream,
               builder: (context, bookSnap) {
-                _placed = bookSnap.data ?? const [];
+                final placed = bookSnap.data ?? const <PlacedBook>[];
+                if (!identical(placed, _placed)) {
+                  // Forget the reusable visuals of books no longer here.
+                  final ids = {for (final pb in placed) pb.placement.id};
+                  _visuals.removeWhere((id, _) => !ids.contains(id));
+                }
+                _placed = placed;
                 return StreamBuilder<List<RoomProp>>(
-                  stream: repo.layout.watchProps(widget.environmentId),
+                  stream: _propsStream,
                   builder: (context, propSnap) {
                 _props = propSnap.data ?? const [];
                 return LayoutBuilder(
@@ -2529,13 +2546,43 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// (cover slice or generated), a quarter-turn for a flat book so its title
   /// still reads left-to-right, and a selection outline. Purely visual —
   /// gestures are handled by the canvas.
+  ///
+  /// A resting book's visual is reused while nothing it shows has changed: a
+  /// zoom step or a selection rebuilds the page, and handing Flutter the very
+  /// same widget object tells it the subtree below needs no rebuilding — only
+  /// the box around it, which is what a zoom actually changes.
   Widget _bookVisual(PlacedBook pb, {required bool dragging}) {
-    final selected = _selectedId == pb.placement.id;
-    final flat = pb.placement.rotation == 90;
     // Dimmed, not hidden, when a search is running and this book doesn't match:
     // the room stays a room, and the matches stand out because everything else
     // recedes.
     final dimmed = _query.trim().isNotEmpty && !_matchesQuery(pb);
+    if (dragging) return _buildBookVisual(pb, dragging: true, dimmed: dimmed);
+    final key = (
+      pb.placement,
+      pb.book,
+      _selectedId == pb.placement.id,
+      _pulseId == pb.placement.id,
+      dimmed,
+      widget.settings.spineArt,
+      Theme.of(context).colorScheme,
+    );
+    final cached = _visuals[pb.placement.id];
+    if (cached != null && cached.key == key) return cached.widget;
+    final built = _buildBookVisual(pb, dragging: false, dimmed: dimmed);
+    _visuals[pb.placement.id] = (key: key, widget: built);
+    return built;
+  }
+
+  /// [_bookVisual]'s reusable widgets, by placement id.
+  final _visuals = <String, ({Object key, Widget widget})>{};
+
+  Widget _buildBookVisual(
+    PlacedBook pb, {
+    required bool dragging,
+    required bool dimmed,
+  }) {
+    final selected = _selectedId == pb.placement.id;
+    final flat = pb.placement.rotation == 90;
     Widget spine = SpineFace(
       book: pb.book,
       coverFile: repo.coverFileOf(pb.book),

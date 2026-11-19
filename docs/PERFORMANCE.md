@@ -966,3 +966,62 @@ measured worse (pan raster p90 86 against 48 ms, in one noisy run).
 
 (A second run of #1 + #2, at a load spike, read 6.7 s and 120 ms raster for
 the pan; the build p90 read 1.3 ms in both.)
+
+### #3 A zoom step reuses the books' widgets, and the streams are made once — kept
+
+After #2 the zoom was what remained: every wheel step rebuilds the page, and
+the timeline put a step at ~10 ms of layout and ~7 ms of build (headless).
+Two things in that build were waste:
+
+- `_bookVisual` built each book's subtree (`SpineFace`, its clip, image,
+  shading, title, the selection outline) afresh on every rebuild. It now hands
+  back the same widget object while nothing it shows has changed — placement,
+  book, selected, pulsing, dimmed, spine artwork, colours — so Flutter skips the
+  subtree and only lays out the resized box. Selecting a book still rebuilds
+  that book (the test checks its outline appears).
+- The page's three `StreamBuilder`s were given `repo.layout.watch…()` *calls*
+  in `build`, so each rebuild handed them new streams: they resubscribed, the
+  queries ran again (the books one joins every placement to its book), and
+  the answer rebuilt the page once more. They are made once, in the state.
+
+A scratch widget benchmark (JIT, 400 books on 8 shelves, 120 wheel steps, the
+time of each `pump`): 66 ms a step before, 49 with the widget reuse alone, 73
+with the streams alone, **39 with both** — the streams only show once the
+rebuild they trigger is the expensive part.
+
+| Room, headless | #1 + #2 | #1 + #2 + #3 |
+|---|---:|---:|
+| zoom: build p50 / p90 / p99 | 30–36 / 52–57 / 59–71 ms | 25 / 42 / 52 ms |
+| zoom: wall for 80 wheel steps | 6.1–6.4 s | 5.3 s |
+| pan: build p90 | 1.2–1.3 ms | 0.9 ms |
+
+### Where the room stands, headless, start to end
+
+| Room (400 books), headless, software GL | 885b1dc | after #1–#3 |
+|---|---:|---:|
+| pan: wall for 120 moves | 15.2–16.1 s | 4.2 s |
+| pan: raster p90 | 170–183 ms | 48 ms |
+| pan: build p90 | 19 ms | 0.9 ms |
+| zoom: wall for 80 wheel steps | 8.1–8.2 s | 5.3 s |
+| zoom: raster p90 / p99 | 195–223 / 569–687 ms | 98 / 173 ms |
+| zoom: build p90 | 44–49 ms | 42 ms |
+
+**Not measured: the GPU.** The display was off for the whole round, so no
+run used the real GPU; the November numbers above (pan raster p90 58 ms with
+the shadow, 13 without) say where a desktop GPU should land, but that is
+expected, not measured. Nor Android (no emulator this round).
+
+### Next, for the room
+
+1. **Measure #1–#3 on the GPU** (`PERF_ONLY=room,shelf tool/perf_run.sh --only
+   gui` with the display awake) and on the Android emulator, whose pan build
+   p90 was 37 ms.
+2. **The zoom is layout-bound now** (~40 ms build p90 headless): each step lays
+   out 400 spines again, titles included, because their size changed. The way
+   past that is to scale the room's layer while a wheel or pinch burst is
+   running and lay it out once when it stops — but titles would grow and
+   shrink with the zoom and then snap back to their size, which changes how a
+   zoom looks; a decision, not just a fix.
+3. **The rest of the pan's raster** is the 400 books' own drawing (cover image,
+   shading strip, scrim, title, shadow image). Measure on the GPU before
+   anything else; per-book layers were kept because merging them measured worse.
