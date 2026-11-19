@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../audio/attach_audio.dart' show formatAudioTime;
+import '../audio/continue_listening.dart';
 import '../data/database.dart';
 import '../data/library_queries.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -14,7 +16,13 @@ class LibraryHighlights {
   const LibraryHighlights({
     required this.continueReading,
     required this.recentlyAdded,
+    this.continueListening = const [],
   });
+
+  /// Audiobooks played but not finished, most recently listened first. Kept
+  /// apart from [continueReading]: a book with text and audio has a reading
+  /// position and a listening position, and each strip follows its own.
+  final List<ListeningEntry> continueListening;
 
   /// Started but not finished, most recently read first.
   final List<Book> continueReading;
@@ -23,7 +31,10 @@ class LibraryHighlights {
   /// a book just added and opened doesn't appear twice.
   final List<Book> recentlyAdded;
 
-  bool get isEmpty => continueReading.isEmpty && recentlyAdded.isEmpty;
+  bool get isEmpty =>
+      continueReading.isEmpty &&
+      continueListening.isEmpty &&
+      recentlyAdded.isEmpty;
 
   /// Reading is "done" at 98%: a PDF's last page often never reports 1.0, and
   /// a finished book lingering in *Continue reading* forever is worse than
@@ -42,7 +53,18 @@ class LibraryHighlights {
     ]..sort((a, b) => b.lastReadAt!.compareTo(a.lastReadAt!));
     final continueReading = started.take(limit).toList();
 
-    final inProgress = {for (final b in continueReading) b.id};
+    final listening = [
+      for (final e in view.entries)
+        if (isListeningOnTheGo(e.book, e.audioMs))
+          ListeningEntry(e.book, e.audioMs),
+    ]..sort((a, b) =>
+        b.book.lastListenedAt!.compareTo(a.book.lastListenedAt!));
+    final continueListening = listening.take(limit).toList();
+
+    final inProgress = {
+      for (final b in continueReading) b.id,
+      for (final l in continueListening) l.book.id,
+    };
     final recent = [
       for (final b in books)
         if (!inProgress.contains(b.id)) b,
@@ -50,9 +72,19 @@ class LibraryHighlights {
 
     return LibraryHighlights(
       continueReading: continueReading,
+      continueListening: continueListening,
       recentlyAdded: recent.take(limit).toList(),
     );
   }
+}
+
+/// A book in *Continue listening*, with the length of its audio (null when
+/// unknown) so its card can say how far through it is.
+class ListeningEntry {
+  const ListeningEntry(this.book, this.audioMs);
+
+  final Book book;
+  final int? audioMs;
 }
 
 /// A compact strip above the shelf: *Continue reading* and *Recently added*
@@ -67,6 +99,7 @@ class LibraryHeader extends StatelessWidget {
     super.key,
     required this.highlights,
     required this.onOpen,
+    this.onListen,
     this.onDismiss,
   });
 
@@ -75,6 +108,10 @@ class LibraryHeader extends StatelessWidget {
   /// Opens a book — the shelf's own detail route, so tapping here and tapping a
   /// spine land in the same place.
   final void Function(Book book) onOpen;
+
+  /// Opens the player for a *Continue listening* card, which resumes at the
+  /// saved position. Without it a card opens the book page like the others.
+  final void Function(Book book)? onListen;
 
   final VoidCallback? onDismiss;
 
@@ -112,17 +149,37 @@ class LibraryHeader extends StatelessWidget {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(children: [
-                      for (final book in highlights.continueReading.isNotEmpty
-                          ? highlights.continueReading
-                          : highlights.recentlyAdded)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _ContinueCard(
-                            book: book,
-                            onTap: () => onOpen(book),
-                            compact: true,
+                      if (highlights.continueReading.isNotEmpty ||
+                          highlights.continueListening.isNotEmpty) ...[
+                        for (final book in highlights.continueReading)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _ContinueCard(
+                              book: book,
+                              onTap: () => onOpen(book),
+                              compact: true,
+                            ),
                           ),
-                        ),
+                        for (final item in highlights.continueListening)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _ContinueCard(
+                              book: item.book,
+                              listening: item,
+                              onTap: () => (onListen ?? onOpen)(item.book),
+                              compact: true,
+                            ),
+                          ),
+                      ] else
+                        for (final book in highlights.recentlyAdded)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _ContinueCard(
+                              book: book,
+                              onTap: () => onOpen(book),
+                              compact: true,
+                            ),
+                          ),
                     ]),
                   ),
                 ),
@@ -162,10 +219,31 @@ class LibraryHeader extends StatelessWidget {
                   ),
               ],
             ),
+          if (highlights.continueListening.isNotEmpty)
+            _Section(
+              title: L10n.of(context).headerContinueListening,
+              trailing: highlights.continueReading.isEmpty && onDismiss != null
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: L10n.of(context).headerHideForNow,
+                      onPressed: onDismiss,
+                    )
+                  : null,
+              children: [
+                for (final item in highlights.continueListening)
+                  _ContinueCard(
+                    book: item.book,
+                    listening: item,
+                    onTap: () => (onListen ?? onOpen)(item.book),
+                  ),
+              ],
+            ),
           if (highlights.recentlyAdded.isNotEmpty)
             _Section(
               title: L10n.of(context).headerRecentlyAdded,
-              trailing: highlights.continueReading.isEmpty && onDismiss != null
+              trailing: highlights.continueReading.isEmpty &&
+                      highlights.continueListening.isEmpty &&
+                      onDismiss != null
                   ? IconButton(
                       icon: const Icon(Icons.close, size: 18),
                       tooltip: L10n.of(context).headerHideForNow,
@@ -236,10 +314,15 @@ class _ContinueCard extends StatelessWidget {
     required this.book,
     required this.onTap,
     this.compact = false,
+    this.listening,
   });
 
   final Book book;
   final VoidCallback onTap;
+
+  /// Set for a *Continue listening* card: the progress is the listening
+  /// position, and a headphones glyph stands before the title.
+  final ListeningEntry? listening;
 
   /// Half the height: the title and the progress bar, with the percentage
   /// folded onto the title's line instead of below it.
@@ -248,7 +331,38 @@ class _ContinueCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final progress = (book.readingProgress ?? 0).clamp(0.0, 1.0);
+    final listen = listening;
+    final progress = listen == null
+        ? (book.readingProgress ?? 0).clamp(0.0, 1.0)
+        : (listenFraction(book, listen.audioMs) ?? 0);
+    Widget title(TextStyle? style) => Text(
+          book.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: style,
+        );
+    // The title, behind a headphones glyph on a listening card. Expanded here
+    // so a long title still ellipsises rather than overflowing the row.
+    Widget titleRow(TextStyle? style) => listen == null
+        ? title(style)
+        : Row(children: [
+            Icon(Icons.headphones, size: 14, color: theme.colorScheme.primary),
+            const SizedBox(width: 4),
+            Expanded(child: title(style)),
+          ]);
+    final l10n = L10n.of(context);
+    final percent = (progress * 100).round();
+    final subtitle = listen != null
+        ? (listenFraction(book, listen.audioMs) == null
+            ? l10n.headerPositionListen(formatAudioTime(
+                Duration(milliseconds: ((book.listenPosition ?? 0) * 1000).round())))
+            : l10n.headerProgressListen(
+                percent,
+                formatAudioTime(Duration(
+                    milliseconds: ((book.listenPosition ?? 0) * 1000).round()))))
+        : book.lastReadPage == null
+            ? '$percent%' // i18n-ignore
+            : l10n.headerProgressPage(percent, book.lastReadPage!);
     if (compact) {
       return SizedBox(
         width: 200,
@@ -265,14 +379,7 @@ class _ContinueCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: Text(
-                          book.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall,
-                        ),
-                      ),
+                      Expanded(child: titleRow(theme.textTheme.titleSmall)),
                       if (progress > 0)
                         Text('${(progress * 100).round()}%', // i18n-ignore
                             style: theme.textTheme.bodySmall),
@@ -301,20 +408,12 @@ class _ContinueCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  book.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall,
-                ),
+                titleRow(theme.textTheme.titleSmall),
                 const SizedBox(height: 6),
                 LinearProgressIndicator(value: progress),
                 const SizedBox(height: 4),
                 Text(
-                  book.lastReadPage == null
-                      ? '${(progress * 100).round()}%'
-                      : L10n.of(context).headerProgressPage(
-                          (progress * 100).round(), book.lastReadPage!),
+                  subtitle,
                   style: theme.textTheme.bodySmall,
                 ),
               ],

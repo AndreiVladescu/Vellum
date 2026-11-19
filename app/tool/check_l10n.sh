@@ -30,6 +30,7 @@ MIGRATED=(
   lib/audio/audio_formats.dart
   lib/audio/audiobook_import.dart
   lib/audio/audio_handler.dart
+  lib/audio/continue_listening.dart
   lib/audio/audiobook_player.dart
   lib/audio/background_playback.dart
   lib/audio/now_playing_bar.dart

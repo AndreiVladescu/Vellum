@@ -3,6 +3,7 @@
 // The plugin call is a wrapper; the *policy* is the feature, and it is the part
 // that decides whether someone's phone wakes up on mobile data at 3% battery.
 // So it is pure Dart and tested here rather than only on a device.
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/l10n/gen/app_localizations_en.dart';
 import 'package:vellum/data/database.dart';
@@ -202,6 +203,118 @@ void main() {
       expect(continueWidgetKey(a), continueWidgetKey(b));
       expect(continueWidgetKey(a), isNot(continueWidgetKey(c)));
       expect(continueWidgetKey(null), isNull);
+    });
+
+    group('listening', () {
+      Book listened({
+        String id = 'a',
+        double? at = 600,
+        DateTime? lastListened,
+        String status = 'reading',
+        double? progress,
+        DateTime? lastRead,
+      }) =>
+          book(id: id, progress: progress, lastRead: lastRead, status: status)
+              .copyWith(
+            title: 'Dune',
+            listenPosition: Value(at),
+            lastListenedAt: Value(lastListened ?? DateTime(2026, 5)),
+          );
+      const tenHours = 10 * 3600 * 1000;
+
+      test('an audiobook on the go is picked, and says so', () {
+        final pick = pickContinue([listened()], audioMs: {'a': tenHours})!;
+        expect(pick.book.id, 'a');
+        expect(pick.listening, isTrue);
+        expect(pick.audioMs, tenHours);
+        expect(pickContinueBook([listened()], audioMs: {'a': tenHours})!.id, 'a');
+      });
+
+      test('with no audio on record it is not a listening candidate', () {
+        // A position left behind by audio that has since been removed.
+        expect(pickContinue([listened()]), isNull);
+        expect(pickContinue([listened()], audioMs: {'other': 5}), isNull);
+      });
+
+      test('the most recent of reading and listening wins, one book shown',
+          () {
+        final read = book(
+            id: 'r', progress: 0.4, lastRead: DateTime(2026, 6), status: 'reading');
+        final heard = listened(lastListened: DateTime(2026, 7));
+        var pick = pickContinue([read, heard], audioMs: {'a': tenHours})!;
+        expect(pick.book.id, 'a');
+        expect(pick.listening, isTrue);
+
+        final readLater = book(
+            id: 'r', progress: 0.4, lastRead: DateTime(2026, 8), status: 'reading');
+        pick = pickContinue([readLater, heard], audioMs: {'a': tenHours})!;
+        expect(pick.book.id, 'r');
+        expect(pick.listening, isFalse);
+      });
+
+      test('a book with both positions is shown for the later one', () {
+        final both = listened(
+            progress: 0.3,
+            lastRead: DateTime(2026, 6),
+            lastListened: DateTime(2026, 5));
+        expect(pickContinue([both], audioMs: {'a': tenHours})!.listening,
+            isFalse);
+        final bothHeardLater = listened(
+            progress: 0.3,
+            lastRead: DateTime(2026, 4),
+            lastListened: DateTime(2026, 5));
+        expect(pickContinue([bothHeardLater], audioMs: {'a': tenHours})!.listening,
+            isTrue);
+      });
+
+      test('finished, abandoned and nearly-done audio drops out', () {
+        for (final status in ['finished', 'abandoned']) {
+          expect(
+              pickContinue([listened(status: status)], audioMs: {'a': tenHours}),
+              isNull,
+              reason: status);
+        }
+        // 20 s from the end of ten hours: done.
+        expect(
+            pickContinue([listened(at: tenHours / 1000 - 20)],
+                audioMs: {'a': tenHours}),
+            isNull);
+        expect(
+            pickContinue([listened(at: tenHours / 1000 - 120)],
+                audioMs: {'a': tenHours}),
+            isNotNull);
+        // Never played.
+        expect(pickContinue([listened(at: null)], audioMs: {'a': tenHours}), isNull);
+      });
+
+      test('the snapshot gives how far through and where you are', () {
+        final data = snapshotFor(L10nEn(), listened(at: 3723),
+            listening: true, audioMs: tenHours);
+        expect(data.title, 'Dune');
+        expect(data.subtitle, '10% · at 1:02:03');
+        // Length unknown: just the place.
+        expect(
+            snapshotFor(L10nEn(), listened(at: 3723), listening: true, audioMs: 0)
+                .subtitle,
+            '1:02:03');
+        expect(
+            snapshotFor(L10nEn(), listened(status: 'finished'),
+                    listening: true, audioMs: tenHours)
+                .isEmpty,
+            isTrue);
+      });
+
+      test('the push key moves by the minute, and apart from reading', () {
+        final a = listened(at: 600);
+        final b = listened(at: 630);
+        final c = listened(at: 700);
+        expect(continueWidgetKey(a, listening: true, audioMs: tenHours),
+            continueWidgetKey(b, listening: true, audioMs: tenHours));
+        expect(continueWidgetKey(a, listening: true, audioMs: tenHours),
+            isNot(continueWidgetKey(c, listening: true, audioMs: tenHours)));
+        expect(continueWidgetKey(a, listening: true, audioMs: tenHours),
+            isNot(continueWidgetKey(a)));
+      });
     });
 
     test('the cover path is carried through when there is one', () {

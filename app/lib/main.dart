@@ -59,6 +59,7 @@ import 'shelf/shelf_view.dart';
 import 'shortcuts.dart';
 import 'snack_bars.dart';
 import 'audio/now_playing_bar.dart';
+import 'audio/player_page.dart';
 import 'wishlist/wishlist_page.dart';
 import 'data/shelf_service.dart';
 import 'notifications/notifications_button.dart';
@@ -753,6 +754,13 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// Opens a book's detail page — the same destination a spine tap reaches, so
   /// the header strip and the shelf can't drift apart.
+  /// The player for [book], which resumes at the saved position.
+  void _openPlayer(Book book) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PlayerPage(bookId: book.id, repository: repository),
+    ));
+  }
+
   void _openBook(Book book) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => BookDetailPage(
@@ -1567,6 +1575,7 @@ class _LibraryPageState extends State<LibraryPage> {
                             LibraryHeader(
                               highlights: LibraryHighlights.from(view),
                               onOpen: _openBook,
+                              onListen: _openPlayer,
                               onDismiss: () =>
                                   setState(() => _headerDismissed = true),
                             ),

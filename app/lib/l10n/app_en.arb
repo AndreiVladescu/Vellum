@@ -10763,6 +10763,18 @@
   "shelfBookAudioLabel": "{label}, audiobook",
   "@shelfBookAudioLabel": {"description": "Screen-reader label of a spine or cover that has audio; label is the title.", "placeholders": {"label": {"type": "String"}}},
 
+  "headerContinueListening": "Continue listening",
+  "@headerContinueListening": {"description": "Heading of the strip of audiobooks the user is partway through, next to Continue reading."},
+
+  "headerProgressListen": "{percent}% · at {time}",
+  "@headerProgressListen": {"description": "Second line of a Continue listening card; percent is how far through the audio, time where you are, like 1:02:33.", "placeholders": {"percent": {"type": "int"}, "time": {"type": "String"}}},
+
+  "headerPositionListen": "At {time}",
+  "@headerPositionListen": {"description": "Second line of a Continue listening card when the audio's length is not known; time is where you are.", "placeholders": {"time": {"type": "String"}}},
+
+  "continueWidgetListening": "{percent}% · at {time}",
+  "@continueWidgetListening": {"description": "Second line of the Android home-screen widget when it shows an audiobook; percent is how far through the audio, time where you are, like 1:02:33.", "placeholders": {"percent": {"type": "int"}, "time": {"type": "String"}}},
+
   "noAudiobooksHere": "No audiobooks here.",
   "@noAudiobooksHere": {"description": "Shown when the Audiobooks filter is on and nothing in the current shelf has audio."}
 }
