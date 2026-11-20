@@ -397,9 +397,18 @@ unit tested (`test/reader/tts/`), the engines and the page-following are not.
   books and restarts. The default voice follows the EPUB's `dc:language`.
 - **No engine:** with the system speech service disabled, Read aloud explains
   rather than doing nothing.
-- **Audio focus.** `flutter_tts` asks for focus when it speaks but reports no
-  loss of it, so a phone call or another player does not pause the reader;
-  leaving the app (paused/hidden) does. Decide whether that is enough.
+- **Audio focus (device check owed).** `flutter_tts` reports no loss of focus,
+  so `SpeechSession` (`lib/reader/tts/speech_session.dart`, tested with a fake
+  session) watches `audio_session` itself. On a phone, with Read aloud going:
+  ring it (or play a video in another app): the voice must pause, and after a
+  short call or a notification sound ends it must carry on by itself, from the
+  start of the sentence; after another music app takes the audio for good it
+  must stay paused. Unplug wired or Bluetooth headphones: pause, and no resume
+  on re-plugging. Press play in the audiobook player while reading: the reading
+  pauses; press Read aloud while an audiobook plays: the audiobook pauses and
+  stays paused. Pause by hand and check another app's music may resume (focus
+  given back). The session is Android and macOS only; Linux and Windows only get
+  the audiobook coordination.
 - **Linux.** `flutter_tts` has no Linux support, so the app calls `spd-say`
   (speech-dispatcher) directly. Check with and without it installed, that stop
   cuts the voice at once, and that the speed slider is audible.

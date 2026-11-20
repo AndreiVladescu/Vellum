@@ -3,6 +3,8 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'audiobook_rival.dart';
+import 'speech_session.dart';
 import 'tts_controller.dart';
 import 'tts_engine.dart';
 
@@ -15,14 +17,26 @@ class ReadAloud extends ChangeNotifier with WidgetsBindingObserver {
     required TtsSource source,
     this.bookLanguage,
     TtsEngine? engine,
+    SpeechAudioSession? audioSession,
+    SpeechRival? rival,
+    bool useDeviceAudio = true,
   }) : engine = engine ?? createTtsEngine() {
     controller = TtsController(engine: this.engine, source: source);
     controller.addListener(notifyListeners);
+    // Pausing for calls and other apps' audio, and not talking over the
+    // audiobook player. [useDeviceAudio] is false in tests that bring no
+    // platform with them.
+    _session = SpeechSession(
+      controller: controller,
+      audio: audioSession ?? (useDeviceAudio ? PluginAudioSession.forPlatform() : null),
+      rival: rival ?? (useDeviceAudio ? AudiobookRival() : null),
+    );
     WidgetsBinding.instance.addObserver(this);
   }
 
   final TtsEngine engine;
   late final TtsController controller;
+  late final SpeechSession _session;
   SharedPreferences? _prefs;
 
   /// The book's own language (an EPUB's `dc:language`), when it says. Chooses
@@ -121,6 +135,7 @@ class ReadAloud extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     controller.removeListener(notifyListeners);
+    _session.dispose();
     controller.dispose();
     engine.dispose();
     super.dispose();

@@ -184,7 +184,9 @@ MIGRATED=(
   lib/reader/reader_settings_sheet.dart
   lib/reader/volume_keys.dart
   lib/reader/translate/local_engine_backend.dart
+  lib/reader/tts/audiobook_rival.dart
   lib/reader/tts/read_aloud.dart
+  lib/reader/tts/speech_session.dart
   lib/reader/tts/read_aloud_widgets.dart
   lib/reader/tts/tts_controller.dart
   lib/reader/tts/tts_engine.dart
