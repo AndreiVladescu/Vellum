@@ -169,6 +169,9 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   /// held rather than re-read per frame: a wall photo is megabytes, and the
   /// painter runs on every pan.
   ui.Image? _backdrop;
+
+  /// The photo's own pixel size; [_backdrop] may be a smaller decode of it.
+  Size? _backdropSource;
   PhysicalEnvironment? _environment;
 
   /// The measure tool. Non-null `_measureFrom` means the tool is armed; the
@@ -216,13 +219,16 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     try {
       final file = File(p.join(repo.dataDir.path, relativePath));
       final bytes = await file.readAsBytes();
-      final decoded = await decodeImageFromList(bytes);
+      final decoded = await decodeBackdrop(bytes);
       if (!mounted) {
-        decoded.dispose();
+        decoded.image.dispose();
         return;
       }
       _backdrop?.dispose();
-      setState(() => _backdrop = decoded);
+      setState(() {
+        _backdrop = decoded.image;
+        _backdropSource = decoded.sourceSize;
+      });
     } catch (_) {
       // A missing or unreadable photo draws nothing rather than failing the
       // room — the geometry is the part that matters.
@@ -1585,8 +1591,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     final result = await showDialog<BackdropCalibration>(
       context: context,
       builder: (_) => BackdropCalibrationDialog(
-        imageWidth: image.width,
-        imageHeight: image.height,
+        imageWidth: (_backdropSource?.width ?? image.width).round(),
+        imageHeight: (_backdropSource?.height ?? image.height).round(),
       ),
     );
     final metresPerPixel = result?.metresPerPixel;
@@ -2234,6 +2240,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                   draggingIds: {for (final part in _dragGroup) part.id},
                   shelfDelta: _shelfDeltaVN,
                   backdrop: _backdrop,
+                  backdropSource: _backdropSource,
                   backdropOpacity: _environment?.backdropOpacity ?? 0.5,
                   backdropScale: _environment?.backdropScale,
                   backdropOffset: Offset(

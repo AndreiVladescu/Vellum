@@ -28,6 +28,7 @@ class RoomPainter extends CustomPainter {
     this.draggingIds = const {},
     required this.shelfDelta,
     this.backdrop,
+    this.backdropSource,
     this.backdropOpacity = 0.5,
     this.backdropScale,
     this.backdropOffset = Offset.zero,
@@ -53,6 +54,10 @@ class RoomPainter extends CustomPainter {
 
   /// The room photo, already decoded. Null when the room has none.
   final ui.Image? backdrop;
+
+  /// The photo's original size in pixels when [backdrop] is a smaller decode
+  /// of it; null when they are the same.
+  final Size? backdropSource;
   final double backdropOpacity;
 
   /// Metres per backdrop pixel, from the two-point calibration. Null means the
@@ -316,8 +321,9 @@ class RoomPainter extends CustomPainter {
     // wall and puts the image on screen at a workable size to line up.
     final metresPerPixel = backdropScale ?? 0.01;
     final topLeft = _w2s(backdropOffset);
-    final width = image.width * metresPerPixel * scale;
-    final height = image.height * metresPerPixel * scale;
+    final source = backdropSource ?? Size(image.width + 0.0, image.height + 0.0);
+    final width = source.width * metresPerPixel * scale;
+    final height = source.height * metresPerPixel * scale;
     canvas.drawImageRect(
       image,
       Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
@@ -372,6 +378,7 @@ class RoomPainter extends CustomPainter {
       old.scale != scale ||
       !setEquals(old.draggingIds, draggingIds) ||
       old.backdrop != backdrop ||
+      old.backdropSource != backdropSource ||
       old.backdropOpacity != backdropOpacity ||
       old.backdropScale != backdropScale ||
       old.backdropOffset != backdropOffset ||

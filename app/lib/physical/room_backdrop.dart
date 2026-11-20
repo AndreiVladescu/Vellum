@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -51,17 +53,19 @@ Future<String?> addRoomBackdrop(
     );
   } on Exception catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(
-              content: Text(L10n.of(context).backdropPickFailed('$e'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(L10n.of(context).backdropPickFailed('$e'))),
+      );
     }
     return null;
   }
   if (shot == null) return null;
 
   final ext = p.extension(shot.path).replaceFirst('.', '').toLowerCase();
-  final relative =
-      p.join(backdropDirName, '${_uuid.v4()}.${ext.isEmpty ? 'jpg' : ext}');
+  final relative = p.join(
+    backdropDirName,
+    '${_uuid.v4()}.${ext.isEmpty ? 'jpg' : ext}',
+  );
   final dest = File(p.join(repository.dataDir.path, relative));
   await dest.parent.create(recursive: true);
   // `.part` then rename, like every other blob write: a row must never point at
@@ -77,16 +81,17 @@ Future<String?> addRoomBackdrop(
       // Best-effort; the sweep will get it.
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(
-              content: Text(L10n.of(context).backdropSaveFailed('$e'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(L10n.of(context).backdropSaveFailed('$e'))),
+      );
     }
     return null;
   }
 
   // The previous photo, so replacing one doesn't leak the old file.
-  final previous =
-      (await repository.layout.environment(environmentId))?.backdropPath;
+  final previous = (await repository.layout.environment(
+    environmentId,
+  ))?.backdropPath;
   await repository.layout.updateBackdrop(
     environmentId,
     backdropPath: Value(relative),
@@ -110,8 +115,9 @@ Future<void> removeRoomBackdrop(
   LibraryRepository repository,
   String environmentId,
 ) async {
-  final previous =
-      (await repository.layout.environment(environmentId))?.backdropPath;
+  final previous = (await repository.layout.environment(
+    environmentId,
+  ))?.backdropPath;
   await repository.layout.updateBackdrop(
     environmentId,
     backdropPath: const Value(null),
@@ -150,8 +156,9 @@ class BackdropCalibrationDialog extends StatefulWidget {
 class _BackdropCalibrationDialogState extends State<BackdropCalibrationDialog> {
   // Pre-filled with the photo's full width and a plausible wall, so the common
   // case ("this whole photo is about three metres across") is two taps.
-  late final _pixels =
-      TextEditingController(text: widget.imageWidth.toString());
+  late final _pixels = TextEditingController(
+    text: widget.imageWidth.toString(),
+  );
   final _metres = TextEditingController(text: '3.0');
 
   @override
@@ -178,7 +185,9 @@ class _BackdropCalibrationDialogState extends State<BackdropCalibrationDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _pixels,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: l10n.backdropPixelsLabel,
                 border: OutlineInputBorder(),
@@ -188,7 +197,9 @@ class _BackdropCalibrationDialogState extends State<BackdropCalibrationDialog> {
             const SizedBox(height: 10),
             TextField(
               controller: _metres,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: l10n.backdropMetresLabel,
                 border: OutlineInputBorder(),
@@ -242,15 +253,19 @@ class BackdropSettingsSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.backdropSettingsTitle,
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              l10n.backdropSettingsTitle,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(l10n.backdropSettingsNote),
             Slider(
               value: opacity.clamp(0, 1),
               onChanged: (value) async {
-                await repository.layout
-                    .updateBackdrop(environmentId, opacity: value);
+                await repository.layout.updateBackdrop(
+                  environmentId,
+                  opacity: value,
+                );
                 onChanged();
               },
             ),
@@ -270,5 +285,51 @@ class BackdropSettingsSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// The longest side, in pixels, a backdrop is decoded at. A phone photo is
+/// 12 MP (48 MB decoded, held for as long as the room is open); the room draws
+/// it a few hundred screen pixels wide, so 2048 is more than it ever shows.
+const backdropMaxSide = 2048;
+
+/// A decoded backdrop and the size of the photo it came from. Everything the
+/// room stores about the photo — the calibration, the offset — is in the
+/// *original's* pixels, so the painter scales by [sourceSize], not by the
+/// (possibly smaller) decoded [image].
+class DecodedBackdrop {
+  const DecodedBackdrop(this.image, this.sourceSize);
+  final ui.Image image;
+  final Size sourceSize;
+}
+
+/// Decodes [bytes] no larger than [maxSide] on its longest side (never
+/// upscaled), keeping the original's size alongside.
+Future<DecodedBackdrop> decodeBackdrop(
+  Uint8List bytes, {
+  int maxSide = backdropMaxSide,
+}) async {
+  final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+  try {
+    final descriptor = await ui.ImageDescriptor.encoded(buffer);
+    try {
+      final w = descriptor.width, h = descriptor.height;
+      final longest = w > h ? w : h;
+      final shrink = longest > maxSide;
+      final codec = await descriptor.instantiateCodec(
+        targetWidth: shrink && w >= h ? maxSide : null,
+        targetHeight: shrink && h > w ? maxSide : null,
+      );
+      try {
+        final frame = await codec.getNextFrame();
+        return DecodedBackdrop(frame.image, Size(w.toDouble(), h.toDouble()));
+      } finally {
+        codec.dispose();
+      }
+    } finally {
+      descriptor.dispose();
+    }
+  } finally {
+    buffer.dispose();
   }
 }
