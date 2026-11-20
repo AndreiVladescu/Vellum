@@ -1,10 +1,9 @@
 // Localization scaffolding (plan 5 #38).
 //
-// English is the only locale shipped, so these can't test a *translation*.
-// What they can test — and what actually breaks in a half-done i18n retrofit —
-// is that lookups resolve through the delegates at all, that plurals are ICU
-// rather than a hand-built `'$n thing${n == 1 ? '' : 's'}'`, and that the
-// generated code is in step with the ARB.
+// These test the English template and the mechanism: that lookups resolve
+// through the delegates at all, that plurals are ICU rather than a hand-built
+// `'$n thing${n == 1 ? '' : 's'}'`, and that the generated code is in step with
+// the ARB. The translations have their own checks in l10n_ro_test.dart.
 import 'dart:convert';
 import 'dart:io';
 
@@ -48,8 +47,7 @@ void main() {
   testWidgets('plurals are ICU, so one is not "1 issues"', (tester) async {
     // The exact bug this item exists to remove: the app used to build these by
     // hand as `'$n issue${n == 1 ? '' : 's'}'`, which no other language
-    // survives. The assertion is about English only because English is all we
-    // ship — the *mechanism* is what has to be right.
+    // survives. Romanian's three forms are checked in l10n_ro_test.dart.
     final l10n = await _l10n(tester);
     expect(l10n.syncIssues(1), '1 issue');
     expect(l10n.syncIssues(2), '2 issues');
@@ -94,9 +92,9 @@ void main() {
 
   testWidgets('an unsupported locale falls back to English rather than failing',
       (tester) async {
-    // A phone set to Romanian must not show a blank app while Vellum ships one
-    // locale; `supportedLocales` resolution is what guarantees that.
-    final l10n = await _l10n(tester, locale: const Locale('ro'));
+    // A phone set to a language Vellum has no file for must not show a blank
+    // app; `supportedLocales` resolution is what guarantees that.
+    final l10n = await _l10n(tester, locale: const Locale('ja'));
     expect(l10n.addBook, 'Add book');
   });
 
