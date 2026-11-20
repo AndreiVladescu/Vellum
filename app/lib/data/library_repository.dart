@@ -211,6 +211,17 @@ class LibraryRepository {
 
   // ---- Queries --------------------------------------------------------
   Stream<List<Book>> watchAllBooks() => queries.watchAllBooks();
+
+  /// Whether the library holds any (untrashed) book — a one-shot query, for
+  /// callers that must not wait on a stream's first event.
+  Future<bool> hasAnyBook() async {
+    final row = await db
+        .customSelect('SELECT EXISTS(SELECT 1 FROM books WHERE deleted_at IS NULL '
+            "AND status <> 'wishlist') AS x")
+        .getSingle();
+    return row.read<int>('x') == 1;
+  }
+
   Stream<int> watchDirtyCount() => queries.watchDirtyCount();
   Stream<Map<String, List<String>>> watchAuthorsByBook() =>
       queries.watchAuthorsByBook();

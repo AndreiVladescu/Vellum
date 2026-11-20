@@ -7,7 +7,7 @@
 // It prints one line, `VELLUM_PERF_STARTUP {json}`, and (on a desktop) exits:
 //
 //   dart_main_ms              process start to the first line of Dart
-//   first_frame_ms            ...to the first frame (the shelf, still empty)
+//   first_frame_ms            ...to the first frame (the shelf area still blank)
 //   first_shelf_frame_ms      ...to the first frame with books on it, built
 //   first_shelf_raster_ms     ...and on screen (rasterised), when the engine's
 //                             frame timings can be matched up
@@ -122,8 +122,8 @@ int _processAge() {
   }
 }
 
-/// Whether the tree holds a spine yet — the shelf, rather than the empty
-/// "no books" page it shows until the library's first query answers.
+/// Whether the tree holds a spine yet — the shelf, rather than the blank it
+/// shows until the library's first query answers.
 bool _showsASpine() {
   var found = false;
   void visit(Element e) {

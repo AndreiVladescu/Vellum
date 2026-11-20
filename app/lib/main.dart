@@ -211,6 +211,7 @@ class LibraryPage extends StatefulWidget {
     required this.settings,
     required this.connection,
     this.history,
+    this.libraryStreamForTesting,
   });
 
   final LibraryRepository repository;
@@ -221,6 +222,11 @@ class LibraryPage extends StatefulWidget {
   /// Told about tab changes so the mouse's back button can undo one. Optional
   /// so tests can pump the shell without one.
   final NavigationHistory? history;
+
+  /// Replaces the shelf's library stream, so a test can control when its first
+  /// answer arrives.
+  @visibleForTesting
+  final Stream<LibraryView>? libraryStreamForTesting;
 
   @override
   State<LibraryPage> createState() => _LibraryPageState();
@@ -709,6 +715,12 @@ class _LibraryPageState extends State<LibraryPage> {
   Future<void> _showFirstRun() async {
     // After the frame, so the sheet has a Scaffold to sit in.
     await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+    // A library that already has books is not a first run (a restore, a sync
+    // that landed before the first frame, an upgrade from before the flag).
+    if (!widget.settings.hasSeenFirstRun && await repository.hasAnyBook()) {
+      await widget.settings.setHasSeenFirstRun(true);
+    }
     if (!mounted) return;
     final action = await FirstRunSheet.maybeShow(context, widget.settings);
     if (action == null || !mounted) return;
@@ -1557,16 +1569,23 @@ class _LibraryPageState extends State<LibraryPage> {
                 else
                 Expanded(
                   child: StreamBuilder<LibraryView>(
-                    stream: repository.queries.watchLibrary(
-                      shelfId: active,
-                      query: _query,
-                      genre: _genreFilter,
-                      status: _statusFilter?.name,
-                      audioOnly: _audioOnly,
-                      sort: widget.settings.shelfSort,
-                    ),
+                    stream: widget.libraryStreamForTesting ??
+                        repository.queries.watchLibrary(
+                          shelfId: active,
+                          query: _query,
+                          genre: _genreFilter,
+                          status: _statusFilter?.name,
+                          audioOnly: _audioOnly,
+                          sort: widget.settings.shelfSort,
+                        ),
                     builder: (context, snapshot) {
-                      final view = snapshot.data ?? LibraryView.empty;
+                      // Until the stream's first answer the library is
+                      // *unknown*, not empty: showing the empty-library page
+                      // here flashed "add your first book" for ~0.2 s at every
+                      // launch of a full library. Nothing at all, and no
+                      // spinner (it would itself flash for so short a wait).
+                      if (!snapshot.hasData) return const SizedBox.expand();
+                      final view = snapshot.data!;
                       return Column(
                         children: [
                           // Derived from the same view the shelf below draws —
