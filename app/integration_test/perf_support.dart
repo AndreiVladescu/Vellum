@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/seed_profiling.dart';
 import 'package:vellum/settings/app_settings.dart';
+import 'package:vellum/shelf/cover_image.dart';
 import 'package:vellum/settings/book_face.dart';
 import 'package:vellum/settings/spine_art.dart';
 import 'package:vellum/shelf/text_shadow_cache.dart';
@@ -91,6 +92,10 @@ Map<String, Object> imageCacheNow() {
     'image_cache_mb': _round(cache.currentSizeBytes / (1 << 20)),
     'image_cache_entries': cache.currentSize,
     'live_images': cache.liveImageCount,
+    'cover_loads': {
+      for (final e in CoverImage.loadsByHeight.entries) '${e.key}': e.value,
+    },
+    ...linuxMemory(),
     'shadow_cache_mb': _round(TextShadowCache.instance.bytes / (1 << 20)),
     'shadow_cache_entries': TextShadowCache.instance.length,
   };
@@ -131,13 +136,14 @@ class FrameRecorder {
     // build or to rasterise is a frame that was late to the screen.
     const budget = 1000 / 60;
     final jank = timings
-        .where((t) =>
-            ms(t.buildDuration) > budget || ms(t.rasterDuration) > budget)
+        .where(
+          (t) => ms(t.buildDuration) > budget || ms(t.rasterDuration) > budget,
+        )
         .length;
-    double pct(List<double> sorted, double q) =>
-        _round(sorted[math.min(sorted.length - 1, (sorted.length * q).floor())]);
-    double mean(List<double> v) =>
-        _round(v.reduce((a, b) => a + b) / v.length);
+    double pct(List<double> sorted, double q) => _round(
+      sorted[math.min(sorted.length - 1, (sorted.length * q).floor())],
+    );
+    double mean(List<double> v) => _round(v.reduce((a, b) => a + b) / v.length);
     return {
       'frames': timings.length,
       'jank_frames': jank,
@@ -183,5 +189,47 @@ class ImageCacheSampler {
       'image_cache_peak_mb': _round(_peakMb),
       'live_images_peak': _peakLive,
     };
+  }
+}
+
+/// On Linux with PERF_SMAPS=1: where the resident set is, from /proc — the
+/// anonymous/file/shared split and the five biggest mappings. Says whether a
+/// growing rss is the heap, a graphics library's buffers or mapped files.
+Map<String, Object> linuxMemory() {
+  if (!Platform.isLinux || Platform.environment['PERF_SMAPS'] != '1') {
+    return const {};
+  }
+  try {
+    final status = File('/proc/self/status').readAsLinesSync();
+    int kb(String key) {
+      final line = status.firstWhere((l) => l.startsWith('$key:'));
+      return int.parse(RegExp(r'\d+').firstMatch(line)!.group(0)!);
+    }
+
+    final regions = <String, int>{};
+    String? name;
+    for (final line in File('/proc/self/smaps').readAsLinesSync()) {
+      final head = RegExp(
+        r'^[0-9a-f]+-[0-9a-f]+ \S+ \S+ \S+ \S+\s*(.*)$',
+      ).firstMatch(line);
+      if (head != null) {
+        name = head.group(1)!.isEmpty ? '[anon]' : head.group(1)!;
+      } else if (line.startsWith('Rss:') && name != null) {
+        final v = int.parse(RegExp(r'\d+').firstMatch(line)!.group(0)!);
+        regions[name] = (regions[name] ?? 0) + v;
+      }
+    }
+    final top = regions.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return {
+      'rss_anon_mb': kb('RssAnon') ~/ 1024,
+      'rss_file_mb': kb('RssFile') ~/ 1024,
+      'rss_shmem_mb': kb('RssShmem') ~/ 1024,
+      'rss_top': [
+        for (final e in top.take(6)) '${e.key} ${e.value ~/ 1024} MB',
+      ],
+    };
+  } catch (_) {
+    return const {};
   }
 }

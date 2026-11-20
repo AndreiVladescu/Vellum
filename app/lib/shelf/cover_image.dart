@@ -49,14 +49,19 @@ class CoverImage extends ImageProvider<CoverImageKey> {
   ImageStreamCompleter loadImage(
     CoverImageKey key,
     ImageDecoderCallback decode,
-  ) =>
-      MultiFrameImageStreamCompleter(
-        codec: _load(key, decode),
-        scale: 1.0,
-        debugLabel: '${cover.path}@$height',
-      );
+  ) => MultiFrameImageStreamCompleter(
+    codec: _load(key, decode),
+    scale: 1.0,
+    debugLabel: '${cover.path}@$height',
+  );
+
+  /// How many covers have been read and decoded since the start, by height.
+  /// A diagnostic for the profiling run (a zoom that crosses buckets shows up
+  /// here as a count, not just as memory).
+  static final loadsByHeight = <int, int>{};
 
   Future<ui.Codec> _load(CoverImageKey key, ImageDecoderCallback decode) async {
+    loadsByHeight[key.height] = (loadsByHeight[key.height] ?? 0) + 1;
     final thumb = await CoverThumbnails.current(
       cover,
       height,

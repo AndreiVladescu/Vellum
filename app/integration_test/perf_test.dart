@@ -65,7 +65,7 @@ void main() {
     if (phoneCache) {
       PaintingBinding.instance.imageCache
         ..maximumSizeBytes = 48 << 20
-        ..maximumSize = 200;
+        ..maximumSize = int.parse(Platform.environment['PERF_CACHE_ENTRIES'] ?? '200');
     }
     _metrics['rss_mb_at_test_start'] = rssMb();
 

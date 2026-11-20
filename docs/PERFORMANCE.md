@@ -1025,3 +1025,106 @@ expected, not measured. Nor Android (no emulator this round).
 3. **The rest of the pan's raster** is the 400 books' own drawing (cover image,
    shading strip, scrim, title, shadow image). Measure on the GPU before
    anything else; per-book layers were kept because merging them measured worse.
+
+## Room memory (Linux; Android pending KVM)
+
+The Android emulator run showed the room taking the resident set to ~905 MB.
+`/dev/kvm` was missing this round (the module is not loaded and loading it
+needs a password), so this was measured on Linux instead: `PERF_ONLY=room
+tool/perf_run.sh --headless --only gui`, a private Xvfb as the parent display,
+software GL (llvmpipe), 1x pixel ratio, 4,000-book library with 400 placed
+books. **Resident-set numbers here are not a phone's**: on a phone the textures
+are GPU memory (`dumpsys meminfo` "Graphics"), here they are ordinary process
+memory. What carries over is *which part of the app* holds it. Load on the
+machine varied between runs (load average 5–28), so frame times are noisy and
+only rss is compared. The Android follow-up is
+`tool/emulator.sh run vellum_test -- <script>` around
+`PERF_ONLY=room tool/perf_run.sh --android`, sampling
+`adb shell dumpsys meminfo app.vellum.Vellum` every few seconds.
+
+### What the run now records
+
+- `PERF_PHONE_CACHE=1` applies `main()`'s phone image cache (48 MB, 200
+  images) to the test binary; on Android it is applied automatically. **This
+  changes the Android baseline** (before, the test ran with the 100 MB desktop
+  cache: image cache peak 99.9 MB), separately from any fix.
+- `PERF_SMAPS=1` (Linux) adds the anonymous / file / shared split of the
+  resident set and the biggest mappings, from `/proc/self/smaps`.
+- Every scenario records `shadow_cache_mb` / `shadow_cache_entries` and
+  `cover_loads` (covers read and decoded, by decode height).
+
+### Where the memory is (room only, phone image cache, MB)
+
+| | start-up | room open | after pan | after zoom |
+|---|---:|---:|---:|---:|
+| resident set | 467 | 722 | 765 | **1195** |
+| anonymous (native + Dart) | 322 | 576 | 620 | 1049 |
+| of it Dart heap | 103 | 145 | 180 | 227 |
+| of it other anonymous (engine, textures, malloc) | 109 | 320 | 321 | 673 |
+| image cache (decoded covers) | 0 | 4.8 | 4.8 | 2.1 (peak 48) |
+| shadow cache | 0 | 3.9 | 3.9 | 10.6 (856 images) |
+
+The two things the brief guessed are small: the **decoded covers are tiny**
+(the room's 260 live covers decode to 4.8 MB: they come from thumbnails at 64
+px high and bucketed, `CoverImage` already decodes at display size) and the
+**shadow images are ~4 MB** (10.6 MB mid-zoom; `Image.clone` shares pixels, so
+the per-box handles cost nothing — the cache's byte count is the real figure).
+The seeded room has no backdrop photo. What grows is native anonymous memory:
++200 MB opening the room and +350 MB over the zoom.
+
+Taking things out, one at a time (room only, resident set at open / after zoom):
+
+| variant | open | after zoom |
+|---|---:|---:|
+| as it is (phone cache) | 667 | 1137 |
+| no per-book `RepaintBoundary` | 684 | 1168 |
+| no title shadow | 686 | 1092 |
+| no title shadow, no cover images | 566 | **662** |
+
+So the covers account for ~430 MB of the zoom's growth, the shadows ~45–100,
+and the boundaries nothing. The zoom decodes 2,000 covers in 80 steps
+(`cover_loads`: 630 at 256 px, 520 at 128, 520 at 64, 336 at 512), because the
+spines cross decode-height buckets, and the decoded bitmaps are uploaded as
+textures and freed again; the image cache itself never holds more than its
+48 MB. Memory that comes and goes this fast and is not given back is the
+allocator/GL texture pool, which is why no number inside Dart sees it.
+
+### Changes
+
+| | result |
+|---|---|
+| Room backdrop decoded at most 2048 px on the long side (`decodeBackdrop`), the painter and the calibration dialog scale by the photo's original size | A 12 MP photo held 48 MB for as long as the room was open; now ≤ 16 MB. Not visible in these numbers (no backdrop in the seeded room); covered by `room_backdrop_decode_test`. **Kept.** |
+| `TextShadowCache` clears on `didHaveMemoryPressure` (boxes keep the image they show, so no frame loses a shadow) | Costs nothing until the system asks; test added. **Kept.** |
+| Phone image cache in the profiling test binary | Baseline fix, not an optimisation: room zoom image cache peak 100 -> 48 MB; the resident set did not move (1310 -> 1357, within noise), which says the cache is not what holds it. **Kept** (the run now matches what a phone keeps). |
+
+### Tried and dropped
+
+- **Culling the books outside the screen** (build only the viewport plus a
+  screen's margin; rebuild when a pan runs out of margin): resident set after
+  the zoom 1196 against 1137 for the control. The 400 books are not what the
+  zoom is spending on; the books that are visible, resizing, are. Dropped, it
+  adds a rebuild during a pan.
+- **A bigger image cache entry limit** (1,000 instead of 200): after-zoom 1154
+  against 1137, loads unchanged. Dropped.
+- **One `RepaintBoundary` fewer per book**: see above, no change in memory.
+  (The earlier round measured the single-layer variant worse in raster.)
+- **Half-octave decode buckets** (a bucket at most 41 % over the spine instead
+  of 100 %): not run. `spine_decode_height_test` pins that a whole pinch stays
+  in one bucket, and finer buckets would split a pinch into several decodes —
+  more churn, which is what the zoom is paying for.
+
+### Not done / next
+
+The remaining lever is what a zoom decodes: crossing a bucket reloads and
+re-uploads every visible spine's cover, ~2,000 loads for the scenario. Either
+hold the bucket for the length of a gesture (decode again once it stops, as the
+shadow cache already waits for a cut-off to hold still), or make the thumbnail a
+*slice* — a spine shows the left quarter of the cover and the rest of each
+bitmap is memory nobody sees. Both need the Android numbers first: if graphics
+memory on the phone is flat across the zoom, this is a software-GL artefact and
+the 905 MB had another cause (the shelf scenarios before it were already at
+704 MB on the emulator).
+
+The shelf's code was not touched (its scenarios ran in the same two Linux runs
+and read as the earlier ones); the frame times in them are not comparable
+between runs at this load.
