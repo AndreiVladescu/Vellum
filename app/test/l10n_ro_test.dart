@@ -126,6 +126,20 @@ void main() {
     });
   }
 
+  test('every Android string has a Romanian values-ro entry', () {
+    // Launcher shortcuts and the home-screen widget are Android resources,
+    // read before Flutter starts, so the ARB checks above cannot see them.
+    Set<String> names(String path) => RegExp(r'<string name="(\w+)"')
+        .allMatches(File(path).readAsStringSync())
+        .map((m) => m.group(1)!)
+        .toSet();
+    const res = 'android/app/src/main/res';
+    final english = names('$res/values/strings.xml');
+    final romanian = names('$res/values-ro/strings.xml');
+    expect(english.difference(romanian), isEmpty);
+    expect(romanian.difference(english), isEmpty);
+  });
+
   test('Romanian uses comma-below ș ț, never the cedilla forms', () {
     final raw = File('lib/l10n/app_ro.arb').readAsStringSync();
     final bad = RegExp('[şţŞŢ]').allMatches(raw).length;

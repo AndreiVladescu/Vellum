@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Romanian launcher shortcuts and home-screen widget. See values/strings.xml:
+  the launcher reads these before Flutter starts, so they cannot come from the
+  ARB. Short labels stay at or under ~10 characters (the launcher truncates
+  without an ellipsis). Terms follow docs/translations/ro-glossary.md.
+-->
+<resources>
+    <string name="shortcut_scan_short">Scanează</string>
+    <string name="shortcut_scan_long">Scanează o carte</string>
+
+    <string name="shortcut_continue_short">Continuă</string>
+    <string name="shortcut_continue_long">Continuă lectura</string>
+
+    <string name="shortcut_add_short">Adaugă</string>
+    <string name="shortcut_add_long">Adaugă o carte</string>
+
+    <string name="widget_name">Continuă lectura</string>
+    <string name="widget_cover_description">Coperta cărții</string>
+    <string name="widget_preview_title">Frăția Inelului</string>
+    <string name="widget_preview_subtitle">Lectură · 42&#160;% · pagina 214</string>
+    <string name="widget_preview_listen_title">Proiectul Hail Mary</string>
+    <string name="widget_preview_listen_subtitle">Ascultare · 42&#160;% · la 1:02:33</string>
+    <string name="widget_label_reading">Lectură</string>
+    <string name="widget_label_listening">Ascultare</string>
+    <string name="widget_row_format">%1$s · %2$s</string>
+    <string name="widget_empty_title">Nimic în curs</string>
+    <string name="widget_empty_subtitle">Deschide Vellum ca să începi o carte</string>
+</resources>

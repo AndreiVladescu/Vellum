@@ -98,7 +98,9 @@ cat > "$DESKTOP" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Vellum
+Name[ro]=Vellum
 Comment=Personal library manager
+Comment[ro]=Gestionar de bibliotecă personală
 Exec=$BINDIR/vellum %f
 Icon=$APP_ID
 Terminal=false

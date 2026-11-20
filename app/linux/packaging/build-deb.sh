@@ -46,7 +46,9 @@ cat > "$ROOT/usr/share/applications/$APP_ID.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Vellum
+Name[ro]=Vellum
 Comment=Personal library manager
+Comment[ro]=Gestionar de bibliotecă personală
 Exec=/usr/bin/vellum %f
 Icon=$APP_ID
 Terminal=false
