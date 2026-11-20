@@ -278,4 +278,32 @@ void main() {
     }
     expect(TextShadowCache.instance.drawn, 1);
   });
+
+  testWidgets('memory pressure empties the store; shown titles keep theirs',
+      (tester) async {
+    final colour = ValueNotifier(0);
+    await tester.pumpWidget(Directionality(
+      textDirection: TextDirection.ltr,
+      child: ValueListenableBuilder<int>(
+        valueListenable: colour,
+        child: SizedBox(
+          width: 20,
+          height: 120,
+          child: _title('Dune', font, cached: true),
+        ),
+        builder: (context, c, child) =>
+            ColoredBox(color: Color(0xFF000000 + c), child: child),
+      ),
+    ));
+    final cache = TextShadowCache.instance;
+    expect(cache.length, 1);
+    expect(cache.bytes, greaterThan(0));
+    tester.binding.handleMemoryPressure();
+    expect(cache.length, 0);
+    expect(cache.bytes, 0);
+    // The box still paints its own image: a repaint draws nothing new.
+    colour.value = 1;
+    await tester.pump();
+    expect(cache.drawn, 1);
+  });
 }

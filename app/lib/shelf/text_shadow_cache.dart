@@ -330,7 +330,7 @@ class _ShadowImage {
 }
 
 /// The shared store of drawn shadows, least recently used first out.
-class TextShadowCache {
+class TextShadowCache with WidgetsBindingObserver {
   TextShadowCache._();
 
   static final instance = TextShadowCache._();
@@ -344,9 +344,31 @@ class TextShadowCache {
   final _images = <_ShadowKey, _ShadowImage>{}; // insertion-ordered
   int _bytes = 0;
 
-  /// How many images the cache holds now; for tests.
-  @visibleForTesting
+  /// How many images the cache holds now.
   int get length => _images.length;
+
+  /// What the cache holds, in decoded bytes. A box's clone of an image shares
+  /// the cache's pixels (`Image.clone` is another handle, not a copy), so this
+  /// is the memory the shadows cost, but for images only a box still holds
+  /// after the cache let go of them.
+  int get bytes => _bytes;
+
+  bool _observing = false;
+
+  /// Lets go of every stored image when the system is short of memory. Boxes
+  /// keep the one they show (it is on screen), so a frame never loses a shadow;
+  /// what is dropped is the store for titles that are not showing.
+  @override
+  void didHaveMemoryPressure() => trim();
+
+  /// Empties the store; the images boxes hold stay alive until they let go.
+  void trim() {
+    for (final image in _images.values) {
+      image.dispose();
+    }
+    _images.clear();
+    _bytes = 0;
+  }
 
   /// How many shadows have been drawn since the start; for tests.
   @visibleForTesting
@@ -389,6 +411,10 @@ class TextShadowCache {
     if (hit != null) {
       _images[key] = hit;
       return hit.clone();
+    }
+    if (!_observing) {
+      _observing = true;
+      WidgetsBinding.instance.addObserver(this);
     }
     final made = _draw(key, paragraph);
     _images[key] = made;
