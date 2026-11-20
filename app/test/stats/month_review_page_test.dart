@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/settings/app_settings.dart';
 import 'package:vellum/stats/heatmap_grid.dart';
@@ -74,7 +75,7 @@ void main() {
       }
     });
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(

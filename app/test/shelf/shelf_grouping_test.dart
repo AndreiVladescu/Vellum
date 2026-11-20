@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_queries.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/settings/book_face.dart';
 import 'package:vellum/settings/shelf_group_by.dart';
@@ -123,7 +124,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       return tester.pumpWidget(MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: body(groupEntries(entries, ShelfGroupBy.author)),

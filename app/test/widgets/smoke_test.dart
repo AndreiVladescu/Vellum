@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/account/user_profile.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/main.dart';
 import 'package:vellum/server/connection_store.dart';
@@ -117,7 +118,7 @@ void main() {
       // The real app registers these (plan 5 #38); a page that looks a string
       // up would otherwise throw on a null L10n, which is the point of
       // `nullable-getter: false`.
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: LibraryPage(
         repository: repo,
@@ -138,7 +139,7 @@ void main() {
     };
 
     Widget shelf(List<Book> shown) => MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
           home: Scaffold(
             body: ShelfView(books: shown, detailBuilder: (_) => const SizedBox()),
@@ -207,7 +208,7 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: PreferencesPage(
         settings: settings,
@@ -251,7 +252,7 @@ void main() {
     expect(connection.isConnected, true);
 
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: ServerPage(
         connection: connection,

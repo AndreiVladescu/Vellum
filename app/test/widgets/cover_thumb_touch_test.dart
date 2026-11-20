@@ -1,10 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/book_detail/cover_thumb.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 Widget _host(TargetPlatform platform, VoidCallback onTap) => MaterialApp(
-  localizationsDelegates: L10n.localizationsDelegates,
+  localizationsDelegates: appLocalizationsDelegates,
   supportedLocales: L10n.supportedLocales,
       theme: ThemeData(platform: platform),
       home: Scaffold(body: Center(child: CoverThumb(cover: null, onTap: onTap))),

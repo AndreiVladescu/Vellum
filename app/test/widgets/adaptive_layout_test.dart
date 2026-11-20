@@ -21,6 +21,7 @@ import 'package:vellum/book_detail/cover_thumb.dart';
 import 'package:vellum/book_detail/formats_section.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/main.dart';
 import 'package:vellum/navigation_history.dart';
@@ -72,7 +73,7 @@ void main() {
       final profile = await UserProfileStore.load();
       final connection = await ServerConnection.load();
       app = MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         navigatorObservers: [history],
         home: LibraryPage(

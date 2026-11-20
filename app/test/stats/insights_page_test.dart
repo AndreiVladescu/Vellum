@@ -17,6 +17,7 @@ import 'package:vellum/stats/heatmap_grid.dart';
 import 'package:vellum/stats/insights_page.dart';
 import 'package:vellum/stats/insights_range.dart';
 import 'heatmap_test_utils.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
@@ -95,7 +96,7 @@ void main() {
       }
     });
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: InsightsPage(repository: repo, settings: settings)));
     await tester.pumpAndSettle();
@@ -163,7 +164,7 @@ void main() {
           ));
     });
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: InsightsPage(repository: repo, settings: settings)));
     await tester.pumpAndSettle();

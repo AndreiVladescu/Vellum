@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/import/free_catalogues.dart';
 import 'package:vellum/import/opds_browser_page.dart';
@@ -49,7 +50,7 @@ void main() {
 
   testWidgets('the empty browser offers the catalogues', (tester) async {
     await tester.pumpWidget(MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         home: OpdsBrowserPage()));
     await tester.pump();
@@ -65,7 +66,7 @@ void main() {
   testWidgets('tapping one fills the address and tries to open it',
       (tester) async {
     await tester.pumpWidget(MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         home: OpdsBrowserPage()));
     await tester.pump();

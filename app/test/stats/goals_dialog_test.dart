@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/settings/app_settings.dart';
 import 'package:vellum/stats/goals_dialog.dart';
@@ -12,7 +13,7 @@ Future<AppSettingsStore> _openDialog(WidgetTester tester) async {
   final settings = (await tester.runAsync(AppSettingsStore.load))!;
   await tester.pumpWidget(
     MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: Builder(

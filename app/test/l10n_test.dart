@@ -9,6 +9,7 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 /// Pumps a minimal app with the real delegates, and hands the lookup back.
@@ -16,7 +17,7 @@ Future<L10n> _l10n(WidgetTester tester, {Locale locale = const Locale('en')}) as
   late L10n found;
   await tester.pumpWidget(MaterialApp(
     locale: locale,
-    localizationsDelegates: L10n.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: L10n.supportedLocales,
     home: Builder(builder: (context) {
       found = L10n.of(context);

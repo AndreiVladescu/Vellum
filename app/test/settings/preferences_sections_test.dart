@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/data/local_text_index.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/server/connection_store.dart';
 import 'package:vellum/server/sync_service.dart';
@@ -51,7 +52,7 @@ void main() {
 
   Future<void> pump(WidgetTester tester, {String? section, String? entry}) async {
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: PreferencesPage(
         repository: repo,
@@ -75,7 +76,7 @@ void main() {
     await load(tester);
     late List<PrefsSection> sections;
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Builder(builder: (context) {
         sections = preferencesCatalogue(

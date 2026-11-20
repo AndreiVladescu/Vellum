@@ -5,6 +5,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart' show pdfrxFlutterInitialize;
+import 'l10n/delegates.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'l10n/platform_l10n.dart';
 import 'l10n/labels.dart';
@@ -186,7 +187,7 @@ class VellumApp extends StatelessWidget {
             // Every language with a file in lib/l10n/. `locale` is the one
             // picked in Preferences; null follows the system, falling back to
             // English for a language Vellum has no file for.
-            localizationsDelegates: L10n.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: L10n.supportedLocales,
             locale: settings.appLocale,
             theme: themes.light,
@@ -195,9 +196,21 @@ class VellumApp extends StatelessWidget {
             navigatorObservers: [_history],
             // Inside the app, so `Navigator.of` here is the one being driven,
             // and above every route, so the buttons work on any screen.
-            builder: (context, child) => MouseNavigation(
-              history: _history,
-              child: child ?? const SizedBox.shrink(),
+            //
+            // The bridge is for two dependencies that still build with the
+            // SDK's old package:flutter/material.dart, whose `Theme.of` cannot
+            // see this app's (material_ui) theme: the EPUB reader's link colour
+            // and loading spinners (flutter_widget_from_html_core 0.17) and the
+            // barcode scanner's buttons (flutter_zxing 2.x). It copies the
+            // theme and localizations across so they look as they did before
+            // Flutter 3.50. It is itself deprecated, as a stopgap: remove it
+            // (and the ignore) once both packages are on material_ui.
+            // ignore: deprecated_member_use
+            builder: (context, child) => MaterialUiCompatibilityBridge(
+              child: MouseNavigation(
+                history: _history,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
             home: LibraryPage(
               repository: repository,

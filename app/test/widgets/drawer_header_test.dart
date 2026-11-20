@@ -16,6 +16,7 @@ import 'package:vellum/account/user_profile.dart';
 import 'package:vellum/app_drawer.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/server/connection_store.dart';
 import 'package:vellum/server/sync_service.dart';
@@ -75,7 +76,7 @@ void main() {
     final connection = await ServerConnection.load();
     return (
       MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: AppDrawer(

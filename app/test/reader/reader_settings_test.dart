@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/reader/night_mode.dart';
 import 'package:vellum/reader/reader_settings.dart';
 import 'package:vellum/reader/reader_settings_sheet.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
@@ -203,7 +204,7 @@ void main() {
 
     // EPUB: typography, no PDF options.
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: ReaderSettingsSheet(
@@ -221,7 +222,7 @@ void main() {
 
     // PDF: fit and night mode, no typography (a rendered page can't reflow).
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: ReaderSettingsSheet(
@@ -243,7 +244,7 @@ void main() {
     late ReaderSettings settings;
     await tester.runAsync(() async => settings = await ReaderSettings.load());
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: ReaderSettingsSheet(

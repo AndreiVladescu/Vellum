@@ -16,3 +16,10 @@ output-class: L10n
 # still being translated.
 untranslated-messages-file: lib/l10n/untranslated.json
 nullable-getter: false
+# Flutter 3.50's gen-l10n template still lists flutter_localizations' Material
+# and Cupertino delegates in `L10n.localizationsDelegates`, which 3.50
+# deprecates in favour of package:material_ui's. The app does not use that list
+# (lib/l10n/delegates.dart is the one it uses), but the generated file still
+# names them, so the deprecation is silenced there and nowhere else. Drop this
+# once the template moves.
+header: "// ignore_for_file: deprecated_member_use"

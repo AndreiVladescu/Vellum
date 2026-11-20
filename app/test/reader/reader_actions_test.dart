@@ -9,6 +9,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/reader_actions.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
@@ -78,7 +79,7 @@ void main() {
     Future<void> pump(WidgetTester tester, double width,
         {int count = 9, List<PopupMenuEntry<VoidCallback?>> extras = const []}) async {
       await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
         home: MediaQuery(
           data: MediaQueryData(size: Size(width, 800)),
@@ -134,7 +135,7 @@ void main() {
     testWidgets('a disabled action is offered and greyed, not hidden',
         (tester) async {
       await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
         home: MediaQuery(
           data: const MediaQueryData(size: Size(360, 800)),

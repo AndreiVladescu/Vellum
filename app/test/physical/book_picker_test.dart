@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
@@ -56,7 +57,7 @@ void main() {
     });
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: Builder(

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/reader_hotkeys.dart';
 import 'package:vellum/reader/reader_search_field.dart';
 import 'package:vellum/reader/reader_settings.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 void main() {
@@ -30,7 +31,7 @@ void main() {
     addTearDown(search.dispose);
     addTearDown(viewer.dispose);
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       theme: appTheme ?? ThemeData.dark(),
       home: Scaffold(
@@ -143,7 +144,7 @@ void main() {
     addTearDown(search.dispose);
     addTearDown(open.dispose);
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: ValueListenableBuilder<bool>(

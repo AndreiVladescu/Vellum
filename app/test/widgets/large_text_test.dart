@@ -20,6 +20,7 @@ import 'package:vellum/stats/insights_page.dart';
 import 'package:vellum/stats/library_stats_page.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/main.dart';
 import 'package:vellum/server/connection_store.dart';
@@ -60,7 +61,7 @@ Widget _app({
 }) =>
     MaterialApp(
       locale: locale,
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context)

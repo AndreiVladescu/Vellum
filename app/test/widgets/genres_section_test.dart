@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/book_detail/genres_section.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 /// Drives the real [GenresSection] + its add sheet against a real (in-memory)
@@ -43,7 +44,7 @@ void main() {
   tearDown(() => dir.deleteSync(recursive: true));
 
   Widget host(LibraryRepository repo, String bookId) => MaterialApp(
-    localizationsDelegates: L10n.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: Center(

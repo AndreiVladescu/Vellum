@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_queries.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/shelf/library_header.dart';
 
@@ -127,7 +128,7 @@ void main() {
   group('widget', () {
     Widget host(LibraryHighlights highlights, {VoidCallback? onDismiss}) =>
         MaterialApp(
-          localizationsDelegates: L10n.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: L10n.supportedLocales,
           home: Scaffold(
             body: LibraryHeader(
@@ -141,7 +142,7 @@ void main() {
     /// The same header on a screen of a given height. `MediaQuery.sizeOf` is
     /// what the header asks, so that is what the test sets.
     Widget hostSized(LibraryHighlights highlights, Size screen) => MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
           home: MediaQuery(
             data: MediaQueryData(size: screen),
@@ -193,7 +194,7 @@ void main() {
         _book('b', 'Just added', created: DateTime(2026, 6, 2)),
       ]));
       await tester.pumpWidget(MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: Column(children: [
@@ -241,7 +242,7 @@ void main() {
         _book('a', 'Halfway', progress: 0.5, lastRead: DateTime(2026, 6, 1)),
       ]));
       await tester.pumpWidget(MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: LibraryHeader(
