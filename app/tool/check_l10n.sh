@@ -84,6 +84,8 @@ MIGRATED=(
   lib/data/reading_position_service.dart
   lib/data/reading_status.dart
   lib/data/search_index.dart
+  lib/data/demo_pdf.dart
+  lib/data/seed_demo.dart
   lib/data/seed_library.dart
   lib/data/seed_profiling.dart
   lib/data/series_service.dart

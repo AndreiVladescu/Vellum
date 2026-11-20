@@ -1,0 +1,1222 @@
+{
+  "about": "Sources of the Vellum demo library (tool/demo_library.sh). Every file is downloaded into ~/.cache/vellum-demo/sources, never into the repository. Nothing here is modified except where \"use\" says so: \"pdf\" books are typeset into a PDF from the Standard Ebooks text by the seeder; \"wishlist\" books only lend their cover.",
+  "licences": {
+    "se-cc0": {
+      "name": "Public domain text; Standard Ebooks production and cover art dedicated to the public domain (CC0 1.0)",
+      "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "note": "https://standardebooks.org/about#public-domain — the texts are public domain in the United States; Standard Ebooks releases its own work (typography, markup, cover compositions) under CC0, and its cover paintings are public-domain artworks."
+    },
+    "librivox-pd": {
+      "name": "LibriVox recording, public domain",
+      "url": "https://librivox.org/pages/public-domain/",
+      "note": "All LibriVox recordings are dedicated to the public domain; the archive.org item carries the Creative Commons public-domain licence URL."
+    }
+  },
+  "books": [
+    {
+      "id": "a-study-in-scarlet",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/a-study-in-scarlet",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/a-study-in-scarlet/downloads/arthur-conan-doyle_a-study-in-scarlet.epub?source=download",
+      "file": "arthur-conan-doyle_a-study-in-scarlet.epub",
+      "licence": "se-cc0",
+      "year": 1887,
+      "genres": [
+        "Mystery",
+        "Classics"
+      ],
+      "series": "Sherlock Holmes",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "the-sign-of-the-four",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-sign-of-the-four",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-sign-of-the-four/downloads/arthur-conan-doyle_the-sign-of-the-four.epub?source=download",
+      "file": "arthur-conan-doyle_the-sign-of-the-four.epub",
+      "licence": "se-cc0",
+      "year": 1890,
+      "genres": [
+        "Mystery",
+        "Classics"
+      ],
+      "series": "Sherlock Holmes",
+      "seriesIndex": 2.0
+    },
+    {
+      "id": "the-adventures-of-sherlock-holmes",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-adventures-of-sherlock-holmes",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-adventures-of-sherlock-holmes/downloads/arthur-conan-doyle_the-adventures-of-sherlock-holmes.epub?source=download",
+      "file": "arthur-conan-doyle_the-adventures-of-sherlock-holmes.epub",
+      "licence": "se-cc0",
+      "year": 1892,
+      "genres": [
+        "Mystery",
+        "Short Stories"
+      ],
+      "series": "Sherlock Holmes",
+      "seriesIndex": 3.0
+    },
+    {
+      "id": "the-memoirs-of-sherlock-holmes",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-memoirs-of-sherlock-holmes",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-memoirs-of-sherlock-holmes/downloads/arthur-conan-doyle_the-memoirs-of-sherlock-holmes.epub?source=download",
+      "file": "arthur-conan-doyle_the-memoirs-of-sherlock-holmes.epub",
+      "licence": "se-cc0",
+      "year": 1894,
+      "genres": [
+        "Mystery",
+        "Short Stories"
+      ],
+      "series": "Sherlock Holmes",
+      "seriesIndex": 4.0
+    },
+    {
+      "id": "the-hound-of-the-baskervilles",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-hound-of-the-baskervilles",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-hound-of-the-baskervilles/downloads/arthur-conan-doyle_the-hound-of-the-baskervilles.epub?source=download",
+      "file": "arthur-conan-doyle_the-hound-of-the-baskervilles.epub",
+      "licence": "se-cc0",
+      "year": 1902,
+      "genres": [
+        "Mystery",
+        "Gothic"
+      ],
+      "series": "Sherlock Holmes",
+      "seriesIndex": 5.0
+    },
+    {
+      "id": "the-return-of-sherlock-holmes",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-return-of-sherlock-holmes",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-return-of-sherlock-holmes/downloads/arthur-conan-doyle_the-return-of-sherlock-holmes.epub?source=download",
+      "file": "arthur-conan-doyle_the-return-of-sherlock-holmes.epub",
+      "licence": "se-cc0",
+      "year": 1905,
+      "genres": [
+        "Mystery",
+        "Short Stories"
+      ],
+      "series": "Sherlock Holmes",
+      "seriesIndex": 6.0
+    },
+    {
+      "id": "the-valley-of-fear",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-valley-of-fear",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-valley-of-fear/downloads/arthur-conan-doyle_the-valley-of-fear.epub?source=download",
+      "file": "arthur-conan-doyle_the-valley-of-fear.epub",
+      "licence": "se-cc0",
+      "year": 1915,
+      "genres": [
+        "Mystery"
+      ],
+      "series": "Sherlock Holmes",
+      "seriesIndex": 7.0
+    },
+    {
+      "id": "the-lost-world",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-lost-world",
+      "url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-lost-world/downloads/arthur-conan-doyle_the-lost-world.epub?source=download",
+      "file": "arthur-conan-doyle_the-lost-world.epub",
+      "licence": "se-cc0",
+      "year": 1912,
+      "genres": [
+        "Adventure",
+        "Science Fiction"
+      ],
+      "series": "Professor Challenger",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "anne-of-green-gables",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/l-m-montgomery/anne-of-green-gables",
+      "url": "https://standardebooks.org/ebooks/l-m-montgomery/anne-of-green-gables/downloads/l-m-montgomery_anne-of-green-gables.epub?source=download",
+      "file": "l-m-montgomery_anne-of-green-gables.epub",
+      "licence": "se-cc0",
+      "year": 1908,
+      "genres": [
+        "Classics",
+        "Children's"
+      ],
+      "series": "Anne of Green Gables",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "anne-of-avonlea",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/l-m-montgomery/anne-of-avonlea",
+      "url": "https://standardebooks.org/ebooks/l-m-montgomery/anne-of-avonlea/downloads/l-m-montgomery_anne-of-avonlea.epub?source=download",
+      "file": "l-m-montgomery_anne-of-avonlea.epub",
+      "licence": "se-cc0",
+      "year": 1909,
+      "genres": [
+        "Classics",
+        "Children's"
+      ],
+      "series": "Anne of Green Gables",
+      "seriesIndex": 2.0
+    },
+    {
+      "id": "anne-of-the-island",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/l-m-montgomery/anne-of-the-island",
+      "url": "https://standardebooks.org/ebooks/l-m-montgomery/anne-of-the-island/downloads/l-m-montgomery_anne-of-the-island.epub?source=download",
+      "file": "l-m-montgomery_anne-of-the-island.epub",
+      "licence": "se-cc0",
+      "year": 1915,
+      "genres": [
+        "Classics",
+        "Romance"
+      ],
+      "series": "Anne of Green Gables",
+      "seriesIndex": 3.0
+    },
+    {
+      "id": "a-princess-of-mars",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/edgar-rice-burroughs/a-princess-of-mars",
+      "url": "https://standardebooks.org/ebooks/edgar-rice-burroughs/a-princess-of-mars/downloads/edgar-rice-burroughs_a-princess-of-mars.epub?source=download",
+      "file": "edgar-rice-burroughs_a-princess-of-mars.epub",
+      "licence": "se-cc0",
+      "year": 1912,
+      "genres": [
+        "Science Fiction",
+        "Adventure"
+      ],
+      "series": "Barsoom",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "the-gods-of-mars",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/edgar-rice-burroughs/the-gods-of-mars",
+      "url": "https://standardebooks.org/ebooks/edgar-rice-burroughs/the-gods-of-mars/downloads/edgar-rice-burroughs_the-gods-of-mars.epub?source=download",
+      "file": "edgar-rice-burroughs_the-gods-of-mars.epub",
+      "licence": "se-cc0",
+      "year": 1918,
+      "genres": [
+        "Science Fiction",
+        "Adventure"
+      ],
+      "series": "Barsoom",
+      "seriesIndex": 2.0
+    },
+    {
+      "id": "the-warlord-of-mars",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/edgar-rice-burroughs/the-warlord-of-mars",
+      "url": "https://standardebooks.org/ebooks/edgar-rice-burroughs/the-warlord-of-mars/downloads/edgar-rice-burroughs_the-warlord-of-mars.epub?source=download",
+      "file": "edgar-rice-burroughs_the-warlord-of-mars.epub",
+      "licence": "se-cc0",
+      "year": 1919,
+      "genres": [
+        "Science Fiction",
+        "Adventure"
+      ],
+      "series": "Barsoom",
+      "seriesIndex": 3.0
+    },
+    {
+      "id": "tarzan-of-the-apes",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/edgar-rice-burroughs/tarzan-of-the-apes",
+      "url": "https://standardebooks.org/ebooks/edgar-rice-burroughs/tarzan-of-the-apes/downloads/edgar-rice-burroughs_tarzan-of-the-apes.epub?source=download",
+      "file": "edgar-rice-burroughs_tarzan-of-the-apes.epub",
+      "licence": "se-cc0",
+      "year": 1914,
+      "genres": [
+        "Adventure"
+      ],
+      "series": "Tarzan",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "pride-and-prejudice",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jane-austen/pride-and-prejudice",
+      "url": "https://standardebooks.org/ebooks/jane-austen/pride-and-prejudice/downloads/jane-austen_pride-and-prejudice.epub?source=download",
+      "file": "jane-austen_pride-and-prejudice.epub",
+      "licence": "se-cc0",
+      "year": 1813,
+      "genres": [
+        "Romance",
+        "Classics"
+      ]
+    },
+    {
+      "id": "sense-and-sensibility",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jane-austen/sense-and-sensibility",
+      "url": "https://standardebooks.org/ebooks/jane-austen/sense-and-sensibility/downloads/jane-austen_sense-and-sensibility.epub?source=download",
+      "file": "jane-austen_sense-and-sensibility.epub",
+      "licence": "se-cc0",
+      "year": 1811,
+      "genres": [
+        "Romance",
+        "Classics"
+      ]
+    },
+    {
+      "id": "emma",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jane-austen/emma",
+      "url": "https://standardebooks.org/ebooks/jane-austen/emma/downloads/jane-austen_emma.epub?source=download",
+      "file": "jane-austen_emma.epub",
+      "licence": "se-cc0",
+      "year": 1815,
+      "genres": [
+        "Romance",
+        "Humour"
+      ]
+    },
+    {
+      "id": "persuasion",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jane-austen/persuasion",
+      "url": "https://standardebooks.org/ebooks/jane-austen/persuasion/downloads/jane-austen_persuasion.epub?source=download",
+      "file": "jane-austen_persuasion.epub",
+      "licence": "se-cc0",
+      "year": 1817,
+      "genres": [
+        "Romance",
+        "Classics"
+      ]
+    },
+    {
+      "id": "northanger-abbey",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jane-austen/northanger-abbey",
+      "url": "https://standardebooks.org/ebooks/jane-austen/northanger-abbey/downloads/jane-austen_northanger-abbey.epub?source=download",
+      "file": "jane-austen_northanger-abbey.epub",
+      "licence": "se-cc0",
+      "year": 1817,
+      "genres": [
+        "Romance",
+        "Gothic",
+        "Satire"
+      ]
+    },
+    {
+      "id": "mansfield-park",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jane-austen/mansfield-park",
+      "url": "https://standardebooks.org/ebooks/jane-austen/mansfield-park/downloads/jane-austen_mansfield-park.epub?source=download",
+      "file": "jane-austen_mansfield-park.epub",
+      "licence": "se-cc0",
+      "year": 1814,
+      "genres": [
+        "Romance",
+        "Classics"
+      ]
+    },
+    {
+      "id": "a-christmas-carol",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/charles-dickens/a-christmas-carol",
+      "url": "https://standardebooks.org/ebooks/charles-dickens/a-christmas-carol/downloads/charles-dickens_a-christmas-carol.epub?source=download",
+      "file": "charles-dickens_a-christmas-carol.epub",
+      "licence": "se-cc0",
+      "year": 1843,
+      "genres": [
+        "Classics",
+        "Fantasy"
+      ]
+    },
+    {
+      "id": "great-expectations",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/charles-dickens/great-expectations",
+      "url": "https://standardebooks.org/ebooks/charles-dickens/great-expectations/downloads/charles-dickens_great-expectations.epub?source=download",
+      "file": "charles-dickens_great-expectations.epub",
+      "licence": "se-cc0",
+      "year": 1861,
+      "genres": [
+        "Classics",
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "a-tale-of-two-cities",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/charles-dickens/a-tale-of-two-cities",
+      "url": "https://standardebooks.org/ebooks/charles-dickens/a-tale-of-two-cities/downloads/charles-dickens_a-tale-of-two-cities.epub?source=download",
+      "file": "charles-dickens_a-tale-of-two-cities.epub",
+      "licence": "se-cc0",
+      "year": 1859,
+      "genres": [
+        "Historical Fiction",
+        "Classics"
+      ]
+    },
+    {
+      "id": "oliver-twist",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/charles-dickens/oliver-twist",
+      "url": "https://standardebooks.org/ebooks/charles-dickens/oliver-twist/downloads/charles-dickens_oliver-twist.epub?source=download",
+      "file": "charles-dickens_oliver-twist.epub",
+      "licence": "se-cc0",
+      "year": 1838,
+      "genres": [
+        "Classics"
+      ]
+    },
+    {
+      "id": "moby-dick",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/herman-melville/moby-dick",
+      "url": "https://standardebooks.org/ebooks/herman-melville/moby-dick/downloads/herman-melville_moby-dick.epub?source=download",
+      "file": "herman-melville_moby-dick.epub",
+      "licence": "se-cc0",
+      "year": 1851,
+      "genres": [
+        "Adventure",
+        "Classics"
+      ]
+    },
+    {
+      "id": "frankenstein",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/mary-shelley/frankenstein",
+      "url": "https://standardebooks.org/ebooks/mary-shelley/frankenstein/downloads/mary-shelley_frankenstein.epub?source=download",
+      "file": "mary-shelley_frankenstein.epub",
+      "licence": "se-cc0",
+      "year": 1818,
+      "genres": [
+        "Gothic",
+        "Science Fiction",
+        "Horror"
+      ]
+    },
+    {
+      "id": "dracula",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/bram-stoker/dracula",
+      "url": "https://standardebooks.org/ebooks/bram-stoker/dracula/downloads/bram-stoker_dracula.epub?source=download",
+      "file": "bram-stoker_dracula.epub",
+      "licence": "se-cc0",
+      "year": 1897,
+      "genres": [
+        "Gothic",
+        "Horror"
+      ]
+    },
+    {
+      "id": "the-time-machine",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/h-g-wells/the-time-machine",
+      "url": "https://standardebooks.org/ebooks/h-g-wells/the-time-machine/downloads/h-g-wells_the-time-machine.epub?source=download",
+      "file": "h-g-wells_the-time-machine.epub",
+      "licence": "se-cc0",
+      "year": 1895,
+      "genres": [
+        "Science Fiction"
+      ]
+    },
+    {
+      "id": "the-war-of-the-worlds",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/h-g-wells/the-war-of-the-worlds",
+      "url": "https://standardebooks.org/ebooks/h-g-wells/the-war-of-the-worlds/downloads/h-g-wells_the-war-of-the-worlds.epub?source=download",
+      "file": "h-g-wells_the-war-of-the-worlds.epub",
+      "licence": "se-cc0",
+      "year": 1898,
+      "genres": [
+        "Science Fiction"
+      ]
+    },
+    {
+      "id": "the-invisible-man",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/h-g-wells/the-invisible-man",
+      "url": "https://standardebooks.org/ebooks/h-g-wells/the-invisible-man/downloads/h-g-wells_the-invisible-man.epub?source=download",
+      "file": "h-g-wells_the-invisible-man.epub",
+      "licence": "se-cc0",
+      "year": 1897,
+      "genres": [
+        "Science Fiction",
+        "Horror"
+      ]
+    },
+    {
+      "id": "the-island-of-doctor-moreau",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/h-g-wells/the-island-of-doctor-moreau",
+      "url": "https://standardebooks.org/ebooks/h-g-wells/the-island-of-doctor-moreau/downloads/h-g-wells_the-island-of-doctor-moreau.epub?source=download",
+      "file": "h-g-wells_the-island-of-doctor-moreau.epub",
+      "licence": "se-cc0",
+      "year": 1896,
+      "genres": [
+        "Science Fiction",
+        "Horror"
+      ]
+    },
+    {
+      "id": "alices-adventures-in-wonderland",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel",
+      "url": "https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel/downloads/lewis-carroll_alices-adventures-in-wonderland_john-tenniel.epub?source=download",
+      "file": "lewis-carroll_alices-adventures-in-wonderland_john-tenniel.epub",
+      "licence": "se-cc0",
+      "year": 1865,
+      "genres": [
+        "Fantasy",
+        "Children's"
+      ],
+      "series": "Alice",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "through-the-looking-glass",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/lewis-carroll/through-the-looking-glass/john-tenniel",
+      "url": "https://standardebooks.org/ebooks/lewis-carroll/through-the-looking-glass/john-tenniel/downloads/lewis-carroll_through-the-looking-glass_john-tenniel.epub?source=download",
+      "file": "lewis-carroll_through-the-looking-glass_john-tenniel.epub",
+      "licence": "se-cc0",
+      "year": 1871,
+      "genres": [
+        "Fantasy",
+        "Children's"
+      ],
+      "series": "Alice",
+      "seriesIndex": 2.0
+    },
+    {
+      "id": "treasure-island",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/robert-louis-stevenson/treasure-island",
+      "url": "https://standardebooks.org/ebooks/robert-louis-stevenson/treasure-island/downloads/robert-louis-stevenson_treasure-island.epub?source=download",
+      "file": "robert-louis-stevenson_treasure-island.epub",
+      "licence": "se-cc0",
+      "year": 1883,
+      "genres": [
+        "Adventure"
+      ]
+    },
+    {
+      "id": "dr-jekyll-and-mr-hyde",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/robert-louis-stevenson/the-strange-case-of-dr-jekyll-and-mr-hyde",
+      "url": "https://standardebooks.org/ebooks/robert-louis-stevenson/the-strange-case-of-dr-jekyll-and-mr-hyde/downloads/robert-louis-stevenson_the-strange-case-of-dr-jekyll-and-mr-hyde.epub?source=download",
+      "file": "robert-louis-stevenson_the-strange-case-of-dr-jekyll-and-mr-hyde.epub",
+      "licence": "se-cc0",
+      "year": 1886,
+      "genres": [
+        "Gothic",
+        "Horror"
+      ]
+    },
+    {
+      "id": "kidnapped",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/robert-louis-stevenson/kidnapped",
+      "url": "https://standardebooks.org/ebooks/robert-louis-stevenson/kidnapped/downloads/robert-louis-stevenson_kidnapped.epub?source=download",
+      "file": "robert-louis-stevenson_kidnapped.epub",
+      "licence": "se-cc0",
+      "year": 1886,
+      "genres": [
+        "Adventure",
+        "Historical Fiction"
+      ]
+    },
+    {
+      "id": "the-picture-of-dorian-gray",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/oscar-wilde/the-picture-of-dorian-gray",
+      "url": "https://standardebooks.org/ebooks/oscar-wilde/the-picture-of-dorian-gray/downloads/oscar-wilde_the-picture-of-dorian-gray.epub?source=download",
+      "file": "oscar-wilde_the-picture-of-dorian-gray.epub",
+      "licence": "se-cc0",
+      "year": 1890,
+      "genres": [
+        "Gothic",
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-importance-of-being-earnest",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/oscar-wilde/the-importance-of-being-earnest",
+      "url": "https://standardebooks.org/ebooks/oscar-wilde/the-importance-of-being-earnest/downloads/oscar-wilde_the-importance-of-being-earnest.epub?source=download",
+      "file": "oscar-wilde_the-importance-of-being-earnest.epub",
+      "licence": "se-cc0",
+      "year": 1895,
+      "genres": [
+        "Drama",
+        "Humour"
+      ]
+    },
+    {
+      "id": "the-great-gatsby",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/f-scott-fitzgerald/the-great-gatsby",
+      "url": "https://standardebooks.org/ebooks/f-scott-fitzgerald/the-great-gatsby/downloads/f-scott-fitzgerald_the-great-gatsby.epub?source=download",
+      "file": "f-scott-fitzgerald_the-great-gatsby.epub",
+      "licence": "se-cc0",
+      "year": 1925,
+      "genres": [
+        "Literary Fiction",
+        "Classics"
+      ]
+    },
+    {
+      "id": "mrs-dalloway",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/virginia-woolf/mrs-dalloway",
+      "url": "https://standardebooks.org/ebooks/virginia-woolf/mrs-dalloway/downloads/virginia-woolf_mrs-dalloway.epub?source=download",
+      "file": "virginia-woolf_mrs-dalloway.epub",
+      "licence": "se-cc0",
+      "year": 1925,
+      "genres": [
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "to-the-lighthouse",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/virginia-woolf/to-the-lighthouse",
+      "url": "https://standardebooks.org/ebooks/virginia-woolf/to-the-lighthouse/downloads/virginia-woolf_to-the-lighthouse.epub?source=download",
+      "file": "virginia-woolf_to-the-lighthouse.epub",
+      "licence": "se-cc0",
+      "year": 1927,
+      "genres": [
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "jane-eyre",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/charlotte-bronte/jane-eyre",
+      "url": "https://standardebooks.org/ebooks/charlotte-bronte/jane-eyre/downloads/charlotte-bronte_jane-eyre.epub?source=download",
+      "file": "charlotte-bronte_jane-eyre.epub",
+      "licence": "se-cc0",
+      "year": 1847,
+      "genres": [
+        "Romance",
+        "Gothic",
+        "Classics"
+      ]
+    },
+    {
+      "id": "wuthering-heights",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/emily-bronte/wuthering-heights",
+      "url": "https://standardebooks.org/ebooks/emily-bronte/wuthering-heights/downloads/emily-bronte_wuthering-heights.epub?source=download",
+      "file": "emily-bronte_wuthering-heights.epub",
+      "licence": "se-cc0",
+      "year": 1847,
+      "genres": [
+        "Romance",
+        "Gothic"
+      ]
+    },
+    {
+      "id": "middlemarch",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/george-eliot/middlemarch",
+      "url": "https://standardebooks.org/ebooks/george-eliot/middlemarch/downloads/george-eliot_middlemarch.epub?source=download",
+      "file": "george-eliot_middlemarch.epub",
+      "licence": "se-cc0",
+      "year": 1871,
+      "genres": [
+        "Literary Fiction",
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-adventures-of-tom-sawyer",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/mark-twain/the-adventures-of-tom-sawyer",
+      "url": "https://standardebooks.org/ebooks/mark-twain/the-adventures-of-tom-sawyer/downloads/mark-twain_the-adventures-of-tom-sawyer.epub?source=download",
+      "file": "mark-twain_the-adventures-of-tom-sawyer.epub",
+      "licence": "se-cc0",
+      "year": 1876,
+      "genres": [
+        "Adventure",
+        "Children's"
+      ]
+    },
+    {
+      "id": "huckleberry-finn",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/mark-twain/the-adventures-of-huckleberry-finn",
+      "url": "https://standardebooks.org/ebooks/mark-twain/the-adventures-of-huckleberry-finn/downloads/mark-twain_the-adventures-of-huckleberry-finn.epub?source=download",
+      "file": "mark-twain_the-adventures-of-huckleberry-finn.epub",
+      "licence": "se-cc0",
+      "year": 1884,
+      "genres": [
+        "Adventure",
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-call-of-the-wild",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jack-london/the-call-of-the-wild",
+      "url": "https://standardebooks.org/ebooks/jack-london/the-call-of-the-wild/downloads/jack-london_the-call-of-the-wild.epub?source=download",
+      "file": "jack-london_the-call-of-the-wild.epub",
+      "licence": "se-cc0",
+      "year": 1903,
+      "genres": [
+        "Adventure",
+        "Nature"
+      ]
+    },
+    {
+      "id": "white-fang",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jack-london/white-fang",
+      "url": "https://standardebooks.org/ebooks/jack-london/white-fang/downloads/jack-london_white-fang.epub?source=download",
+      "file": "jack-london_white-fang.epub",
+      "licence": "se-cc0",
+      "year": 1906,
+      "genres": [
+        "Adventure",
+        "Nature"
+      ]
+    },
+    {
+      "id": "the-wind-in-the-willows",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/kenneth-grahame/the-wind-in-the-willows",
+      "url": "https://standardebooks.org/ebooks/kenneth-grahame/the-wind-in-the-willows/downloads/kenneth-grahame_the-wind-in-the-willows.epub?source=download",
+      "file": "kenneth-grahame_the-wind-in-the-willows.epub",
+      "licence": "se-cc0",
+      "year": 1908,
+      "genres": [
+        "Children's",
+        "Fantasy"
+      ]
+    },
+    {
+      "id": "peter-and-wendy",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/j-m-barrie/peter-and-wendy",
+      "url": "https://standardebooks.org/ebooks/j-m-barrie/peter-and-wendy/downloads/j-m-barrie_peter-and-wendy.epub?source=download",
+      "file": "j-m-barrie_peter-and-wendy.epub",
+      "licence": "se-cc0",
+      "year": 1911,
+      "genres": [
+        "Children's",
+        "Fantasy"
+      ]
+    },
+    {
+      "id": "the-wonderful-wizard-of-oz",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/l-frank-baum/the-wonderful-wizard-of-oz",
+      "url": "https://standardebooks.org/ebooks/l-frank-baum/the-wonderful-wizard-of-oz/downloads/l-frank-baum_the-wonderful-wizard-of-oz.epub?source=download",
+      "file": "l-frank-baum_the-wonderful-wizard-of-oz.epub",
+      "licence": "se-cc0",
+      "year": 1900,
+      "genres": [
+        "Children's",
+        "Fantasy"
+      ],
+      "series": "Oz",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "little-women",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/louisa-may-alcott/little-women",
+      "url": "https://standardebooks.org/ebooks/louisa-may-alcott/little-women/downloads/louisa-may-alcott_little-women.epub?source=download",
+      "file": "louisa-may-alcott_little-women.epub",
+      "licence": "se-cc0",
+      "year": 1868,
+      "genres": [
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-secret-garden",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/frances-hodgson-burnett/the-secret-garden",
+      "url": "https://standardebooks.org/ebooks/frances-hodgson-burnett/the-secret-garden/downloads/frances-hodgson-burnett_the-secret-garden.epub?source=download",
+      "file": "frances-hodgson-burnett_the-secret-garden.epub",
+      "licence": "se-cc0",
+      "year": 1911,
+      "genres": [
+        "Children's",
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-age-of-innocence",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/edith-wharton/the-age-of-innocence",
+      "url": "https://standardebooks.org/ebooks/edith-wharton/the-age-of-innocence/downloads/edith-wharton_the-age-of-innocence.epub?source=download",
+      "file": "edith-wharton_the-age-of-innocence.epub",
+      "licence": "se-cc0",
+      "year": 1920,
+      "genres": [
+        "Literary Fiction",
+        "Romance"
+      ]
+    },
+    {
+      "id": "tess-of-the-durbervilles",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/thomas-hardy/tess-of-the-durbervilles",
+      "url": "https://standardebooks.org/ebooks/thomas-hardy/tess-of-the-durbervilles/downloads/thomas-hardy_tess-of-the-durbervilles.epub?source=download",
+      "file": "thomas-hardy_tess-of-the-durbervilles.epub",
+      "licence": "se-cc0",
+      "year": 1891,
+      "genres": [
+        "Classics",
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "the-scarlet-letter",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/nathaniel-hawthorne/the-scarlet-letter",
+      "url": "https://standardebooks.org/ebooks/nathaniel-hawthorne/the-scarlet-letter/downloads/nathaniel-hawthorne_the-scarlet-letter.epub?source=download",
+      "file": "nathaniel-hawthorne_the-scarlet-letter.epub",
+      "licence": "se-cc0",
+      "year": 1850,
+      "genres": [
+        "Historical Fiction",
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-mysterious-affair-at-styles",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/agatha-christie/the-mysterious-affair-at-styles",
+      "url": "https://standardebooks.org/ebooks/agatha-christie/the-mysterious-affair-at-styles/downloads/agatha-christie_the-mysterious-affair-at-styles.epub?source=download",
+      "file": "agatha-christie_the-mysterious-affair-at-styles.epub",
+      "licence": "se-cc0",
+      "year": 1920,
+      "genres": [
+        "Mystery"
+      ],
+      "series": "Hercule Poirot",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "the-secret-adversary",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/agatha-christie/the-secret-adversary",
+      "url": "https://standardebooks.org/ebooks/agatha-christie/the-secret-adversary/downloads/agatha-christie_the-secret-adversary.epub?source=download",
+      "file": "agatha-christie_the-secret-adversary.epub",
+      "licence": "se-cc0",
+      "year": 1922,
+      "genres": [
+        "Mystery",
+        "Thriller"
+      ],
+      "series": "Tommy and Tuppence",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "the-innocence-of-father-brown",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/g-k-chesterton/the-innocence-of-father-brown",
+      "url": "https://standardebooks.org/ebooks/g-k-chesterton/the-innocence-of-father-brown/downloads/g-k-chesterton_the-innocence-of-father-brown.epub?source=download",
+      "file": "g-k-chesterton_the-innocence-of-father-brown.epub",
+      "licence": "se-cc0",
+      "year": 1911,
+      "genres": [
+        "Mystery",
+        "Short Stories"
+      ],
+      "series": "Father Brown",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "the-thirty-nine-steps",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/john-buchan/the-thirty-nine-steps",
+      "url": "https://standardebooks.org/ebooks/john-buchan/the-thirty-nine-steps/downloads/john-buchan_the-thirty-nine-steps.epub?source=download",
+      "file": "john-buchan_the-thirty-nine-steps.epub",
+      "licence": "se-cc0",
+      "year": 1915,
+      "genres": [
+        "Thriller",
+        "Adventure"
+      ],
+      "series": "Richard Hannay",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "a-room-with-a-view",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/e-m-forster/a-room-with-a-view",
+      "url": "https://standardebooks.org/ebooks/e-m-forster/a-room-with-a-view/downloads/e-m-forster_a-room-with-a-view.epub?source=download",
+      "file": "e-m-forster_a-room-with-a-view.epub",
+      "licence": "se-cc0",
+      "year": 1908,
+      "genres": [
+        "Romance",
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "the-jungle-book",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/rudyard-kipling/the-jungle-book",
+      "url": "https://standardebooks.org/ebooks/rudyard-kipling/the-jungle-book/downloads/rudyard-kipling_the-jungle-book.epub?source=download",
+      "file": "rudyard-kipling_the-jungle-book.epub",
+      "licence": "se-cc0",
+      "year": 1894,
+      "genres": [
+        "Children's",
+        "Short Stories"
+      ]
+    },
+    {
+      "id": "the-origin-of-species",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/charles-darwin/the-origin-of-species",
+      "url": "https://standardebooks.org/ebooks/charles-darwin/the-origin-of-species/downloads/charles-darwin_the-origin-of-species.epub?source=download",
+      "file": "charles-darwin_the-origin-of-species.epub",
+      "licence": "se-cc0",
+      "year": 1859,
+      "genres": [
+        "Science",
+        "Non-fiction"
+      ]
+    },
+    {
+      "id": "walden",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/henry-david-thoreau/walden",
+      "url": "https://standardebooks.org/ebooks/henry-david-thoreau/walden/downloads/henry-david-thoreau_walden.epub?source=download",
+      "file": "henry-david-thoreau_walden.epub",
+      "licence": "se-cc0",
+      "year": 1854,
+      "genres": [
+        "Nature",
+        "Philosophy",
+        "Non-fiction"
+      ]
+    },
+    {
+      "id": "leaves-of-grass",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/walt-whitman/leaves-of-grass",
+      "url": "https://standardebooks.org/ebooks/walt-whitman/leaves-of-grass/downloads/walt-whitman_leaves-of-grass.epub?source=download",
+      "file": "walt-whitman_leaves-of-grass.epub",
+      "licence": "se-cc0",
+      "year": 1855,
+      "genres": [
+        "Poetry"
+      ]
+    },
+    {
+      "id": "the-scarlet-pimpernel",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/baroness-orczy/the-scarlet-pimpernel",
+      "url": "https://standardebooks.org/ebooks/baroness-orczy/the-scarlet-pimpernel/downloads/baroness-orczy_the-scarlet-pimpernel.epub?source=download",
+      "file": "baroness-orczy_the-scarlet-pimpernel.epub",
+      "licence": "se-cc0",
+      "year": 1905,
+      "genres": [
+        "Adventure",
+        "Historical Fiction"
+      ]
+    },
+    {
+      "id": "the-prisoner-of-zenda",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/anthony-hope/the-prisoner-of-zenda",
+      "url": "https://standardebooks.org/ebooks/anthony-hope/the-prisoner-of-zenda/downloads/anthony-hope_the-prisoner-of-zenda.epub?source=download",
+      "file": "anthony-hope_the-prisoner-of-zenda.epub",
+      "licence": "se-cc0",
+      "year": 1894,
+      "genres": [
+        "Adventure"
+      ]
+    },
+    {
+      "id": "black-beauty",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/anna-sewell/black-beauty",
+      "url": "https://standardebooks.org/ebooks/anna-sewell/black-beauty/downloads/anna-sewell_black-beauty.epub?source=download",
+      "file": "anna-sewell_black-beauty.epub",
+      "licence": "se-cc0",
+      "year": 1877,
+      "genres": [
+        "Children's",
+        "Classics"
+      ]
+    },
+    {
+      "id": "robinson-crusoe",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/daniel-defoe/the-life-and-adventures-of-robinson-crusoe",
+      "url": "https://standardebooks.org/ebooks/daniel-defoe/the-life-and-adventures-of-robinson-crusoe/downloads/daniel-defoe_the-life-and-adventures-of-robinson-crusoe.epub?source=download",
+      "file": "daniel-defoe_the-life-and-adventures-of-robinson-crusoe.epub",
+      "licence": "se-cc0",
+      "year": 1719,
+      "genres": [
+        "Adventure",
+        "Classics"
+      ]
+    },
+    {
+      "id": "gullivers-travels",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jonathan-swift/gullivers-travels",
+      "url": "https://standardebooks.org/ebooks/jonathan-swift/gullivers-travels/downloads/jonathan-swift_gullivers-travels.epub?source=download",
+      "file": "jonathan-swift_gullivers-travels.epub",
+      "licence": "se-cc0",
+      "year": 1726,
+      "genres": [
+        "Satire",
+        "Fantasy"
+      ]
+    },
+    {
+      "id": "flatland",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/edwin-a-abbott/flatland",
+      "url": "https://standardebooks.org/ebooks/edwin-a-abbott/flatland/downloads/edwin-a-abbott_flatland.epub?source=download",
+      "file": "edwin-a-abbott_flatland.epub",
+      "licence": "se-cc0",
+      "year": 1884,
+      "genres": [
+        "Science Fiction",
+        "Satire"
+      ]
+    },
+    {
+      "id": "king-solomons-mines",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/h-rider-haggard/king-solomons-mines",
+      "url": "https://standardebooks.org/ebooks/h-rider-haggard/king-solomons-mines/downloads/h-rider-haggard_king-solomons-mines.epub?source=download",
+      "file": "h-rider-haggard_king-solomons-mines.epub",
+      "licence": "se-cc0",
+      "year": 1885,
+      "genres": [
+        "Adventure"
+      ]
+    },
+    {
+      "id": "the-awakening",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/kate-chopin/the-awakening",
+      "url": "https://standardebooks.org/ebooks/kate-chopin/the-awakening/downloads/kate-chopin_the-awakening.epub?source=download",
+      "file": "kate-chopin_the-awakening.epub",
+      "licence": "se-cc0",
+      "year": 1899,
+      "genres": [
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "crime-and-punishment",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/fyodor-dostoevsky/crime-and-punishment/constance-garnett",
+      "url": "https://standardebooks.org/ebooks/fyodor-dostoevsky/crime-and-punishment/constance-garnett/downloads/fyodor-dostoevsky_crime-and-punishment_constance-garnett.epub?source=download",
+      "file": "fyodor-dostoevsky_crime-and-punishment_constance-garnett.epub",
+      "licence": "se-cc0",
+      "year": 1866,
+      "genres": [
+        "Classics",
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "anna-karenina",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/leo-tolstoy/anna-karenina/constance-garnett",
+      "url": "https://standardebooks.org/ebooks/leo-tolstoy/anna-karenina/constance-garnett/downloads/leo-tolstoy_anna-karenina_constance-garnett.epub?source=download",
+      "file": "leo-tolstoy_anna-karenina_constance-garnett.epub",
+      "licence": "se-cc0",
+      "year": 1878,
+      "genres": [
+        "Classics",
+        "Romance"
+      ]
+    },
+    {
+      "id": "war-and-peace",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/leo-tolstoy/war-and-peace/louise-maude_aylmer-maude",
+      "url": "https://standardebooks.org/ebooks/leo-tolstoy/war-and-peace/louise-maude_aylmer-maude/downloads/leo-tolstoy_war-and-peace_louise-maude-aylmer-maude.epub?source=download",
+      "file": "leo-tolstoy_war-and-peace_louise-maude-aylmer-maude.epub",
+      "licence": "se-cc0",
+      "year": 1869,
+      "genres": [
+        "Historical Fiction",
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-count-of-monte-cristo",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/alexandre-dumas/the-count-of-monte-cristo/chapman-and-hall",
+      "url": "https://standardebooks.org/ebooks/alexandre-dumas/the-count-of-monte-cristo/chapman-and-hall/downloads/alexandre-dumas_the-count-of-monte-cristo_chapman-and-hall.epub?source=download",
+      "file": "alexandre-dumas_the-count-of-monte-cristo_chapman-and-hall.epub",
+      "licence": "se-cc0",
+      "year": 1846,
+      "genres": [
+        "Adventure",
+        "Historical Fiction"
+      ]
+    },
+    {
+      "id": "the-three-musketeers",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/alexandre-dumas/the-three-musketeers/william-robson",
+      "url": "https://standardebooks.org/ebooks/alexandre-dumas/the-three-musketeers/william-robson/downloads/alexandre-dumas_the-three-musketeers_william-robson.epub?source=download",
+      "file": "alexandre-dumas_the-three-musketeers_william-robson.epub",
+      "licence": "se-cc0",
+      "year": 1844,
+      "genres": [
+        "Adventure",
+        "Historical Fiction"
+      ],
+      "series": "The d'Artagnan Romances",
+      "seriesIndex": 1.0
+    },
+    {
+      "id": "around-the-world-in-eighty-days",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/jules-verne/around-the-world-in-eighty-days/george-makepeace-towle",
+      "url": "https://standardebooks.org/ebooks/jules-verne/around-the-world-in-eighty-days/george-makepeace-towle/downloads/jules-verne_around-the-world-in-eighty-days_george-makepeace-towle.epub?source=download",
+      "file": "jules-verne_around-the-world-in-eighty-days_george-makepeace-towle.epub",
+      "licence": "se-cc0",
+      "year": 1873,
+      "genres": [
+        "Adventure"
+      ]
+    },
+    {
+      "id": "don-quixote",
+      "use": "library",
+      "page": "https://standardebooks.org/ebooks/miguel-de-cervantes-saavedra/don-quixote/john-ormsby",
+      "url": "https://standardebooks.org/ebooks/miguel-de-cervantes-saavedra/don-quixote/john-ormsby/downloads/miguel-de-cervantes-saavedra_don-quixote_john-ormsby.epub?source=download",
+      "file": "miguel-de-cervantes-saavedra_don-quixote_john-ormsby.epub",
+      "licence": "se-cc0",
+      "year": 1605,
+      "genres": [
+        "Classics",
+        "Satire"
+      ]
+    },
+    {
+      "id": "les-miserables",
+      "use": "wishlist",
+      "page": "https://standardebooks.org/ebooks/victor-hugo/les-miserables/isabel-f-hapgood",
+      "url": "https://standardebooks.org/ebooks/victor-hugo/les-miserables/isabel-f-hapgood/downloads/victor-hugo_les-miserables_isabel-f-hapgood.epub?source=download",
+      "file": "victor-hugo_les-miserables_isabel-f-hapgood.epub",
+      "licence": "se-cc0",
+      "year": 1862,
+      "genres": [
+        "Historical Fiction",
+        "Classics"
+      ]
+    },
+    {
+      "id": "the-odyssey",
+      "use": "wishlist",
+      "page": "https://standardebooks.org/ebooks/homer/the-odyssey/william-cullen-bryant",
+      "url": "https://standardebooks.org/ebooks/homer/the-odyssey/william-cullen-bryant/downloads/homer_the-odyssey_william-cullen-bryant.epub?source=download",
+      "file": "homer_the-odyssey_william-cullen-bryant.epub",
+      "licence": "se-cc0",
+      "genres": [
+        "Poetry",
+        "Classics"
+      ]
+    },
+    {
+      "id": "kim",
+      "use": "wishlist",
+      "page": "https://standardebooks.org/ebooks/rudyard-kipling/kim",
+      "url": "https://standardebooks.org/ebooks/rudyard-kipling/kim/downloads/rudyard-kipling_kim.epub?source=download",
+      "file": "rudyard-kipling_kim.epub",
+      "licence": "se-cc0",
+      "year": 1901,
+      "genres": [
+        "Adventure"
+      ]
+    },
+    {
+      "id": "my-antonia",
+      "use": "wishlist",
+      "page": "https://standardebooks.org/ebooks/willa-cather/my-antonia",
+      "url": "https://standardebooks.org/ebooks/willa-cather/my-antonia/downloads/willa-cather_my-antonia.epub?source=download",
+      "file": "willa-cather_my-antonia.epub",
+      "licence": "se-cc0",
+      "year": 1918,
+      "genres": [
+        "Literary Fiction"
+      ]
+    },
+    {
+      "id": "the-art-of-war",
+      "use": "pdf",
+      "page": "https://standardebooks.org/ebooks/sun-tzu/the-art-of-war/lionel-giles",
+      "url": "https://standardebooks.org/ebooks/sun-tzu/the-art-of-war/lionel-giles/downloads/sun-tzu_the-art-of-war_lionel-giles.epub?source=download",
+      "file": "sun-tzu_the-art-of-war_lionel-giles.epub",
+      "licence": "se-cc0",
+      "genres": [
+        "Philosophy",
+        "Non-fiction"
+      ]
+    },
+    {
+      "id": "meditations",
+      "use": "pdf",
+      "page": "https://standardebooks.org/ebooks/marcus-aurelius/meditations/george-long",
+      "url": "https://standardebooks.org/ebooks/marcus-aurelius/meditations/george-long/downloads/marcus-aurelius_meditations_george-long.epub?source=download",
+      "file": "marcus-aurelius_meditations_george-long.epub",
+      "licence": "se-cc0",
+      "genres": [
+        "Philosophy"
+      ]
+    },
+    {
+      "id": "the-prince",
+      "use": "pdf",
+      "page": "https://standardebooks.org/ebooks/niccolo-machiavelli/the-prince/w-k-marriott",
+      "url": "https://standardebooks.org/ebooks/niccolo-machiavelli/the-prince/w-k-marriott/downloads/niccolo-machiavelli_the-prince_w-k-marriott.epub?source=download",
+      "file": "niccolo-machiavelli_the-prince_w-k-marriott.epub",
+      "licence": "se-cc0",
+      "year": 1532,
+      "genres": [
+        "Philosophy",
+        "Non-fiction"
+      ]
+    }
+  ],
+  "audio": [
+    {
+      "id": "a-christmas-carol-librivox",
+      "attachTo": "a-christmas-carol",
+      "page": "https://librivox.org/a-christmas-carol-by-charles-dickens/",
+      "archive": "https://archive.org/details/A_Christmas_Carol",
+      "licence": "librivox-pd",
+      "narrator": "LibriVox volunteers",
+      "files": [
+        {
+          "file": "A_Christmas_Carol_Preface_and_Stave_1_Dickens_64kb.mp3",
+          "url": "https://archive.org/download/A_Christmas_Carol/A_Christmas_Carol_Preface_and_Stave_1_Dickens_64kb.mp3"
+        },
+        {
+          "file": "A_Christmas_Carol_Stave_2_Dickens_64kb.mp3",
+          "url": "https://archive.org/download/A_Christmas_Carol/A_Christmas_Carol_Stave_2_Dickens_64kb.mp3"
+        },
+        {
+          "file": "A_Christmas_Carol_Stave_3_Dickens_64kb.mp3",
+          "url": "https://archive.org/download/A_Christmas_Carol/A_Christmas_Carol_Stave_3_Dickens_64kb.mp3"
+        },
+        {
+          "file": "A_Christmas_Carol_Stave_4_Dickens_64kb.mp3",
+          "url": "https://archive.org/download/A_Christmas_Carol/A_Christmas_Carol_Stave_4_Dickens_64kb.mp3"
+        },
+        {
+          "file": "A_Christmas_Carol_Stave_5_Dickens_64kb.mp3",
+          "url": "https://archive.org/download/A_Christmas_Carol/A_Christmas_Carol_Stave_5_Dickens_64kb.mp3"
+        }
+      ]
+    }
+  ]
+}
