@@ -22,6 +22,10 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 
 import 'epub_pagination.dart';
 
+/// How long a page turn glides. Short on purpose: it is a hint of direction,
+/// not a show, and a reader tapping through a chapter must never wait on it.
+const pageTurnDuration = Duration(milliseconds: 200);
+
 /// Shows [child] — the chapter column — one page at a time.
 ///
 /// [anchor] says which page; the view resolves it against its own layout every
@@ -29,7 +33,14 @@ import 'epub_pagination.dart';
 /// chapter's long parse finishing) can never show a page from the old one.
 /// [onPaginated] reports each new pagination so the reader can count pages and
 /// turn them; it is called after the frame, never during layout.
-class PagedChapterView extends StatelessWidget {
+///
+/// **The glide.** A turn to the next or previous page slides the one painted
+/// column from where the old page started to where the new one does, over
+/// [pageTurnDuration]. It is one painting of the column moved about, not a
+/// second layout and not a second copy: the chapter is never laid out again, and
+/// its repaint boundary's recording is reused every frame. Nothing glides when
+/// the system asks for reduced motion (`disableAnimations`).
+class PagedChapterView extends StatefulWidget {
   const PagedChapterView({
     super.key,
     required this.anchor,
@@ -42,16 +53,34 @@ class PagedChapterView extends StatelessWidget {
   final Widget child;
 
   @override
+  State<PagedChapterView> createState() => _PagedChapterViewState();
+}
+
+class _PagedChapterViewState extends State<PagedChapterView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _turn =
+      AnimationController(vsync: this, duration: pageTurnDuration);
+
+  @override
+  void dispose() {
+    _turn.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final animate = !MediaQuery.disableAnimationsOf(context);
     return LayoutBuilder(
       builder: (context, constraints) => PageImageCap(
         // A picture taller than the page is scaled to fit it: there is no page
         // to put the rest of it on.
         maxHeight: constraints.maxHeight,
         child: _PagedViewport(
-          anchor: anchor,
-          onPaginated: onPaginated,
-          child: RepaintBoundary(child: child),
+          anchor: widget.anchor,
+          onPaginated: widget.onPaginated,
+          turn: _turn,
+          animate: animate,
+          child: RepaintBoundary(child: widget.child),
         ),
       ),
     );
@@ -62,49 +91,102 @@ class _PagedViewport extends SingleChildRenderObjectWidget {
   const _PagedViewport({
     required this.anchor,
     required this.onPaginated,
+    required this.turn,
+    required this.animate,
     super.child,
   });
 
   final PageAnchor anchor;
   final ValueChanged<ChapterPages> onPaginated;
+  final AnimationController turn;
+  final bool animate;
 
   @override
   RenderPagedViewport createRenderObject(BuildContext context) =>
-      RenderPagedViewport(anchor, onPaginated: onPaginated);
+      RenderPagedViewport(anchor,
+          onPaginated: onPaginated, turn: turn, animate: animate);
 
   @override
   void updateRenderObject(
       BuildContext context, RenderPagedViewport renderObject) {
     renderObject
-      ..anchor = anchor
-      ..onPaginated = onPaginated;
+      ..animate = animate
+      ..onPaginated = onPaginated
+      ..anchor = anchor;
   }
 }
 
 /// Lays its child out at unbounded height and paints one page of it.
 class RenderPagedViewport extends RenderBox
     with RenderObjectWithChildMixin<RenderBox> {
-  RenderPagedViewport(this._anchor, {required this.onPaginated});
+  RenderPagedViewport(
+    this._anchor, {
+    required this.onPaginated,
+    this.turn,
+    this.animate = false,
+  }) {
+    turn?.addListener(markNeedsPaint);
+  }
 
   ValueChanged<ChapterPages> onPaginated;
+
+  /// Drives the glide: 0 at the old page, 1 at the new one. Null for none.
+  final AnimationController? turn;
+
+  /// False under reduced motion: pages then change in one frame.
+  bool animate;
 
   PageAnchor get anchor => _anchor;
   PageAnchor _anchor;
   set anchor(PageAnchor value) {
     if (value == _anchor) return;
+    final pages = _pages;
+    final before = _page;
+    // Where the old page is on screen right now (possibly part-way through an
+    // earlier glide), so a quick second tap carries on from there.
+    final shownStart = _start;
+    final shownVisible = _visible;
     _anchor = value;
     // Paint only: a page turn never lays anything out again.
     markNeedsPaint();
     markNeedsSemanticsUpdate();
+    final after = _page;
+    final glide = animate &&
+        turn != null &&
+        pages != null &&
+        pages.ready &&
+        after != before &&
+        (after - before).abs() == 1;
+    if (glide) {
+      _fromStart = shownStart;
+      _fromVisible = shownVisible;
+      turn!.forward(from: 0);
+    } else {
+      turn?.value = 1;
+    }
   }
 
   ChapterPages? _pages;
   ChapterPages? _reported;
   bool _reportScheduled = false;
 
+  double _fromStart = 0;
+  double _fromVisible = 0;
+
   int get _page => _pages?.pageFor(_anchor) ?? 0;
-  double get _start => _pages?.starts[_page] ?? 0;
-  double get _visible => _pages?.visibleHeight(_page) ?? size.height;
+  double get _targetStart => _pages?.starts[_page] ?? 0;
+  double get _targetVisible => _pages?.visibleHeight(_page) ?? size.height;
+
+  /// Where the page's slice starts and how tall it is *now*: the target, or a
+  /// point on the way there while a turn is gliding.
+  double get _glide {
+    final t = turn;
+    if (t == null || !t.isAnimating) return 1;
+    return Curves.easeOutCubic.transform(t.value);
+  }
+
+  double get _start => ui.lerpDouble(_fromStart, _targetStart, _glide)!;
+  double get _visible => ui.lerpDouble(_fromVisible, _targetVisible, _glide)!;
 
   @override
   bool get isRepaintBoundary => true;
@@ -125,6 +207,9 @@ class RenderPagedViewport extends RenderBox
       contentHeight: child.size.height,
       ready: measured.ready,
     );
+    // A new pagination ends any glide: the old rectangle belongs to the old
+    // page boundaries.
+    turn?.value = 1;
     _report();
   }
 
@@ -160,6 +245,7 @@ class RenderPagedViewport extends RenderBox
 
   @override
   void dispose() {
+    turn?.removeListener(markNeedsPaint);
     _clip.layer = null;
     super.dispose();
   }
