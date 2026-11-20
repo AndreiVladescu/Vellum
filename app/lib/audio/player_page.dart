@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import '../data/library_repository.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../snack_bars.dart';
 import 'attach_audio.dart';
+import 'audio_download_view.dart';
+import 'audio_downloads.dart';
 import 'audio_engine.dart';
 import 'audio_formats.dart';
 import 'audiobook_player.dart';
@@ -61,13 +64,18 @@ class PlayerPage extends StatefulWidget {
     required this.bookId,
     required this.repository,
     PlaybackHost? host,
-  }) : host = host ?? PlaybackHost.instance;
+    AudioDownloads? downloads,
+  })  : host = host ?? PlaybackHost.instance,
+        downloads = downloads ?? AudioDownloads.instance;
 
   final String bookId;
   final LibraryRepository repository;
 
   /// What is playing; the app's own unless a test passes one.
   final PlaybackHost host;
+
+  /// Fetches audio that is not on this device yet.
+  final AudioDownloads downloads;
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -105,6 +113,17 @@ class _PlayerPageState extends State<PlayerPage> {
         untitledChapter: l10n.playerChapterNumber,
       );
       _player = opened.player..addListener(_onPlayerChanged);
+      // Listen on a book whose audio is not here (docs/AUDIOBOOKS.md §6):
+      // start fetching it, the part with the position first, so play can
+      // begin as soon as that one has arrived. The Wi-Fi rule may hold it
+      // back; the panel at the top then asks.
+      if (_player!.parts.any((f) => !f.present)) {
+        unawaited(widget.downloads.download(
+          widget.repository,
+          widget.bookId,
+          firstFileId: _player!.currentPartFile.id,
+        ));
+      }
       // Only for a book just opened: one already playing has no use for
       // "go to where you were on another device".
       if (mounted && !opened.reused) await _maybeOfferJump();
@@ -194,8 +213,20 @@ class _PlayerPageState extends State<PlayerPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
+    final player = _player;
     return Scaffold(
-      appBar: AppBar(title: Text(_book?.title ?? '')),
+      appBar: AppBar(
+        title: Text(_book?.title ?? ''),
+        actions: [
+          if (player != null && player.parts.isNotEmpty)
+            _RemoveDownloadMenu(
+              bookId: widget.bookId,
+              repository: widget.repository,
+              downloads: widget.downloads,
+              host: widget.host,
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -227,6 +258,16 @@ class _PlayerPageState extends State<PlayerPage> {
     final maxMs = total.inMilliseconds <= 0 ? 1.0 : total.inMilliseconds.toDouble();
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: AudioDownloadPanel(
+            bookId: widget.bookId,
+            repository: widget.repository,
+            downloads: widget.downloads,
+            host: widget.host,
+            firstFileId: () => _player?.currentPartFile.id,
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(
@@ -285,11 +326,19 @@ class _PlayerPageState extends State<PlayerPage> {
               icon: const Icon(Icons.replay_30),
               onPressed: () => player.skip(const Duration(seconds: -30)),
             ),
+            // Asked to play while the part downloads: it shows as playing,
+            // so a second tap takes the wish back.
             IconButton.filled(
               iconSize: 40,
-              tooltip: player.playing ? l10n.playerPause : l10n.playerPlay,
-              icon: Icon(player.playing ? Icons.pause : Icons.play_arrow),
-              onPressed: player.playing ? player.pause : player.play,
+              tooltip: player.playing || player.playPending
+                  ? l10n.playerPause
+                  : l10n.playerPlay,
+              icon: Icon(player.playing || player.playPending
+                  ? Icons.pause
+                  : Icons.play_arrow),
+              onPressed: player.playing || player.playPending
+                  ? player.pause
+                  : player.play,
             ),
             IconButton(
               tooltip: l10n.playerForward30,
@@ -305,6 +354,33 @@ class _PlayerPageState extends State<PlayerPage> {
             ),
           ],
         ),
+        if (player.waitingForPart || player.partMissing)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (player.waitingForPart)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                Flexible(
+                  child: Text(
+                    player.waitingForPart
+                        ? l10n.playerWaitingForPart
+                        : l10n.playerPartNotHere,
+                    style: theme.textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
         Wrap(
           alignment: WrapAlignment.center,
           spacing: 8,
@@ -350,6 +426,64 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The player's overflow menu: Remove download, once some of the book's
+/// audio is on this device. Removing stops the book, so the page closes.
+class _RemoveDownloadMenu extends StatefulWidget {
+  const _RemoveDownloadMenu({
+    required this.bookId,
+    required this.repository,
+    required this.downloads,
+    required this.host,
+  });
+
+  final String bookId;
+  final LibraryRepository repository;
+  final AudioDownloads downloads;
+  final PlaybackHost host;
+
+  @override
+  State<_RemoveDownloadMenu> createState() => _RemoveDownloadMenuState();
+}
+
+class _RemoveDownloadMenuState extends State<_RemoveDownloadMenu> {
+  // Once, not per build: the page rebuilds on every position tick.
+  late final Stream<List<BookFile>> _files =
+      widget.repository.watchFilesOf(widget.bookId);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<BookFile>>(
+      stream: _files,
+      builder: (context, snapshot) {
+        final here = [
+          for (final f in snapshot.data ?? const <BookFile>[])
+            if (isAudioFormat(f.format) && f.present) f,
+        ];
+        if (here.isEmpty) return const SizedBox.shrink();
+        return PopupMenuButton<void>(
+          itemBuilder: (_) => [
+            PopupMenuItem<void>(
+              onTap: () async {
+                final navigator = Navigator.of(context);
+                final removed = await confirmRemoveAudioDownload(
+                  context,
+                  repository: widget.repository,
+                  bookId: widget.bookId,
+                  size: here.fold<int>(0, (n, f) => n + f.sizeBytes),
+                  downloads: widget.downloads,
+                  host: widget.host,
+                );
+                if (removed && navigator.mounted) navigator.pop();
+              },
+              child: Text(L10n.of(context).audioDownloadRemove),
+            ),
+          ],
+        );
+      },
     );
   }
 }

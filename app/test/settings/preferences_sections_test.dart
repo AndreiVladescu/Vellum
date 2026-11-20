@@ -96,9 +96,10 @@ void main() {
       'appearance', 'wallpaper', 'books', 'genres',
       if (textIndexSupportedHere) 'index',
       'samples', 'autoPush', 'readingPosition', 'backgroundSync',
+      'audioWifiOnly',
       // 'sharedShelves' only when connected to a server.
-      'tray', 'loanReminders', 'backup', 'trash', 'health', 'diagnostics',
-      'clearLibrary',
+      'tray', 'loanReminders', 'backup', 'audioStorage', 'trash', 'health',
+      'diagnostics', 'clearLibrary',
     });
     expect(sections.map((s) => s.id),
         ['appearance', 'shelf', 'sync', 'notifications', 'data']);
@@ -139,6 +140,25 @@ void main() {
     await settle(tester, rounds: 30);
     expect(find.text('Remove every book from this device'), findsOneWidget,
         reason: 'the page scrolled to the setting it was asked for');
+    await unmount(tester);
+  });
+
+  testWidgets('search finds the audiobook download settings', (tester) async {
+    await load(tester);
+    await pump(tester);
+    // A keyword, not the title: someone thinks "mobile data", not "Wi-Fi".
+    await tester.enterText(find.byType(TextField), 'mobile data');
+    await settle(tester);
+    expect(find.byKey(const ValueKey('prefs-result-audioWifiOnly')),
+        findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'storage');
+    await settle(tester);
+    expect(find.byKey(const ValueKey('prefs-result-audioStorage')),
+        findsOneWidget);
+    // The backup line is found by the switch's own title.
+    await tester.enterText(find.byType(TextField), 'audiobook audio');
+    await settle(tester);
+    expect(find.byKey(const ValueKey('prefs-result-backup')), findsOneWidget);
     await unmount(tester);
   });
 

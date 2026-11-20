@@ -73,7 +73,8 @@ class BackupScheduler {
     try {
       if (!await folder.exists()) await folder.create(recursive: true);
       final dest = File(p.join(folder.path, nameFor(now(), encrypted: passphrase != null)));
-      await BackupService(repository).exportTo(dest, passphrase: passphrase);
+      await BackupService(repository).exportTo(dest,
+          passphrase: passphrase, includeAudio: settings.backupIncludeAudio);
       // Only after a successful write: a failure must leave the schedule due,
       // or one bad day silently skips a whole interval.
       await settings.setLastBackupAt(now());

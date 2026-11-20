@@ -280,6 +280,9 @@ void main() {
     // the chapter jump.
     await tester.pumpWidget(const SizedBox());
     await settle();
+    // Drift schedules a zero-length timer when a watched stream (the
+    // download panel's) loses its last listener; let it fire.
+    await tester.pump(const Duration(milliseconds: 1));
     expect(engine.isPlaying, isTrue);
     final saved = await tester.runAsync(() => (repo.db.select(repo.db.books)
           ..where((b) => b.id.equals('b')))

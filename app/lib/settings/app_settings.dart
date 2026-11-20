@@ -525,6 +525,35 @@ class AppSettingsStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Whether the app's own backups, manual and scheduled, carry audiobook
+  /// audio. **Off by default** (docs/AUDIOBOOKS.md §6): a few audiobooks
+  /// would make every archive gigabytes, and synced audio is already on the
+  /// server. The rows still go in, so a restore knows the books and fetches
+  /// the audio on demand.
+  bool get backupIncludeAudio => _prefs.getBool(backupIncludeAudioKey) ?? false;
+
+  static const backupIncludeAudioKey = 'settings.backupIncludeAudio';
+
+  Future<void> setBackupIncludeAudio(bool value) async {
+    await _prefs.setBool(backupIncludeAudioKey, value);
+    notifyListeners();
+  }
+
+  // ---- Audiobook downloads (docs/AUDIOBOOKS.md §6) -------------------------
+
+  /// Whether audiobook audio downloads only on an unmetered network (Wi-Fi).
+  /// **On by default, and Android only**: a computer ignores it. On mobile
+  /// data the player offers "Download anyway" for one book.
+  bool get audioWifiOnly => _prefs.getBool(audioWifiOnlyKey) ?? true;
+
+  /// Public so `AudioDownloads` can read it without an [AppSettingsStore].
+  static const audioWifiOnlyKey = 'settings.audioWifiOnly';
+
+  Future<void> setAudioWifiOnly(bool value) async {
+    await _prefs.setBool(audioWifiOnlyKey, value);
+    notifyListeners();
+  }
+
   /// Whether the first-run introduction has been shown (plan 5 #41). Set as soon
   /// as it opens, not when it completes: someone who swipes it away has answered,
   /// and showing it again next launch would be nagging.

@@ -2,6 +2,9 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Metadata search + cover downloads (release builds need this explicitly). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- "Download audiobooks on Wi-Fi only": MainActivity asks the
+         ConnectivityManager whether the active network is metered. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- ISBN barcode scanning (plan 5 #16). Requested at first use by
          mobile_scanner; the feature falls back to typing an ISBN when it is
          denied, so the camera stays optional. `required="false"` keeps the app

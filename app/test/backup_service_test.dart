@@ -379,4 +379,133 @@ void main() {
     expect(books.single.title, 'Safe', reason: 'library must be untouched');
     await repo.db.close();
   });
+
+  // ---- audiobook audio (docs/AUDIOBOOKS.md §6) ---------------------------
+
+  group('audiobook audio', () {
+    /// A book with an EPUB and a two-part mp3 audiobook, all here.
+    Future<LibraryRepository> library() async {
+      final source = await _repo(dir, 'source.sqlite');
+      final db = source.db;
+      await db.into(db.books).insert(BooksCompanion.insert(id: 'b', title: 'Dune'));
+      for (final (id, format) in [('t', 'epub'), ('a1', 'mp3'), ('a2', 'mp3')]) {
+        await db.into(db.bookFiles).insert(BookFilesCompanion.insert(
+              id: id,
+              bookId: 'b',
+              format: format,
+              path: 'files/$id.$format',
+              sizeBytes: 4,
+              sha256: id,
+            ));
+        File(p.join(dir.path, 'files', '$id.$format'))
+            .writeAsBytesSync([1, 2, 3, id.length]);
+      }
+      return source;
+    }
+
+    Future<(LibraryRepository, Directory)> restore(File zip) async {
+      final destDir = Directory(p.join(dir.path, 'dest'))..createSync();
+      final destDbFile = File(p.join(destDir.path, 'vellum.sqlite'));
+      final dest = await _repo(destDir, 'vellum.sqlite');
+      expect(
+        await BackupService(dest, databaseFile: destDbFile).restoreFrom(zip),
+        isTrue,
+      );
+      final reopened = await LibraryRepository.forTesting(
+        VellumDatabase(NativeDatabase(destDbFile)),
+        destDir,
+      );
+      return (reopened, destDir);
+    }
+
+    test('is left out by default; the restore downloads it on demand', () async {
+      final source = await library();
+      final zip = File(p.join(dir.path, 'backup.zip'));
+      await BackupService(source).exportTo(zip);
+      expect((await source.fileById('a1'))!.present, isTrue,
+          reason: 'the live library is not touched');
+      await source.db.close();
+
+      final names = [
+        for (final f in ZipDecoder().decodeBytes(zip.readAsBytesSync()).files)
+          f.name,
+      ];
+      expect(names, contains('files/t.epub'));
+      expect(names.where((n) => n.endsWith('.mp3')), isEmpty);
+
+      // Verify knows the audio was left out on purpose: nothing "missing".
+      final check = await BackupService(source).verify(zip);
+      expect(check.ok, isTrue);
+      expect(check.missing, isEmpty);
+
+      final (restored, _) = await restore(zip);
+      final rows = {
+        for (final f in await restored.db.select(restored.db.bookFiles).get())
+          f.id: f.present,
+      };
+      expect(rows, {'t': true, 'a1': false, 'a2': false},
+          reason: 'the parts are known, and waiting to be downloaded');
+      await restored.db.close();
+    });
+
+    test('goes in when asked, and comes back present', () async {
+      final source = await library();
+      final zip = File(p.join(dir.path, 'backup.zip'));
+      await BackupService(source).exportTo(zip, includeAudio: true);
+      await source.db.close();
+
+      final names = [
+        for (final f in ZipDecoder().decodeBytes(zip.readAsBytesSync()).files)
+          f.name,
+      ];
+      expect(names, containsAll(['files/a1.mp3', 'files/a2.mp3']));
+      expect((await BackupService(source).verify(zip)).ok, isTrue);
+
+      final (restored, destDir) = await restore(zip);
+      for (final id in ['a1', 'a2']) {
+        expect((await restored.fileById(id))!.present, isTrue);
+        expect(File(p.join(destDir.path, 'files', '$id.mp3')).existsSync(), isTrue);
+      }
+      await restored.db.close();
+    });
+
+    test('a restore trusts the files over the rows', () async {
+      // An archive whose rows say "present" but which lacks the bytes (one
+      // made by an older 1.5 build, then pruned by hand) still restores to
+      // parts that download on demand, not to "missing file" damage.
+      final source = await library();
+      final zip = File(p.join(dir.path, 'backup.zip'));
+      await BackupService(source).exportTo(zip, includeAudio: true);
+      await source.db.close();
+      final archive = ZipDecoder().decodeBytes(zip.readAsBytesSync());
+      final pruned = Archive();
+      for (final f in archive.files) {
+        if (f.name != 'files/a2.mp3') pruned.addFile(f);
+      }
+      zip.writeAsBytesSync(ZipEncoder().encode(pruned));
+
+      final (restored, _) = await restore(zip);
+      expect((await restored.fileById('a1'))!.present, isTrue);
+      expect((await restored.fileById('a2'))!.present, isFalse);
+      await restored.db.close();
+    });
+
+    test('the scheduled backup follows the preference', () async {
+      final source = await library();
+      SharedPreferences.setMockInitialValues({
+        'settings.backupFrequency': 'daily',
+        'settings.backupFolder': p.join(dir.path, 'out'),
+      });
+      final settings = await AppSettingsStore.load();
+      expect(settings.backupIncludeAudio, isFalse, reason: 'off by default');
+      await BackupScheduler(repository: source, settings: settings).runIfDue();
+      final first = Directory(p.join(dir.path, 'out')).listSync().single as File;
+      final names = [
+        for (final f in ZipDecoder().decodeBytes(first.readAsBytesSync()).files)
+          f.name,
+      ];
+      expect(names.where((n) => n.endsWith('.mp3')), isEmpty);
+      await source.db.close();
+    });
+  });
 }

@@ -2,6 +2,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../audio/attach_audio.dart';
+import '../audio/audio_download_view.dart';
 import '../audio/audio_formats.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
@@ -109,15 +110,30 @@ class DigitalFormatsSection extends StatelessWidget {
     final parts = [for (final f in files) if (isAudioFormat(f.format)) f];
     final ms = parts.fold<int>(0, (sum, f) => sum + (f.durationMs ?? 0));
     final bytes = parts.fold<int>(0, (sum, f) => sum + f.sizeBytes);
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.headphones_outlined),
-      title: Text(l10n.formatsAudiobook),
-      subtitle: Text(l10n.formatsAudiobookDetail(
-        parts.length,
-        formatAudioTime(Duration(milliseconds: ms)),
-        (bytes / (1024 * 1024)).toStringAsFixed(1),
-      )),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.headphones_outlined),
+          title: Text(l10n.formatsAudiobook),
+          subtitle: Text(l10n.formatsAudiobookDetail(
+            parts.length,
+            formatAudioTime(Duration(milliseconds: ms)),
+            (bytes / (1024 * 1024)).toStringAsFixed(1),
+          )),
+        ),
+        // Audio comes on demand (docs/AUDIOBOOKS.md §6): whether it is here,
+        // Download or its progress, and Remove download.
+        Padding(
+          padding: const EdgeInsets.only(left: 56),
+          child: AudioDownloadPanel(
+            bookId: book.id,
+            repository: repository,
+            showWhenHere: true,
+          ),
+        ),
+      ],
     );
   }
 }

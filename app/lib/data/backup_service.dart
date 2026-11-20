@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../audio/audio_formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'background_work.dart';
 import 'backup_crypto.dart';
@@ -107,6 +108,7 @@ class BackupService {
   /// ~0% gain, so they're stored (not recompressed) in the archive.
   static const _storedExtensions = {
     'pdf', 'epub', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip',
+    ...audioFormats,
   };
 
   /// Test seam: the live database file to replace on restore. Defaults to
@@ -135,11 +137,21 @@ class BackupService {
   /// With a [passphrase], the archive is built to a temporary file and then
   /// sealed into [dest] (see [BackupCrypto]); without one it stays a plain
   /// `.zip` that any tool can open, which is the default on purpose.
-  Future<void> exportTo(File dest, {String? passphrase}) async {
+  ///
+  /// Audiobook audio is left out unless [includeAudio] (docs/AUDIOBOOKS.md
+  /// §6): a few audiobooks would make every archive gigabytes, and synced
+  /// audio is on the server. Its rows still go in, marked not `present`, so
+  /// a restore knows the books and downloads the audio on demand; the
+  /// manifest says it was left out, so Verify does not call it missing.
+  Future<void> exportTo(
+    File dest, {
+    String? passphrase,
+    bool includeAudio = false,
+  }) async {
     if (passphrase != null && passphrase.isNotEmpty) {
       final plain = File('${dest.path}.plain');
       try {
-        await _exportZip(plain);
+        await _exportZip(plain, includeAudio: includeAudio);
         await BackupCrypto.encryptFile(
           source: plain,
           dest: dest,
@@ -150,14 +162,27 @@ class BackupService {
       }
       return;
     }
-    await _exportZip(dest);
+    await _exportZip(dest, includeAudio: includeAudio);
   }
 
-  Future<void> _exportZip(File dest) async {
+  /// `('m4b', 'm4a', 'mp3')`, for SQL.
+  static final _audioFormatList =
+      '(${audioFormats.map((f) => "'$f'").join(', ')})';
+
+  Future<void> _exportZip(File dest, {required bool includeAudio}) async {
     final dataDir = repository.dataDir;
     final snapshot = File(p.join(dataDir.path, '.backup-snapshot.sqlite'));
     if (await snapshot.exists()) await snapshot.delete();
     await repository.db.customStatement('VACUUM INTO ?', [snapshot.path]);
+    if (!includeAudio) {
+      // The snapshot's audio rows say what the archive holds: no bytes.
+      await _inAttached(snapshot, (schema) async {
+        await repository.db.customStatement(
+            'UPDATE $schema.book_files SET present = 0 '
+            'WHERE LOWER(format) IN $_audioFormatList');
+      });
+    }
+    var audioLeftOut = 0;
     final encoder = ZipFileEncoder();
     // Filled as blobs are added, then written as the manifest at the end —
     // which is why the manifest is added last rather than first.
@@ -177,6 +202,10 @@ class BackupService {
           // Skip transfer leftovers; everything else in these dirs is a blob.
           if (entry is File && !entry.path.endsWith('.part')) {
             final ext = p.extension(entry.path).replaceFirst('.', '').toLowerCase();
+            if (sub == 'files' && !includeAudio && isAudioFormat(ext)) {
+              audioLeftOut++;
+              continue;
+            }
             final name = '$sub/${p.basename(entry.path)}';
             hashes[name] = await _sha256(entry);
             if (_storedExtensions.contains(ext)) {
@@ -204,6 +233,9 @@ class BackupService {
           // it needs no extra platform plugin to read.
           'schemaVersion': repository.db.schemaVersion,
           'counts': await _counts(),
+          // What was deliberately left out, so nobody mistakes it for loss.
+          'audio': includeAudio ? 'included' : 'excluded',
+          'audioFilesLeftOut': audioLeftOut,
           'blobs': hashes,
         }),
       ));
@@ -211,6 +243,51 @@ class BackupService {
     } finally {
       if (await snapshot.exists()) await snapshot.delete();
     }
+  }
+
+  /// Runs [body] with [file] attached to the live connection under a
+  /// schema name it is given, and detaches afterwards. The live connection
+  /// is how this edits a database file that is not open: the snapshot
+  /// before it is zipped, the incoming one before a restore swaps it in.
+  Future<void> _inAttached(
+    File file,
+    Future<void> Function(String schema) body,
+  ) async {
+    const schema = 'vellum_other';
+    final db = repository.db;
+    await db.customStatement('ATTACH DATABASE ? AS $schema', [file.path]);
+    try {
+      await body(schema);
+    } finally {
+      await db.customStatement('DETACH DATABASE $schema');
+    }
+  }
+
+  /// After a restore, an audio row is `present` exactly when the archive
+  /// brought its bytes: an archive without audio (the default since
+  /// docs/AUDIOBOOKS.md §6) leaves the parts to be downloaded on demand,
+  /// rather than as files the doctor would report missing. Older databases
+  /// without the column (before audiobooks) have no audio to reconcile.
+  Future<void> _reconcileAudio(File stagedDb, Directory staging) async {
+    await _inAttached(stagedDb, (schema) async {
+      final db = repository.db;
+      final columns = await db
+          .customSelect('PRAGMA $schema.table_info(book_files)')
+          .get();
+      if (!columns.any((c) => c.read<String>('name') == 'present')) return;
+      final rows = await db
+          .customSelect('SELECT id, path FROM $schema.book_files '
+              'WHERE LOWER(format) IN $_audioFormatList')
+          .get();
+      for (final row in rows) {
+        final path = row.read<String>('path');
+        final here = await File(p.join(staging.path, path)).exists();
+        await db.customStatement(
+          'UPDATE $schema.book_files SET present = ? WHERE id = ?',
+          [if (here) 1 else 0, row.read<String>('id')],
+        );
+      }
+    });
   }
 
   /// Counts worth showing before a restore — "12 books" is the difference
@@ -425,6 +502,9 @@ class BackupService {
         return false;
       }
 
+      // Before the live connection closes, since it is what edits the file.
+      await _reconcileAudio(stagedDb, staging);
+
       // Past this point we mutate the library: close the live connection so
       // the swap below can't race a write.
       final liveDb = await _databaseFile();
@@ -452,6 +532,9 @@ class BackupService {
           await live.create(recursive: true);
         }
       }
+      // Half-downloaded audio belonged to the library just replaced.
+      final partials = Directory(p.join(dataDir.path, 'audio-downloads'));
+      if (await partials.exists()) await partials.delete(recursive: true);
       return true;
     } finally {
       if (await staging.exists()) await staging.delete(recursive: true);

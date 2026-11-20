@@ -27,6 +27,8 @@ MIGRATED=(
   lib/account/user_profile.dart
   lib/audio/attach_audio.dart
   lib/audio/audio_engine.dart
+  lib/audio/audio_download_view.dart
+  lib/audio/audio_downloads.dart
   lib/audio/audio_formats.dart
   lib/audio/audiobook_import.dart
   lib/audio/audio_handler.dart

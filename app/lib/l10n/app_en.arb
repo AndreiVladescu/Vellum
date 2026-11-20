@@ -10776,5 +10776,101 @@
   "@continueWidgetListening": {"description": "Second line of the Android home-screen widget when it shows an audiobook; percent is how far through the audio, time where you are, like 1:02:33.", "placeholders": {"percent": {"type": "int"}, "time": {"type": "String"}}},
 
   "noAudiobooksHere": "No audiobooks here.",
-  "@noAudiobooksHere": {"description": "Shown when the Audiobooks filter is on and nothing in the current shelf has audio."}
+  "@noAudiobooksHere": {"description": "Shown when the Audiobooks filter is on and nothing in the current shelf has audio."},
+
+  "audioDownloadNotHere": "Not downloaded to this device · {size}",
+  "@audioDownloadNotHere": {"description": "Audiobook download state on the book page and player: nothing of it is here; size is the whole audiobook, like 430.2 MB.", "placeholders": {"size": {"type": "String"}}},
+
+  "audioDownloadPartlyHere": "{here} of {size} on this device",
+  "@audioDownloadPartlyHere": {"description": "Audiobook download state: some parts are here; here and size are sizes like 120.0 MB.", "placeholders": {"here": {"type": "String"}, "size": {"type": "String"}}},
+
+  "audioDownloadHere": "On this device · {size}",
+  "@audioDownloadHere": {"description": "Audiobook download state: all of its audio is here; size like 430.2 MB.", "placeholders": {"size": {"type": "String"}}},
+
+  "audioDownloadButton": "Download",
+  "@audioDownloadButton": {"description": "Button that downloads an audiobook's audio to this device."},
+
+  "audioDownloadProgress": "Downloading part {part} of {parts} · {received} of {size}",
+  "@audioDownloadProgress": {"description": "Progress line of an audiobook download; received and size are sizes like 120.0 MB.", "placeholders": {"part": {"type": "int"}, "parts": {"type": "int"}, "received": {"type": "String"}, "size": {"type": "String"}}},
+
+  "audioDownloadCancel": "Cancel",
+  "@audioDownloadCancel": {"description": "Button that stops an audiobook download; what has arrived is kept."},
+
+  "audioDownloadRemove": "Remove download",
+  "@audioDownloadRemove": {"description": "Action that deletes an audiobook's audio from this device; the book stays."},
+
+  "audioDownloadMetered": "You're on mobile data, and audiobooks download on Wi-Fi only.",
+  "@audioDownloadMetered": {"description": "Shown instead of downloading an audiobook on a metered network with the Wi-Fi-only preference on."},
+
+  "audioDownloadAnyway": "Download anyway ({size})",
+  "@audioDownloadAnyway": {"description": "Button that downloads this one audiobook on mobile data; size like 430.2 MB.", "placeholders": {"size": {"type": "String"}}},
+
+  "audioDownloadNoServer": "Sign in to your server to download this audiobook.",
+  "@audioDownloadNoServer": {"description": "Shown when an audiobook's audio is not here and the app has no server to fetch it from."},
+
+  "audioDownloadFailedNetwork": "The download stopped: {error}",
+  "@audioDownloadFailedNetwork": {"description": "Shown when an audiobook download failed after retrying; error is the technical reason.", "placeholders": {"error": {"type": "String"}}},
+
+  "audioDownloadFailedHash": "A downloaded part didn't match the server's copy, so it was thrown away.",
+  "@audioDownloadFailedHash": {"description": "Shown when a downloaded audiobook part failed its checksum."},
+
+  "audioDownloadRetry": "Try again",
+  "@audioDownloadRetry": {"description": "Button that restarts a failed audiobook download, continuing where it stopped."},
+
+  "audioRemoveTitle": "Remove the download?",
+  "@audioRemoveTitle": {"description": "Title of the dialog that confirms deleting an audiobook's audio from this device."},
+
+  "audioRemoveBody": "This frees {size} on this device. The audiobook stays in your library and on your server, with your place in it, and downloads again when you listen.",
+  "@audioRemoveBody": {"description": "Body of the remove-download dialog; size like 430.2 MB.", "placeholders": {"size": {"type": "String"}}},
+
+  "audioRemoveConfirm": "Remove",
+  "@audioRemoveConfirm": {"description": "Confirm button of the remove-download dialog."},
+
+  "audioRemoved": "Download removed",
+  "@audioRemoved": {"description": "Snack bar after an audiobook's audio was deleted from this device."},
+
+  "audioRemoveNotOnServer": "Not removed: your server doesn't hold all of this audiobook, so this device may have the only copy.",
+  "@audioRemoveNotOnServer": {"description": "Snack bar when an audiobook's audio cannot be removed safely."},
+
+  "playerWaitingForPart": "Waiting for this part to download…",
+  "@playerWaitingForPart": {"description": "Audiobook player: playback waits for the part at the position to arrive."},
+
+  "playerPartNotHere": "This part isn't on this device yet.",
+  "@playerPartNotHere": {"description": "Audiobook player: the part at the position has not been downloaded and nothing is fetching it."},
+
+  "prefsAudioWifiTitle": "Download audiobooks on Wi-Fi only",
+  "@prefsAudioWifiTitle": {"description": "Switch title on Preferences."},
+
+  "prefsAudioWifiSubtitle": "On mobile data, the player asks before downloading one.",
+  "@prefsAudioWifiSubtitle": {"description": "Switch subtitle on Preferences (Android)."},
+
+  "prefsAudioWifiDesktop": "Android only: a computer downloads audiobooks on any network.",
+  "@prefsAudioWifiDesktop": {"description": "Subtitle of the Wi-Fi-only switch on a computer, where it does nothing."},
+
+  "prefsKwAudioWifi": "audiobook audio download mobile data cellular metered network wifi",
+  "@prefsKwAudioWifi": {"description": "Extra search words for the audiobook Wi-Fi-only preference."},
+
+  "prefsAudioStorageTitle": "Audiobooks on this device",
+  "@prefsAudioStorageTitle": {"description": "Preferences entry: how much space downloaded audiobook audio takes."},
+
+  "prefsAudioStorageUsed": "{size} in {count, plural, =1{1 audiobook} other{{count} audiobooks}}",
+  "@prefsAudioStorageUsed": {"description": "Subtitle of the audiobook storage entry; size like 1.2 GB.", "placeholders": {"size": {"type": "String"}, "count": {"type": "int"}}},
+
+  "prefsAudioStorageNone": "No audiobook audio downloaded. Audio downloads when you listen.",
+  "@prefsAudioStorageNone": {"description": "Subtitle of the audiobook storage entry when none is here."},
+
+  "prefsKwAudioStorage": "audiobook audio storage space disk size downloaded remove free",
+  "@prefsKwAudioStorage": {"description": "Extra search words for the audiobook storage entry."},
+
+  "prefsBackupAudioTitle": "Include audiobook audio",
+  "@prefsBackupAudioTitle": {"description": "Switch in the backup section."},
+
+  "prefsBackupAudioOff": "Audiobook audio is not included; it stays on your server.",
+  "@prefsBackupAudioOff": {"description": "Subtitle of the include-audio backup switch when off."},
+
+  "prefsBackupAudioOffNoServer": "Audiobook audio is not included. With no server, this backup holds no copy of it.",
+  "@prefsBackupAudioOffNoServer": {"description": "Subtitle of the include-audio backup switch when off and the app is not connected to a server."},
+
+  "prefsBackupAudioOn": "Audiobook audio is included, which can make each backup much larger.",
+  "@prefsBackupAudioOn": {"description": "Subtitle of the include-audio backup switch when on."}
 }

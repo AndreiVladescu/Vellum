@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import '../audio/audio_formats.dart';
-import '../audio/audiobook_import.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -517,6 +516,30 @@ class SyncService {
             continue;
           }
           final rel = p.join('files', '${f.id}.${f.format}');
+          // Audio comes on demand (docs/AUDIOBOOKS.md §6): an audiobook can be
+          // gigabytes, and a phone that syncs should not fetch every one. The
+          // row arrives now, so the book shows its duration, its parts and the
+          // listening position; the bytes wait for Listen (AudioDownloads).
+          if (isAudioFormat(f.format)) {
+            await db
+                .into(db.bookFiles)
+                .insertOnConflictUpdate(
+                  BookFilesCompanion.insert(
+                    id: f.id,
+                    bookId: b.id,
+                    format: f.format,
+                    path: rel,
+                    sizeBytes: f.sizeBytes,
+                    sha256: f.sha256,
+                    durationMs: Value(f.durationMs),
+                    track: Value(f.track),
+                    label: Value(f.label),
+                    narrator: Value(f.narrator),
+                    present: const Value(false),
+                  ),
+                );
+            continue;
+          }
           // Stream to a .part file first so an interrupted download isn't
           // mistaken for a complete one, then move it into place.
           final dest = File(p.join(_dataDir.path, rel));
@@ -539,11 +562,6 @@ class SyncService {
                   narrator: Value(f.narrator),
                 ),
               );
-          // Chapters are derived, not synced: read them from the bytes that
-          // just arrived, as the importing device did.
-          if (isAudioFormat(f.format)) {
-            await AudiobookImporter(repository).rebuildChapters(f.id);
-          }
         }
       } catch (e) {
         // Metadata and cover are already pulled; skip files on error.

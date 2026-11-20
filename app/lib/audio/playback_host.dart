@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import 'audio_downloads.dart';
 import 'audio_engine.dart';
 import 'audiobook_player.dart';
 import 'background_playback.dart';
@@ -22,7 +23,9 @@ class PlaybackHost extends ChangeNotifier {
     BackgroundPlayback? background,
     this.engine,
     this.speedStore,
-  }) : background = background ?? BackgroundPlayback();
+    AudioDownloads? downloads,
+  })  : background = background ?? BackgroundPlayback(),
+        downloads = downloads ?? AudioDownloads.instance;
 
   /// The app's one host.
   static final PlaybackHost instance = PlaybackHost();
@@ -32,6 +35,9 @@ class PlaybackHost extends ChangeNotifier {
   /// Replace the real backend and the speed preferences; for tests.
   final AudioEngine Function()? engine;
   final SpeedStore? speedStore;
+
+  /// Fetches parts that are not on this device yet (docs/AUDIOBOOKS.md §6).
+  final AudioDownloads downloads;
 
   AudiobookPlayer? _player;
   LibraryRepository? _repository;
@@ -89,6 +95,7 @@ class PlaybackHost extends ChangeNotifier {
       bookId: bookId,
       engine: engine,
       speedStore: speedStore,
+      fetchPart: (part) => downloads.ensurePart(repository, part),
     );
     try {
       await player.load(); // throws before anything is replaced

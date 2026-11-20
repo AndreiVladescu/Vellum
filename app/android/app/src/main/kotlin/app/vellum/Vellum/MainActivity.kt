@@ -1,6 +1,8 @@
 package app.vellum.Vellum
 
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -47,6 +49,14 @@ class MainActivity : AudioServiceActivity() {
     /** Starts/stops [SyncForegroundService] around a manual sync. */
     private val syncServiceChannelName = "app.vellum.Vellum/sync_service"
 
+    /**
+     * Whether the active network is metered, for "Download audiobooks on
+     * Wi-Fi only" (docs/AUDIOBOOKS.md §6). Metered rather than "is Wi-Fi":
+     * a phone's hotspot is Wi-Fi and still someone's data plan, and Android
+     * already knows which networks the user marked as metered.
+     */
+    private val networkChannelName = "app.vellum.Vellum/network"
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
@@ -81,6 +91,20 @@ class MainActivity : AudioServiceActivity() {
                     "stop" -> {
                         stopService(Intent(this, SyncForegroundService::class.java))
                         result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, networkChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isMetered" -> {
+                        val manager =
+                            getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                        // No manager: say metered, so the app asks rather than
+                        // spends someone's data.
+                        result.success(manager?.isActiveNetworkMetered ?: true)
                     }
                     else -> result.notImplemented()
                 }

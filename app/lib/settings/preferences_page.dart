@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../audio/audio_downloads.dart';
 import '../data/backup_crypto.dart';
 import '../diagnostics/diagnostics_collector.dart';
 import '../diagnostics/diagnostics_report.dart';
@@ -274,6 +275,26 @@ List<PrefsSection> preferencesCatalogue(
           keywords: [l10n.prefsKwBackgroundSync, l10n.prefsHowOften],
           builder: (_) => _BackgroundSyncTile(settings: settings),
         ),
+        // Audio is downloaded on demand (docs/AUDIOBOOKS.md §6). Shown, not
+        // hidden, on a computer, like the other Android-only switches.
+        PrefsEntry(
+          id: 'audioWifiOnly',
+          title: l10n.prefsAudioWifiTitle,
+          subtitle: l10n.prefsAudioWifiSubtitle,
+          keywords: [l10n.prefsKwAudioWifi],
+          builder: (_) {
+            final android = defaultTargetPlatform == TargetPlatform.android;
+            return SwitchListTile(
+              secondary: const Icon(Icons.wifi),
+              title: Text(l10n.prefsAudioWifiTitle),
+              subtitle: Text(android
+                  ? l10n.prefsAudioWifiSubtitle
+                  : l10n.prefsAudioWifiDesktop),
+              value: android && settings.audioWifiOnly,
+              onChanged: android ? settings.setAudioWifiOnly : null,
+            );
+          },
+        ),
         // Only meaningful on a shared library: with no server there is
         // nobody else whose shelves could arrive.
         if (connection.isConnected)
@@ -336,6 +357,7 @@ List<PrefsSection> preferencesCatalogue(
             l10n.prefsVerifyTitle,
             l10n.prefsRestoreTile,
             l10n.prefsSchedTitle,
+            l10n.prefsBackupAudioTitle,
           ],
           heading: l10n.prefsSectionBackup,
           builder: (_) => _BackupSection(
@@ -344,6 +366,12 @@ List<PrefsSection> preferencesCatalogue(
             sync: sync,
             settings: settings,
           ),
+        ),
+        PrefsEntry(
+          id: 'audioStorage',
+          title: l10n.prefsAudioStorageTitle,
+          keywords: [l10n.prefsKwAudioStorage],
+          builder: (_) => _AudioStorageTile(repository: repository),
         ),
         PrefsEntry(
           id: 'trash',
@@ -1061,7 +1089,9 @@ class _BackupSectionState extends State<_BackupSection> {
     setState(() => _busy = true);
     try {
       await BackupService(widget.repository)
-          .exportTo(File(location.path), passphrase: passphrase);
+          .exportTo(File(location.path),
+              passphrase: passphrase,
+              includeAudio: widget.settings.backupIncludeAudio);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.prefsBackupSaved(location.path))),
@@ -1085,7 +1115,9 @@ class _BackupSectionState extends State<_BackupSection> {
       final tmp = File(p.join((await getTemporaryDirectory()).path,
           _suggestedName(encrypted: encrypted)));
       await BackupService(widget.repository)
-          .exportTo(tmp, passphrase: passphrase);
+          .exportTo(tmp,
+              passphrase: passphrase,
+              includeAudio: widget.settings.backupIncludeAudio);
       await SharePlus.instance.share(ShareParams(
         files: [
           XFile(tmp.path,
@@ -1222,8 +1254,48 @@ class _BackupSectionState extends State<_BackupSection> {
           enabled: !_busy,
           onTap: _restore,
         ),
+        // Audio is left out by default (docs/AUDIOBOOKS.md §6), and the line
+        // says so, in both directions, for manual and scheduled backups alike.
+        SwitchListTile(
+          secondary: const Icon(Icons.headphones_outlined),
+          title: Text(l10n.prefsBackupAudioTitle),
+          subtitle: Text(widget.settings.backupIncludeAudio
+              ? l10n.prefsBackupAudioOn
+              : widget.connection.isConnected
+                  ? l10n.prefsBackupAudioOff
+                  : l10n.prefsBackupAudioOffNoServer),
+          value: widget.settings.backupIncludeAudio,
+          onChanged: _busy ? null : widget.settings.setBackupIncludeAudio,
+        ),
         _ScheduledBackupTile(settings: widget.settings),
       ],
+    );
+  }
+}
+
+/// How much space downloaded audiobook audio takes on this device. Audio
+/// comes on demand (docs/AUDIOBOOKS.md §6), so this is what listening has
+/// fetched; each book's page has Remove download.
+class _AudioStorageTile extends StatelessWidget {
+  const _AudioStorageTile({required this.repository});
+
+  final LibraryRepository repository;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    return StreamBuilder<AudioStorage>(
+      stream: watchAudioStorage(repository.db),
+      builder: (context, snapshot) {
+        final used = snapshot.data;
+        return ListTile(
+          leading: const Icon(Icons.headphones_outlined),
+          title: Text(l10n.prefsAudioStorageTitle),
+          subtitle: Text(used == null || used.books == 0
+              ? l10n.prefsAudioStorageNone
+              : l10n.prefsAudioStorageUsed(formatBytes(used.bytes), used.books)),
+        );
+      },
     );
   }
 }

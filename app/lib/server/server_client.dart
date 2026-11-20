@@ -20,6 +20,22 @@ class ServerException implements Exception {
   String toString() => message;
 }
 
+/// Asks a running [VellumServerClient.downloadFileTo] to stop. One per
+/// transfer; cancelling is final.
+class TransferCancel {
+  bool _cancelled = false;
+  bool get isCancelled => _cancelled;
+  void cancel() => _cancelled = true;
+}
+
+/// Thrown by a transfer stopped through its [TransferCancel].
+class TransferCancelled implements Exception {
+  const TransferCancelled();
+
+  @override
+  String toString() => 'Transfer cancelled';
+}
+
 /// The broad kinds of failure a request can end in, so the UI can word each in
 /// the reader's language (`ServerErrorKindL10n` in labels.dart) instead of
 /// showing an exception's English text. The raw text stays available as a
@@ -926,25 +942,67 @@ class VellumServerClient {
   /// where it left off with a `Range` request; the server answers `206` (append)
   /// or `200` (start over). Book files are content-addressed and immutable, so a
   /// resume can't stitch together bytes from two different files.
-  Future<void> downloadFileTo(String fileId, File dest) async {
+  ///
+  /// For on-demand audio (docs/AUDIOBOOKS.md §6), which can be hundreds of MB:
+  ///
+  /// - [sha256], when given, goes out as `If-Range`, so a partial file of some
+  ///   other blob is answered with the whole file rather than glued to it.
+  /// - [onProgress] is told the bytes now in [dest] and the file's full size
+  ///   (null when the server does not say).
+  /// - [cancel] stops the transfer between two chunks, keeping what has
+  ///   arrived so the next call resumes it; the call then throws
+  ///   [TransferCancelled].
+  ///
+  /// A `416` to a resume means [dest] already holds the whole file (or more);
+  /// it is left as it is and the caller's hash check decides.
+  Future<void> downloadFileTo(
+    String fileId,
+    File dest, {
+    String? sha256,
+    void Function(int received, int? total)? onProgress,
+    TransferCancel? cancel,
+  }) async {
     final existing = await dest.exists() ? await dest.length() : 0;
     final req = http.Request('GET', _uri('/api/files/$fileId'));
     final auth = _bearer;
     if (auth != null) req.headers['authorization'] = auth;
-    if (existing > 0) req.headers['range'] = 'bytes=$existing-';
+    if (existing > 0) {
+      req.headers['range'] = 'bytes=$existing-';
+      if (sha256 != null) req.headers['if-range'] = '"$sha256"';
+    }
     final res = await _http.send(req);
+    if (res.statusCode == 416 && existing > 0) {
+      await res.stream.drain<void>();
+      return;
+    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ServerException('File download failed (HTTP ${res.statusCode})');
+      await res.stream.drain<void>().catchError((_) {});
+      throw ServerException(
+        'File download failed (HTTP ${res.statusCode})',
+        statusCode: res.statusCode,
+      );
     }
     // 206 continues the existing file; anything else (200) is a full body, so
     // overwrite from the start.
-    final sink = res.statusCode == 206
-        ? dest.openWrite(mode: FileMode.append)
-        : dest.openWrite();
+    final resumed = res.statusCode == 206;
+    var received = resumed ? existing : 0;
+    final length = res.contentLength;
+    final total = length == null ? null : received + length;
+    onProgress?.call(received, total);
+    final out = await dest.open(mode: resumed ? FileMode.append : FileMode.write);
     try {
-      await sink.addStream(res.stream);
+      // `await for` holds the next chunk back until this one is on disk, so a
+      // fast network cannot pile a whole file up in memory; leaving the loop
+      // (cancelled, or an error) cancels the response stream.
+      await for (final chunk in res.stream) {
+        if (cancel?.isCancelled ?? false) throw const TransferCancelled();
+        await out.writeFrom(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total);
+      }
+      await out.flush();
     } finally {
-      await sink.close();
+      await out.close();
     }
   }
 

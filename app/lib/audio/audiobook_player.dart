@@ -88,6 +88,7 @@ class AudiobookPlayer extends ChangeNotifier {
     SpeedStore? speedStore,
     SessionRecorder? recorder,
     DateTime Function()? clock,
+    this.fetchPart,
   })  : _engineFactory = engine ?? JustAudioEngine.new,
         _speedStore = speedStore ?? PrefsSpeedStore(),
         _recorder = recorder ?? SessionRecorder(repository.db),
@@ -96,6 +97,13 @@ class AudiobookPlayer extends ChangeNotifier {
   final LibraryRepository repository;
   final String bookId;
   final Duration saveEvery;
+
+  /// Brings a part's bytes to this device (`AudioDownloads.ensurePart`): true
+  /// once it can be played. Audio is downloaded on demand
+  /// (docs/AUDIOBOOKS.md §6), so the part the position falls in, or the next
+  /// one, may not be here yet; without this a missing part just stays
+  /// missing.
+  final Future<bool> Function(BookFile part)? fetchPart;
   final AudioEngine Function() _engineFactory;
   final SpeedStore _speedStore;
   final SessionRecorder _recorder;
@@ -132,7 +140,30 @@ class AudiobookPlayer extends ChangeNotifier {
   bool _startedOnce = false;
   bool _disposed = false;
 
+  /// The part at the position is downloading and the player waits for it.
+  bool _waiting = false;
+
+  /// The part at the position is not on this device and nothing is fetching
+  /// it (no server, mobile data, cancelled): the engine holds nothing to play.
+  bool _partMissing = false;
+
+  /// Play was asked for while waiting for a part; it starts when it arrives.
+  bool _wantPlay = false;
+
+  /// Bumped by every [_openPart], so a wait that a seek has overtaken does not
+  /// open its part when it ends.
+  int _openGeneration = 0;
+
   bool get playing => _playing;
+
+  /// True while the player waits for the part it needs to download.
+  bool get waitingForPart => _waiting;
+
+  /// True when the part at the position is not here and is not coming.
+  bool get partMissing => _partMissing;
+
+  /// Whether play has been asked for and will start once the part is here.
+  bool get playPending => _wantPlay;
 
   /// The playback speed, 1.0 being normal.
   double get speed => _speed;
@@ -181,13 +212,21 @@ class AudiobookPlayer extends ChangeNotifier {
     if (_speed != 1.0) await _engine!.setSpeed(_speed);
     _playingSub = _engine!.playingStream.listen(_onEnginePlaying);
     _positionSub = _engine!.positionStream.listen((p) {
+      // While a part is awaited the engine still holds the one before; its
+      // position is not ours any more.
+      if (_waiting || _partMissing) return;
       _offsetMs = p.inMilliseconds;
       if (!_disposed) notifyListeners();
     });
     _completedSub = _engine!.completed.listen((_) => _onPartCompleted());
     final (part, offset) = _timeline.locate(savedMs);
-    await _openPart(part, offset);
+    // Not waiting here: the page opens on the book (chapters, length,
+    // position) while its first part downloads, and play waits for it.
+    await _openPart(part, offset, wait: false);
   }
+
+  /// The part the position is in, for the downloader to fetch first.
+  BookFile get currentPartFile => parts[_part];
 
   Map<String, List<AudioChapter>> _chaptersByFile = const {};
 
@@ -207,9 +246,45 @@ class AudiobookPlayer extends ChangeNotifier {
     chapters = out;
   }
 
-  Future<void> _openPart(int part, int offsetMs) async {
+  /// Loads [part] at [offsetMs] into the engine, paused. False when it did
+  /// not: the part is not on this device and could not be fetched (or, with
+  /// [wait] false, was not asked for), or a later seek overtook the wait.
+  Future<bool> _openPart(int part, int offsetMs, {bool wait = true}) async {
+    final generation = ++_openGeneration;
     _part = part;
     _offsetMs = offsetMs;
+    if (!await _isHere(parts[part])) {
+      final fetch = fetchPart;
+      if (!wait || fetch == null) {
+        _waiting = false;
+        _partMissing = true;
+        if (!_disposed) notifyListeners();
+        return false;
+      }
+      // Stop what is playing: from here the position is the awaited part's.
+      // The sitting ends now, and play resumes on its own when it arrives.
+      if (_playing) {
+        _wantPlay = true;
+        _playing = false;
+        _saveTimer?.cancel();
+        _endSitting();
+      }
+      _waiting = true;
+      _partMissing = false;
+      if (!_disposed) notifyListeners();
+      await _engine?.pause();
+      final ok = await fetch(parts[part]);
+      if (generation != _openGeneration || _disposed) return false;
+      _waiting = false;
+      if (!ok) {
+        _partMissing = true;
+        _wantPlay = false;
+        notifyListeners();
+        return false;
+      }
+    }
+    _waiting = false;
+    _partMissing = false;
     final file = repository.fileOf(parts[part]);
     final measured = await _engine!.open(file.path, at: Duration(milliseconds: offsetMs));
     // A new source can reset the backend's speed (media_kit does on some
@@ -222,6 +297,19 @@ class AudiobookPlayer extends ChangeNotifier {
       await _storeMeasuredDuration(part, measured.inMilliseconds);
     }
     if (!_disposed) notifyListeners();
+    return true;
+  }
+
+  /// Whether [part]'s bytes are on this device. Read from the row, not the
+  /// list loaded at the start: a download may have finished since.
+  Future<bool> _isHere(BookFile part) async =>
+      (await repository.fileById(part.id))?.present ?? false;
+
+  /// Starts playback that was asked for while a part was awaited.
+  Future<void> _resumeIfWanted() async {
+    if (!_wantPlay) return;
+    _wantPlay = false;
+    await play();
   }
 
   Future<void> _storeMeasuredDuration(int part, int ms) async {
@@ -243,10 +331,26 @@ class AudiobookPlayer extends ChangeNotifier {
   Future<void> play() async {
     final engine = _engine;
     if (engine == null || _playing) return;
+    if (_waiting) {
+      // It starts when the part arrives.
+      _wantPlay = true;
+      notifyListeners();
+      return;
+    }
     if (_ended) {
       _ended = false;
-      await _openPart(0, 0);
+      _wantPlay = true;
+      final opened = await _openPart(0, 0);
+      if (!opened || !_wantPlay) return;
+      _wantPlay = false;
+    } else if (_partMissing) {
+      _wantPlay = true;
+      final opened = await _openPart(_part, _offsetMs);
+      // Paused while it downloaded, or it could not come.
+      if (!opened || !_wantPlay) return;
+      _wantPlay = false;
     }
+    if (_playing) return;
     if (!_startedOnce) {
       _startedOnce = true;
       // The one automatic status change: the first play makes an unread book
@@ -304,7 +408,7 @@ class AudiobookPlayer extends ChangeNotifier {
   /// notification show is what is true.
   void _onEnginePlaying(bool playing) {
     if (_disposed || playing == _playing) return;
-    if (playing && _ended) return;
+    if (playing && (_ended || _waiting || _partMissing)) return;
     _playing = playing;
     if (playing) {
       _beginSitting();
@@ -419,6 +523,7 @@ class AudiobookPlayer extends ChangeNotifier {
     if (engine == null) return;
     final wasPlaying = _playing;
     _playing = false;
+    _wantPlay = false;
     _saveTimer?.cancel();
     await engine.pause();
     if (wasPlaying) _endSitting();
@@ -433,15 +538,18 @@ class AudiobookPlayer extends ChangeNotifier {
     if (engine == null) return;
     final (part, offset) = _timeline.locate(target.inMilliseconds);
     _ended = false;
-    if (part == _part) {
+    if (part == _part && !_waiting && !_partMissing) {
       _offsetMs = offset;
       await engine.seek(Duration(milliseconds: offset));
-    } else {
-      await _openPart(part, offset);
-      if (_playing) await engine.play();
+    } else if (await _openPart(part, offset, wait: _playing || _wantPlay)) {
+      if (_playing) {
+        await engine.play();
+      } else {
+        await _resumeIfWanted();
+      }
     }
     await save();
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   /// Back or forward by [delta] (the ±30 s buttons).
@@ -484,13 +592,20 @@ class AudiobookPlayer extends ChangeNotifier {
       _endSitting();
       _playing = false;
       _saveTimer?.cancel();
-      await _openPart(_part + 1, 0);
+      await _openPart(_part + 1, 0, wait: false);
       await _stopForSleep();
       return;
     }
     if (_part + 1 < parts.length) {
-      await _openPart(_part + 1, 0);
-      if (_playing) await _engine!.play();
+      // The next part may still be downloading: the player waits for it and
+      // carries on when it is here.
+      if (await _openPart(_part + 1, 0)) {
+        if (_playing) {
+          await _engine!.play();
+        } else {
+          await _resumeIfWanted();
+        }
+      }
       await save();
       return;
     }
