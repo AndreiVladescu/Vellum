@@ -384,7 +384,9 @@ void main() {
 /// list in PERF_ONLY (shelf, covers, detail, search, insights, room, prefs) —
 /// for iterating on one fix without sitting through the rest.
 bool _want(String group) {
-  final only = Platform.environment['PERF_ONLY'] ?? '';
+  // On a phone there is no environment: perf_run.sh passes it as a define.
+  const defined = String.fromEnvironment('PERF_ONLY');
+  final only = Platform.environment['PERF_ONLY'] ?? defined;
   return only.isEmpty || only.split(',').contains(group);
 }
 

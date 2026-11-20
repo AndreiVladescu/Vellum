@@ -186,6 +186,7 @@ if [ "$only" != startup ]; then
   # with DDS in the middle the connection is refused ("Failed to connect to VM
   # Service"), so Android runs without it.
   PERF_OUT=$RUN/gui "$FLUTTER" drive --profile -d "$DEVICE" ${NODDS:+--no-dds} \
+    ${PERF_ONLY:+--dart-define=PERF_ONLY=$PERF_ONLY} \
     --driver test_driver/perf_driver.dart \
     --target integration_test/perf_test.dart \
     2>&1 | tee "$RUN/gui.log" | grep -E 'All tests passed|Some tests failed|Exception|Error' || true
