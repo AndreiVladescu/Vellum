@@ -58,7 +58,9 @@ copies so lending history is preserved (active loan = `returned_at IS NULL`).
 
 ## Commands
 
-Flutter SDK is at `~/Documents/tools/flutter` (add its `bin/` to PATH).
+Flutter SDK 3.50.0 is at `~/Documents/tools/flutter-3.50` (add its `bin/` to PATH);
+CI and releases pin the same version. `~/Documents/tools/flutter` is the old
+3.47.9, kept only for rolling back (the current tree needs 3.50).
 
 ### App (`app/`)
 

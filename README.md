@@ -73,7 +73,7 @@ platform, including Windows and Android.
 Follow the official installer for your system:
 **<https://docs.flutter.dev/get-started/install>**
 
-Vellum needs Flutter with **Dart SDK 3.12.2 or newer**. Check what you have:
+Vellum needs **Flutter 3.50 or newer** (Dart SDK 3.14). Check what you have:
 
 ```sh
 flutter --version
