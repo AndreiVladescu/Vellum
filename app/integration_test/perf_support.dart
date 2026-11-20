@@ -8,6 +8,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:vellum/server/connection_store.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/seed_profiling.dart';
 import 'package:vellum/settings/app_settings.dart';
@@ -32,6 +33,14 @@ Future<void> guardProfilingLibrary(VellumDatabase db) async {
       throw StateError(
         'Refusing to profile: XDG_DATA_HOME ($dataHome) is not a '
         'profiling directory. Run tool/perf_run.sh instead.',
+      );
+    }
+    // The files are isolated, the OS keyring is not: without this the run
+    // could read, or on a sign-out delete, the real app's server token.
+    if (!ServerConnection.keyringDisabled) {
+      throw StateError(
+        'Refusing to profile: VELLUM_NO_KEYRING is not set, so this run '
+        "would share the real app's keyring. Run tool/perf_run.sh instead.",
       );
     }
   }

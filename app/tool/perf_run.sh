@@ -130,6 +130,9 @@ if [ "$target" = linux ]; then
   cp -a "$SEED/data" "$RUN/xdg/data"
   cp "$SEED/seed.json" "$RUN/seed.json"
   export XDG_DATA_HOME=$RUN/xdg/data
+  # The files are isolated above, but the OS keyring is shared with the real
+  # app: never let a profiling run read, write or delete its server token.
+  export VELLUM_NO_KEYRING=1
   export XDG_CONFIG_HOME=$RUN/xdg/config
   # Shared between runs on purpose: the GPU driver keeps its shader cache here,
   # and a cold shader cache in one run but not the next is noise, not signal.

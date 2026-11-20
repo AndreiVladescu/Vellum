@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../server/connection_store.dart';
+
 class AiSettings extends ChangeNotifier {
   AiSettings._(this._prefs, this._storage, this._apiKey, this.keyInsecure);
 
@@ -33,6 +35,11 @@ class AiSettings extends ChangeNotifier {
     String? key;
     var insecure = false;
     try {
+      // VELLUM_NO_KEYRING (see ServerConnection.keyringDisabled): a profiling
+      // or demo run must not read the real app's API key.
+      if (ServerConnection.keyringDisabled) {
+        throw StateError('keyring disabled');
+      }
       key = await storage.read(key: _secretKey);
     } catch (_) {
       key = prefs.getString(_secretKey);
@@ -63,8 +70,12 @@ class AiSettings extends ChangeNotifier {
 
   /// True when the address is on this machine — which is the difference
   /// between "this passage leaves your device" and "it does not".
-  bool get isLocal => const ['localhost', '127.0.0.1', '::1', '0.0.0.0']
-      .contains(host.toLowerCase());
+  bool get isLocal => const [
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    '0.0.0.0',
+  ].contains(host.toLowerCase());
 
   Future<void> save({
     required String baseUrl,
@@ -76,6 +87,9 @@ class AiSettings extends ChangeNotifier {
     final key = (apiKey ?? '').trim();
     _apiKey = key.isEmpty ? null : key;
     try {
+      if (ServerConnection.keyringDisabled) {
+        throw StateError('keyring disabled');
+      }
       if (key.isEmpty) {
         await _storage.delete(key: _secretKey);
       } else {

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,7 +17,12 @@ import 'server_client.dart';
 /// in [SharedPreferences]. If the secure store is unavailable (e.g. no keyring),
 /// it transparently falls back to preferences so the app still works.
 class ServerConnection extends ChangeNotifier {
-  ServerConnection._(this._prefs, this._storage, this._token, this._tokenInsecure);
+  ServerConnection._(
+    this._prefs,
+    this._storage,
+    this._token,
+    this._tokenInsecure,
+  );
 
   static const _urlKey = 'server.url';
   static const _tokenKey = 'server.token';
@@ -51,12 +58,28 @@ class ServerConnection extends ChangeNotifier {
   /// box, typically. Drives the honesty notice on the server page (L2).
   bool _tokenInsecure;
 
+  /// Set `VELLUM_NO_KEYRING=1` to keep this process away from the OS keyring
+  /// entirely: the token then lives only in this run's own preferences, as on
+  /// a keyring-less machine. The profiling and demo scripts set it, because
+  /// they isolate the app's files with XDG_DATA_HOME but the keyring is
+  /// shared: without it a test run could read the real app's server token,
+  /// or delete it on a sign-out.
+  static bool get keyringDisabled =>
+      debugKeyringDisabled ?? Platform.environment['VELLUM_NO_KEYRING'] == '1';
+
+  /// Overrides [keyringDisabled] in tests, which cannot set the environment.
+  @visibleForTesting
+  static bool? debugKeyringDisabled;
+
   static Future<ServerConnection> load() async {
     final prefs = await SharedPreferences.getInstance();
     const storage = FlutterSecureStorage();
     String? token;
     var insecure = false;
     try {
+      if (keyringDisabled) {
+        throw StateError('keyring disabled');
+      }
       token = await storage.read(key: _tokenKey);
       // Migrate a token previously kept in plaintext prefs into the secure
       // store, then scrub the plaintext copy.
@@ -75,6 +98,22 @@ class ServerConnection extends ChangeNotifier {
       insecure = token != null && token.isNotEmpty;
     }
     return ServerConnection._(prefs, storage, token, insecure);
+  }
+
+  // Every keyring access goes through these two, so [keyringDisabled] takes
+  // the same fallback paths as a machine with no keyring at all.
+  Future<void> _secureWrite(String token) {
+    if (keyringDisabled) {
+      throw StateError('keyring disabled');
+    }
+    return _storage.write(key: _tokenKey, value: token);
+  }
+
+  Future<void> _secureDelete() {
+    if (keyringDisabled) {
+      throw StateError('keyring disabled');
+    }
+    return _storage.delete(key: _tokenKey);
   }
 
   String get baseUrl => _prefs.getString(_urlKey) ?? '';
@@ -228,7 +267,7 @@ class ServerConnection extends ChangeNotifier {
     _capabilities = null;
     _token = auth.token;
     try {
-      await _storage.write(key: _tokenKey, value: auth.token);
+      await _secureWrite(auth.token);
       _tokenInsecure = false;
     } catch (_) {
       // fallback: keep it in prefs if the secure store is unavailable, and
@@ -259,7 +298,7 @@ class ServerConnection extends ChangeNotifier {
     _tokenInsecure = false;
     _capabilities = null;
     try {
-      await _storage.delete(key: _tokenKey);
+      await _secureDelete();
     } catch (_) {
       // ignore: the prefs removal below clears any fallback copy.
     }
@@ -292,7 +331,7 @@ class ServerConnection extends ChangeNotifier {
   Future<void> clearExpiredSession() async {
     _token = null;
     try {
-      await _storage.delete(key: _tokenKey);
+      await _secureDelete();
     } catch (_) {
       // ignore: the prefs removal below clears any fallback copy.
     }
