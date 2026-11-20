@@ -2229,18 +2229,26 @@ async fn a_snapshot_leaves_no_workspace_behind() {
     let _ = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    // The cleanup is a detached blocking task; give it a moment.
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-    let leftovers: Vec<_> = std::fs::read_dir(&data_dir)
-        .map(|entries| {
-            entries
-                .filter_map(Result::ok)
-                .map(|e| e.file_name().to_string_lossy().to_string())
-                .filter(|n| n.starts_with(".snapshot-"))
-                .collect()
-        })
-        .unwrap_or_default();
+    // The cleanup is a detached blocking task, so wait for the condition it
+    // produces (no workspace left) rather than a fixed time: under load a
+    // blocking-pool thread can be slow to run.
+    let leftover_snapshots = || -> Vec<String> {
+        std::fs::read_dir(&data_dir)
+            .map(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .map(|e| e.file_name().to_string_lossy().to_string())
+                    .filter(|n| n.starts_with(".snapshot-"))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    let mut leftovers = leftover_snapshots();
+    while !leftovers.is_empty() && std::time::Instant::now() < deadline {
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        leftovers = leftover_snapshots();
+    }
     assert!(
         leftovers.is_empty(),
         "an abandoned snapshot must not leave a copy of the library: {leftovers:?}"

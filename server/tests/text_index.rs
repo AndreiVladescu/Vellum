@@ -144,15 +144,26 @@ async fn upload_and_index(
     bytes: Vec<u8>,
 ) {
     upload(app, token, book, name, bytes).await;
-    for _ in 0..200 {
-        let queued: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM book_text")
-            .fetch_one(&state.db)
-            .await
-            .unwrap();
-        if queued > 0 {
-            break;
+    // Poll for the row with a deadline, and fail loudly if it never comes: a
+    // silent timeout here drained an empty queue and failed later, far from
+    // the cause, whenever the machine was busy.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    // (With indexing off, nothing is ever queued: there is nothing to wait for.)
+    if state.index_text {
+        loop {
+            let queued: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM book_text")
+                .fetch_one(&state.db)
+                .await
+                .unwrap();
+            if queued > 0 {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{name} was never queued for indexing"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
     drain_text_index(state).await;
 }
