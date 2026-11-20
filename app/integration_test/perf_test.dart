@@ -54,6 +54,19 @@ void main() {
 
   testWidgets('profiling run', (tester) async {
     _metrics['platform'] = Platform.operatingSystem;
+    // main() caps the image cache on a phone (48 MB, 200 images); the test
+    // binary skips main(), so without this an Android run measured a cache
+    // twice the size a phone keeps. PERF_PHONE_CACHE=1 does the same on
+    // desktop, to measure phone-sized caches off a phone.
+    final phoneCache = Platform.isAndroid ||
+        Platform.isIOS ||
+        Platform.environment['PERF_PHONE_CACHE'] == '1';
+    _metrics['phone_image_cache'] = phoneCache;
+    if (phoneCache) {
+      PaintingBinding.instance.imageCache
+        ..maximumSizeBytes = 48 << 20
+        ..maximumSize = 200;
+    }
     _metrics['rss_mb_at_test_start'] = rssMb();
 
     // ---- Boot, as main() does: the four loads, then the app.

@@ -13,6 +13,7 @@ import 'package:vellum/data/seed_profiling.dart';
 import 'package:vellum/settings/app_settings.dart';
 import 'package:vellum/settings/book_face.dart';
 import 'package:vellum/settings/spine_art.dart';
+import 'package:vellum/shelf/text_shadow_cache.dart';
 import 'package:vellum/stats/insights_range.dart';
 
 /// Refuses to run anywhere but a library the profiling run made.
@@ -90,6 +91,8 @@ Map<String, Object> imageCacheNow() {
     'image_cache_mb': _round(cache.currentSizeBytes / (1 << 20)),
     'image_cache_entries': cache.currentSize,
     'live_images': cache.liveImageCount,
+    'shadow_cache_mb': _round(TextShadowCache.instance.bytes / (1 << 20)),
+    'shadow_cache_entries': TextShadowCache.instance.length,
   };
 }
 
