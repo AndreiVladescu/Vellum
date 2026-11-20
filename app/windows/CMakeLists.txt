@@ -58,12 +58,14 @@ add_subdirectory("runner")
 include(flutter/generated_plugins.cmake)
 
 # audio_service_win (audiobook media controls) includes C++/WinRT, which under
-# C++17 falls back to <experimental/coroutine>. Newer MSVC turns that header's
-# deprecation into a hard error (STL1011). As C++20, C++/WinRT uses the
-# standard <coroutine> instead. The define only covers an older SDK whose
-# C++/WinRT still reaches for the experimental header.
+# C++17 falls back to <experimental/coroutine>, and current MSVC turns that
+# header's deprecation into a hard error (STL1011). Building it as C++20 is
+# not an option: the plugin streams a wchar_t* into std::cerr, which C++20
+# deletes. So it stays C++17 with the deprecation silenced. Microsoft says the
+# experimental header will be removed; when a runner image does, this breaks
+# again, and the fix is upstream (or dropping the plugin, which only costs the
+# Windows media overlay: playback is unaffected).
 if(TARGET audio_service_win_plugin)
-  target_compile_features(audio_service_win_plugin PRIVATE cxx_std_20)
   target_compile_definitions(audio_service_win_plugin PRIVATE
     _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 endif()
