@@ -210,11 +210,14 @@ lets the work be checked before it ships.
 
 - [ ] **M** Move to Flutter 3.50: `package:flutter/material.dart` is deprecated
       there in favour of `package:material_ui`. CI and releases are pinned to
-      3.47.9 until this is done on purpose. *Blocked (2026-11-20):* the
-      migration is done on branch `flutter-3.50`, but 3.50.0's Linux engine
-      exports its own `_Unwind_*` symbols, so a plugin's C++ exception (the
-      keyring being locked) kills the app at start-up. Merge on a 3.50.x that
-      fixes it
+      3.47.9 until this is done on purpose. *Ready, not merged (2026-11-20):* branch `flutter-3.50`
+      is on 3.50.1 and passes everything, with three workarounds for open
+      upstream bugs: a link-order fix for the start-up crash when the keyring
+      is locked (flutter#196402), `dynamic_color` held at 2.0.2 (2.1.0 can
+      freeze start-up for 25 s on a hung desktop portal), and the wallpaper
+      gradient drawn small and scaled (flutter#196865). Shelf rendering
+      measured 12–18 % slower in software. Merge after a check on a real GPU,
+      or once the upstream fixes land
 
 ### v1.4.1 — finding your way around
 
