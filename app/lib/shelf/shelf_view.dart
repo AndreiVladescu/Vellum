@@ -9,6 +9,7 @@ import '../settings/book_face.dart';
 import '../settings/spine_art.dart';
 import 'book_open_route.dart';
 import 'cover_image.dart';
+import 'detail_pane.dart';
 import 'cover_color.dart';
 import 'gradient_strip.dart';
 import 'group_header.dart';
@@ -46,7 +47,12 @@ class ShelfView extends StatefulWidget {
     this.selected = const {},
     this.onToggleSelected,
     this.selectionMode = false,
+    this.pane,
   });
+
+  /// The wide layout's side pane: when it is on screen a tap selects the book
+  /// into it instead of pushing its page.
+  final DetailPaneController? pane;
 
   /// The books to show when [groups] is null.
   final List<Book> books;
@@ -192,6 +198,7 @@ class _ShelfViewState extends State<ShelfView> {
                           selected: widget.selected,
                           onToggleSelected: widget.onToggleSelected,
                           selectionMode: widget.selectionMode,
+                          pane: widget.pane,
                         ),
                       ),
                     ),
@@ -249,6 +256,7 @@ class _ShelfRow extends StatelessWidget {
     required this.selected,
     required this.onToggleSelected,
     required this.selectionMode,
+    this.pane,
   });
 
   final List<Book> row;
@@ -258,6 +266,7 @@ class _ShelfRow extends StatelessWidget {
   final Set<String> selected;
   final void Function(Book)? onToggleSelected;
   final bool selectionMode;
+  final DetailPaneController? pane;
   final BookFace bookFace;
   final SpineArt spineArt;
   final ShelfMaterial material;
@@ -270,6 +279,14 @@ class _ShelfRow extends StatelessWidget {
     // whatever held it when a route pops, so opening a book while the keyboard
     // was up brought the keyboard back on the way home — as if the shelf were
     // asking you to type something.
+    //
+    // Not when the book opens in the pane: nothing pops there, and unfocusing
+    // would take keyboard focus off the shell, so Esc would no longer reach it.
+    final pane = this.pane;
+    if (pane != null && pane.enabled) {
+      pane.select(book);
+      return;
+    }
     FocusScope.of(bookContext).unfocus();
     final box = bookContext.findRenderObject()! as RenderBox;
     final rect = box.localToGlobal(Offset.zero) & box.size;
@@ -325,7 +342,7 @@ class _ShelfRow extends StatelessWidget {
                               onLongPress: onLongPress,
                               selected: ticked,
                             );
-                      return face(
+                      final shown = face(
                         // In selection mode a tap ticks; otherwise it opens the
                         // book, as it always has. The pull-out animation is
                         // handed the *unticked* face, so a book doesn't fly off
@@ -336,6 +353,13 @@ class _ShelfRow extends StatelessWidget {
                         onLongPress: toggle == null ? null : () => toggle(book),
                         ticked: isSelected,
                       );
+                      return pane == null
+                          ? shown
+                          : PaneHighlight(
+                              controller: pane,
+                              bookId: book.id,
+                              child: shown,
+                            );
                     },
                   ),
                 ),

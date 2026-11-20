@@ -52,6 +52,7 @@ import 'settings/wallpaper.dart';
 import 'shelf/shelf_target_sheet.dart';
 import 'shelf/book_list_view.dart';
 import 'shelf/command_palette.dart';
+import 'shelf/detail_pane.dart';
 import 'shelf/content_search.dart';
 import 'shelf/library_header.dart';
 import 'shelf/shelf_grouping.dart';
@@ -315,6 +316,16 @@ class _LibraryPageState extends State<LibraryPage> {
   StreamSubscription<String>? _reminderTapSub;
 
   LibraryRepository get repository => widget.repository;
+
+  /// The book shown in the wide layout's side pane. Its own notifier, not
+  /// state of this widget: selecting a book must not rebuild the shelf.
+  final _pane = DetailPaneController();
+
+  /// Whether the window was wide enough for the pane at the last build, and the
+  /// page pushed to carry the pane's book when the window narrowed — so
+  /// widening again can fold it back into the pane.
+  bool _wasWide = false;
+  Route<void>? _demotedRoute;
 
   /// Switches section, remembering where we were so the mouse's back button can
   /// undo it. Every tab change goes through here — one that didn't would leave
@@ -641,6 +652,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   @override
   void dispose() {
+    _pane.dispose();
     _searchDebounce?.cancel();
     _searchController.dispose();
     _searchFocus.removeListener(_onSearchFocusChanged);
@@ -780,16 +792,58 @@ class _LibraryPageState extends State<LibraryPage> {
     ));
   }
 
-  void _openBook(Book book) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => BookDetailPage(
+  /// A book's page: the same widget whether it is a route or sits in the pane
+  /// (then [onClose] is set and it draws a close button).
+  Widget _detailPage(Book book, {VoidCallback? onClose}) => BookDetailPage(
         book: book,
         repository: repository,
         settings: widget.settings,
         connection: widget.connection,
         onGenreTap: _applyGenreFilter,
-      ),
+        onClose: onClose,
+      );
+
+  void _openBook(Book book) {
+    // On a wide window the book opens beside the shelf, not over it.
+    if (_pane.enabled) {
+      _pane.select(book);
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _detailPage(book),
     ));
+  }
+
+  /// Moves the pane's book to and from a pushed page as the window crosses
+  /// [detailPaneFrom], so a resize never loses what you were looking at.
+  /// Runs after the frame: it navigates, which a build must not.
+  void _followPaneWidth(bool wide) {
+    final was = _wasWide;
+    _wasWide = wide;
+    if (wide == was) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!wide) {
+        final book = _pane.selected.value;
+        if (book == null || _tab != 0) return;
+        _pane.close();
+        final route = MaterialPageRoute<void>(
+          settings: RouteSettings(arguments: book),
+          builder: (_) => _detailPage(book),
+        );
+        _demotedRoute = route;
+        Navigator.of(context).push(route);
+      } else {
+        final route = _demotedRoute;
+        _demotedRoute = null;
+        if (route == null || !route.isActive) return;
+        // Whatever is stacked above the page (a reader) stays; only the book
+        // page itself folds back into the pane.
+        final book = (route.settings.arguments as Book?);
+        Navigator.of(context).removeRoute(route);
+        if (book != null) _pane.select(book);
+      }
+    });
   }
 
   /// Applies the genre facet from a tapped genre chip on a book's detail page.
@@ -1069,6 +1123,10 @@ class _LibraryPageState extends State<LibraryPage> {
       setState(_selection.clear);
       return;
     }
+    if (_pane.selected.value != null) {
+      _pane.close();
+      return;
+    }
     _clearSearchAndFilters();
   }
 
@@ -1199,6 +1257,10 @@ class _LibraryPageState extends State<LibraryPage> {
   Widget _scaffold(BuildContext context) {
     final l10n = L10n.of(context);
     final size = WindowSize.of(context);
+    final wide = MediaQuery.sizeOf(context).width >= detailPaneFrom;
+    final paneOn = wide && _tab == 0;
+    _pane.enabled = paneOn;
+    _followPaneWidth(wide);
     AppDrawer drawer({int? section, ValueChanged<int>? onSection}) => AppDrawer(
           profile: widget.profile,
           settings: widget.settings,
@@ -1344,6 +1406,11 @@ class _LibraryPageState extends State<LibraryPage> {
             child: scaffold,
           ),
         ),
+        if (paneOn)
+          DetailPane(
+            controller: _pane,
+            pageBuilder: (book, close) => _detailPage(book, onClose: close),
+          ),
       ],
     );
   }
@@ -1740,13 +1807,8 @@ class _LibraryPageState extends State<LibraryPage> {
         selected: _selection,
         onToggleSelected: _toggleSelected,
         selectionMode: _selection.isNotEmpty,
-        detailBuilder: (book) => BookDetailPage(
-          book: book,
-          repository: repository,
-          settings: widget.settings,
-          connection: widget.connection,
-          onGenreTap: _applyGenreFilter,
-        ),
+        pane: _pane,
+        detailBuilder: _detailPage,
       );
     }
     return ShelfView(
@@ -1759,13 +1821,8 @@ class _LibraryPageState extends State<LibraryPage> {
       material: widget.settings.shelfMaterial,
       typography: widget.settings.spineTypography,
       coverFileOf: repository.coverFileOf,
-      detailBuilder: (book) => BookDetailPage(
-        book: book,
-        repository: repository,
-        settings: widget.settings,
-        connection: widget.connection,
-        onGenreTap: _applyGenreFilter,
-      ),
+      pane: _pane,
+      detailBuilder: _detailPage,
     );
   }
 

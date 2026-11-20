@@ -42,7 +42,13 @@ class BookDetailPage extends StatelessWidget {
     this.settings,
     this.connection,
     this.onGenreTap,
+    this.onClose,
   });
+
+  /// Set when the page sits in the shelf's side pane rather than being a
+  /// route: the back arrow becomes a close button, and trashing the book
+  /// (or it vanishing) empties the pane instead of popping a route.
+  final VoidCallback? onClose;
 
   /// Snapshot used before the first stream event arrives.
   final Book book;
@@ -67,7 +73,12 @@ class BookDetailPage extends StatelessWidget {
       builder: (context, snapshot) {
         final current = snapshot.data;
         if (current == null) {
-          // Book was deleted while this page was open.
+          // Book was deleted while this page was open. In the pane there is no
+          // route to pop, so the pane is told to empty itself.
+          final close = onClose;
+          if (close != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => close());
+          }
           return const Scaffold(body: SizedBox.shrink());
         }
         return _BookDetailBody(
@@ -76,6 +87,7 @@ class BookDetailPage extends StatelessWidget {
           settings: settings,
           connection: connection,
           onGenreTap: onGenreTap,
+          onClose: onClose,
         );
       },
     );
@@ -89,8 +101,10 @@ class _BookDetailBody extends StatefulWidget {
     this.settings,
     this.connection,
     this.onGenreTap,
+    this.onClose,
   });
 
+  final VoidCallback? onClose;
   final Book book;
   final LibraryRepository repository;
   final AppSettingsStore? settings;
@@ -395,6 +409,13 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
     return Scaffold(
       appBar: AppBar(
         title: Text(book.title),
+        leading: widget.onClose == null
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: l10n.detailClosePane,
+                onPressed: widget.onClose,
+              ),
         // The three sharing-related actions below are each conditional on
         // server/connection state, and used to sit unconditionally alongside
         // the five actions that are always shown — up to eight icons at once
@@ -626,6 +647,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                                   repository: repository,
                                   bookId: book.id,
                                   onGenreTap: widget.onGenreTap,
+                                  popOnTap: widget.onClose == null,
                                 ),
                               ],
                             );
@@ -716,6 +738,7 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     // `context` would no longer be mounted to pop or to show
                     // the undo snackbar with.
                     final navigator = Navigator.of(context);
+                    final onClose = widget.onClose;
                     final messenger = ScaffoldMessenger.of(context);
                     final confirmed = await showDialog<bool>(
                       context: context,
@@ -744,7 +767,11 @@ class _BookDetailBodyState extends State<_BookDetailBody> {
                     );
                     if (confirmed != true) return;
                     await repository.trashBook(book.id);
-                    navigator.pop();
+                    if (onClose != null) {
+                      onClose();
+                    } else {
+                      navigator.pop();
+                    }
                     // The grace period makes an in-place undo cheap and
                     // honest: restoring is one column write, not a restore
                     // from backup.

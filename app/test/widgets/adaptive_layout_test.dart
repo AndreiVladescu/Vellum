@@ -215,7 +215,7 @@ void main() {
   // 700, not 400, for the one-column case: at 400 the read button's own row
   // overflows under the test font, which is that row's problem (tracked with
   // the large-text fixes), not the page layout's.
-  for (final (width, twoColumns) in [(700.0, false), (1280.0, true)]) {
+  for (final (width, twoColumns) in [(700.0, false), (1100.0, true)]) {
     testWidgets(
         'at ${width.toInt()} wide the book page is '
         '${twoColumns ? 'two columns' : 'one column'}', (tester) async {
@@ -235,8 +235,8 @@ void main() {
         expect(formats.dy,
             lessThan(tester.getBottomLeft(find.byType(CoverThumb)).dy),
             reason: 'beside the cover, not under it');
-        // Centred in the window rather than starting at its left edge.
-        expect(cover.dx, greaterThan(24));
+        // (1100 is narrower than the page's centring width, so no margin
+        // check; from 1200 the book opens in the side pane instead.)
       } else {
         expect(formats.dx, cover.dx, reason: 'one column: same left edge');
         expect(formats.dy, greaterThan(cover.dy));

@@ -14,6 +14,7 @@ class GenresSection extends StatelessWidget {
     required this.repository,
     required this.bookId,
     this.onGenreTap,
+    this.popOnTap = true,
   });
 
   final LibraryRepository repository;
@@ -21,6 +22,9 @@ class GenresSection extends StatelessWidget {
 
   /// Tapping a genre chip closes the book page and filters the shelf by it.
   final void Function(String genre)? onGenreTap;
+
+  /// False in the side pane, where there is no page to close.
+  final bool popOnTap;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +46,7 @@ class GenresSection extends StatelessWidget {
                 onPressed: onGenreTap == null
                     ? null
                     : () {
-                        Navigator.of(context).pop();
+                        if (popOnTap) Navigator.of(context).pop();
                         onGenreTap!(genre);
                       },
                 // …and the ✕ removes it from the book.

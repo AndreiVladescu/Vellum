@@ -7,6 +7,7 @@ import '../widgets/page_insets.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 import '../settings/shelf_group_by.dart';
+import 'detail_pane.dart';
 import 'group_header.dart';
 import 'shelf_grouping.dart';
 
@@ -30,7 +31,11 @@ class BookListView extends StatefulWidget {
     this.selected = const {},
     this.onToggleSelected,
     this.selectionMode = false,
+    this.pane,
   });
+
+  /// See `ShelfView.pane`.
+  final DetailPaneController? pane;
 
   /// The rows to show when [groups] is null.
   final List<LibraryEntry> entries;
@@ -91,6 +96,7 @@ class _BookListViewState extends State<BookListView> {
                       ticked: widget.selected.contains(group.entries[i].book.id),
                       onToggleSelected: widget.onToggleSelected,
                       selectionMode: widget.selectionMode,
+                      pane: widget.pane,
                     ),
                   ),
                 ),
@@ -108,8 +114,10 @@ class _BookRow extends StatelessWidget {
     required this.ticked,
     required this.onToggleSelected,
     required this.selectionMode,
+    this.pane,
   });
 
+  final DetailPaneController? pane;
   final LibraryEntry entry;
   final Widget Function(Book) detailBuilder;
   final bool ticked;
@@ -136,7 +144,7 @@ class _BookRow extends StatelessWidget {
         '${(progress * 100).round()}%',
     ].join(' · ');
 
-    return ListTile(
+    final tile = ListTile(
       dense: true,
       // A checkbox only in selection mode, so the ordinary list stays a list
       // rather than a form. The tick still shows, as a leading icon.
@@ -196,6 +204,11 @@ class _BookRow extends StatelessWidget {
               // Same reason as `ShelfView._openBook`: focus is restored when a
               // route pops, so leaving with the keyboard up brings it back on
               // return. This view is where searching is most likely.
+              final pane = this.pane;
+              if (pane != null && pane.enabled) {
+                pane.select(book); // no pop to restore focus on, and Esc needs it
+                return;
+              }
               FocusScope.of(context).unfocus();
               Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => detailBuilder(book),
@@ -203,5 +216,9 @@ class _BookRow extends StatelessWidget {
             },
       onLongPress: toggle == null ? null : () => toggle(book),
     );
+    final pane = this.pane;
+    return pane == null
+        ? tile
+        : PaneHighlight(controller: pane, bookId: book.id, child: tile);
   }
 }

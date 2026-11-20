@@ -1305,6 +1305,10 @@
     }
   },
 
+  "detailClosePane": "Close",
+  "@detailClosePane": {"description": "Tooltip of the close button when a book's page sits in the shelf's side pane on a wide window."},
+  "detailPaneEmpty": "Select a book to see its details here.",
+  "@detailPaneEmpty": {"description": "Shown in the shelf's side pane on a wide window while no book is selected."},
   "detailMovedToTrash": "“{title}” moved to the trash",
   "@detailMovedToTrash": {
     "description": "Snack bar after trashing a book, with an Undo action.",
