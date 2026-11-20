@@ -46,6 +46,9 @@ plus loan reminders (v1.4.2), scheduled backups (v1.6.1), app passwords
 `v1.3.6` (2026-11-13) — paged EPUB (v1.4.0), wide layouts for tablets and
 desktop, signed links and two-factor sign-in (v1.6.2), KOReader sync
 (v1.6.3), large-text fixes and a performance round.
+`v1.5.3` (2026-11-20) — Preferences in sections and shelf grouping (v1.4.1),
+read aloud (v1.4.3), audiobooks (v1.5.0–v1.5.3), a smoother physical room
+and fixes from the emulator pass. Flutter 3.50 (v1.4.0a) is held back.
 
 ---
 
@@ -204,12 +207,16 @@ lets the work be checked before it ships.
 
 - [ ] **M** Move to Flutter 3.50: `package:flutter/material.dart` is deprecated
       there in favour of `package:material_ui`. CI and releases are pinned to
-      3.47.9 until this is done on purpose
+      3.47.9 until this is done on purpose. *Blocked (2026-11-20):* the
+      migration is done on branch `flutter-3.50`, but 3.50.0's Linux engine
+      exports its own `_Unwind_*` symbols, so a plugin's C++ exception (the
+      keyring being locked) kills the app at start-up. Merge on a 3.50.x that
+      fixes it
 
 ### v1.4.1 — finding your way around
 
-- [ ] **M** Preferences split into sections, with a search box
-- [ ] **M** Shelf grouping headers: by author, series or genre
+- [x] **M** Preferences split into sections, with a search box
+- [x] **M** Shelf grouping headers: by author, series or genre
 
 ### v1.4.2 — loans that remind you
 
@@ -218,7 +225,7 @@ lets the work be checked before it ships.
 
 ### v1.4.3 — read aloud
 
-- [ ] **M** Text to speech in both readers
+- [x] **M** Text to speech in both readers
 
 ---
 
@@ -232,23 +239,23 @@ A new kind of book, so it starts with a design note rather than code.
       player library on five platforms and whether the F-Droid flavour can ship
       it, how position is stored (seconds, not pages) and how it reaches the
       existing per-device reading-position channel
-- [ ] **L** Import and model: an audiobook is a `book_file` with a duration and
+- [x] **L** Import and model: an audiobook is a `book_file` with a duration and
       chapters; a book can have text and audio both
-- [ ] **L** A basic player: play, pause, skip, chapters, position remembered
+- [x] **L** A basic player: play, pause, skip, chapters, position remembered
 
 ### v1.5.1 — a player you can live with
 
-- [ ] **L** Background playback and lock-screen controls
-- [ ] **M** Playback speed and a sleep timer
+- [x] **L** Background playback and lock-screen controls
+- [x] **M** Playback speed and a sleep timer
 
 ### v1.5.2 — on the shelf
 
-- [ ] **M** An *Audiobooks* section on the shelf, and *Continue listening* next
+- [x] **M** An *Audiobooks* section on the shelf, and *Continue listening* next
       to *Continue reading*
 
 ### v1.5.3 — in the numbers
 
-- [ ] **M** Listening time in Insights, kept apart from reading time
+- [x] **M** Listening time in Insights, kept apart from reading time
 
 ---
 

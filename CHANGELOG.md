@@ -6,6 +6,67 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.5.3 — 2026-11-20
+
+Audiobooks, read aloud, and a library that is easier to find your way around.
+
+### Added
+
+- **Audiobooks.** Import an `.m4b`, or a folder of `.mp3` files (`CD1`/`CD2`
+  folders join up), and it becomes a book with its chapters, narrator and
+  cover. Press *Listen* on the book page.
+  - **The player:** play and pause, back and forward 30 s, chapters, speed
+    from 0.5× to 3× (remembered per book, pitch kept) and a sleep timer that
+    fades out, including *end of chapter*.
+  - **It keeps playing in the background,** with controls in the notification,
+    on the lock screen and on Bluetooth buttons; on Linux, the desktop's media
+    controls. A small *now playing* bar takes you back to the player.
+  - **On the shelf:** an *Audiobooks* filter, a headphones badge, and spines as
+    thick as the book is long. *Continue listening* sits under *Continue
+    reading*, and the home-screen widget shows whichever you did last.
+  - **In Insights:** a Reading/Listening switch. Listening has its own time,
+    streaks and heat map and never counts as pages read.
+  - **Synced** through your server: the audio, and where you are in it, per
+    device. Older apps and servers ignore audiobooks.
+  - On Linux the player needs `libmpv`: the `.deb` installs it, and with the
+    AppImage install `libmpv2` yourself (Ubuntu, Debian). Without it
+    everything but playback works.
+- **Read aloud.** Both readers can read the book to you, a sentence at a time,
+  turning pages as they go. Speed and voice are in the reader's settings, and
+  Ctrl+Shift+R starts and stops it. Uses your device's own voices; on Linux,
+  `speech-dispatcher`.
+- **Preferences in sections** — Appearance, Shelf, Sync and server,
+  Notifications, Data and backups — with a search box that finds a setting and
+  takes you to it.
+- **Group the shelf** by author, series or genre, with a header per group that
+  folds away. In spines, covers and the list.
+
+### Changed
+
+- **The physical room pans smoothly.** Panning no longer redraws every book
+  (about 3.7× quicker in a 400-book room) and zooming is quicker too. Spine
+  titles' shadows are drawn once and reused.
+- The system bars hide only in the readers, so Android no longer shows the
+  *Viewing full screen* hint on the shelf.
+- Sync errors say what went wrong (server unreachable, timed out, signed out,
+  a certificate problem) instead of showing the raw error.
+
+### Fixed
+
+- Paged EPUB reading no longer gets stuck in a chapter with a picture.
+- Sample books no longer make every sync report *1 issue*.
+- The home-screen widget updates when your progress changes, not only after a
+  sync.
+- Shelf chips are no longer cut off at large text sizes.
+
+### Maintenance
+
+- Server: `lettre` 0.11.24 for RUSTSEC-2026-0560 to 0565.
+- Flutter stays on 3.47.9: 3.50.0 crashes on Linux desktops whose keyring is
+  locked. The move is ready and waits for a fixed 3.50.x.
+
+---
+
 ## v1.3.6 — 2026-11-13
 
 Pages you can turn, room on a tablet, and a safer server.
