@@ -327,3 +327,129 @@ async fn reading_progress_keeps_the_audio_position_across_text_pushes() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+/// GET [uri] with an optional `Range` and `If-Range`, returning the status,
+/// the `Content-Range` header and the body.
+async fn fetch_range(
+    app: &axum::Router,
+    uri: &str,
+    token: Option<&str>,
+    range: Option<&str>,
+    if_range: Option<&str>,
+) -> (StatusCode, Option<String>, Vec<u8>) {
+    let mut builder = Request::builder().uri(uri);
+    if let Some(token) = token {
+        builder = builder.header("authorization", format!("Bearer {token}"));
+    }
+    if let Some(range) = range {
+        builder = builder.header("range", range);
+    }
+    if let Some(tag) = if_range {
+        builder = builder.header("if-range", tag);
+    }
+    let res = app
+        .clone()
+        .oneshot(builder.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = res.status();
+    let content_range = res
+        .headers()
+        .get("content-range")
+        .map(|v| v.to_str().unwrap().to_string());
+    let body = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+    (status, content_range, body)
+}
+
+/// On-demand audio download (docs/AUDIOBOOKS.md §6): the app resumes a part
+/// it was partway through with `Range: bytes=N-` and an `If-Range` naming the
+/// part's hash, and must get exactly the rest, whether it signs in with its
+/// header or comes through a signed link.
+#[tokio::test]
+async fn an_interrupted_audio_download_resumes_with_a_range() {
+    let app = app().await;
+    let token = register(&app).await;
+    make_book(&app, &token, "dune").await;
+
+    // Big enough that the split lands well inside the body.
+    let mut audio = m4b_bytes();
+    audio.extend((0..4000u32).map(|i| (i % 251) as u8));
+    let (status, file) = upload(&app, &token, "dune", "filename=book.m4b", audio.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{file}");
+    let id = file["id"].as_str().unwrap().to_string();
+    let etag = format!("\"{}\"", file["sha256"].as_str().unwrap());
+    let uri = format!("/api/files/{id}");
+    let total = audio.len();
+
+    // The first attempt got 1500 bytes before the connection dropped; the
+    // second asks for the rest, open-ended, guarded by the hash.
+    let split = 1500;
+    let (status, range, rest) = fetch_range(
+        &app,
+        &uri,
+        Some(&token),
+        Some(&format!("bytes={split}-")),
+        Some(&etag),
+    )
+    .await;
+    assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+    assert_eq!(
+        range.as_deref(),
+        Some(format!("bytes {split}-{}/{total}", total - 1).as_str())
+    );
+    let mut joined = audio[..split].to_vec();
+    joined.extend_from_slice(&rest);
+    assert_eq!(joined, audio, "the two halves are the file");
+
+    // An If-Range naming some other blob means the partial file is of
+    // something else: the whole file comes back instead, as a 200.
+    let (status, range, whole) = fetch_range(
+        &app,
+        &uri,
+        Some(&token),
+        Some(&format!("bytes={split}-")),
+        Some("\"not-this-file\""),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(range.is_none());
+    assert_eq!(whole, audio);
+
+    // A partial that is already complete asks past the end: 416 with the
+    // size, so the client checks what it holds instead.
+    let (status, range, _) = fetch_range(
+        &app,
+        &uri,
+        Some(&token),
+        Some(&format!("bytes={total}-")),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::RANGE_NOT_SATISFIABLE);
+    assert_eq!(range.as_deref(), Some(format!("bytes */{total}").as_str()));
+
+    // The same through a signed link, which carries no header.
+    let (status, links) = call(
+        &app,
+        "POST",
+        "/api/links",
+        Some(&token),
+        Some(serde_json::json!({ "paths": [uri] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{links}");
+    let signed = links["links"][0]["url"].as_str().unwrap().to_string();
+    let (status, _, rest) = fetch_range(
+        &app,
+        &signed,
+        None,
+        Some(&format!("bytes={split}-")),
+        Some(&etag),
+    )
+    .await;
+    assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+    assert_eq!(rest, audio[split..].to_vec());
+}
