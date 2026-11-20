@@ -161,6 +161,12 @@ jobs:
       - name: Build and push
         id: build
         uses: docker/build-push-action@v7
+        # The action uploads a build record as a workflow artifact by default,
+        # and the release job publishes every artifact, so it ended up on each
+        # release as `<owner>.Vellum.<id>.dockerbuild`. The build summary is
+        # kept; only the artifact is turned off.
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           platforms: linux/amd64,linux/arm64
