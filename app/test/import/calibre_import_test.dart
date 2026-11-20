@@ -18,6 +18,14 @@ Directory buildLibrary(
   bool withCover = true,
 }) {
   final db = raw.sqlite3.open(p.join(root.path, 'metadata.db'));
+  // Every statement below would otherwise be its own committed, fsynced
+  // transaction (~30 of them). On a busy machine each fsync can take seconds,
+  // which is what made these tests fail only under load. The fixture is thrown
+  // away with its directory, so durability is worth nothing here; one
+  // transaction and no syncing is the whole fix.
+  db.execute('PRAGMA synchronous = OFF');
+  db.execute('PRAGMA journal_mode = MEMORY');
+  db.execute('BEGIN');
   db.execute('''
     CREATE TABLE books (
       id INTEGER PRIMARY KEY, title TEXT NOT NULL, sort TEXT, pubdate TIMESTAMP,
@@ -88,6 +96,7 @@ Directory buildLibrary(
     "VALUES (2, 'Untitled Notes', 'Untitled Notes', "
     "'0101-01-01 00:00:00+00:00', 1.0, 'Unknown/Untitled Notes (2)')",
   );
+  db.execute('COMMIT');
   db.close();
 
   final bookDir = Directory(p.join(root.path, 'Frank Herbert', 'Dune (1)'))
