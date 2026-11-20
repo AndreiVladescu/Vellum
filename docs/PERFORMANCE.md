@@ -1026,7 +1026,7 @@ expected, not measured. Nor Android (no emulator this round).
    shading strip, scrim, title, shadow image). Measure on the GPU before
    anything else; per-book layers were kept because merging them measured worse.
 
-## Room memory (Linux; Android pending KVM)
+## Room memory (Linux, then Android)
 
 The Android emulator run showed the room taking the resident set to ~905 MB.
 `/dev/kvm` was missing this round (the module is not loaded and loading it
@@ -1037,10 +1037,7 @@ books. **Resident-set numbers here are not a phone's**: on a phone the textures
 are GPU memory (`dumpsys meminfo` "Graphics"), here they are ordinary process
 memory. What carries over is *which part of the app* holds it. Load on the
 machine varied between runs (load average 5–28), so frame times are noisy and
-only rss is compared. The Android follow-up is
-`tool/emulator.sh run vellum_test -- <script>` around
-`PERF_ONLY=room tool/perf_run.sh --android`, sampling
-`adb shell dumpsys meminfo app.vellum.Vellum` every few seconds.
+only rss is compared. The Android numbers are in the last subsections.
 
 ### What the run now records
 
@@ -1113,17 +1110,72 @@ allocator/GL texture pool, which is why no number inside Dart sees it.
   in one bucket, and finer buckets would split a pinch into several decodes —
   more churn, which is what the zoom is paying for.
 
+### Android emulator (2026-11-20, after KVM came back)
+
+`PERF_ONLY=room tool/perf_run.sh --android --only gui` on `vellum_test`
+(Pixel 6, Android 14, swiftshader GL), profile build, the 2,000-book seeded
+library, phone image cache applied automatically, `dumpsys meminfo` sampled
+every 3 s. (`PERF_ONLY` now reaches the device as a `--dart-define`; before,
+an Android run ignored it and ran every scenario, and the *search* scenario
+timed out at 60 s in that full run — not looked at.)
+
+| room only, phone cache | start-up | open | after pan | after zoom | max |
+|---|---:|---:|---:|---:|---:|
+| resident set (test's rss) | 331 | 377 | 393 | 422 | 544 |
+| `dumpsys` TOTAL PSS | 194 | 301 | ~275 | 348 | |
+| Java heap | 19 | 11 | 11 | 11 | |
+| Native heap | 34 | 67 | 66 | 83 | |
+| Graphics | 0 | 0 | 0 | 0 | |
+| Unknown + Private Other | ~200 | ~330 | ~310 | ~410 | |
+
+(PSS rows are the nearest 3-second samples to each phase, in MB; the emulator's
+software GL keeps its textures in "Unknown"/"Private Other", not "Graphics", so
+Graphics reads 0 here and says nothing about a phone's GPU memory.)
+
+- **The room does not reach 905 MB on its own.** Resident set peaks at 544 MB,
+  and 422 at the end of the zoom. The 905 MB of the first baseline was the
+  *whole* run (shelf scenarios, insights, preferences) with the 100 MB desktop
+  image cache; the room's own share is ~+100 MB to open and ~+30 more over the
+  zoom. Dart's heap is not it (Java heap 11 MB; the Dart heap is inside
+  "Unknown"/native, ~+30 MB).
+- **Room open is where it grows** (+100 PSS): 400 books' covers (36 at 512 px,
+  201 at 256 px), 11.7 MB of shadow images, layers.
+- **The zoom re-decodes ~1,000 covers on Android too** (`cover_loads` 407 at
+  512 px, 402 at 256, 201 at 1,024), but that costs +30 MB of resident set, not
+  the +430 MB the Linux run saw: the Linux growth was llvmpipe textures.
+
+### Holding the decode size during a zoom — kept (for frame time, not memory)
+
+`SpineFace.decodeHeight`: the room passes the spine height *from before the
+zoom began* and puts it back to the live size 250 ms after the last wheel or
+pinch step (`_holdDecode`). During the gesture the GPU scales the bitmap it
+has; the re-decode happens once afterwards. The widgets' reuse key carries the
+decode scale, so a zoom step also still reuses them.
+
+| Android emulator, room zoom (80 steps) | before | held |
+|---|---:|---:|
+| cover decodes during the zoom | 1,010 | 0 |
+| build p50 / p90 / p99 | 26.7 / 39.3 / 76.3 ms | 21.8 / 26.3 / 36.3 ms |
+| raster p90 / p99 | 67.5 / 112.3 ms | 54.0 / 64.1 ms |
+| wall | 8.8 s | 6.0 s |
+| resident set after zoom / max | 422 / 544 MB | 439 / 439 MB |
+| PSS at the end of the zoom (3 s samples) | 348 | 370 |
+
+Memory is a wash (the 17 MB difference is inside run-to-run noise; the lower
+*max* is the only memory sign and one run each is not enough to claim it).
+Frame times improve across the board. **Unverified:** how long the spines look
+soft after a zoom-in ends (they should sharpen ~250 ms + a decode later; I did
+not watch it, only measured). The emulator is not a phone: every frame
+reads janky in software GL and these are comparisons, not budgets.
+
 ### Not done / next
 
-The remaining lever is what a zoom decodes: crossing a bucket reloads and
-re-uploads every visible spine's cover, ~2,000 loads for the scenario. Either
-hold the bucket for the length of a gesture (decode again once it stops, as the
-shadow cache already waits for a cut-off to hold still), or make the thumbnail a
-*slice* — a spine shows the left quarter of the cover and the rest of each
-bitmap is memory nobody sees. Both need the Android numbers first: if graphics
-memory on the phone is flat across the zoom, this is a software-GL artefact and
-the 905 MB had another cause (the shelf scenarios before it were already at
-704 MB on the emulator).
+The slice thumbnail is the remaining lever: a spine shows the left quarter of
+the cover and the rest of each bitmap is memory nobody sees. On Android the
+room's own memory is ~+130 MB over a start-up of ~330, so it is not urgent;
+the run's 905 MB came from everything before the room. Worth measuring the
+*whole* run's growth next (each scenario's resident set, same `dumpsys`
+sampling) before spending on the room.
 
 The shelf's code was not touched (its scenarios ran in the same two Linux runs
 and read as the earlier ones); the frame times in them are not comparable
