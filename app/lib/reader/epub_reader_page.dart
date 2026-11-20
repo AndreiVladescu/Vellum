@@ -196,7 +196,19 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   bool _autoHeld = false;
   int _autoStuckFrames = 0;
 
-  bool get _autoScrolling => _autoTicker?.isActive ?? false;
+  /// Paged mode turns pages on a timer instead of scrolling: [_autoPageTimer]
+  /// fires once per page and is set again after each turn.
+  Timer? _autoPageTimer;
+
+  bool get _autoScrolling =>
+      (_autoTicker?.isActive ?? false) || (_autoPageTimer?.isActive ?? false);
+
+  /// Seconds a page stays up in paged mode.
+  double get _autoPageSecs => clampAutoScrollSpeed(
+        _settings?.autoPageSeconds ?? defaultAutoPageSeconds,
+        min: minAutoPageSeconds,
+        max: maxAutoPageSeconds,
+      );
 
   double get _autoSpeed => clampAutoScrollSpeed(
         _settings?.autoScrollLinesPerMinute ?? defaultAutoScrollLinesPerMinute,
@@ -220,6 +232,12 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   }
 
   void _startAutoScroll() {
+    if (_paged) {
+      _autoHeld = false;
+      _scheduleAutoPage();
+      setState(() {});
+      return;
+    }
     if (!_scroll.hasClients) return;
     _autoHeld = false;
     _autoStuckFrames = 0;
@@ -229,7 +247,36 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     setState(() {});
   }
 
+  void _scheduleAutoPage() {
+    _autoPageTimer?.cancel();
+    _autoPageTimer = Timer(
+      Duration(milliseconds: (_autoPageSecs * 1000).round()),
+      _onAutoPage,
+    );
+  }
+
+  /// One timed page turn. Rolls into the next chapter at the end of this one,
+  /// as scrolled mode does, and stops when the book runs out.
+  void _onAutoPage() {
+    if (!mounted || !_paged) return;
+    final pages = _pages;
+    final step = autoPageStep(
+      held: _autoHeld,
+      ready: pages != null && pages.ready,
+      onLastPage: pages != null && pages.pageFor(_anchor) >= pages.count - 1,
+      lastChapter: _chapter >= _count - 1,
+    );
+    if (step == AutoPageStep.stop) {
+      _stopAutoScroll();
+      return;
+    }
+    if (step == AutoPageStep.turn) _pageForward(_count);
+    _scheduleAutoPage();
+  }
+
   void _stopAutoScroll() {
+    _autoPageTimer?.cancel();
+    _autoPageTimer = null;
     _autoTicker?.stop();
     if (mounted) setState(() {});
   }
@@ -275,6 +322,18 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   Future<void> _setAutoSpeed(double linesPerMinute) async {
     final settings = _settings;
     if (settings == null) return;
+    if (_paged) {
+      // In paged mode the value is seconds a page.
+      await settings.setAutoPageSeconds(roundAutoScrollSpeed(
+        clampAutoScrollSpeed(
+          linesPerMinute,
+          min: minAutoPageSeconds,
+          max: maxAutoPageSeconds,
+        ),
+      ));
+      if (_autoScrolling) _scheduleAutoPage();
+      return;
+    }
     await settings.setAutoScrollLinesPerMinute(roundAutoScrollSpeed(
       clampAutoScrollSpeed(
         linesPerMinute,
@@ -380,6 +439,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
       if (_scroll.hasClients) _anchor = AtScrollFraction(_scrollFraction);
       _pages = null;
     } else {
+      if (_autoScrolling) _stopAutoScroll();
       final fraction = _pagedFraction;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scroll.hasClients) return;
@@ -430,6 +490,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   /// was already selected when the pointer went down: that tap is dismissing
   /// the selection, and that drag is moving its handle.
   void _onPointerDown(PointerDownEvent event) {
+    _autoHeld = _autoScrolling;
     final selected = _selectionRange;
     // A caret (an empty selection, which a tap on text leaves) is not a
     // selection anyone is working on.
@@ -439,6 +500,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   }
 
   void _onPointerUp(PointerUpEvent event, double width) {
+    _autoHeld = false;
     final start = _pointerStart;
     _pointerStart = null;
     if (start == null || !_paged) return;
@@ -487,6 +549,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   void dispose() {
     ReaderSystemUi.leave();
     _autoTicker?.dispose();
+    _autoPageTimer?.cancel();
     // The wakelock belongs to this page, not to the app.
     unawaited(WakelockPlus.disable().catchError((_) {}));
     _hotkeys.detach();
@@ -1153,6 +1216,8 @@ class _EpubReaderPageState extends State<EpubReaderPage>
 
   /// A page turn inside the chapter: the view repaints, nothing is laid out.
   void _turnTo(ChapterPages pages, int page) {
+    // A page turned by hand gives the next timed turn a fresh interval.
+    if (_autoPageTimer?.isActive ?? false) _scheduleAutoPage();
     setState(() => _anchor = AtContentFraction(pages.contentFractionOf(page)));
     _savePositionSoon();
   }
@@ -1445,17 +1510,15 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                           ? EpubLayout.scrolled
                           : EpubLayout.paged),
                     ),
-                  // Scrolling by itself has nothing to scroll in paged mode.
-                  if (!_paged)
-                    ReaderAction(
-                      icon: _autoScrolling
-                          ? Icons.pause_circle_outline
-                          : Icons.play_circle_outline,
-                      label: _autoScrolling
-                          ? l10n.readerActAutoScrollStop
-                          : l10n.readerActAutoScroll,
-                      onPressed: _toggleAutoScroll,
-                    ),
+                  ReaderAction(
+                    icon: _autoScrolling
+                        ? Icons.pause_circle_outline
+                        : Icons.play_circle_outline,
+                    label: _autoScrolling
+                        ? l10n.readerActAutoScrollStop
+                        : l10n.readerActAutoScroll,
+                    onPressed: _toggleAutoScroll,
+                  ),
                   ReaderAction(
                     icon: _speaking
                         ? Icons.stop_circle_outlined
@@ -1550,6 +1613,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   onPointerDown: _onPointerDown,
                   onPointerUp: (event) =>
                       _onPointerUp(event, constraints.maxWidth),
+                  onPointerCancel: (_) => _autoHeld = false,
                   child: Padding(
                     // The same insets as scrolled mode's scroll view, so the
                     // column is the same width and wraps the same way.
@@ -1675,10 +1739,17 @@ class _EpubReaderPageState extends State<EpubReaderPage>
                   bottom: 24,
                   child: Center(
                     child: AutoScrollBar(
-                      speed: _autoSpeed,
-                      unit: AutoScrollUnit.lines,
-                      min: minAutoScrollLinesPerMinute,
-                      max: maxAutoScrollLinesPerMinute,
+                      speed: _paged ? _autoPageSecs : _autoSpeed,
+                      smallerIsFaster: _paged,
+                      unit: _paged
+                          ? AutoScrollUnit.seconds
+                          : AutoScrollUnit.lines,
+                      min: _paged
+                          ? minAutoPageSeconds
+                          : minAutoScrollLinesPerMinute,
+                      max: _paged
+                          ? maxAutoPageSeconds
+                          : maxAutoScrollLinesPerMinute,
                       onSpeed: _setAutoSpeed,
                       onStop: _stopAutoScroll,
                     ),

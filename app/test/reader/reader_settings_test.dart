@@ -37,6 +37,7 @@ void main() {
     await settings.setPdfFit(PdfFit.width);
     await settings.setNightMode(true);
     await settings.setImmersive(true);
+    await settings.setAutoPageSeconds(12.5);
 
     // A second load is the next launch.
     final reloaded = await ReaderSettings.load();
@@ -48,6 +49,7 @@ void main() {
     expect(reloaded.pdfFit, PdfFit.width);
     expect(reloaded.nightMode, true);
     expect(reloaded.immersive, true);
+    expect(reloaded.autoPageSeconds, 12.5);
   });
 
   test('out-of-range values are clamped, not stored as given', () async {

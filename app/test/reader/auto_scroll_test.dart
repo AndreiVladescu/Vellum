@@ -6,11 +6,15 @@
 // racing through the same words twice as fast. And the steps are proportional,
 // because a tenth of a page a minute is the whole difference at the slow end
 // and invisible at the fast one.
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/reader/auto_scroll_bar.dart';
+import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/reader/auto_scroll.dart';
 import 'package:vellum/l10n/gen/app_localizations_en.dart';
 
 void main() {
+  pagedAutoTests();
   group('speed in pixels', () {
     test('a page a minute moves one page height a minute', () {
       final speed = autoScrollPixelsPerSecond(
@@ -34,10 +38,14 @@ void main() {
     test('zooming in slows it down, so the same words go past', () {
       // The caller passes the page height *as drawn*: at 2× zoom the page is
       // twice as tall on screen, so the scroll must cover twice the pixels…
-      final normal =
-          autoScrollPixelsPerSecond(unitsPerMinute: 3, unitHeightPixels: 900);
-      final zoomed =
-          autoScrollPixelsPerSecond(unitsPerMinute: 3, unitHeightPixels: 1800);
+      final normal = autoScrollPixelsPerSecond(
+        unitsPerMinute: 3,
+        unitHeightPixels: 900,
+      );
+      final zoomed = autoScrollPixelsPerSecond(
+        unitsPerMinute: 3,
+        unitHeightPixels: 1800,
+      );
       expect(zoomed, closeTo(normal * 2, 0.001));
       // …which is the same page every twenty seconds either way.
       expect(1800 / zoomed, closeTo(900 / normal, 0.001));
@@ -45,13 +53,17 @@ void main() {
 
     test('a nonsense speed or an unmeasured page stands still', () {
       expect(
-          autoScrollPixelsPerSecond(unitsPerMinute: 0, unitHeightPixels: 900),
-          0);
+        autoScrollPixelsPerSecond(unitsPerMinute: 0, unitHeightPixels: 900),
+        0,
+      );
       expect(
-          autoScrollPixelsPerSecond(unitsPerMinute: -2, unitHeightPixels: 900),
-          0);
+        autoScrollPixelsPerSecond(unitsPerMinute: -2, unitHeightPixels: 900),
+        0,
+      );
       expect(
-          autoScrollPixelsPerSecond(unitsPerMinute: 3, unitHeightPixels: 0), 0);
+        autoScrollPixelsPerSecond(unitsPerMinute: 3, unitHeightPixels: 0),
+        0,
+      );
     });
   });
 
@@ -73,27 +85,39 @@ void main() {
       // Pressed until it stops moving — the floor is reachable, and the point
       // is what it passes through on the way.
       for (var i = 0; i < 40; i++) {
-        final next = stepAutoScrollSpeed(speed,
-            faster: false,
-            min: minAutoScrollPagesPerMinute,
-            max: maxAutoScrollPagesPerMinute);
+        final next = stepAutoScrollSpeed(
+          speed,
+          faster: false,
+          min: minAutoScrollPagesPerMinute,
+          max: maxAutoScrollPagesPerMinute,
+        );
         if (next == speed) break;
         stops.add(speed = next);
       }
-      expect(stops.last, minAutoScrollPagesPerMinute,
-          reason: 'the floor is reachable by pressing');
-      expect(stops.where((s) => s > 0.2 && s < 0.5).length, greaterThan(3),
-          reason: 'the new range is somewhere to sit, not a cliff onto the '
-              'floor');
+      expect(
+        stops.last,
+        minAutoScrollPagesPerMinute,
+        reason: 'the floor is reachable by pressing',
+      );
+      expect(
+        stops.where((s) => s > 0.2 && s < 0.5).length,
+        greaterThan(3),
+        reason:
+            'the new range is somewhere to sit, not a cliff onto the '
+            'floor',
+      );
     });
 
     test('a slow step is gentler than a fast one', () {
-      final fromSlow = 0.4 -
-          stepAutoScrollSpeed(0.4, faster: false, min: 0.2, max: 30);
+      final fromSlow =
+          0.4 - stepAutoScrollSpeed(0.4, faster: false, min: 0.2, max: 30);
       final fromFast =
           8.0 - stepAutoScrollSpeed(8, faster: false, min: 0.2, max: 30);
-      expect(fromSlow / 0.4, lessThan(fromFast / 8),
-          reason: 'a quarter off 0.4 is a different speed entirely');
+      expect(
+        fromSlow / 0.4,
+        lessThan(fromFast / 8),
+        reason: 'a quarter off 0.4 is a different speed entirely',
+      );
     });
 
     test('a broken number falls back to the slowest rather than NaN', () {
@@ -105,14 +129,16 @@ void main() {
     test('step proportionally, not by a fixed amount', () {
       final fromSlow = stepAutoScrollSpeed(1, faster: true, min: 0.5, max: 30);
       final fromFast = stepAutoScrollSpeed(20, faster: true, min: 0.5, max: 30);
-      expect(fromSlow - 1, lessThan(fromFast - 20),
-          reason: 'the same press means more pages a minute when already fast');
+      expect(
+        fromSlow - 1,
+        lessThan(fromFast - 20),
+        reason: 'the same press means more pages a minute when already fast',
+      );
     });
 
     test('a press each way comes back to about where it started', () {
       final there = stepAutoScrollSpeed(4, faster: true, min: 0.5, max: 30);
-      final back =
-          stepAutoScrollSpeed(there, faster: false, min: 0.5, max: 30);
+      final back = stepAutoScrollSpeed(there, faster: false, min: 0.5, max: 30);
       expect(back, closeTo(4, 0.05));
     });
 
@@ -125,26 +151,47 @@ void main() {
       var speed = 4.0;
       for (var i = 0; i < 6; i++) {
         speed = stepAutoScrollSpeed(speed, faster: true, min: 0.5, max: 30);
-        expect(autoScrollSpeedLabel(L10nEn(), speed, AutoScrollUnit.pages).length, lessThan(16),
-            reason: 'a readout of "7.8125 pages/min" helps nobody');
+        expect(
+          autoScrollSpeedLabel(L10nEn(), speed, AutoScrollUnit.pages).length,
+          lessThan(16),
+          reason: 'a readout of "7.8125 pages/min" helps nobody',
+        );
       }
     });
   });
 
   group('the readout', () {
     test('names the unit each reader counts in', () {
-      expect(autoScrollSpeedLabel(L10nEn(), 6, AutoScrollUnit.pages), '6 pages/min');
-      expect(autoScrollSpeedLabel(L10nEn(), 25, AutoScrollUnit.lines), '25 lines/min');
+      expect(
+        autoScrollSpeedLabel(L10nEn(), 6, AutoScrollUnit.pages),
+        '6 pages/min',
+      );
+      expect(
+        autoScrollSpeedLabel(L10nEn(), 25, AutoScrollUnit.lines),
+        '25 lines/min',
+      );
     });
 
     test('keeps the detail that matters at the slow end', () {
-      expect(autoScrollSpeedLabel(L10nEn(), 0.75, AutoScrollUnit.pages), '0.75 pages/min');
-      expect(autoScrollSpeedLabel(L10nEn(), 1.5, AutoScrollUnit.pages), '1.5 pages/min');
+      expect(
+        autoScrollSpeedLabel(L10nEn(), 0.75, AutoScrollUnit.pages),
+        '0.75 pages/min',
+      );
+      expect(
+        autoScrollSpeedLabel(L10nEn(), 1.5, AutoScrollUnit.pages),
+        '1.5 pages/min',
+      );
     });
 
     test('drops trailing zeros', () {
-      expect(autoScrollSpeedLabel(L10nEn(), 12.0, AutoScrollUnit.pages), '12 pages/min');
-      expect(autoScrollSpeedLabel(L10nEn(), 1.50, AutoScrollUnit.pages), '1.5 pages/min');
+      expect(
+        autoScrollSpeedLabel(L10nEn(), 12.0, AutoScrollUnit.pages),
+        '12 pages/min',
+      );
+      expect(
+        autoScrollSpeedLabel(L10nEn(), 1.50, AutoScrollUnit.pages),
+        '1.5 pages/min',
+      );
     });
   });
 
@@ -175,11 +222,81 @@ void main() {
   });
 
   test('the defaults are inside their own limits', () {
-    expect(defaultAutoScrollPagesPerMinute,
-        inInclusiveRange(minAutoScrollPagesPerMinute,
-            maxAutoScrollPagesPerMinute));
-    expect(defaultAutoScrollLinesPerMinute,
-        inInclusiveRange(minAutoScrollLinesPerMinute,
-            maxAutoScrollLinesPerMinute));
+    expect(
+      defaultAutoScrollPagesPerMinute,
+      inInclusiveRange(
+        minAutoScrollPagesPerMinute,
+        maxAutoScrollPagesPerMinute,
+      ),
+    );
+    expect(
+      defaultAutoScrollLinesPerMinute,
+      inInclusiveRange(
+        minAutoScrollLinesPerMinute,
+        maxAutoScrollLinesPerMinute,
+      ),
+    );
+  });
+}
+
+void pagedAutoTests() {
+  group('timed page turns (paged EPUB)', () {
+    test('wait while held or laying out, stop only at the end of the book', () {
+      AutoPageStep step({
+        bool held = false,
+        bool ready = true,
+        bool onLastPage = false,
+        bool lastChapter = false,
+      }) => autoPageStep(
+        held: held,
+        ready: ready,
+        onLastPage: onLastPage,
+        lastChapter: lastChapter,
+      );
+      expect(step(), AutoPageStep.turn);
+      expect(step(held: true), AutoPageStep.wait);
+      expect(step(ready: false), AutoPageStep.wait);
+      // The end of a chapter carries on into the next one.
+      expect(step(onLastPage: true), AutoPageStep.turn);
+      expect(step(onLastPage: true, lastChapter: true), AutoPageStep.stop);
+    });
+
+    test('the seconds readout', () {
+      final l10n = L10nEn();
+      expect(
+        autoScrollSpeedLabel(l10n, 30, AutoScrollUnit.seconds),
+        '30 s/page',
+      );
+      expect(
+        autoScrollSpeedLabel(l10n, 4.5, AutoScrollUnit.seconds),
+        '4.5 s/page',
+      );
+    });
+
+    testWidgets('on the bar, "faster" lowers the seconds', (tester) async {
+      final seen = <double>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: L10n.localizationsDelegates,
+          supportedLocales: L10n.supportedLocales,
+          home: Scaffold(
+            body: AutoScrollBar(
+              speed: 30,
+              unit: AutoScrollUnit.seconds,
+              min: minAutoPageSeconds,
+              max: maxAutoPageSeconds,
+              smallerIsFaster: true,
+              onSpeed: seen.add,
+              onStop: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byTooltip('Faster'));
+      await tester.tap(find.byTooltip('Slower'));
+      expect(seen[0], lessThan(30));
+      expect(seen[1], greaterThan(30));
+      expect(find.text('30 s/page'), findsOneWidget);
+    });
   });
 }

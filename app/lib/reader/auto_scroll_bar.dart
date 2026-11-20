@@ -18,6 +18,7 @@ class AutoScrollBar extends StatelessWidget {
     required this.max,
     required this.onSpeed,
     required this.onStop,
+    this.smallerIsFaster = false,
   });
 
   final double speed;
@@ -27,6 +28,10 @@ class AutoScrollBar extends StatelessWidget {
 
   final double min;
   final double max;
+
+  /// True when the value is a time (seconds a page): the "faster" button then
+  /// lowers it.
+  final bool smallerIsFaster;
 
   final void Function(double speed) onSpeed;
   final VoidCallback onStop;
@@ -47,12 +52,12 @@ class AutoScrollBar extends StatelessWidget {
               icon: const Icon(Icons.remove),
               color: scheme.onInverseSurface,
               tooltip: l10n.readerAutoSlower,
-              onPressed: speed <= min
+              onPressed: (smallerIsFaster ? speed >= max : speed <= min)
                   ? null
                   : () => onSpeed(
                       stepAutoScrollSpeed(
                         speed,
-                        faster: false,
+                        faster: smallerIsFaster,
                         min: min,
                         max: max,
                       ),
@@ -66,12 +71,12 @@ class AutoScrollBar extends StatelessWidget {
               icon: const Icon(Icons.add),
               color: scheme.onInverseSurface,
               tooltip: l10n.readerAutoFaster,
-              onPressed: speed >= max
+              onPressed: (smallerIsFaster ? speed <= min : speed >= max)
                   ? null
                   : () => onSpeed(
                       stepAutoScrollSpeed(
                         speed,
-                        faster: true,
+                        faster: !smallerIsFaster,
                         min: min,
                         max: max,
                       ),

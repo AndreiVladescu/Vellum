@@ -122,6 +122,7 @@ class ReaderSettings extends ChangeNotifier {
   static const _highlightColorKey = 'reader.highlightColor';
   static const _pageMetricKey = 'reader.pageMetric';
   static const _autoScrollKey = 'reader.autoScrollPagesPerMinute';
+  static const _autoPageSecondsKey = 'reader.autoPageSeconds';
   static const _autoScrollLinesKey = 'reader.autoScrollLinesPerMinute';
   // Translation (next features #12). The URL is what decides whether the
   // feature exists at all: no server, no button — the same rule the sync
@@ -355,6 +356,17 @@ class ReaderSettings extends ChangeNotifier {
 
   Future<void> setAutoScrollLinesPerMinute(double value) async {
     await _prefs.setDouble(_autoScrollLinesKey, value);
+    notifyListeners();
+  }
+
+  /// Seconds a page stays up when a paged EPUB turns its own pages.
+  double? get autoPageSeconds {
+    final value = _prefs.getDouble(_autoPageSecondsKey);
+    return value != null && value > 0 ? value : null;
+  }
+
+  Future<void> setAutoPageSeconds(double value) async {
+    await _prefs.setDouble(_autoPageSecondsKey, value);
     notifyListeners();
   }
 

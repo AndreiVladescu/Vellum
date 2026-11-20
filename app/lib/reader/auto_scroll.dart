@@ -31,6 +31,29 @@ const defaultAutoScrollLinesPerMinute = 25.0;
 const minAutoScrollLinesPerMinute = 4.0;
 const maxAutoScrollLinesPerMinute = 200.0;
 
+/// Paged EPUB: the self-scroller turns a page on a timer instead, so its speed
+/// is *seconds a page*, and a smaller number is faster.
+const defaultAutoPageSeconds = 30.0;
+const minAutoPageSeconds = 3.0;
+const maxAutoPageSeconds = 300.0;
+
+/// What a timed page turn does when its interval is up.
+enum AutoPageStep { wait, turn, stop }
+
+/// Wait while a finger holds the page or the chapter is still being laid out;
+/// stop on the book's last page; otherwise turn (which rolls into the next
+/// chapter by itself at the end of this one, as scrolled mode does).
+AutoPageStep autoPageStep({
+  required bool held,
+  required bool ready,
+  required bool onLastPage,
+  required bool lastChapter,
+}) {
+  if (held || !ready) return AutoPageStep.wait;
+  if (onLastPage && lastChapter) return AutoPageStep.stop;
+  return AutoPageStep.turn;
+}
+
 /// How far the viewport should travel each second, in view pixels.
 ///
 /// [unitHeightPixels] is the height of one unit *as drawn* — a PDF page times
@@ -75,7 +98,7 @@ double stepAutoScrollSpeed(
 }
 
 /// What one unit of auto-scroll speed is: a PDF counts pages, an EPUB lines.
-enum AutoScrollUnit { pages, lines }
+enum AutoScrollUnit { pages, lines, seconds }
 
 /// The speed as it is shown on the control: "6 pages/min", "0.75 pages/min".
 String autoScrollSpeedLabel(L10n l10n, double speed, AutoScrollUnit unit) {
@@ -86,6 +109,7 @@ String autoScrollSpeedLabel(L10n l10n, double speed, AutoScrollUnit unit) {
   return switch (unit) {
     AutoScrollUnit.pages => l10n.readerAutoSpeedPages(trimmed),
     AutoScrollUnit.lines => l10n.readerAutoSpeedLines(trimmed),
+    AutoScrollUnit.seconds => l10n.readerAutoSpeedSeconds(trimmed),
   };
 }
 

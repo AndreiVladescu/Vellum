@@ -4282,6 +4282,14 @@
     }
   },
 
+  "readerAutoSpeedSeconds": "{speed} s/page",
+  "@readerAutoSpeedSeconds": {
+    "description": "Auto-scroll readout in a paged EPUB: seconds before the page turns by itself; `speed` is already formatted.",
+    "placeholders": {
+      "speed": {"type": "String"}
+    }
+  },
+
   "readerAutoSlower": "Slower",
   "@readerAutoSlower": {
     "description": "Tooltip."
