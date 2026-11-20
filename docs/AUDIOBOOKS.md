@@ -515,7 +515,7 @@ fixtures were made with ffmpeg: a 5 h 30 min AAC `.m4b` with six chapters
 - [x] **M** Schema: app v40 and the server migration (0043: `book_file` and `reading_progress` columns), the `audiobooks` capability, `schema_parity.rs`
 - [x] **L** Import: detection, ordering, tags, duration, chapters, cover, magic bytes at both ends. *Open:* the "One audiobook from these 24 files?" prompt — several audio files are grouped per folder without asking
 - [x] **M** Server: accept audio uploads plus the file fields, hide audio from old clients (`?audio=1`), skip it in the text index, KOReader digests, send and cover rendering, OPDS mime types
-- [ ] **L** Sync: upload audio, `present` flag, on-demand resumable download; audit every `bookFiles` consumer (doctor, backups, dedupe, read button, local text index). *Done so far:* audio uploads with its fields (only to a server with `audiobooks`), pulled parts keep them and get their chapters re-read, the doctor skips `present = false`, the read button, text index and send sheet skip audio. *Open:* the pull still downloads audio straight away — nothing sets `present = false` yet — and there is no Range resume, Wi-Fi-only default or backup exclusion
+- [x] **L** Sync: upload audio, `present` flag, on-demand resumable download; audit every `bookFiles` consumer (doctor, backups, dedupe, read button, local text index). Audio uploads with its fields (only to a server with `audiobooks`); the pull brings audio rows with `present = false` and no bytes; Listen downloads them, resumable and hash-checked; Wi-Fi only on Android by default; backups leave audio out by default. See §11. *Not built:* the opt-in *Download audiobooks automatically*; *Unverified:* the metered-network check and backgrounded downloads on a real phone
 - [x] **L** Basic player page: play and pause, ±30 s, chapter list and skip, position saved locally and on `reading_progress`, the "go there?" offer. *Open:* the "Mark as finished" offer is a snack bar at the end; there is no *Continue listening* yet (v1.5.2). *Unverified:* the page itself has only run against a fake engine in tests; the real engine's calls (`setFilePath(initialPosition:)`, `completed`) are the ones the spike exercised on Linux
 
 **Hooks left for later.** `AudiobookPlayer` (`app/lib/audio/audiobook_player.dart`)
@@ -635,4 +635,114 @@ screen the compact row shows both kinds of card.
 listening happened last (`pickContinue`), with "42% · at 1:02:33" for audio.
 One of each would need a second layout and a second widget provider; not worth
 it for a launcher tile. No Android code changed.
+
+## 11. On-demand audio as built
+
+This is §6's *Download: on demand* as it was built. There is no schema change:
+the app-local `book_files.present` column from v1.5.0 is the download state,
+and nothing on the server changed.
+
+**The pull** inserts an audio part's row with `present = false` and does not
+fetch it (`sync_service.dart`). The book appears with its duration, parts,
+labels and listening position. An m4b's own chapters are inside the file, so
+until it is downloaded the player shows one chapter per part, titled from
+its label. Text files download during the pull as before.
+
+**The download** (`AudioDownloads`, `lib/audio/audio_downloads.dart`) is one
+job per book:
+
+- **Order.** The part holding the saved position goes first, then the parts
+  after it, then the ones before it. If the player needs a part that is still
+  queued, that part moves to the front.
+- **Where the bytes go.** Each part streams into
+  `audio-downloads/<file>.partial`. That is outside `files/`, so the startup
+  sweep of `.part` files leaves it alone and a restart can resume it. The
+  part is then hashed and compared with the row's `sha256`. Only after that
+  is it renamed into `files/`, marked `present`, and its chapters re-read.
+- **Resume.** `downloadFileTo` sends `Range: bytes=N-` with an `If-Range`
+  of the part's hash. A `200` starts the file over. A `416` means the partial
+  is already whole, and the hash check decides. A dropped connection is
+  retried twice (after 2 s and 10 s) from where it stopped. A refusal (4xx)
+  is not retried.
+- **Hash failure.** If the hash is wrong, the partial is deleted. A part that
+  had been resumed starts again once from scratch; if it is still wrong, or
+  if a fresh download is wrong, the download stops with "didn't match the
+  server's copy".
+- **Cancel** stops between two chunks. Finished parts and the partial are
+  kept, so the next Download resumes.
+- **The client** is `ServerConnection.load().client`, read when a download
+  starts, so the service needs nothing from `main.dart`.
+
+The server already answered ranges (`serve_blob`, including through signed
+links). `tests/audiobooks.rs` now covers the resume itself: an open-ended
+`bytes=N-`, a stale `If-Range` falling back to `200`, `416` past the end, and
+a ranged request through a signed link.
+
+**The player** (`AudiobookPlayer.fetchPart`, which `PlaybackHost` wires to
+`AudioDownloads.ensurePart`):
+
+- It loads without bytes: chapters, length and position are all there.
+- Play on a missing part waits for that part and starts when it arrives.
+- When a part ends and the next one is not here yet, the player pauses
+  (ending the sitting), waits for the part, and plays on by itself.
+- A seek while paused into a missing part only moves the position.
+- The play button shows pause while play is pending, so a second tap
+  withdraws it.
+- If the part cannot come (no server, mobile data, cancelled), the page
+  says "This part isn't on this device yet."
+
+**The UI** is one widget, `AudioDownloadPanel`
+(`lib/audio/audio_download_view.dart`):
+
+- On the book page it sits under the audiobook in the formats list, with
+  "Not downloaded to this device · 430 MB" and Download, the progress and
+  Cancel, or "On this device" and Remove download.
+- In the player it sits at the top of the page. Opening the player on a book
+  whose audio is not all here starts the download (the user tapped Listen).
+- The player's overflow menu also has Remove download, which closes the
+  page.
+
+**Remove download** keeps the book, its rows, chapters and position, and
+marks the parts not `present`. It deletes nothing unless the server lists
+every part's hash for that book. Without that check it could delete the only
+copy of an audiobook that was imported on this device and never uploaded:
+*keep on this device*, no server, or a push still pending. Removing the book
+that is playing stops it first.
+
+**Wi-Fi only.** The preference is `audioWifiOnly`, on by default, in
+Preferences → Sync. The rule is the pure `audioNetworkVerdict`, and it asks
+only on Android. On a computer the switch is shown disabled, like the other
+Android-only switches. "Wi-Fi" means *unmetered*: `MainActivity` answers
+`ConnectivityManager.isActiveNetworkMetered()` on
+`app.vellum.Vellum/network`, which needs `ACCESS_NETWORK_STATE`. A phone
+hotspot is Wi-Fi but metered, so it asks. On mobile data the panel offers
+"Download anyway (size)", which lifts the rule for that book until the app
+restarts.
+
+**Backups** leave audio out by default. The switch "Include audiobook audio"
+sits in the backup section, and its line says what happens: "it stays on your
+server", or, with no server, that the backup holds no copy. Manual and
+scheduled backups both follow it.
+
+- The snapshot's audio rows are set to `present = 0` through `ATTACH`.
+- The manifest records `audio: excluded` and how many files were left out.
+  Verify only checks what the manifest lists, so it reports nothing missing.
+- On restore, an audio row is `present` exactly when the archive carried its
+  file. This reconciliation also runs through `ATTACH`, before the live
+  connection closes. A restore also clears `audio-downloads/`.
+
+**Storage.** Preferences → Data and backups → *Audiobooks on this device*
+watches the sum of the sizes of the `present` audio parts.
+
+*Not built:*
+
+- *Download audiobooks automatically*, §6's opt-in to keep today's behaviour.
+- A foreground service for a download while the app is in the background.
+  While audio is playing, the `mediaPlayback` service keeps the process
+  alive. Otherwise a backgrounded phone may cut the connection, and the
+  download resumes from the partial next time.
+- Streaming instead of downloading, which is still deferred (§6).
+
+*Unverified on a device:* the metered check, Download anyway, and the waiting
+player on a real phone.
 
