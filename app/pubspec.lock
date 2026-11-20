@@ -365,10 +365,10 @@ packages:
     dependency: "direct main"
     description:
       name: dynamic_color
-      sha256: "869b3bce0100eb519768ecd71c0111f0b5ea679f5f62e1f59c49d80067e730c5"
+      sha256: "6194c6fbf03ec7cf2f555a152bb8e547f84fa7f0a330116c353e37a46b08dcb0"
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.0"
+    version: "2.0.2"
   fake_async:
     dependency: transitive
     description:

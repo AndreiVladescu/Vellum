@@ -61,7 +61,11 @@ dependencies:
   image_picker: ^1.2.4
   qr: ^4.0.1
   cryptography: ^2.9.0
-  dynamic_color: ^2.1.0
+  # Held at 2.0.2 (2.x is the first on material_ui): 2.1.0's Linux plugin asks
+  # the XDG desktop portal for the accent colour with a blocking D-Bus call on
+  # the UI thread and the default 25 s timeout, so where the portal is slow or
+  # stuck the first shelf frame waits 25 s. 2.0.2 reads GTK's colour, as 1.9 did.
+  dynamic_color: 2.0.2
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.3
