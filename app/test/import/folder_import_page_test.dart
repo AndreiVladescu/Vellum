@@ -35,22 +35,28 @@ void main() {
   void write(String name, String contents) =>
       File(p.join(folder.path, name)).writeAsStringSync(contents);
 
-  /// Drives the wizard's real file I/O to completion.
+  /// Drives the wizard's real file I/O until [done] holds.
   ///
   /// `pumpAndSettle` can't be used (the progress indicator animates forever) and
   /// neither half alone is enough: each `runAsync` lets one pending dart:io
   /// operation finish, and the following `pump` drains the continuation it
-  /// scheduled. A scan is several operations per file, so this needs many more
-  /// rounds than a typical widget test — hence the generous count rather than a
-  /// tight one.
-  Future<void> settle(WidgetTester tester, {int rounds = 40}) async {
-    for (var i = 0; i < rounds; i++) {
+  /// scheduled.
+  ///
+  /// It waits on a *condition* (what the test is about to assert), up to 30 s of
+  /// real time, rather than for a fixed number of rounds: a scan is file I/O
+  /// plus hashing in background isolates, whose duration depends on how busy the
+  /// machine is, and a round count tuned on an idle one failed under load.
+  Future<void> settleUntil(WidgetTester tester, bool Function() done) async {
+    final clock = Stopwatch()..start();
+    while (!done() && clock.elapsed < const Duration(seconds: 30)) {
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 5));
       });
       await tester.pump(const Duration(milliseconds: 20));
     }
   }
+
+  bool shown(Finder finder) => finder.evaluate().isNotEmpty;
 
   Future<Widget> wizard(LibraryRepository repo) async => MaterialApp(
         localizationsDelegates: L10n.localizationsDelegates,
@@ -78,7 +84,7 @@ void main() {
     });
 
     await tester.pumpWidget(app);
-    await settle(tester);
+    await settleUntil(tester, () => shown(find.text('Import 2')));
 
     // The parsed titles, not the raw file names.
     expect(find.text('Dune'), findsOneWidget);
@@ -112,7 +118,7 @@ void main() {
     });
 
     await tester.pumpWidget(app);
-    await settle(tester);
+    await settleUntil(tester, () => shown(find.text('Import 1')));
 
     expect(find.text('Already here'), findsWidgets, reason: 'status label shown');
     // Only the genuinely new file is queued: 3 files found, 1 selected.
@@ -134,15 +140,15 @@ void main() {
     });
 
     await tester.pumpWidget(app);
-    await settle(tester);
+    await settleUntil(tester, () => shown(find.text('Import 1')));
 
     // "Look up metadata online" is on by default for a small folder; turn it
     // off so the test makes no network calls.
     await tester.tap(find.text('Look up covers and descriptions online'));
     await tester.pump();
     await tester.tap(find.text('Import 1'));
-    await settle(tester);
-    await settle(tester);
+    await settleUntil(
+        tester, () => shown(find.textContaining('Imported 1 book')));
 
     final books = await repo.db.select(repo.db.books).get();
     expect(books.single.title, 'Dune');
@@ -166,7 +172,7 @@ void main() {
     });
 
     await tester.pumpWidget(app);
-    await settle(tester);
+    await settleUntil(tester, () => shown(find.text('No PDFs or EPUBs here')));
 
     expect(find.text('No PDFs or EPUBs here'), findsOneWidget);
     // No review bar at all — nothing to select, nothing to import. (The app bar
