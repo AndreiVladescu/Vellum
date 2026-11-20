@@ -99,7 +99,7 @@ only) + `audio_service` 0.18.19 (+ `audio_service_mpris` 0.2.1 on Linux).**
 | Android | `just_audio` → ExoPlayer (Media3) | `audio_service`: MediaSession, notification, lock screen, Bluetooth buttons |
 | macOS | `just_audio` → AVPlayer | `audio_service`: Now Playing, media keys |
 | Linux | `just_audio_media_kit` → `media_kit` 1.2.6 → system libmpv | `audio_service_mpris` (MPRIS: desktop widgets, media keys) |
-| Windows | `just_audio_media_kit` → libmpv DLL from `media_kit_libs_windows_audio` | none in 1.5 (SMTC is a later nicety) |
+| Windows | `just_audio_media_kit` → libmpv DLL from `media_kit_libs_windows_audio` | SMTC via `audio_service_win` (§9) |
 | iOS | not a Vellum target (there is no `app/ios`). `just_audio` and `audio_service` both support it if that changes. | |
 
 Reasons:
@@ -566,7 +566,22 @@ never covers the shelf. It closes with the book.
 | Android | `audio_service`: notification, lock screen, headset and Bluetooth buttons. Foreground service of type `mediaPlayback` (`FOREGROUND_SERVICE_MEDIA_PLAYBACK` for API 34+). `MainActivity` now extends `AudioServiceActivity`. |
 | macOS | `audio_service`: Now Playing, media keys. |
 | Linux | MPRIS through `audio_service_mpris` (pure Dart over D-Bus; MPL-2.0 `dbus`, Linux only). If there is no session bus the session simply does not start. |
-| Windows | `audio_service` has no Windows support: no system controls. Playback continues while the app is open. |
+| Windows | SMTC (the media overlay, keyboard media keys, lock screen) through `audio_service_win` 0.0.6, the federated Windows implementation of `audio_service`: **unverified, never run on Windows** (see below). If it fails to start the session simply does not appear and playback goes on. |
+
+**Windows SMTC.** `audio_service` itself has no Windows code, but its
+platform interface is federated and `audio_service_win` (MIT, pub.dev, native
+C++/WinRT, `implements: audio_service_platform_interface`, 140/160 pub points)
+supplies it. It was chosen over `smtc_windows` (Rust through
+flutter_rust_bridge: needs `rustup` on every Windows build machine and has its
+own API, so the handler would have been wired twice) and over writing our own.
+Nothing in `VellumAudioHandler` changed except `supportedHere` now including
+Windows: the same `mediaItem` (chapter title, book as album, author, cover as a
+`file:` URI) and `playbackState` feed it, and its play, pause, next, previous,
+fast-forward, rewind and seek callbacks land on the same handler methods as
+Android and MPRIS. The channel id doubles as the SMTC app id. Caveats: the
+package is days-to-weeks old (0.0.x, hence the exact pin), and re-check the pin
+when bumping. Unverified: the Windows build compiles, the overlay shows
+title/author/cover, media keys and lock screen work, next/previous move chapters.
 
 Leaving the player page does not stop playback anywhere.
 

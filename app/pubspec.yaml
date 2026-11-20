@@ -88,6 +88,9 @@ dependencies:
   # the audio-focus plugin just_audio already uses; listed because we set it up.
   audio_service: ^0.18.19
   audio_service_mpris: ^0.2.1
+  # Windows system media controls (SMTC): the federated Windows half of
+  # audio_service. Exact pin: it is young (0.0.x).
+  audio_service_win: 0.0.6
   audio_session: ^0.2.4
 
 dev_dependencies:

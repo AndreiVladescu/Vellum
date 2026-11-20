@@ -425,8 +425,13 @@ are tested over fakes.
   mp3 folder. A pause freezes the countdown.
 - **Linux.** `playerctl status` and `playerctl play-pause` (or a desktop media
   widget) see and drive Vellum while a book is open.
-- **macOS and Windows.** macOS: Now Playing and the media keys. Windows: only
-  that playback continues while the app is open.
+- **macOS.** Now Playing and the media keys.
+- **Windows (SMTC, never run).** `flutter build windows` compiles with
+  `audio_service_win` 0.0.6. Playing a book shows the title (chapter), author
+  and cover in the volume/media overlay and on the lock screen; the keyboard
+  play/pause, next and previous keys drive it (next/previous change chapter);
+  seeking from the overlay works; closing the book clears the overlay. If the
+  session fails, playback must still work.
 - **Killing the app.** Swipe it from the recents while playing: it keeps playing
   from the service (decide whether that is wanted); while paused the
   notification goes away.

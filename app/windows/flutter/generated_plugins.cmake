@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audio_service_win
   desktop_drop
   dynamic_color
   file_selector_windows

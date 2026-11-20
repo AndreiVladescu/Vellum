@@ -7,7 +7,7 @@ import 'audiobook_player.dart';
 
 /// The OS's view of the player: a media session (notification, lock screen,
 /// headset and Bluetooth buttons on Android; Now Playing on macOS; MPRIS on
-/// Linux) that **drives an [AudiobookPlayer]** and mirrors its state.
+/// Linux; SMTC on Windows) that **drives an [AudiobookPlayer]** and mirrors its state.
 ///
 /// Why `audio_service` and not `just_audio_background`: the latter owns the
 /// `AudioPlayer` and describes a playlist of `MediaItem`s, so the notification
@@ -189,7 +189,8 @@ class VellumAudioHandler extends BaseAudioHandler {
     if (_player?.playing != true) await stop();
   }
 
-  /// Desktop has no task to remove.
+  /// Desktop has no task to remove. Windows is served by `audio_service_win`
+  /// (SMTC); it has not been run on a real Windows machine yet.
   static bool get supportedHere =>
-      Platform.isAndroid || Platform.isMacOS || Platform.isLinux;
+      Platform.isAndroid || Platform.isMacOS || Platform.isLinux || Platform.isWindows;
 }

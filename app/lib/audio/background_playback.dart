@@ -10,7 +10,7 @@ import 'audiobook_player.dart';
 ///
 /// The session is started lazily, the first time something plays, so the app
 /// starts as fast as before and a machine where it cannot start (no D-Bus
-/// session, Windows, which `audio_service` does not support) loses only the
+/// session, or an SMTC that fails to start on Windows) loses only the
 /// system controls: playback itself is the [AudiobookPlayer]'s and goes on
 /// while the app is open.
 class BackgroundPlayback {
