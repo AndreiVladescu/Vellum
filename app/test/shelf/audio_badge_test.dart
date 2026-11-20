@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_queries.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/shelf/book_list_view.dart';
 import 'package:vellum/shelf/shelf_grouping.dart';
@@ -30,7 +31,7 @@ Book _book(String id, String title, {int? pages}) => Book(
     );
 
 Widget _app(Widget body, {double textScale = 1.0}) => MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context)
@@ -135,7 +136,7 @@ void main() {
         hasFile: true,
         audioMs: audioMs);
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: BookListView(

@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/account/user_profile.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/main.dart';
 import 'package:vellum/navigation_history.dart';
@@ -72,7 +73,7 @@ void main() {
       final profile = await UserProfileStore.load();
       final connection = await ServerConnection.load();
       app = MaterialApp(
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: L10n.supportedLocales,
         navigatorObservers: [history],
         home: LibraryPage(
@@ -243,7 +244,7 @@ void main() {
     });
     var builds = 0;
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
         body: ShelfView(

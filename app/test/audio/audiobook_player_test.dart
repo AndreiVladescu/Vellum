@@ -14,6 +14,7 @@ import 'package:vellum/audio/playback_options.dart';
 import 'package:vellum/audio/player_page.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 import 'fake_engine.dart';
@@ -252,7 +253,7 @@ void main() {
       background: BackgroundPlayback(handlerFactory: (_) async => null),
     );
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: PlayerPage(
         bookId: 'b',

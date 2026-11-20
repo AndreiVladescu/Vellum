@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/audio/continue_listening.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_queries.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/shelf/library_header.dart';
 
@@ -141,7 +142,7 @@ void main() {
             Size? size,
             double textScale = 1.0}) =>
         MaterialApp(
-          localizationsDelegates: L10n.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: L10n.supportedLocales,
           home: MediaQuery(
             data: MediaQueryData(

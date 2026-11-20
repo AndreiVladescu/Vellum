@@ -9,6 +9,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/auto_scroll_bar.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/reader/auto_scroll.dart';
 import 'package:vellum/l10n/gen/app_localizations_en.dart';
@@ -277,7 +278,7 @@ void pagedAutoTests() {
       final seen = <double>[];
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: L10n.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: L10n.supportedLocales,
           home: Scaffold(
             body: AutoScrollBar(

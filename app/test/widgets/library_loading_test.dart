@@ -11,6 +11,7 @@ import 'package:vellum/account/user_profile.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_queries.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 import 'package:vellum/main.dart';
 import 'package:vellum/server/connection_store.dart';
@@ -55,7 +56,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final settings = await AppSettingsStore.load();
     final app = MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: LibraryPage(
         repository: repo,

@@ -10,6 +10,7 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 Map<String, dynamic> _arb(String path) =>
@@ -51,7 +52,7 @@ Future<L10n> _ro(WidgetTester tester) async {
   late L10n found;
   await tester.pumpWidget(MaterialApp(
     locale: const Locale('ro'),
-    localizationsDelegates: L10n.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: L10n.supportedLocales,
     home: Builder(builder: (context) {
       found = L10n.of(context);

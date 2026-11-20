@@ -15,6 +15,7 @@ import 'package:vellum/audio/playback_host.dart';
 import 'package:vellum/audio/playback_options.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
+import 'package:vellum/l10n/delegates.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';
 
 import 'fake_engine.dart';
@@ -463,7 +464,7 @@ void main() {
     }
 
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(bottomNavigationBar: NowPlayingBar(host: host)),
     ));
