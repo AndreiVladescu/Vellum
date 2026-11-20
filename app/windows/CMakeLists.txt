@@ -57,6 +57,17 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# audio_service_win (audiobook media controls) includes C++/WinRT, which under
+# C++17 falls back to <experimental/coroutine>. Newer MSVC turns that header's
+# deprecation into a hard error (STL1011). As C++20, C++/WinRT uses the
+# standard <coroutine> instead. The define only covers an older SDK whose
+# C++/WinRT still reaches for the experimental header.
+if(TARGET audio_service_win_plugin)
+  target_compile_features(audio_service_win_plugin PRIVATE cxx_std_20)
+  target_compile_definitions(audio_service_win_plugin PRIVATE
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
