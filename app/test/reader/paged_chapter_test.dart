@@ -4,6 +4,7 @@
 // No HtmlWidget here (it hangs under testWidgets): the chapter is a plain
 // column of Text, which the viewport measures the same way.
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/epub_pagination.dart';
@@ -140,5 +141,56 @@ void main() {
       tester.getTopLeft(find.text('line 0')).dy,
       closeTo(-pages.starts[3], 0.01),
     );
+  });
+
+  group('a tap on a link', () {
+    testWidgets('is a link only where the linked text is', (tester) async {
+      final recognizer = TapGestureRecognizer();
+      addTearDown(recognizer.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 300,
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 20, color: Colors.black),
+                  children: [
+                    const TextSpan(text: 'plain '),
+                    TextSpan(text: 'linked', recognizer: recognizer),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.byType(RichText),
+      );
+      // A fake hit-test result: the paragraph is the only thing "hit".
+      final result = HitTestResult()..add(HitTestEntry(paragraph));
+      final origin = paragraph.localToGlobal(Offset.zero);
+      final plain = paragraph.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 5),
+      );
+      final linked = paragraph.getBoxesForSelection(
+        const TextSelection(baseOffset: 6, extentOffset: 12),
+      );
+
+      expect(
+        hitTestHitsLink(result, origin + linked.first.toRect().center),
+        isTrue,
+      );
+      expect(
+        hitTestHitsLink(result, origin + plain.first.toRect().center),
+        isFalse,
+      );
+      // Empty space to the right of a short line, inside the paragraph.
+      expect(hitTestHitsLink(result, origin + const Offset(280, 10)), isFalse);
+      // Nothing hit at all.
+      expect(hitTestHitsLink(HitTestResult(), origin), isFalse);
+    });
   });
 }

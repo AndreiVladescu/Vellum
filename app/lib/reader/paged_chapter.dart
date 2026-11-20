@@ -340,6 +340,33 @@ class RenderPagedViewport extends RenderBox
   return (lines: lines, ready: ready);
 }
 
+/// Whether the text under [globalPosition] is a link: a span with a tap
+/// recogniser, which is what the chapter's `HtmlWidget` gives an `<a>`.
+///
+/// Reads a hit-test [result] rather than doing the test itself, so the paged
+/// reader's raw-pointer tap handling can ask "was that a link?" before it turns
+/// a page: a tap on a link follows the link and nothing else. A paragraph is
+/// as wide as the column, so the position must land on the span's own text
+/// boxes, not merely inside the paragraph beside a short line.
+bool hitTestHitsLink(HitTestResult result, Offset globalPosition) {
+  for (final entry in result.path) {
+    final target = entry.target;
+    if (target is! RenderParagraph || !target.attached) continue;
+    final local = target.globalToLocal(globalPosition);
+    final position = target.getPositionForOffset(local);
+    final span = target.text.getSpanForPosition(position);
+    if (span is! TextSpan || span.recognizer == null) continue;
+    final boxes = target.getBoxesForSelection(TextSelection(
+      baseOffset: position.offset,
+      extentOffset: position.offset + 1,
+    ));
+    if (boxes.any((box) => box.toRect().inflate(2).contains(local))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// The tallest a picture may be drawn: the page height in paged mode, unbounded
 /// in scrolled mode (where there is no ancestor of this kind).
 class PageImageCap extends InheritedWidget {

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart'
-    show PointerDeviceKind, kLongPressTimeout, kTouchSlop;
+    show HitTestResult, PointerDeviceKind, kLongPressTimeout, kTouchSlop;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -445,6 +445,9 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     final delta = event.localPosition - start.at;
     final elapsed = event.timeStamp - start.time;
     if (delta.distance < kTouchSlop && elapsed < kLongPressTimeout) {
+      // A link in a side third is followed by the book's own tap handling;
+      // turning the page as well would leave you on the wrong one.
+      if (_tapIsOnLink(event)) return;
       _onPagedTap(start.at.dx, width);
       return;
     }
@@ -460,6 +463,12 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     // The drag selected text on its way across; that was not what it meant.
     _selectionArea.currentState?.selectableRegion.clearSelection();
     turn == SwipeTurn.forward ? _pageForward(_count) : _pageBack(_count);
+  }
+
+  bool _tapIsOnLink(PointerEvent event) {
+    final result = HitTestResult();
+    WidgetsBinding.instance.hitTestInView(result, event.position, event.viewId);
+    return hitTestHitsLink(result, event.position);
   }
 
   /// Paged mode's taps: the left third goes back, the right third forward, and
