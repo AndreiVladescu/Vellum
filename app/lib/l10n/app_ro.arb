@@ -1932,5 +1932,8 @@
   "prefsBackupAudioTitle": "Include audio pentru cărțile audio",
   "prefsBackupAudioOff": "Audio pentru cărțile audio nu e inclus; rămâne pe server.",
   "prefsBackupAudioOffNoServer": "Audio pentru cărțile audio nu e inclus. Fără server, această copie de rezervă nu conține nicio copie a lui.",
-  "prefsBackupAudioOn": "Audio pentru cărțile audio e inclus, ceea ce poate face fiecare copie de rezervă mult mai mare."
+  "prefsBackupAudioOn": "Audio pentru cărțile audio e inclus, ceea ce poate face fiecare copie de rezervă mult mai mare.",
+  "readerSettingsVolumeKeys": "Tastele de volum întorc paginile",
+  "readerSettingsVolumeKeysSub": "Volumul jos dă pagina înainte, volumul sus o dă înapoi. Doar cât timp e deschisă o carte.",
+  "readerAutoSpeedSeconds": "{speed} s/pagină"
 }
