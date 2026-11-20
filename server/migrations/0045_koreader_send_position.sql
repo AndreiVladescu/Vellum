@@ -1,0 +1,17 @@
+-- KOReader sync both ways: whether a KOReader app password is also *sent* the
+-- Vellum app's reading position (`koreader.rs`, `GET /syncs/progress`).
+--
+-- Server-only, like the rest of `app_password` (0039): not in
+-- `schema_parity.rs`, nothing the app syncs.
+--
+-- Per app password because it is per device: one KOReader may be the place a
+-- person reads, another a phone they only glance at.
+--
+-- A constant default of 0, so every app password that exists when this runs
+-- keeps doing exactly what it did — KOReader got back only what KOReader sent,
+-- and its owner was told so. Switching a device mid-book to "the server may now
+-- move you" is a choice its owner makes, in the console. New KOReader app
+-- passwords are created with it on (`app_passwords::create`): someone setting
+-- one up today wants their place to follow them. Being constant, the default
+-- is safe on a populated table (tests/migrations_with_data.rs).
+ALTER TABLE app_password ADD COLUMN koreader_send_position INTEGER NOT NULL DEFAULT 0;

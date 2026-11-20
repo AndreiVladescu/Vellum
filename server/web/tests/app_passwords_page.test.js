@@ -202,6 +202,36 @@ check('the list marks the ones that sync with KOReader', async () => {
   assert.ok(html.includes('https://books.example/koreader'));
 });
 
+check('a KOReader one says whether it sends Vellum\'s position, and can switch', async () => {
+  const { sandbox, get } = load({
+    'GET /api/app-passwords': [
+      { ...LIST[1], koreader: true, koreader_send_position: true },
+      { ...LIST[0], id: 'a5', koreader: true, koreader_send_position: false },
+      LIST[0],
+    ],
+  });
+  await sandbox.showAppPasswords();
+  const html = get('page').innerHTML;
+  assert.ok(html.includes("Sends Vellum's position to KOReader"));
+  assert.ok(html.includes('KOReader gets back only its own position'));
+  assert.ok(/data-act="koreadersend" data-id="a2"\s+data-on="0"/.test(html), 'on → offers off');
+  assert.ok(/data-act="koreadersend" data-id="a5"\s+data-on="1"/.test(html), 'off → offers on');
+  assert.strictEqual((html.match(/data-act="koreadersend"/g) || []).length, 2,
+    'an OPDS-only password has nothing to switch');
+});
+
+check('switching it sends the new setting and redraws the list', async () => {
+  const { sandbox, calls, toasts } = load({
+    'PATCH /api/app-passwords/a2': { id: 'a2', koreader: true, koreader_send_position: false },
+    'GET /api/app-passwords': [],
+  });
+  await sandbox.setKoreaderSend('a2', false);
+  const patch = calls.find((c) => c.method === 'PATCH');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(patch.body)), { koreader_send_position: false });
+  assert.ok(calls.some((c) => c.method === 'GET'), 'and the list is redrawn');
+  assert.ok(/own position/.test(toasts.join(' ')));
+});
+
 check('a nameless one is refused before any request', async () => {
   const { sandbox, calls, toasts } = load({}, [{ 0: '' }]);
   await sandbox.newAppPassword();

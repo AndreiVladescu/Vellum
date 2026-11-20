@@ -147,7 +147,7 @@ pub(crate) async fn touch(state: &AppState, id: &str) {
 
 // ---- endpoints -------------------------------------------------------------
 //
-// All three take a plain `AuthUser` and are *not* in the app-password scope,
+// All four take a plain `AuthUser` and are *not* in the app-password scope,
 // so only a real sign-in (a console session, or the account password) can
 // manage them. Each is scoped to the caller: there is no admin view of other
 // people's devices, because the owner of the server has no need to know which
@@ -163,11 +163,16 @@ pub struct AppPasswordDto {
     /// Whether it also opens KOReader progress sync (v1.6.3) — decided at
     /// creation, since only then does the secret exist to derive its key from.
     pub koreader: bool,
+    /// Whether KOReader is also sent the Vellum app's position when that is
+    /// newer than its own (migration 0045). Only ever true when `koreader` is;
+    /// unlike it, switchable at any time ([`update`]).
+    pub koreader_send_position: bool,
 }
 
 /// The DTO's columns, `koreader` derived from whether it has keys.
 const DTO_COLUMNS: &str = "id, label, prefix, created_at, last_used_at, \
-     EXISTS(SELECT 1 FROM koreader_key k WHERE k.app_password_id = app_password.id) AS koreader";
+     EXISTS(SELECT 1 FROM koreader_key k WHERE k.app_password_id = app_password.id) AS koreader, \
+     koreader_send_position";
 
 /// The one response that carries the secret. Never stored, never logged.
 #[derive(Serialize)]
@@ -184,6 +189,11 @@ pub struct CreateInput {
     /// (migration 0042). Off by default: an OPDS-only device has no use for it.
     #[serde(default)]
     pub koreader: bool,
+    /// Send the Vellum app's position back to KOReader (migration 0045). On
+    /// unless asked otherwise: someone making a KOReader password today wants
+    /// their place to follow them. Ignored without `koreader`.
+    #[serde(default)]
+    pub koreader_send_position: Option<bool>,
 }
 
 /// `GET /api/app-passwords` — the caller's, newest first, without secrets.
@@ -237,14 +247,16 @@ pub async fn create(
         )));
     }
     sqlx::query(
-        "INSERT INTO app_password (id, user_id, label, prefix, secret_hash) \
-         VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO app_password \
+            (id, user_id, label, prefix, secret_hash, koreader_send_position) \
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&user.id)
     .bind(label)
     .bind(&secret[..GROUP])
     .bind(hash(&normalized))
+    .bind(input.koreader && input.koreader_send_position.unwrap_or(true))
     .execute(&mut *tx)
     .await?;
     if input.koreader {
@@ -271,6 +283,63 @@ pub async fn create(
         app_password: row,
         password: secret,
     }))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateInput {
+    pub koreader_send_position: bool,
+}
+
+/// `PATCH /api/app-passwords/{id}` — switch whether KOReader is sent the Vellum
+/// app's position. The one thing about an app password that can change after
+/// creation: it needs no secret, only the row. Someone else's id answers 404,
+/// as for [`revoke`]; one without KOReader sync answers 400, since there is no
+/// KOReader to send anything to.
+pub async fn update(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<String>,
+    Json(input): Json<UpdateInput>,
+) -> AppResult<Json<AppPasswordDto>> {
+    let koreader: Option<bool> = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM koreader_key k WHERE k.app_password_id = ap.id) \
+         FROM app_password ap WHERE ap.id = ? AND ap.user_id = ?",
+    )
+    .bind(&id)
+    .bind(&user.id)
+    .fetch_optional(&state.db)
+    .await?;
+    match koreader {
+        None => return Err(AppError::NotFound("no such app password".into())),
+        Some(false) => {
+            return Err(AppError::BadRequest(
+                "this app password is not used for KOReader progress sync".into(),
+            ));
+        }
+        Some(true) => {}
+    }
+    sqlx::query("UPDATE app_password SET koreader_send_position = ? WHERE id = ? AND user_id = ?")
+        .bind(input.koreader_send_position)
+        .bind(&id)
+        .bind(&user.id)
+        .execute(&state.db)
+        .await?;
+    let row = sqlx::query_as::<_, AppPasswordDto>(sqlx::AssertSqlSafe(format!(
+        "SELECT {DTO_COLUMNS} FROM app_password WHERE id = ?"
+    )))
+    .bind(&id)
+    .fetch_one(&state.db)
+    .await?;
+    crate::audit::record(
+        &state,
+        Some(&user),
+        "app_password.update",
+        "app_password",
+        &id,
+        Some(&row.label),
+    )
+    .await;
+    Ok(Json(row))
 }
 
 /// `DELETE /api/app-passwords/{id}` — revoke one of the caller's. Takes effect

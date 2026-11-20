@@ -10,7 +10,7 @@ use axum::http::HeaderValue;
 use axum::http::header::{CONTENT_SECURITY_POLICY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS};
 use axum::middleware::Next;
 use axum::response::Response;
-use axum::routing::{delete, get, post, put};
+use axum::routing::{delete, get, patch, post, put};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
 mod access;
@@ -270,7 +270,10 @@ fn api_routes(max_upload: usize) -> Router<AppState> {
             "/app-passwords",
             get(app_passwords::list).post(app_passwords::create),
         )
-        .route("/app-passwords/{id}", delete(app_passwords::revoke))
+        .route(
+            "/app-passwords/{id}",
+            patch(app_passwords::update).delete(app_passwords::revoke),
+        )
         .route("/users", get(auth::list_users).post(auth::create_user))
         // Administering the people in a shared library (plan 6 #1). Master-only,
         // and console-only by design — this is a desk job, not something to

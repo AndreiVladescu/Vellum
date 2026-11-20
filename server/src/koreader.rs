@@ -41,9 +41,16 @@
 //! is personal data keyed by the credential's `user_id`, never a book column —
 //! the rule in CLAUDE.md.
 //!
-//! The mirror never travels back: a GET answers only with what a KOReader
-//! device wrote. Turning a Vellum EPUB chapter into an xpointer KOReader would
-//! trust is a guess this module declines to make.
+//! ## And back (migration 0045)
+//!
+//! A GET answers with KOReader's own latest report, verbatim — unless the app
+//! password has "Send Vellum's position to KOReader" on and the Vellum app has
+//! a strictly newer position in a book holding this file. Then that position
+//! goes out in KOReader's form ([`progress_in_koreader_terms`]): a PDF's page,
+//! or an EPUB chapter's **start**, `/body/DocFragment[N]`. Only the chapter:
+//! the app's in-chapter scroll has no xpointer the server could vouch for, and
+//! crengine sends an xpointer it cannot resolve to the first page of the book.
+//! The `device` says "Vellum on <device>", so KOReader's prompt names it.
 
 use std::io::{Read, Seek, SeekFrom};
 
@@ -229,7 +236,12 @@ type KoResult<T> = Result<T, KoError>;
 
 /// A request carrying a valid KOReader key. The user comes from the key's app
 /// password — `x-auth-user` only has to agree with it.
-pub struct KoUser(pub AuthUser);
+pub struct KoUser {
+    pub user: AuthUser,
+    /// The app password's "Send Vellum's position to KOReader" (migration
+    /// 0045): whether a GET may answer with the app's position.
+    pub send_position: bool,
+}
 
 impl FromRequestParts<AppState> for KoUser {
     type Rejection = KoError;
@@ -256,9 +268,10 @@ impl FromRequestParts<AppState> for KoUser {
             return Err(KoError::Throttled);
         }
         let well_formed = key.len() == 32 && key.bytes().all(|b| b.is_ascii_hexdigit());
-        let found: Option<(String, String, String, bool, String)> = if well_formed {
+        let found: Option<(String, String, String, bool, String, bool)> = if well_formed {
             sqlx::query_as(
-                "SELECT u.id, u.email, u.display_name, u.is_master, ap.id \
+                "SELECT u.id, u.email, u.display_name, u.is_master, ap.id, \
+                        ap.koreader_send_position \
                  FROM koreader_key k \
                  JOIN app_password ap ON ap.id = k.app_password_id \
                  JOIN app_user u ON u.id = ap.user_id \
@@ -271,18 +284,22 @@ impl FromRequestParts<AppState> for KoUser {
         } else {
             None
         };
-        let Some((id, email, display_name, is_master, app_password_id)) = found else {
+        let Some((id, email, display_name, is_master, app_password_id, send_position)) = found
+        else {
             state.throttle.record_failure(&bucket);
             return Err(KoError::Unauthorized);
         };
         state.throttle.clear(&bucket);
         crate::app_passwords::touch(state, &app_password_id).await;
-        Ok(KoUser(AuthUser {
-            id,
-            email,
-            display_name,
-            is_master,
-        }))
+        Ok(KoUser {
+            user: AuthUser {
+                id,
+                email,
+                display_name,
+                is_master,
+            },
+            send_position,
+        })
     }
 }
 
@@ -394,7 +411,7 @@ fn parse_report(body: &[u8], timestamp: i64) -> KoResult<Reported> {
 
 async fn put_progress(
     State(state): State<AppState>,
-    KoUser(user): KoUser,
+    KoUser { user, .. }: KoUser,
     body: Bytes,
 ) -> KoResult<Json<Value>> {
     let report = parse_report(&body, chrono::Utc::now().timestamp())?;
@@ -427,15 +444,29 @@ async fn put_progress(
     })))
 }
 
+/// `GET /syncs/progress/{document}`: the newest position for this document,
+/// in KOReader's terms.
+///
+/// Two candidates. KOReader's own latest report, across this person's devices,
+/// is returned **verbatim** — the reference server's single last-writer-wins
+/// slot; KOReader tells its own report from another device's by `device_id`.
+/// And, when the app password allows it, the Vellum app's latest position in a
+/// book holding this file ([`vellum_position`]), converted. The Vellum one wins
+/// only when strictly newer; a tie goes to KOReader, whose position is the
+/// precise one.
+///
+/// Nothing at all is `200 {}`, as the reference server answers and as
+/// KOReader's plugin expects: it reads a body without `percentage` as "No
+/// progress found", and any non-200 as "Something went wrong".
 async fn get_progress(
     State(state): State<AppState>,
-    KoUser(user): KoUser,
+    KoUser {
+        user,
+        send_position,
+    }: KoUser,
     Path(document): Path<String>,
 ) -> KoResult<Json<Value>> {
     let document = check_document(Some(&document))?;
-    // The latest across this person's devices — what the reference server's
-    // single last-writer-wins slot holds. KOReader tells its own report from
-    // another device's by `device_id`.
     let row: Option<(String, String, f64, String, String, i64)> = sqlx::query_as(
         "SELECT document, progress, percentage, device, device_id, timestamp \
          FROM koreader_progress WHERE user_id = ? AND document = ? \
@@ -445,17 +476,203 @@ async fn get_progress(
     .bind(document)
     .fetch_optional(&state.db)
     .await?;
-    Ok(Json(match row {
+    let reported = row.map(
+        |(document, progress, percentage, device, device_id, timestamp)| Reported {
+            document,
+            progress,
+            percentage,
+            device,
+            device_id,
+            timestamp,
+        },
+    );
+    let vellum = if send_position {
+        vellum_position(&state, &user, document).await?
+    } else {
+        None
+    };
+    let newest = match (reported, vellum) {
+        (Some(k), Some(v)) => Some(if v.timestamp > k.timestamp { v } else { k }),
+        (k, v) => k.or(v),
+    };
+    Ok(Json(match newest {
         None => json!({}),
-        Some((document, progress, percentage, device, device_id, timestamp)) => json!({
-            "document": document,
-            "progress": progress,
-            "percentage": percentage,
-            "device": device,
-            "device_id": device_id,
-            "timestamp": timestamp,
+        Some(r) => json!({
+            "document": r.document,
+            "progress": r.progress,
+            "percentage": r.percentage,
+            "device": r.device,
+            "device_id": r.device_id,
+            "timestamp": r.timestamp,
         }),
     }))
+}
+
+// ---- out of the reading-position channel -------------------------------------
+
+/// The `device_id` a Vellum position is sent to KOReader under. Prefixed, so
+/// KOReader never takes it for its own (it ignores a body whose `device` and
+/// `device_id` are both its own).
+pub fn vellum_device_id(device_id: &str) -> String {
+    format!("vellum:{device_id}")
+}
+
+/// What KOReader's `progress` is for the app's `(page, unit)` in a file of
+/// `format`, or None when there is nothing safe to send.
+///
+/// - **PDF** (`unit = 'page'`): the 1-based page number as a string — what
+///   KOReader's paging mode reports (`tostring(getTopPage())`) and reads back
+///   (`GotoPage(tonumber(progress))`, which clamps to the document's pages).
+/// - **EPUB** (`unit = 'chapter'`): `/body/DocFragment[N]`, the *start* of the
+///   chapter. crengine's whole EPUB is `<body>` with one `<DocFragment>` per
+///   spine item, so this is the coarsest xpointer it resolves, and valid in
+///   every rendering of the book; going deeper (`…/body/p[1]`) would assume
+///   markup the chapter may not have. The app's in-chapter scroll is dropped
+///   for the same reason. `fragments` maps the app's chapter to its
+///   `DocFragment` ([`crate::blobs::epub_docfragments`]); a chapter past the
+///   end is clamped to the last, as the app's own reader does.
+/// - A unit that does not match the format, or anything else: None.
+pub fn progress_in_koreader_terms(
+    format: &str,
+    page: i64,
+    unit: &str,
+    fragments: Option<&[usize]>,
+) -> Option<String> {
+    match (format, unit) {
+        ("pdf", "page") if page >= 1 => Some(page.to_string()),
+        ("epub", "chapter") if page >= 1 => {
+            let fragments = fragments.filter(|f| !f.is_empty())?;
+            let index = usize::try_from(page).ok()?.min(fragments.len()) - 1;
+            Some(format!("/body/DocFragment[{}]", fragments[index]))
+        }
+        _ => None,
+    }
+}
+
+/// The unit the app counts a file of `format` in, when KOReader can be sent it.
+fn app_unit(format: &str) -> Option<&'static str> {
+    match format {
+        "pdf" => Some("page"),
+        "epub" => Some("chapter"),
+        _ => None,
+    }
+}
+
+/// The Vellum app's newest position in any book the caller can see that holds
+/// this document's file, as a KOReader report — or None.
+///
+/// Only a position that can be sent safely counts: one an app install wrote
+/// (never a mirrored `koreader:` row), with a percentage and a page in the unit
+/// this file's format needs. A book holding both a PDF and an EPUB is skipped:
+/// the app keeps one `page` per book and labels it `page` whenever a PDF is
+/// present, even when the EPUB was the one being read, so the number cannot be
+/// trusted to mean either.
+async fn vellum_position(
+    state: &AppState,
+    user: &AuthUser,
+    document: &str,
+) -> KoResult<Option<Reported>> {
+    let mut books = linked_books(state, document).await?;
+    if books.is_empty() {
+        // Maybe a file that predates the digest table, not yet indexed.
+        index_missing(state, BACKFILL_ON_REQUEST).await;
+        books = linked_books(state, document).await?;
+    }
+    // (report without its progress yet, format, blob path, app page)
+    let mut best: Option<(Reported, String, String, i64)> = None;
+    for (book_id, format, path) in books {
+        let Some(unit) = app_unit(&format) else {
+            continue;
+        };
+        if !book_access(state, user, &book_id).await?.can_view() {
+            continue;
+        }
+        let both: bool = sqlx::query_scalar(
+            "SELECT COUNT(DISTINCT format) = 2 FROM book_file \
+             WHERE book_id = ? AND format IN ('pdf', 'epub')",
+        )
+        .bind(&book_id)
+        .fetch_one(&state.db)
+        .await?;
+        if both {
+            continue;
+        }
+        // `updated_at` is the writing device's clock, UTC; KOReader compares
+        // the timestamp with its own last page turn, in Unix seconds.
+        let row: Option<(String, Option<String>, f64, i64, i64)> = sqlx::query_as(
+            "SELECT device_id, device_label, progress, page, \
+                    CAST(strftime('%s', updated_at) AS INTEGER) AS ts \
+             FROM reading_progress \
+             WHERE book_id = ? AND user_id = ? AND device_id NOT LIKE 'koreader:%' \
+               AND unit = ? AND page >= 1 AND progress IS NOT NULL \
+               AND strftime('%s', updated_at) IS NOT NULL \
+             ORDER BY ts DESC, device_id LIMIT 1",
+        )
+        .bind(&book_id)
+        .bind(&user.id)
+        .bind(unit)
+        .fetch_optional(&state.db)
+        .await?;
+        let Some((device_id, label, percentage, page, timestamp)) = row else {
+            continue;
+        };
+        if best
+            .as_ref()
+            .is_some_and(|(b, ..)| b.timestamp >= timestamp)
+        {
+            continue;
+        }
+        let label = label
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .unwrap_or_else(|| "another device".into());
+        let report = Reported {
+            document: document.to_string(),
+            progress: String::new(), // converted below, for the winner only
+            percentage: if percentage.is_finite() {
+                percentage.clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
+            device: format!("Vellum on {label}")
+                .chars()
+                .take(MAX_DEVICE)
+                .collect(),
+            device_id: vellum_device_id(&device_id),
+            timestamp,
+        };
+        best = Some((report, format, path, page));
+    }
+    let Some((mut report, format, path, page)) = best else {
+        return Ok(None);
+    };
+    let fragments = if format == "epub" {
+        // An EPUB that cannot be read here gets nothing: an xpointer the server
+        // cannot vouch for is worse than none.
+        let Some(fragments) = docfragments(state, &path).await else {
+            return Ok(None);
+        };
+        Some(fragments)
+    } else {
+        None
+    };
+    let unit = app_unit(&format).unwrap_or_default();
+    let Some(progress) = progress_in_koreader_terms(&format, page, unit, fragments.as_deref())
+    else {
+        return Ok(None);
+    };
+    report.progress = progress;
+    Ok(Some(report))
+}
+
+/// [`crate::blobs::epub_docfragments`] for a stored file, off the async
+/// runtime. None when the file is missing on disk or is not a readable EPUB.
+async fn docfragments(state: &AppState, rel: &str) -> Option<Vec<usize>> {
+    let path = crate::blobs::blob_file_path(state, rel).ok()?;
+    tokio::task::spawn_blocking(move || crate::blobs::epub_docfragments(&path))
+        .await
+        .ok()
+        .flatten()
 }
 
 // ---- into the reading-position channel ---------------------------------------
@@ -466,10 +683,17 @@ async fn get_progress(
 /// - A PDF (KOReader's *paging* mode) reports the page number itself.
 /// - An EPUB (*rolling* mode) reports an xpointer such as
 ///   `/body/DocFragment[12]/body/div/p[3]/text().42`. `DocFragment[N]` is the
-///   N-th spine item, 1-based — which is what the app counts as chapter N.
+///   N-th spine item, 1-based. That is the app's chapter N too, unless the app
+///   skipped a spine item before it — `fragments` (the app's chapters' fragment
+///   indices, [`crate::blobs::epub_docfragments`]) says; without it, N. A
+///   fragment the app has no chapter for maps to no page.
 ///
 /// Anything else maps to no page, and the app still shows the percentage.
-pub fn position_in_app_terms(format: &str, progress: &str) -> (Option<i64>, Option<&'static str>) {
+pub fn position_in_app_terms(
+    format: &str,
+    progress: &str,
+    fragments: Option<&[usize]>,
+) -> (Option<i64>, Option<&'static str>) {
     let progress = progress.trim();
     match format {
         "pdf" => match progress.parse::<i64>() {
@@ -481,7 +705,14 @@ pub fn position_in_app_terms(format: &str, progress: &str) -> (Option<i64>, Opti
                 .strip_prefix("/body/DocFragment[")
                 .and_then(|rest| rest.split_once(']'))
                 .and_then(|(n, _)| n.parse::<i64>().ok())
-                .filter(|n| *n >= 1);
+                .filter(|n| *n >= 1)
+                .and_then(|n| match fragments {
+                    None => Some(n),
+                    Some(f) => f
+                        .iter()
+                        .position(|&frag| i64::try_from(frag) == Ok(n))
+                        .and_then(|i| i64::try_from(i + 1).ok()),
+                });
             match chapter {
                 Some(n) => (Some(n), Some("chapter")),
                 None => (None, None),
@@ -508,19 +739,21 @@ async fn mirror(state: &AppState, user: &AuthUser, report: &Reported) -> KoResul
         books = linked_books(state, &report.document).await?;
     }
     let mut written = 0;
-    for (book_id, format) in books {
+    for (book_id, format, path) in books {
         if book_access(state, user, &book_id).await?.can_view() {
-            write_mirror(state, &user.id, &book_id, &format, report).await?;
+            write_mirror(state, &user.id, &book_id, &format, &path, report).await?;
             written += 1;
         }
     }
     Ok(written)
 }
 
-/// `(book_id, format)` of every file with this digest, one per book.
-async fn linked_books(state: &AppState, document: &str) -> KoResult<Vec<(String, String)>> {
+/// `(book_id, format, path)` of a file with this digest, one per book. (The
+/// same file twice in one book has one format and one blob path anyway: the
+/// store is content-addressed.)
+async fn linked_books(state: &AppState, document: &str) -> KoResult<Vec<(String, String, String)>> {
     Ok(sqlx::query_as(
-        "SELECT bf.book_id, MIN(bf.format) FROM koreader_file_digest d \
+        "SELECT bf.book_id, MIN(bf.format), MIN(bf.path) FROM koreader_file_digest d \
          JOIN book_file bf ON bf.id = d.file_id \
          WHERE d.digest = ? GROUP BY bf.book_id ORDER BY bf.book_id",
     )
@@ -534,9 +767,15 @@ async fn write_mirror(
     user_id: &str,
     book_id: &str,
     format: &str,
+    path: &str,
     report: &Reported,
 ) -> KoResult<()> {
-    let (page, unit) = position_in_app_terms(format, &report.progress);
+    let fragments = if format == "epub" {
+        docfragments(state, path).await
+    } else {
+        None
+    };
+    let (page, unit) = position_in_app_terms(format, &report.progress, fragments.as_deref());
     sqlx::query(
         "INSERT INTO reading_progress \
             (book_id, user_id, device_id, device_label, progress, page, unit, scroll, \
@@ -596,12 +835,12 @@ async fn store_digest(state: &AppState, file_id: &str, digest: &str) -> Result<(
 /// checked against *its* owner's access, never the uploader's: uploading a
 /// file must not publish someone's reading into a book they cannot see.
 async fn link_waiting(state: &AppState, file_id: &str, digest: &str) -> KoResult<()> {
-    let target: Option<(String, String)> =
-        sqlx::query_as("SELECT book_id, format FROM book_file WHERE id = ?")
+    let target: Option<(String, String, String)> =
+        sqlx::query_as("SELECT book_id, format, path FROM book_file WHERE id = ?")
             .bind(file_id)
             .fetch_optional(&state.db)
             .await?;
-    let Some((book_id, format)) = target else {
+    let Some((book_id, format, path)) = target else {
         return Ok(());
     };
     let waiting: Vec<(String, String, f64, String, String, i64)> = sqlx::query_as(
@@ -628,7 +867,7 @@ async fn link_waiting(state: &AppState, file_id: &str, digest: &str) -> KoResult
             device_id,
             timestamp: ts,
         };
-        write_mirror(state, &user.id, &book_id, &format, &report).await?;
+        write_mirror(state, &user.id, &book_id, &format, &path, &report).await?;
     }
     Ok(())
 }
@@ -773,29 +1012,90 @@ mod tests {
     #[test]
     fn progress_converts_into_the_apps_units() {
         assert_eq!(
-            position_in_app_terms("pdf", "214"),
+            position_in_app_terms("pdf", "214", None),
             (Some(214), Some("page"))
         );
-        assert_eq!(position_in_app_terms("pdf", " 7 "), (Some(7), Some("page")));
-        assert_eq!(position_in_app_terms("pdf", "0"), (None, None));
         assert_eq!(
-            position_in_app_terms("pdf", "/body/DocFragment[3]"),
+            position_in_app_terms("pdf", " 7 ", None),
+            (Some(7), Some("page"))
+        );
+        assert_eq!(position_in_app_terms("pdf", "0", None), (None, None));
+        assert_eq!(
+            position_in_app_terms("pdf", "/body/DocFragment[3]", None),
             (None, None)
         );
         assert_eq!(
-            position_in_app_terms("epub", "/body/DocFragment[12]/body/div/p[3]/text().42"),
+            position_in_app_terms(
+                "epub",
+                "/body/DocFragment[12]/body/div/p[3]/text().42",
+                None
+            ),
             (Some(12), Some("chapter"))
         );
         assert_eq!(
-            position_in_app_terms("epub", "/body/DocFragment[1].0"),
+            position_in_app_terms("epub", "/body/DocFragment[1].0", None),
             (Some(1), Some("chapter"))
         );
         assert_eq!(
-            position_in_app_terms("epub", "#_doc_fragment_3"),
+            position_in_app_terms("epub", "#_doc_fragment_3", None),
             (None, None)
         );
-        assert_eq!(position_in_app_terms("epub", "42"), (None, None));
-        assert_eq!(position_in_app_terms("cbz", "4"), (None, None));
+        assert_eq!(position_in_app_terms("epub", "42", None), (None, None));
+        assert_eq!(position_in_app_terms("cbz", "4", None), (None, None));
+
+        // The app skipped spine item 2 (its file is missing): fragments 1, 3, 4
+        // are its chapters 1, 2, 3, and fragment 2 is no chapter of the app's.
+        let skipped: &[usize] = &[1, 3, 4];
+        let at = |xp: &str| position_in_app_terms("epub", xp, Some(skipped)).0;
+        assert_eq!(at("/body/DocFragment[1]/body/p[2]/text().4"), Some(1));
+        assert_eq!(at("/body/DocFragment[2]/body/p[1]"), None);
+        assert_eq!(at("/body/DocFragment[3]"), Some(2));
+        assert_eq!(at("/body/DocFragment[4].0"), Some(3));
+        assert_eq!(at("/body/DocFragment[5]"), None);
+    }
+
+    #[test]
+    fn the_apps_position_converts_into_koreaders() {
+        let identity: &[usize] = &[1, 2, 3, 4];
+        let to = |format, page, unit, f| progress_in_koreader_terms(format, page, unit, f);
+        assert_eq!(to("pdf", 214, "page", None).as_deref(), Some("214"));
+        assert_eq!(to("pdf", 0, "page", None), None);
+        assert_eq!(to("pdf", 3, "chapter", None), None, "units must match");
+        assert_eq!(
+            to("epub", 1, "chapter", Some(identity)).as_deref(),
+            Some("/body/DocFragment[1]"),
+            "the first spine item"
+        );
+        assert_eq!(
+            to("epub", 4, "chapter", Some(identity)).as_deref(),
+            Some("/body/DocFragment[4]"),
+            "the last"
+        );
+        assert_eq!(
+            to("epub", 9, "chapter", Some(identity)).as_deref(),
+            Some("/body/DocFragment[4]"),
+            "past the end is clamped, as the app's reader does"
+        );
+        assert_eq!(
+            to("epub", 2, "chapter", Some(&[1, 3, 4])).as_deref(),
+            Some("/body/DocFragment[3]"),
+            "a spine item the app skipped still has its DocFragment"
+        );
+        assert_eq!(to("epub", 2, "chapter", None), None, "no map, no guess");
+        assert_eq!(to("epub", 2, "chapter", Some(&[])), None);
+        assert_eq!(to("epub", 0, "chapter", Some(identity)), None);
+        assert_eq!(to("epub", 2, "page", Some(identity)), None);
+        assert_eq!(to("cbz", 2, "page", None), None);
+
+        // What is sent reads back as the same chapter (a KOReader that syncs
+        // straight back before turning a page reports our xpointer).
+        for page in 1..=3 {
+            let xp = to("epub", page, "chapter", Some(&[1, 3, 4])).unwrap();
+            assert_eq!(
+                position_in_app_terms("epub", &xp, Some(&[1, 3, 4])),
+                (Some(page), Some("chapter"))
+            );
+        }
     }
 
     #[test]

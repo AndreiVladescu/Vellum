@@ -604,3 +604,457 @@ async fn malformed_reports_answer_in_the_protocols_error_shape() {
         assert_eq!(got["code"], json!(code));
     }
 }
+
+// ---- Vellum → KOReader (migration 0045) -------------------------------------
+
+/// A real EPUB whose spine is `c1, nosuch, gone, c3, c4`: `nosuch` names no
+/// manifest item (neither KOReader nor the app counts it), and `gone` names a
+/// file that is not in the archive — KOReader still makes it `DocFragment[2]`,
+/// the app skips it. So the app's chapters 1, 2, 3 are fragments 1, 3, 4. The
+/// last is `linear="no"`, which both still count.
+fn skipping_epub(seed: &str) -> Vec<u8> {
+    use std::io::Write;
+    const CONTAINER: &str = "<?xml version=\"1.0\"?>\
+        <container xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\" version=\"1.0\">\
+        <rootfiles><rootfile full-path=\"OEBPS/content.opf\" \
+        media-type=\"application/oebps-package+xml\"/></rootfiles></container>";
+    const OPF: &str = "<?xml version=\"1.0\"?>\
+        <package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\">\
+        <metadata><dc:title xmlns:dc=\"http://purl.org/dc/elements/1.1/\">Skips</dc:title></metadata>\
+        <manifest>\
+        <item id=\"c1\" href=\"ch1.xhtml\" media-type=\"application/xhtml+xml\"/>\
+        <item id=\"gone\" href=\"missing.xhtml\" media-type=\"application/xhtml+xml\"/>\
+        <item id=\"c3\" href=\"text/ch%203.xhtml\" media-type=\"application/xhtml+xml\"/>\
+        <item id=\"c4\" href=\"ch4.xhtml\" media-type=\"application/xhtml+xml\"/>\
+        </manifest>\
+        <spine><itemref idref=\"c1\"/><itemref idref=\"nosuch\"/><itemref idref=\"gone\"/>\
+        <itemref idref=\"c3\"/><itemref idref=\"c4\" linear=\"no\"/></spine></package>";
+    let chapter = |n: u8| format!("<html><body><p>Chapter {n} of {seed}</p></body></html>");
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    for (name, data) in [
+        ("mimetype", "application/epub+zip".to_string()),
+        ("META-INF/container.xml", CONTAINER.to_string()),
+        ("OEBPS/content.opf", OPF.to_string()),
+        ("OEBPS/ch1.xhtml", chapter(1)),
+        ("OEBPS/text/ch 3.xhtml", chapter(3)),
+        ("OEBPS/ch4.xhtml", chapter(4)),
+    ] {
+        zw.start_file(name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zw.write_all(data.as_bytes()).unwrap();
+    }
+    zw.finish().unwrap().into_inner()
+}
+
+/// `(server time text, unix seconds)` `offset` seconds from now — what the app
+/// sends as `updated_at`, and what KOReader is told as `timestamp`.
+fn at(offset: i64) -> (String, i64) {
+    let t = chrono::Utc::now() + chrono::Duration::seconds(offset);
+    (t.format("%Y-%m-%d %H:%M:%S").to_string(), t.timestamp())
+}
+
+/// One position the app publishes, as `sync_service.dart` does.
+struct Read<'a> {
+    device: &'a str,
+    page: i64,
+    unit: &'a str,
+    progress: f64,
+    updated_at: &'a str,
+}
+
+async fn app_reads(app: &axum::Router, token: &str, book: &str, r: Read<'_>) {
+    let (status, body) = api(
+        app,
+        "PUT",
+        &format!("/api/reading-progress/{book}"),
+        Some(token),
+        Some(json!({
+            "device_id": r.device, "device_label": "desktop", "progress": r.progress,
+            "page": r.page, "unit": r.unit, "scroll": 0.5, "updated_at": r.updated_at,
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+}
+
+fn chapter_at(page: i64, progress: f64, updated_at: &str) -> Read<'_> {
+    Read {
+        device: "desk-1",
+        page,
+        unit: "chapter",
+        progress,
+        updated_at,
+    }
+}
+
+async fn pull(app: &axum::Router, key: &str, user: &str, document: &str) -> Value {
+    let (status, body) = ko(
+        app,
+        "GET",
+        &format!("/syncs/progress/{document}"),
+        Some((user, key)),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body
+}
+
+#[tokio::test]
+async fn a_newer_vellum_epub_position_goes_to_koreader_as_the_chapter_start() {
+    let t = test_app().await;
+    let master = register_master(&t.app).await;
+    let book = add_book(&t.app, &master, "Skips").await;
+    let epub = skipping_epub("epub-a");
+    let document = document_of(&epub);
+    upload(&t.app, &master, &book, "epub", epub).await;
+    let (_, body) = api(
+        &t.app,
+        "POST",
+        "/api/app-passwords",
+        Some(&master),
+        Some(json!({ "label": "Kobo", "koreader": true })),
+    )
+    .await;
+    assert_eq!(
+        body["koreader_send_position"],
+        json!(true),
+        "on by default for a new KOReader app password"
+    );
+    let key = md5_hex(body["password"].as_str().unwrap());
+
+    // Nothing from anyone yet: still the reference server's `{}`, never a 404,
+    // which KOReader would report as a network failure.
+    assert_eq!(pull(&t.app, &key, MASTER, &document).await, json!({}));
+
+    // chapter → DocFragment: the first, the one after the skipped item, the
+    // last, and a stale chapter past the end (clamped, as the app's reader is).
+    for (chapter, fragment) in [(1, 1), (2, 3), (3, 4), (9, 4)] {
+        let (when, unix) = at(-100 + chapter);
+        app_reads(&t.app, &master, &book, chapter_at(chapter, 0.4, &when)).await;
+        let got = pull(&t.app, &key, MASTER, &document).await;
+        assert_eq!(
+            got,
+            json!({
+                "document": document,
+                "progress": format!("/body/DocFragment[{fragment}]"),
+                "percentage": 0.4,
+                "device": "Vellum on desktop",
+                "device_id": "vellum:desk-1",
+                "timestamp": unix,
+            }),
+            "chapter {chapter}"
+        );
+    }
+
+    // KOReader syncing straight back reports our xpointer; the app reads it as
+    // the chapter it came from, not the fragment's number.
+    let (status, _) = ko(
+        &t.app,
+        "PUT",
+        "/syncs/progress",
+        Some((MASTER, &key)),
+        Some(report(&document, "/body/DocFragment[3]", 0.4)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let rows = positions(&t.app, &master).await;
+    let mirrored = rows
+        .iter()
+        .find(|r| r["device_id"] == json!("koreader:B7C1F00D"))
+        .expect("mirrored");
+    assert_eq!(
+        mirrored["page"],
+        json!(2),
+        "DocFragment[3] is the app's chapter 2"
+    );
+    assert_eq!(mirrored["unit"], json!("chapter"));
+}
+
+#[tokio::test]
+async fn a_newer_vellum_pdf_position_goes_to_koreader_as_its_page() {
+    let t = test_app().await;
+    let master = register_master(&t.app).await;
+    let book = add_book(&t.app, &master, "Manual").await;
+    let pdf = file_bytes("pdf", 11, 20_000);
+    let document = document_of(&pdf);
+    upload(&t.app, &master, &book, "pdf", pdf).await;
+    let (_, secret, _) = mint(&t.app, &master, true).await;
+    let key = md5_hex(&secret);
+
+    let (when, unix) = at(0);
+    let read = Read {
+        device: "desk-1",
+        page: 214,
+        unit: "page",
+        progress: 0.72,
+        updated_at: &when,
+    };
+    app_reads(&t.app, &master, &book, read).await;
+    assert_eq!(
+        pull(&t.app, &key, MASTER, &document).await,
+        json!({
+            "document": document,
+            "progress": "214",
+            "percentage": 0.72,
+            "device": "Vellum on desktop",
+            "device_id": "vellum:desk-1",
+            "timestamp": unix,
+        })
+    );
+}
+
+#[tokio::test]
+async fn the_newer_of_koreader_and_vellum_wins_and_koreaders_comes_back_verbatim() {
+    let t = test_app().await;
+    let master = register_master(&t.app).await;
+    let book = add_book(&t.app, &master, "Skips").await;
+    let epub = skipping_epub("epub-b");
+    let document = document_of(&epub);
+    upload(&t.app, &master, &book, "epub", epub).await;
+    let (_, secret, _) = mint(&t.app, &master, true).await;
+    let key = md5_hex(&secret);
+
+    // The app read an hour ago; KOReader reports now. KOReader's, verbatim.
+    let (an_hour_ago, _) = at(-3600);
+    app_reads(&t.app, &master, &book, chapter_at(3, 0.9, &an_hour_ago)).await;
+    let xpointer = "/body/DocFragment[3]/body/p[22]/text().17";
+    let (_, put) = ko(
+        &t.app,
+        "PUT",
+        "/syncs/progress",
+        Some((MASTER, &key)),
+        Some(report(&document, xpointer, 0.43)),
+    )
+    .await;
+    let koreader = json!({
+        "document": document,
+        "progress": xpointer,
+        "percentage": 0.43,
+        "device": "Kobo Libra 2",
+        "device_id": "B7C1F00D",
+        "timestamp": put["timestamp"],
+    });
+    assert_eq!(pull(&t.app, &key, MASTER, &document).await, koreader);
+
+    // The mirrored `koreader:` row is newer than the app's, but it is never
+    // sent back dressed as a Vellum position (the GET above was verbatim).
+    let rows = positions(&t.app, &master).await;
+    assert_eq!(rows.len(), 2, "{rows:?}");
+
+    // Then the app reads on, later than KOReader's report: the app's now.
+    let (later, unix) = at(120);
+    app_reads(&t.app, &master, &book, chapter_at(1, 0.1, &later)).await;
+    let got = pull(&t.app, &key, MASTER, &document).await;
+    assert_eq!(got["progress"], json!("/body/DocFragment[1]"));
+    assert_eq!(got["timestamp"], json!(unix));
+
+    // A tie goes to KOReader, whose position is the precise one.
+    let ko_ts = put["timestamp"].as_i64().unwrap();
+    let tie = chrono::DateTime::from_timestamp(ko_ts, 0)
+        .unwrap()
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    app_reads(&t.app, &master, &book, chapter_at(1, 0.1, &tie)).await;
+    assert_eq!(pull(&t.app, &key, MASTER, &document).await, koreader);
+}
+
+#[tokio::test]
+async fn nothing_safe_to_send_leaves_koreader_with_what_it_had() {
+    let t = test_app().await;
+    let master = register_master(&t.app).await;
+    let (_, secret, _) = mint(&t.app, &master, true).await;
+    let key = md5_hex(&secret);
+    let (now, _) = at(0);
+    let page_at = |page| Read {
+        device: "desk-1",
+        page,
+        unit: "page",
+        progress: 0.3,
+        updated_at: &now,
+    };
+
+    // A book with a PDF too: the app keeps one `page` per book and calls it a
+    // page whenever a PDF is there, so it cannot be trusted for the EPUB.
+    let both = add_book(&t.app, &master, "Both").await;
+    let pdf = file_bytes("pdf", 5, 9_000);
+    let document = document_of(&pdf);
+    upload(&t.app, &master, &both, "epub", skipping_epub("epub-c")).await;
+    upload(&t.app, &master, &both, "pdf", pdf).await;
+    app_reads(&t.app, &master, &both, page_at(2)).await;
+    assert_eq!(pull(&t.app, &key, MASTER, &document).await, json!({}));
+
+    // A unit that does not match the file: an EPUB-only book with a `page`.
+    let single = add_book(&t.app, &master, "Single").await;
+    let epub = skipping_epub("epub-d");
+    let document = document_of(&epub);
+    upload(&t.app, &master, &single, "epub", epub).await;
+    app_reads(&t.app, &master, &single, page_at(2)).await;
+    assert_eq!(pull(&t.app, &key, MASTER, &document).await, json!({}));
+
+    // An "EPUB" the server cannot open (no package file): no xpointer is
+    // better than a guessed one.
+    let broken = add_book(&t.app, &master, "Broken").await;
+    let junk = file_bytes("epub", 8, 30_000);
+    let document = document_of(&junk);
+    upload(&t.app, &master, &broken, "epub", junk).await;
+    app_reads(&t.app, &master, &broken, chapter_at(2, 0.3, &now)).await;
+    assert_eq!(pull(&t.app, &key, MASTER, &document).await, json!({}));
+
+    // A document no book holds.
+    assert_eq!(
+        pull(&t.app, &key, MASTER, "0123456789abcdef0123456789abcdef").await,
+        json!({})
+    );
+}
+
+#[tokio::test]
+async fn sending_vellums_position_is_per_app_password_and_switchable() {
+    let t = test_app().await;
+    let master = register_master(&t.app).await;
+    let book = add_book(&t.app, &master, "Skips").await;
+    let epub = skipping_epub("epub-e");
+    let document = document_of(&epub);
+    upload(&t.app, &master, &book, "epub", epub).await;
+    let (now, _) = at(0);
+    app_reads(&t.app, &master, &book, chapter_at(2, 0.5, &now)).await;
+
+    let (status, made) = api(
+        &t.app,
+        "POST",
+        "/api/app-passwords",
+        Some(&master),
+        Some(json!({ "label": "Phone", "koreader": true, "koreader_send_position": false })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(made["koreader_send_position"], json!(false));
+    let id = made["id"].as_str().unwrap().to_string();
+    let key = md5_hex(made["password"].as_str().unwrap());
+    // Off: KOReader gets back only what KOReader sent — here, nothing.
+    assert_eq!(pull(&t.app, &key, MASTER, &document).await, json!({}));
+
+    let (status, body) = api(
+        &t.app,
+        "PATCH",
+        &format!("/api/app-passwords/{id}"),
+        Some(&master),
+        Some(json!({ "koreader_send_position": true })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["koreader_send_position"], json!(true));
+    assert_eq!(
+        pull(&t.app, &key, MASTER, &document).await["progress"],
+        json!("/body/DocFragment[3]")
+    );
+
+    // Only a KOReader app password has anything to switch, and only its owner
+    // can switch it.
+    let (opds, _, _) = mint(&t.app, &master, false).await;
+    let (status, _) = api(
+        &t.app,
+        "PATCH",
+        &format!("/api/app-passwords/{opds}"),
+        Some(&master),
+        Some(json!({ "koreader_send_position": true })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (_, list) = api(&t.app, "GET", "/api/app-passwords", Some(&master), None).await;
+    let opds_row = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == json!(opds))
+        .unwrap();
+    assert_eq!(opds_row["koreader_send_position"], json!(false));
+    let member = add_member(&t.app, &master).await;
+    let (status, _) = api(
+        &t.app,
+        "PATCH",
+        &format!("/api/app-passwords/{id}"),
+        Some(&member),
+        Some(json!({ "koreader_send_position": false })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn one_persons_vellum_position_never_reaches_anothers_koreader() {
+    let t = test_app().await;
+    let master = register_master(&t.app).await;
+    let member = add_member(&t.app, &master).await;
+    let book = add_book(&t.app, &master, "Shared").await;
+    let epub = skipping_epub("epub-f");
+    let document = document_of(&epub);
+    upload(&t.app, &master, &book, "epub", epub).await;
+    // The member can see the book — and so holds the same file — but where
+    // the master is in it is still the master's own business.
+    let (status, body) = api(
+        &t.app,
+        "POST",
+        "/api/shares",
+        Some(&master),
+        Some(json!({
+            "scope": "book", "scope_id": book,
+            "grantee_email": MEMBER, "permission": "viewer",
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (_, master_secret, _) = mint(&t.app, &master, true).await;
+    let (_, member_secret, _) = mint(&t.app, &member, true).await;
+    let master_key = md5_hex(&master_secret);
+    let member_key = md5_hex(&member_secret);
+
+    let (now, _) = at(0);
+    app_reads(&t.app, &master, &book, chapter_at(3, 0.8, &now)).await;
+    assert_eq!(
+        pull(&t.app, &member_key, MEMBER, &document).await,
+        json!({}),
+        "the master's app position is not the member's"
+    );
+    assert_eq!(
+        pull(&t.app, &master_key, MASTER, &document).await["progress"],
+        json!("/body/DocFragment[4]")
+    );
+
+    // The member's own app position is theirs, in the same book.
+    let (later, _) = at(5);
+    let read = Read {
+        device: "phone-9",
+        ..chapter_at(1, 0.05, &later)
+    };
+    app_reads(&t.app, &member, &book, read).await;
+    let got = pull(&t.app, &member_key, MEMBER, &document).await;
+    assert_eq!(got["progress"], json!("/body/DocFragment[1]"));
+    assert_eq!(got["device_id"], json!("vellum:phone-9"));
+    assert_eq!(
+        pull(&t.app, &master_key, MASTER, &document).await["device_id"],
+        json!("vellum:desk-1"),
+        "and it does not reach the master"
+    );
+
+    // Unshared, the book is gone from the member's view, and so is its
+    // position: their KOReader is told nothing about it.
+    let (_, shares) = api(&t.app, "GET", "/api/shares", Some(&master), None).await;
+    let share = shares.as_array().unwrap()[0]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let (status, _) = api(
+        &t.app,
+        "DELETE",
+        &format!("/api/shares/{share}"),
+        Some(&master),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        pull(&t.app, &member_key, MEMBER, &document).await,
+        json!({})
+    );
+}

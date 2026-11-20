@@ -530,14 +530,45 @@ app uses. Each page turn KOReader reports reaches the app as another device:
 
 What it does and does not do:
 
-- **KOReader gets back exactly what KOReader sent.** Its position is an xpointer
-  into the EPUB or a PDF page number, and only another KOReader can use it, so
-  the latest one from any of your KOReader devices is what a sync returns.
-  Positions from the Vellum app are not sent to KOReader.
+- **KOReader's own position comes back exactly as KOReader sent it.** It is an
+  xpointer into the EPUB or a PDF page number, and the latest one from any of
+  your KOReader devices is what a sync returns — unless the Vellum app has a
+  newer one (next point).
+- **Vellum → KOReader lands at the start of the chapter.** When you have read
+  the book in the Vellum app *more recently* than any KOReader reported, a sync
+  from KOReader gets the app's place instead, from a device called *Vellum on
+  <the app's device name>*:
+  - a **PDF** gets the exact page;
+  - an **EPUB** gets the **start of the chapter** you were in, not the
+    paragraph. The app remembers a chapter and how far down it you scrolled;
+    KOReader needs a pointer into its own layout of the chapter, which the
+    server cannot work out safely, and a wrong one would send KOReader to the
+    first page of the book. So you land at the chapter heading and page on
+    from there. The percentage KOReader shows in its prompt is the app's own.
+
+  The newer one wins, by time; a tie goes to KOReader. KOReader's default is
+  to *ask* before jumping forward ("Sync to latest location 43% from device
+  'Vellum on desktop'?") and to never jump back, and **Pull progress from
+  other devices now** always jumps — those are KOReader's settings under
+  *Progress sync*, and they apply to Vellum's position like any other
+  device's. Nothing is sent when the app's position cannot be put into
+  KOReader's terms: a book that has both a PDF and an EPUB (the app keeps one
+  position per book and the server cannot tell which file it was in), or an
+  EPUB the server cannot open.
+
+  **Per app password, and switchable.** The console's app passwords list
+  shows *Sends Vellum's position to KOReader* on each KOReader one, with a
+  button to switch it. New KOReader app passwords start with it on. App
+  passwords made before this existed start with it **off**, so a device
+  already set up keeps doing exactly what it did until you switch it on —
+  turning on "the server may move you" mid-book is your call, not an
+  upgrade's.
 - **The app sees KOReader's position** once *Preferences → Sync reading
   position* is on there. A PDF reports its page, an EPUB its chapter (KOReader's
-  `DocFragment[N]` is the N-th spine item, which is what the app counts as a
-  chapter), and the percentage in both cases.
+  `DocFragment[N]` is the N-th spine item; the server counts the EPUB's spine
+  the way the app does, so a spine item the app skips — one whose file is
+  missing from the archive — does not shift the chapter number), and the
+  percentage in both cases.
 - **A book KOReader reads before it is on the server** is still recorded. When
   the file is imported later, the positions waiting for it attach to the book.
 - **Per person.** The position belongs to the account whose app password sent
@@ -551,6 +582,33 @@ What it does and does not do:
 The app password's KOReader key is only valid on `/koreader`; it is not a
 password anywhere else. Like Basic auth, the key is sent with every request, so
 use **HTTPS** off a trusted network.
+
+Checking it on a real device (the tests drive the protocol, not KOReader):
+
+1. **PDF.** Read a PDF to page 40 in the app and let it sync. In KOReader, open
+   the same file, **Progress sync → Pull progress from other devices now**:
+   it should go to page 40, and the message should name *Vellum on …*.
+2. **EPUB.** Read into the middle of a chapter in the app, sync, and pull in
+   KOReader: it should land on the **first page of that chapter** — not the
+   start of the book (that would mean the xpointer did not resolve) and not a
+   neighbouring chapter (that would mean the chapter count disagrees). Try an
+   EPUB with a cover page or a title page as its own spine item, since that is
+   where a miscount would show.
+3. **Without pulling by hand.** Turn a page in KOReader, close the book, read
+   on in the app, reopen in KOReader: it should *ask* to sync to the app's
+   position (its default for a newer position). Then turn a page in KOReader
+   and pull again — KOReader's own position should now win.
+4. **Switched off.** Use **Stop sending Vellum's position** in the console and
+   pull again: KOReader should report its own last position, or *No progress
+   found*.
+5. **An EPUB first opened in a KOReader older than v2024.01.** KOReader keeps
+   a book's rendering version from when it first opened it, and before that
+   version its spine skipped items that are not XHTML (an SVG or an image as
+   a page of its own). For such a book KOReader can land that many chapters
+   *later* than the app's. Most EPUBs have none. KOReader keeps that version in
+   the book's own settings, so resetting them in KOReader re-renders it at the
+   current version — at the cost of what else they hold, such as KOReader's
+   highlights in that book.
 
 ### Activity log (optional)
 

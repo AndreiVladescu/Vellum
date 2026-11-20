@@ -999,8 +999,20 @@ what keeps it from re-opening the settled question:
   `sha256(md5(secret))`). KOReader's report is kept verbatim in
   `koreader_progress` — its xpointer has to go back byte for byte — and
   mirrored into `reading_progress` as device `koreader:<id>` for each book the
-  reporter can see whose file has that partial-MD5 digest. Nothing flows the
-  other way; the app needs no change to show it.
+  reporter can see whose file has that partial-MD5 digest. The app needs no
+  change to show it. **And back** (migration 0045, per app password, on for new
+  KOReader passwords and off for those that predate it): when the app's own
+  newest row for a book holding that file is strictly newer than KOReader's
+  latest report, the GET answers with it in KOReader's form — a PDF's page, or
+  `/body/DocFragment[N]` for an EPUB, the chapter's *start*. That is the
+  coarsest xpointer crengine resolves and valid in any rendering; an invented
+  deeper one that fails to resolve sends KOReader to the book's first page, so
+  the in-chapter scroll is dropped. Chapter N maps to a fragment by walking the
+  spine (`blobs::epub_docfragments`): crengine makes a fragment for every
+  itemref with a manifest item, the app skips one whose file is missing. Only
+  app rows count (never a mirrored `koreader:` row), and a book holding both a
+  PDF and an EPUB is skipped, since the app's one `page` per book is ambiguous
+  there.
 
 The two schemas are kept in sync by hand, so `server/tests/schema_parity.rs`
 pins the column list of every synced table (`book`, `author`, `book_author`,

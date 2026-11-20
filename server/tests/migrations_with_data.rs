@@ -563,3 +563,40 @@ async fn existing_sittings_upgrade_to_reading_sittings() {
     assert_eq!(row.get::<i64, _>(3), 20);
     let _ = std::fs::remove_file(&path);
 }
+
+/// 0045 adds `koreader_send_position` with a constant default of 0: an app
+/// password made before it keeps doing what its owner was told it does —
+/// KOReader gets back only what KOReader sent — until they switch it on.
+#[tokio::test]
+async fn existing_koreader_app_passwords_keep_not_sending_vellums_position() {
+    let path = std::env::temp_dir().join(format!("vellum_popmig_{}.db", uuid::Uuid::new_v4()));
+    let path = path.to_str().unwrap().to_string();
+    {
+        let pool = migrate_partially(&path, 44).await;
+        for sql in [
+            "INSERT INTO app_user (id, email, display_name, password_hash, is_master) \
+             VALUES ('u1', 'someone@lib.test', 'Someone', 'x', 1)",
+            "INSERT INTO app_password (id, user_id, label, prefix, secret_hash) \
+             VALUES ('a1', 'u1', 'KOReader', 'abcd', 'hash')",
+            "INSERT INTO koreader_key (key_hash, app_password_id) VALUES ('k', 'a1')",
+        ] {
+            sqlx::query(sql).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+    }
+
+    let db = connect_db(&path)
+        .await
+        .expect("a database with app passwords in it must migrate");
+    let send: i64 = sqlx::query_scalar("SELECT koreader_send_position FROM app_password")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(send, 0);
+    let keys: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM koreader_key")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(keys, 1, "its KOReader key still works");
+    let _ = std::fs::remove_file(&path);
+}

@@ -19,7 +19,7 @@ import { grantAccess, revokeLink, revokeShare } from './shares.js';
 import { invitePerson, removePerson, renamePerson, resetFor, revokeInvite,
   setRole } from './people.js';
 import { showMailSetup, testMail } from './mail.js';
-import { copySecret, newAppPassword, revokeAppPassword } from './app_passwords.js';
+import { copySecret, newAppPassword, revokeAppPassword, setKoreaderSend } from './app_passwords.js';
 import { clear2fa, disable2fa, regen2fa, setup2fa } from './security.js';
 import { showActivity } from './activity.js';
 import { showOverview } from './overview.js';
@@ -96,6 +96,7 @@ export const ACTIONS = {
   newapppassword: () => newAppPassword(),
   revokeapppassword: el => revokeAppPassword(el.dataset.id, el.dataset.label),
   copysecret: el => copySecret(el.dataset.secret),
+  koreadersend: el => setKoreaderSend(el.dataset.id, el.dataset.on === '1'),
   setup2fa: () => setup2fa(),
   disable2fa: () => disable2fa(),
   regen2fa: () => regen2fa(),

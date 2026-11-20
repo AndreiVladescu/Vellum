@@ -893,6 +893,77 @@ pub(crate) fn epub_spine_len(path: &Path) -> usize {
     epub_spine_hrefs(path).map(|(_, h)| h.len()).unwrap_or(0)
 }
 
+/// How the app's EPUB chapters line up with KOReader's `DocFragment`s: entry
+/// `i` is the 1-based `DocFragment` index of the app's chapter `i + 1`.
+///
+/// The two count the same spine differently in one case. Both walk the
+/// `<itemref>`s whose `idref` names a manifest item, in order. KOReader's
+/// crengine makes a `<DocFragment>` for **every** one of them (since its DOM
+/// version 20240114 — a dummy one for an item it cannot parse, so indices never
+/// shift), while the app (`app/lib/reader/epub_book.dart`) drops an item whose
+/// file is missing from the archive. So the app's chapter 3 is `DocFragment[4]`
+/// in a book whose second spine item names a file that is not there.
+///
+/// None when the archive or its package file cannot be read.
+pub(crate) fn epub_docfragments(path: &Path) -> Option<Vec<usize>> {
+    use std::io::Read;
+    const MAX_ENTRY_BYTES: u64 = 32 * 1024 * 1024;
+    let file = std::fs::File::open(path).ok()?;
+    let mut zip = zip::ZipArchive::new(file).ok()?;
+    let mut read = |name: &str| -> Option<String> {
+        let f = zip.by_name(name).ok()?;
+        let mut buf = Vec::new();
+        f.take(MAX_ENTRY_BYTES).read_to_end(&mut buf).ok()?;
+        String::from_utf8(buf).ok()
+    };
+    let container = read("META-INF/container.xml")?;
+    let opf_path = tag_attr(find_tag(&container, "rootfile")?, "full-path")?.to_string();
+    let opf = read(&opf_path)?;
+    let opf_dir = opf_path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+
+    // crengine keeps a manifest item only when both are non-empty.
+    let manifest: Vec<(&str, &str)> = item_tags(&opf)
+        .filter_map(|tag| Some((tag_attr(tag, "id")?, tag_attr(tag, "href")?)))
+        .filter(|(id, href)| !id.is_empty() && !href.is_empty())
+        .collect();
+    let mut fragments = Vec::new();
+    let mut fragment = 0;
+    for idref in itemref_ids(&opf) {
+        let Some((_, href)) = manifest.iter().find(|(id, _)| *id == idref) else {
+            continue; // no DocFragment, and no chapter either
+        };
+        fragment += 1;
+        // The app decodes `%20` and friends before looking the file up.
+        let raw = join_posix(opf_dir, href);
+        let decoded = join_posix(opf_dir, &percent_decode(href));
+        if zip.index_for_name(&raw).is_some() || zip.index_for_name(&decoded).is_some() {
+            fragments.push(fragment);
+        }
+    }
+    Some(fragments)
+}
+
+/// `%XX` escapes decoded, as the app's `Uri.decodeComponent` does for an
+/// href; anything malformed is left as it is.
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && let Some(hex) = s.get(i + 1..i + 3)
+            && let Ok(b) = u8::from_str_radix(hex, 16)
+        {
+            out.push(b);
+            i += 3;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| s.to_string())
+}
+
 /// A zip entry's bytes, for serving an EPUB's own images to the reader.
 ///
 /// Reads **by name from the archive**, never through the filesystem, so a

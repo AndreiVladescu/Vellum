@@ -31,6 +31,20 @@ function appPasswordKosyncUrl(){
 
 export function appPasswordRow(p){
   const used = p.last_used_at ? 'last used ' + appPasswordTime(p.last_used_at) : 'never used';
+  // Whether KOReader is also sent the app's position (migration 0045). The one
+  // thing about an app password that can change later, so it is a button here
+  // rather than a choice at creation only.
+  const sends = !!p.koreader_send_position;
+  const send = p.koreader
+    ? `<div class="muted sharesub">${sends
+        ? "Sends Vellum's position to KOReader (at the chapter start)"
+        : "KOReader gets back only its own position"}</div>`
+    : '';
+  const toggle = p.koreader
+    ? `<button class="btn sm" data-act="koreadersend" data-id="${esc(p.id)}"
+               data-on="${sends ? '0' : '1'}">${sends
+        ? "Stop sending Vellum's position" : "Send Vellum's position"}</button>`
+    : '';
   return `
     <div class="row shareline">
       <span>
@@ -38,10 +52,22 @@ export function appPasswordRow(p){
         <span class="pill">${esc(p.prefix)}-…</span>
         ${p.koreader ? '<span class="pill">KOReader sync</span>' : ''}
         <div class="muted sharesub">created ${appPasswordTime(p.created_at)} · ${used}</div>
+        ${send}
       </span>
+      ${toggle}
       <button class="btn sm danger" data-act="revokeapppassword"
               data-id="${esc(p.id)}" data-label="${esc(p.label)}">Revoke</button>
     </div>`;
+}
+
+/// Switch whether KOReader is sent the Vellum app's position, then redraw.
+export async function setKoreaderSend(id, on){
+  try {
+    await api('PATCH', '/api/app-passwords/' + encodeURIComponent(id),
+      { koreader_send_position: on });
+  } catch(e){ toast(e.message); return; }
+  toast(on ? "KOReader will be sent Vellum's position" : "KOReader keeps only its own position");
+  showAppPasswords();
 }
 
 export async function showAppPasswords(){
@@ -77,7 +103,10 @@ export async function showAppPasswords(){
        <p class="muted" style="margin:0">Make the app password <em>for KOReader
          progress sync</em>, then in KOReader open <em>Progress sync → Custom sync
          server</em>, enter <span class="shareurl">${esc(appPasswordKosyncUrl())}</span>,
-         and log in with your email and that app password.</p>
+         and log in with your email and that app password. Positions go both
+         ways: when you have read in the Vellum app more recently, KOReader is offered
+         that place — the start of the chapter for an EPUB, the page for a PDF.
+         Switch that off per device below.</p>
      </div>
      <div class="row" style="justify-content:flex-end; margin-bottom:8px">
        <button class="btn primary" data-act="newapppassword">New app password…</button>
