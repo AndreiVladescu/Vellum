@@ -182,6 +182,12 @@ Future<LibraryRepository> _repo() async {
     VellumDatabase(NativeDatabase.memory()),
     dir,
   );
+  // Every caller is inside a test, so this runs when that test ends; without
+  // it each run left a directory behind in the system temp folder.
+  addTearDown(() async {
+    await repo.db.close();
+    if (dir.existsSync()) await dir.delete(recursive: true);
+  });
   await repo.db.into(repo.db.books).insert(
         BooksCompanion.insert(id: 'b1', title: 'Dune', needsPush: const Value(false)),
       );
