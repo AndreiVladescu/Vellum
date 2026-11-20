@@ -127,10 +127,12 @@ Reasons:
 
 Costs:
 
-- Linux now needs libmpv at run time: `libmpv2` (or `libmpv1`) in the `.deb`
-  `Depends`. The spike showed `libmpv-dev` is not needed to build (§7a). The
-  AppImage either bundles libmpv and its FFmpeg (tens of MB) or requires it on
-  the host.
+- Linux needs libmpv at run time, but only to play: it is loaded the first
+  time a player is made (`ensureAudioBackend`), so the app starts and reads
+  without it. The `.deb` therefore *recommends* `libmpv2 | libmpv1` (apt
+  installs it by default) rather than depending on it. The AppImage leaves it
+  to the host, like GTK, instead of bundling libmpv and its FFmpeg (tens of
+  MB). The spike showed `libmpv-dev` is not needed to build (§7a).
 - On Android, `MainActivity` has to extend `AudioServiceActivity` instead of
   `FlutterActivity`, and the manifest needs a `mediaPlayback` foreground
   service next to the existing `dataSync` one.

@@ -69,6 +69,7 @@ Architecture: amd64
 Installed-Size: $SIZE
 Maintainer: Andrei Vladescu <avladescu2000@gmail.com>
 Depends: libgtk-3-0 (>= 3.22), libsecret-1-0 (>= 0.18.4), libstdc++6, zlib1g
+Recommends: libmpv2 | libmpv1
 Homepage: https://github.com/AndreiVladescu/Vellum
 Description: Personal library manager for digital and physical books
  Vellum shows your library as a visual bookshelf: you browse your books
