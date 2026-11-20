@@ -19,3 +19,14 @@ taken without patching sqlx. Exposure is limited: the server opens only its own
 `vellum.db`, never a database or WAL file supplied by a client. Revisit when a
 sqlx release allows 0.39.
 """
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+reason = """
+`chrono` is marked unmaintained: an informational notice, not a vulnerability,
+with no fixed version to move to. It cannot be dropped: `sqlx-core`,
+`sqlx-sqlite` and `lopdf` all depend on it, as does the server directly.
+`cargo audit` already reports it as a warning rather than a failure, so the
+`--ignore` list in ci.yml does not need it. Revisit when sqlx moves off chrono
+or a maintained fork appears.
+"""
