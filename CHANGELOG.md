@@ -6,6 +6,68 @@ follow [semantic versioning](https://semver.org/).
 
 ---
 
+## v1.6.0 — 2026-11-20
+
+Vellum in Romanian, KOReader in both directions, and audiobooks that don't
+fill your phone.
+
+### Added
+
+- **Romanian.** The whole app, its Android shortcuts and widget, and the Linux
+  menu entry. Choose the language in *Preferences → Appearance → Language*, or
+  let it follow the system. Want Vellum in your language? See
+  `docs/TRANSLATING.md`.
+- **KOReader both ways.** When you last read a book in the Vellum app,
+  KOReader's *Pull progress* now takes you there: the exact page of a PDF, the
+  start of the chapter in an EPUB. On for new KOReader app passwords; switch it
+  on for existing ones in the console's *App passwords* list.
+- **Audiobooks download when you listen.** Syncing brings an audiobook's
+  details and your place in it, not gigabytes of audio. *Listen* downloads the
+  part you're in first and starts as soon as it arrives; an interrupted
+  download picks up where it stopped. On Android, *Download audiobooks on Wi-Fi
+  only* is on by default, with *Download anyway* for one book. *Remove
+  download* frees the space, and *Data and backups* shows how much audiobooks
+  use. Backups leave audio out unless you switch it in.
+- **A side pane on wide screens.** At 1200 px and wider, a book opens next to
+  the shelf instead of on its own page.
+- **Paged EPUB:** pages glide when they turn (not with *remove animations*),
+  self-scroll turns pages on a timer, and on Android the volume keys can turn
+  pages in both readers (*Reading options*, off by default).
+- **Windows media controls** for audiobooks: the media overlay, media keys and
+  the lock screen.
+- **The home-screen widget shows a reading and a listening book** at 4×2, each
+  opening its own; at 4×1 it shows the most recent.
+- **Server: `VELLUM_BASE_PATH`** for running behind a reverse proxy under a
+  path, with nginx and Caddy examples in `docs/DEPLOYMENT.md`.
+
+### Changed
+
+- Read aloud pauses for a call or another app's audio, and when headphones are
+  unplugged. It and an audiobook never talk over each other.
+- Dates and numbers follow your system's region: `20/11/2026` in the UK,
+  `11/20/2026` in the US, `20.11.2026` in Romanian.
+- A large library no longer flashes *Your shelf is empty* for a moment at
+  start-up.
+- A room's backdrop photo is decoded at screen size, not the camera's.
+
+### Fixed
+
+- Tapping a link near the edge of a paged EPUB no longer also turns the page.
+- Reading and listening sessions cut short by the app being closed are now
+  finished and counted.
+- The console no longer trims spaces from passwords, so two-factor setup works
+  with a password that starts or ends with one.
+- KOReader positions in books whose spine lists an item the app skips land on
+  the right chapter.
+
+### Maintenance
+
+- Tests that failed under load were made reliable; their real cause was
+  SQLite waiting on the disk.
+- Release downloads no longer include a stray Docker build record.
+
+---
+
 ## v1.5.3 — 2026-11-20
 
 Audiobooks, read aloud, and a library that is easier to find your way around.

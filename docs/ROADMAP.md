@@ -49,6 +49,9 @@ desktop, signed links and two-factor sign-in (v1.6.2), KOReader sync
 `v1.5.3` (2026-11-20) — Preferences in sections and shelf grouping (v1.4.1),
 read aloud (v1.4.3), audiobooks (v1.5.0–v1.5.3), a smoother physical room
 and fixes from the emulator pass. Flutter 3.50 (v1.4.0a) is held back.
+`v1.6.0` (2026-11-20) — Romanian, KOReader both ways, audiobooks downloaded on
+demand, a side pane on wide screens, reader polish, Windows media controls and
+a two-row home widget. Flutter 3.50 is still held back.
 
 ---
 
