@@ -12,13 +12,24 @@ import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/settings/app_settings.dart';
 
+/// An on-disk database that never waits for the disk.
+///
+/// SQLite normally fsyncs on every commit, and creating a library is dozens of
+/// them. On a busy machine (other test suites, a compile) each fsync can take
+/// seconds, which is what pushed these tests past their timeout. Durability
+/// means nothing for a directory the test deletes a moment later, so it is
+/// switched off; the file is still real, which is all backup needs.
+VellumDatabase _open(File file) => VellumDatabase(NativeDatabase(
+      file,
+      setup: (raw) => raw
+        ..execute('PRAGMA synchronous = OFF')
+        ..execute('PRAGMA journal_mode = MEMORY'),
+    ));
+
 /// A repository over a real on-disk database (backup needs `VACUUM INTO` and
 /// a file to swap, so `NativeDatabase.memory()` won't do here).
 Future<LibraryRepository> _repo(Directory dir, String dbName) async =>
-    LibraryRepository.forTesting(
-      VellumDatabase(NativeDatabase(File(p.join(dir.path, dbName)))),
-      dir,
-    );
+    LibraryRepository.forTesting(_open(File(p.join(dir.path, dbName))), dir);
 
 void main() {
   late Directory dir;
@@ -159,7 +170,7 @@ void main() {
         isTrue,
       );
       final reopened = await LibraryRepository.forTesting(
-        VellumDatabase(NativeDatabase(destDbFile)),
+        _open(destDbFile),
         destDir,
       );
       expect((await reopened.detailsFor(id)).authors, ['Anon']);
@@ -291,7 +302,7 @@ void main() {
 
     // The restored database holds the source's book, not the destination's.
     final reopened = await LibraryRepository.forTesting(
-      VellumDatabase(NativeDatabase(destDbFile)),
+      _open(destDbFile),
       destDir,
     );
     final books = await reopened.watchAllBooks().first;
@@ -326,7 +337,7 @@ void main() {
         isTrue);
 
     final reopened = await LibraryRepository.forTesting(
-      VellumDatabase(NativeDatabase(destDbFile)),
+      _open(destDbFile),
       destDir,
     );
     final restored = await reopened.copyPhotos.photosOf(copyId);
@@ -412,7 +423,7 @@ void main() {
         isTrue,
       );
       final reopened = await LibraryRepository.forTesting(
-        VellumDatabase(NativeDatabase(destDbFile)),
+        _open(destDbFile),
         destDir,
       );
       return (reopened, destDir);
