@@ -12,6 +12,16 @@
 //! the handler then runs its usual `book_access` check. So a share revoked after
 //! the link was minted stops working on the next request.
 //!
+//! **Behind a reverse proxy that serves Vellum under a path prefix** (say
+//! `https://host/vellum/`), the path a browser asks for and the path this
+//! server sees can differ. The signature therefore never covers either raw
+//! path: it covers the *canonical* path, `/api/...` relative to the API root,
+//! with the configured prefix (`VELLUM_BASE_PATH`, opt-in) removed. Both ends
+//! derive it from the same function ([`canonical`]), the server hands out the
+//! finished public URL (so no client computes a path), and a proxy that strips
+//! the prefix and one that does not verify identically. Nothing is read from
+//! `X-Forwarded-*` headers, which any client can send. See docs/DEPLOYMENT.md.
+//!
 //! The key lives in `server_setting` (`link_signing_key`), created on first
 //! use. Deleting that row (or `POST /api/links/rotate`) invalidates every link.
 
@@ -39,6 +49,46 @@ const MAX_PATHS: usize = 500;
 enum Kind {
     Cover,
     File,
+}
+
+/// The public path prefix Vellum is served under (`VELLUM_BASE_PATH`), or `""`.
+///
+/// Opt-in configuration, never inferred from a request: normalised to a leading
+/// `/` and no trailing one, so `vellum`, `/vellum` and `/vellum/` are the same.
+/// Empty (the default) changes nothing at all.
+pub fn base_path() -> &'static str {
+    static BASE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        normalize_base(&std::env::var("VELLUM_BASE_PATH").unwrap_or_default())
+    });
+    &BASE
+}
+
+fn normalize_base(raw: &str) -> String {
+    let trimmed = raw.trim().trim_matches('/');
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        format!("/{trimmed}")
+    }
+}
+
+/// The path relative to the API root: `path` with `base` removed if (and only
+/// if) it is there as whole segments.
+///
+/// This is what gets signed and verified, on both sides. A proxy that strips
+/// its prefix delivers `/api/files/x`; one that forwards it delivers
+/// `/vellum/api/files/x`; both canonicalise to `/api/files/x`. The prefix is
+/// removed only at a segment boundary (`/vellumx/...` is left alone and then
+/// fails [`classify`]), and only one copy of it, so no spelling of a path can
+/// name a resource other than the one the signature was made for.
+fn canonical<'a>(base: &str, path: &'a str) -> &'a str {
+    if base.is_empty() {
+        return path;
+    }
+    match path.strip_prefix(base) {
+        Some(rest) if rest.starts_with('/') => rest,
+        _ => path,
+    }
 }
 
 /// Which resource a path names, if it is one a link may point at. Anything
@@ -123,6 +173,20 @@ async fn key(state: &AppState) -> AppResult<Vec<u8>> {
 /// returns the user id the link was minted for; the caller must still load that
 /// user and check access. Any failure is the same "unauthorised" answer.
 pub async fn verify(state: &AppState, path: &str, query: &str) -> Option<String> {
+    let key = key(state).await.ok()?;
+    verify_with(
+        &key,
+        base_path(),
+        path,
+        query,
+        chrono::Utc::now().timestamp(),
+    )
+}
+
+/// [`verify`] with everything it depends on passed in, so the prefixed and
+/// unprefixed setups can be tested side by side.
+fn verify_with(key: &[u8], base: &str, path: &str, query: &str, now: i64) -> Option<String> {
+    let path = canonical(base, path);
     classify(path)?;
     let (mut u, mut exp, mut sig) = (None, None, None);
     for pair in query.split('&') {
@@ -134,12 +198,21 @@ pub async fn verify(state: &AppState, path: &str, query: &str) -> Option<String>
         }
     }
     let (u, exp, sig) = (u?, exp?.parse::<i64>().ok()?, sig?);
-    if exp < chrono::Utc::now().timestamp() {
+    if exp < now {
         return None;
     }
-    let key = key(state).await.ok()?;
-    let want = mac(&key, u, path, exp);
+    let want = mac(key, u, path, exp);
     ct_eq(want.as_bytes(), sig.as_bytes()).then(|| u.to_string())
+}
+
+/// Signs one link: the signature is over the canonical path, and the result is
+/// the public URL to hand to a browser (`base` + that path + the query). `None`
+/// if the path is not one a link may point at.
+fn sign_with(key: &[u8], base: &str, user_id: &str, path: &str, exp: i64) -> Option<String> {
+    let path = canonical(base, path);
+    classify(path)?;
+    let sig = mac(key, user_id, path, exp);
+    Some(format!("{base}{path}?u={user_id}&exp={exp}&sig={sig}"))
 }
 
 #[derive(Deserialize)]
@@ -150,7 +223,8 @@ pub struct LinksInput {
 #[derive(Serialize)]
 pub struct Link {
     pub path: String,
-    /// Root-relative URL, ready to use as an `src`/`href`.
+    /// Root-relative URL, ready to use as an `src`/`href`. It already carries
+    /// the public path prefix when one is configured, so clients use it as is.
     pub url: String,
     pub expires_at: i64,
 }
@@ -179,7 +253,7 @@ pub async fn create(
     let now = chrono::Utc::now().timestamp();
     let mut links = Vec::new();
     for path in input.paths {
-        let Some((kind, id)) = classify(&path) else {
+        let Some((kind, id)) = classify(canonical(base_path(), &path)) else {
             return Err(AppError::BadRequest(format!(
                 "cannot sign {path}: only cover and file paths"
             )));
@@ -202,9 +276,11 @@ pub async fn create(
                 Kind::Cover => COVER_TTL_SECS,
                 Kind::File => DOWNLOAD_TTL_SECS,
             };
-        let sig = mac(&key, &user.id, &path, exp);
+        let Some(url) = sign_with(&key, base_path(), &user.id, &path, exp) else {
+            continue;
+        };
         links.push(Link {
-            url: format!("{path}?u={}&exp={exp}&sig={sig}", user.id),
+            url,
             path,
             expires_at: exp,
         });
@@ -248,5 +324,137 @@ mod tests {
         assert!(classify("/api/books/a/b/cover").is_none());
         assert!(classify("/api/files/").is_none());
         assert!(classify("/api/admin/snapshot").is_none());
+    }
+
+    const KEY: &[u8] = b"test-signing-key";
+    const NOW: i64 = 1_000;
+    const EXP: i64 = NOW + 60;
+
+    /// Splits a URL from `sign_with` into (path, query).
+    fn split(url: &str) -> (&str, &str) {
+        url.split_once('?').unwrap()
+    }
+
+    #[test]
+    fn unprefixed_setup_signs_and_verifies_as_before() {
+        let url = sign_with(KEY, "", "u1", "/api/files/f1", EXP).unwrap();
+        let (path, query) = split(&url);
+        assert_eq!(path, "/api/files/f1", "no prefix configured, none added");
+        assert_eq!(
+            verify_with(KEY, "", path, query, NOW).as_deref(),
+            Some("u1")
+        );
+    }
+
+    #[test]
+    fn a_proxy_that_strips_the_prefix_still_verifies() {
+        // The console asked for `/vellum/api/files/f1`; the server hands back a
+        // URL under the prefix; the proxy strips it, so the server sees the
+        // bare path. Same signature, same answer.
+        let url = sign_with(KEY, "/vellum", "u1", "/api/files/f1", EXP).unwrap();
+        let (public, query) = split(&url);
+        assert_eq!(public, "/vellum/api/files/f1");
+        let seen_by_server = public.strip_prefix("/vellum").unwrap();
+        assert_eq!(
+            verify_with(KEY, "/vellum", seen_by_server, query, NOW).as_deref(),
+            Some("u1")
+        );
+    }
+
+    #[test]
+    fn a_proxy_that_keeps_the_prefix_verifies_too() {
+        let url = sign_with(KEY, "/vellum", "u1", "/api/books/b1/cover", EXP).unwrap();
+        let (public, query) = split(&url);
+        assert_eq!(
+            verify_with(KEY, "/vellum", public, query, NOW).as_deref(),
+            Some("u1"),
+            "the path as the proxy forwarded it, prefix and all"
+        );
+    }
+
+    #[test]
+    fn a_path_given_with_the_prefix_signs_the_same_resource() {
+        let bare = sign_with(KEY, "/vellum", "u1", "/api/files/f1", EXP).unwrap();
+        let prefixed = sign_with(KEY, "/vellum", "u1", "/vellum/api/files/f1", EXP).unwrap();
+        assert_eq!(bare, prefixed);
+    }
+
+    #[test]
+    fn a_signature_for_one_resource_never_opens_another() {
+        let url = sign_with(KEY, "/vellum", "u1", "/api/files/f1", EXP).unwrap();
+        let (_, query) = split(&url);
+        for other in [
+            "/api/files/f2",
+            "/vellum/api/files/f2",
+            "/api/books/f1/cover",
+            "/vellum/vellum/api/files/f2",
+            "/vellum/api/files/f1/extra",
+            "/vellum/api/admin/snapshot",
+        ] {
+            assert_eq!(
+                verify_with(KEY, "/vellum", other, query, NOW),
+                None,
+                "{other}"
+            );
+        }
+        // And the same with no prefix configured.
+        let url = sign_with(KEY, "", "u1", "/api/files/f1", EXP).unwrap();
+        let (_, query) = split(&url);
+        assert_eq!(verify_with(KEY, "", "/api/files/f2", query, NOW), None);
+    }
+
+    #[test]
+    fn the_prefix_is_removed_only_as_whole_segments_and_only_once() {
+        assert_eq!(canonical("/vellum", "/vellum/api/files/x"), "/api/files/x");
+        assert_eq!(canonical("/vellum", "/api/files/x"), "/api/files/x");
+        assert_eq!(
+            canonical("/vellum", "/vellumx/api/files/x"),
+            "/vellumx/api/files/x"
+        );
+        assert_eq!(canonical("/vellum", "/vellum"), "/vellum");
+        assert_eq!(
+            canonical("/vellum", "/vellum/vellum/api/files/x"),
+            "/vellum/api/files/x",
+            "one copy only; what is left is not an API path"
+        );
+        assert!(classify(canonical("/vellum", "/vellum/vellum/api/files/x")).is_none());
+        assert_eq!(canonical("", "/vellum/api/files/x"), "/vellum/api/files/x");
+    }
+
+    #[test]
+    fn a_prefix_that_was_not_configured_is_not_honoured() {
+        // What `X-Forwarded-Prefix` trust would have allowed: a link made for a
+        // prefixed deployment does not verify on one with none configured.
+        let url = sign_with(KEY, "/vellum", "u1", "/api/files/f1", EXP).unwrap();
+        let (public, query) = split(&url);
+        assert_eq!(verify_with(KEY, "", public, query, NOW), None);
+    }
+
+    #[test]
+    fn expired_wrong_user_and_wrong_key_are_refused() {
+        let url = sign_with(KEY, "/vellum", "u1", "/api/files/f1", EXP).unwrap();
+        let (public, query) = split(&url);
+        assert_eq!(verify_with(KEY, "/vellum", public, query, EXP + 1), None);
+        assert_eq!(
+            verify_with(b"another key", "/vellum", public, query, NOW),
+            None
+        );
+        let swapped = query.replace("u=u1", "u=u2");
+        assert_eq!(verify_with(KEY, "/vellum", public, &swapped, NOW), None);
+    }
+
+    #[test]
+    fn only_cover_and_file_paths_can_be_signed_under_a_prefix() {
+        assert!(sign_with(KEY, "/vellum", "u1", "/api/admin/snapshot", EXP).is_none());
+        assert!(sign_with(KEY, "/vellum", "u1", "/vellum/api/books/b1", EXP).is_none());
+    }
+
+    #[test]
+    fn base_path_is_normalised() {
+        assert_eq!(normalize_base(""), "");
+        assert_eq!(normalize_base("/"), "");
+        assert_eq!(normalize_base("vellum"), "/vellum");
+        assert_eq!(normalize_base("/vellum/"), "/vellum");
+        assert_eq!(normalize_base(" /a/b/ "), "/a/b");
     }
 }

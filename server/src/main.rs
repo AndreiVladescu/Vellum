@@ -19,6 +19,8 @@ ENVIRONMENT:
     VELLUM_DATA_DIR          Covers and book files (default ./data)
     VELLUM_PUBLIC_URL        Base URL used in public share links
                              (default http://localhost:3000)
+    VELLUM_BASE_PATH         Public path prefix when a proxy serves Vellum under
+                             one, e.g. /vellum (default none)
     VELLUM_MAX_UPLOAD_MB     Per-file upload cap in MB (default 2048)
     VELLUM_TLS               1/true to serve HTTPS with a self-signed certificate
     VELLUM_TLS_CERT          PEM certificate path (default <data dir>/cert.pem)

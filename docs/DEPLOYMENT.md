@@ -284,6 +284,7 @@ same list, commented out at its defaults — to `server/.env` and source it.
 | `VELLUM_DB` | `./vellum.db` | SQLite file; migrations run at startup |
 | `VELLUM_DATA_DIR` | `./data` | Covers and book files |
 | `VELLUM_PUBLIC_URL` | `http://localhost:3000` | Base URL embedded in public share links |
+| `VELLUM_BASE_PATH` | — | Public path prefix when a proxy serves Vellum under one, e.g. `/vellum` (see [Under a path prefix](#under-a-path-prefix)) |
 | `VELLUM_MAX_UPLOAD_MB` | `2048` | Per-file upload cap |
 | `VELLUM_TLS` | off | `1`/`true` serves HTTPS with a self-signed certificate |
 | `VELLUM_TLS_CERT` | `<data>/cert.pem` | PEM certificate |
@@ -448,6 +449,55 @@ revoking a share stops its links at once.
 The HMAC key is generated on first use and kept in the `server_setting` table
 (`link_signing_key`). To invalidate every outstanding link, call
 `POST /api/links/rotate` as the owner, or delete that row.
+
+#### Under a path prefix
+
+Serving Vellum at `https://host/vellum/` from a reverse proxy works for the
+API, OPDS and signed links, with one setting. (The web console's own pages and
+scripts are addressed from the site root, so give the console a host of its own
+rather than a prefix.)
+
+Set **`VELLUM_BASE_PATH=/vellum`** to the prefix people see in the address bar.
+Leave it unset, and nothing changes, when Vellum is at the root of its host.
+
+A signed link covers one resource, so what is signed has to be the same on the
+way out and on the way back in, whatever the proxy does to the path in between.
+Vellum signs the **canonical path**: the path relative to the API root
+(`/api/files/<id>`), with the configured prefix removed. Both sides compute it
+with the same function, and `POST /api/links` returns the finished URL, prefix
+included (`/vellum/api/files/<id>?u=…`), so clients use it as given and never
+build a path themselves. The signature check then gives the same answer whether
+your proxy
+
+- **strips** the prefix (the server sees `/api/files/<id>`), or
+- **keeps** it (the server sees `/vellum/api/files/<id>`).
+
+nginx, stripping (the trailing slashes do it):
+
+```nginx
+location /vellum/ {
+    proxy_pass http://127.0.0.1:3000/;
+}
+```
+
+nginx, keeping it:
+
+```nginx
+location /vellum/ {
+    proxy_pass http://127.0.0.1:3000;
+}
+```
+
+Caddy, stripping: `handle_path /vellum/* { reverse_proxy 127.0.0.1:3000 }`.
+Caddy, keeping it: `handle /vellum/* { reverse_proxy 127.0.0.1:3000 }`.
+
+What this does not do, on purpose: it does not read `X-Forwarded-Prefix` or any
+other header. Any client can send one, so honouring it would let the sender
+choose which path a signature is checked against. The prefix is configuration,
+and only that exact prefix, only as whole path segments, and only once, is
+removed; a link made for one file, cover or deployment prefix opens nothing
+else. Set `VELLUM_PUBLIC_URL` to the full prefixed address
+(`https://host/vellum`) too, so share links and e-mails point at it.
 
 The session token in a `?token=` query is **not** accepted, and there is no
 setting to turn that back on: it has been refused since the L1 fix in
