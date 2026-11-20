@@ -63,9 +63,16 @@ class AutoScrollBar extends StatelessWidget {
                       ),
                     ),
             ),
-            Text(
-              autoScrollSpeedLabel(l10n, speed, unit),
-              style: TextStyle(color: scheme.onInverseSurface),
+            // Flexible, so a long unit ("pagini/min") or large text wraps
+            // inside the pill instead of pushing the stop button off screen.
+            Flexible(
+              child: Text(
+                autoScrollSpeedLabel(l10n, speed, unit),
+                style: TextStyle(color: scheme.onInverseSurface),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             IconButton(
               icon: const Icon(Icons.add),

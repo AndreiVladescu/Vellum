@@ -267,13 +267,14 @@ class PhysicalCopiesSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Wraps the button under the heading when both do not fit.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
-                  child: Text(
-                    L10n.of(context).copiesSectionTitle,
-                    style: theme.textTheme.titleMedium,
-                  ),
+                Text(
+                  L10n.of(context).copiesSectionTitle,
+                  style: theme.textTheme.titleMedium,
                 ),
                 TextButton.icon(
                   onPressed: () => _addCopy(context),

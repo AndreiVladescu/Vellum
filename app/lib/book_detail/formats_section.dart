@@ -62,13 +62,16 @@ class DigitalFormatsSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // A Wrap rather than a Row: when the heading and the button do not
+            // fit side by side (long labels, large text) the button drops to
+            // its own line instead of overflowing.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
-                  child: Text(
-                    l10n.formatsTitle,
-                    style: theme.textTheme.titleMedium,
-                  ),
+                Text(
+                  l10n.formatsTitle,
+                  style: theme.textTheme.titleMedium,
                 ),
                 TextButton.icon(
                   onPressed: () => _attach(context),
