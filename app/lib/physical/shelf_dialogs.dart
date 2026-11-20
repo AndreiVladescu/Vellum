@@ -589,9 +589,11 @@ class _BookcaseDialogState extends State<BookcaseDialog> {
                 child: Text(
                   _style.hasSides
                       ? l10n.roomBookcaseSummarySides(spec.shelves,
-                          formatDistance(spec.height / spec.shelves))
+                          formatDistance(spec.height / spec.shelves,
+                              locale: l10n.localeName))
                       : l10n.roomBookcaseSummary(spec.shelves,
-                          formatDistance(spec.height / spec.shelves)),
+                          formatDistance(spec.height / spec.shelves,
+                              locale: l10n.localeName)),
                   style: const TextStyle(fontSize: 12),
                 ),
               ),

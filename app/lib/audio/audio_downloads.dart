@@ -124,15 +124,6 @@ enum AudioRemoveResult {
   notOnServer,
 }
 
-/// "812 KB" / "430.2 MB" / "1.2 GB". The units read the same in every
-/// language.
-String formatBytes(int bytes) {
-  const kb = 1024;
-  if (bytes < kb * kb) return '${(bytes / kb).round()} KB';
-  if (bytes < kb * kb * kb) return '${(bytes / (kb * kb)).toStringAsFixed(1)} MB';
-  return '${(bytes / (kb * kb * kb)).toStringAsFixed(1)} GB';
-}
-
 /// How much audiobook audio this device holds.
 typedef AudioStorage = ({int bytes, int books});
 

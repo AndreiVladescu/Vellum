@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'duration_label.dart';
 import 'year_review.dart';
@@ -34,9 +35,9 @@ class YearCard extends StatelessWidget {
 
     // The numbers under the big one: label above, value below.
     final facts = <({String label, String value})>[
-      (label: l10n.insightsPagesRead, value: '${review.pages}'), // i18n-ignore
+      (label: l10n.insightsPagesRead, value: l10n.formatInt(review.pages)),
       (label: l10n.monthTimeRead, value: formatMinutes(l10n, review.minutes)),
-      (label: l10n.insightsDaysRead, value: '${review.readingDays}'), // i18n-ignore
+      (label: l10n.insightsDaysRead, value: l10n.formatInt(review.readingDays)),
       (
         label: l10n.insightsLongestStreak,
         value: l10n.insightsDaysShort(review.longestStreak)

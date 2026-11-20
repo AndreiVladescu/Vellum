@@ -91,8 +91,8 @@
   "@syncResultWithIssues": {
     "description": "The launch sync's result when it also had issues. `issues` is syncIssues, so the plural stays ICU instead of being glued on with a ternary.",
     "placeholders": {
-      "pulled": { "type": "int" },
-      "pushed": { "type": "int" },
+      "pulled": { "type": "int", "format": "decimalPattern" },
+      "pushed": { "type": "int", "format": "decimalPattern" },
       "issues": { "type": "String" }
     }
   },
@@ -101,20 +101,20 @@
   "@syncResult": {
     "description": "Result of a manual sync with no issues.",
     "placeholders": {
-      "pulled": { "type": "int" },
-      "pushed": { "type": "int" }
+      "pulled": { "type": "int", "format": "decimalPattern" },
+      "pushed": { "type": "int", "format": "decimalPattern" }
     }
   },
 
   "syncIssues": "{count, plural, =1{1 issue} other{{count} issues}}",
   "@syncIssues": {
     "description": "ICU plural. The app used to build this by hand as '$n issue${n == 1 ? '' : 's'}', which no other language survives — that pattern is the reason this item exists.",
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": { "count": { "type": "int", "format": "decimalPattern" } }
   },
 
   "newFilesInWatchedFolder": "{count, plural, =1{1 new file} other{{count} new files}} in your watched folder.",
   "@newFilesInWatchedFolder": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": { "count": { "type": "int", "format": "decimalPattern" } }
   },
 
   "review": "Review",
@@ -176,7 +176,7 @@
   "groupHeaderLabel": "{name}, {count} books",
   "@groupHeaderLabel": {
     "description": "Screen-reader label of a shelf group header.",
-    "placeholders": { "name": { "type": "String" }, "count": { "type": "int" } }
+    "placeholders": { "name": { "type": "String" }, "count": { "type": "int", "format": "decimalPattern" } }
   },
 
   "sortBy": "Sort by {field}",
@@ -300,7 +300,7 @@
   "selectionCount": "{count} selected",
   "@selectionCount": {
     "description": "Contextual app-bar title while books are selected on the shelf.",
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": { "count": { "type": "int", "format": "decimalPattern" } }
   },
 
   "putOnShelf": "Put on a shelf",
@@ -321,7 +321,7 @@
   "trashedBooks": "{count, plural, =1{Moved 1 book to the trash} other{Moved {count} books to the trash}}",
   "@trashedBooks": {
     "description": "Confirmation after trashing a selection. ICU plural, for the reason syncIssues exists.",
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": { "count": { "type": "int", "format": "decimalPattern" } }
   },
 
   "noShelvesYet": "You have no shelves yet — make one first.",
@@ -333,7 +333,7 @@
   "@movedToShelf": {
     "description": "Confirmation after moving books onto a shelf, off the one being viewed.",
     "placeholders": {
-      "count": { "type": "int" },
+      "count": { "type": "int", "format": "decimalPattern" },
       "shelf": { "type": "String" }
     }
   },
@@ -342,7 +342,7 @@
   "@addedToShelf": {
     "description": "Confirmation after adding books to a shelf without taking them off another.",
     "placeholders": {
-      "count": { "type": "int" },
+      "count": { "type": "int", "format": "decimalPattern" },
       "shelf": { "type": "String" }
     }
   },
@@ -542,7 +542,8 @@
     "description": "First part of the summary line on an author page: how many of the author's books are owned. Joined with authorOnWishlist by \" · \".",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -552,7 +553,8 @@
     "description": "Second part of the summary line on an author page: how many are only wished for.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -585,7 +587,8 @@
     "description": "Series row subtitle when the owned books have no volume numbers.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -761,7 +764,8 @@
     "description": "Title of the sheet for choosing a shelf for the selected books.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -809,7 +813,8 @@
         "type": "int"
       },
       "total": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -1000,7 +1005,8 @@
     "description": "App bar counter of books added during this scanning session.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -1100,7 +1106,8 @@
     "description": "Snack bar after PDFs/EPUBs were dropped on the book page.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -1255,7 +1262,8 @@
     "description": "Page count in the book page byline.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -1300,7 +1308,8 @@
     "description": "Body of the trash confirmation; days is the grace period.",
     "placeholders": {
       "days": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -1329,7 +1338,8 @@
     "description": "Tooltip of a star in the 1-5 rating row.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -1352,7 +1362,8 @@
         "type": "String"
       },
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -1832,7 +1843,8 @@
     "description": "Heading above the photos of a physical copy when it has some.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -2060,7 +2072,8 @@
     "description": "Summary button that opens the list of copies.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -2188,7 +2201,8 @@
     "description": "Shown after the bundled sample books are added.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       },
       "shelf": {
         "type": "String"
@@ -2404,7 +2418,7 @@
   "@prefsBackupDamagedCount": {
     "description": "Phrase in the verify dialog: files whose checksum no longer matches.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2412,7 +2426,7 @@
   "@prefsBackupMissingCount": {
     "description": "Phrase in the verify dialog: files listed but absent.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2433,7 +2447,7 @@
   "@prefsBackupIntact": {
     "description": "Verify dialog for a good backup.",
     "placeholders": {
-      "checked": { "type": "int" }
+      "checked": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2441,8 +2455,8 @@
   "@prefsBackupIntactBooks": {
     "description": "Verify dialog for a good backup that records its book count.",
     "placeholders": {
-      "checked": { "type": "int" },
-      "books": { "type": "int" }
+      "checked": { "type": "int", "format": "decimalPattern" },
+      "books": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2688,7 +2702,7 @@
   "@prefsIndexedCount": {
     "description": "First phrase of the index status line; phrases are joined with commas.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2696,7 +2710,7 @@
   "@prefsIndexWaitingCount": {
     "description": "Phrase of the index status line: books still queued.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2704,7 +2718,7 @@
   "@prefsIndexNoTextCount": {
     "description": "Phrase of the index status line: books that have no text layer.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2728,7 +2742,7 @@
     "description": "Confirmation before a destructive repair. `action` is the repair description, such as \"Delete the file from disk\".",
     "placeholders": {
       "action": { "type": "String" },
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2741,7 +2755,7 @@
   "@prefsRepaired": {
     "description": "Snack bar after a library repair.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -2774,7 +2788,7 @@
   "@prefsHealthReclaim": {
     "description": "Result row for orphaned files: how many, and how much disk space deleting them frees. `size` is already formatted, e.g. \"3.2 MB\".",
     "placeholders": {
-      "count": { "type": "int" },
+      "count": { "type": "int", "format": "decimalPattern" },
       "size": { "type": "String" }
     }
   },
@@ -2783,7 +2797,7 @@
   "@prefsHealthFound": {
     "description": "Result row for a repairable problem: how many were found and what the repair does.",
     "placeholders": {
-      "count": { "type": "int" },
+      "count": { "type": "int", "format": "decimalPattern" },
       "action": { "type": "String" }
     }
   },
@@ -2802,7 +2816,7 @@
   "@prefsHealthAdviceRow": {
     "description": "Advisory result row: how many, and what to do about it by hand.",
     "placeholders": {
-      "count": { "type": "int" },
+      "count": { "type": "int", "format": "decimalPattern" },
       "action": { "type": "String" }
     }
   },
@@ -3238,6 +3252,26 @@
     "description": "Theme mode option."
   },
 
+  "languageName": "English",
+  "@languageName": {
+    "description": "The name of THIS file's language, written in that language (its endonym): \"English\", \"Română\", \"Français\". Shown in the language picker of every language, so a reader always finds their own. Do not translate it into another language's word for English."
+  },
+
+  "prefsLanguageTitle": "Language",
+  "@prefsLanguageTitle": {
+    "description": "Row title on Preferences → Appearance: the language the app is shown in."
+  },
+
+  "prefsLanguageSystem": "System default",
+  "@prefsLanguageSystem": {
+    "description": "Language choice: follow the device's language (English when Vellum has no translation for it)."
+  },
+
+  "prefsKwLanguage": "language locale translation translate english",
+  "@prefsKwLanguage": {
+    "description": "Extra search words for the language setting. Add your own language's word for \"language\" and its name, and keep \"language\" so an English search still finds it."
+  },
+
   "prefsDynamicColourTitle": "Use the system colours",
   "@prefsDynamicColourTitle": {
     "description": "Switch title (Android)."
@@ -3292,7 +3326,7 @@
   "@prefsSamplesRemoved": {
     "description": "Snack bar after removing the sample books.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3323,7 +3357,7 @@
   "@prefsSamplesRemoveSubtitle": {
     "description": "Row subtitle; `shelf` is the sample shelf's name.",
     "placeholders": {
-      "count": { "type": "int" },
+      "count": { "type": "int", "format": "decimalPattern" },
       "shelf": { "type": "String" }
     }
   },
@@ -3342,8 +3376,8 @@
   "@prefsTrashCount": {
     "description": "Row subtitle: books in the trash and the grace period.",
     "placeholders": {
-      "count": { "type": "int" },
-      "days": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" },
+      "days": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3371,7 +3405,7 @@
   "@prefsClearDialogTitle": {
     "description": "Dialog title.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3379,7 +3413,7 @@
   "@prefsClearDialogBody": {
     "description": "Dialog body.",
     "placeholders": {
-      "days": { "type": "int" }
+      "days": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3415,7 +3449,7 @@
   "@trashEmptyBody": {
     "description": "Empty state text; `days` is the grace period.",
     "placeholders": {
-      "days": { "type": "int" }
+      "days": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3423,7 +3457,7 @@
   "@trashEmptyAllTitle": {
     "description": "Dialog title for emptying the whole trash.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3436,7 +3470,7 @@
   "@trashEmptyAllDone": {
     "description": "Snack bar after emptying the trash.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3444,7 +3478,7 @@
   "@trashHeaderNote": {
     "description": "Explanation at the top of the trash list; `days` is the grace period.",
     "placeholders": {
-      "days": { "type": "int" }
+      "days": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3493,7 +3527,7 @@
   "@trashRemainingDays": {
     "description": "Subtitle of a trashed book: time left.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3501,7 +3535,7 @@
   "@trashRemainingHours": {
     "description": "Subtitle of a trashed book: time left.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3534,7 +3568,7 @@
   "@sharedShelvesCount": {
     "description": "Heading above the list of other people's shelves.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": { "type": "int", "format": "decimalPattern" }
     }
   },
 
@@ -3597,7 +3631,7 @@
   "@insightsCleared": {
     "description": "Snack bar after clearing the reading history.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -3620,7 +3654,7 @@
   "@insightsDaysShort": {
     "description": "A number of days in a compact stat tile, e.g. \"12d\".",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -3721,7 +3755,7 @@
   "@insightsBestDay": {
     "description": "Title of the personal-best card.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -3802,7 +3836,7 @@
   "@readerGoToPageTitle": {
     "description": "Dialog title of the PDF reader's page jump; `count` is the number of pages.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -3820,7 +3854,7 @@
   "@readerGoToChapterTitle": {
     "description": "Dialog title of the EPUB reader's chapter jump; `count` is the number of chapters.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -4091,7 +4125,7 @@
   "@readerHighlightedPassages": {
     "description": "Snack bar after highlighting in a PDF.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -4151,7 +4185,7 @@
     "description": "Reader page counter: current page and total.",
     "placeholders": {
       "page": {"type": "int"},
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -4180,7 +4214,7 @@
   "@readerCounterLeft": {
     "description": "Reader page counter: pages left.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -4254,7 +4288,7 @@
     "placeholders": {
       "unit": {"type": "String"},
       "position": {"type": "int"},
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -4415,7 +4449,7 @@
     "description": "EPUB paged mode: which page of the current chapter is showing.",
     "placeholders": {
       "page": {"type": "int"},
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -4932,7 +4966,7 @@
   "@aiTruncated": {
     "description": "Shown when the passage is cut before sending; `count` is thousands of characters.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5214,7 +5248,7 @@
   "@translatePacksCount": {
     "description": "Footer: how many languages are downloaded.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5295,7 +5329,7 @@
     "description": "Name of several local translators, shown as \"via …\"; `count` is how many besides the first.",
     "placeholders": {
       "engine": {"type": "String"},
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5380,7 +5414,7 @@
   "@annotationsCount": {
     "description": "Heading of the annotations list.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5403,7 +5437,7 @@
   "@annotationsShowAll": {
     "description": "Row that opens the full list of annotations.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5497,7 +5531,7 @@
   "@markdownLibraryCount": {
     "description": "Line in the library Markdown export.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5621,7 +5655,7 @@
   "@notificationsUnreadTooltip": {
     "description": "Tooltip of the bell in the app bar; `count` is how many notifications are unread.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5654,7 +5688,7 @@
   "@notificationsAgoMinutes": {
     "description": "Age of a notification, in minutes.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5662,7 +5696,7 @@
   "@notificationsAgoHours": {
     "description": "Age of a notification, in hours.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5670,7 +5704,7 @@
   "@notificationsAgoDays": {
     "description": "Age of a notification, in days.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5811,8 +5845,8 @@
     "description": "Body of the sync progress notification, e.g. \"Pushing books — 12 of 40\".",
     "placeholders": {
       "phase": {"type": "String"},
-      "done": {"type": "int"},
-      "total": {"type": "int"}
+      "done": {"type": "int", "format": "decimalPattern"},
+      "total": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -5846,7 +5880,7 @@
     "description": "Body of the status-bar notification when several requests are waiting; `newest` is the latest one's sentence and `count` how many others there are.",
     "placeholders": {
       "newest": {"type": "String"},
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6018,7 +6052,7 @@
   "@loansOutNow": {
     "description": "Section heading of the loans that are currently lent out; `count` is how many.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6031,7 +6065,7 @@
   "@loansHistory": {
     "description": "Heading of the collapsed list of returned loans; `count` is how many.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6098,7 +6132,7 @@
   "@loansDueOverdue": {
     "description": "Status line of an overdue loan.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6116,7 +6150,7 @@
   "@loansDueInDays": {
     "description": "Status line of a loan due in two or more days.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6215,7 +6249,7 @@
   "@borrowToAnswer": {
     "description": "Section heading of the requests waiting for the owner's answer.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6233,7 +6267,7 @@
   "@borrowYouAsked": {
     "description": "Heading of the collapsed list of requests the user made.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6274,7 +6308,7 @@
   "@borrowAnswered": {
     "description": "Heading of the collapsed list of requests the owner already answered.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6490,7 +6524,7 @@
   "@mergeLogFiles": {
     "description": "Line of the merge report.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6498,7 +6532,7 @@
   "@mergeLogCopies": {
     "description": "Line of the merge report.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6506,7 +6540,7 @@
   "@mergeLogShelves": {
     "description": "Line of the merge report.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6514,7 +6548,7 @@
   "@mergeLogAuthors": {
     "description": "Line of the merge report.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6522,7 +6556,7 @@
   "@mergeLogGenres": {
     "description": "Line of the merge report.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6530,7 +6564,7 @@
   "@mergeLogAnnotations": {
     "description": "Line of the merge report.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6538,7 +6572,7 @@
   "@mergeLogSessions": {
     "description": "Line of the merge report.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6642,7 +6676,7 @@
   "@importFilesFound": {
     "description": "First part of the summary line above the import review list.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6650,7 +6684,7 @@
   "@importSummaryAlreadyIn": {
     "description": "Part of the summary line above the import review list.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6658,7 +6692,7 @@
   "@importSummaryLookLike": {
     "description": "Part of the summary line above the import review list.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6666,7 +6700,7 @@
   "@importSummaryUnreadable": {
     "description": "Part of the summary line above the import review list.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6717,8 +6751,8 @@
   "@importSelectedCount": {
     "description": "Count on the import review bar.",
     "placeholders": {
-      "count": {"type": "int"},
-      "total": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"},
+      "total": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6741,7 +6775,7 @@
   "@importButtonCount": {
     "description": "Import button; `count` is how many are selected.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6749,7 +6783,7 @@
   "@importDoneImported": {
     "description": "Heading of the import result.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6757,7 +6791,7 @@
   "@importDoneStopped": {
     "description": "Heading of the import result when it was cancelled.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6765,7 +6799,7 @@
   "@importMatchedOnline": {
     "description": "Note on the import result; `count` is how many books were matched by the online look-up.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6773,7 +6807,7 @@
   "@importFailedCount": {
     "description": "Heading of the list of files that failed to import.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -6856,8 +6890,8 @@
   "@importProgressLine": {
     "description": "Progress line during an import; `label` is the name of the item being processed.",
     "placeholders": {
-      "done": {"type": "int"},
-      "total": {"type": "int"},
+      "done": {"type": "int", "format": "decimalPattern"},
+      "total": {"type": "int", "format": "decimalPattern"},
       "label": {"type": "String"}
     }
   },
@@ -6984,8 +7018,8 @@
   "@opdsDownloadProgress": {
     "description": "Progress detail while OPDS books are downloaded; `title` is the book being fetched.",
     "placeholders": {
-      "done": {"type": "int"},
-      "total": {"type": "int"},
+      "done": {"type": "int", "format": "decimalPattern"},
+      "total": {"type": "int", "format": "decimalPattern"},
       "title": {"type": "String"}
     }
   },
@@ -7007,7 +7041,7 @@
   "@opdsSomeSkipped": {
     "description": "Snackbar after some of the selected OPDS books failed to download.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -7040,7 +7074,7 @@
   "@opdsReview": {
     "description": "Button that sends the selected OPDS books to the import review.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -7317,7 +7351,7 @@
     "description": "Line under the fill bar of a shelf; `fill` is a sentence such as \"42 cm of 90 cm used\".",
     "placeholders": {
       "fill": {"type": "String"},
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -7447,7 +7481,7 @@
   "@roomBookcaseSummarySides": {
     "description": "Summary under the bookcase dialog fields; `spacing` is a distance such as \"30 cm\".",
     "placeholders": {
-      "shelves": {"type": "int"},
+      "shelves": {"type": "int", "format": "decimalPattern"},
       "spacing": {"type": "String"}
     }
   },
@@ -7456,7 +7490,7 @@
   "@roomBookcaseSummary": {
     "description": "Summary under the bookcase dialog fields for a bookcase without side panels; `spacing` is a distance.",
     "placeholders": {
-      "shelves": {"type": "int"},
+      "shelves": {"type": "int", "format": "decimalPattern"},
       "spacing": {"type": "String"}
     }
   },
@@ -7598,7 +7632,7 @@
   "@roomGrouped": {
     "description": "Announcement after shelves were grouped into a bookcase.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -7611,7 +7645,7 @@
   "@roomDeleteCaseBody": {
     "description": "Body of the confirmation dialog for deleting a bookcase.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -7640,7 +7674,7 @@
   "@roomPutBooksOn": {
     "description": "Title of the dialog that asks which shelf the books go on.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -7648,7 +7682,7 @@
   "@roomAddedBooks": {
     "description": "Announcement after books were placed on a shelf; `where` is the shelf's name.",
     "placeholders": {
-      "count": {"type": "int"},
+      "count": {"type": "int", "format": "decimalPattern"},
       "where": {"type": "String"}
     }
   },
@@ -7665,9 +7699,9 @@
   "@roomAddedSome": {
     "description": "Announcement when only some of the books fit on the shelf.",
     "placeholders": {
-      "placed": {"type": "int"},
+      "placed": {"type": "int", "format": "decimalPattern"},
       "where": {"type": "String"},
-      "unplaced": {"type": "int"}
+      "unplaced": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -7893,8 +7927,8 @@
   "@roomTidied": {
     "description": "Announcement after tidying a shelf.",
     "placeholders": {
-      "moved": {"type": "int"},
-      "total": {"type": "int"}
+      "moved": {"type": "int", "format": "decimalPattern"},
+      "total": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8106,7 +8140,7 @@
   "@roomGroupingBar": {
     "description": "Text of the bar shown while shelves are being grouped into a bookcase.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8158,7 +8192,7 @@
     "description": "Screen reader sentence for a shelf; `titles` is a comma-separated list.",
     "placeholders": {
       "name": {"type": "String"},
-      "count": {"type": "int"},
+      "count": {"type": "int", "format": "decimalPattern"},
       "titles": {"type": "String"}
     }
   },
@@ -8192,7 +8226,7 @@
   "@roomLabelBooks": {
     "description": "Book count line on a printed shelf label.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8215,7 +8249,7 @@
   "@bookPickerClearThese": {
     "description": "Button that unticks every visible book; `count` is how many.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8223,7 +8257,7 @@
   "@bookPickerSelectThese": {
     "description": "Button that ticks every visible book; `count` is how many.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8231,7 +8265,7 @@
   "@bookPickerSelected": {
     "description": "Count of ticked books in the book picker.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8249,7 +8283,7 @@
   "@bookPickerPages": {
     "description": "Part of a book's subtitle in the book picker.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8258,7 +8292,7 @@
     "description": "Confirm button of the book picker once books are ticked; `label` is the button's normal label such as \"Add\".",
     "placeholders": {
       "label": {"type": "String"},
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8276,7 +8310,7 @@
   "@findCopyPlacedTitle": {
     "description": "Title of the dialog that asks which placed copy to show.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8447,7 +8481,7 @@
   "@publishRoomUpdatedSkipped": {
     "description": "Result of updating a room when some books are not on this device.",
     "placeholders": {
-      "skipped": {"type": "int"},
+      "skipped": {"type": "int", "format": "decimalPattern"},
       "room": {"type": "String"}
     }
   },
@@ -8688,8 +8722,8 @@
   "@stocktakeTickPrompt": {
     "description": "Instruction above the stocktake checklist.",
     "placeholders": {
-      "found": {"type": "int"},
-      "total": {"type": "int"}
+      "found": {"type": "int", "format": "decimalPattern"},
+      "total": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8702,7 +8736,7 @@
   "@stocktakeAllMatchBody": {
     "description": "Detail of a stocktake result with no differences.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8710,7 +8744,7 @@
   "@stocktakeMissing": {
     "description": "Heading of the books placed here that were not found.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8728,7 +8762,7 @@
   "@stocktakeUnexpected": {
     "description": "Heading of the books found that the map places elsewhere.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8754,7 +8788,7 @@
   "@stocktakeConfirmed": {
     "description": "Heading of the books found where the map says.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8849,7 +8883,7 @@
   "@serverPulledBooks": {
     "description": "Result of pulling the library.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8857,7 +8891,7 @@
   "@serverPulledBooksIssues": {
     "description": "Result of pulling the library with problems; `issues` is a phrase such as \"2 issues\".",
     "placeholders": {
-      "count": {"type": "int"},
+      "count": {"type": "int", "format": "decimalPattern"},
       "issues": {"type": "String"}
     }
   },
@@ -8866,7 +8900,7 @@
   "@serverPushedBooks": {
     "description": "Result of pushing the library.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8874,7 +8908,7 @@
   "@serverPushedBooksIssues": {
     "description": "Result of pushing the library with problems; `issues` is a phrase such as \"2 issues\".",
     "placeholders": {
-      "count": {"type": "int"},
+      "count": {"type": "int", "format": "decimalPattern"},
       "issues": {"type": "String"}
     }
   },
@@ -8883,8 +8917,8 @@
   "@serverSyncResult": {
     "description": "Result of a full sync.",
     "placeholders": {
-      "pulled": {"type": "int"},
-      "pushed": {"type": "int"}
+      "pulled": {"type": "int", "format": "decimalPattern"},
+      "pushed": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -8892,8 +8926,8 @@
   "@serverSyncResultIssues": {
     "description": "Result of a full sync with problems; `issues` is a phrase such as \"2 issues\".",
     "placeholders": {
-      "pulled": {"type": "int"},
-      "pushed": {"type": "int"},
+      "pulled": {"type": "int", "format": "decimalPattern"},
+      "pushed": {"type": "int", "format": "decimalPattern"},
       "issues": {"type": "String"}
     }
   },
@@ -8907,7 +8941,7 @@
   "@serverIssuesTitle": {
     "description": "Title of the dialog listing sync problems.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -9595,7 +9629,7 @@
   "@syncScopeRemoved": {
     "description": "Snackbar after data was removed from the server; `count` is how many items.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -9659,7 +9693,7 @@
   "@sharingGroupBooks": {
     "description": "Subtitle of a group; how many books it holds.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {"type": "int", "format": "decimalPattern"}
     }
   },
 
@@ -9698,7 +9732,8 @@
     "description": "Progress toward the yearly goal; finished is how many books were finished this year and target the goal.",
     "placeholders": {
       "finished": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       },
       "target": {
         "type": "int"
@@ -9721,7 +9756,8 @@
     "description": "Shown under the yearly goal when ahead of an even pace through the year.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -9731,7 +9767,8 @@
     "description": "Shown under the yearly goal when behind an even pace through the year. Keep the tone neutral.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -9759,7 +9796,8 @@
     "description": "Under the daily goal; on how many of the last seven days, today included, the goal was met.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -9949,7 +9987,8 @@
         "type": "int"
       },
       "total": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -9974,7 +10013,8 @@
     "description": "Value of the best-day tile: pages read on that day.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10012,7 +10052,8 @@
         "type": "String"
       },
       "pages": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10123,7 +10164,8 @@
     "description": "How many days of the month reached the daily reading goal; goal is already formatted, e.g. \"30m\".",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       },
       "goal": {
         "type": "String"
@@ -10162,7 +10204,8 @@
     "description": "Pages read on the day in the day sheet.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10172,7 +10215,8 @@
     "description": "Number of reading sittings on the day in the day sheet.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10190,7 +10234,8 @@
         "type": "String"
       },
       "pages": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10270,7 +10315,8 @@
     "description": "Headline of the library statistics page. Wishlist, trashed and sample books are not counted.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10305,7 +10351,8 @@
     "description": "Note under the publication year chart.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10365,7 +10412,8 @@
     "description": "Size of the unread pile.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10375,7 +10423,8 @@
     "description": "Estimated pages in the unread pile.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10385,7 +10434,8 @@
     "description": "Explains the estimate in the unread pile.",
     "placeholders": {
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10423,7 +10473,8 @@
         "type": "String"
       },
       "count": {
-        "type": "int"
+        "type": "int",
+        "format": "decimalPattern"
       }
     }
   },
@@ -10465,10 +10516,10 @@
   "@yearTopGenres": {"description": "Heading of the list of genres the reader finished most books in."},
 
   "yearTopEntry": "{name}, {count, plural, =1{1 book} other{{count} books}}",
-  "@yearTopEntry": {"description": "An author or genre with the number of finished books.", "placeholders": {"name": {"type": "String"}, "count": {"type": "int"}}},
+  "@yearTopEntry": {"description": "An author or genre with the number of finished books.", "placeholders": {"name": {"type": "String"}, "count": {"type": "int", "format": "decimalPattern"}}},
 
   "yearGoalProgress": "{finished} of {goal, plural, =1{1 book} other{{goal} books}}",
-  "@yearGoalProgress": {"description": "Progress against the books-a-year goal of a past or current year.", "placeholders": {"finished": {"type": "int"}, "goal": {"type": "int"}}},
+  "@yearGoalProgress": {"description": "Progress against the books-a-year goal of a past or current year.", "placeholders": {"finished": {"type": "int", "format": "decimalPattern"}, "goal": {"type": "int", "format": "decimalPattern"}}},
 
   "yearGoalReached": "You reached your goal for the year",
   "@yearGoalReached": {"description": "Shown under the goal progress when the books-a-year goal was met."},
@@ -10504,7 +10555,7 @@
   "@yearPictureFailed": {"description": "Snack bar when saving or sharing the picture failed.", "placeholders": {"error": {"type": "String"}}},
 
   "yearPictureSemantics": "Reading in {year}: {books}, {pages} pages, {time}",
-  "@yearPictureSemantics": {"description": "Screen-reader summary of the shareable picture; books is already worded, e.g. \"3 books finished\".", "placeholders": {"year": {"type": "String"}, "books": {"type": "String"}, "pages": {"type": "int"}, "time": {"type": "String"}}},
+  "@yearPictureSemantics": {"description": "Screen-reader summary of the shareable picture; books is already worded, e.g. \"3 books finished\".", "placeholders": {"year": {"type": "String"}, "books": {"type": "String"}, "pages": {"type": "int", "format": "decimalPattern"}, "time": {"type": "String"}}},
 
   "yearMonthsChartSemantics": "Time read in each month of the year",
   "@yearMonthsChartSemantics": {"description": "Screen-reader label of the small bar chart of months on the picture."},
@@ -10576,13 +10627,13 @@
   "@audioReplaceTitle": {"description": "Dialog title when audio is added to a book that already has audio."},
 
   "audioReplaceBody": "{count, plural, =1{This book already has audio. Replace it with the new file?} other{This book already has audio. Replace it with these {count} files?}}",
-  "@audioReplaceBody": {"description": "Dialog body: a book holds one audiobook, so new audio replaces the old.", "placeholders": {"count": {"type": "int"}}},
+  "@audioReplaceBody": {"description": "Dialog body: a book holds one audiobook, so new audio replaces the old.", "placeholders": {"count": {"type": "int", "format": "decimalPattern"}}},
 
   "audioReplaceAction": "Replace",
   "@audioReplaceAction": {"description": "Confirms replacing a book's audiobook."},
 
   "audioAttached": "{count, plural, =1{Added the audiobook (1 part)} other{Added the audiobook ({count} parts)}}",
-  "@audioAttached": {"description": "Snack bar after audio files are attached to a book.", "placeholders": {"count": {"type": "int"}}},
+  "@audioAttached": {"description": "Snack bar after audio files are attached to a book.", "placeholders": {"count": {"type": "int", "format": "decimalPattern"}}},
 
   "audioImportFailed": "Could not read the audio: {error}",
   "@audioImportFailed": {"description": "Snack bar when reading an audio file's tags fails.", "placeholders": {"error": {"type": "String"}}},
@@ -10761,13 +10812,13 @@
   "monthDaysListenedValue": "{days, plural, =1{1 day} other{{days} days}}",
   "@monthDaysListenedValue": {
     "description": "Under the time-listened tile of a month: on how many days there was listening.",
-    "placeholders": {"days": {"type": "int"}}
+    "placeholders": {"days": {"type": "int", "format": "decimalPattern"}}
   },
 
   "yearListenedLine": "Listened for {time} on {days, plural, =1{1 day} other{{days} days}}",
   "@yearListenedLine": {
     "description": "One line on the year page: listening time of the year, kept apart from the reading figures; time is already formatted, e.g. \"12h 5m\".",
-    "placeholders": {"time": {"type": "String"}, "days": {"type": "int"}}
+    "placeholders": {"time": {"type": "String"}, "days": {"type": "int", "format": "decimalPattern"}}
   },
 
   "detailListeningTitle": "Your listening",
@@ -10876,7 +10927,7 @@
   "@prefsAudioStorageTitle": {"description": "Preferences entry: how much space downloaded audiobook audio takes."},
 
   "prefsAudioStorageUsed": "{size} in {count, plural, =1{1 audiobook} other{{count} audiobooks}}",
-  "@prefsAudioStorageUsed": {"description": "Subtitle of the audiobook storage entry; size like 1.2 GB.", "placeholders": {"size": {"type": "String"}, "count": {"type": "int"}}},
+  "@prefsAudioStorageUsed": {"description": "Subtitle of the audiobook storage entry; size like 1.2 GB.", "placeholders": {"size": {"type": "String"}, "count": {"type": "int", "format": "decimalPattern"}}},
 
   "prefsAudioStorageNone": "No audiobook audio downloaded. Audio downloads when you listen.",
   "@prefsAudioStorageNone": {"description": "Subtitle of the audiobook storage entry when none is here."},

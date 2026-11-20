@@ -7,6 +7,8 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:intl/intl.dart' show NumberFormat;
+
 import '../data/database.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'physical_metrics.dart';
@@ -83,10 +85,14 @@ double pixelDistanceBetween(double x1, double y1, double x2, double y2) =>
 ///
 /// Rounded to the nearest centimetre because the input is a finger on a screen
 /// — showing `43.7241 cm` would claim a precision the gesture doesn't have.
-String formatDistance(double metres) {
+///
+/// [locale] picks the decimal separator ("1,45 m" in Romanian); without one it
+/// is intl's default.
+String formatDistance(double metres, {String? locale}) {
   final abs = metres.abs();
   if (abs < 1) return '${(abs * 100).round()} cm';
-  return '${abs.toStringAsFixed(2)} m';
+  final f = NumberFormat.decimalPatternDigits(locale: locale, decimalDigits: 2);
+  return '${f.format(abs)} m';
 }
 
 /// How much of a shelf is used, and by what (plan 5 #29).
@@ -116,10 +122,10 @@ class ShelfFill {
   /// "42 cm of 90 cm used" — the sentence, not the number.
   String describe(L10n l10n) {
     if (lengthM <= 0) return l10n.roomFillNoLength;
-    final used = formatDistance(usedM);
-    final total = formatDistance(lengthM);
+    final used = formatDistance(usedM, locale: l10n.localeName);
+    final total = formatDistance(lengthM, locale: l10n.localeName);
     if (isOverfull) return l10n.roomFillOverfull(used, total);
-    return l10n.roomFillUsed(used, total, formatDistance(freeM));
+    return l10n.roomFillUsed(used, total, formatDistance(freeM, locale: l10n.localeName));
   }
 }
 
@@ -173,7 +179,7 @@ String shelfName(
   List<PhysicalShelf> siblings,
 ) {
   final label = shelf.label?.trim();
-  final height = formatDistance(math.max(shelf.y1, shelf.y2));
+  final height = formatDistance(math.max(shelf.y1, shelf.y2), locale: l10n.localeName);
   if (label == null || label.isEmpty) return l10n.roomShelfAt(height);
   final sameLabel = siblings
       .where((s) => (s.label?.trim() ?? '') == label)

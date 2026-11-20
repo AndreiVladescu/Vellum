@@ -3,6 +3,7 @@ import '../widgets/adaptive.dart';
 import 'package:flutter/services.dart';
 
 import '../data/library_repository.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../server/connection_store.dart';
 import 'borrow_requests.dart';
@@ -110,8 +111,8 @@ class LoansPage extends StatelessWidget {
                         subtitle: Text(
                           l10n.loansHistoryLine(
                             e.loan.borrower,
-                            _date(e.loan.loanedAt),
-                            _date(e.loan.returnedAt!),
+                            l10n.formatDate(e.loan.loanedAt),
+                            l10n.formatDate(e.loan.returnedAt!),
                           ),
                         ),
                       ),
@@ -124,11 +125,6 @@ class LoansPage extends StatelessWidget {
     );
   }
 }
-
-/// `YYYY-MM-DD`, shared by the page and its tiles.
-String _date(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
-    '${d.day.toString().padLeft(2, '0')}';
 
 /// Active loans ordered by how much they need attention.
 List<LoanEntry> _byUrgency(List<LoanEntry> entries) {
@@ -198,11 +194,11 @@ class _ActiveLoanTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(entry.loan.borrowerContact == null
-              ? l10n.loansSince(entry.loan.borrower, _date(entry.loan.loanedAt))
+              ? l10n.loansSince(entry.loan.borrower, l10n.formatDate(entry.loan.loanedAt))
               : l10n.loansSinceWithContact(
                   entry.loan.borrower,
                   entry.loan.borrowerContact!,
-                  _date(entry.loan.loanedAt),
+                  l10n.formatDate(entry.loan.loanedAt),
                 )),
           Text(
             LoanDue.describe(l10n, entry.loan),

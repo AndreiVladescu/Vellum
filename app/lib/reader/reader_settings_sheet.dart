@@ -9,6 +9,7 @@ import '../widgets/page_insets.dart';
 import 'translate/on_device.dart';
 import 'tts/read_aloud.dart';
 import 'tts/read_aloud_widgets.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 
@@ -147,7 +148,7 @@ class ReaderSettingsSheet extends StatelessWidget {
                     value: settings.lineHeight,
                     min: ReaderSettings.minLineHeight,
                     max: ReaderSettings.maxLineHeight,
-                    display: settings.lineHeight.toStringAsFixed(2),
+                    display: l10n.formatDecimal(settings.lineHeight, digits: 2),
                     onChanged: settings.setLineHeight,
                   ),
                   _Slider(

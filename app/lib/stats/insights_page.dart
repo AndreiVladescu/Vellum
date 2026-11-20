@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import '../widgets/adaptive.dart';
 
 import '../data/database.dart';
@@ -14,6 +15,7 @@ import 'reading_goals.dart';
 import 'insights_summary.dart';
 import 'stats_queries.dart';
 import '../settings/app_settings.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// Reading insights (plan 5 #19, plan 6 refresh).
@@ -238,7 +240,7 @@ class _InsightsPageState extends State<InsightsPage> {
                 ),
                 (
                   label: l10n.insightsDaysRead,
-                  value: '${data.readingDays.length}', // i18n-ignore
+                  value: l10n.formatInt(data.readingDays.length),
                   sub: null,
                 ),
               ]),
@@ -248,12 +250,12 @@ class _InsightsPageState extends State<InsightsPage> {
               _StatRow(stats: [
                 (
                   label: l10n.insightsPagesPerSession,
-                  value: data.averagePages.toStringAsFixed(0),
+                  value: l10n.formatInt(data.averagePages),
                   sub: null,
                 ),
                 (
                   label: l10n.insightsPagesRead,
-                  value: _compact(data.totalPages),
+                  value: l10n.formatInt(data.totalPages),
                   sub: null,
                 ),
                 (
@@ -263,12 +265,12 @@ class _InsightsPageState extends State<InsightsPage> {
                 ),
                 (
                   label: l10n.insightsBooksFinished,
-                  value: '${data.totalFinished}', // i18n-ignore
+                  value: l10n.formatInt(data.totalFinished),
                   sub: null,
                 ),
                 (
                   label: l10n.insightsThisWeek,
-                  value: '${data.thisWeekPages}', // i18n-ignore
+                  value: l10n.formatInt(data.thisWeekPages),
                   sub: _weekDeltaLabel(
                       l10n, data.thisWeekPages, data.lastWeekPages),
                 ),
@@ -386,9 +388,9 @@ class _InsightsPageState extends State<InsightsPage> {
                         ListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
-                          title: Text('${entry.key.year}-' // i18n-ignore
-                              '${entry.key.month.toString().padLeft(2, '0')}'),
-                          trailing: Text('${entry.value}'), // i18n-ignore
+                          title: Text(DateFormat.yMMMM(l10n.localeName)
+                              .format(entry.key)),
+                          trailing: Text(l10n.formatInt(entry.value)),
                         ),
                     ],
                   ),
@@ -490,7 +492,7 @@ class _InsightsPageState extends State<InsightsPage> {
             ),
             (
               label: l10n.insightsDaysListened,
-              value: '${data.days.length}', // i18n-ignore
+              value: l10n.formatInt(data.days.length),
               sub: null,
             ),
           ]),
@@ -505,12 +507,12 @@ class _InsightsPageState extends State<InsightsPage> {
             ),
             (
               label: l10n.insightsListeningSittings,
-              value: '${data.sittings}', // i18n-ignore
+              value: l10n.formatInt(data.sittings),
               sub: null,
             ),
             (
               label: l10n.insightsListenedFinished,
-              value: '${data.finished.length}', // i18n-ignore
+              value: l10n.formatInt(data.finished.length),
               sub: null,
             ),
             (
@@ -664,17 +666,6 @@ typedef _Loaded = ({
   Map<InsightsRange, InsightsSummary> byRange,
 });
 
-/// "1,234" for a number worth grouping — a lifetime page count is the one
-/// figure here big enough to need it.
-String _compact(int value) {
-  final s = value.toString();
-  final out = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) out.write(',');
-    out.write(s[i]);
-  }
-  return out.toString();
-}
 
 String _formatLabel(String format) => switch (format.toLowerCase()) {
       'pdf' => 'PDF',

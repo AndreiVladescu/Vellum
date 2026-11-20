@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/formats.dart';
 import '../../l10n/gen/app_localizations.dart';
 import 'read_aloud.dart';
 import 'tts_engine.dart';
@@ -106,7 +107,7 @@ class ReadAloudSettingsSection extends StatelessWidget {
                 SizedBox(
                   width: 44,
                   child: Text(
-                    l10n.ttsSpeedValue(readAloud.rate.toStringAsFixed(1)),
+                    l10n.ttsSpeedValue(l10n.formatDecimal(readAloud.rate)),
                     textAlign: TextAlign.end,
                   ),
                 ),

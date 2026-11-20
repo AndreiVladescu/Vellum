@@ -4,6 +4,7 @@ import '../audio/attach_audio.dart' show formatAudioTime;
 import '../audio/continue_listening.dart';
 import '../data/database.dart';
 import '../data/library_queries.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// Books worth surfacing above the shelf, derived from a [LibraryView].
@@ -361,7 +362,7 @@ class _ContinueCard extends StatelessWidget {
                 formatAudioTime(Duration(
                     milliseconds: ((book.listenPosition ?? 0) * 1000).round()))))
         : book.lastReadPage == null
-            ? '$percent%' // i18n-ignore
+            ? l10n.formatPercent(progress)
             : l10n.headerProgressPage(percent, book.lastReadPage!);
     if (compact) {
       return SizedBox(
@@ -381,7 +382,7 @@ class _ContinueCard extends StatelessWidget {
                     children: [
                       Expanded(child: titleRow(theme.textTheme.titleSmall)),
                       if (progress > 0)
-                        Text('${(progress * 100).round()}%', // i18n-ignore
+                        Text(l10n.formatPercent(progress),
                             style: theme.textTheme.bodySmall),
                     ],
                   ),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/platform_l10n.dart';
 import '../server/sync_scope.dart';
 import '../stats/insights_range.dart';
 import '../stats/reading_goals.dart';
@@ -61,10 +62,35 @@ class AppSettingsStore extends ChangeNotifier {
   // The Insights range control (v1.3.2), per device.
   static const _insightsRangeKey = 'settings.insightsRange';
 
+  // The app's language (Preferences → Appearance), per device.
+  static const _languageKey = 'settings.language';
+
   final SharedPreferences _prefs;
 
-  static Future<AppSettingsStore> load() async =>
-      AppSettingsStore._(await SharedPreferences.getInstance());
+  static Future<AppSettingsStore> load() async {
+    final store = AppSettingsStore._(await SharedPreferences.getInstance());
+    // Code with no widget tree (notifications, the background isolate) reads
+    // the language from here rather than from MaterialApp.
+    chosenLocale = store.appLocale;
+    return store;
+  }
+
+  // ---- Language ------------------------------------------------------------
+
+  /// The language picked in Preferences, or null to follow the system (the
+  /// default). A stored language the app no longer ships reads as null.
+  Locale? get appLocale => supportedLocaleFor(_prefs.getString(_languageKey));
+
+  Future<void> setAppLocale(Locale? value) async {
+    final locale = supportedLocaleFor(value?.languageCode);
+    if (locale == null) {
+      await _prefs.remove(_languageKey);
+    } else {
+      await _prefs.setString(_languageKey, locale.languageCode);
+    }
+    chosenLocale = locale;
+    notifyListeners();
+  }
 
   // ---- Reading goals (v1.3.1) ----------------------------------------------
 

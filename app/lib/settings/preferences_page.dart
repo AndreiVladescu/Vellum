@@ -30,6 +30,7 @@ import '../loans/loan_reminders.dart';
 import '../notifications/tray.dart';
 import 'shared_shelves_page.dart';
 import 'trash_page.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 import '../onboarding/sample_library.dart';
@@ -117,6 +118,17 @@ List<PrefsSection> preferencesCatalogue(
             l10n.prefsDynamicColourTitle,
           ],
           builder: (_) => _AppearanceSection(settings: settings),
+        ),
+        PrefsEntry(
+          id: 'language',
+          title: l10n.prefsLanguageTitle,
+          keywords: [
+            l10n.prefsKwLanguage,
+            l10n.prefsLanguageSystem,
+            for (final locale in L10n.supportedLocales)
+              lookupL10n(locale).languageName,
+          ],
+          builder: (_) => _LanguageTile(settings: settings),
         ),
         PrefsEntry(
           id: 'wallpaper',
@@ -598,15 +610,6 @@ class _HealthSectionState extends State<_HealthSection> {
     );
   }
 
-  String _bytes(int value) {
-    if (value < 1024) return '$value B';
-    if (value < 1024 * 1024) return '${(value / 1024).round()} KB';
-    if (value < 1024 * 1024 * 1024) {
-      return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(value / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
@@ -659,7 +662,7 @@ class _HealthSectionState extends State<_HealthSection> {
               title: Text(entry.key.labelOf(l10n)),
               subtitle: Text(entry.key == DefectKind.orphanBlob
                   ? l10n.prefsHealthReclaim(
-                      entry.value, _bytes(report.reclaimableBytes))
+                      entry.value, l10n.formatFileSize(report.reclaimableBytes))
                   : l10n.prefsHealthFound(
                       entry.value, entry.key.repairLabelOf(l10n))),
               trailing: TextButton(
@@ -1039,7 +1042,7 @@ class _BackupSectionState extends State<_BackupSection> {
                 Text(check.describeOf(l10n)),
                 if (check.created != null) ...[
                   const SizedBox(height: 8),
-                  Text(l10n.prefsVerifyWritten('${check.created!.toLocal()}')),
+                  Text(l10n.prefsVerifyWritten(l10n.formatDateTime(check.created!))),
                 ],
                 for (final name in [...check.corrupt, ...check.missing].take(10))
                   Text('• $name'), // i18n-ignore
@@ -1293,7 +1296,7 @@ class _AudioStorageTile extends StatelessWidget {
           title: Text(l10n.prefsAudioStorageTitle),
           subtitle: Text(used == null || used.books == 0
               ? l10n.prefsAudioStorageNone
-              : l10n.prefsAudioStorageUsed(formatBytes(used.bytes), used.books)),
+              : l10n.prefsAudioStorageUsed(l10n.formatFileSize(used.bytes), used.books)),
         );
       },
     );
@@ -1469,7 +1472,7 @@ class _BackgroundSyncTile extends StatelessWidget {
                 : last == null
                     ? interval.labelOf(l10n)
                     : l10n.prefsIntervalLast(
-                        interval.labelOf(l10n), '${last.toLocal()}'),
+                        interval.labelOf(l10n), l10n.formatDateTime(last)),
       ),
       children: [
         if (!_supported)
@@ -1564,7 +1567,7 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
                         ? l10n.prefsSchedSummary(
                             frequency.labelOf(l10n), settings.backupKeep)
                         : l10n.prefsSchedSummaryLast(frequency.labelOf(l10n),
-                            settings.backupKeep, '${last.toLocal()}'),
+                            settings.backupKeep, l10n.formatDateTime(last)),
           ),
           children: [
             if (!_supported)
@@ -1639,6 +1642,62 @@ class _ScheduledBackupTileState extends State<_ScheduledBackupTile> {
 /// Grouped into one section because they are one decision — "what does my
 /// library look like" — taken in four parts, and splitting them across the page
 /// would make each feel like an unrelated switch.
+/// The app's language: the system's, or one Vellum ships. Each language is
+/// named in itself ("Română", not "Romanian"), so a reader who switched to a
+/// language they cannot read can still find their own way back.
+class _LanguageTile extends StatelessWidget {
+  const _LanguageTile({required this.settings});
+
+  final AppSettingsStore settings;
+
+  /// [locale]'s name in its own language, or "System default" for null.
+  static String _nameOf(L10n l10n, Locale? locale) => locale == null
+      ? l10n.prefsLanguageSystem
+      : lookupL10n(locale).languageName;
+
+  Future<void> _pick(BuildContext context) async {
+    final l10n = L10n.of(context);
+    final current = settings.appLocale;
+    // A record wraps the answer so "System default" (null) can be told apart
+    // from the dialog being dismissed (also null).
+    final picked = await showDialog<({Locale? locale})>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(l10n.prefsLanguageTitle),
+        children: [
+          for (final locale in <Locale?>[null, ...L10n.supportedLocales])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, (locale: locale)),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 32,
+                    child: locale?.languageCode == current?.languageCode
+                        ? const Icon(Icons.check, size: 20)
+                        : null,
+                  ),
+                  Expanded(child: Text(_nameOf(l10n, locale))),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked != null) await settings.setAppLocale(picked.locale);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    return ListTile(
+      leading: const Icon(Icons.translate),
+      title: Text(l10n.prefsLanguageTitle),
+      subtitle: Text(_nameOf(l10n, settings.appLocale)),
+      onTap: () => _pick(context),
+    );
+  }
+}
+
 class _AppearanceSection extends StatelessWidget {
   const _AppearanceSection({required this.settings});
 
@@ -1896,7 +1955,7 @@ class _ScaleSlider extends StatelessWidget {
               max: SpineTypography.max,
               divisions: 12,
               value: value,
-              label: '${(value * 100).round()}%', // i18n-ignore
+              label: L10n.of(context).formatPercent(value),
               onChanged: onChanged,
             ),
           ),

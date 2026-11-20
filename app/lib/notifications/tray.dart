@@ -30,7 +30,7 @@ class NotificationTray {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final L10n? _l10nOverride;
-  late final L10n _l10n = _l10nOverride ?? platformL10n();
+  L10n get _l10n => _l10nOverride ?? platformL10n();
 
   /// One channel, named for what it is about rather than for the app — Android
   /// shows this name in the system settings, where "Vellum" would tell nobody

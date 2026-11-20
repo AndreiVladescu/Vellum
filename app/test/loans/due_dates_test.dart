@@ -4,9 +4,11 @@
 // moment happened to be midnight UTC.
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/loans/due_dates.dart';
 import 'package:vellum/l10n/gen/app_localizations_en.dart';
+import 'package:vellum/l10n/gen/app_localizations_ro.dart';
 
 Loan _loan({
   String id = 'l1',
@@ -30,6 +32,10 @@ Loan _loan({
     );
 
 void main() {
+  // Date symbols other than en_US are loaded by the Material delegate in the
+  // app; a plain test() has to ask for them.
+  setUpAll(() => initializeDateFormatting('ro'));
+
   final now = DateTime(2026, 7, 10, 14, 30);
 
   group('urgency', () {
@@ -199,8 +205,17 @@ void main() {
         'Dune',
       );
       expect(message, contains('Dune'));
-      expect(message, contains('2026-06-01'));
-      expect(message, contains('2026-07-01'));
+      // Dates in the reader's locale (intl), not hand-built ISO.
+      expect(message, contains('6/1/2026'));
+      expect(message, contains('7/1/2026'));
+      expect(
+        LoanDue.reminderMessage(
+          L10nRo(),
+          _loan(loanedAt: DateTime(2026, 6, 1), dueAt: DateTime(2026, 7, 1)),
+          'Dune',
+        ),
+        contains('01.06.2026'),
+      );
     });
 
     test('an undated loan gets a softer nudge with no invented deadline', () {

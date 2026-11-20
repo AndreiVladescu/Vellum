@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../data/database.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../widgets/adaptive.dart';
 import 'library_stats.dart';
@@ -269,7 +270,7 @@ class _BarList extends StatelessWidget {
                   SizedBox(
                     width: 40,
                     child: Text(
-                      '${b.count}',
+                      l10n.formatInt(b.count),
                       textAlign: TextAlign.end,
                     ), // i18n-ignore (a number)
                   ),
@@ -315,7 +316,7 @@ class _MonthColumns extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${m.count}',
+                      l10n.formatInt(m.count),
                       style: Theme.of(context).textTheme.labelSmall,
                     ), // i18n-ignore (a number)
                     const SizedBox(height: 2),
@@ -352,16 +353,6 @@ class _UnreadPileCard extends StatelessWidget {
 
   final UnreadPile pile;
 
-  /// "812 KB" / "3.4 MB" / "1.2 GB". Units are the same in every language.
-  static String _size(int bytes) {
-    const kb = 1024;
-    if (bytes < kb * kb) return '${(bytes / kb).round()} KB';
-    if (bytes < kb * kb * kb) {
-      return '${(bytes / (kb * kb)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (kb * kb * kb)).toStringAsFixed(1)} GB';
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
@@ -380,7 +371,7 @@ class _UnreadPileCard extends StatelessWidget {
               style: text.bodySmall,
             ),
           if (pile.totalBytes > 0)
-            Text(l10n.libraryStatsUnreadSize(_size(pile.totalBytes))),
+            Text(l10n.libraryStatsUnreadSize(l10n.formatFileSize(pile.totalBytes))),
         ],
       ],
     );

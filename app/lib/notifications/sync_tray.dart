@@ -35,7 +35,7 @@ class SyncNotificationTray {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final L10n? _l10nOverride;
-  late final L10n _l10n = _l10nOverride ?? platformL10n();
+  L10n get _l10n => _l10nOverride ?? platformL10n();
 
   /// Must match `SyncForegroundService.CHANNEL_ID` / `NOTIFICATION_ID`.
   static const _channelId = 'vellum.sync';

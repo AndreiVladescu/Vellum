@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../book_detail/book_detail_page.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../settings/app_settings.dart';
 import '../widgets/adaptive.dart';
@@ -254,7 +255,7 @@ class _MonthReviewPageState extends State<MonthReviewPage> {
     final tiles = <({String label, String value, String? sub})>[
       (
         label: l10n.insightsPagesRead,
-        value: '${review.pages}', // i18n-ignore
+        value: l10n.formatInt(review.pages),
         sub: null,
       ),
       (

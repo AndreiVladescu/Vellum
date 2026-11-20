@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Playback speed and the sleep timer's arithmetic: the pure part, so it is
@@ -22,12 +23,13 @@ double normaliseSpeed(double speed) {
   return double.parse(((clamped / speedStep).round() * speedStep).toStringAsFixed(2));
 }
 
-/// "1.25×", "1×": no trailing zeros.
-String formatSpeed(double speed) {
-  final fixed = normaliseSpeed(speed).toStringAsFixed(2);
-  final trimmed =
-      fixed.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
-  return '$trimmed×';
+/// "1.25×", "1×": no trailing zeros. [locale] picks the decimal separator
+/// ("1,25×" in Romanian); without one it is intl's default.
+String formatSpeed(double speed, {String? locale}) {
+  final f = NumberFormat.decimalPattern(locale)
+    ..minimumFractionDigits = 0
+    ..maximumFractionDigits = 2;
+  return '${f.format(normaliseSpeed(speed))}×';
 }
 
 /// The durations offered by the sleep timer, in minutes. "End of chapter" is

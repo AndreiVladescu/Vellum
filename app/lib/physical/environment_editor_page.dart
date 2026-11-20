@@ -887,7 +887,8 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
                 ),
                 title: Text(k.labelOf(l10n)),
                 subtitle: Text(
-                  '${formatDistance(k.width)} × ${formatDistance(k.height)}',
+                  '${formatDistance(k.width, locale: l10n.localeName)} × '
+                  '${formatDistance(k.height, locale: l10n.localeName)}',
                 ),
                 onTap: () => Navigator.pop(sheetContext, k),
               ),
@@ -2223,6 +2224,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
               child: CustomPaint(
                 painter: RoomPainter(
                   shelves: _shelves,
+                  locale: L10n.of(context).localeName,
                   origin: _origin!,
                   camera: _originVN,
                   scale: _scale,

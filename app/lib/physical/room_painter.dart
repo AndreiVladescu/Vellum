@@ -39,6 +39,7 @@ class RoomPainter extends CustomPainter {
     this.surfaces = true,
     this.highlightIds = const {},
     this.outlines = const [],
+    this.locale,
   }) : super(
           repaint: camera == null
               ? shelfDelta
@@ -46,6 +47,9 @@ class RoomPainter extends CustomPainter {
         );
 
   final List<PhysicalShelf> shelves;
+
+  /// The reader's locale, for the decimal separator of the measure readout.
+  final String? locale;
 
   /// The room photo, already decoded. Null when the room has none.
   final ui.Image? backdrop;
@@ -341,7 +345,7 @@ class RoomPainter extends CustomPainter {
     final metres = (to - from).distance;
     final tp = TextPainter(
       text: TextSpan(
-        text: formatDistance(metres),
+        text: formatDistance(metres, locale: locale),
         style: TextStyle(
           color: colour,
           fontSize: 13,
@@ -356,6 +360,7 @@ class RoomPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant RoomPainter old) =>
+      old.locale != locale ||
       old.wallColor != wallColor ||
       old.floorColor != floorColor ||
       old.surfaces != surfaces ||

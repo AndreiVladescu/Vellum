@@ -5,6 +5,7 @@ import '../data/library_repository.dart';
 import '../snack_bars.dart';
 import '../widgets/page_insets.dart';
 import 'copy_photos.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// Prompts for a borrower's name. Returns the trimmed name, or null if the user
@@ -114,8 +115,7 @@ Future<LendDetails?> promptBorrower(BuildContext context) async {
                     ActionChip(
                       avatar: const Icon(Icons.event, size: 16),
                       label: Text(due != null && selectedPreset == -1
-                          ? '${due!.year}-${due!.month.toString().padLeft(2, '0')}'
-                              '-${due!.day.toString().padLeft(2, '0')}'
+                          ? L10n.of(dialogContext).formatDate(due!)
                           : L10n.of(dialogContext).copiesPickDate),
                       onPressed: () async {
                         final now = DateTime.now();
@@ -401,11 +401,6 @@ class _CopyCard extends StatelessWidget {
   final PhysicalCopy copy;
   final LibraryRepository repository;
 
-  static String _date(DateTime d) =>
-      '${d.year}-'
-      '${d.month.toString().padLeft(2, '0')}-'
-      '${d.day.toString().padLeft(2, '0')}';
-
   Future<void> _lend(BuildContext context) async {
     final l10n = L10n.of(context);
     final details = await promptBorrower(context);
@@ -492,7 +487,7 @@ class _CopyCard extends StatelessWidget {
         final past = loans.where((l) => l.returnedAt != null).toList();
         final l10n = L10n.of(context);
         final status = active != null
-            ? l10n.copiesOnLoan(active.borrower, _date(active.loanedAt))
+            ? l10n.copiesOnLoan(active.borrower, l10n.formatDate(active.loanedAt))
             : l10n.copiesOnShelf;
         return Card(
           margin: EdgeInsets.zero,
@@ -611,11 +606,6 @@ class PhysicalCopyTile extends StatelessWidget {
   final PhysicalCopy copy;
   final LibraryRepository repository;
 
-  static String _date(DateTime d) =>
-      '${d.year}-'
-      '${d.month.toString().padLeft(2, '0')}-'
-      '${d.day.toString().padLeft(2, '0')}';
-
   Future<void> _lend(BuildContext context) async {
     final l10n = L10n.of(context);
     final details = await promptBorrower(context);
@@ -675,7 +665,7 @@ class PhysicalCopyTile extends StatelessWidget {
         final past = loans.where((l) => l.returnedAt != null).toList();
         final l10n = L10n.of(context);
         final status = active != null
-            ? l10n.copiesOnLoan(active.borrower, _date(active.loanedAt))
+            ? l10n.copiesOnLoan(active.borrower, l10n.formatDate(active.loanedAt))
             : l10n.copiesOnShelf;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

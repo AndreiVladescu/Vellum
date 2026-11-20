@@ -44,7 +44,7 @@ class _SpeedSheet extends StatelessWidget {
               Text(l10n.playerSpeedTitle, style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Center(
-                child: Text(formatSpeed(player.speed),
+                child: Text(formatSpeed(player.speed, locale: l10n.localeName),
                     style: theme.textTheme.headlineMedium),
               ),
               Slider(
@@ -52,7 +52,7 @@ class _SpeedSheet extends StatelessWidget {
                 max: maxSpeed,
                 divisions: ((maxSpeed - minSpeed) / speedStep).round(),
                 value: player.speed,
-                label: formatSpeed(player.speed),
+                label: formatSpeed(player.speed, locale: l10n.localeName),
                 onChanged: player.setSpeed,
               ),
               Wrap(
@@ -60,7 +60,7 @@ class _SpeedSheet extends StatelessWidget {
                 children: [
                   for (final preset in speedPresets)
                     ChoiceChip(
-                      label: Text(formatSpeed(preset)),
+                      label: Text(formatSpeed(preset, locale: l10n.localeName)),
                       selected: (player.speed - preset).abs() < 0.001,
                       onSelected: (_) => player.setSpeed(preset),
                     ),

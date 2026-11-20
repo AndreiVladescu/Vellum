@@ -387,7 +387,7 @@ class _PlayerPageState extends State<PlayerPage> {
           children: [
             TextButton.icon(
               icon: const Icon(Icons.speed),
-              label: Text(l10n.playerSpeedButton(formatSpeed(player.speed))),
+              label: Text(l10n.playerSpeedButton(formatSpeed(player.speed, locale: l10n.localeName))),
               onPressed: () => showSpeedSheet(context, player),
             ),
             TextButton.icon(

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart' show pdfrxFlutterInitialize;
 import 'l10n/gen/app_localizations.dart';
+import 'l10n/platform_l10n.dart';
 import 'l10n/labels.dart';
 
 import 'account/user_profile.dart';
@@ -182,11 +183,12 @@ class VellumApp extends StatelessWidget {
           );
           return MaterialApp(
             title: 'Vellum', // i18n-ignore: a proper noun, never translated
-            // Localization scaffolding (plan 5 #38). English only for now; the
-            // point is that every string added from here on has somewhere to
-            // go, and that plurals are ICU rather than `n == 1 ? '' : 's'`.
+            // Every language with a file in lib/l10n/. `locale` is the one
+            // picked in Preferences; null follows the system, falling back to
+            // English for a language Vellum has no file for.
             localizationsDelegates: L10n.localizationsDelegates,
             supportedLocales: L10n.supportedLocales,
+            locale: settings.appLocale,
             theme: themes.light,
             darkTheme: themes.dark,
             themeMode: settings.themeMode,
@@ -465,9 +467,9 @@ class _LibraryPageState extends State<LibraryPage> {
       // running, is a phone that says it is syncing forever.
       // After the awaits above `context` is usable, unlike in initState where
       // this was started; a disposed page has no locale, so it asks for the
-      // template one rather than hanging the notification.
+      // app's language the way the notifications do rather than hanging.
       await tray.finish(
-        (mounted ? L10n.of(context) : lookupL10n(const Locale('en')))
+        (mounted ? L10n.of(context) : platformL10n())
             .syncFinished,
       );
       await SyncForegroundService.stop();

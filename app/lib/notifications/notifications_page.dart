@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 import '../server/connection_store.dart';
@@ -206,7 +207,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (d.inHours < 1) return l10n.notificationsAgoMinutes(d.inMinutes);
     if (d.inDays < 1) return l10n.notificationsAgoHours(d.inHours);
     if (d.inDays < 7) return l10n.notificationsAgoDays(d.inDays);
-    return '${when.year}-${when.month.toString().padLeft(2, '0')}-'
-        '${when.day.toString().padLeft(2, '0')}';
+    return l10n.formatDate(when);
   }
 }

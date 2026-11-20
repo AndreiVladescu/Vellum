@@ -4,6 +4,7 @@ import '../data/database.dart';
 import '../data/library_queries.dart';
 import '../data/reading_status.dart';
 import '../widgets/page_insets.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 import '../settings/shelf_group_by.dart';
@@ -141,7 +142,7 @@ class _BookRow extends StatelessWidget {
       if (entry.authors.isNotEmpty) entry.authors.join(', '),
       if (book.publishedYear != null) '${book.publishedYear}',
       if (book.status == 'reading' && progress != null && progress > 0)
-        '${(progress * 100).round()}%',
+        L10n.of(context).formatPercent(progress),
     ].join(' · ');
 
     final tile = ListTile(

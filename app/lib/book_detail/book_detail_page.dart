@@ -29,6 +29,7 @@ import 'reader_notes_section.dart';
 import 'reading_stats_section.dart';
 import 'send_to_device_sheet.dart';
 import '../data/shelf_service.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/labels.dart';
 
@@ -876,10 +877,10 @@ class _StatusAndRating extends StatelessWidget {
             Text(
               book.readCount > 1
                   ? l10n.detailFinishedOnTimes(
-                      book.finishedAt!.toLocal().toString().split(' ').first,
+                      l10n.formatDate(book.finishedAt!),
                       book.readCount)
                   : l10n.detailFinishedOn(
-                      book.finishedAt!.toLocal().toString().split(' ').first),
+                      l10n.formatDate(book.finishedAt!)),
               style: theme.textTheme.bodySmall,
             ),
           if (offerFinish)

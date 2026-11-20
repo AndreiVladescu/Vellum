@@ -1,4 +1,5 @@
 import '../data/database.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// How a loan stands against its due date (plan 5 #27).
@@ -122,21 +123,15 @@ class LoanDue {
     String bookTitle, {
     DateTime? now,
   }) {
-    final lent = _dateOnly(loan.loanedAt);
+    final lent = l10n.formatDate(loan.loanedAt);
     final due = loan.dueAt;
     if (due == null) return l10n.loansReminderNoDue(bookTitle, lent);
-    return l10n.loansReminderWithDue(bookTitle, lent, _dateOnly(due));
+    return l10n.loansReminderWithDue(bookTitle, lent, l10n.formatDate(due));
   }
 
   /// Local calendar day, so comparisons are about days rather than instants.
   static DateTime _day(DateTime moment) {
     final local = moment.toLocal();
     return DateTime(local.year, local.month, local.day);
-  }
-
-  static String _dateOnly(DateTime moment) {
-    final local = moment.toLocal();
-    return '${local.year}-${local.month.toString().padLeft(2, '0')}-'
-        '${local.day.toString().padLeft(2, '0')}';
   }
 }

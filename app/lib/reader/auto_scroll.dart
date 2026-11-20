@@ -10,6 +10,7 @@
 /// settings know exactly. Nothing here guesses a pace and calls it measured.
 library;
 
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// Where a PDF starts when there is no measured pace to start from.
@@ -102,10 +103,10 @@ enum AutoScrollUnit { pages, lines, seconds }
 
 /// The speed as it is shown on the control: "6 pages/min", "0.75 pages/min".
 String autoScrollSpeedLabel(L10n l10n, double speed, AutoScrollUnit unit) {
-  final fixed = speed < 2 ? speed.toStringAsFixed(2) : speed.toStringAsFixed(1);
-  final trimmed = fixed.contains('.')
-      ? fixed.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '')
-      : fixed;
+  // Up to two decimals below 2, one above, no trailing zeros, and the
+  // reader's decimal separator ("0,75" in Romanian).
+  final trimmed =
+      l10n.formatCompactDecimal(speed, maxDigits: speed < 2 ? 2 : 1);
   return switch (unit) {
     AutoScrollUnit.pages => l10n.readerAutoSpeedPages(trimmed),
     AutoScrollUnit.lines => l10n.readerAutoSpeedLines(trimmed),

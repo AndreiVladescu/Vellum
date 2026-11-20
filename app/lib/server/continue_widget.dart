@@ -19,6 +19,7 @@ import '../audio/continue_listening.dart';
 import '../data/database.dart';
 import '../data/library_queries.dart';
 import '../data/library_repository.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/platform_l10n.dart';
 
@@ -215,7 +216,7 @@ ContinueWidgetData snapshotFor(
   return ContinueWidgetData(
     title: book.title,
     subtitle:
-        page == null ? '$percent%' : l10n.continueWidgetPage(percent, page),
+        page == null ? l10n.formatPercent(progress) : l10n.continueWidgetPage(percent, page),
     coverPath: coverPath,
   );
 }

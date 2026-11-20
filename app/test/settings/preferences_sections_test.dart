@@ -93,7 +93,7 @@ void main() {
         for (final e in s.entries) e.id,
     };
     expect(ids, {
-      'appearance', 'wallpaper', 'books', 'genres',
+      'appearance', 'language', 'wallpaper', 'books', 'genres',
       if (textIndexSupportedHere) 'index',
       'samples', 'autoPush', 'readingPosition', 'backgroundSync',
       'audioWifiOnly',

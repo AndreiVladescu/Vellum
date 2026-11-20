@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'audio_downloads.dart';
 import 'audio_formats.dart';
@@ -104,8 +105,8 @@ class _AudioDownloadPanelState extends State<AudioDownloadPanel> {
           l10n.audioDownloadProgress(
             (status!.partsDone + 1).clamp(1, status.partsTotal),
             status.partsTotal,
-            formatBytes(status.receivedBytes),
-            formatBytes(status.totalBytes),
+            l10n.formatFileSize(status.receivedBytes),
+            l10n.formatFileSize(status.totalBytes),
           ),
           [
             TextButton(
@@ -122,7 +123,7 @@ class _AudioDownloadPanelState extends State<AudioDownloadPanel> {
         return line(l10n.audioDownloadMetered, [
           FilledButton.tonal(
             onPressed: () => start(anyway: true),
-            child: Text(l10n.audioDownloadAnyway(formatBytes(total - here))),
+            child: Text(l10n.audioDownloadAnyway(l10n.formatFileSize(total - here))),
           ),
           TextButton(
             onPressed: () => downloads.dismiss(bookId),
@@ -159,12 +160,12 @@ class _AudioDownloadPanelState extends State<AudioDownloadPanel> {
     );
     if (allHere) {
       if (!widget.showWhenHere) return const SizedBox.shrink();
-      return line(l10n.audioDownloadHere(formatBytes(total)), [remove]);
+      return line(l10n.audioDownloadHere(l10n.formatFileSize(total)), [remove]);
     }
     return line(
       here == 0
-          ? l10n.audioDownloadNotHere(formatBytes(total))
-          : l10n.audioDownloadPartlyHere(formatBytes(here), formatBytes(total)),
+          ? l10n.audioDownloadNotHere(l10n.formatFileSize(total))
+          : l10n.audioDownloadPartlyHere(l10n.formatFileSize(here), l10n.formatFileSize(total)),
       [
         FilledButton.tonalIcon(
           onPressed: start,
@@ -195,7 +196,7 @@ Future<bool> confirmRemoveAudioDownload(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: Text(l10n.audioRemoveTitle),
-      content: Text(l10n.audioRemoveBody(formatBytes(size))),
+      content: Text(l10n.audioRemoveBody(l10n.formatFileSize(size))),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),

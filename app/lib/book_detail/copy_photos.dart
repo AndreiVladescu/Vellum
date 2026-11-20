@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// Condition photos for a physical copy (plan 5 #51): the picker, a thumbnail
@@ -209,7 +210,7 @@ class _PhotoThumb extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Tooltip(
-        message: photo.caption ?? _stamp(photo.takenAt),
+        message: photo.caption ?? L10n.of(context).formatDate(photo.takenAt),
         child: InkWell(
           onTap: () => _open(context),
           borderRadius: BorderRadius.circular(8),
@@ -249,7 +250,7 @@ class _PhotoThumb extends StatelessWidget {
             ),
             ListTile(
               title: Text(photo.caption ?? L10n.of(dialogContext).copyPhotosNoCaption),
-              subtitle: Text(_stamp(photo.takenAt)),
+              subtitle: Text(L10n.of(dialogContext).formatDate(photo.takenAt)),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -315,7 +316,3 @@ Future<String?> _promptCaption(BuildContext context, String? initial) async {
   controller.dispose();
   return result;
 }
-
-String _stamp(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
-    '${d.day.toString().padLeft(2, '0')}';

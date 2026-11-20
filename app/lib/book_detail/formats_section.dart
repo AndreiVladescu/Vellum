@@ -6,6 +6,7 @@ import '../audio/audio_download_view.dart';
 import '../audio/audio_formats.dart';
 import '../data/database.dart';
 import '../data/library_repository.dart';
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 
 /// The "Digital formats" list: attached PDF/EPUB files plus an attach action.
@@ -93,7 +94,7 @@ class DigitalFormatsSection extends StatelessWidget {
                   ),
                   title: Text(f.format.toUpperCase()),
                   subtitle: Text(
-                    '${(f.sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB',
+                    l10n.formatFileSize(f.sizeBytes),
                   ),
                 ),
               // An audiobook is one row however many parts it has.
@@ -120,7 +121,7 @@ class DigitalFormatsSection extends StatelessWidget {
           subtitle: Text(l10n.formatsAudiobookDetail(
             parts.length,
             formatAudioTime(Duration(milliseconds: ms)),
-            (bytes / (1024 * 1024)).toStringAsFixed(1),
+            l10n.formatDecimal(bytes / (1024 * 1024)),
           )),
         ),
         // Audio comes on demand (docs/AUDIOBOOKS.md §6): whether it is here,

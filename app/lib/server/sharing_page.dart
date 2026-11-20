@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/page_insets.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/formats.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'connection_store.dart';
 import 'server_client.dart';
@@ -234,7 +235,7 @@ class _SharingPageState extends State<SharingPage> {
                 ? l10n.sharingRevoked
                 : l.expiresAt == null
                     ? l10n.sharingNeverExpires
-                    : l10n.sharingExpires('${l.expiresAt}')),
+                    : l10n.sharingExpires(_when(l10n, l.expiresAt!))),
             trailing: l.revoked
                 ? null
                 : IconButton(
@@ -536,4 +537,13 @@ class _ShareDialogState extends State<_ShareDialog> {
       ],
     );
   }
+}
+
+/// A link's expiry in the reader's date format. The server sends a UTC
+/// `datetime('now')` string ("YYYY-MM-DD HH:MM:SS"); anything else is shown as
+/// it came.
+String _when(L10n l10n, String raw) {
+  final parsed = DateTime.tryParse(
+      raw.contains('T') ? raw : '${raw.replaceFirst(' ', 'T')}Z');
+  return parsed == null ? raw : l10n.formatDateTime(parsed);
 }

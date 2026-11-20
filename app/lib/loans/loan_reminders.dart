@@ -185,7 +185,7 @@ class LocalReminderNotifier implements ReminderNotifier {
       : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   final FlutterLocalNotificationsPlugin _plugin;
-  late final L10n _l10n = platformL10n();
+  L10n get _l10n => platformL10n();
   bool _ready = false;
 
   static const channelId = 'vellum.loans';
