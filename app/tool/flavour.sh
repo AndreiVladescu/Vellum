@@ -45,8 +45,8 @@ STUB_LINE="export 'on_device_stub.dart';"
 REAL_LINE="export 'proprietary/on_device.dart';"
 
 # The dependency block, written on one line each so the toggle is a grep away.
-MLKIT_TRANSLATION="  google_mlkit_translation: ^0.14.0"
-MLKIT_LANGUAGE_ID="  google_mlkit_language_id: ^0.14.0"
+MLKIT_TRANSLATION="  google_mlkit_translation: ^0.15.1"
+MLKIT_LANGUAGE_ID="  google_mlkit_language_id: ^0.15.1"
 
 # `flutter test` collects every *_test.dart under test/, so the proprietary
 # half's one test is parked under a name it does not match.
@@ -120,6 +120,20 @@ case "${1:-status}" in
       want_exports=proprietary; want_excluded=no;  want_test=collected; want=full
     else
       want_exports=stub;        want_excluded=yes; want_test=parked;    want=free
+    fi
+
+    # In the full flavour, the ML Kit lines must be exactly the ones `full`
+    # writes. Otherwise a free -> full round trip quietly changes the version
+    # (it once downgraded ^0.15.1 to ^0.14.0), so bump both places together.
+    if [ "$has_mlkit" = yes ] &&
+       { ! grep -qxF "$MLKIT_TRANSLATION" pubspec.yaml ||
+         ! grep -qxF "$MLKIT_LANGUAGE_ID" pubspec.yaml; }; then
+      echo "flavour: pubspec.yaml's ML Kit versions differ from tool/flavour.sh:" >&2
+      grep '^  google_mlkit' pubspec.yaml >&2
+      echo "  flavour.sh writes:" >&2
+      printf '%s\n%s\n' "$MLKIT_TRANSLATION" "$MLKIT_LANGUAGE_ID" >&2
+      echo "Make MLKIT_* at the top of tool/flavour.sh match pubspec.yaml." >&2
+      exit 1
     fi
 
     if [ "$exports" = "$want_exports" ] &&
