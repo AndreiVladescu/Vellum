@@ -12,6 +12,21 @@ import 'package:vellum/stats/session_recorder.dart';
 
 import 'generated/drift_schema_versions/schema.dart' as versions;
 
+/// An on-disk database that never waits for the disk.
+///
+/// These tests need a real file (they close and reopen it to re-run a
+/// migration), but not a durable one. With SQLite's default every statement of
+/// a migration is an fsync, and when the machine is busy with other suites each
+/// one can take seconds: the three heaviest tests here measured 30-40 s, over
+/// the 30 s limit, only under load. The directory is deleted at the end of each
+/// test, so nothing is lost by not syncing.
+VellumDatabase _open(File file) => VellumDatabase(NativeDatabase(
+      file,
+      setup: (raw) => raw
+        ..execute('PRAGMA synchronous = OFF')
+        ..execute('PRAGMA journal_mode = MEMORY'),
+    ));
+
 /// Recreates the corrupted state seen in the wild: a database whose
 /// `user_version` is stuck at 3 while the v4/v5 objects (the physical tables,
 /// and `book_placements.format`) already exist — the result of a previously
@@ -22,7 +37,7 @@ void main() {
     final file = File('${dir.path}/vellum.sqlite');
 
     // Build the stuck-at-3 schema by hand with a raw sqlite connection.
-    final db = raw.sqlite3.open(file.path);
+    final db = raw.sqlite3.open(file.path)..execute('PRAGMA synchronous = OFF');
     db.execute('''
       CREATE TABLE books (
         id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, subtitle TEXT,
@@ -53,7 +68,7 @@ void main() {
     db.close();
 
     // Open through drift — this triggers onUpgrade(3 -> 7).
-    final vellum = VellumDatabase(NativeDatabase(file));
+    final vellum = _open(file);
     // Forcing a query runs the migration; it must not throw "already exists".
     final books = await vellum.select(vellum.books).get();
     expect(books.map((b) => b.title), ['Dune'], reason: 'existing data preserved');
@@ -76,7 +91,7 @@ void main() {
     // Seed two genres that differ only by case, both tagging the same book —
     // raw inserts bypass the write-path canonicalization so we recreate the
     // pre-v8 state exactly.
-    final setup = VellumDatabase(NativeDatabase(file));
+    final setup = _open(file);
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     await setup.customStatement(
       "INSERT INTO books (id, title, created_at, updated_at) "
@@ -98,7 +113,7 @@ void main() {
     await setup.customStatement('PRAGMA user_version = 7');
     await setup.close();
 
-    final vellum = VellumDatabase(NativeDatabase(file));
+    final vellum = _open(file);
     final genres =
         await vellum.customSelect('SELECT name FROM genres').get();
     expect(
@@ -125,7 +140,7 @@ void main() {
     // simulate "this database predates the search index" by dropping it and
     // rewinding user_version, so the next open must recreate it from scratch
     // via the backfill, not the triggers.
-    final setup = VellumDatabase(NativeDatabase(file));
+    final setup = _open(file);
     await setup.into(setup.books).insert(
         BooksCompanion.insert(id: 'b1', title: 'Dune', subtitle: const Value('A Novel')));
     await setup
@@ -146,7 +161,7 @@ void main() {
     await setup.customStatement('PRAGMA user_version = 8');
     await setup.close();
 
-    final vellum = VellumDatabase(NativeDatabase(file));
+    final vellum = _open(file);
     final byTitle = await vellum
         .customSelect(
           'SELECT book_id FROM book_search WHERE book_search MATCH ?',
