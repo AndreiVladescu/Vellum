@@ -646,10 +646,23 @@ with the same card and a headphones glyph; its subtitle is "42% · at 1:02:33".
 Tapping opens the player, which resumes at the saved position. On a short
 screen the compact row shows both kinds of card.
 
-**The home widget** has one slot and keeps it: it shows whichever of reading or
-listening happened last (`pickContinue`), with "42% · at 1:02:33" for audio.
-One of each would need a second layout and a second widget provider; not worth
-it for a launcher tile. No Android code changed.
+**The home widget** (revised after 1.5.2): one widget, two layouts chosen by the
+size the launcher gives it. Tall enough (about 4x2, 110 dp and up) and with both
+a book being read and one being listened to, it draws two rows, *Reading* above
+*Listening* ("Listening · 42% · at 1:02:33"), each its own tap target: the
+reading row opens the book, the listening row opens its player. As a 4x1 (or
+when only one kind exists) it draws the single row it always had, showing
+whichever happened last. A second "Continue listening" widget type was
+rejected: it makes people place and size two tiles, and a 4x2 has the room for
+both anyway, while a 4x1 has room for one book however many widgets there are.
+It is placed 4x2 by default and resizes vertically down to 4x1.
+`pickContinues` returns the reading and listening candidates (`pickContinue` is
+its `latest`); the snapshot carries three slots (`continue_*`, `read_*`,
+`listen_*`, each with a book id) so a resize redraws from what is stored,
+without the app. The tap goes through `MainActivity`'s existing
+`vellum_shortcut` extra (`read:<id>`, `listen:<id>`), so no Kotlin change
+outside the widget. "Opens the book" is the book's page (the destination of
+every other continue-reading tap), whose Read button resumes.
 
 ## 11. On-demand audio as built
 

@@ -6,14 +6,18 @@
   it wakes the device to honour it. The app pushes an update when the reading
   position actually changes, which is both fresher and cheaper — the whole
   design here is battery-conscious.
+
+  Placed 4x2 by default and resizable down to 4x1. Tall enough it shows two
+  rows (reading, listening); as a single row it shows whichever came last.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
-    android:minHeight="80dp"
+    android:minHeight="110dp"
+    android:minResizeHeight="40dp"
     android:targetCellWidth="4"
-    android:targetCellHeight="1"
+    android:targetCellHeight="2"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/continue_reading_widget"
     android:previewLayout="@layout/continue_reading_widget_preview"
-    android:resizeMode="horizontal"
+    android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen" />

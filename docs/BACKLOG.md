@@ -436,3 +436,23 @@ are tested over fakes.
   from the service (decide whether that is wanted); while paused the
   notification goes away.
 
+
+**Home widget, two rows** (docs/AUDIOBOOKS.md section 10). The layout switch and
+the taps only show on a launcher:
+
+1. **Picker.** Add widget: the preview shows two rows (Reading, Listening).
+   It lands 4x2.
+2. **Both kinds.** With a book being read and another listened to, the 4x2
+   shows both rows with cover, title and "Reading . 42% . page 214" /
+   "Listening . 42% . at 1:02:33" (check the covers load, and that two covers
+   do not make the update fail).
+3. **Resize to 4x1.** Drag the widget down to one row: it flips to the single
+   most recent book; back up, to two rows, without opening the app.
+4. **Taps.** Reading row opens that book page; listening row opens the
+   player at the saved position; the 4x1 row opens whichever it shows. Try
+   cold (force-stopped app) and warm.
+5. **Only one kind.** With nothing being listened to, the 4x2 shows the
+   single row (reading), not an empty second row. Nothing at all: the empty
+   state, tap opens the app.
+6. **After the update.** A widget placed before this change still draws
+   (old snapshot) until the app starts, then updates.

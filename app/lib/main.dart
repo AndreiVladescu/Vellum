@@ -304,7 +304,7 @@ class _LibraryPageState extends State<LibraryPage> {
   late final IncomingShare _incoming = IncomingShare();
   StreamSubscription<List<String>>? _incomingSub;
   StreamSubscription<void>? _continueWidgetSub;
-  StreamSubscription<LauncherShortcut>? _shortcutSub;
+  StreamSubscription<ShortcutRequest>? _shortcutSub;
 
   /// Due-date notifications for lent books (roadmap v1.4.2).
   late final LocalReminderNotifier _reminderNotifier = LocalReminderNotifier();
@@ -597,9 +597,9 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// A launcher shortcut lands on the same destination the in-app action does,
   /// rather than a parallel entry point with its own state to get wrong.
-  void _runShortcut(LauncherShortcut shortcut) {
+  void _runShortcut(ShortcutRequest request) {
     if (!mounted) return;
-    switch (shortcut) {
+    switch (request.shortcut) {
       case LauncherShortcut.scan:
         _openScan(context);
       case LauncherShortcut.add:
@@ -609,6 +609,23 @@ class _LibraryPageState extends State<LibraryPage> {
         // to continue is not an error — it opens the shelf, which is where you
         // would have started anyway.
         _openMostRecentlyRead();
+      case LauncherShortcut.openBook:
+        _openBookById(request.bookId, player: false);
+      case LauncherShortcut.openPlayer:
+        _openBookById(request.bookId, player: true);
+    }
+  }
+
+  /// A home-widget row: the book it showed, or its player. A book that has
+  /// since been deleted opens nothing (the shelf is where you land).
+  Future<void> _openBookById(String? id, {required bool player}) async {
+    if (id == null) return;
+    final book = await repository.watchBook(id).first;
+    if (!mounted || book == null) return;
+    if (player) {
+      _openPlayer(book);
+    } else {
+      _openBook(book);
     }
   }
 

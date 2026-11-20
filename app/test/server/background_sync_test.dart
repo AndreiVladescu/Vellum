@@ -7,6 +7,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/l10n/gen/app_localizations_en.dart';
 import 'package:vellum/data/database.dart';
+import 'package:vellum/import/incoming_share.dart';
 import 'package:vellum/server/background_sync.dart';
 import 'package:vellum/server/continue_widget.dart';
 
@@ -265,6 +266,96 @@ void main() {
             lastListened: DateTime(2026, 5));
         expect(pickContinue([bothHeardLater], audioMs: {'a': tenHours})!.listening,
             isTrue);
+      });
+
+      test('the two-row widget gets one of each, the one-row the later', () {
+        final read = book(
+            id: 'r', progress: 0.4, lastRead: DateTime(2026, 6), status: 'reading');
+        final olderRead = book(
+            id: 'o', progress: 0.2, lastRead: DateTime(2026, 3), status: 'reading');
+        final heard = listened(lastListened: DateTime(2026, 7));
+        final picks = pickContinues([olderRead, read, heard],
+            audioMs: {'a': tenHours});
+        expect(picks.reading!.book.id, 'r');
+        expect(picks.reading!.listening, isFalse);
+        expect(picks.listening!.book.id, 'a');
+        expect(picks.listening!.listening, isTrue);
+        expect(picks.latest!.book.id, 'a');
+        // Reading later: the single row follows it.
+        final readLater = book(
+            id: 'r', progress: 0.4, lastRead: DateTime(2026, 8), status: 'reading');
+        expect(
+            pickContinues([readLater, heard], audioMs: {'a': tenHours})
+                .latest!
+                .book
+                .id,
+            'r');
+      });
+
+      test('either row can be missing', () {
+        final read = book(id: 'r', progress: 0.4, lastRead: DateTime(2026, 6));
+        final onlyRead = pickContinues([read]);
+        expect(onlyRead.listening, isNull);
+        expect(onlyRead.latest!.book.id, 'r');
+        final onlyHeard = pickContinues([listened()], audioMs: {'a': tenHours});
+        expect(onlyHeard.reading, isNull);
+        expect(onlyHeard.latest!.listening, isTrue);
+        final none = pickContinues(const []);
+        expect(none.latest, isNull);
+        expect(none.reading, isNull);
+      });
+
+      test('one book can be both rows; finished leaves both', () {
+        final both = listened(
+            progress: 0.3,
+            lastRead: DateTime(2026, 6),
+            lastListened: DateTime(2026, 5));
+        final picks = pickContinues([both], audioMs: {'a': tenHours});
+        expect(picks.reading!.book.id, 'a');
+        expect(picks.listening!.book.id, 'a');
+        expect(picks.latest!.listening, isFalse);
+        final done = listened(
+            progress: 0.3,
+            lastRead: DateTime(2026, 6),
+            status: 'finished');
+        final gone = pickContinues([done], audioMs: {'a': tenHours});
+        expect(gone.reading, isNull);
+        expect(gone.listening, isNull);
+      });
+
+      test('the push key covers both rows and the single-row choice', () {
+        final read = book(id: 'r', progress: 0.4, lastRead: DateTime(2026, 6));
+        final heard = listened(lastListened: DateTime(2026, 7));
+        final audio = {'a': tenHours};
+        final both = pickContinues([read, heard], audioMs: audio);
+        expect(continueWidgetKeys(both),
+            continueWidgetKeys(pickContinues([read, heard], audioMs: audio)));
+        // Dropping the listening row changes it.
+        expect(continueWidgetKeys(both),
+            isNot(continueWidgetKeys(pickContinues([read]))));
+        // Reading overtaking listening changes the single row, whatever the
+        // rows' own percentages say.
+        final readLater = book(
+            id: 'r', progress: 0.4, lastRead: DateTime(2026, 8));
+        expect(
+            continueWidgetKeys(
+                pickContinues([readLater, heard], audioMs: audio)),
+            isNot(continueWidgetKeys(both)));
+      });
+
+      test('widget taps name the book and where it opens', () {
+        var r = LauncherShortcut.request('read:abc')!;
+        expect(r.shortcut, LauncherShortcut.openBook);
+        expect(r.bookId, 'abc');
+        r = LauncherShortcut.request('listen:abc')!;
+        expect(r.shortcut, LauncherShortcut.openPlayer);
+        expect(r.bookId, 'abc');
+        expect(LauncherShortcut.request('continue')!.shortcut,
+            LauncherShortcut.continueReading);
+        expect(LauncherShortcut.request('read:'), isNull);
+        expect(LauncherShortcut.request('listen'), isNull);
+        expect(LauncherShortcut.request('nope'), isNull);
+        expect(LauncherShortcut.request(null), isNull);
       });
 
       test('finished, abandoned and nearly-done audio drops out', () {

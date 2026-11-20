@@ -5,7 +5,7 @@
 /// store the app assumes it owns alone, and a locked or half-written database is
 /// a far worse failure than a widget showing yesterday's book.
 ///
-/// So the contract is three strings and a file path, written whenever the app
+/// So the contract is a few strings and a file path per row, written whenever the app
 /// knows the answer changed. Stale is the intended failure mode.
 library;
 
@@ -52,45 +52,72 @@ bool _onTheGo(Book book) {
       status != ReadingStatus.abandoned;
 }
 
-/// What the widget shows: a book, and whether it is the listening position
-/// (rather than the reading one) that is being continued.
-typedef ContinuePick = ({Book book, bool listening, int? audioMs});
+/// What the widget shows for one row: a book, and whether it is the listening
+/// position (rather than the reading one) that is being continued; [at] is
+/// when that position last moved.
+typedef ContinuePick = ({Book book, bool listening, int? audioMs, DateTime at});
 
-/// The book the widget should show: whichever of reading or listening happened
-/// most recently, among books still on the go. One book, not one of each: the
-/// widget has a single slot, and the launcher is where "carry on" should be one
-/// tap, not a choice. A book marked Finished or Abandoned drops out whatever
-/// its progress says, so the next candidate (or the empty state) takes over.
+/// The two things the widget can continue: the book last read and the book
+/// last listened to, either of which may be absent. They can be the same book.
+class ContinuePicks {
+  const ContinuePicks({this.reading, this.listening});
+
+  final ContinuePick? reading;
+  final ContinuePick? listening;
+
+  /// Whichever of the two happened most recently (reading wins a tie): what a
+  /// one-row widget shows.
+  ContinuePick? get latest {
+    final r = reading, l = listening;
+    if (r == null) return l;
+    if (l == null) return r;
+    return l.at.isAfter(r.at) ? l : r;
+  }
+}
+
+/// The book the widget should continue reading and the one it should continue
+/// listening to, among books still on the go. The widget has two layouts: a
+/// 4x2 shows both rows (tap one to open that book, or its player), a 4x1 has
+/// room for [ContinuePicks.latest] only, so "carry on" stays one tap. A book
+/// marked Finished or Abandoned drops out of both whatever its progress says,
+/// so the next candidate (or the empty state) takes over.
 ///
 /// [audioMs] maps a book id to its audio length; a book not in it has no audio
-/// and is never a listening candidate. A book that qualifies both ways is
-/// shown for whichever is later.
-ContinuePick? pickContinue(
+/// and is never a listening candidate.
+ContinuePicks pickContinues(
   Iterable<Book> books, {
   Map<String, int> audioMs = const {},
 }) {
-  ContinuePick? best;
-  DateTime? bestAt;
+  ContinuePick? reading;
+  ContinuePick? listening;
   for (final book in books) {
     final length = audioMs[book.id];
-    final listens = isListeningOnTheGo(book, length);
-    final reads = _readingOnTheGo(book);
-    if (!listens && !reads) continue;
-    final listenAt = listens ? book.lastListenedAt! : null;
-    final readAt = reads ? _readAt(book) : null;
-    final listening = listens && (readAt == null || listenAt!.isAfter(readAt));
-    final at = listening ? listenAt! : readAt!;
-    // A reading position with no timestamp (restored from a backup, or
-    // published by another device) is still a book on the go: it ranks below
-    // any that has one, rather than dropping out and leaving the widget saying
-    // "nothing".
-    if (best == null || at.isAfter(bestAt!)) {
-      best = (book: book, listening: listening, audioMs: length);
-      bestAt = at;
+    if (_readingOnTheGo(book)) {
+      // A reading position with no timestamp (restored from a backup, or
+      // published by another device) is still a book on the go: it ranks
+      // below any that has one, rather than dropping out and leaving the
+      // widget saying "nothing".
+      final at = _readAt(book);
+      if (reading == null || at.isAfter(reading.at)) {
+        reading = (book: book, listening: false, audioMs: length, at: at);
+      }
+    }
+    if (isListeningOnTheGo(book, length)) {
+      final at = book.lastListenedAt!;
+      if (listening == null || at.isAfter(listening.at)) {
+        listening = (book: book, listening: true, audioMs: length, at: at);
+      }
     }
   }
-  return best;
+  return ContinuePicks(reading: reading, listening: listening);
 }
+
+/// The single book a one-row widget shows: [ContinuePicks.latest].
+ContinuePick? pickContinue(
+  Iterable<Book> books, {
+  Map<String, int> audioMs = const {},
+}) =>
+    pickContinues(books, audioMs: audioMs).latest;
 
 bool _readingOnTheGo(Book book) {
   final progress = book.readingProgress;
@@ -137,6 +164,18 @@ Object? continueWidgetKey(
                 book.status,
               );
 
+/// [continueWidgetKey] for both rows.
+Object? continueWidgetKeys(ContinuePicks picks) => (
+      continueWidgetKey(picks.reading?.book),
+      continueWidgetKey(
+        picks.listening?.book,
+        listening: true,
+        audioMs: picks.listening?.audioMs,
+      ),
+      // Which of the two a one-row widget shows.
+      picks.latest?.listening,
+    );
+
 /// Builds the snapshot for [book].
 ///
 /// A book at 98% or more is treated as finished and doesn't count as "on the
@@ -181,12 +220,13 @@ ContinueWidgetData snapshotFor(
   );
 }
 
-/// Pushes the current continue-reading book to the widget.
+/// Pushes the current continue-reading and continue-listening books to the
+/// widget.
 ///
 /// Best-effort and silent: no widget on the home screen, an older Android, or a
 /// platform without the plugin are all non-events. A local-first app must never
 /// nag about a nicety failing.
-ContinuePick? _pickFrom(LibraryView view) => pickContinue(
+ContinuePicks _pickFrom(LibraryView view) => pickContinues(
       [for (final e in view.entries) e.book],
       audioMs: {
         for (final e in view.entries)
@@ -217,14 +257,10 @@ StreamSubscription<void>? watchContinueWidget(LibraryRepository repository) {
   Object? last;
   var first = true;
   Timer? settle;
-  ContinuePick? pending;
+  var pending = const ContinuePicks();
   return repository.queries.watchLibrary().listen((view) {
     final candidate = _pickFrom(view);
-    final key = continueWidgetKey(
-      candidate?.book,
-      listening: candidate?.listening ?? false,
-      audioMs: candidate?.audioMs,
-    );
+    final key = continueWidgetKeys(candidate);
     // The first answer is always pushed: what the widget holds (a reinstall
     // clears it) says nothing about what the library holds.
     if (!first && key == last) return;
@@ -241,24 +277,42 @@ StreamSubscription<void>? watchContinueWidget(LibraryRepository repository) {
 
 Future<void> _pushContinueWidget(
   LibraryRepository repository,
-  ContinuePick? pick,
+  ContinuePicks picks,
 ) async {
   try {
-    final candidate = pick?.book;
-    final cover = candidate == null ? null : repository.coverFileOf(candidate);
     // No widget tree here to ask (this also runs from the background sync), so
     // the platform's language, like the status-bar notifications.
-    final data = snapshotFor(
-      platformL10n(),
-      candidate,
-      coverPath: cover != null && cover.existsSync() ? cover.path : null,
-      listening: pick?.listening ?? false,
-      audioMs: pick?.audioMs,
-    );
+    final l10n = platformL10n();
 
-    await HomeWidget.saveWidgetData<String>('continue_title', data.title);
-    await HomeWidget.saveWidgetData<String>('continue_subtitle', data.subtitle);
-    await HomeWidget.saveWidgetData<String>('continue_cover', data.coverPath);
+    // Three slots, so the widget can draw whichever layout its size allows:
+    // `continue_*` is the most recent of the two (one row), `read_*` and
+    // `listen_*` are one row each. `*_book` is what a tap opens, and
+    // `continue_kind` says whether the one-row slot is reading or listening.
+    Future<void> save(String prefix, ContinuePick? pick) async {
+      final book = pick?.book;
+      final cover = book == null ? null : repository.coverFileOf(book);
+      final data = snapshotFor(
+        l10n,
+        book,
+        coverPath: cover != null && cover.existsSync() ? cover.path : null,
+        listening: pick?.listening ?? false,
+        audioMs: pick?.audioMs,
+      );
+      await HomeWidget.saveWidgetData<String>('${prefix}_title', data.title);
+      await HomeWidget.saveWidgetData<String>(
+          '${prefix}_subtitle', data.subtitle);
+      await HomeWidget.saveWidgetData<String>(
+          '${prefix}_cover', data.coverPath);
+      await HomeWidget.saveWidgetData<String>(
+          '${prefix}_book', data.isEmpty ? null : book?.id);
+    }
+
+    final latest = picks.latest;
+    await save('continue', latest);
+    await HomeWidget.saveWidgetData<String>('continue_kind',
+        latest == null ? null : (latest.listening ? 'listen' : 'read'));
+    await save('read', picks.reading);
+    await save('listen', picks.listening);
     await HomeWidget.updateWidget(name: 'ContinueReadingWidget');
   } catch (_) {
     // See the doc comment: a widget that didn't update is not worth telling

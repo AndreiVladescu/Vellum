@@ -24,14 +24,46 @@ import 'package:flutter/services.dart';
 enum LauncherShortcut {
   scan,
   continueReading,
-  add;
+  add,
 
-  static LauncherShortcut? parse(String? raw) => switch (raw) {
-        'scan' => LauncherShortcut.scan,
-        'continue' => LauncherShortcut.continueReading,
-        'add' => LauncherShortcut.add,
-        _ => null,
-      };
+  /// A home-widget row: open this book (`read:<id>`).
+  openBook,
+
+  /// A home-widget row: open this book's player (`listen:<id>`).
+  openPlayer;
+
+  static LauncherShortcut? parse(String? raw) => request(raw)?.shortcut;
+
+  /// [parse], with the book id the widget rows carry after a colon.
+  static ShortcutRequest? request(String? raw) {
+    if (raw == null) return null;
+    final colon = raw.indexOf(':');
+    final name = colon < 0 ? raw : raw.substring(0, colon);
+    final id = colon < 0 ? null : raw.substring(colon + 1);
+    final shortcut = switch (name) {
+      'scan' => LauncherShortcut.scan,
+      'continue' => LauncherShortcut.continueReading,
+      'add' => LauncherShortcut.add,
+      'read' => LauncherShortcut.openBook,
+      'listen' => LauncherShortcut.openPlayer,
+      _ => null,
+    };
+    if (shortcut == null) return null;
+    if ((shortcut == LauncherShortcut.openBook ||
+            shortcut == LauncherShortcut.openPlayer) &&
+        (id == null || id.isEmpty)) {
+      return null;
+    }
+    return ShortcutRequest(shortcut, id);
+  }
+}
+
+/// A [LauncherShortcut] and, for the widget's rows, the book it names.
+class ShortcutRequest {
+  const ShortcutRequest(this.shortcut, [this.bookId]);
+
+  final LauncherShortcut shortcut;
+  final String? bookId;
 }
 
 class IncomingShare {
@@ -40,7 +72,7 @@ class IncomingShare {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onShortcut') {
         final raw = call.arguments?.toString();
-        final shortcut = LauncherShortcut.parse(raw);
+        final shortcut = LauncherShortcut.request(raw);
         if (shortcut != null) _shortcuts.add(shortcut);
         return null;
       }
@@ -63,17 +95,17 @@ class IncomingShare {
   /// Files shared while the app was already running.
   Stream<List<String>> get files => _controller.stream;
 
-  final _shortcuts = StreamController<LauncherShortcut>.broadcast();
+  final _shortcuts = StreamController<ShortcutRequest>.broadcast();
 
   /// Launcher shortcuts tapped while the app was already running (plan 5 #40).
-  Stream<LauncherShortcut> get shortcuts => _shortcuts.stream;
+  Stream<ShortcutRequest> get shortcuts => _shortcuts.stream;
 
   /// The shortcut that launched this run, if any. Consumed once, like
   /// [takeInitialFiles] — a hot restart must not re-trigger it.
-  Future<LauncherShortcut?> takeInitialShortcut() async {
+  Future<ShortcutRequest?> takeInitialShortcut() async {
     try {
       final raw = await _channel.invokeMethod<String>('takeShortcut');
-      return LauncherShortcut.parse(raw);
+      return LauncherShortcut.request(raw);
     } on MissingPluginException {
       return null; // desktop, or a host build without the handler
     } catch (_) {
