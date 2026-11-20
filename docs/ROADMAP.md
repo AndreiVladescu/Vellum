@@ -105,7 +105,7 @@ that gets posted.**
       `X.Y.Z`, `X.Y` and `latest`, with OCI labels, provenance and an SBOM
 - [x] **S** `docker-compose.yml` and `docs/DEPLOYMENT.md` pull the published
       image instead of building; the Docker Hub page shows the deployment guide
-- [ ] **by hand** A Docker Hub account, the `vellum-server` repository and an
+- [x] **by hand** A Docker Hub account, the `vellum-server` repository and an
       access token, stored as the `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`
       repository secrets
 
