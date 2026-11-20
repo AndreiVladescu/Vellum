@@ -26,7 +26,7 @@
 set -euo pipefail
 
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
-export PATH="$SDK/platform-tools:$SDK/emulator:$HOME/Documents/tools/flutter-3.50/bin:$PATH"
+export PATH="$SDK/platform-tools:$SDK/emulator:$HOME/Documents/tools/flutter-3.50.1/bin:$PATH"
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EMU_WAIT="${EMU_WAIT:-300}"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-300}"

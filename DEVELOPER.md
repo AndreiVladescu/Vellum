@@ -39,7 +39,7 @@ is a complete product on its own, and the server is optional.
 
 | To build | You need | Version |
 |---|---|---|
-| The app (any platform) | Flutter SDK | Flutter **3.50** or newer, with Dart 3.14 (`environment: sdk: ^3.14.0`, `flutter: ">=3.50.0"`); CI and releases use 3.50.0 |
+| The app (any platform) | Flutter SDK | Flutter **3.50** or newer, with Dart 3.14 (`environment: sdk: ^3.14.0`, `flutter: ">=3.50.0"`); CI and releases use 3.50.1 |
 | The app on Linux | clang, cmake, ninja, pkg-config, GTK 3, liblzma, libsecret | distribution packages |
 | The app on Windows | Visual Studio 2022, *Desktop development with C++* | 2022 |
 | The app on macOS | Xcode | from the App Store |
