@@ -12862,18 +12862,16 @@ abstract class _$VellumDatabase extends GeneratedDatabase {
   ]);
 }
 
-typedef $$SeriesTableCreateCompanionBuilder =
-    SeriesCompanion Function({
-      required String id,
-      required String name,
-      Value<int> rowid,
-    });
-typedef $$SeriesTableUpdateCompanionBuilder =
-    SeriesCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<int> rowid,
-    });
+typedef $$SeriesTableCreateCompanionBuilder = SeriesCompanion Function({
+  required String id,
+  required String name,
+  Value<int> rowid,
+});
+typedef $$SeriesTableUpdateCompanionBuilder = SeriesCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<int> rowid,
+});
 
 final class $$SeriesTableReferences
     extends BaseReferences<_$VellumDatabase, $SeriesTable, Sery> {
@@ -13031,18 +13029,16 @@ class $$SeriesTableTableManager
               $$SeriesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$SeriesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SeriesCompanion(id: id, name: name, rowid: rowid),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                Value<int> rowid = const Value.absent(),
-              }) => SeriesCompanion.insert(id: id, name: name, rowid: rowid),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => SeriesCompanion(id: id, name: name, rowid: rowid),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<int> rowid = const Value.absent(),
+          }) => SeriesCompanion.insert(id: id, name: name, rowid: rowid),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
@@ -13097,90 +13093,88 @@ typedef $$SeriesTableProcessedTableManager =
       Sery,
       PrefetchHooks Function({bool booksRefs})
     >;
-typedef $$BooksTableCreateCompanionBuilder =
-    BooksCompanion Function({
-      required String id,
-      required String title,
-      Value<String?> subtitle,
-      Value<String?> description,
-      Value<String?> isbn,
-      Value<String?> publisher,
-      Value<int?> publishedYear,
-      Value<int?> pageCount,
-      Value<String?> coverPath,
-      Value<String?> spineStyle,
-      Value<String?> seriesId,
-      Value<double?> seriesIndex,
-      Value<double?> readingProgress,
-      Value<int?> lastReadPage,
-      Value<DateTime?> lastReadAt,
-      Value<double?> listenPosition,
-      Value<DateTime?> lastListenedAt,
-      Value<String?> readerNotes,
-      Value<DateTime?> readerNotesUpdatedAt,
-      Value<bool> readerNotesNeedsPush,
-      Value<String?> sourceMetadata,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<bool> needsPush,
-      Value<String?> coverEtag,
-      Value<bool> needsProgressPush,
-      Value<String> status,
-      Value<int?> rating,
-      Value<DateTime?> startedAt,
-      Value<DateTime?> finishedAt,
-      Value<int> readCount,
-      Value<DateTime?> statusUpdatedAt,
-      Value<bool> statusNeedsPush,
-      Value<DateTime?> ratingUpdatedAt,
-      Value<bool> statusInferred,
-      Value<DateTime?> deletedAt,
-      Value<bool> syncExcluded,
-      Value<String?> addedBy,
-      Value<int> rowid,
-    });
-typedef $$BooksTableUpdateCompanionBuilder =
-    BooksCompanion Function({
-      Value<String> id,
-      Value<String> title,
-      Value<String?> subtitle,
-      Value<String?> description,
-      Value<String?> isbn,
-      Value<String?> publisher,
-      Value<int?> publishedYear,
-      Value<int?> pageCount,
-      Value<String?> coverPath,
-      Value<String?> spineStyle,
-      Value<String?> seriesId,
-      Value<double?> seriesIndex,
-      Value<double?> readingProgress,
-      Value<int?> lastReadPage,
-      Value<DateTime?> lastReadAt,
-      Value<double?> listenPosition,
-      Value<DateTime?> lastListenedAt,
-      Value<String?> readerNotes,
-      Value<DateTime?> readerNotesUpdatedAt,
-      Value<bool> readerNotesNeedsPush,
-      Value<String?> sourceMetadata,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<bool> needsPush,
-      Value<String?> coverEtag,
-      Value<bool> needsProgressPush,
-      Value<String> status,
-      Value<int?> rating,
-      Value<DateTime?> startedAt,
-      Value<DateTime?> finishedAt,
-      Value<int> readCount,
-      Value<DateTime?> statusUpdatedAt,
-      Value<bool> statusNeedsPush,
-      Value<DateTime?> ratingUpdatedAt,
-      Value<bool> statusInferred,
-      Value<DateTime?> deletedAt,
-      Value<bool> syncExcluded,
-      Value<String?> addedBy,
-      Value<int> rowid,
-    });
+typedef $$BooksTableCreateCompanionBuilder = BooksCompanion Function({
+  required String id,
+  required String title,
+  Value<String?> subtitle,
+  Value<String?> description,
+  Value<String?> isbn,
+  Value<String?> publisher,
+  Value<int?> publishedYear,
+  Value<int?> pageCount,
+  Value<String?> coverPath,
+  Value<String?> spineStyle,
+  Value<String?> seriesId,
+  Value<double?> seriesIndex,
+  Value<double?> readingProgress,
+  Value<int?> lastReadPage,
+  Value<DateTime?> lastReadAt,
+  Value<double?> listenPosition,
+  Value<DateTime?> lastListenedAt,
+  Value<String?> readerNotes,
+  Value<DateTime?> readerNotesUpdatedAt,
+  Value<bool> readerNotesNeedsPush,
+  Value<String?> sourceMetadata,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<bool> needsPush,
+  Value<String?> coverEtag,
+  Value<bool> needsProgressPush,
+  Value<String> status,
+  Value<int?> rating,
+  Value<DateTime?> startedAt,
+  Value<DateTime?> finishedAt,
+  Value<int> readCount,
+  Value<DateTime?> statusUpdatedAt,
+  Value<bool> statusNeedsPush,
+  Value<DateTime?> ratingUpdatedAt,
+  Value<bool> statusInferred,
+  Value<DateTime?> deletedAt,
+  Value<bool> syncExcluded,
+  Value<String?> addedBy,
+  Value<int> rowid,
+});
+typedef $$BooksTableUpdateCompanionBuilder = BooksCompanion Function({
+  Value<String> id,
+  Value<String> title,
+  Value<String?> subtitle,
+  Value<String?> description,
+  Value<String?> isbn,
+  Value<String?> publisher,
+  Value<int?> publishedYear,
+  Value<int?> pageCount,
+  Value<String?> coverPath,
+  Value<String?> spineStyle,
+  Value<String?> seriesId,
+  Value<double?> seriesIndex,
+  Value<double?> readingProgress,
+  Value<int?> lastReadPage,
+  Value<DateTime?> lastReadAt,
+  Value<double?> listenPosition,
+  Value<DateTime?> lastListenedAt,
+  Value<String?> readerNotes,
+  Value<DateTime?> readerNotesUpdatedAt,
+  Value<bool> readerNotesNeedsPush,
+  Value<String?> sourceMetadata,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<bool> needsPush,
+  Value<String?> coverEtag,
+  Value<bool> needsProgressPush,
+  Value<String> status,
+  Value<int?> rating,
+  Value<DateTime?> startedAt,
+  Value<DateTime?> finishedAt,
+  Value<int> readCount,
+  Value<DateTime?> statusUpdatedAt,
+  Value<bool> statusNeedsPush,
+  Value<DateTime?> ratingUpdatedAt,
+  Value<bool> statusInferred,
+  Value<DateTime?> deletedAt,
+  Value<bool> syncExcluded,
+  Value<String?> addedBy,
+  Value<int> rowid,
+});
 
 final class $$BooksTableReferences
     extends BaseReferences<_$VellumDatabase, $BooksTable, Book> {
@@ -14692,17 +14686,15 @@ class $$BooksTableTableManager
                         >
                       >(state) {
                         if (seriesId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.seriesId,
-                                    referencedTable: $$BooksTableReferences
-                                        ._seriesIdTable(db),
-                                    referencedColumn: $$BooksTableReferences
-                                        ._seriesIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.seriesId,
+                            referencedTable: $$BooksTableReferences
+                                ._seriesIdTable(db),
+                            referencedColumn: $$BooksTableReferences
+                                ._seriesIdTable(db)
+                                .id,
+                          ) as T;
                         }
 
                         return state;
@@ -14922,18 +14914,16 @@ typedef $$BooksTableProcessedTableManager =
         bool bookTextsRefs,
       })
     >;
-typedef $$AuthorsTableCreateCompanionBuilder =
-    AuthorsCompanion Function({
-      required String id,
-      required String name,
-      Value<int> rowid,
-    });
-typedef $$AuthorsTableUpdateCompanionBuilder =
-    AuthorsCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<int> rowid,
-    });
+typedef $$AuthorsTableCreateCompanionBuilder = AuthorsCompanion Function({
+  required String id,
+  required String name,
+  Value<int> rowid,
+});
+typedef $$AuthorsTableUpdateCompanionBuilder = AuthorsCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<int> rowid,
+});
 
 final class $$AuthorsTableReferences
     extends BaseReferences<_$VellumDatabase, $AuthorsTable, Author> {
@@ -15090,18 +15080,16 @@ class $$AuthorsTableTableManager
               $$AuthorsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$AuthorsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => AuthorsCompanion(id: id, name: name, rowid: rowid),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                Value<int> rowid = const Value.absent(),
-              }) => AuthorsCompanion.insert(id: id, name: name, rowid: rowid),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => AuthorsCompanion(id: id, name: name, rowid: rowid),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<int> rowid = const Value.absent(),
+          }) => AuthorsCompanion.insert(id: id, name: name, rowid: rowid),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
@@ -15472,30 +15460,26 @@ class $$BookAuthorsTableTableManager
                     >
                   >(state) {
                     if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$BookAuthorsTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn: $$BookAuthorsTableReferences
-                                    ._bookIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.bookId,
+                        referencedTable: $$BookAuthorsTableReferences
+                            ._bookIdTable(db),
+                        referencedColumn: $$BookAuthorsTableReferences
+                            ._bookIdTable(db)
+                            .id,
+                      ) as T;
                     }
                     if (authorId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.authorId,
-                                referencedTable: $$BookAuthorsTableReferences
-                                    ._authorIdTable(db),
-                                referencedColumn: $$BookAuthorsTableReferences
-                                    ._authorIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.authorId,
+                        referencedTable: $$BookAuthorsTableReferences
+                            ._authorIdTable(db),
+                        referencedColumn: $$BookAuthorsTableReferences
+                            ._authorIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -15523,18 +15507,16 @@ typedef $$BookAuthorsTableProcessedTableManager =
       BookAuthor,
       PrefetchHooks Function({bool bookId, bool authorId})
     >;
-typedef $$GenresTableCreateCompanionBuilder =
-    GenresCompanion Function({
-      required String id,
-      required String name,
-      Value<int> rowid,
-    });
-typedef $$GenresTableUpdateCompanionBuilder =
-    GenresCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<int> rowid,
-    });
+typedef $$GenresTableCreateCompanionBuilder = GenresCompanion Function({
+  required String id,
+  required String name,
+  Value<int> rowid,
+});
+typedef $$GenresTableUpdateCompanionBuilder = GenresCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<int> rowid,
+});
 
 final class $$GenresTableReferences
     extends BaseReferences<_$VellumDatabase, $GenresTable, Genre> {
@@ -15691,18 +15673,16 @@ class $$GenresTableTableManager
               $$GenresTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$GenresTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => GenresCompanion(id: id, name: name, rowid: rowid),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                Value<int> rowid = const Value.absent(),
-              }) => GenresCompanion.insert(id: id, name: name, rowid: rowid),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => GenresCompanion(id: id, name: name, rowid: rowid),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<int> rowid = const Value.absent(),
+          }) => GenresCompanion.insert(id: id, name: name, rowid: rowid),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
@@ -15756,18 +15736,16 @@ typedef $$GenresTableProcessedTableManager =
       Genre,
       PrefetchHooks Function({bool bookGenresRefs})
     >;
-typedef $$BookGenresTableCreateCompanionBuilder =
-    BookGenresCompanion Function({
-      required String bookId,
-      required String genreId,
-      Value<int> rowid,
-    });
-typedef $$BookGenresTableUpdateCompanionBuilder =
-    BookGenresCompanion Function({
-      Value<String> bookId,
-      Value<String> genreId,
-      Value<int> rowid,
-    });
+typedef $$BookGenresTableCreateCompanionBuilder = BookGenresCompanion Function({
+  required String bookId,
+  required String genreId,
+  Value<int> rowid,
+});
+typedef $$BookGenresTableUpdateCompanionBuilder = BookGenresCompanion Function({
+  Value<String> bookId,
+  Value<String> genreId,
+  Value<int> rowid,
+});
 
 final class $$BookGenresTableReferences
     extends BaseReferences<_$VellumDatabase, $BookGenresTable, BookGenre> {
@@ -16051,30 +16029,26 @@ class $$BookGenresTableTableManager
                     >
                   >(state) {
                     if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$BookGenresTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn: $$BookGenresTableReferences
-                                    ._bookIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.bookId,
+                        referencedTable: $$BookGenresTableReferences
+                            ._bookIdTable(db),
+                        referencedColumn: $$BookGenresTableReferences
+                            ._bookIdTable(db)
+                            .id,
+                      ) as T;
                     }
                     if (genreId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.genreId,
-                                referencedTable: $$BookGenresTableReferences
-                                    ._genreIdTable(db),
-                                referencedColumn: $$BookGenresTableReferences
-                                    ._genreIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.genreId,
+                        referencedTable: $$BookGenresTableReferences
+                            ._genreIdTable(db),
+                        referencedColumn: $$BookGenresTableReferences
+                            ._genreIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -16102,38 +16076,36 @@ typedef $$BookGenresTableProcessedTableManager =
       BookGenre,
       PrefetchHooks Function({bool bookId, bool genreId})
     >;
-typedef $$BookFilesTableCreateCompanionBuilder =
-    BookFilesCompanion Function({
-      required String id,
-      required String bookId,
-      required String format,
-      required String path,
-      required int sizeBytes,
-      required String sha256,
-      Value<DateTime> addedAt,
-      Value<int?> durationMs,
-      Value<int?> track,
-      Value<String?> label,
-      Value<String?> narrator,
-      Value<bool> present,
-      Value<int> rowid,
-    });
-typedef $$BookFilesTableUpdateCompanionBuilder =
-    BookFilesCompanion Function({
-      Value<String> id,
-      Value<String> bookId,
-      Value<String> format,
-      Value<String> path,
-      Value<int> sizeBytes,
-      Value<String> sha256,
-      Value<DateTime> addedAt,
-      Value<int?> durationMs,
-      Value<int?> track,
-      Value<String?> label,
-      Value<String?> narrator,
-      Value<bool> present,
-      Value<int> rowid,
-    });
+typedef $$BookFilesTableCreateCompanionBuilder = BookFilesCompanion Function({
+  required String id,
+  required String bookId,
+  required String format,
+  required String path,
+  required int sizeBytes,
+  required String sha256,
+  Value<DateTime> addedAt,
+  Value<int?> durationMs,
+  Value<int?> track,
+  Value<String?> label,
+  Value<String?> narrator,
+  Value<bool> present,
+  Value<int> rowid,
+});
+typedef $$BookFilesTableUpdateCompanionBuilder = BookFilesCompanion Function({
+  Value<String> id,
+  Value<String> bookId,
+  Value<String> format,
+  Value<String> path,
+  Value<int> sizeBytes,
+  Value<String> sha256,
+  Value<DateTime> addedAt,
+  Value<int?> durationMs,
+  Value<int?> track,
+  Value<String?> label,
+  Value<String?> narrator,
+  Value<bool> present,
+  Value<int> rowid,
+});
 
 final class $$BookFilesTableReferences
     extends BaseReferences<_$VellumDatabase, $BookFilesTable, BookFile> {
@@ -16735,17 +16707,15 @@ class $$BookFilesTableTableManager
                         >
                       >(state) {
                         if (bookId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.bookId,
-                                    referencedTable: $$BookFilesTableReferences
-                                        ._bookIdTable(db),
-                                    referencedColumn: $$BookFilesTableReferences
-                                        ._bookIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.bookId,
+                            referencedTable: $$BookFilesTableReferences
+                                ._bookIdTable(db),
+                            referencedColumn: $$BookFilesTableReferences
+                                ._bookIdTable(db)
+                                .id,
+                          ) as T;
                         }
 
                         return state;
@@ -17221,30 +17191,26 @@ class $$FilePositionsTableTableManager
                     >
                   >(state) {
                     if (fileId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.fileId,
-                                referencedTable: $$FilePositionsTableReferences
-                                    ._fileIdTable(db),
-                                referencedColumn: $$FilePositionsTableReferences
-                                    ._fileIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.fileId,
+                        referencedTable: $$FilePositionsTableReferences
+                            ._fileIdTable(db),
+                        referencedColumn: $$FilePositionsTableReferences
+                            ._fileIdTable(db)
+                            .id,
+                      ) as T;
                     }
                     if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$FilePositionsTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn: $$FilePositionsTableReferences
-                                    ._bookIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.bookId,
+                        referencedTable: $$FilePositionsTableReferences
+                            ._bookIdTable(db),
+                        referencedColumn: $$FilePositionsTableReferences
+                            ._bookIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -17817,19 +17783,15 @@ class $$PhysicalCopiesTableTableManager
                         >
                       >(state) {
                         if (bookId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.bookId,
-                                    referencedTable:
-                                        $$PhysicalCopiesTableReferences
-                                            ._bookIdTable(db),
-                                    referencedColumn:
-                                        $$PhysicalCopiesTableReferences
-                                            ._bookIdTable(db)
-                                            .id,
-                                  )
-                                  as T;
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.bookId,
+                            referencedTable: $$PhysicalCopiesTableReferences
+                                ._bookIdTable(db),
+                            referencedColumn: $$PhysicalCopiesTableReferences
+                                ._bookIdTable(db)
+                                .id,
+                          ) as T;
                         }
 
                         return state;
@@ -17923,38 +17885,36 @@ typedef $$PhysicalCopiesTableProcessedTableManager =
         bool bookPlacementsRefs,
       })
     >;
-typedef $$LoansTableCreateCompanionBuilder =
-    LoansCompanion Function({
-      required String id,
-      required String copyId,
-      required String borrower,
-      Value<DateTime> loanedAt,
-      Value<DateTime?> returnedAt,
-      Value<DateTime> updatedAt,
-      Value<bool> needsPush,
-      Value<DateTime?> dueAt,
-      Value<String?> borrowerContact,
-      Value<String?> notes,
-      Value<bool> remind,
-      Value<DateTime?> reminderSentAt,
-      Value<int> rowid,
-    });
-typedef $$LoansTableUpdateCompanionBuilder =
-    LoansCompanion Function({
-      Value<String> id,
-      Value<String> copyId,
-      Value<String> borrower,
-      Value<DateTime> loanedAt,
-      Value<DateTime?> returnedAt,
-      Value<DateTime> updatedAt,
-      Value<bool> needsPush,
-      Value<DateTime?> dueAt,
-      Value<String?> borrowerContact,
-      Value<String?> notes,
-      Value<bool> remind,
-      Value<DateTime?> reminderSentAt,
-      Value<int> rowid,
-    });
+typedef $$LoansTableCreateCompanionBuilder = LoansCompanion Function({
+  required String id,
+  required String copyId,
+  required String borrower,
+  Value<DateTime> loanedAt,
+  Value<DateTime?> returnedAt,
+  Value<DateTime> updatedAt,
+  Value<bool> needsPush,
+  Value<DateTime?> dueAt,
+  Value<String?> borrowerContact,
+  Value<String?> notes,
+  Value<bool> remind,
+  Value<DateTime?> reminderSentAt,
+  Value<int> rowid,
+});
+typedef $$LoansTableUpdateCompanionBuilder = LoansCompanion Function({
+  Value<String> id,
+  Value<String> copyId,
+  Value<String> borrower,
+  Value<DateTime> loanedAt,
+  Value<DateTime?> returnedAt,
+  Value<DateTime> updatedAt,
+  Value<bool> needsPush,
+  Value<DateTime?> dueAt,
+  Value<String?> borrowerContact,
+  Value<String?> notes,
+  Value<bool> remind,
+  Value<DateTime?> reminderSentAt,
+  Value<int> rowid,
+});
 
 final class $$LoansTableReferences
     extends BaseReferences<_$VellumDatabase, $LoansTable, Loan> {
@@ -18341,17 +18301,16 @@ class $$LoansTableTableManager
                     >
                   >(state) {
                     if (copyId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.copyId,
-                                referencedTable: $$LoansTableReferences
-                                    ._copyIdTable(db),
-                                referencedColumn: $$LoansTableReferences
-                                    ._copyIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.copyId,
+                        referencedTable: $$LoansTableReferences._copyIdTable(
+                          db,
+                        ),
+                        referencedColumn: $$LoansTableReferences
+                            ._copyIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -18379,28 +18338,26 @@ typedef $$LoansTableProcessedTableManager =
       Loan,
       PrefetchHooks Function({bool copyId})
     >;
-typedef $$CopyPhotosTableCreateCompanionBuilder =
-    CopyPhotosCompanion Function({
-      required String id,
-      required String copyId,
-      required String path,
-      Value<DateTime> takenAt,
-      Value<String?> caption,
-      Value<DateTime> updatedAt,
-      Value<bool> needsPush,
-      Value<int> rowid,
-    });
-typedef $$CopyPhotosTableUpdateCompanionBuilder =
-    CopyPhotosCompanion Function({
-      Value<String> id,
-      Value<String> copyId,
-      Value<String> path,
-      Value<DateTime> takenAt,
-      Value<String?> caption,
-      Value<DateTime> updatedAt,
-      Value<bool> needsPush,
-      Value<int> rowid,
-    });
+typedef $$CopyPhotosTableCreateCompanionBuilder = CopyPhotosCompanion Function({
+  required String id,
+  required String copyId,
+  required String path,
+  Value<DateTime> takenAt,
+  Value<String?> caption,
+  Value<DateTime> updatedAt,
+  Value<bool> needsPush,
+  Value<int> rowid,
+});
+typedef $$CopyPhotosTableUpdateCompanionBuilder = CopyPhotosCompanion Function({
+  Value<String> id,
+  Value<String> copyId,
+  Value<String> path,
+  Value<DateTime> takenAt,
+  Value<String?> caption,
+  Value<DateTime> updatedAt,
+  Value<bool> needsPush,
+  Value<int> rowid,
+});
 
 final class $$CopyPhotosTableReferences
     extends BaseReferences<_$VellumDatabase, $CopyPhotosTable, CopyPhoto> {
@@ -18697,17 +18654,15 @@ class $$CopyPhotosTableTableManager
                     >
                   >(state) {
                     if (copyId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.copyId,
-                                referencedTable: $$CopyPhotosTableReferences
-                                    ._copyIdTable(db),
-                                referencedColumn: $$CopyPhotosTableReferences
-                                    ._copyIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.copyId,
+                        referencedTable: $$CopyPhotosTableReferences
+                            ._copyIdTable(db),
+                        referencedColumn: $$CopyPhotosTableReferences
+                            ._copyIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -18735,30 +18690,28 @@ typedef $$CopyPhotosTableProcessedTableManager =
       CopyPhoto,
       PrefetchHooks Function({bool copyId})
     >;
-typedef $$ShelvesTableCreateCompanionBuilder =
-    ShelvesCompanion Function({
-      required String id,
-      required String name,
-      Value<int> sortOrder,
-      Value<DateTime> updatedAt,
-      Value<bool> isPersonal,
-      Value<String?> ownerId,
-      Value<bool?> accepted,
-      Value<bool> needsPush,
-      Value<int> rowid,
-    });
-typedef $$ShelvesTableUpdateCompanionBuilder =
-    ShelvesCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<int> sortOrder,
-      Value<DateTime> updatedAt,
-      Value<bool> isPersonal,
-      Value<String?> ownerId,
-      Value<bool?> accepted,
-      Value<bool> needsPush,
-      Value<int> rowid,
-    });
+typedef $$ShelvesTableCreateCompanionBuilder = ShelvesCompanion Function({
+  required String id,
+  required String name,
+  Value<int> sortOrder,
+  Value<DateTime> updatedAt,
+  Value<bool> isPersonal,
+  Value<String?> ownerId,
+  Value<bool?> accepted,
+  Value<bool> needsPush,
+  Value<int> rowid,
+});
+typedef $$ShelvesTableUpdateCompanionBuilder = ShelvesCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<int> sortOrder,
+  Value<DateTime> updatedAt,
+  Value<bool> isPersonal,
+  Value<String?> ownerId,
+  Value<bool?> accepted,
+  Value<bool> needsPush,
+  Value<int> rowid,
+});
 
 final class $$ShelvesTableReferences
     extends BaseReferences<_$VellumDatabase, $ShelvesTable, Shelf> {
@@ -19095,20 +19048,18 @@ typedef $$ShelvesTableProcessedTableManager =
       Shelf,
       PrefetchHooks Function({bool shelfBooksRefs})
     >;
-typedef $$ShelfBooksTableCreateCompanionBuilder =
-    ShelfBooksCompanion Function({
-      required String shelfId,
-      required String bookId,
-      Value<int> position,
-      Value<int> rowid,
-    });
-typedef $$ShelfBooksTableUpdateCompanionBuilder =
-    ShelfBooksCompanion Function({
-      Value<String> shelfId,
-      Value<String> bookId,
-      Value<int> position,
-      Value<int> rowid,
-    });
+typedef $$ShelfBooksTableCreateCompanionBuilder = ShelfBooksCompanion Function({
+  required String shelfId,
+  required String bookId,
+  Value<int> position,
+  Value<int> rowid,
+});
+typedef $$ShelfBooksTableUpdateCompanionBuilder = ShelfBooksCompanion Function({
+  Value<String> shelfId,
+  Value<String> bookId,
+  Value<int> position,
+  Value<int> rowid,
+});
 
 final class $$ShelfBooksTableReferences
     extends BaseReferences<_$VellumDatabase, $ShelfBooksTable, ShelfBook> {
@@ -19409,30 +19360,26 @@ class $$ShelfBooksTableTableManager
                     >
                   >(state) {
                     if (shelfId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.shelfId,
-                                referencedTable: $$ShelfBooksTableReferences
-                                    ._shelfIdTable(db),
-                                referencedColumn: $$ShelfBooksTableReferences
-                                    ._shelfIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.shelfId,
+                        referencedTable: $$ShelfBooksTableReferences
+                            ._shelfIdTable(db),
+                        referencedColumn: $$ShelfBooksTableReferences
+                            ._shelfIdTable(db)
+                            .id,
+                      ) as T;
                     }
                     if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$ShelfBooksTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn: $$ShelfBooksTableReferences
-                                    ._bookIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.bookId,
+                        referencedTable: $$ShelfBooksTableReferences
+                            ._bookIdTable(db),
+                        referencedColumn: $$ShelfBooksTableReferences
+                            ._bookIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -20572,19 +20519,15 @@ class $$PhysicalShelvesTableTableManager
                     >
                   >(state) {
                     if (environmentId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.environmentId,
-                                referencedTable:
-                                    $$PhysicalShelvesTableReferences
-                                        ._environmentIdTable(db),
-                                referencedColumn:
-                                    $$PhysicalShelvesTableReferences
-                                        ._environmentIdTable(db)
-                                        .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.environmentId,
+                        referencedTable: $$PhysicalShelvesTableReferences
+                            ._environmentIdTable(db),
+                        referencedColumn: $$PhysicalShelvesTableReferences
+                            ._environmentIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -21075,32 +21018,26 @@ class $$BookPlacementsTableTableManager
                     >
                   >(state) {
                     if (environmentId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.environmentId,
-                                referencedTable: $$BookPlacementsTableReferences
-                                    ._environmentIdTable(db),
-                                referencedColumn:
-                                    $$BookPlacementsTableReferences
-                                        ._environmentIdTable(db)
-                                        .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.environmentId,
+                        referencedTable: $$BookPlacementsTableReferences
+                            ._environmentIdTable(db),
+                        referencedColumn: $$BookPlacementsTableReferences
+                            ._environmentIdTable(db)
+                            .id,
+                      ) as T;
                     }
                     if (copyId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.copyId,
-                                referencedTable: $$BookPlacementsTableReferences
-                                    ._copyIdTable(db),
-                                referencedColumn:
-                                    $$BookPlacementsTableReferences
-                                        ._copyIdTable(db)
-                                        .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.copyId,
+                        referencedTable: $$BookPlacementsTableReferences
+                            ._copyIdTable(db),
+                        referencedColumn: $$BookPlacementsTableReferences
+                            ._copyIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -21128,32 +21065,30 @@ typedef $$BookPlacementsTableProcessedTableManager =
       BookPlacement,
       PrefetchHooks Function({bool environmentId, bool copyId})
     >;
-typedef $$RoomPropsTableCreateCompanionBuilder =
-    RoomPropsCompanion Function({
-      required String id,
-      required String environmentId,
-      required String kind,
-      required double x,
-      required double y,
-      required double widthM,
-      required double heightM,
-      Value<bool> inFront,
-      Value<DateTime> createdAt,
-      Value<int> rowid,
-    });
-typedef $$RoomPropsTableUpdateCompanionBuilder =
-    RoomPropsCompanion Function({
-      Value<String> id,
-      Value<String> environmentId,
-      Value<String> kind,
-      Value<double> x,
-      Value<double> y,
-      Value<double> widthM,
-      Value<double> heightM,
-      Value<bool> inFront,
-      Value<DateTime> createdAt,
-      Value<int> rowid,
-    });
+typedef $$RoomPropsTableCreateCompanionBuilder = RoomPropsCompanion Function({
+  required String id,
+  required String environmentId,
+  required String kind,
+  required double x,
+  required double y,
+  required double widthM,
+  required double heightM,
+  Value<bool> inFront,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$RoomPropsTableUpdateCompanionBuilder = RoomPropsCompanion Function({
+  Value<String> id,
+  Value<String> environmentId,
+  Value<String> kind,
+  Value<double> x,
+  Value<double> y,
+  Value<double> widthM,
+  Value<double> heightM,
+  Value<bool> inFront,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
 
 final class $$RoomPropsTableReferences
     extends BaseReferences<_$VellumDatabase, $RoomPropsTable, RoomProp> {
@@ -21487,17 +21422,15 @@ class $$RoomPropsTableTableManager
                     >
                   >(state) {
                     if (environmentId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.environmentId,
-                                referencedTable: $$RoomPropsTableReferences
-                                    ._environmentIdTable(db),
-                                referencedColumn: $$RoomPropsTableReferences
-                                    ._environmentIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.environmentId,
+                        referencedTable: $$RoomPropsTableReferences
+                            ._environmentIdTable(db),
+                        referencedColumn: $$RoomPropsTableReferences
+                            ._environmentIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -22467,17 +22400,15 @@ class $$AnnotationsTableTableManager
                     >
                   >(state) {
                     if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$AnnotationsTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn: $$AnnotationsTableReferences
-                                    ._bookIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.bookId,
+                        referencedTable: $$AnnotationsTableReferences
+                            ._bookIdTable(db),
+                        referencedColumn: $$AnnotationsTableReferences
+                            ._bookIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -22951,19 +22882,15 @@ class $$ReadingSessionsTableTableManager
                     >
                   >(state) {
                     if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable:
-                                    $$ReadingSessionsTableReferences
-                                        ._bookIdTable(db),
-                                referencedColumn:
-                                    $$ReadingSessionsTableReferences
-                                        ._bookIdTable(db)
-                                        .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.bookId,
+                        referencedTable: $$ReadingSessionsTableReferences
+                            ._bookIdTable(db),
+                        referencedColumn: $$ReadingSessionsTableReferences
+                            ._bookIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -22991,24 +22918,22 @@ typedef $$ReadingSessionsTableProcessedTableManager =
       ReadingSession,
       PrefetchHooks Function({bool bookId})
     >;
-typedef $$BookTextsTableCreateCompanionBuilder =
-    BookTextsCompanion Function({
-      required String fileId,
-      required String bookId,
-      Value<int?> pages,
-      Value<DateTime> extractedAt,
-      required String status,
-      Value<int> rowid,
-    });
-typedef $$BookTextsTableUpdateCompanionBuilder =
-    BookTextsCompanion Function({
-      Value<String> fileId,
-      Value<String> bookId,
-      Value<int?> pages,
-      Value<DateTime> extractedAt,
-      Value<String> status,
-      Value<int> rowid,
-    });
+typedef $$BookTextsTableCreateCompanionBuilder = BookTextsCompanion Function({
+  required String fileId,
+  required String bookId,
+  Value<int?> pages,
+  Value<DateTime> extractedAt,
+  required String status,
+  Value<int> rowid,
+});
+typedef $$BookTextsTableUpdateCompanionBuilder = BookTextsCompanion Function({
+  Value<String> fileId,
+  Value<String> bookId,
+  Value<int?> pages,
+  Value<DateTime> extractedAt,
+  Value<String> status,
+  Value<int> rowid,
+});
 
 final class $$BookTextsTableReferences
     extends BaseReferences<_$VellumDatabase, $BookTextsTable, BookText> {
@@ -23345,30 +23270,26 @@ class $$BookTextsTableTableManager
                     >
                   >(state) {
                     if (fileId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.fileId,
-                                referencedTable: $$BookTextsTableReferences
-                                    ._fileIdTable(db),
-                                referencedColumn: $$BookTextsTableReferences
-                                    ._fileIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.fileId,
+                        referencedTable: $$BookTextsTableReferences
+                            ._fileIdTable(db),
+                        referencedColumn: $$BookTextsTableReferences
+                            ._fileIdTable(db)
+                            .id,
+                      ) as T;
                     }
                     if (bookId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.bookId,
-                                referencedTable: $$BookTextsTableReferences
-                                    ._bookIdTable(db),
-                                referencedColumn: $$BookTextsTableReferences
-                                    ._bookIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.bookId,
+                        referencedTable: $$BookTextsTableReferences
+                            ._bookIdTable(db),
+                        referencedColumn: $$BookTextsTableReferences
+                            ._bookIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -23663,17 +23584,15 @@ class $$AudioChaptersTableTableManager
                     >
                   >(state) {
                     if (fileId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.fileId,
-                                referencedTable: $$AudioChaptersTableReferences
-                                    ._fileIdTable(db),
-                                referencedColumn: $$AudioChaptersTableReferences
-                                    ._fileIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.fileId,
+                        referencedTable: $$AudioChaptersTableReferences
+                            ._fileIdTable(db),
+                        referencedColumn: $$AudioChaptersTableReferences
+                            ._fileIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;

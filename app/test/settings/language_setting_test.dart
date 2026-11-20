@@ -1,6 +1,6 @@
 // The language choice on Preferences → Appearance: stored per device, followed
 // by MaterialApp, and by the code that posts notifications with no widget tree.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';

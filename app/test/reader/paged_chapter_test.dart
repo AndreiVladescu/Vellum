@@ -3,7 +3,7 @@
 //
 // No HtmlWidget here (it hangs under testWidgets): the chapter is a plain
 // column of Text, which the viewport measures the same way.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

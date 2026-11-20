@@ -6,7 +6,7 @@
 // racing through the same words twice as fast. And the steps are proportional,
 // because a tenth of a page a minute is the whole difference at the slow end
 // and invisible at the fast one.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/reader/auto_scroll_bar.dart';
 import 'package:vellum/l10n/gen/app_localizations.dart';

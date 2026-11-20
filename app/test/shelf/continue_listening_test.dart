@@ -2,7 +2,7 @@
 // text and audio has a reading position and a listening position, and each
 // strip follows its own.
 import 'package:drift/drift.dart' show Value;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/audio/continue_listening.dart';
 import 'package:vellum/data/database.dart';

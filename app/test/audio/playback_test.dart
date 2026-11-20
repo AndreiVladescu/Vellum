@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vellum/audio/audio_handler.dart';
 import 'package:vellum/audio/audiobook_player.dart';

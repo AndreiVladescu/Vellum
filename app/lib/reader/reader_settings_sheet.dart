@@ -1,6 +1,6 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'dictionary/dictionary_tile.dart';
 import 'page_metric.dart';
