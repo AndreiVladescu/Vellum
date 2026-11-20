@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as raw;
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/search_index.dart';
+import 'package:vellum/stats/session_recorder.dart';
 
 import 'generated/drift_schema_versions/schema.dart' as versions;
 
@@ -349,6 +350,32 @@ void main() {
     expect(row.startSecond, isNull);
     expect(row.endSecond, isNull);
     expect(row.endPage, 9);
+  });
+
+  // v42 adds the app-local `open` flag to a table of existing sittings: none of
+  // them can be open (a pre-42 app never wrote the flag), so the startup sweep
+  // must leave them all alone.
+  test('upgrading leaves existing sittings closed, and the sweep skips them',
+      () async {
+    final verifier = verify.SchemaVerifier(versions.GeneratedHelper());
+    final schema = await verifier.schemaAt(41);
+    addTearDown(schema.close);
+    schema.rawDatabase.execute(
+      "INSERT INTO books (id, title, status, created_at, updated_at, "
+      "needs_push, reader_notes_needs_push, needs_progress_push) "
+      "VALUES ('b', 'Dune', 'unread', 0, 0, 0, 0, 0)",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO reading_sessions (id, book_id, started_at, ended_at, "
+      "start_page, end_page, needs_push) VALUES ('s', 'b', 0, 600, 3, 9, 0)",
+    );
+
+    final db = VellumDatabase(schema.newConnection());
+    addTearDown(db.close);
+    final row = await db.select(db.readingSessions).getSingle();
+    expect(row.open, isFalse);
+    expect(await SessionRecorder.closeAbandoned(db), 0);
+    expect((await db.select(db.readingSessions).getSingle()).needsPush, isFalse);
   });
 
   group('every historical schema version migrates cleanly to the latest', () {

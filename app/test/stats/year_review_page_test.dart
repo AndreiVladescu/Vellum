@@ -129,6 +129,7 @@ void main() {
             endPage: 20,
             needsPush: false,
             kind: 'read',
+            open: false,
           ),
         ],
         books: [],

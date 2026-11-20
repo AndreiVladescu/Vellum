@@ -33,6 +33,7 @@ ReadingSession _s(DateTime start, int minutes, {int? from, int? to}) =>
       endPage: to,
       needsPush: false,
       kind: 'read',
+      open: false,
     );
 
 void main() {

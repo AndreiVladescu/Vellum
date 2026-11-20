@@ -37,6 +37,7 @@ void main() {
               deviceLabel: ['Phone', 'Desktop', null][rng.nextInt(3)],
               needsPush: false,
               kind: 'read',
+              open: false,
             );
           }(),
       ];

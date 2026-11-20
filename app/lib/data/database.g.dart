@@ -11368,6 +11368,19 @@ class $ReadingSessionsTable extends ReadingSessions
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _openMeta = const VerificationMeta('open');
+  @override
+  late final GeneratedColumn<bool> open = GeneratedColumn<bool>(
+    'open',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("open" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -11382,6 +11395,7 @@ class $ReadingSessionsTable extends ReadingSessions
     kind,
     startSecond,
     endSecond,
+    open,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -11478,6 +11492,12 @@ class $ReadingSessionsTable extends ReadingSessions
         endSecond.isAcceptableOrUnknown(data['end_second']!, _endSecondMeta),
       );
     }
+    if (data.containsKey('open')) {
+      context.handle(
+        _openMeta,
+        open.isAcceptableOrUnknown(data['open']!, _openMeta),
+      );
+    }
     return context;
   }
 
@@ -11535,6 +11555,10 @@ class $ReadingSessionsTable extends ReadingSessions
         DriftSqlType.int,
         data['${effectivePrefix}end_second'],
       ),
+      open: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}open'],
+      )!,
     );
   }
 
@@ -11573,6 +11597,16 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
   /// reading, which has pages instead.
   final int? startSecond;
   final int? endSecond;
+
+  /// True while this device's recorder is still extending the sitting (set on
+  /// begin, cleared on end). An open sitting has `needsPush = false`, like a
+  /// pulled one, so without this flag one left behind by a killed app could
+  /// not be told apart from a sitting that was pulled from the server; the
+  /// startup sweep (`SessionRecorder.closeAbandoned`) uses it to find them.
+  ///
+  /// **App-local by design** — do *not* add it to the server schema or to the
+  /// session sync payload. A pulled sitting is never open.
+  final bool open;
   const ReadingSession({
     required this.id,
     required this.bookId,
@@ -11586,6 +11620,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     required this.kind,
     this.startSecond,
     this.endSecond,
+    required this.open,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -11614,6 +11649,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     if (!nullToAbsent || endSecond != null) {
       map['end_second'] = Variable<int>(endSecond);
     }
+    map['open'] = Variable<bool>(open);
     return map;
   }
 
@@ -11643,6 +11679,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       endSecond: endSecond == null && nullToAbsent
           ? const Value.absent()
           : Value(endSecond),
+      open: Value(open),
     );
   }
 
@@ -11664,6 +11701,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       kind: serializer.fromJson<String>(json['kind']),
       startSecond: serializer.fromJson<int?>(json['startSecond']),
       endSecond: serializer.fromJson<int?>(json['endSecond']),
+      open: serializer.fromJson<bool>(json['open']),
     );
   }
   @override
@@ -11682,6 +11720,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       'kind': serializer.toJson<String>(kind),
       'startSecond': serializer.toJson<int?>(startSecond),
       'endSecond': serializer.toJson<int?>(endSecond),
+      'open': serializer.toJson<bool>(open),
     };
   }
 
@@ -11698,6 +11737,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     String? kind,
     Value<int?> startSecond = const Value.absent(),
     Value<int?> endSecond = const Value.absent(),
+    bool? open,
   }) => ReadingSession(
     id: id ?? this.id,
     bookId: bookId ?? this.bookId,
@@ -11711,6 +11751,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     kind: kind ?? this.kind,
     startSecond: startSecond.present ? startSecond.value : this.startSecond,
     endSecond: endSecond.present ? endSecond.value : this.endSecond,
+    open: open ?? this.open,
   );
   ReadingSession copyWithCompanion(ReadingSessionsCompanion data) {
     return ReadingSession(
@@ -11730,6 +11771,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           ? data.startSecond.value
           : this.startSecond,
       endSecond: data.endSecond.present ? data.endSecond.value : this.endSecond,
+      open: data.open.present ? data.open.value : this.open,
     );
   }
 
@@ -11747,7 +11789,8 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           ..write('needsPush: $needsPush, ')
           ..write('kind: $kind, ')
           ..write('startSecond: $startSecond, ')
-          ..write('endSecond: $endSecond')
+          ..write('endSecond: $endSecond, ')
+          ..write('open: $open')
           ..write(')'))
         .toString();
   }
@@ -11766,6 +11809,7 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
     kind,
     startSecond,
     endSecond,
+    open,
   );
   @override
   bool operator ==(Object other) =>
@@ -11782,7 +11826,8 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
           other.needsPush == this.needsPush &&
           other.kind == this.kind &&
           other.startSecond == this.startSecond &&
-          other.endSecond == this.endSecond);
+          other.endSecond == this.endSecond &&
+          other.open == this.open);
 }
 
 class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
@@ -11798,6 +11843,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
   final Value<String> kind;
   final Value<int?> startSecond;
   final Value<int?> endSecond;
+  final Value<bool> open;
   final Value<int> rowid;
   const ReadingSessionsCompanion({
     this.id = const Value.absent(),
@@ -11812,6 +11858,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     this.kind = const Value.absent(),
     this.startSecond = const Value.absent(),
     this.endSecond = const Value.absent(),
+    this.open = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReadingSessionsCompanion.insert({
@@ -11827,6 +11874,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     this.kind = const Value.absent(),
     this.startSecond = const Value.absent(),
     this.endSecond = const Value.absent(),
+    this.open = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        bookId = Value(bookId),
@@ -11845,6 +11893,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     Expression<String>? kind,
     Expression<int>? startSecond,
     Expression<int>? endSecond,
+    Expression<bool>? open,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -11860,6 +11909,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
       if (kind != null) 'kind': kind,
       if (startSecond != null) 'start_second': startSecond,
       if (endSecond != null) 'end_second': endSecond,
+      if (open != null) 'open': open,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -11877,6 +11927,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     Value<String>? kind,
     Value<int?>? startSecond,
     Value<int?>? endSecond,
+    Value<bool>? open,
     Value<int>? rowid,
   }) {
     return ReadingSessionsCompanion(
@@ -11892,6 +11943,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
       kind: kind ?? this.kind,
       startSecond: startSecond ?? this.startSecond,
       endSecond: endSecond ?? this.endSecond,
+      open: open ?? this.open,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -11935,6 +11987,9 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
     if (endSecond.present) {
       map['end_second'] = Variable<int>(endSecond.value);
     }
+    if (open.present) {
+      map['open'] = Variable<bool>(open.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -11956,6 +12011,7 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
           ..write('kind: $kind, ')
           ..write('startSecond: $startSecond, ')
           ..write('endSecond: $endSecond, ')
+          ..write('open: $open, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -22463,6 +22519,7 @@ typedef $$ReadingSessionsTableCreateCompanionBuilder =
       Value<String> kind,
       Value<int?> startSecond,
       Value<int?> endSecond,
+      Value<bool> open,
       Value<int> rowid,
     });
 typedef $$ReadingSessionsTableUpdateCompanionBuilder =
@@ -22479,6 +22536,7 @@ typedef $$ReadingSessionsTableUpdateCompanionBuilder =
       Value<String> kind,
       Value<int?> startSecond,
       Value<int?> endSecond,
+      Value<bool> open,
       Value<int> rowid,
     });
 
@@ -22577,6 +22635,11 @@ class $$ReadingSessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get open => $composableBuilder(
+    column: $table.open,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$BooksTableFilterComposer get bookId {
     final $$BooksTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -22665,6 +22728,11 @@ class $$ReadingSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get open => $composableBuilder(
+    column: $table.open,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$BooksTableOrderingComposer get bookId {
     final $$BooksTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -22735,6 +22803,9 @@ class $$ReadingSessionsTableAnnotationComposer
   GeneratedColumn<int> get endSecond =>
       $composableBuilder(column: $table.endSecond, builder: (column) => column);
 
+  GeneratedColumn<bool> get open =>
+      $composableBuilder(column: $table.open, builder: (column) => column);
+
   $$BooksTableAnnotationComposer get bookId {
     final $$BooksTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -22801,6 +22872,7 @@ class $$ReadingSessionsTableTableManager
                 Value<String> kind = const Value.absent(),
                 Value<int?> startSecond = const Value.absent(),
                 Value<int?> endSecond = const Value.absent(),
+                Value<bool> open = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingSessionsCompanion(
                 id: id,
@@ -22815,6 +22887,7 @@ class $$ReadingSessionsTableTableManager
                 kind: kind,
                 startSecond: startSecond,
                 endSecond: endSecond,
+                open: open,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -22831,6 +22904,7 @@ class $$ReadingSessionsTableTableManager
                 Value<String> kind = const Value.absent(),
                 Value<int?> startSecond = const Value.absent(),
                 Value<int?> endSecond = const Value.absent(),
+                Value<bool> open = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingSessionsCompanion.insert(
                 id: id,
@@ -22845,6 +22919,7 @@ class $$ReadingSessionsTableTableManager
                 kind: kind,
                 startSecond: startSecond,
                 endSecond: endSecond,
+                open: open,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

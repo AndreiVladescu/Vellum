@@ -781,6 +781,16 @@ class ReadingSessions extends Table {
   IntColumn get startSecond => integer().nullable()();
   IntColumn get endSecond => integer().nullable()();
 
+  /// True while this device's recorder is still extending the sitting (set on
+  /// begin, cleared on end). An open sitting has `needsPush = false`, like a
+  /// pulled one, so without this flag one left behind by a killed app could
+  /// not be told apart from a sitting that was pulled from the server; the
+  /// startup sweep (`SessionRecorder.closeAbandoned`) uses it to find them.
+  ///
+  /// **App-local by design** — do *not* add it to the server schema or to the
+  /// session sync payload. A pulled sitting is never open.
+  BoolColumn get open => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -852,7 +862,7 @@ class VellumDatabase extends _$VellumDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 41;
+  int get schemaVersion => 42;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1399,6 +1409,15 @@ class VellumDatabase extends _$VellumDatabase {
               if (!sessionCols.contains(name)) {
                 await m.addColumn(readingSessions, column);
               }
+            }
+          }
+          if (from < 42) {
+            // Open-sitting flag (app-local; see ReadingSessions.open): every
+            // existing row is a finished or pulled sitting, which the
+            // constant default says.
+            final sessionCols = await columnsOf('reading_sessions');
+            if (!sessionCols.contains('open')) {
+              await m.addColumn(readingSessions, readingSessions.open);
             }
           }
         },

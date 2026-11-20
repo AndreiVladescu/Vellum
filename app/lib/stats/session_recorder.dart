@@ -74,6 +74,7 @@ class SessionRecorder {
         at.difference(recent.endedAt).abs() <= coalesceGap) {
       // Same sitting: keep extending the existing row.
       _sessionId = recent.id;
+      await _setOpen(recent.id, true);
       return recent.id;
     }
 
@@ -96,10 +97,15 @@ class SessionRecorder {
           // took the first version of a session and ignored the rest kept it
           // that way for good. See [end].
           needsPush: const Value(false),
+          open: const Value(true),
         ));
     _sessionId = id;
     return id;
   }
+
+  Future<void> _setOpen(String id, bool open) =>
+      (db.update(db.readingSessions)..where((s) => s.id.equals(id)))
+          .write(ReadingSessionsCompanion(open: Value(open)));
 
   /// Extends the open session to [page] and *now*. Called as the reader turns
   /// pages; cheap enough to call per turn since it updates one row.
@@ -145,8 +151,42 @@ class SessionRecorder {
       return;
     }
     // Over, and therefore a fact: now it can go.
-    await (db.update(db.readingSessions)..where((s) => s.id.equals(id)))
-        .write(const ReadingSessionsCompanion(needsPush: Value(true)));
+    await (db.update(db.readingSessions)..where((s) => s.id.equals(id))).write(
+        const ReadingSessionsCompanion(
+            needsPush: Value(true), open: Value(false)));
+  }
+
+  /// Closes every sitting an earlier run left open — the app was killed (or
+  /// crashed) between [begin] and [end], so nothing ever marked it finished and
+  /// it would never have been pushed. Run once at startup, before any recorder
+  /// has begun a new one.
+  ///
+  /// Each is closed at its last touch (`endedAt`), which is the last moment
+  /// anything is known to have happened; a sitting shorter than
+  /// [minimumLength] (with no page moved, for reading) is dropped as [end]
+  /// would drop it. The rest are marked for push and the flag is cleared.
+  /// Returns how many were kept.
+  static Future<int> closeAbandoned(VellumDatabase db) async {
+    final rows = await (db.select(db.readingSessions)
+          ..where((s) => s.open.equals(true)))
+        .get();
+    var kept = 0;
+    for (final row in rows) {
+      final duration = row.endedAt.difference(row.startedAt);
+      final moved = row.kind == listen
+          ? false
+          : (row.endPage ?? 0) != (row.startPage ?? 0);
+      if (duration < minimumLength && !moved) {
+        await (db.delete(db.readingSessions)..where((s) => s.id.equals(row.id)))
+            .go();
+        continue;
+      }
+      await (db.update(db.readingSessions)..where((s) => s.id.equals(row.id)))
+          .write(const ReadingSessionsCompanion(
+              needsPush: Value(true), open: Value(false)));
+      kept++;
+    }
+    return kept;
   }
 
   /// Wipes the history — the "Clear reading history" action. Behavioural data the

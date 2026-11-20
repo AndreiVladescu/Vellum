@@ -50,6 +50,7 @@ ReadingSession _read(String id, DateTime start, int minutes,
       deviceLabel: 'Phone',
       needsPush: false,
       kind: 'read',
+      open: false,
     );
 
 ReadingSession _listen(String id, DateTime start, int minutes,
@@ -64,6 +65,7 @@ ReadingSession _listen(String id, DateTime start, int minutes,
       deviceLabel: 'Phone',
       needsPush: false,
       kind: 'listen',
+      open: false,
     );
 
 void main() {

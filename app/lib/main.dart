@@ -111,6 +111,13 @@ Future<void> main() async {
   // first frame depends on the sweep having run. It swallows its own errors —
   // a file the OS won't release just waits for the next launch.
   unawaited(repository.trash.sweep());
+  // Close the sittings a killed app left open, so they are counted and pushed.
+  // Awaited, unlike the sweeps around it: it is a single small query, and it
+  // must finish before any recorder opens a sitting of its own, which it would
+  // otherwise close. Errors are swallowed; the next launch tries again.
+  try {
+    await SessionRecorder.closeAbandoned(repository.db);
+  } catch (_) {}
   // Index a few books' text, if the user asked for local content search.
   // Not awaited, and bounded per launch rather than draining the queue: the
   // first pass over a large library is minutes of extraction, and the shelf

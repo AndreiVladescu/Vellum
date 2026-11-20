@@ -38,6 +38,7 @@ ReadingSession _s(
       endPage: to,
       needsPush: false,
       kind: 'read',
+      open: false,
     );
 
 void main() {
