@@ -19,6 +19,12 @@ import { esc } from './dom.js';
 /// and a prompt-shaped one destructures what it asked for.
 export let _askResolve = null;
 
+/// Which fields of the open dialog hold a secret, by index. A secret is read
+/// back exactly as typed: trimming a password changes it, so one with a leading
+/// or trailing space could never be confirmed. A field is secret if it is
+/// `type: 'password'` or says `secret: true` (for a secret shown in the clear).
+let _askSecret = new Set();
+
 /// `html` is author-written markup, `body` is text that gets escaped. Two
 /// parameters rather than one because everything passed here so far has been a
 /// sentence containing somebody's email address, and the day one of those is
@@ -28,6 +34,7 @@ export function ask({ title, body = '', html = '', fields = [], confirmLabel = '
                cancelLabel = 'Cancel', danger = false, width = 460 }){
   return new Promise(resolve => {
     _askResolve = resolve;
+    _askSecret = new Set(fields.flatMap((f, i) => (f.secret || f.type === 'password') ? [i] : []));
     const inputs = fields.map((f, i) => `
       <label for="ask-${i}">${esc(f.label)}</label>
       ${f.options
@@ -72,8 +79,10 @@ export function askDone(ok){
   for (let i = 0; ; i++){
     const el = document.getElementById('ask-' + i);
     if (!el) break;
-    values[i] = (el.value || '').trim();
+    const typed = el.value || '';
+    values[i] = _askSecret.has(i) ? typed : typed.trim();
   }
+  _askSecret = new Set();
   closeModal();
   if (resolve) resolve(ok ? values : null);
 }

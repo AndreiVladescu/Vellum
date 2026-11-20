@@ -46,7 +46,8 @@ export async function register(){
   try {
     const body = { email, display_name: name, password: pass };
     if (!tokenField.classList.contains('hidden')) {
-      body.bootstrap_token = tokenField.value.trim();
+      // A secret: sent exactly as typed, never trimmed.
+      body.bootstrap_token = tokenField.value;
     }
     const r = await api('POST','/api/auth/register', body);
     // Registering signs you in — the server hands back a session token, so

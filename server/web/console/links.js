@@ -37,7 +37,8 @@ export async function createLink(bookId){
   // Shown in the clear rather than as a password field: whoever creates the
   // link has to read it back to pass it on, and hiding it from them protects
   // nobody.
-  const pw = document.getElementById('m-pw').value.trim();
+  // Never trimmed: a password is exactly what was typed, spaces included.
+  const pw = document.getElementById('m-pw').value;
   try {
     const r = await api('POST','/api/share-links', {
       book_id: bookId, one_time: oneTime, ...(exp?{expires_at:exp}:{}),
