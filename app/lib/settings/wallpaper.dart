@@ -1,5 +1,7 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 
 /// Built-in library wallpapers. Each adapts to light/dark theme.
@@ -24,43 +26,25 @@ class WallpaperBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final view = View.of(context);
-    final decoration = BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: switch ((wallpaper, dark)) {
-          (Wallpaper.parchment, false) => const [
-              Color(0xFFFAF4E8),
-              Color(0xFFEBDCC3)
-            ],
-          (Wallpaper.parchment, true) => const [
-              Color(0xFF262019),
-              Color(0xFF171310)
-            ],
-          (Wallpaper.fern, false) => const [
-              Color(0xFFFCFCFA),
-              Color(0xFFEFEEE7)
-            ],
-          (Wallpaper.fern, true) => const [
-              Color(0xFF1F231E),
-              Color(0xFF131511)
-            ],
-          (Wallpaper.ocean, false) => const [
-              Color(0xFFF0F6FB),
-              Color(0xFFD3E2EF)
-            ],
-          (Wallpaper.ocean, true) => const [
-              Color(0xFF19202C),
-              Color(0xFF0E1219)
-            ],
-        },
-      ),
-    );
+    final ramp = _VerticalRamp(switch ((wallpaper, dark)) {
+      (Wallpaper.parchment, false) => const [
+        Color(0xFFFAF4E8),
+        Color(0xFFEBDCC3),
+      ],
+      (Wallpaper.parchment, true) => const [
+        Color(0xFF262019),
+        Color(0xFF171310),
+      ],
+      (Wallpaper.fern, false) => const [Color(0xFFFCFCFA), Color(0xFFEFEEE7)],
+      (Wallpaper.fern, true) => const [Color(0xFF1F231E), Color(0xFF131511)],
+      (Wallpaper.ocean, false) => const [Color(0xFFF0F6FB), Color(0xFFD3E2EF)],
+      (Wallpaper.ocean, true) => const [Color(0xFF19202C), Color(0xFF0E1219)],
+    });
     if (wallpaper != Wallpaper.fern) {
-      return Container(decoration: decoration, child: child);
+      return CustomPaint(painter: ramp, child: child);
     }
-    return Container(
-      decoration: decoration,
+    return CustomPaint(
+      painter: ramp,
       child: Stack(
         children: [
           Positioned.fill(
@@ -85,6 +69,47 @@ class WallpaperBackground extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The wallpaper's top-to-bottom gradient, filling the box.
+///
+/// Drawn into a small 1 × [_height] box and scaled up to the real size, rather
+/// than as a `BoxDecoration` gradient. Since Flutter 3.50, Impeller's OpenGL ES
+/// backend (the Linux desktop) works out where a pixel sits along a gradient
+/// on a rectangle in 16-bit floats, which overflow once position × gradient
+/// length passes 65504 (flutter/flutter#196865): on a 720 px window the
+/// parchment ramp stopped about 130 px down and the rest of the shelf was flat
+/// end colour, with a hard edge. In the small box that product is at most
+/// 128 × 128; the scale is applied after, by the GPU, so the colours are the
+/// same ramp. Once the pinned Flutter has the fix this can go back to a
+/// `BoxDecoration` with a `LinearGradient`.
+class _VerticalRamp extends CustomPainter {
+  const _VerticalRamp(this.colors);
+
+  final List<Color> colors;
+
+  static const _height = 128.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    canvas.save();
+    canvas.scale(size.width, size.height / _height);
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 1, _height),
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset.zero,
+          const Offset(0, _height),
+          colors,
+        ),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_VerticalRamp oldDelegate) =>
+      !listEquals(colors, oldDelegate.colors);
 }
 
 /// A few soft fern fronds growing out of the bottom-left corner.
