@@ -4282,6 +4282,16 @@
     }
   },
 
+  "readerSettingsVolumeKeys": "Volume keys turn pages",
+  "@readerSettingsVolumeKeys": {
+    "description": "Reader settings switch (Android): the phone's volume keys turn pages."
+  },
+
+  "readerSettingsVolumeKeysSub": "Volume down goes forward, volume up goes back. Only while a book is open.",
+  "@readerSettingsVolumeKeysSub": {
+    "description": "Subtitle of the volume-keys switch in the reader settings."
+  },
+
   "readerAutoSpeedSeconds": "{speed} s/page",
   "@readerAutoSpeedSeconds": {
     "description": "Auto-scroll readout in a paged EPUB: seconds before the page turns by itself; `speed` is already formatted.",

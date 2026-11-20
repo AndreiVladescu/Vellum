@@ -182,6 +182,7 @@ MIGRATED=(
   lib/reader/reader_search_field.dart
   lib/reader/reader_settings.dart
   lib/reader/reader_settings_sheet.dart
+  lib/reader/volume_keys.dart
   lib/reader/translate/local_engine_backend.dart
   lib/reader/tts/read_aloud.dart
   lib/reader/tts/read_aloud_widgets.dart

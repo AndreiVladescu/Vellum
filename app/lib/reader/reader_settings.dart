@@ -122,6 +122,7 @@ class ReaderSettings extends ChangeNotifier {
   static const _highlightColorKey = 'reader.highlightColor';
   static const _pageMetricKey = 'reader.pageMetric';
   static const _autoScrollKey = 'reader.autoScrollPagesPerMinute';
+  static const _volumeKeysKey = 'reader.volumeKeysTurnPages';
   static const _autoPageSecondsKey = 'reader.autoPageSeconds';
   static const _autoScrollLinesKey = 'reader.autoScrollLinesPerMinute';
   // Translation (next features #12). The URL is what decides whether the
@@ -367,6 +368,14 @@ class ReaderSettings extends ChangeNotifier {
 
   Future<void> setAutoPageSeconds(double value) async {
     await _prefs.setDouble(_autoPageSecondsKey, value);
+    notifyListeners();
+  }
+
+  /// Android: the volume keys turn pages while a reader is open.
+  bool get volumeKeysTurnPages => _prefs.getBool(_volumeKeysKey) ?? false;
+
+  Future<void> setVolumeKeysTurnPages(bool value) async {
+    await _prefs.setBool(_volumeKeysKey, value);
     notifyListeners();
   }
 

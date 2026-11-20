@@ -40,6 +40,7 @@ import 'tts/tts_text.dart';
 import 'reader_search_field.dart';
 import 'pdf_paged_view.dart';
 import 'reader_settings.dart';
+import 'volume_keys.dart';
 import 'reader_settings_sheet.dart';
 import 'translate/translate_sheet.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -241,6 +242,12 @@ class _ReaderPageState extends State<ReaderPage>
     }
   }
 
+  /// The volume keys as page turns, when the setting is on (Android).
+  late final VolumeKeys _volumeKeys = VolumeKeys(
+    isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+    onStep: (delta) => _stepPage(delta),
+  );
+
   /// Ctrl+F / Ctrl+G, which have to work before the page is clicked.
   late final ReaderHotkeys _hotkeys = ReaderHotkeys(
     isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
@@ -334,6 +341,7 @@ class _ReaderPageState extends State<ReaderPage>
         _chromeHidden = settings.immersive;
       });
       settings.addListener(_onSettingsChanged);
+      _volumeKeys.sync(settings.volumeKeysTurnPages);
       // Re-anchor now that the real mode and fit are known.
       //
       // These settings arrive asynchronously, and the viewer is built before
@@ -377,6 +385,7 @@ class _ReaderPageState extends State<ReaderPage>
     unawaited(WakelockPlus.disable().catchError((_) {}));
     _openTimer?.cancel();
     _hotkeys.detach();
+    _volumeKeys.dispose();
     _readAloud.removeListener(_onSpeechChanged);
     _readAloud.dispose();
     // Closing the session is fire-and-forget: the widget is going away, and a
@@ -395,6 +404,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   void _onSettingsChanged() {
     if (!mounted) return;
+    _volumeKeys.sync(_settings?.volumeKeysTurnPages ?? false);
     setState(() {});
     _applyFit();
   }

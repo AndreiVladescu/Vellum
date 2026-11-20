@@ -35,6 +35,7 @@ import 'reader_search_field.dart';
 import 'page_metric.dart';
 import 'reader_actions.dart';
 import 'reader_settings.dart';
+import 'volume_keys.dart';
 import 'translate/translate_sheet.dart';
 import 'tts/read_aloud.dart';
 import 'tts/read_aloud_widgets.dart';
@@ -380,6 +381,12 @@ class _EpubReaderPageState extends State<EpubReaderPage>
   bool _hitsTruncated = false;
   int _hitIndex = 0;
 
+  /// The volume keys as page turns, when the setting is on (Android).
+  late final VolumeKeys _volumeKeys = VolumeKeys(
+    isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+    onStep: (delta) => delta > 0 ? _pageForward(_count) : _pageBack(_count),
+  );
+
   /// Ctrl+F / Ctrl+G, which have to work before the page is clicked.
   late final ReaderHotkeys _hotkeys = ReaderHotkeys(
     isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
@@ -419,12 +426,14 @@ class _EpubReaderPageState extends State<EpubReaderPage>
         _chromeHidden = settings.immersive;
       });
       settings.addListener(_onSettingsChanged);
+      _volumeKeys.sync(settings.volumeKeysTurnPages);
     });
     _session.begin(widget.book.id, page: (widget.book.lastReadPage ?? 1));
   }
 
   void _onSettingsChanged() {
     if (!mounted) return;
+    _volumeKeys.sync(_settings?.volumeKeysTurnPages ?? false);
     final layout = _settings?.epubLayout;
     if (layout != _layout) _switchLayout(layout);
     setState(() {});
@@ -553,6 +562,7 @@ class _EpubReaderPageState extends State<EpubReaderPage>
     // The wakelock belongs to this page, not to the app.
     unawaited(WakelockPlus.disable().catchError((_) {}));
     _hotkeys.detach();
+    _volumeKeys.dispose();
     _readAloud.removeListener(_onSpeechChanged);
     _readAloud.dispose();
     _annotationsSub?.cancel();

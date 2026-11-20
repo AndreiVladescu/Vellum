@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.view.KeyEvent
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -57,8 +58,55 @@ class MainActivity : AudioServiceActivity() {
      */
     private val networkChannelName = "app.vellum.Vellum/network"
 
+    /**
+     * The volume keys as page turns, for the readers' opt-in setting. Off by
+     * default and only on while a reader that asked for it is open, so the keys
+     * change the volume everywhere else. Dart enables and disables it; while it
+     * is on, the key presses go to Dart and the system never sees them.
+     */
+    private val volumeKeysChannelName = "app.vellum.Vellum/volume_keys"
+    private var volumeKeysChannel: MethodChannel? = null
+    private var volumeKeysOn = false
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (volumeKeysOn &&
+            (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+                event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)
+        ) {
+            // One turn per press: holding the key repeats, which would race
+            // through the chapter. Both halves of the press are swallowed so
+            // the volume bar never appears.
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                volumeKeysChannel?.invokeMethod(
+                    "key",
+                    if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) "up" else "down",
+                )
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // A new engine starts with the keys back to the system's.
+        volumeKeysOn = false
+        volumeKeysChannel =
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, volumeKeysChannelName).also {
+                it.setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "enable" -> {
+                            volumeKeysOn = true
+                            result.success(null)
+                        }
+                        "disable" -> {
+                            volumeKeysOn = false
+                            result.success(null)
+                        }
+                        else -> result.notImplemented()
+                    }
+                }
+            }
         val messenger = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
         channel = messenger
         messenger.setMethodCallHandler { call, result ->

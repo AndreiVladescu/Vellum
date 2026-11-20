@@ -320,6 +320,21 @@ to see on a real phone: swipes and side-third taps against text selection
 (long-press to select, then dragging a handle must not turn), rotation, a
 chapter with a tall picture (it should be scaled to the page), and night mode.
 
+**Volume keys turn pages (Android, both readers) — device check owed.** The
+Dart half is unit tested and `flutter build apk --debug` builds, but the keys
+themselves were never pressed. Reader settings, *Volume keys turn pages* (off by
+default; only offered on Android). With it on: volume down goes forward and up
+goes back in the EPUB reader (paged and scrolled) and the PDF reader, one turn
+per press even when held, and the system volume bar does not appear. Check that
+with it on the keys still change the volume on the shelf, in the audiobook
+player, and in a reader after you open the settings sheet or a dialog (a covered
+reader must not turn), and after leaving the reader. Check that a locked screen
+and a call still use the keys normally, and that turning it off in the sheet
+gives the keys back at once. Also check the page-turn glide (smooth at 60/90 Hz,
+none with Settings, Accessibility, Remove animations on) and timed page turns
+(Scroll by itself in paged mode: a page every N seconds, the finger holds it,
+it rolls on into the next chapter and stops at the last page).
+
 ---
 
 ## Performance round (October 2026)
@@ -360,10 +375,10 @@ this order.
   Paged mode landed in v1.4.0 (`epub_pagination.dart`, `paged_chapter.dart`).
   Still open: heavy CSS-driven layouts rendering approximately
   (`flutter_widget_from_html_core`). Paged-mode follow-ups: auto-scroll is
-  hidden there rather than turning pages on a timer; a tap in a side third on a
-  link turns the page as well as following it; a re-pagination (text size,
-  window) keeps the place by proportion of the chapter, not by the exact line;
-  no page-turn animation; volume-key turns still need a platform plugin.
+  a re-pagination (text size, window) keeps the place by proportion of the
+  chapter, not by the exact line. Done since: a 200 ms page-turn glide (none
+  under reduced motion), a tap on a link no longer turns the page, auto-scroll
+  turns pages on a timer (seconds a page), volume keys on Android (below).
 
 ## Read aloud (v1.4.3): checks owed on a device
 

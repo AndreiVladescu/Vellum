@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 
 import 'dictionary/dictionary_tile.dart';
@@ -22,9 +24,14 @@ class ReaderSettingsSheet extends StatelessWidget {
     required this.showTypography,
     required this.showPdfOptions,
     this.readAloud,
+    this.showVolumeKeys,
   });
 
   final ReaderSettings settings;
+
+  /// Android only (the default): the volume-keys option has nothing to claim
+  /// elsewhere.
+  final bool? showVolumeKeys;
 
   /// EPUB: font, size, line height, measure.
   final bool showTypography;
@@ -211,6 +218,14 @@ class ReaderSettingsSheet extends StatelessWidget {
                   value: settings.immersive,
                   onChanged: settings.setImmersive,
                 ),
+                if (showVolumeKeys ?? Platform.isAndroid)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l10n.readerSettingsVolumeKeys),
+                    subtitle: Text(l10n.readerSettingsVolumeKeysSub),
+                    value: settings.volumeKeysTurnPages,
+                    onChanged: settings.setVolumeKeysTurnPages,
+                  ),
                 // Where the word lookup's dictionary is managed. The download
                 // is also offered inside the lookup itself, which is where it
                 // is first wanted; this is where it can be given back.
