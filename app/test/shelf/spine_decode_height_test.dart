@@ -120,5 +120,34 @@ void main() {
         reason: 'without this the spine blanks when the bucket changes',
       );
     });
+
+    testWidgets('a decodeHeight overrides the laid-out height', (tester) async {
+      // The room hands the size from before a zoom began, so the zoom does not
+      // decode every cover again at each size it passes.
+      Future<Object> held(double laidOut, double decodeHeight) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Center(
+              child: SizedBox(
+                width: 30,
+                height: laidOut,
+                child: SpineFace(
+                  book: book,
+                  coverFile: File('/nonexistent/cover.jpg'),
+                  decodeHeight: decodeHeight,
+                ),
+              ),
+            ),
+          ),
+        );
+        return tester.widget<Image>(find.byType(Image)).image;
+      }
+
+      final before = await held(100, 100);
+      final during = await held(900, 100);
+      expect(during, equals(before), reason: 'zoomed, decode held');
+      final after = await providerAt(tester, 900);
+      expect(after, isNot(equals(before)), reason: 'released, decode follows');
+    });
   });
 }

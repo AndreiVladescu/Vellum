@@ -244,6 +244,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
     _pulse.dispose();
     _dragPosVN.dispose();
     _shelfDeltaVN.dispose();
+    _decodeTimer?.cancel();
     _originVN.dispose();
     super.dispose();
   }
@@ -375,9 +376,28 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
 
   // ---- camera -------------------------------------------------------------
 
+  /// The zoom the covers were last decoded for, while a zoom is running; null
+  /// when none is. A pinch or wheel burst changes the spines' height on every
+  /// step, and each bucket it crosses decodes and uploads every cover again —
+  /// ~2,000 decodes in the profiling zoom. So the decode keeps the size from
+  /// before the burst, the GPU scales it, and it is redone once, a moment
+  /// after the last step.
+  double? _decodeScale;
+  Timer? _decodeTimer;
+
+  void _holdDecode() {
+    _decodeScale ??= _scale;
+    _decodeTimer?.cancel();
+    _decodeTimer = Timer(const Duration(milliseconds: 250), () {
+      _decodeTimer = null;
+      if (mounted) setState(() => _decodeScale = null);
+    });
+  }
+
   void _zoomAt(Offset focal, double factor) {
     final newScale = (_scale * factor).clamp(_minScale, _maxScale);
     final worldFocal = _screenToWorld(focal);
+    _holdDecode();
     setState(() {
       _scale = newScale;
       _origin = Offset(
@@ -545,6 +565,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
         // all 400 placed books on every frame of a drag.
         _origin = origin;
       } else {
+        _holdDecode();
         setState(() {
           _scale = newScale;
           _origin = origin;
@@ -2573,6 +2594,7 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
       _pulseId == pb.placement.id,
       dimmed,
       widget.settings.spineArt,
+      _decodeScale ?? _scale,
       Theme.of(context).colorScheme,
     );
     final cached = _visuals[pb.placement.id];
@@ -2592,10 +2614,12 @@ class _EnvironmentEditorPageState extends State<EnvironmentEditorPage>
   }) {
     final selected = _selectedId == pb.placement.id;
     final flat = pb.placement.rotation == 90;
+    final foot = _footOf(pb);
     Widget spine = SpineFace(
       book: pb.book,
       coverFile: repo.coverFileOf(pb.book),
       spineArt: widget.settings.spineArt,
+      decodeHeight: (flat ? foot.w : foot.h) * (_decodeScale ?? _scale),
     );
     if (flat) spine = RotatedBox(quarterTurns: 3, child: spine);
     return IgnorePointer(

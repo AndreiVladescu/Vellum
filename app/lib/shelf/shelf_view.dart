@@ -680,6 +680,7 @@ class SpineFace extends StatelessWidget {
     this.spineArt = SpineArt.coverSlice,
     this.titleScale = 1.0,
     this.audio = false,
+    this.decodeHeight,
   });
 
   final Book book;
@@ -690,6 +691,13 @@ class SpineFace extends StatelessWidget {
   /// clear of it. Part of the face so it is the same on both spine materials
   /// (cover slice and generated), and so the physical room could show it too.
   final bool audio;
+
+  /// Logical height to size the cover's decode by, instead of the height the
+  /// spine is laid out at. The room passes the height from before a zoom
+  /// gesture began, so a pinch does not decode every cover again at each size
+  /// it crosses (docs/PERFORMANCE.md, "Room memory"); the decode catches up
+  /// when the gesture ends.
+  final double? decodeHeight;
 
   /// Room the title leaves at the foot of an audio spine for the badge.
   static const _audioFoot = 24.0;
@@ -759,9 +767,10 @@ class SpineFace extends StatelessWidget {
           // centerLeft alignment keeps the cover's left edge visible.
           LayoutBuilder(
             builder: (context, constraints) {
-              final h = constraints.maxHeight.isFinite
-                  ? constraints.maxHeight
-                  : _bookAreaHeight;
+              final h = decodeHeight ??
+                  (constraints.maxHeight.isFinite
+                      ? constraints.maxHeight
+                      : _bookAreaHeight);
               return Image(
                 image: CoverImage(
                   cover,
