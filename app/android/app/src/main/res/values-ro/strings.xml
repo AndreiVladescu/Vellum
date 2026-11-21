@@ -17,9 +17,9 @@
 
     <string name="widget_name">Continuă lectura</string>
     <string name="widget_cover_description">Coperta cărții</string>
-    <string name="widget_preview_title">Frăția Inelului</string>
+    <string name="widget_preview_title">Mândrie și prejudecată</string>
     <string name="widget_preview_subtitle">Lectură · 42&#160;% · pagina 214</string>
-    <string name="widget_preview_listen_title">Proiectul Hail Mary</string>
+    <string name="widget_preview_listen_title">Colind de Crăciun</string>
     <string name="widget_preview_listen_subtitle">Ascultare · 42&#160;% · la 1:02:33</string>
     <string name="widget_label_reading">Lectură</string>
     <string name="widget_label_listening">Ascultare</string>
