@@ -1,0 +1,48 @@
+Vellum îți gestionează biblioteca – cărțile pe care le ai ca fișiere și pe cele din rafturile tale reale – și ți-o arată ca pe un raft pe care îl răsfoiești cu cotorul la vedere. Citește EPUB și PDF, redă cărți audio, îți păstrează evidențierile și istoricul de lectură și ține minte în ce corp de bibliotecă stă fiecare exemplar fizic și cui i l-ai împrumutat.
+
+Totul rulează pe dispozitivul tău. Nu-ți faci niciun cont și nu se încarcă nimic nicăieri, decât dacă alegi să-ți instalezi serverul opțional.
+
+<b>Raftul</b>
+
+* Cărțile tale cu cotorul la vedere, cu coperta la vedere sau ca listă simplă. Le poți grupa după autor, serie sau gen.
+* Rafturi personale, filtre după gen, starea lecturii și cărți audio, o listă de dorințe și o pagină a seriei care îți arată ce volume lipsesc.
+* Temă luminoasă și întunecată, stiluri de cotor și imagini de fundal pentru raft.
+
+<b>Lectura</b>
+
+* Cititoare EPUB și PDF incluse, care țin minte unde ai rămas. Un EPUB se citește pe pagini sau în derulare continuă, cu fontul, mărimea, spațierea și lățimea rândului alese de tine.
+* Evidențieri în patru culori, note și semne de carte, căutare în carte și mod de noapte. Butoanele de volum pot întoarce paginile.
+* Citire cu voce tare, cu vocile dispozitivului. Traduce un pasaj pe dispozitiv, cu pachete de limbi pe care le descarci și le ștergi singur.
+* Statistici de lectură: timp citit, pagini, zile la rând, obiective, o hartă a zilelor de lectură, lună de lună și „Anul în cărți”, o imagine pe care o poți salva.
+
+<b>Cărți audio</b>
+
+* Importă un fișier .m4b sau un dosar de fișiere .mp3. Capitolele, naratorul și coperta vin odată cu ele.
+* Viteza de redare de la 0,5× la 3×, fără să se schimbe tonul vocii, temporizator de oprire și salturi de 30 de secunde. Redarea continuă în fundal, cu comenzi pe ecranul de blocare și pe butoanele Bluetooth.
+* Un widget pe ecranul de pornire îți arată cartea pe care o citești și pe cea pe care o asculți.
+
+<b>Cărți fizice și împrumuturi</b>
+
+* Desenează-ți camera și corpurile de bibliotecă, apoi așază fiecare exemplar fizic acolo unde stă de fapt – pe o fotografie a rafturilor tale, dacă vrei.
+* Când împrumuți o carte, notezi cui și până când. Împrumuturile cu termen depășit ies în evidență, iar istoricul rămâne și după ce cartea se întoarce.
+* Scanează codul de bare ISBN cu camera ca să adaugi o carte.
+
+<b>Biblioteca pe care o ai deja</b>
+
+Caută în Open Library și Google Books, iar coperta, autorul și descrierea se completează singure. Sau importă un dosar de fișiere, o bibliotecă Calibre, un export Goodreads sau StoryGraph (cu evaluările, rafturile și recenziile tale) ori un catalog OPDS. Orice import îți arată ce a găsit înainte să scrie ceva.
+
+<b>Opțional: un server găzduit de tine</b>
+
+Nu ai nevoie de el. Pornește serverul doar dacă vrei aceeași bibliotecă pe calculator și pe telefon, alte persoane cu propriile conturi, un flux OPDS pentru un e-reader, sincronizarea progresului cu KOReader sau linkuri publice pentru o singură carte. Într-o bibliotecă partajată, evidențierile, notele, evaluările și poziția de lectură rămân ale tale.
+
+<b>Privat din start</b>
+
+Vellum funcționează complet offline, fără cont și fără telemetrie. Singurele căutări pe internet sunt în Open Library și Google Books, când cauți o carte de adăugat. Copiile de rezervă, criptate dacă vrei, pot rula automat.
+
+În română și engleză. Liber și open source, sub licența AGPL-3.0, și pentru Linux, Windows și macOS.
+
+Cărțile din capturile de ecran sunt în domeniul public: cărți electronice de la Standard Ebooks și o înregistrare LibriVox a „Colindului de Crăciun” (A Christmas Carol).
+
+<b>Ce este, de fapt</b>
+
+Codul a fost scris de un LLM, cu un om care l-a coordonat și l-a verificat. Are peste două mii de teste automate, dar asta nu e totuna cu ani de folosire de către mulți oameni. Păstrează-ți fișierele cărților și în altă parte, nu doar în Vellum.

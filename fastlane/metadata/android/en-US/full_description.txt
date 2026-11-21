@@ -1,35 +1,48 @@
-Vellum is a personal library manager for digital <i>and</i> physical books. It shows your library as a visual bookshelf — you browse your books spine-out, the way they look on a real shelf, instead of scrolling a grid of covers.
+Vellum is a library manager for the books you have as files and the ones on your real shelves, shown as a bookshelf you can browse spine-out. It reads EPUB and PDF, plays audiobooks, keeps your highlights and reading history, and remembers which paper copy sits in which bookcase and who borrowed it.
 
-It runs entirely on your own device. There is no account to create and nothing is uploaded anywhere, unless you deliberately set up the optional server.
+It all runs on your own device. There is no account to create and nothing is uploaded anywhere, unless you deliberately set up the optional server.
 
-<b>Your library</b>
+<b>The shelf</b>
 
-* Add books by searching Open Library and Google Books — cover, author, publisher and description fill themselves in.
-* Scan an ISBN barcode with the camera, or type the number.
-* Books with no file are records of physical copies, so a library can be part digital and part paper without keeping two systems.
-* A wishlist for books you want but do not own, kept off the shelf until you get them.
-* Ratings, reading status, re-read counts and private notes.
+* Your books spine-out, face-out, or as a plain list. Group them by author, series or genre.
+* Your own shelves, filters by genre, reading status and audiobooks, a wishlist, and a series page that shows which volumes you are missing.
+* Light and dark themes, spine styles and shelf wallpapers.
 
 <b>Reading</b>
 
-* A built-in reader for PDF and EPUB that remembers where you stopped.
-* Highlights in four colours, notes and bookmarks, all listed on the book's page.
-* Search inside a book, jump to a page, and read in night mode.
-* For EPUBs: typeface, text size, line spacing and line width.
-* Translate a selected passage on the device, with language packs you download and delete yourself.
+* Built-in EPUB and PDF readers that remember your place. EPUBs read in pages or as one long scroll, with your choice of typeface, size, spacing and line width.
+* Highlights in four colours, notes and bookmarks, search inside the book, and night mode. The volume keys can turn pages.
+* Read aloud with your device's voices. Translate a passage on the device, with language packs you download and delete yourself.
+* Reading insights: time read, pages, streaks, goals, a heat map, a month by month view and a year in review you can save as a picture.
+
+<b>Audiobooks</b>
+
+* Import an .m4b, or a folder of .mp3 files. Chapters, narrator and cover come with it.
+* Speed from 0.5× to 3× with the pitch kept, a sleep timer and 30-second skips. Playback continues in the background, with controls on the lock screen and Bluetooth buttons.
+* A home-screen widget shows the book you are reading and the one you are listening to.
+
+<b>Physical books and loans</b>
+
+* Draw your room and its bookcases, then place each paper copy where it really stands, on a photo of your actual shelves if you like.
+* Lend a book and record who has it and when it is due back. Overdue loans show up, and the lending history is kept after a book comes back.
+* Scan an ISBN barcode with the camera to add a book.
 
 <b>Bringing in a library you already have</b>
 
-Imports a folder of files, a Calibre library, a CSV or JSON catalogue (Goodreads and StoryGraph exports work unedited, and keep your ratings, shelves and reviews), or an OPDS catalogue. Every import shows you what it found and what it thinks you already have before writing anything.
+Search Open Library and Google Books, and the cover, author and description fill themselves in. Or import a folder of files, a Calibre library, a Goodreads or StoryGraph export (with your ratings, shelves and reviews), or an OPDS catalogue. Every import shows you what it found before it writes anything.
 
-<b>Physical books</b>
+<b>Optional: a server you host yourself</b>
 
-Build a room, put bookcases in it, and record which copy sits where — on a photo of your actual shelves if you like. Loans are kept as history, so returning a book does not erase the fact it was lent.
+You do not need one. Run the companion server only if you want the same library on a desktop and a phone, other people with their own accounts, an OPDS feed for an e-reader, KOReader progress sync, or public links to share a single book. In a shared library, your highlights, notes, ratings and reading position stay yours.
 
-<b>Optional: a server</b>
+<b>Private by default</b>
 
-You do not need one. Run the companion server only if you want the same library on a desktop and a phone, other people with their own accounts, an OPDS feed for an e-reader, or public links to share a single book.
+Vellum works fully offline, with no account and no telemetry. The only lookups are Open Library and Google Books, when you search for a book to add. Backups, optionally encrypted, can run on a schedule.
+
+In English and Romanian. Free and open source under the AGPL-3.0, also for Linux, Windows and macOS.
+
+The books in the screenshots are public-domain ebooks from Standard Ebooks and a LibriVox recording of A Christmas Carol.
 
 <b>Being honest about what this is</b>
 
-The code was written by an LLM, with a human directing and reviewing it. It is tested — over a thousand automated tests — but that is not the same as years of use by many people. Keep your book files backed up somewhere Vellum is not the only copy.
+The code was written by an LLM, with a human directing and reviewing it. It is tested — over two thousand automated tests — but that is not the same as years of use by many people. Keep your book files backed up somewhere Vellum is not the only copy.
