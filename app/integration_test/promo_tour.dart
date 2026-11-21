@@ -47,7 +47,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vellum/account/user_profile.dart';
-import 'package:vellum/audio/player_page.dart';
+import 'package:vellum/book_detail/book_detail_page.dart';
 import 'package:vellum/data/database.dart';
 import 'package:vellum/data/library_repository.dart';
 import 'package:vellum/data/seed_demo.dart';
@@ -58,6 +58,7 @@ import 'package:vellum/server/connection_store.dart';
 import 'package:vellum/settings/app_settings.dart';
 import 'package:vellum/settings/book_face.dart';
 import 'package:vellum/shelf/shelf_view.dart';
+import 'package:vellum/stats/heatmap_grid.dart';
 import 'package:vellum/stats/insights_page.dart';
 import 'package:vellum/stats/year_review_page.dart';
 
@@ -85,6 +86,9 @@ void main() {
     // The paged reader is what the clip turns pages in.
     await (await SharedPreferences.getInstance())
         .setString('reader.epubLayout', 'paged');
+    // Light, whatever the desktop it is filmed on prefers; the dark scene
+    // switches on purpose.
+    await settings.setThemeMode(ThemeMode.light);
 
     await _waitForWindow(tester, env['PROMO_WINDOW']);
     await tester.pumpWidget(
@@ -127,13 +131,21 @@ void main() {
       await _settle(tester);
     }
 
-    // ---- 1. The shelf, spine-out.
-    await _scene(tester, 'shelf', hold: 1300, () async {});
+    // A book chosen before anything is filmed: on a window of 1200 px or more
+    // the shelf keeps a side pane, and an empty one ("Select a book…") is a
+    // waste of a third of the picture. Anne of Green Gables has a short
+    // description, so the pane shows its copy, series and rating too.
+    await _select(tester, ids['anne-of-green-gables']!);
 
-    // ---- 2. The same books face-out.
-    await _scene(tester, 'covers', hold: 1100, () async {
+    // ---- 1. The shelf, spine-out.
+    await _scene(tester, 'shelf', hold: 2000, () async {});
+
+    // ---- 2. The same books face-out. Switched off camera: the shelf lays
+    // the new faces out a frame late, and the clip should cut, not flash.
+    await _scene(tester, 'covers', hold: 1300, () async {}, before: () async {
       await settings.setBookFace(BookFace.cover);
       await _settle(tester);
+      await _pause(200);
     }, after: () async {
       await settings.setBookFace(BookFace.spine);
       await _settle(tester);
@@ -162,16 +174,31 @@ void main() {
     });
 
     // ---- 4. The book: on a wide window it opens beside the shelf.
-    await _scene(tester, 'book', hold: 1500, () async {
+    await _scene(tester, 'book', hold: 1900, () async {
       final spine = _spineOf(ids[featured]!);
       await _until(tester, () => spine.evaluate().isNotEmpty);
       await tester.tap(spine.first);
       await _settle(tester);
     });
 
+    // ---- 4b. The same book's own page, full window: two columns, with the
+    // series, the rating and the reading record above the fold.
+    await _scene(tester, 'book-page', hold: 900, () async {
+      final book = await repository.watchBook(ids[featured]!).first;
+      await push(BookDetailPage(
+        book: book!,
+        repository: repository,
+        settings: settings,
+        connection: connection,
+      ));
+    }, after: popToShelf);
+
     // ---- 5. Reading: Middlemarch in the paged reader, open on the page
     // with today's highlight, then a few pages turned.
-    await _scene(tester, 'reader', hold: 1100, () async {
+    // Opened before the scene's span starts: the reader's first frames are an
+    // empty page while the chapter is laid out, and the clip should cut
+    // straight to the text instead.
+    await _scene(tester, 'reader', hold: 1100, () async {}, before: () async {
       final book = await repository.watchBook(ids['middlemarch']!).first;
       final file = (await repository.watchFilesOf(book!.id).first)
           .firstWhere((f) => f.format == 'epub');
@@ -184,9 +211,11 @@ void main() {
       await _until(
           tester, () => find.byType(EpubReaderPage).evaluate().isNotEmpty);
       await _settle(tester);
+      await _pause(600);
+      await _settle(tester);
     });
     await _scene(tester, 'pages', hold: 300, () async {
-      for (var i = 0; i < 3; i++) {
+      for (var i = 0; i < 4; i++) {
         // The physical key named outright: the simulator looks it up by
         // debug name, and a profile build has no debug names.
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight,
@@ -196,13 +225,9 @@ void main() {
       }
     }, after: popToShelf);
 
-    // ---- 6. The audiobook player, part-way through A Christmas Carol.
-    await _scene(tester, 'player', hold: 1100, () async {
-      await push(PlayerPage(
-        bookId: ids['a-christmas-carol']!,
-        repository: repository,
-      ));
-    }, after: popToShelf);
+    // (The audiobook player is shown on the phone: at desktop size it is
+    // mostly empty space, and opening it leaves the now-playing bar on every
+    // later scene.)
 
     // ---- 7. Reading insights, and a slow look down the page.
     await _scene(tester, 'insights', hold: 1000, () async {
@@ -226,11 +251,24 @@ void main() {
                   matching: find.byType(Scrollable))
               .first)
           .position;
+      // Down until the twelve-week heat map's bottom edge is in view: the
+      // habits, totals and charts above it fill the window.
+      final heatmap = find.descendant(
+          of: find.byType(InsightsPage), matching: find.byType(HeatmapGrid));
+      final target = heatmap.evaluate().isEmpty
+          ? (scroll.maxScrollExtent * 0.45).clamp(0.0, 900.0)
+          : (scroll.pixels +
+                  tester.getRect(heatmap.first).bottom +
+                  24 -
+                  tester.getRect(find.byType(InsightsPage)).bottom)
+              .clamp(0.0, scroll.maxScrollExtent);
       await scroll.animateTo(
-        (scroll.maxScrollExtent * 0.45).clamp(0.0, 900.0),
+        target,
         duration: const Duration(milliseconds: 1200),
         curve: Curves.easeInOut,
       );
+      // Let the scrollbar fade before the picture.
+      await _pause(1400);
     }, after: popToShelf);
 
     // ---- 8. The year in review.
@@ -240,8 +278,11 @@ void main() {
     }, after: popToShelf);
 
     // ---- 9. The room: open, pan along the bookcases, zoom in and out.
-    await _scene(tester, 'room', hold: 600, () async {
-      final room = await (repository.db.select(repository.db.physicalEnvironments)
+    // Opened off camera, so the clip cuts from the reader straight to the
+    // room rather than flashing the shelf on the way.
+    late PhysicalEnvironment room;
+    await _scene(tester, 'room', hold: 600, before: () async {
+      room = await (repository.db.select(repository.db.physicalEnvironments)
             ..where((e) => e.name.equals(demoRoomName)))
           .getSingle();
       await push(EnvironmentEditorPage(
@@ -251,6 +292,7 @@ void main() {
         environmentName: room.name,
       ));
       await _pause(300);
+    }, () async {
       // The room opens at 300 px/m with the world's origin 40 px in from the
       // canvas's bottom-left corner (EnvironmentEditorPage), so the bookcases
       // start small in that corner: drag them to the middle, then zoom in
@@ -278,8 +320,10 @@ void main() {
       final cases = Offset(canvas.left + 40 + bounds.center.dx * startScale,
           canvas.bottom - 90 - bounds.center.dy * startScale);
       final centre = canvas.center;
-      final fill = math.min(0.82 * canvas.width / bounds.width,
-          0.78 * canvas.height / bounds.height);
+      // Nearly the canvas's full height (the bookcases are taller than the
+      // window is, proportionally, so height is what limits).
+      final fill = math.min(0.94 * canvas.width / bounds.width,
+          0.92 * canvas.height / bounds.height);
       // x1.1 a wheel click.
       final clicks =
           (math.log(fill / startScale) / math.log(1.1)).floor().clamp(0, 30);
@@ -292,7 +336,7 @@ void main() {
         await SchedulerBinding.instance.endOfFrame;
       }
       await drag.up();
-      await _pause(500);
+      await _pause(250);
       final mouse = TestPointer(9, PointerDeviceKind.mouse);
       await tester.sendEventToBinding(mouse.addPointer(location: centre));
       await tester.sendEventToBinding(mouse.hover(centre));
@@ -300,10 +344,11 @@ void main() {
         for (var i = 0; i < clicks; i++) {
           await tester.sendEventToBinding(
               mouse.scroll(Offset(0, zoomIn ? -20 : 20)));
-          // A wheel click every few frames: a smooth glide, not a jump.
-          for (var f = 0; f < 3; f++) {
-            await SchedulerBinding.instance.endOfFrame;
-          }
+          // A wheel click every few frames: a smooth glide, not a jump. Timed
+          // rather than counted in frames, which a fast display hands out
+          // quicker than the eye can follow.
+          await _pause(70);
+          await SchedulerBinding.instance.endOfFrame;
         }
       }
       // In until the bookcases fill the window, a little closer, and back.
@@ -317,9 +362,14 @@ void main() {
     }, after: popToShelf);
 
     // ---- 10. Dark theme, back on the shelf.
-    await _scene(tester, 'dark', hold: 1300, () async {
+    await _scene(tester, 'dark', hold: 1700, before: () async {
       final position = _shelfPosition(tester);
       position.jumpTo(0);
+      await _settle(tester);
+      // Dracula, for the dark.
+      await _select(tester, ids['dracula']!);
+      await _pause(300);
+    }, () async {
       await settings.setThemeMode(ThemeMode.dark);
       await _settle(tester);
     });
@@ -363,18 +413,20 @@ Map<String, dynamic> _guardDemoLibrary(Directory dataDir) {
   return jsonDecode(marker.readAsStringSync()) as Map<String, dynamic>;
 }
 
-/// Runs one scene: [action] (the part that moves), then [hold] ms of stillness
-/// — together the span the clip keeps — then the screenshot, then [after]
-/// (tidying up off camera).
+/// Runs one scene: [before] (setting up off camera), [action] (the part that
+/// moves), then [hold] ms of stillness — together the span the clip keeps —
+/// then the screenshot, then [after] (tidying up off camera).
 Future<void> _scene(
   WidgetTester tester,
   String name,
   Future<void> Function() action, {
   required int hold,
+  Future<void> Function()? before,
   Future<void> Function()? after,
 }) async {
   final only = Platform.environment['PROMO_ONLY'] ?? '';
   final wanted = only.isEmpty || only.split(',').contains(name);
+  await before?.call();
   if (!wanted) {
     // Still walked through (later scenes start where this one leaves off),
     // just not filmed.
@@ -419,6 +471,21 @@ Future<void> _waitForWindow(WidgetTester tester, String? wanted) async {
   }
   // ignore: avoid_print
   print('PROMO_WINDOW ${now()} (wanted $wanted)');
+}
+
+/// Taps [bookId]'s spine, which on a wide window shows it in the side pane.
+Future<void> _select(WidgetTester tester, String bookId) async {
+  final spine = _spineOf(bookId);
+  await _until(tester, () => spine.evaluate().isNotEmpty);
+  // Scrolled to only when it is off screen, so the shelf's top stays put.
+  final shelf = tester.getRect(find.byType(ShelfView).first);
+  final rect = tester.getRect(spine.first);
+  if (rect.top < shelf.top || rect.bottom > shelf.bottom) {
+    await Scrollable.ensureVisible(spine.evaluate().first, alignment: 0.5);
+    await _settle(tester);
+  }
+  await tester.tap(spine.first);
+  await _settle(tester);
 }
 
 Finder _spineOf(String bookId) =>

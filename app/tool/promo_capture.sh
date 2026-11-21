@@ -8,11 +8,19 @@
 #   tool/promo_capture.sh --no-video       # screenshots only
 #   tool/promo_capture.sh --only shelf,room  # rehearse some scenes
 #   PROMO_WINDOW=1280x800 tool/promo_capture.sh
+#   PROMO_AT=1080,303 tool/promo_capture.sh   # where the window goes (the
+#                                          # top-left of a monitor; default 0,0)
 #   PROMO_CLIP=shelf,scroll,book,reader,pages,room tool/promo_capture.sh
 #                                          # only these scenes in the clip
 #   tool/promo_capture.sh --recut <capture dir>   # cut its clip again (say
 #                                          # with another PROMO_CLIP or
 #                                          # PROMO_LAG_MS) without refilming
+#
+# The README's clip and screenshots (an X11 desktop whose panel leaves a
+# 1080-pixel monitor 999 pixels under a title bar, hence 990):
+#   PROMO_WINDOW=1600x990 PROMO_AT=<monitor's x,y> \
+#     PROMO_CLIP=shelf,covers,scroll,book,reader,pages,room,dark \
+#     tool/promo_capture.sh
 #
 # WHAT COMES OUT — in $VELLUM_DEMO_HOME/captures/<date>-<commit>/ (default
 # ~/.cache/vellum-demo), never in the repository:
@@ -21,6 +29,8 @@
 #                          window's size and device pixel ratio
 #   vellum-promo.mp4       the clip: each scene's moving part, joined (H.264)
 #   vellum-promo.webm      the same, smaller, for the README (VP9, loops)
+#   vellum-promo.webp      the same as an animated WebP, 960 px at 12 fps:
+#                          what a README can show inline (it plays no video)
 #   vellum-promo.gif       the same as a GIF, for places a video cannot go
 #   raw.mkv                the whole recording, uncut
 #   scenes.json, tour.log
@@ -49,6 +59,7 @@ APP_DIR=$PWD
 FLUTTER=${FLUTTER:-flutter}
 DEMO_HOME=${VELLUM_DEMO_HOME:-$HOME/.cache/vellum-demo}
 WINDOW=${PROMO_WINDOW:-1600x1000}
+AT=${PROMO_AT:-0,0}
 FPS=${PROMO_FPS:-30}
 
 headless=
@@ -91,10 +102,13 @@ make_clip() {
   ffmpeg -loglevel error -y -i "$run/vellum-promo.mp4" \
     -vf "scale=960:-2:flags=lanczos,fps=24" -c:v libvpx-vp9 -b:v 0 -crf 40 \
     -row-mt 1 -an "$run/vellum-promo.webm"
+  ffmpeg -loglevel error -y -i "$run/vellum-promo.mp4" \
+    -vf "fps=12,scale=960:-2:flags=lanczos" -c:v libwebp_anim -q:v 72 \
+    -compression_level 6 -loop 0 -an "$run/vellum-promo.webp"
   ffmpeg -loglevel error -y -i "$run/vellum-promo.mp4" -filter_complex \
     "fps=12,scale=720:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" \
     -loop 0 "$run/vellum-promo.gif"
-  for f in mp4 webm gif; do
+  for f in mp4 webm webp gif; do
     d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$run/vellum-promo.$f")
     echo "  vellum-promo.$f  $(du -h "$run/vellum-promo.$f" | cut -f1)  ${d%.*} s"
   done
@@ -182,7 +196,7 @@ window_id() {
     win=$(window_id || true)
     if [ -n "${win:-}" ]; then
       wmctrl -i -r "$win" -b remove,maximized_vert,maximized_horz
-      wmctrl -i -r "$win" -e "0,0,0,${WINDOW%x*},${WINDOW#*x}"
+      wmctrl -i -r "$win" -e "0,${AT},${WINDOW%x*},${WINDOW#*x}"
       exit 0
     fi
     sleep 0.5
@@ -201,8 +215,10 @@ if [ -n "$video" ]; then
     geo=$(xwininfo -id "$win")
     x=$(awk '/Absolute upper-left X/ {print $4}' <<< "$geo")
     y=$(awk '/Absolute upper-left Y/ {print $4}' <<< "$geo")
-    w=$(awk '/Width:/ {print $2}' <<< "$geo")
-    h=$(awk '/Height:/ {print $2}' <<< "$geo")
+    # Even, for H.264's 4:2:0 (a window manager can leave a window a pixel
+    # short of what was asked, to keep it clear of a panel).
+    w=$(awk '/Width:/ {print $2 - $2 % 2}' <<< "$geo")
+    h=$(awk '/Height:/ {print $2 - $2 % 2}' <<< "$geo")
     echo "recording ${w}x${h}+${x},${y} at $FPS fps" > "$RUN/record.txt"
     # Wall-clock timestamps, kept (-copyts), so the recording's own clock is
     # the one the tour's scene times are written in.
